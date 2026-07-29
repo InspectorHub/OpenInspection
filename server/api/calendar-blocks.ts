@@ -6,6 +6,7 @@ import { safeISODate } from '../lib/date';
 import { requireRole } from '../lib/middleware/rbac';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { isAdminRole } from '../lib/auth/roles';
 import {
     CalendarBlockErrorSchema,
     CalendarBlockListResponseSchema,
@@ -116,7 +117,7 @@ const deleteBlockRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'primary' }));
 
 function isAdmin(role: string | undefined): boolean {
-    return role === 'owner' || role === 'manager';
+    return isAdminRole(role);
 }
 
 function errorResponse(message: string, code: 'FORBIDDEN' | 'NOT_FOUND') {

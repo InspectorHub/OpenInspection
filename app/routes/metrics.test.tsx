@@ -32,6 +32,29 @@ function renderMetrics(data: Record<string, unknown> | null) {
   return render(<Stub initialEntries={["/metrics"]} />);
 }
 
+describe("MetricsPage money scale", () => {
+  it("renders the server's CENTS as dollars, not 100x them", async () => {
+    // The endpoint sums `_cents` columns, so 83_000 is $830.00. The page used to
+    // multiply by 100 before formatting, on the belief that these were whole
+    // dollars — $83,000 for two jobs worth $830. It went unnoticed because the
+    // endpoint summed a cache column that reads 0 on real data, and 100 × 0 is
+    // still 0; only fixing the source (IA-132) made the scale visible.
+    const { findByText, queryByText } = renderMetrics({
+      totalInspections: 2,
+      totalRevenue: 83_000,
+      avgOrderValue: 41_500,
+      monthly: [],
+      topAgents: [],
+      byInspector: [],
+    });
+
+    expect(await findByText("$830")).toBeTruthy();
+    expect(await findByText("$415")).toBeTruthy();
+    expect(queryByText("$83,000")).toBeNull();
+    expect(queryByText("$41,500")).toBeNull();
+  });
+});
+
 describe("MetricsPage monthly charts", () => {
   it("renders the monthly bars from the server's `monthly` series", async () => {
     const { findByText, findAllByText, queryByText } = renderMetrics({

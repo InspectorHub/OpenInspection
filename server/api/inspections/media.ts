@@ -36,7 +36,7 @@ const uploadPhotoRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "Upload inspection for current tenant",
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
             content: {
                 'multipart/form-data': {
@@ -86,7 +86,7 @@ const servePhotoRoute = createRoute(withMcpMetadata({
     summary: 'Serve an inspection photo (tenant-scoped)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('Inspection id that scopes the photo.') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection id that scopes the photo.') }),
         query: z.object({
             key: z.string().describe('R2 object key (`${tenantId}/${inspectionId}/...`).'),
             download: z.string().optional().describe('Set to "1" to force an attachment download named after the original file.'),
@@ -115,7 +115,7 @@ const mediaCenterRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Media Center — all attached + pool photos',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
             content: { 'application/json': { schema: createApiResponseSchema(MediaCenterResponseSchema) } },
@@ -133,7 +133,7 @@ const mediaUploadRoute = createRoute(withMcpMetadata({
     summary: 'Upload a photo to the inspection media pool (loose, unattached)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
             content: {
                 'multipart/form-data': {
@@ -166,7 +166,7 @@ const mediaAttachRoute = createRoute(withMcpMetadata({
     summary: 'Attach a pool photo to an inspection item',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: MediaAttachRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
@@ -186,7 +186,7 @@ const mediaPoolDeleteRoute = createRoute(withMcpMetadata({
     summary: 'Delete a pool photo (cancel an upload)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'), poolId: z.string().min(1).describe('TODO describe poolId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'), poolId: z.string().min(1).describe('TODO describe poolId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
@@ -208,7 +208,7 @@ const itemPhotosReorderRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
-            id:     z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+            id:     z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
             itemId: z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
         }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: ReorderPhotosSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
@@ -233,7 +233,7 @@ const itemPhotoDetachRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
-            id:         z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+            id:         z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
             itemId:     z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
             photoIndex: z.coerce.number().int().nonnegative().describe('Index of the photo within the item\'s photos[] array'),
         }).describe('TODO describe params field for the OpenInspection MCP integration'),
@@ -259,7 +259,7 @@ const itemPhotoRevertRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
-            id:         z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+            id:         z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
             itemId:     z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
             photoIndex: z.coerce.number().int().nonnegative().describe('Index of the photo within the item\'s photos[] array'),
         }).describe('TODO describe params field for the OpenInspection MCP integration'),
@@ -285,7 +285,7 @@ const itemPhotoMoveRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
-            id:         z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+            id:         z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
             itemId:     z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
             photoIndex: z.coerce.number().int().nonnegative().describe('Index of the photo within the source item\'s photos[] array'),
         }).describe('TODO describe params field for the OpenInspection MCP integration'),
@@ -314,7 +314,7 @@ const approveConciergeRoute = createRoute(withMcpMetadata({
     summary: 'Approve a concierge booking awaiting inspector review',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {

@@ -68,5 +68,47 @@ export async function action({ request, context }: Route.ActionArgs) {
         }
     }
 
+    // IA-101 — editing an existing member. Deliberately a sibling of "invite"
+    // on this same resource route: both write the same two fields (role,
+    // capability overrides) and the drawer that submits them is nearly the
+    // same form, so splitting them across routes would guarantee they drift.
+    if (intent === "update") {
+        const id = fd.get("id") as string | null;
+        const role = fd.get("role") as string | null;
+        if (!id) return { ok: false, intent, error: "Member id is required", url: null };
+
+        // Unlike invite, an ABSENT override payload here means "clear all
+        // overrides", not "use the template" — the edit drawer always submits
+        // the full capability set, so anything missing was deliberately
+        // un-ticked. `null` says that explicitly rather than leaving the old
+        // values in place.
+        let permissionOverrides: Record<string, boolean> | null = null;
+        const rawOverrides = fd.get("permissionOverrides");
+        if (typeof rawOverrides === "string" && rawOverrides.trim()) {
+            try {
+                const parsed = JSON.parse(rawOverrides) as Record<string, boolean>;
+                if (parsed && Object.keys(parsed).length > 0) permissionOverrides = parsed;
+            } catch {
+                // Malformed payload → clear, which falls back to the role
+                // template. Failing safe means fewer powers, never more.
+            }
+        }
+
+        try {
+            const res = await api.team.members[":id"].$patch({
+                param: { id },
+                json: { ...(role ? { role } : {}), permissionOverrides } as Parameters<typeof api.team.members[":id"]["$patch"]>[0]["json"],
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({})) as { error?: { message?: string } | string };
+                const message = typeof body?.error === "string" ? body.error : body?.error?.message;
+                return { ok: false, intent, error: message ?? `HTTP ${res.status}`, url: null };
+            }
+            return { ok: true, intent, error: null, url: null };
+        } catch (e) {
+            return { ok: false, intent, error: e instanceof Error ? e.message : "Failed", url: null };
+        }
+    }
+
     return { ok: false, intent, error: "Unknown intent", url: null };
 }

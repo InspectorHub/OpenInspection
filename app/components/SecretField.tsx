@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
 /**
- * Secret UI化 — reusable input field for integration API keys.
+ * Secrets UI — reusable input field for integration API keys.
  *
  * - Shows masked value (bullet characters) when a secret is already set
  * - Shows "Not configured" placeholder when empty

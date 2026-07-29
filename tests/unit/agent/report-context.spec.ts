@@ -71,7 +71,7 @@ describe('POST /api/agent/report-context', () => {
             c.set('services', {
                 portalAccess: { resolveToken },
                 people: new PeopleService({ DB: {} as D1Database }),
-                agent: new AgentService({} as D1Database, {} as any, ''),
+                agent: new AgentService({} as D1Database),
             } as unknown as HonoConfig['Variables']['services']);
             await next();
         });

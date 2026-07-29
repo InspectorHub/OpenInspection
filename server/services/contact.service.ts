@@ -1,22 +1,38 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, like, sql, isNull, inArray, isNotNull } from 'drizzle-orm';
-import { contacts } from '../lib/db/schema/contact';
-import { inspections } from '../lib/db/schema/inspection';
-import { invoices } from '../lib/db/schema/invoice';
+import { eq, and, like, sql, isNull, isNotNull } from 'drizzle-orm';
+import { contacts, type ContactType } from '../lib/db/schema/contact';
 import { inspectionPeople, contactRoleProfiles } from '../lib/db/schema/inspection/role-profiles';
 import { Errors } from '../lib/errors';
+import { buildContactDetail } from './contact-detail';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate } from '../lib/date';
+import { tenantConfigs } from '../lib/db/schema';
+import { logger } from '../lib/logger';
 
 export class ContactService {
-    constructor(private db: D1Database) {}
+    /**
+     * `portalAccess` is optional so the many tests that construct this service
+     * bare keep working. When absent, archive simply does not revoke — the
+     * conservative direction: failing to revoke is visible on the next audit,
+     * whereas revoking by accident silently breaks a customer's report link.
+     */
+    constructor(
+        private db: D1Database,
+        private portalAccess?: import('./portal-access.service').PortalAccessService,
+    ) {}
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private getDrizzle() { return drizzle(this.db as any); }
 
-    async listContacts(tenantId: string, opts: { type?: 'agent' | 'client'; search?: string; limit: number; offset: number }) {
+    async listContacts(tenantId: string, opts: { type?: ContactType; search?: string; archived?: 'exclude' | 'only'; limit: number; offset: number }) {
         const db = this.getDrizzle();
-        const conditions = [eq(contacts.tenantId, tenantId), isNull(contacts.archivedAt)];
+        // IA-120 — archived rows used to be unconditionally excluded here, which
+        // is what made Archive a one-way door: written by the button, readable
+        // by nothing.
+        const conditions = [
+            eq(contacts.tenantId, tenantId),
+            opts.archived === 'only' ? isNotNull(contacts.archivedAt) : isNull(contacts.archivedAt),
+        ];
         if (opts.type) conditions.push(eq(contacts.type, opts.type));
         if (opts.search) conditions.push(like(contacts.name, `%${escapeLikePattern(opts.search)}%`));
 
@@ -67,83 +83,10 @@ export class ContactService {
      * still count toward inspectionCount.
      */
     async getContactDetail(id: string, tenantId: string) {
-        const db = this.getDrizzle();
-
-        const contact = await db.select().from(contacts)
-            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
-        if (!contact) return null;
-
-        const rows = await db.select({
-            id:            inspections.id,
-            propertyAddress: inspections.propertyAddress,
-            date:          inspections.date,
-            status:        inspections.status,
-            price:         inspections.price,
-            paymentStatus: inspections.paymentStatus,
-        }).from(inspections)
-            .innerJoin(inspectionPeople, eq(inspectionPeople.inspectionId, inspections.id))
-            .where(and(
-                eq(inspections.tenantId, tenantId),
-                eq(inspectionPeople.tenantId, tenantId),
-                eq(inspectionPeople.contactId, id),
-            ))
-            .all();
-
-        // Dedup by inspection id (a row matched by both linkage paths appears
-        // once) and order date desc, newest first.
-        const seen = new Set<string>();
-        const inspectionRows = rows
-            .filter(r => (seen.has(r.id) ? false : (seen.add(r.id), true)))
-            .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-
-        const inspectionIds = inspectionRows.map(r => r.id);
-
-        // Revenue = Σ amountCents of PAID invoices on those inspections.
-        // Chunk the inArray to stay under D1's 100-bind-param ceiling.
-        let totalRevenueCents = 0;
-        const CHUNK = 90;
-        for (let i = 0; i < inspectionIds.length; i += CHUNK) {
-            const chunk = inspectionIds.slice(i, i + CHUNK);
-            const res = await db.select({ total: sql<number>`coalesce(sum(${invoices.amountCents}), 0)` })
-                .from(invoices)
-                .where(and(
-                    eq(invoices.tenantId, tenantId),
-                    inArray(invoices.inspectionId, chunk),
-                    isNotNull(invoices.paidAt),
-                    isNull(invoices.voidedAt),
-                ))
-                .get();
-            totalRevenueCents += res?.total ?? 0;
-        }
-
-        return {
-            contact: {
-                id:         contact.id,
-                type:       contact.type,
-                name:       contact.name,
-                email:      contact.email,
-                phone:      contact.phone,
-                agency:     contact.agency,
-                notes:      contact.notes,
-                createdAt:  safeISODate(contact.createdAt),
-                archivedAt: contact.archivedAt ? safeISODate(contact.archivedAt) : null,
-            },
-            inspections: inspectionRows.map(r => ({
-                id:              r.id,
-                propertyAddress: r.propertyAddress,
-                date:            r.date,
-                status:          r.status,
-                price:           r.price,
-                paymentStatus:   r.paymentStatus,
-            })),
-            stats: {
-                inspectionCount:   inspectionRows.length,
-                totalRevenueCents,
-            },
-        };
+        return buildContactDetail(this.getDrizzle(), id, tenantId);
     }
 
-    async createContact(tenantId: string, data: { type: 'agent' | 'client'; name: string; email?: string | null | undefined; phone?: string | null | undefined; agency?: string | null | undefined; notes?: string | null | undefined; createdByUserId?: string | null | undefined }) {
+    async createContact(tenantId: string, data: { type: ContactType; name: string; email?: string | null | undefined; phone?: string | null | undefined; agency?: string | null | undefined; notes?: string | null | undefined; createdByUserId?: string | null | undefined }) {
         const db = this.getDrizzle();
         const normalized = {
             email: data.email ?? null,
@@ -160,7 +103,7 @@ export class ContactService {
         return { ...row, createdAt: safeISODate(row.createdAt), inspectionCount: 0 };
     }
 
-    async updateContact(id: string, tenantId: string, data: Partial<{ type: 'agent' | 'client'; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null }>) {
+    async updateContact(id: string, tenantId: string, data: Partial<{ type: ContactType; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null }>) {
         const db = this.getDrizzle();
         const existing = await db.select().from(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Contact not found');
@@ -196,6 +139,98 @@ export class ContactService {
         // Idempotent — re-archiving an archived row is a no-op set.
         await db.update(contacts).set({ archivedAt: new Date() })
             .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+
+        // IA-100 — archiving a contact LOOKED like it cut off their access and
+        // did not: a report link is a per-inspection token that works with no
+        // account, so it survives the contact row being retired. Whether that
+        // is right depends on what the tenant means by "archive", so it is
+        // their setting rather than our guess — see is_archive_revoking_access.
+        //
+        // Type-agnostic: clients hold these links exactly as agents do.
+        if (existing.email) {
+            const revokes = await db.select({ on: tenantConfigs.archiveRevokesAccess })
+                .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+            if (revokes?.on) {
+                const n = await this.portalAccess?.revokeAccessForRecipient(tenantId, existing.email) ?? 0;
+                if (n > 0) logger.info('contact.archive.revoked_access', { tenantId, contactId: id, revoked: n });
+            }
+        }
+    }
+
+    /**
+     * Undo an archive (IA-120).
+     *
+     * Deliberately narrow: it clears `archivedAt` and nothing else. Archiving
+     * can also REVOKE report links when the tenant has that policy on, and those
+     * are not resurrected here — a revoked link is revoked, and re-granting
+     * access is the People card's job ("Reset access link"), not a side effect
+     * of un-hiding a contact row. Restoring a contact must not silently hand
+     * someone back a report.
+     *
+     * Note the asymmetry with archive(): archive DELETES the row outright when
+     * the contact is referenced by no inspection, so there is nothing to restore
+     * in that case. Restore therefore only ever applies to contacts that have
+     * history — which is exactly the set worth keeping.
+     */
+    async restoreContact(id: string, tenantId: string): Promise<{ restored: boolean }> {
+        const db = this.getDrizzle();
+        const row = await db.select({ archivedAt: contacts.archivedAt }).from(contacts)
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
+        if (!row) throw Errors.NotFound('Contact not found');
+        if (!row.archivedAt) return { restored: false };
+        await db.update(contacts).set({ archivedAt: null })
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+        return { restored: true };
+    }
+
+    /**
+     * Every inspection this contact can still open (IA-100). Null when the
+     * contact does not exist in this tenant, so the route can 404 rather than
+     * report an empty list for an id that was never theirs — those two answers
+     * look identical to a caller and mean very different things.
+     *
+     * An empty array for a contact with no email is correct: a token is
+     * addressed to an email, so there is nothing to hold.
+     */
+    async listAccess(id: string, tenantId: string): Promise<Array<{
+        inspectionId: string;
+        propertyAddress: string | null;
+        role: string;
+        createdAt: number | null;
+    }> | null> {
+        const db = this.getDrizzle();
+        const row = await db.select({ email: contacts.email }).from(contacts)
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
+        if (!row) return null;
+        if (!row.email || !this.portalAccess) return [];
+        return this.portalAccess.listLiveAccessByRecipient(tenantId, row.email);
+    }
+
+    /**
+     * Withdraw some or all of that access. Null on an unknown contact (see
+     * listAccess); otherwise the number of links ACTUALLY revoked, which can
+     * be lower than asked for when a link had already lapsed. Reporting the
+     * real number matters: "revoked 3" when one was already dead would teach
+     * an operator to trust a count that is not measuring anything.
+     */
+    async revokeAccess(id: string, tenantId: string, inspectionIds?: string[]): Promise<number | null> {
+        const db = this.getDrizzle();
+        const row = await db.select({ email: contacts.email }).from(contacts)
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
+        if (!row) return null;
+        if (!row.email || !this.portalAccess) return 0;
+        const n = await this.portalAccess.revokeAccessForRecipient(tenantId, row.email, inspectionIds);
+        if (n > 0) logger.info('contact.access.revoked', { tenantId, contactId: id, revoked: n });
+        return n;
+    }
+
+    /**
+     * How many live report links this contact still holds (IA-100). Drives the
+     * archive dialog's warning, so an operator is never asked to archive
+     * someone without being told what that does or does not withdraw.
+     */
+    async liveAccessCount(id: string, tenantId: string): Promise<number> {
+        return (await this.listAccess(id, tenantId))?.length ?? 0;
     }
 
     /**
@@ -244,7 +279,11 @@ export class ContactService {
                     await db
                         .update(contacts)
                         .set(updates)
-                        .where(eq(contacts.id, existing.id));
+                        // tenantId as well as id: `existing` came from a
+                        // tenant-scoped read, so this is belt-and-braces, but
+                        // an id-only write is the shape the scoping gate exists
+                        // to keep out of the codebase — and it costs nothing.
+                        .where(and(eq(contacts.id, existing.id), eq(contacts.tenantId, tenantId)));
                 }
                 return { id: existing.id, created: false };
             }

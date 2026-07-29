@@ -145,13 +145,29 @@ describe('POST /api/inspections/:id/agreement-requests (Task 7, #111)', () => {
         expect(sendAgreementRequest.mock.calls[0][2]).toBe('Standard Agreement');
     });
 
-    it('rejects a non-UUID agreementId (canonical UUID enforced; production ids are always randomUUID)', async () => {
-        // agreements.id is always crypto.randomUUID() in production (the Spectora
-        // import preserves external ids only for template-internal items, never as
-        // the PK). Pre-launch we enforce the canonical format rather than tolerate
-        // non-UUID ids — the schema's .uuid() gate rejects malformed ids up front.
+    it('refuses an agreementId that is not this tenant\'s, whatever shape it is', async () => {
+        // This used to assert 400 on a non-UUID id, reasoning that agreements.id
+        // is always crypto.randomUUID() in production so the canonical format
+        // could be enforced up front. That reasoning is what IA-117 is about: it
+        // is a fact about today's writers, not a promise of the TEXT column, and
+        // the same `.uuid()` habit had already 400'd a live contact's
+        // report-access lookup and silently killed Mark paid.
+        //
+        // Nothing is lost by dropping it, because the format check was never the
+        // protection. The handler resolves the template tenant-scoped and refuses
+        // what it cannot find — which also covers a perfectly UUID-shaped id
+        // belonging to another workspace, something the format gate never did.
+        // So assert the guarantee that actually matters: not sent, and told why.
         const res = await post({ agreementId: 'agr-not-a-uuid' });
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(422);
+        expect((await res.json() as { error: { message: string } }).error.message)
+            .toMatch(/not found in this workspace/i);
+        expect(sendAgreementRequest).not.toHaveBeenCalled();
+    });
+
+    it('refuses a well-formed UUID belonging to another tenant (what the format gate never caught)', async () => {
+        const res = await post({ agreementId: crypto.randomUUID() });
+        expect(res.status).toBe(422);
         expect(sendAgreementRequest).not.toHaveBeenCalled();
     });
 

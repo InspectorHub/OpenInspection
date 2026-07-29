@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { users, tenantInvites, tenants } from '../lib/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, ne } from 'drizzle-orm';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import type { UserRole } from '../types/auth';
 import { Errors } from '../lib/errors';
@@ -70,6 +70,11 @@ export class TeamService {
                 name: users.name,
                 email: users.email,
                 role: users.role,
+                // IA-101 — the edit drawer seeds its capability toggles from
+                // this. Without it the drawer could only show the role
+                // template, so opening it on a member who HAD overrides and
+                // pressing Save would silently reset them to defaults.
+                permissionOverrides: users.permissionOverrides,
                 createdAt: users.createdAt
             }).from(users).where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt))),
             db.select().from(tenantInvites)
@@ -185,6 +190,101 @@ export class TeamService {
             if (typeof value === 'boolean' && value !== template[cap]) diff[cap] = value;
         }
         return Object.keys(diff).length ? diff : null;
+    }
+
+    /**
+     * Change a member's role and/or their permission overrides (IA-101).
+     *
+     * The Team page has always had an "Edit" button next to every active
+     * member; it had no onClick. A workspace could therefore be composed only
+     * by inviting and removing people — the only way to correct a role was to
+     * remove the member and re-invite them, which burns their history.
+     *
+     * SESSION INVALIDATION IS NOT OPTIONAL HERE. The role is a JWT claim
+     * (jwt-claims.ts) and jwtAuthMiddleware never re-reads the users row, so a
+     * demotion written only to D1 would sit inert for up to the token's full
+     * 24h life — the member would keep every power we had just taken away,
+     * and the UI would show the new role while the API honoured the old one.
+     * Same reasoning as removeMember, and the same two mechanisms: the
+     * `pwchanged` KV marker, plus MCP grant revocation (grant props are baked
+     * at authorize time and never re-checked, so the KV marker cannot reach
+     * that path).
+     *
+     * Overrides alone do NOT need invalidation — those are read from the row
+     * per request (capabilitiesFor -> resolveOverridesFromDb) and so take
+     * effect on the very next call. We invalidate only when the ROLE moves,
+     * rather than logging someone out for a checkbox.
+     */
+    async updateMember(params: {
+        tenantId: string;
+        userId: string;
+        requesterId: string;
+        role?: UserRole;
+        permissionOverrides?: RequestedOverrides | null;
+    }) {
+        const { tenantId, userId, requesterId } = params;
+        const db = this.getDB();
+
+        const user = await db.select({ id: users.id, email: users.email, role: users.role }).from(users)
+            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId), isNull(users.deletedAt)))
+            .get();
+        if (!user) throw Errors.NotFound('Member not found');
+
+        const nextRole = params.role ?? (user.role as UserRole);
+
+        // An agent is not a seat-holding team member: access is granted per
+        // inspection by a token that works without an account at all. Letting
+        // the Team page mint one would create a second, contradictory way to
+        // become an agent and put them on the seat count.
+        if (nextRole === 'agent') {
+            throw Errors.BadRequest('Agents are granted access per inspection, not added as team members');
+        }
+
+        if (params.role && params.role !== user.role) {
+            // Demoting yourself is the fastest way to lock yourself out of the
+            // page you are standing on. Mirrors removeMember's self-check.
+            if (userId === requesterId) throw Errors.BadRequest('Cannot change your own role');
+
+            // A workspace with no owner cannot be administered by anyone — no
+            // remaining member could restore one.
+            if (user.role === 'owner') {
+                const otherOwners = await db.select({ id: users.id }).from(users)
+                    .where(and(
+                        eq(users.tenantId, tenantId),
+                        eq(users.role, 'owner'),
+                        ne(users.id, userId),
+                        isNull(users.deletedAt),
+                    )).limit(1);
+                if (otherOwners.length === 0) throw Errors.BadRequest('Cannot change the role of the last owner');
+            }
+        }
+
+        // Store only what differs from the (possibly new) role template, so an
+        // all-default member stores null and the role stays the single source.
+        const permissionOverrides = TeamService.diffOverrides(
+            nextRole,
+            params.permissionOverrides ?? null,
+        );
+
+        await db.update(users)
+            .set({ role: nextRole, permissionOverrides })
+            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+
+        if (params.role && params.role !== user.role) {
+            await this.writeSessionInvalidation(userId);
+            if (this.oauth) {
+                try {
+                    await revokeAllUserGrants(this.oauth, userId);
+                } catch (err) {
+                    logger.warn('Failed to revoke MCP OAuth grants after a role change; outstanding grants may keep the OLD role', {
+                        userId,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                }
+            }
+        }
+
+        return { id: userId, role: nextRole, permissionOverrides };
     }
 
     async removeMember(tenantId: string, userId: string, requesterId: string) {

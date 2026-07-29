@@ -65,8 +65,16 @@ export function dedupeBucketMembership<T extends { id: string }>(
  * path, and it lives beside `BUCKET_PRIORITY` because the two are the same list
  * seen twice: every bucket named here needs a rank there.
  */
-export function emptyDashboard() {
+/**
+ * The "nothing here" dashboard shape.
+ *
+ * IA-118 — this doubles as the loader's catch fallback, so `loadFailed` is a
+ * parameter rather than a constant: an operator's whole workload showing as
+ * empty is a claim, and it must not be made because a request failed.
+ */
+export function emptyDashboard(loadFailed = false) {
     return {
+        loadFailed,
         buckets: {
             needsAttention: [] as Inspection[],
             today: [] as Inspection[],

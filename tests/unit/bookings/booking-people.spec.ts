@@ -21,9 +21,8 @@ import {
     tenants,
     users,
     availability,
-    inspections,
-    agentTenantLinks,
-} from '../../../server/lib/db/schema';
+    inspections,} from '../../../server/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
@@ -147,15 +146,10 @@ async function seedAgentReferral(db: BetterSQLite3Database<typeof schema>) {
         id: AGENT_CONTACT, tenantId: T1, type: 'agent', name: 'Jane Agent',
         email: 'jane@realty.com', createdAt: new Date(),
     } as any);
-    await db.insert(agentTenantLinks).values({
-        id: crypto.randomUUID(),
-        agentUserId: AGENT_USER,
-        tenantId: T1,
-        inspectorContactId: AGENT_CONTACT,
-        status: 'active',
-        invitedByUserId: U1,
-        createdAt: new Date(),
-    } as any);
+    // IA-104 — binding lives on the contact.
+    await db.update(schema.contacts)
+        .set({ agentUserId: AGENT_USER, agentLinkedAt: new Date() })
+        .where(eq(schema.contacts.id, AGENT_CONTACT));
 }
 
 function morningBody(overrides: Record<string, unknown> = {}) {

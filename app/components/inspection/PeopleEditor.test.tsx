@@ -219,6 +219,29 @@ describe("PeopleEditor", () => {
     );
   });
 
+  it("describes Reset as a RESTORE when the link is already revoked (IA-134)", () => {
+    // The confirm copy assumed the recipient is holding a working link, and
+    // this control is offered on revoked and expired rows too. There, the
+    // operation is not destruction — it is the only way back, since report
+    // tokens are unique per (inspection, recipient) and re-adding someone
+    // reissues nothing (IA-133). Telling an operator that "their link stops
+    // working" in the one case where they have no working link is backwards.
+    const { getAllByText, getByText, queryByText } = render(
+      <PeopleEditor
+        inspectionId="insp-1"
+        people={[
+          { ...AGENT_PERSON, access: { status: "revoked", sentAt: 1_700_000_000_000, expiresAt: null } },
+        ]}
+        roleProfiles={[CLIENT_ROLE, AGENT_ROLE]}
+        isAdmin
+      />,
+    );
+    fireEvent.click(getAllByText("Reset access link")[0]);
+
+    expect(getByText(/no working link right now/)).toBeTruthy();
+    expect(queryByText(/stops working immediately/)).toBeNull();
+  });
+
   // Caught reviewing the real card: a person who was never sent a link was
   // still offered Reset, and the endpoint can only answer 404 for them.
   it("offers Reset only to someone who actually has a link", () => {

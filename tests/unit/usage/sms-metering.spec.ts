@@ -61,6 +61,18 @@ function makeCtx(recipientKind: 'role' | 'inspector' | 'all' = 'role', recipient
             error: null,
             deliveredAt: null,
             eventId: null,
+            // Addressed to the INSPECTOR, whose consent is implied (D5) and
+            // whose role short-circuits the kind lookup with no DB access —
+            // which is what keeps this spec's db stub viable.
+            //
+            // It previously carried no role key at all. Under the old gate that
+            // meant no consent check ran, so the fixture was passing through a
+            // hole rather than around it; IA-109 closed the hole, and a
+            // client-kind recipient the stub cannot identify now (correctly)
+            // fails closed. This spec measures metering, so it should not be
+            // depending on the consent gate's behaviour either way.
+            recipientRoleKey: 'inspector',
+            recipientContactId: null,
         },
         automation: {
             id: 'auto-1',

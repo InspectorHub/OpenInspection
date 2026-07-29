@@ -1,5 +1,5 @@
 /**
- * Secret UI化 — GET/PUT /api/admin/secrets
+ * Secrets UI — GET/PUT /api/admin/secrets
  *
  * Manages all 14 integration API keys stored as AES-256-GCM encrypted JSON
  * in `tenant_configs.secrets_enc`. Worker env vars always take precedence

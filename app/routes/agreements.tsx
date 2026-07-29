@@ -6,6 +6,7 @@ import { PageHeader, Card, Button, EmptyState } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { TemplateRow } from "~/components/agreements/AgreementRows";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 /**
  * Library → Agreements. Reusable agreement TEMPLATES, and nothing else.
@@ -29,19 +30,24 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const api = createApi(context, { token });
     const tplRes = await api.admin.agreements.$get();
     const tplBody = tplRes.ok ? ((await tplRes.json()) as Record<string, unknown>) : { data: [] };
+    if (!tplRes.ok) throw new Error(`agreements ${tplRes.status}`);
     return {
       templates: (tplBody.data ?? []) as Array<{ id: string; name?: string; updatedAt?: string; createdAt?: string }>,
+      loadFailed: false,
     };
   } catch {
-    return { templates: [] };
+    return { templates: [] as Array<{ id: string; name?: string; updatedAt?: string; createdAt?: string }>, loadFailed: true };
   }
 }
 
 export default function AgreementsPage() {
-  const { templates } = useLoaderData<typeof loader>();
+  const { templates, loadFailed } = useLoaderData<typeof loader>();
 
   return (
     <div className="space-y-ih-list">
+      {/* IA-118 — an empty list here is a conclusion; say when it is not a real one. */}
+      {loadFailed && <LoadFailedNotice />}
+
       <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.library_agreements_heading() }]} />
       <PageHeader
         title={m.library_agreements_heading()}

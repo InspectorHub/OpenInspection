@@ -12,6 +12,7 @@ import { EntityAuditTrail } from "~/components/audit/EntityAuditTrail";
 import type { Severity } from "~/lib/severity";
 import { SEVERITIES, SEVERITY_LABEL, isSeverity } from "~/lib/severity";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 export function meta() {
   return [{ title: m.comments_meta_title() }];
@@ -38,15 +39,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const query: Record<string, string> = { page, pageSize };
   if (isSeverity(severityParam)) query.severity = severityParam;
   const api = createApi(context, { token });
-  const empty = { comments: [] as LibraryComment[], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 }, contractorTypes: [] as Array<{ id: string; name: string }> };
+  const empty = { comments: [] as LibraryComment[], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 }, contractorTypes: [] as Array<{ id: string; name: string }>, loadFailed: true };
   try {
     const [commentsRes, contractorTypesRes] = await Promise.all([
       api.admin.comments.$get({ query }),
       api.contractorTypes.index.$get(),
     ]);
-    const body = commentsRes.ok
-      ? ((await commentsRes.json()) as { data?: LibraryComment[]; meta?: { total: number; page: number; pageSize: number; totalPages: number } })
-      : { data: [], meta: empty.meta };
+    if (!commentsRes.ok) throw new Error(`comments ${commentsRes.status}`);
+    const body = (await commentsRes.json()) as { data?: LibraryComment[]; meta?: { total: number; page: number; pageSize: number; totalPages: number } };
     const contractorTypes = contractorTypesRes.ok
       ? (((await contractorTypesRes.json()) as { data?: Array<{ id: string; name: string }> }).data ?? [])
       : [];
@@ -54,6 +54,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       comments: body.data ?? [],
       meta: body.meta ?? empty.meta,
       contractorTypes,
+      loadFailed: false,
     };
   } catch {
     return empty;
@@ -80,7 +81,7 @@ const SEVERITY_TONE: Record<Severity, "sat" | "monitor" | "defect" | "gen"> = {
 };
 
 export default function CommentsPage() {
-  const { comments, meta, contractorTypes } = useLoaderData<typeof loader>();
+  const { comments, meta, contractorTypes, loadFailed } = useLoaderData<typeof loader>();
   const displayTz = useDisplayTimeZone();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = isSeverity(searchParams.get("severity") ?? "") ? (searchParams.get("severity") as Severity) : "all";
@@ -99,6 +100,9 @@ export default function CommentsPage() {
 
   return (
     <div className="space-y-ih-list">
+      {/* IA-118 — an empty list here is a conclusion; say when it is not a real one. */}
+      {loadFailed && <LoadFailedNotice />}
+
       <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.comments_heading() }]} />
       <PageHeader
         title={m.comments_heading()}

@@ -3,6 +3,7 @@ import { useFetcher } from "react-router";
 import { Modal, Button, Input, Select } from "@core/shared-ui";
 import type { action } from "~/routes/inspection-hub";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
+import { capabilitiesForKind } from "../../../server/lib/people/capabilities";
 import { m } from "~/paraglide/messages";
 
 /** A contact returned by the "search-contacts" hub action intent. */
@@ -24,6 +25,7 @@ export interface ContactSearchResult {
 export function AddPersonModal({
   open,
   onClose,
+  alreadyPresent = false,
   roleProfiles,
   isAdmin,
   fetcher,
@@ -33,6 +35,10 @@ export function AddPersonModal({
   roleProfiles: RoleProfile[];
   isAdmin: boolean;
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
+  /** IA-133 — the add returned ok but created nothing: this contact already
+   *  holds this role. The modal stays OPEN and says so, because the notice
+   *  above it is what sends operators here to "refresh" a revoked link. */
+  alreadyPresent?: boolean;
 }) {
   // Dedicated fetcher for the contact typeahead — independent of `fetcher`
   // (the add mutation). A debounced search must never cancel an in-flight
@@ -93,7 +99,18 @@ export function AddPersonModal({
     fetcher.data?.intent === "person-add" && !fetcher.data.ok ? fetcher.data.error : undefined;
 
   const roleKind = activeRoles.find((r) => r.id === roleProfileId)?.kind;
-  const newContactType = roleKind === "agent" ? "agent" : "client";
+  // IA-102 — whether picking this role hands the person the report. Derived
+  // from the SAME capability table the server enforces with
+  // (server/lib/people/capabilities.ts), rather than a list of role keys kept
+  // in step by hand: a tenant-custom role must not slip through the notice
+  // just because nobody thought to add its key here.
+  const grantsAccess = roleKind ? capabilitiesForKind(roleKind).receivesReport : false;
+  // IA-96 — this was `roleKind === "agent" ? "agent" : "client"`, which
+  // collapsed the role's third kind onto "client": adding someone under a
+  // contractor role filed them in the client list, where they then turned up
+  // in every client-filtered view. The two vocabularies now match, so the
+  // kind passes straight through; the fallback only covers an unresolved role.
+  const newContactType = roleKind ?? "client";
 
   const canSubmit =
     roleProfileId.length > 0 && (createMode ? newName.trim().length > 0 : selectedContact !== null);
@@ -263,6 +280,31 @@ export function AddPersonModal({
               : undefined
           }
         />
+
+        {/* IA-102 — adding someone here is an AUTHORIZATION act wearing the
+            clothes of a data-entry one. Every role kind has receivesReport, so
+            naming a person on this inspection is what lets them open it; add
+            the wrong same-named agent and you have handed a stranger the job,
+            with no receipt anywhere.
+
+            Wording deliberately avoids "their portal" and any hint of signing
+            up: the link is a per-inspection token that works with NO account
+            (IA-100). Saying "they will need an account" would be false, and
+            worse, it would read as a barrier that does not exist. */}
+        {grantsAccess && (
+          <p className="text-[12px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md px-3 py-2">
+            {m.inspections_hub_people_access_notice()}{" "}
+            <span className="text-ih-fg-4">{m.inspections_hub_people_access_revoke_hint()}</span>
+          </p>
+        )}
+
+        {alreadyPresent && (
+          <p role="status" className="text-[12px] text-ih-fg-2 bg-ih-status-watch-bg border border-ih-border rounded-md px-3 py-2">
+            {m.inspections_hub_people_already_present({
+              name: selectedContact?.name ?? (newName.trim() || m.inspections_hub_people_this_contact()),
+            })}
+          </p>
+        )}
 
         {error && <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>}
       </div>

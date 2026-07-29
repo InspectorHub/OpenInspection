@@ -5,6 +5,7 @@ import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Button, EmptyState, Table } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 export function meta() {
   return [{ title: m.library_tags_meta_title() }];
@@ -16,17 +17,21 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const api = createApi(context, { token });
     const res = await api.tags.index.$get();
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
-    return { tags: (body.data ?? []) as Array<{ id: string; name: string; color?: string | null; count?: number }> };
+    if (!res.ok) throw new Error(`tags ${res.status}`);
+    return { tags: (body.data ?? []) as Array<{ id: string; name: string; color?: string | null; count?: number }>, loadFailed: false };
   } catch {
-    return { tags: [] };
+    return { tags: [] as Array<{ id: string; name: string; color?: string | null; count?: number }>, loadFailed: true };
   }
 }
 
 export default function TagsPage() {
-  const { tags } = useLoaderData<typeof loader>();
+  const { tags, loadFailed } = useLoaderData<typeof loader>();
 
   return (
     <div className="space-y-ih-list">
+      {/* IA-118 — an empty list here is a conclusion; say when it is not a real one. */}
+      {loadFailed && <LoadFailedNotice />}
+
       <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.library_tags_heading() }]} />
       <PageHeader
         title={m.library_tags_heading()}

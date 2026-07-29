@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLoaderData, useFetcher } from 'react-router';
-import { Icon, RadioGroup, Button, Modal } from "@core/shared-ui";
+import { Icon, RadioGroup, Button, Modal, Banner } from "@core/shared-ui";
 import { SettingsCrumb } from '~/components/SettingsCrumb';
 import type { Route } from './+types/settings-inspection';
 import { requireToken } from '~/lib/session.server';
@@ -42,12 +42,39 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         // no button.
         liveLinks = null;
     }
-    return { tags, liveLinks };
+    // IA-100 — current archive-revokes policy, read from the same branding
+    // payload the archive dialog reads so the two always agree.
+    let archiveRevokesAccess = false;
+    try {
+        const res = await api.sessionContext.context.$get();
+        if (res.ok) {
+            const b = (await res.json()) as { data?: { branding?: { archiveRevokesAccess?: boolean } } };
+            archiveRevokesAccess = b.data?.branding?.archiveRevokesAccess ?? false;
+        }
+    } catch {
+        archiveRevokesAccess = false;
+    }
+    return { tags, liveLinks, archiveRevokesAccess };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
     const token = await requireToken(context, request);
     const form = await request.formData();
+
+    // IA-100 — the archive-revokes policy is a tenant_configs column, so it
+    // rides the existing branding PUT rather than growing its own endpoint.
+    if (form.get('intent') === 'archive-revokes') {
+        try {
+            const api = createApi(context, { token });
+            const res = await api.adminBranding.branding.$post({
+                json: { archiveRevokesAccess: form.get('value') === '1' },
+            } as unknown as Parameters<typeof api.adminBranding.branding.$post>[0]);
+            return { ok: res.ok, affected: 0 };
+        } catch {
+            return { ok: false as const, affected: 0 };
+        }
+    }
+
     // Narrowed to the real type rather than cast through `never`: the server
     // re-validates with ReportLinkTtlSchema regardless, but a blind cast here
     // would let a shape change compile silently on this side — the same
@@ -70,14 +97,34 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function SettingsInspectionPage() {
-    const { prefs, loaded, patch } = useInspectionPrefs();
-    const { tags, liveLinks } = useLoaderData<typeof loader>();
+    const { prefs, loaded, patch, saveFailed } = useInspectionPrefs();
+    const { tags, liveLinks, archiveRevokesAccess: initialArchiveRevokes } = useLoaderData<typeof loader>();
+    // IA-100 — optimistic so the checkbox does not appear to ignore a click
+    // while the PUT is in flight; the loader revalidation is the source of
+    // truth on the next render.
+    const archiveRevokesFetcher = useFetcher<{ ok?: boolean }>();
+    const [archiveRevokes, setArchiveRevokes] = useState(initialArchiveRevokes);
+    const saveArchiveRevokes = (next: boolean) => {
+        setArchiveRevokes(next);
+        archiveRevokesFetcher.submit(
+            { intent: "archive-revokes", value: next ? "1" : "0" },
+            { method: "post" },
+        );
+    };
 
     if (!loaded) return <div className="p-6 text-[13px] text-ih-fg-3">{m.settings_inspection_loading()}</div>;
 
     return (
         <div className="space-y-8">
             <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: '/settings' }, { label: m.settings_inspection_crumb() }]} />
+            {/* IA-129 — these controls save silently on change, so a failure
+                used to be indistinguishable from a success: the radio stayed
+                where you put it and nothing was said. The value is rolled back
+                now, which without this banner would look like the click simply
+                never registered. */}
+            {saveFailed && (
+                <Banner tone="danger">{m.settings_inspection_save_failed()}</Banner>
+            )}
             <p className="text-[13px] text-ih-fg-3">{m.settings_inspection_intro()}</p>
 
             <section>
@@ -167,6 +214,29 @@ export default function SettingsInspectionPage() {
                 />
                 <p className="text-[12px] text-ih-fg-3 mt-2">{m.settings_inspection_report_link_future_only()}</p>
                 <BulkLinkExpiry ttl={prefs.reportLinkTtl} liveLinks={liveLinks} />
+
+                {/* IA-100 — sits under report links because that is what it
+                    governs, not under Contacts. Archiving a contact does not
+                    touch the links they hold unless this is on; the archive
+                    dialog states which way it is set, so the two cannot drift
+                    apart in an operator's head. */}
+                <label className="flex items-start gap-2.5 mt-4 pt-4 border-t border-ih-border cursor-pointer">
+                    <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={archiveRevokes}
+                        onChange={(e) => saveArchiveRevokes(e.target.checked)}
+                        disabled={archiveRevokesFetcher.state !== "idle"}
+                    />
+                    <span>
+                        <span className="block text-[13px] font-medium text-ih-fg-1">
+                            {m.settings_inspection_archive_revokes_label()}
+                        </span>
+                        <span className="block text-[12px] text-ih-fg-3">
+                            {m.settings_inspection_archive_revokes_help()}
+                        </span>
+                    </span>
+                </label>
             </section>
 
             <section>

@@ -53,6 +53,10 @@ export const UpdateBrandingSchema = z.object({
     // Tenant transaction/display currency (ISO 4217). Constrained to the
     // supported set; tenant-scoped only (no per-user override).
     currency: z.enum(['USD']).optional().openapi({ example: 'USD' }).describe('Tenant currency (ISO 4217).'),
+    // IA-100 — whether archiving a contact also revokes the report links they
+    // still hold. Off by default; see the column comment for why archiving is
+    // treated as list hygiene rather than offboarding.
+    archiveRevokesAccess: z.boolean().optional().openapi({ example: false }).describe('Archiving a contact also revokes their live report links.'),
     // Phase B — transient (NOT persisted) acknowledgement that the caller accepts
     // changing the tenant currency while invoices already exist. Without it the
     // save is blocked (409 CURRENCY_CHANGE_NEEDS_CONFIRM); existing invoices keep
@@ -78,6 +82,8 @@ export const BrandingResponseSchema = createApiResponseSchema(z.object({
         defaultTimezone: z.string().describe('Tenant default IANA timezone (e.g. America/New_York); UTC when unset.'),
         defaultLocale: z.string().describe('Tenant default display locale (BCP-47, e.g. es-419); en-US when unset.'),
         currency: z.string().describe('Tenant currency (ISO 4217, e.g. USD); USD when unset.'),
+        archiveRevokesAccess: z.boolean().optional()
+            .describe('Whether archiving a contact also revokes the report links they still hold. False by default: archiving is list hygiene, not offboarding.'),
     }).describe('TODO describe branding field for the OpenInspection MCP integration'),
 })).openapi('BrandingResponse');
 

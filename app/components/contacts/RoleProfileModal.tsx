@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { useForm, type SubmissionResult } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
@@ -56,10 +56,28 @@ export function RoleProfileModal({
   // fresh open) — the modal would never close after the actual save. Close
   // from an effect once the fetcher settles back to idle with ok:true instead
   // (mirrors AddPersonModal's addSucceeded effect / the hub's useModalFetcher).
-  const succeeded = fetcher.state === "idle" && fetcherOk === true;
+  //
+  // The catch, and why the guard below is not redundant: `fetcher.data`
+  // OUTLIVES the submission that produced it. A bare `ok === true` test is
+  // therefore a latch that never resets — after one successful save it stays
+  // true forever, so the next time `open` flips to true this effect fires in
+  // that same commit and closes the modal before it ever paints. The symptom
+  // is that every row click on the Roles table goes dead after the first save
+  // and only a full page reload brings it back. So only a save that happened
+  // during THIS opening may close THIS opening.
+  const submittedWhileOpen = useRef(false);
   useEffect(() => {
-    if (open && succeeded) onClose();
-  }, [open, succeeded, onClose]);
+    if (open) submittedWhileOpen.current = false;
+  }, [open]);
+  useEffect(() => {
+    if (open && fetcher.state !== "idle") submittedWhileOpen.current = true;
+  }, [open, fetcher.state]);
+  useEffect(() => {
+    if (open && submittedWhileOpen.current && fetcher.state === "idle" && fetcherOk === true) {
+      submittedWhileOpen.current = false;
+      onClose();
+    }
+  }, [open, fetcher.state, fetcherOk, onClose]);
 
   const emailOptions = [
     { value: "", label: m.contacts_roles_modal_template_none() },

@@ -11,9 +11,12 @@ export interface ServiceLine {
     id: string;
     serviceId: string;
     name: string;
-    priceCents: number;
-    priceSnapshot: number;
-    priceOverride: number | null;
+    // IA-95 — all three are absent when the caller lacks the `financial`
+    // capability. The LINE itself (what was sold) is still legitimately theirs
+    // to see; only the figures are withheld.
+    priceCents?: number;
+    priceSnapshot?: number;
+    priceOverride?: number | null;
 }
 
 export interface CatalogService {
@@ -34,8 +37,12 @@ export interface CatalogService {
  * editor behind an unlabelled gear.
  *
  * Money verbs are owner/manager, matching what the API enforces: a card must
- * never offer an action the server refuses. An inspector sees the lines and the
- * total, which is what they need.
+ * never offer an action the server refuses.
+ *
+ * IA-95 — a caller without the `financial` capability (an inspector's default)
+ * gets the LINES but not the figures: what was sold is theirs to see, what it
+ * cost is not. The figures are redacted server-side, so this component reads
+ * their absence rather than re-deriving the permission.
  */
 export function ServicesCard({
     services,
@@ -54,7 +61,13 @@ export function ServicesCard({
     const [repricing, setRepricing] = useState<ServiceLine | null>(null);
     const [removing, setRemoving] = useState<ServiceLine | null>(null);
 
-    const total = services.reduce((sum, s) => sum + s.priceCents, 0);
+    // IA-95 — absence of the figures IS the signal that money is redacted; we
+    // do not carry a second client-side copy of the capability that could
+    // disagree with what the server actually sent. Every money affordance
+    // (total, per-line figure, reprice, the add modal's price field) hangs off
+    // this one derivation.
+    const showMoney = services.every((s) => s.priceCents !== undefined);
+    const total = showMoney ? services.reduce((sum, s) => sum + (s.priceCents ?? 0), 0) : undefined;
     const booked = new Set(services.map((s) => s.serviceId));
     const available = catalog.filter((c) => !booked.has(c.id));
 
@@ -83,11 +96,14 @@ export function ServicesCard({
                         <div key={svc.id} className="flex items-center justify-between gap-3 py-2 text-[13px]">
                             <span className="text-ih-fg-1 min-w-0 truncate">{svc.name}</span>
                             <span className="flex items-center gap-2 shrink-0">
-                                <span className="text-ih-fg-2 font-medium tabular-nums">
-                                    {formatCents(svc.priceCents)}
-                                </span>
+                                {svc.priceCents !== undefined && (
+                                    <span className="text-ih-fg-2 font-medium tabular-nums">
+                                        {formatCents(svc.priceCents)}
+                                    </span>
+                                )}
                                 {canManage && (
                                     <>
+                                        {showMoney && (
                                         <button
                                             type="button"
                                             onClick={() => setRepricing(svc)}
@@ -95,6 +111,7 @@ export function ServicesCard({
                                         >
                                             {m.inspections_hub_services_edit_price()}
                                         </button>
+                                        )}
                                         <button
                                             type="button"
                                             onClick={() => setRemoving(svc)}
@@ -107,10 +124,12 @@ export function ServicesCard({
                             </span>
                         </div>
                     ))}
-                    <div className="flex items-center justify-between py-2 text-[13px] font-bold">
-                        <span className="text-ih-fg-1">{m.inspections_hub_services_total()}</span>
-                        <span className="text-ih-fg-1 tabular-nums">{formatCents(total)}</span>
-                    </div>
+                    {total !== undefined && (
+                        <div className="flex items-center justify-between py-2 text-[13px] font-bold">
+                            <span className="text-ih-fg-1">{m.inspections_hub_services_total()}</span>
+                            <span className="text-ih-fg-1 tabular-nums">{formatCents(total)}</span>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -326,7 +345,7 @@ function RepriceModal({
     // different row re-seeds instead of carrying the last row's figure over.
     if (editingId !== line.id) {
         setEditingId(line.id);
-        setCents(line.priceCents);
+        setCents(line.priceCents ?? null);
     }
 
     return (
@@ -344,7 +363,7 @@ function RepriceModal({
                         variant="primary"
                         size="sm"
                         disabled={submitting}
-                        onClick={() => onSave(line.id, cents === line.priceSnapshot ? null : cents)}
+                        onClick={() => onSave(line.id, cents === (line.priceSnapshot ?? null) ? null : cents)}
                     >
                         {m.common_save()}
                     </Button>
@@ -360,12 +379,12 @@ function RepriceModal({
             />
             <div className="mt-2 flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] text-ih-fg-4">
-                    {m.inspections_hub_services_price_catalog({ price: formatCents(line.priceSnapshot) })}
+                    {m.inspections_hub_services_price_catalog({ price: formatCents(line.priceSnapshot ?? 0) })}
                 </span>
                 {line.priceOverride !== null && (
                     <button
                         type="button"
-                        onClick={() => setCents(line.priceSnapshot)}
+                        onClick={() => setCents(line.priceSnapshot ?? null)}
                         className="text-[11px] font-bold text-ih-primary hover:underline"
                     >
                         {m.inspections_hub_services_price_revert()}

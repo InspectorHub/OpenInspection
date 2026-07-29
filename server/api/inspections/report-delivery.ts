@@ -8,6 +8,8 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
+import { capabilitiesFor } from '../../lib/middleware/require-capability';
+import { redactMoney } from '../../lib/auth/money-redaction';
 import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, getBaseUrl, resolveTenantSlug } from '../../lib/url';
 import { reportUrl as buildReportUrl, buildRenderReportUrl, paymentUrl } from '../../lib/public-urls';
@@ -27,6 +29,8 @@ import { eq, and } from 'drizzle-orm';
 import { resolveSignatureInspector } from '../../lib/signature-helpers';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { resolveRoleEmailTemplate } from '../../lib/people/role-template';
+import { interpolate } from '../../services/automation/shared';
 import { resolveReportTier } from '../../lib/report-tier';
 
 const sendReportPdfRoute = createRoute(withMcpMetadata({
@@ -36,7 +40,7 @@ const sendReportPdfRoute = createRoute(withMcpMetadata({
     summary: 'Send the inspection report to one or more role-keyed recipients',
     middleware: [requireRole('owner', 'manager', 'inspector')],
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
             content: {
                 'application/json': { schema: SendReportSchema },
@@ -382,7 +386,35 @@ const reportDeliveryRoutes = createApiRouter()
                 // portal hub (overview) carrying the persistent portalAccess token.
                 const linkUrl = buildPortalUrl(getBaseUrl(c), tenantSlug, id, reportToken);
 
-                if (pdf) {
+                // The role's own email template, when it names one. Every
+                // recipient of a manual send used to get identical copy — see
+                // resolveRoleEmailTemplate for why this is scoped to the manual
+                // path and not offered as a general mechanism.
+                const roleTemplate = await resolveRoleEmailTemplate(db, c.env.DB, tenantId, recipient.roleKey);
+                if (roleTemplate) {
+                    const vars: Record<string, string> = {
+                        client_name:      (inspection.clientName as string | null) ?? '',
+                        property_address: address,
+                        scheduled_date:   (inspection.date as string | null) ?? '',
+                        report_url:       linkUrl,
+                        company_name:     tenantSlug,
+                        role_label:       roleTemplate.roleLabel,
+                    };
+                    // The PDF rides along, exactly as it does on the default
+                    // path. The first version of this branch omitted it, so a
+                    // recipient whose role named a template got a link-only
+                    // email while everyone else got the attachment — after the
+                    // render cost had already been paid once for the batch.
+                    // Choosing different WORDING must not change what is
+                    // ENCLOSED.
+                    await c.var.services.email.sendEmail(
+                        [recipientEmail],
+                        interpolate(roleTemplate.subject, vars),
+                        interpolate(roleTemplate.body, vars),
+                        pdf ? [{ filename: `${address.replace(/[^a-z0-9]+/gi, '-')}-report.pdf`, content: pdf }] : undefined,
+                        { inspector: sigInspector },
+                    );
+                } else if (pdf) {
                     await c.var.services.email.sendInspectionReportPdf(recipientEmail, address, linkUrl, pdf, sigInspector, sigHost);
                 } else {
                     await c.var.services.email.sendReportReady(recipientEmail, address, linkUrl, sigInspector, sigHost);
@@ -457,7 +489,12 @@ const reportDeliveryRoutes = createApiRouter()
             }
         }
         const hub = { ...data, invoice: data.invoice ? { ...data.invoice, payUrl } : null };
-        return c.json({ success: true, data: hub }, 200);
+        // IA-95 — an inspector may see the inspection but not its money, and
+        // `financial` is false by default for that role. The gate on
+        // `GET /api/invoices` never covered this aggregate, so the same figures
+        // came out here unguarded. Project rather than refuse: the rest of the
+        // payload is legitimately theirs.
+        return c.json({ success: true, data: redactMoney(hub, await capabilitiesFor(c)) }, 200);
     })
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/agent-token',

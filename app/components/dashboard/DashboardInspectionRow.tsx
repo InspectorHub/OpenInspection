@@ -5,6 +5,8 @@ import { reportStateLabel } from "~/lib/dashboard-filters";
 import { REPORT_STATE_TONE, type Inspection } from "~/lib/dashboard-schema";
 import { Pill, Icon } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { formatDollars } from "~/lib/money";
+import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 
 interface DashboardInspectionRowProps {
   insp: Inspection;
@@ -32,6 +34,8 @@ export function DashboardInspectionRow({
   transitionStatus,
   timeZone,
 }: DashboardInspectionRowProps) {
+  const locale = useDisplayLocale();
+  const currency = useDisplayCurrency();
   const isSelected = selectedIds.has(insp.id);
   const showReportLink =
     reportView && tenantSlug && isReportPublished(insp.reportStatus);
@@ -96,12 +100,17 @@ export function DashboardInspectionRow({
               )}
             </div>
           )}
-          {/* P-4: dashboard rows only carry inspections.price (cache tier 3).
-              Invoices and service-snapshot tiers are not loaded here — out of scope.
-              Use getEffectivePriceCents() when a full authority-chain read is needed. */}
+          {/* P-4: `price` is the full authority chain — invoice, else the service
+              snapshots, else the cached column — resolved server-side in
+              getDashboardBuckets (IA-131). It arrives in integer CENTS, like every
+              other `_cents` value, so it must be formatted rather than
+              interpolated. This rendered `${insp.price}` raw for as long as it did
+              because the cache tier reads 0 on real data: "$0" looks the same
+              whichever unit you think it is in, and fixing the source is what
+              turned it into "$45000". */}
           {isColumnVisible("price") && insp.price != null && (
             <span className="text-[11px] font-medium text-ih-fg-3">
-              ${insp.price}
+              {formatDollars(insp.price, { locale, currency })}
             </span>
           )}
         </div>

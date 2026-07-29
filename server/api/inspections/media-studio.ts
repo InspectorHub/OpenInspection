@@ -74,7 +74,7 @@ const videoCreateUploadRoute = createRoute(withMcpMetadata({
     summary: 'Mint a video upload URL (Stream or R2 backend)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('Inspection id') }).describe('Path params'),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection id') }).describe('Path params'),
         body: { content: { 'application/json': { schema: CreateVideoUploadSchema } } },
     },
     responses: {
@@ -94,7 +94,7 @@ const videoFinalizeRoute = createRoute(withMcpMetadata({
     summary: 'Finalize a video upload — insert the media-pool row (idempotent)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('Inspection id') }).describe('Path params'),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection id') }).describe('Path params'),
         body: { content: { 'application/json': { schema: FinalizeVideoSchema } } },
     },
     responses: {
@@ -114,7 +114,7 @@ const videoPosterRoute = createRoute(withMcpMetadata({
     summary: 'Set a video poster frame (Stream-only: thumbnailTimestampPct as a 0..1 fraction)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('Inspection id') }).describe('Path params'),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection id') }).describe('Path params'),
         body: { content: { 'application/json': { schema: SetPosterSchema } } },
     },
     responses: {
@@ -135,7 +135,7 @@ const videoDeleteRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
-            id:        z.string().uuid().describe('Inspection id'),
+            id:        z.string().trim().min(1).describe('Inspection id'),
             streamUid: z.string().min(1).describe('Stream UID (Stream) or mediaId (R2)'),
         }).describe('Path params'),
     },
@@ -159,7 +159,7 @@ const updateMediaAnnotationsRoute = createRoute(withMcpMetadata({
     summary:    'Save PhotoStudio annotation overlay + caption',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'), mediaId: z.string().min(1).describe('TODO describe mediaId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'), mediaId: z.string().min(1).describe('TODO describe mediaId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
             content: {
                 'application/json': {

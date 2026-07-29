@@ -83,7 +83,7 @@ interface ItemEditorProps {
  photoUploading?: boolean;
  /** B-20 — add a field-authored defect into result.customComments.defects. */
  onAddCustomDefect?: (input: { title: string; comment: string; category: CustomDefectCategory }) => void;
- /** Track H (B-20 回流) — save the custom defect into the tenant library
+ /** Track H (B-20 back-flow) — save the custom defect into the tenant library
   *  (best-effort; failure must not block the defect itself). */
  onSaveDefectToLibrary?: (input: { title: string; comment: string; category: CustomDefectCategory }) => void;
  onToggleCustomDefect?: (customId: string, included: boolean) => void;
@@ -109,7 +109,7 @@ interface ItemEditorProps {
  tagChipRow?: React.ReactNode;
  /** B-19b — called when "/" is typed at a line/word start in the notes field. */
  onOpenSnippets?: () => void;
- /** Track H (IA-5/迁移③) — searches the whole tenant comment library
+ /** Track H (IA-5 / migration step 3) — searches the whole tenant comment library
   *  (incl. imported libraries); powers the "From your library" group under
   *  the Defects-tab search. */
  onSearchLibrary?: (query: string) => Promise<LibraryMatch[]>;
@@ -219,7 +219,7 @@ export function ItemEditor({
   });
  };
 
- // Track H (IA-5/迁移③) — debounced whole-library search behind the Defects
+ // Track H (IA-5 / migration step 3) — debounced whole-library search behind the Defects
  // tab search box. Defect-bucket hits sort first; imported-library rows
  // participate (that's the migration selling point — years of accumulated
  // language come along).
@@ -329,7 +329,7 @@ export function ItemEditor({
  const title = customTitle.trim();
  if (!title || !onAddCustomDefect) return;
  onAddCustomDefect({ title, comment: customComment.trim(), category: customCategory });
- // Track H (B-20 回流) — optionally flow the field-authored defect back into
+ // Track H (B-20 back-flow) — optionally flow the field-authored defect back into
  // the tenant library so the next inspection finds it in search. Best-effort:
  // library save failure must never block the defect itself (parent toasts).
  if (saveToLibrary && onSaveDefectToLibrary) {

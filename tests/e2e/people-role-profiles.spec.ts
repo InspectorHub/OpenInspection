@@ -104,12 +104,13 @@ test.describe.serial('People / Role Profiles (Plan 1B)', () => {
     await page.waitForURL('**/inspections');
   });
 
-  test('Step 1-2: admin-only Roles tab; create a custom "other" role profile', async ({ page }) => {
-    await page.goto('/contacts');
+  test('Step 1-2: admin-only Inspection roles page; create a custom "other" role profile', async ({ page }) => {
+    // IA-96 — Roles was a third tab on /contacts, sitting a configuration
+    // table beside two lists of people. It moved to Settings, where it is
+    // admin-gated in the loader rather than merely hidden from the nav.
+    await page.goto('/settings/inspection-roles');
 
-    const rolesTab = page.getByRole('button', { name: 'Roles', exact: true });
-    await expect(rolesTab).toBeVisible();
-    await rolesTab.click();
+    await expect(page.getByRole('heading', { name: 'Inspection roles', exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Add Role', exact: true }).click();
 

@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, or, gt, isNull, count } from 'drizzle-orm';
+import { eq, and, or, gt, isNull, count, inArray } from 'drizzle-orm';
 import { inspectionAccessTokens } from '../lib/db/schema/portal-access';
-import { contactRoleProfiles, tenantConfigs } from '../lib/db/schema';
+import { contactRoleProfiles, tenantConfigs, inspections } from '../lib/db/schema';
 import { resolveReportLinkTtl, reportLinkExpiresAt } from '../lib/report-link-ttl';
 import type { RoleKind } from '../lib/people/capabilities';
 import type { PortalAccessRow, PortalRole } from '../lib/public-access';
@@ -253,6 +253,101 @@ export class PortalAccessService {
      * Returns the hash of the token that was killed so the caller can reference
      * it in the audit trail. Never returns (or logs) the plaintext.
      */
+    /**
+     * Every inspection this email can still open in this tenant (IA-100).
+     *
+     * An agent or client reaches a report through a per-inspection token that
+     * works with NO account, so "does this person still have access" is not
+     * answerable from the contacts page — the answer lives one row per
+     * inspection, in a table nothing surfaced. Archiving a contact therefore
+     * looked like it cut them off and did not.
+     *
+     * Live means: not revoked, and not past its expiry. A token with a null
+     * `expiresAt` is open by policy (the order is still active) and counts as
+     * live — treating null as "expired" would under-report access, which is
+     * the dangerous direction for a screen whose job is to answer "who can
+     * still read this".
+     *
+     * Type-agnostic on purpose. Clients hold these links exactly as agents do,
+     * and an operator revoking access after a sale falls through cares about
+     * the person, not their contact type.
+     */
+    async listLiveAccessByRecipient(tenantId: string, recipientEmail: string): Promise<Array<{
+        inspectionId: string;
+        propertyAddress: string | null;
+        role: string;
+        createdAt: number | null;
+    }>> {
+        const db = this.getDrizzle();
+        const now = new Date();
+        const rows = await db
+            .select({
+                inspectionId:    inspectionAccessTokens.inspectionId,
+                propertyAddress: inspections.propertyAddress,
+                role:            inspectionAccessTokens.role,
+                createdAt:       inspectionAccessTokens.createdAt,
+            })
+            .from(inspectionAccessTokens)
+            .leftJoin(inspections, and(
+                eq(inspections.id, inspectionAccessTokens.inspectionId),
+                eq(inspections.tenantId, inspectionAccessTokens.tenantId),
+            ))
+            .where(and(
+                eq(inspectionAccessTokens.tenantId, tenantId),
+                eq(inspectionAccessTokens.recipientEmail, recipientEmail),
+                isNull(inspectionAccessTokens.revokedAt),
+                or(
+                    isNull(inspectionAccessTokens.expiresAt),
+                    gt(inspectionAccessTokens.expiresAt, now),
+                ),
+            ))
+            .all();
+        return rows.map((r) => ({
+            inspectionId:    r.inspectionId,
+            propertyAddress: r.propertyAddress ?? null,
+            role:            r.role,
+            createdAt:       r.createdAt instanceof Date ? r.createdAt.getTime() : (r.createdAt ? Number(r.createdAt) : null),
+        }));
+    }
+
+    /**
+     * Revoke this recipient's access to the named inspections, or to ALL of
+     * them when `inspectionIds` is omitted (IA-100).
+     *
+     * One statement rather than a loop over revokeForRecipient: a partial
+     * failure midway through a bulk revoke would leave the operator believing
+     * they had cut access off when some links still worked, and that is the
+     * failure mode least acceptable here.
+     *
+     * Returns how many rows it actually revoked, so the caller can report the
+     * real number instead of echoing what was asked for.
+     */
+    async revokeAccessForRecipient(
+        tenantId: string,
+        recipientEmail: string,
+        inspectionIds?: string[],
+    ): Promise<number> {
+        const db = this.getDrizzle();
+        if (inspectionIds && inspectionIds.length === 0) return 0;
+
+        const live = await this.listLiveAccessByRecipient(tenantId, recipientEmail);
+        const targets = inspectionIds
+            ? live.filter((l) => inspectionIds.includes(l.inspectionId))
+            : live;
+        if (targets.length === 0) return 0;
+
+        await db.update(inspectionAccessTokens)
+            .set({ revokedAt: new Date() })
+            .where(and(
+                eq(inspectionAccessTokens.tenantId, tenantId),
+                eq(inspectionAccessTokens.recipientEmail, recipientEmail),
+                inArray(inspectionAccessTokens.inspectionId, targets.map((t) => t.inspectionId)),
+                isNull(inspectionAccessTokens.revokedAt),
+            ))
+            .run();
+        return targets.length;
+    }
+
     async revokeForRecipient(tenantId: string, inspectionId: string, recipientEmail: string): Promise<{ previousTokenHash: string | null }> {
         const db = this.getDrizzle();
         const existing = await this.rowForRecipient(tenantId, inspectionId, recipientEmail);

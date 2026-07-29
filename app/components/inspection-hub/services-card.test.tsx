@@ -75,6 +75,24 @@ describe("ServicesCard", () => {
     expect(screen.getByText(/service catalog is empty/i)).toBeTruthy();
   });
 
+  it("shows the lines but no figures when money is redacted (IA-95)", () => {
+    // The server omits the price fields for a caller without `financial`.
+    // Absence is the signal — the card must not re-derive the permission.
+    const redacted: ServiceLine[] = LINES.map(({ id, serviceId, name }) => ({ id, serviceId, name }));
+    render(<ServicesCard services={redacted} catalog={CATALOG} canManage />);
+
+    // What was sold is still theirs to see...
+    expect(screen.getByText("Radon test")).toBeTruthy();
+    expect(screen.getByText("Sewer scope")).toBeTruthy();
+    // ...what it cost is not, and no total is invented.
+    expect(screen.queryByText(/\$/)).toBeNull();
+    expect(screen.queryByText("Total")).toBeNull();
+    // Repricing something you cannot see the price of makes no sense.
+    expect(screen.queryByRole("button", { name: "Edit price" })).toBeNull();
+    // Removing a line is not a money read, so it survives.
+    expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(2);
+  });
+
   it("still offers a way in when the inspection has no services yet", () => {
     // The whole of IA-87: this state used to be a sentence and nothing else.
     render(<ServicesCard services={[]} catalog={CATALOG} canManage />);

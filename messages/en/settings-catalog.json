@@ -43,6 +43,8 @@
   "settings_inspection_pinned_help": "Up to 5 tags shown as 1-click chips below the Notes field.",
   "settings_inspection_manage_tags": "Manage tag library",
   "settings_inspection_types_crumb": "Inspection types",
+  "settings_inspection_roles_heading": "Inspection roles",
+  "settings_inspection_roles_meta_title": "Inspection Roles - OpenInspection",
   "settings_inspection_types_platform_eyebrow": "Platform",
   "settings_inspection_types_platform_desc": "Standard types that ship with the platform.",
   "settings_inspection_types_counts": "{templates} templates · {inspections} inspections",
@@ -118,5 +120,7 @@
   "settings_inspection_report_link_bulk_lift_one": "Lift expiry on 1 link",
   "settings_inspection_report_link_bulk_expire_confirm": "This re-dates {count} report links that work today. Anyone holding one keeps access only until the new expiry. Links that have already expired or been revoked stay closed.",
   "settings_inspection_report_link_bulk_lift_confirm": "This removes the expiry from {count} report links that work today, so they stay open indefinitely. Links that have already expired or been revoked stay closed.",
-  "settings_inspection_report_link_bulk_done": "Updated {count} links."
+  "settings_inspection_report_link_bulk_done": "Updated {count} links.",
+  "settings_inspection_archive_revokes_label": "Archiving a contact also revokes their report links",
+  "settings_inspection_archive_revokes_help": "Off by default. A report link works without an account, so archiving a contact normally leaves the reports they were given readable. Turn this on if archiving is how you offboard someone."
 }

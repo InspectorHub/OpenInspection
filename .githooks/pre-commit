@@ -121,15 +121,23 @@ fi
 #    box. `server/index.ts` is exempt from type-aware rules entirely, because no
 #    heap this machine can spare was enough for it (see eslint.config.js).
 #
-#    The heap below is the step's whole ceiling now that it is one process, and it
-#    has to be bigger than the global 4GB: the program build is a fixed cost, but
-#    each additional file's type instantiation is retained on top of it. A 4-file
-#    commit finishes in ~9s inside 4GB; a 17-file commit exhausted it after 103s
-#    and needed 6GB, where it takes ~147s. That is slower than four parallel groups
-#    would be on a large commit and faster on a small one — and it cannot die from
-#    one group happening to contain a big file, which the old shape did.
+#    ESLINT_FAST=1 drops the type-information program for this run — same rules,
+#    minus the ones that cannot fail a commit anyway. Measured, cache cleared:
+#    15.1s → 3.7s (one server file), 15.8s → 3.9s (two app files). The reasoning
+#    for why nothing is lost lives at the top of eslint.config.js; the short
+#    version is that every type-aware rule here is 'warn' and .lintstagedrc sets
+#    no --max-warnings, so eslint exited 0 on all of them regardless. CI's
+#    `npm run lint` runs without the flag and stays the authority.
+#
+#    Dropping the program also retires this step's 6GB heap override. That number
+#    existed because the program build is a large fixed cost with each file's type
+#    instantiation retained on top of it — a 17-file commit exhausted 4GB after
+#    103s and needed 6GB to finish in ~147s. With no program there is nothing to
+#    retain, so the global 4GB ceiling is plenty and peak memory stops scaling
+#    with commit size. (The `server/index.ts` type-aware exemption in
+#    eslint.config.js exists for the same OOM reason; at commit time it is now moot.)
 step "Lint & Fix"
-if NODE_OPTIONS="--max-old-space-size=6144" npx lint-staged; then
+if ESLINT_FAST=1 npx lint-staged; then
     pass "Lint & Fix passed"
 else
     fail "Lint failed  →  npx lint-staged"

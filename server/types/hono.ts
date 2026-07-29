@@ -325,7 +325,6 @@ export interface AppServices {
     qbo: import('../services/qbo.service').QBOService;
     unit: import('../services/unit.service').UnitService;
     unitSwitch: import('../services/unit-switch.service').UnitSwitchService;
-    observerLink: import('../services/observer-link.service').ObserverLinkService;
     reportVersion: import('../services/report-version.service').ReportVersionService;
     integrations: import('../services/integrations.service').IntegrationsService;
     analytics: import('../services/analytics.service').AnalyticsService;

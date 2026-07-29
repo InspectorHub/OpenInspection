@@ -12,6 +12,7 @@ import * as schema from '../../../server/lib/db/schema';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { PeopleService } from '../../../server/services/people.service';
 import { REPORT_STATUS } from '../../../server/lib/status/report-status';
+import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -48,10 +49,14 @@ async function seedCommon() {
         { id: AGENT_CONTACT, tenantId: T1, type: 'agent', name: 'Jane', email: 'jane@realty.com', createdAt: new Date() },
         { id: OTHER_CONTACT, tenantId: T1, type: 'agent', name: 'Other', email: 'other@realty.com', createdAt: new Date() },
     ]);
-    await db.insert(schema.agentTenantLinks).values([
-        { id: 'l1', agentUserId: AGENT_USER, tenantId: T1, inspectorContactId: AGENT_CONTACT, status: 'active', createdAt: new Date() },
-        { id: 'l2', agentUserId: OTHER_AGENT_USER, tenantId: T1, inspectorContactId: OTHER_CONTACT, status: 'active', createdAt: new Date() },
-    ]);
+    // IA-104 — bind each agent account to its own contact row. Two distinct
+    // agents in ONE tenant is the isolation case these specs exist for.
+    await db.update(schema.contacts)
+        .set({ agentUserId: AGENT_USER, agentLinkedAt: new Date() })
+        .where(eq(schema.contacts.id, AGENT_CONTACT));
+    await db.update(schema.contacts)
+        .set({ agentUserId: OTHER_AGENT_USER, agentLinkedAt: new Date() })
+        .where(eq(schema.contacts.id, OTHER_CONTACT));
 }
 
 describe('accessToInspection — buyer_agent via inspection_people (Task 9c)', () => {

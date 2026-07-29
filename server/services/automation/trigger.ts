@@ -105,8 +105,13 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                     for (const r of recipients) {
                         const addr = channel === 'email' ? r.email : r.phone;
                         if (!addr) continue; // resolveRecipients already logged/skipped addr-less people; belt-and-braces
+                        // IA-109 — carry the contact id through. The resolver has
+                        // it; dropping it forced the SMS consent gate to guess
+                        // the person from `inspections.client_contact_id`, which
+                        // is only ever right for the primary client.
                         logs.push({ id: nanoid(), tenantId: ctx.tenantId, automationId: rule.id,
-                                    inspectionId: ctx.inspectionId, recipient: addr, recipientRoleKey: r.roleKey, channel,
+                                    inspectionId: ctx.inspectionId, recipient: addr, recipientRoleKey: r.roleKey,
+                                    recipientContactId: r.contactId ?? null, channel,
                                     sendAt, deliveredAt: null, status: 'pending' as const, error: null, eventId: dedupEventId });
                     }
                 }

@@ -94,7 +94,11 @@ describe('B-29+ importContacts phase 2 — real D1 bind limit', () => {
         // binds every schema column, so the DDL must carry them all. The DB-9
         // partial unique index is included for fidelity.
         await b.DB.exec(
-            'CREATE TABLE IF NOT EXISTS contacts (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, type TEXT NOT NULL DEFAULT \'client\', name TEXT NOT NULL, email TEXT, phone TEXT, agency TEXT, notes TEXT, created_by_user_id TEXT, created_at INTEGER NOT NULL, archived_at INTEGER);',
+            // IA-104 appended the agent-binding columns (agent_user_id /
+            // agent_linked_at / agent_revoked_at). They must be here even
+            // though this spec never reads them: drizzle's INSERT lists every
+            // column in the schema, so a missing one fails the whole batch.
+            'CREATE TABLE IF NOT EXISTS contacts (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, type TEXT NOT NULL DEFAULT \'client\', name TEXT NOT NULL, email TEXT, phone TEXT, agency TEXT, notes TEXT, created_by_user_id TEXT, created_at INTEGER NOT NULL, archived_at INTEGER, agent_user_id TEXT, agent_linked_at INTEGER, agent_revoked_at INTEGER);',
         );
         await b.DB.exec(
             'CREATE UNIQUE INDEX IF NOT EXISTS uq_contacts_tenant_email ON contacts (tenant_id, email) WHERE email IS NOT NULL AND archived_at IS NULL;',

@@ -21,7 +21,7 @@ import {
 } from '../lib/validations/auth.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { authCookieOptions } from '../lib/auth-helpers';
+import { authCookieOptions, AUTH_COOKIE_NAME } from '../lib/auth-helpers';
 import { safeReturnTo } from '../lib/mcp/safe-return-to';
 import { findGlobalAgentById } from '../services/agent/account';
 import totpRoutes from './auth/totp';
@@ -313,7 +313,7 @@ const coreAuthRoutes = createApiRouter()
             exp: now + 60 * 60 * 24,
         }, keyring);
 
-        setCookie(c, '__Host-inspector_token', token, authCookieOptions());
+        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
 
         // Token Relay BFF: when the React Router v7 SSR frontend (server-to-server) calls
         // this endpoint, Workers fetch() may strip Set-Cookie. The BFF signals
@@ -352,7 +352,7 @@ const coreAuthRoutes = createApiRouter()
             exp: now + 60 * 60 * 24,
         }, keyring);
 
-        setCookie(c, '__Host-inspector_token', token, authCookieOptions());
+        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
 
         return c.json({
             success: true,
@@ -398,7 +398,7 @@ const coreAuthRoutes = createApiRouter()
                 exp: now + 60 * 60 * 24,
             }, keyring);
 
-            setCookie(c, '__Host-inspector_token', token, authCookieOptions());
+            setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
             // Global agent identity — tenant-less by design, so this does NOT
             // go through the tenant-scoped audit_logs table (auditLogs.tenantId
             // is a NOT NULL FK to tenants.id). Structured logging only, mirrors
@@ -431,7 +431,7 @@ const coreAuthRoutes = createApiRouter()
             'custom:sso': true,
         }, keyring);
 
-        setCookie(c, '__Host-inspector_token', token, authCookieOptions());
+        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
         return c.redirect(safeReturnTo(return_to, '/inspections'), 302);
     })
     .openapi(forgotPasswordRoute, async (c) => {
@@ -537,7 +537,7 @@ const coreAuthRoutes = createApiRouter()
                 iat: now,
                 exp: now + 60 * 60 * 24,
             }, keyring);
-            setCookie(c, '__Host-inspector_token', token, authCookieOptions());
+            setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
         }
 
         return c.json({

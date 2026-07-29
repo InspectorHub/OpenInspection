@@ -179,8 +179,12 @@ export class DataService {
 
             try {
                 const typeRaw = typeIdx >= 0 ? row[typeIdx]?.trim().toLowerCase() : 'client';
-                const type = (['agent', 'client'].includes(typeRaw ?? ''))
-                    ? (typeRaw as 'agent' | 'client')
+                // IA-96 — 'other' joined the type set; an unrecognised value
+                // still falls back to 'client' rather than 'other', because an
+                // unreadable CSV cell is a parse failure, not a statement that
+                // this person is neither an agent nor a client.
+                const type = (['agent', 'client', 'other'].includes(typeRaw ?? ''))
+                    ? (typeRaw as 'agent' | 'client' | 'other')
                     : 'client';
 
                 // Prefer `name` column; fall back to joining first + last

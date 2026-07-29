@@ -9,6 +9,7 @@ import { getBaseUrl } from '../lib/url';
 import { tenantConfigs } from '../lib/db/schema';
 import {
     InviteMemberSchema,
+    UpdateMemberSchema,
     InviteResponseSchema,
     TeamMembersResponseSchema
 } from '../lib/validations/admin.schema';
@@ -73,6 +74,33 @@ const inviteTeamMemberRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
+ * PATCH /api/team/members/:id
+ * Changes a member's role and/or capability overrides (IA-101). owner/manager
+ * only, same tier as invite/remove — this grants and revokes power.
+ */
+const updateTeamMemberRoute = createRoute(withMcpMetadata({
+    method: 'patch',
+    path: '/members/{id}',
+    tags: ["team"],
+    summary: 'Update a team member\'s role or permissions',
+    description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats).',
+    middleware: [requireRole('manager', 'owner')],
+    request: {
+        params: z.object({ id: z.string().trim().min(1).describe('The member\'s user id.') }),
+        body: { content: { 'application/json': { schema: UpdateMemberSchema } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ updated: z.boolean() })) } },
+            description: 'Member updated',
+        },
+        400: { description: 'Last owner, self role-change, or agent role requested' },
+        404: { description: 'Member not found in this tenant' },
+    },
+    operationId: "updateTeamMember",
+}, { scopes: ['write'], tier: 'extended' }));
+
+/**
  * DELETE /api/team/members/:id
  * Removes a team member and invalidates their sessions.
  */
@@ -83,7 +111,7 @@ const removeTeamMemberRoute = createRoute(withMcpMetadata({
     summary: 'Remove a team member',
     middleware: [requireRole('manager', 'owner')],
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
@@ -112,7 +140,7 @@ const cancelInviteRoute = createRoute(withMcpMetadata({
     description: 'Hard-deletes a pending tenant_invites row that belongs to the caller tenant. 404 when the token is unknown, already accepted, or belongs to another tenant.',
     middleware: [requireRole('manager', 'owner')],
     request: {
-        params: z.object({ token: z.string().uuid().describe('The pending invite token (tenant_invites.id).') }),
+        params: z.object({ token: z.string().trim().min(1).describe('The pending invite token (tenant_invites.id).') }),
     },
     responses: {
         200: {
@@ -137,7 +165,7 @@ const resendInviteRoute = createRoute(withMcpMetadata({
     description: 'Re-sends the invitation email for an existing pending tenant_invites row. 404 when the token is unknown, accepted, or cross-tenant.',
     middleware: [requireRole('manager', 'owner')],
     request: {
-        params: z.object({ token: z.string().uuid().describe('The pending invite token (tenant_invites.id).') }),
+        params: z.object({ token: z.string().trim().min(1).describe('The pending invite token (tenant_invites.id).') }),
     },
     responses: {
         200: {
@@ -194,6 +222,22 @@ const teamRoutes = createApiRouter()
                 expiresAt: expiresAt.toISOString()
             }
         }, 201);
+    })
+    .openapi(updateTeamMemberRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const user = c.get('user');
+        const { id: memberId } = c.req.valid('param');
+        const body = c.req.valid('json');
+
+        await c.var.services.team.updateMember({
+            tenantId,
+            userId: memberId,
+            requesterId: user?.sub as string,
+            ...(body.role ? { role: body.role } : {}),
+            ...(body.permissionOverrides !== undefined ? { permissionOverrides: body.permissionOverrides } : {}),
+        });
+
+        return c.json({ success: true as const, data: { updated: true as const } }, 200);
     })
     .openapi(removeTeamMemberRoute, async (c) => {
         const tenantId = c.get('tenantId');

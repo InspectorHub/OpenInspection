@@ -9,6 +9,7 @@ import { propertyGroupKey, inspectionDateValue } from "~/lib/property-groups";
 import { agentMayReadRepairList, type AgentRepairAccess } from "~/lib/agent-repair-access";
 import { useAgentTimeZoneOverride } from "~/routes/agent-layout";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 export function meta() {
  return [{ title: m.agent_portal_dashboard_meta_title() }];
@@ -45,9 +46,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
  referrals: (body.data ?? []) as Referral[],
  unreadReports: (typeof body?.unreadReports === "number" ? body.unreadReports : 0) as number,
  welcomeInspectionId,
+ loadFailed: false,
  };
  } catch {
- return { referrals: [] as Referral[], unreadReports: 0, welcomeInspectionId };
+ return { referrals: [] as Referral[], unreadReports: 0, welcomeInspectionId, loadFailed: true };
  }
 }
 
@@ -73,7 +75,7 @@ function statusColor(s: string): string {
 }
 
 export default function AgentDashboardPage() {
- const { referrals, unreadReports, welcomeInspectionId } = useLoaderData<typeof loader>();
+ const { referrals, unreadReports, welcomeInspectionId, loadFailed } = useLoaderData<typeof loader>();
  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
  // Referral-date timezone resolution (agents are global users spanning many
  // tenants, so there is no single "the agent's tenant tz"):
@@ -132,6 +134,9 @@ export default function AgentDashboardPage() {
 
  return (
  <div className="space-y-6">
+      {/* IA-118 — an empty list here is a conclusion; say when it is not a real one. */}
+      {loadFailed && <LoadFailedNotice />}
+
  {welcomeInspectionId && !welcomeDismissed && (
  <Banner tone="brand" dismissible onDismiss={() => setWelcomeDismissed(true)}>
  {m.agent_portal_dashboard_welcome_banner()}

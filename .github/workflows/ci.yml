@@ -1,16 +1,40 @@
 name: CI
 
-# Quality gate for pull requests. `verify` (below) is the authoritative merge
-# gate — wire it as a required status check in branch protection.
+# Quality gate for pull requests. `verify` (at the bottom) is the authoritative
+# merge gate — wire it as a required status check in branch protection.
+#
+# `verify` used to BE the work: one job running type-check, then test:types,
+# then lint, then three test suites, then build, in a single 17.8-minute line.
+# Nothing in that chain needed the step before it. It is now a fan-out, and
+# `verify` is an aggregator that fails if any of them did.
+#
+# Keeping the NAME is the point of the aggregator. Branch protection requires a
+# check called `verify`; splitting the work into differently-named jobs without
+# it would leave the required check permanently absent, and a rule that never
+# runs is worse than a slow one.
+#
+# Measured on the 2026-07-29 run, serial:
+#     type-check 337s · lint 208s · test:unit 164s · test:types 126s
+#     test:web 114s · install 39s · build 34s · test:workers 30s   = 17.8 min
+# The fan-out's wall clock is setup + the slowest single job, ~4.5 min.
+#
+# Deliberately NOT a shared "setup" job that installs once and passes
+# node_modules along: that reintroduces a serial stage, and every job here would
+# still have to wait for it. Running `npm ci` concurrently costs ~39s of wall
+# clock TOTAL because the jobs overlap. It does roughly double billed
+# runner-minutes, which is the real trade being made.
+#
+# Note for anyone copying this locally: test:unit and test:web must NOT be run
+# concurrently on ONE machine — concurrent runs under-collect spec files and
+# emit phantom failures. Separate CI jobs are separate runners, so this is safe
+# here and is not a licence to background them side by side in a terminal.
 #
 # This workflow runs ONLY on pull_request, not on push-to-main. Re-running the
 # full suite on the merge commit is redundant: branch protection requires
 # "branches up to date before merging" (strict), so a PR's tested tree equals
 # the post-squash main tree. Default-branch security scanning still runs via
 # codeql.yml (push + PR + schedule); release automation runs via
-# release-please.yml (push). If a future job here genuinely needs the merge
-# commit (e.g. a deploy gated on main's status), re-add a scoped push trigger
-# for that job only.
+# release-please.yml (push).
 on:
   pull_request:
     branches: [master, main]
@@ -24,70 +48,205 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: verify
+  # ── Type checking ────────────────────────────────────────────────────────
+  # Split app/api because they are two independent tsc programs; together they
+  # were the longest step in the old chain. The app side needs the generators
+  # first (paraglide messages + route types); the api side includes only
+  # server/** and has never needed either.
+  typecheck-app:
+    name: type-check (app)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        # Full history so scripts/gen-version.js can read the commit/branch.
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22.22.x
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x, cache: npm }
+      - run: npm ci
       # server/generated/version.ts is git-ignored and produced by the build;
-      # type-check imports it, so stamp it before type-check on a fresh checkout.
-      - name: Generate version stamp
-        run: npm run gen-version
+      # type-check imports it, so stamp it on a fresh checkout.
+      - run: npm run gen-version
+      - run: npm run i18n:compile
+      - run: npx react-router typegen
+      - run: npm run type-check:app
 
-      - name: Type-check (react-router typegen + tsc app + api)
-        run: npm run type-check
+  typecheck-api:
+    name: type-check (api)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x, cache: npm }
+      - run: npm ci
+      - run: npm run gen-version
+      - run: npm run type-check:api
 
-      # Type-only test project: expectTypeOf(...) assertions in tests/**/*.spec-d.ts
-      # are a runtime no-op under plain vitest run — this is the only thing that
-      # actually type-checks them. tsc needs a larger heap for this codebase's
-      # AdminApi-scale intersection types (mirrors type-check:api's own bump).
-      - name: Type-only tests (vitest --typecheck)
-        run: npm run test:types
+  # Type-only test project: expectTypeOf(...) assertions in tests/**/*.spec-d.ts
+  # are a runtime no-op under plain vitest run — this is the only thing that
+  # actually type-checks them.
+  test-types:
+    name: type-only tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x, cache: npm }
+      - run: npm ci
+      - run: npm run gen-version
+      - run: npm run i18n:compile
+      - run: npx react-router typegen
+      - run: npm run test:types
 
-      - name: Lint
-        run: npm run lint
+  # ── Lint ─────────────────────────────────────────────────────────────────
+  # eslint is type-aware here (unlike pre-commit, which sets ESLINT_FAST and
+  # drops the type-information program) and is by far the slower half, so it
+  # runs apart from the sixteen lint:* gates rather than in front of them.
+  lint-eslint:
+    name: lint (eslint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x, cache: npm }
+      - run: npm ci
+      - run: npm run gen-version
+      - run: npm run i18n:compile
+      - run: npx react-router typegen
+      - run: npm run lint:eslint
 
+  lint-gates:
+    name: lint (gates)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x, cache: npm }
+      - run: npm ci
+      - run: npm run gen-version
+      - run: npm run i18n:compile
+      # knip resolves every `./+types/*` import a route file makes, so it needs
+      # the generated route types present or it reports the whole of app/routes
+      # as unresolved. In the old serial job these existed only because
+      # type-check had already run; nothing declared the dependency.
+      - run: npx react-router typegen
+      - run: npm run lint:gates-full
       - name: Migration drift gate (schema vs migrations)
         run: npm run db:check
 
-      - name: API unit tests
-        run: npm run test:unit
+  # ── Tests ────────────────────────────────────────────────────────────────
+  test-unit:
+    name: API unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x, cache: npm }
+      - run: npm ci
+      - run: npm run gen-version
+      - run: npm run test:unit
 
-      - name: Worker-runtime tests (queues)
-        run: npm run test:workers
+  test-workers:
+    name: worker-runtime tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x, cache: npm }
+      - run: npm ci
+      - run: npm run gen-version
+      - run: npm run test:workers
 
-      - name: Web unit tests
-        run: npm run test:web
+  test-web:
+    name: web unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x, cache: npm }
+      - run: npm ci
+      - run: npm run gen-version
+      - run: npm run i18n:compile
+      - run: npx react-router typegen
+      - run: npm run test:web
 
-      - name: Build (bundle the Worker)
-        run: npm run build
-
+  # ── Build + bundle ceiling ───────────────────────────────────────────────
+  build:
+    name: build + bundle size
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x, cache: npm }
+      - run: npm ci
+      - run: npm run gen-version
+      - run: npm run build
       # Bundle-size gate (Workers Free 3 MiB gzipped). Reuses the build/ output
       # from the previous step (--skip-build); also enforced in pre-commit.
-      - name: Bundle size gate
-        run: npm run check:bundle -- --skip-build
+      - run: npm run check:bundle -- --skip-build
 
-  # Seeded Playwright E2E against the real built worker. Runs in parallel with
-  # `verify` (independent). playwright.config.ts's `webServer` builds the worker
-  # and boots `wrangler dev` on :8789; `globalSetup` truncates + migrates + seeds
-  # local D1 so every spec exercises the actual database. Auth is standalone-mode
-  # only (the local login form) — saas login is a portal handoff and is out of
-  # scope for this repo's CI.
+  # ── The required check ───────────────────────────────────────────────────
+  # Does no work; exists so branch protection has a single stable name to
+  # require. `if: always()` plus the explicit result test is load-bearing: with
+  # the default `success()` behaviour a SKIPPED dependency would let this pass,
+  # so a cancelled or skipped job would read as green.
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - typecheck-app
+      - typecheck-api
+      - test-types
+      - lint-eslint
+      - lint-gates
+      - test-unit
+      - test-workers
+      - test-web
+      - build
+    steps:
+      # Block scalar, not a plain one: a plain YAML scalar may not contain
+      # ": " and `echo "results: …"` does, which is a parse error rather than
+      # the harmless-looking line it resembles.
+      - name: Report results
+        run: |
+          echo "results: ${{ join(needs.*.result, ', ') }}"
+      # An EXPRESSION, not shell. GitHub expressions accept only single-quoted
+      # strings; a stray double quote fails the entire WORKFLOW to parse, and
+      # the run then shows zero jobs and "this run likely failed because of a
+      # workflow file issue" — which looks nothing like a syntax error. Local
+      # `yaml.safe_load` does not catch it either: that validates YAML, not
+      # Actions expressions. This is how the first version of this file broke.
+      - name: Fail if any check did not succeed
+        if: >-
+          contains(needs.*.result, 'failure')
+          || contains(needs.*.result, 'cancelled')
+          || contains(needs.*.result, 'skipped')
+        run: |
+          echo "::error::One or more checks did not succeed."
+          exit 1
+
+  # Seeded Playwright E2E against the real built worker. Independent of the
+  # fan-out above. playwright.config.ts's `webServer` builds the worker and boots
+  # `wrangler dev` on :8789; `globalSetup` truncates + migrates + seeds local D1
+  # so every spec exercises the actual database. Auth is standalone-mode only
+  # (the local login form) — saas login is a portal handoff and is out of scope
+  # for this repo's CI.
   e2e:
     name: e2e
     runs-on: ubuntu-latest

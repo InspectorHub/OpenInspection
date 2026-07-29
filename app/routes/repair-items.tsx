@@ -10,6 +10,7 @@ import { MoneyInput } from "~/components/MoneyInput";
 import { formatDollars } from "~/lib/money";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 export function meta() {
   return [{ title: m.repair_items_meta_title() }];
@@ -35,11 +36,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       api.recommendations.index.$get({ query: {} }),
       api.contractorTypes.index.$get(),
     ]);
-    const recBody = recRes.ok ? ((await recRes.json()) as { data?: RepairItem[] }) : { data: [] };
+    // IA-118 — "no repair items" reads as "nothing needs fixing", which is a
+    // claim about a property. A failed fetch must not make it.
+    if (!recRes.ok) throw new Error(`recommendations ${recRes.status}`);
+    const recBody = (await recRes.json()) as { data?: RepairItem[] };
+    // The contractor-type catalogue only populates a filter; an empty one
+    // narrows nothing and asserts nothing, so it stays best-effort.
     const ctBody = ctRes.ok ? ((await ctRes.json()) as { data?: ContractorType[] }) : { data: [] };
-    return { items: recBody.data ?? [], contractorTypes: ctBody.data ?? [] };
+    return { items: recBody.data ?? [], contractorTypes: ctBody.data ?? [], loadFailed: false };
   } catch {
-    return { items: [] as RepairItem[], contractorTypes: [] as ContractorType[] };
+    return { items: [] as RepairItem[], contractorTypes: [] as ContractorType[], loadFailed: true };
   }
 }
 
@@ -94,7 +100,7 @@ const EMPTY = {
 };
 
 export default function RepairItemsPage() {
-  const { items, contractorTypes } = useLoaderData<typeof loader>();
+  const { items, contractorTypes, loadFailed } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const deleteFetcher = useFetcher<typeof action>();
   const [pendingDelete, setPendingDelete] = useState<RepairItem | null>(null);
@@ -122,6 +128,9 @@ export default function RepairItemsPage() {
   return (
     <div className="space-y-ih-list">
       <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.repair_items_heading() }]} />
+      {/* IA-118 — "no repair items" reads as "nothing needs fixing", a claim
+          about a property. Do not make it on a failed fetch. */}
+      {loadFailed && <LoadFailedNotice what={m.repair_items_heading()} />}
       <PageHeader
         title={m.repair_items_heading()}
         meta={m.repair_items_meta({ count: items.length })}

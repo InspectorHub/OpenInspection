@@ -437,14 +437,14 @@ export class InspectionService {
     }
 
     /**
-     * C-10 ③-A.4 — live progress for the public observer view
+     * Live per-section progress (client portal progress section)
      * (`/observe/inspections/:id`). Derives per-section completion from the same
      * resolved report shape getReportData builds, so the section/item structure
      * (templateSnapshot-aware) stays in one place. An item counts as "done" once
      * the inspector has captured a rating (rich items) or a value (data points).
      */
-    async getObserveProgress(inspectionId: string, tenantId: string) {
-        return this.analytics.getObserveProgress(inspectionId, tenantId);
+    async getSectionProgress(inspectionId: string, tenantId: string) {
+        return this.analytics.getSectionProgress(inspectionId, tenantId);
     }
 
     /**

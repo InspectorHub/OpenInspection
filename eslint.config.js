@@ -6,6 +6,31 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';
 import importX from 'eslint-plugin-import-x';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 
+/**
+ * ESLINT_FAST — the pre-commit shape: same rules, no type information.
+ *
+ * Building the type-aware program is what eslint costs here, and on a commit it
+ * buys nothing. Measured on this repo, cache cleared:
+ *
+ *     one staged server file    15.1s  →  3.7s
+ *     two staged app files      15.8s  →  3.9s
+ *
+ * It buys nothing because every rule that NEEDS type information is 'warn'
+ * (no-floating-promises and the no-unsafe-* family below), and `.lintstagedrc`
+ * passes no `--max-warnings` — so eslint exits 0 no matter what those rules
+ * find. The only error-level TypeScript rules are `no-explicit-any` and
+ * `no-unused-vars`, and neither reads types. The hook was therefore spending
+ * ~11.5s per commit building a program whose entire output was discarded.
+ *
+ * The warnings still matter — they are just meant to be READ, not raced past on
+ * the way to a commit. `npm run lint` (CI's verify job) runs with no flag set
+ * and stays the authority; nothing below changes what CI checks.
+ */
+const FAST = !!process.env.ESLINT_FAST;
+
+/** A rule that requires type information: its normal severity, or off under ESLINT_FAST. */
+const typed = (severity = 'warn') => (FAST ? 'off' : severity);
+
 // T-hooks warn-first rollout: downgrade every rule in a plugin's preset rules
 // object to 'warn' (preserving any non-severity options), rather than hand-
 // picking which of a preset's rules to enable. Used for jsx-a11y's flat
@@ -53,7 +78,8 @@ export default tseslint.config(
         files: ['**/*.ts', '**/*.tsx'],
         languageOptions: {
             parserOptions: {
-                project: ['./tsconfig.json', './tsconfig.api.json'],
+                // Omitted under ESLINT_FAST — see the FAST note at the top of this file.
+                ...(FAST ? {} : { project: ['./tsconfig.json', './tsconfig.api.json'] }),
                 tsconfigRootDir: import.meta.dirname,
             },
         },
@@ -67,24 +93,24 @@ export default tseslint.config(
             // the specific rules called out, all at 'warn' pending cleanup.
             // floating/misused-promises are the headline pre-release signal —
             // silent unawaited promises are a data-loss bug class on Workers.
-            '@typescript-eslint/no-floating-promises': 'warn',
+            '@typescript-eslint/no-floating-promises': typed(),
             // `checksVoidReturn.attributes: false` — passing an async function to
             // a JSX event-handler prop (`onClick={async () => …}`) is idiomatic
             // React (the return is ignored by design); flagging it is pure noise.
             // The pre-release triage confirmed 43/45 misused-promises hits were
             // exactly this pattern and zero were server-executed. The remaining
             // argument/return/property checks stay on to catch genuine misuse.
-            '@typescript-eslint/no-misused-promises': ['warn', { checksVoidReturn: { attributes: false } }],
-            '@typescript-eslint/await-thenable': 'warn',
-            '@typescript-eslint/require-await': 'warn',
-            '@typescript-eslint/no-base-to-string': 'warn',
-            '@typescript-eslint/restrict-template-expressions': 'warn',
-            '@typescript-eslint/no-unnecessary-condition': 'warn',
-            '@typescript-eslint/no-unsafe-assignment': 'warn',
-            '@typescript-eslint/no-unsafe-member-access': 'warn',
-            '@typescript-eslint/no-unsafe-call': 'warn',
-            '@typescript-eslint/no-unsafe-return': 'warn',
-            '@typescript-eslint/no-unsafe-argument': 'warn',
+            '@typescript-eslint/no-misused-promises': typed(['warn', { checksVoidReturn: { attributes: false } }]),
+            '@typescript-eslint/await-thenable': typed(),
+            '@typescript-eslint/require-await': typed(),
+            '@typescript-eslint/no-base-to-string': typed(),
+            '@typescript-eslint/restrict-template-expressions': typed(),
+            '@typescript-eslint/no-unnecessary-condition': typed(),
+            '@typescript-eslint/no-unsafe-assignment': typed(),
+            '@typescript-eslint/no-unsafe-member-access': typed(),
+            '@typescript-eslint/no-unsafe-call': typed(),
+            '@typescript-eslint/no-unsafe-return': typed(),
+            '@typescript-eslint/no-unsafe-argument': typed(),
             // T-hooks Tier 3 — architecture/hygiene, warn (no --fix sweep; huge diff).
             '@typescript-eslint/consistent-type-imports': 'warn',
             '@typescript-eslint/no-import-type-side-effects': 'warn',
@@ -98,8 +124,57 @@ export default tseslint.config(
             // hide-on-load, use style="display:none" + x-show.
             'no-restricted-syntax': ['error',
                 {
+                    // IA-117 — an id validator must never be STRICTER than the
+                    // column it guards. Every id here is a plain TEXT column:
+                    // each writer happens to mint crypto.randomUUID() today, but
+                    // the COLUMN makes no such promise and the API must not make
+                    // it either.
+                    //
+                    // Not theoretical. `.uuid()` on contacts.id 400'd the
+                    // report-access lookup, and the page rendered that as "this
+                    // contact cannot open any reports" about someone holding two
+                    // live links. The same shape on invoices.id made Mark paid do
+                    // nothing, and earlier on inspectorId it rejected a whole
+                    // patch (IA-87). Three times, each found by a person.
+                    //
+                    // Relaxing loses nothing: a malformed id reaches the
+                    // tenant-scoped lookup and 404s, which is the honest answer.
+                    // `.trim()` matters — a bare `.min(1)` accepts "%20".
+                    // If a value really is UUID-shaped by construction rather
+                    // than convention, disable inline WITH that reason.
+                    selector: "CallExpression[callee.property.name='uuid'][callee.object.callee.property.name='string']",
+                    message: 'Do not validate an id with z.string().uuid() — these are opaque TEXT columns and the check is stricter than the column promises (IA-117/IA-87). Use z.string().trim().min(1).',
+                },
+                {
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
+                },
+                // Cookie-policy guard (PR 1) — setCookie must take its attributes
+                // from a factory in server/lib/auth-helpers.ts, never an inline object.
+                // CLAUDE.md mandates httpOnly + secure + sameSite + path on EVERY
+                // setCookie; five sites were hand-maintaining identical copies of the
+                // staff-session options and two more the portal's. They were correct
+                // at the time, which is exactly why nobody noticed there were seven
+                // places to update on the next policy change.
+                {
+                    selector: "CallExpression[callee.name='setCookie'] > ObjectExpression",
+                    message: 'Pass a cookie-options factory from server/lib/auth-helpers.ts (authCookieOptions / portalSessionCookieOptions), not an inline object — CLAUDE.md requires httpOnly+secure+sameSite+path on every cookie.',
+                },
+                // Admin-tier guard (IA-94 / PR 1) — "is this an owner or a manager"
+                // must go through isAdminRole() in server/lib/auth/roles.ts. It was
+                // re-derived in SEVEN places before this rule existed, including a
+                // same-named local const with its own logic, and a comment reading
+                // "Keep in sync with isAdminRole" — a note asking a human to do what
+                // a rule can. The role-literal guard does not catch these: its
+                // override block exempts server/lib, server/api, server/services and
+                // app — i.e. everywhere they lived.
+                {
+                    selector: "LogicalExpression[operator='||']:has(Literal[value='owner']):has(Literal[value='manager'])",
+                    message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to owner/manager inline.',
+                },
+                {
+                    selector: "LogicalExpression[operator='||']:has(MemberExpression[property.name='OWNER']):has(MemberExpression[property.name='MANAGER'])",
+                    message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to ROLE.OWNER/ROLE.MANAGER inline.',
                 },
                 // Role taxonomy guard — all RBAC role string literals must derive from
                 // ROLES / Role in server/lib/auth/roles.ts (the single source of truth).
@@ -195,8 +270,57 @@ export default tseslint.config(
             // Turn off ONLY the role-literal restriction for these files; all other rules still apply.
             'no-restricted-syntax': ['error',
                 {
+                    // IA-117 — an id validator must never be STRICTER than the
+                    // column it guards. Every id here is a plain TEXT column:
+                    // each writer happens to mint crypto.randomUUID() today, but
+                    // the COLUMN makes no such promise and the API must not make
+                    // it either.
+                    //
+                    // Not theoretical. `.uuid()` on contacts.id 400'd the
+                    // report-access lookup, and the page rendered that as "this
+                    // contact cannot open any reports" about someone holding two
+                    // live links. The same shape on invoices.id made Mark paid do
+                    // nothing, and earlier on inspectorId it rejected a whole
+                    // patch (IA-87). Three times, each found by a person.
+                    //
+                    // Relaxing loses nothing: a malformed id reaches the
+                    // tenant-scoped lookup and 404s, which is the honest answer.
+                    // `.trim()` matters — a bare `.min(1)` accepts "%20".
+                    // If a value really is UUID-shaped by construction rather
+                    // than convention, disable inline WITH that reason.
+                    selector: "CallExpression[callee.property.name='uuid'][callee.object.callee.property.name='string']",
+                    message: 'Do not validate an id with z.string().uuid() — these are opaque TEXT columns and the check is stricter than the column promises (IA-117/IA-87). Use z.string().trim().min(1).',
+                },
+                {
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
+                },
+                // Cookie-policy guard (PR 1) — setCookie must take its attributes
+                // from a factory in server/lib/auth-helpers.ts, never an inline object.
+                // CLAUDE.md mandates httpOnly + secure + sameSite + path on EVERY
+                // setCookie; five sites were hand-maintaining identical copies of the
+                // staff-session options and two more the portal's. They were correct
+                // at the time, which is exactly why nobody noticed there were seven
+                // places to update on the next policy change.
+                {
+                    selector: "CallExpression[callee.name='setCookie'] > ObjectExpression",
+                    message: 'Pass a cookie-options factory from server/lib/auth-helpers.ts (authCookieOptions / portalSessionCookieOptions), not an inline object — CLAUDE.md requires httpOnly+secure+sameSite+path on every cookie.',
+                },
+                // Admin-tier guard (IA-94 / PR 1) — "is this an owner or a manager"
+                // must go through isAdminRole() in server/lib/auth/roles.ts. It was
+                // re-derived in SEVEN places before this rule existed, including a
+                // same-named local const with its own logic, and a comment reading
+                // "Keep in sync with isAdminRole" — a note asking a human to do what
+                // a rule can. The role-literal guard does not catch these: its
+                // override block exempts server/lib, server/api, server/services and
+                // app — i.e. everywhere they lived.
+                {
+                    selector: "LogicalExpression[operator='||']:has(Literal[value='owner']):has(Literal[value='manager'])",
+                    message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to owner/manager inline.',
+                },
+                {
+                    selector: "LogicalExpression[operator='||']:has(MemberExpression[property.name='OWNER']):has(MemberExpression[property.name='MANAGER'])",
+                    message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to ROLE.OWNER/ROLE.MANAGER inline.',
                 },
             ],
         },
@@ -211,8 +335,57 @@ export default tseslint.config(
         rules: {
             'no-restricted-syntax': ['error',
                 {
+                    // IA-117 — an id validator must never be STRICTER than the
+                    // column it guards. Every id here is a plain TEXT column:
+                    // each writer happens to mint crypto.randomUUID() today, but
+                    // the COLUMN makes no such promise and the API must not make
+                    // it either.
+                    //
+                    // Not theoretical. `.uuid()` on contacts.id 400'd the
+                    // report-access lookup, and the page rendered that as "this
+                    // contact cannot open any reports" about someone holding two
+                    // live links. The same shape on invoices.id made Mark paid do
+                    // nothing, and earlier on inspectorId it rejected a whole
+                    // patch (IA-87). Three times, each found by a person.
+                    //
+                    // Relaxing loses nothing: a malformed id reaches the
+                    // tenant-scoped lookup and 404s, which is the honest answer.
+                    // `.trim()` matters — a bare `.min(1)` accepts "%20".
+                    // If a value really is UUID-shaped by construction rather
+                    // than convention, disable inline WITH that reason.
+                    selector: "CallExpression[callee.property.name='uuid'][callee.object.callee.property.name='string']",
+                    message: 'Do not validate an id with z.string().uuid() — these are opaque TEXT columns and the check is stricter than the column promises (IA-117/IA-87). Use z.string().trim().min(1).',
+                },
+                {
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
+                },
+                // Cookie-policy guard (PR 1) — setCookie must take its attributes
+                // from a factory in server/lib/auth-helpers.ts, never an inline object.
+                // CLAUDE.md mandates httpOnly + secure + sameSite + path on EVERY
+                // setCookie; five sites were hand-maintaining identical copies of the
+                // staff-session options and two more the portal's. They were correct
+                // at the time, which is exactly why nobody noticed there were seven
+                // places to update on the next policy change.
+                {
+                    selector: "CallExpression[callee.name='setCookie'] > ObjectExpression",
+                    message: 'Pass a cookie-options factory from server/lib/auth-helpers.ts (authCookieOptions / portalSessionCookieOptions), not an inline object — CLAUDE.md requires httpOnly+secure+sameSite+path on every cookie.',
+                },
+                // Admin-tier guard (IA-94 / PR 1) — "is this an owner or a manager"
+                // must go through isAdminRole() in server/lib/auth/roles.ts. It was
+                // re-derived in SEVEN places before this rule existed, including a
+                // same-named local const with its own logic, and a comment reading
+                // "Keep in sync with isAdminRole" — a note asking a human to do what
+                // a rule can. The role-literal guard does not catch these: its
+                // override block exempts server/lib, server/api, server/services and
+                // app — i.e. everywhere they lived.
+                {
+                    selector: "LogicalExpression[operator='||']:has(Literal[value='owner']):has(Literal[value='manager'])",
+                    message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to owner/manager inline.',
+                },
+                {
+                    selector: "LogicalExpression[operator='||']:has(MemberExpression[property.name='OWNER']):has(MemberExpression[property.name='MANAGER'])",
+                    message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to ROLE.OWNER/ROLE.MANAGER inline.',
                 },
                 {
                     // `/api/public/*` is exempt: those endpoints are unauthenticated

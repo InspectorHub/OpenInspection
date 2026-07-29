@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 import { tenants } from './core';
 import { users } from './user';
 
@@ -81,27 +81,6 @@ export const auditLogs = sqliteTable('audit_logs', {
     index('idx_audit_entity').on(t.entityType, t.entityId),
 ]);
 
-// Agent Accounts A1 — multi-to-multi link between global agent users and the
-// tenants they have access to. One row per (agent_user_id, tenant_id). Created
-// either by an explicit invite (POST /api/agents/invite -> accept) or by the
-// same-email auto-link routine that converges contact rows with matching email.
-export const agentTenantLinks = sqliteTable('agent_tenant_links', {
-    id:                  text('id').primaryKey(),
-    agentUserId:         text('agent_user_id').notNull().references(() => users.id),
-    tenantId:            text('tenant_id').notNull().references(() => tenants.id),
-    // Optional pointer to the contacts row this link was promoted from. NULL
-    // when the agent self-signed-up before the inspector added them as a contact.
-    inspectorContactId:  text('inspector_contact_id'),
-    // Schema Rules: state-machine column declares its enum (type-layer only).
-    status:              text('status', { enum: ['pending', 'active', 'revoked'] }).notNull().default('active'),
-    invitedByUserId:     text('invited_by_user_id'),
-    createdAt:           integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-    revokedAt:           integer('revoked_at', { mode: 'timestamp_ms' }),
-}, (t) => [
-    uniqueIndex('idx_agent_tenant_unique').on(t.agentUserId, t.tenantId),
-    index('idx_agent_tenant_by_tenant').on(t.tenantId, t.status),
-    index('idx_agent_tenant_by_agent').on(t.agentUserId, t.status),
-]);
 
 export const notifications = sqliteTable('notifications', {
     id:          text('id').primaryKey().notNull(),

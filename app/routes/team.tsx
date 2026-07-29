@@ -5,11 +5,13 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SeatBanner } from "~/components/SeatBanner";
 import { InviteSeatDrawer } from "~/components/modals/InviteSeatDrawer";
+import { EditMemberDrawer, type EditableMember } from "~/components/modals/EditMemberDrawer";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table } from "@core/shared-ui";
+import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table, Banner } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { isAdminRole } from "~/lib/access";
 
 export function meta() {
   return [{ title: m.settings_team_meta_title() }];
@@ -26,9 +28,11 @@ interface Member {
   token: string | null;
   /** Present only on pending rows — ISO expiry for the "expires in Nd" label. */
   expiresAt: string | null;
+  /** Capability toggles differing from the role template; seeds the edit drawer (IA-101). */
+  permissionOverrides: Record<string, boolean> | null;
 }
 
-interface LoaderActiveUser { id: string; email: string; role: string; name?: string | null }
+interface LoaderActiveUser { id: string; email: string; role: string; name?: string | null; permissionOverrides?: Record<string, boolean> | null }
 interface LoaderInvite { id: string; email: string; role: string; expiresAt: string }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -48,22 +52,38 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     role = undefined;
   }
 
+  // IA-118 — a fetch failure must not be answered with an empty roster. This
+  // page states who has access to the workspace; "no members" is a claim, and
+  // rendering it because a request failed is the same defect that told an
+  // operator a contact "cannot open any reports" while they held two live
+  // links. Note also that `res.ok === false` used to fall through to the SAME
+  // empty shape as success, so a 500 and an empty team were indistinguishable.
+  let loadFailed = false;
   try {
     const res = await api.team.members.$get();
-    const body = res.ok
-      ? ((await res.json()) as unknown as { data?: { members?: LoaderActiveUser[]; invites?: LoaderInvite[] } })
-      : { data: { members: [], invites: [] } };
+    if (!res.ok) throw new Error(`team members ${res.status}`);
+    const body = (await res.json()) as unknown as { data?: { members?: LoaderActiveUser[]; invites?: LoaderInvite[] } };
     const active: Member[] = (body.data?.members ?? []).map((u) => ({
       id: u.id, name: u.name ?? null, email: u.email, role: u.role,
       status: "active", lastActiveAt: null, token: null, expiresAt: null,
+      permissionOverrides: u.permissionOverrides ?? null,
     }));
     const pending: Member[] = (body.data?.invites ?? []).map((i) => ({
       id: i.id, name: null, email: i.email, role: i.role,
       status: "pending", lastActiveAt: null, token: i.id, expiresAt: i.expiresAt,
+      // A pending invite's overrides live on tenant_invites and are replayed
+      // at accept time; there is no member row to edit yet.
+      permissionOverrides: null,
     }));
-    return { members: [...active, ...pending], canManage: role === "owner" || role === "manager" };
+    return { members: [...active, ...pending], canManage: isAdminRole(role), loadFailed };
   } catch {
-    return { members: [] as Member[], canManage: false };
+    // `canManage` is derived from the JWT role, which was resolved BEFORE this
+    // try block and is not in doubt. Returning false here downgraded an owner's
+    // permissions because a list request failed — the page then hid the manage
+    // affordances, which reads as "you are not allowed" rather than "we could
+    // not load this".
+    loadFailed = true;
+    return { members: [] as Member[], canManage: isAdminRole(role), loadFailed };
   }
 }
 
@@ -97,13 +117,14 @@ const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "m
 };
 
 export default function TeamPage() {
-  const { members, canManage } = useLoaderData<typeof loader>();
+  const { members, canManage, loadFailed } = useLoaderData<typeof loader>();
   const cancelFetcher = useFetcher<{ ok?: boolean }>();
   const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean }>();
   const [pendingCancel, setPendingCancel] = useState<{ token: string; email: string } | null>(null);
   const sessionCtx = useSessionContext();
   const [activeTab, setActiveTab] = useState("active");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editMember, setEditMember] = useState<EditableMember | null>(null);
 
   // Human "expires in Nd" / "expired Nd ago" from an ISO expiry. Whole-day
   // granularity is enough for a 7-day invite window.
@@ -154,6 +175,10 @@ export default function TeamPage() {
         ]}
       />
 
+      {/* IA-118 — an empty roster is a statement about who can reach this
+          workspace. Say when it is not a real answer. */}
+      {loadFailed && <Banner tone="danger">{m.settings_team_load_failed()}</Banner>}
+
       <PageHeader
         title={m.settings_team_heading()}
         meta={`${members.length} ${members.length === 1 ? m.settings_team_member_singular() : m.settings_team_member_plural()}`}
@@ -165,6 +190,7 @@ export default function TeamPage() {
       />
 
       <InviteSeatDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} />
+      <EditMemberDrawer open={editMember !== null} onClose={() => setEditMember(null)} member={editMember} />
 
       <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
 
@@ -234,8 +260,27 @@ export default function TeamPage() {
                         </>
                       )}
                     </div>
-                  ) : member.status === "active" ? (
-                    <button className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1">
+                  ) : member.status === "active" && canManage ? (
+                    // IA-101 — this button existed with no onClick. The only
+                    // way to fix a role was to remove the member and re-invite.
+                    //
+                    // `canManage` matters MORE now than it did before. While the
+                    // button was inert it was merely decorative for everyone;
+                    // wiring it up without this gate would walk an inspector
+                    // through a whole drawer and then 403 on save. The API
+                    // enforces owner/manager regardless — this stops us
+                    // offering an action we know will be refused.
+                    <button
+                      type="button"
+                      onClick={() => setEditMember({
+                        id: member.id as string,
+                        name: member.name as string | null,
+                        email: member.email,
+                        role: member.role as string,
+                        permissionOverrides: (member.permissionOverrides ?? null) as Record<string, boolean> | null,
+                      })}
+                      className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1"
+                    >
                       {m.common_edit()}
                     </button>
                   ) : null,

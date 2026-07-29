@@ -3,11 +3,11 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 export const TENANT = '00000000-0000-0000-0000-0000000000a1';
 
-// A stub InspectionService.getObserveProgress — returns the FULL observe shape
+// A stub InspectionService.getSectionProgress — returns the FULL observe shape
 // (address/date/inspectorName/status + named sections). hubOverview sums
 // totalItems/completedItems; observeProgress returns the whole object.
 export const inspStub = {
-    getObserveProgress: async () => ({
+    getSectionProgress: async () => ({
         address: 'Stub St',
         date: '2026-06-01',
         inspectorName: 'Stub Inspector',

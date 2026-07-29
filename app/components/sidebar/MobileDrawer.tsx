@@ -12,7 +12,8 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
   const companyName = ctx?.branding?.companyName || "OpenInspection";
   const logoUrl = ctx?.branding?.logoUrl || "/logo.svg";
   const tenantSlug = ctx?.branding?.tenantSlug || "openinspection.dev";
-  const userName = ctx?.user?.name || "Inspector";
+  // See Sidebar.tsx — never fall back to a ROLE name.
+  const userName = ctx?.user?.name || ctx?.user?.email || m.settings_team_member_unnamed();
   const userRole = ctx?.user?.role || null;
   const showSwitchWorkspace = ctx?.branding?.isSaas && ctx?.branding?.portalBaseUrl;
   const privacyUrl = ctx?.branding?.privacyUrl ?? null;

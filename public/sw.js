@@ -25,7 +25,7 @@ self.addEventListener('install', (event) => {
       Promise.allSettled(PRECACHE_ASSETS.map((a) => cache.add(a)))
     )
   );
-  // Activate immediately ??don't wait for old tabs to close
+  // Activate immediately — don't wait for old tabs to close
   self.skipWaiting();
 });
 
@@ -52,7 +52,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Photo files served from R2 via our API ??cache-first (keys are UUIDs, immutable)
+  // Photo files served from R2 via our API — cache-first (keys are UUIDs, immutable)
   if (url.pathname.startsWith('/api/inspections/files/')) {
     event.respondWith(cacheFirstWithRefresh(request));
     return;
@@ -122,7 +122,7 @@ async function networkFirstWithCacheFallback(request) {
     return response;
   } catch {
     const cached = await cache.match(request);
-    return cached || new Response('Offline ??please reconnect to continue.', {
+    return cached || new Response('Offline — please reconnect to continue.', {
       status: 503,
       headers: { 'Content-Type': 'text/plain' },
     });

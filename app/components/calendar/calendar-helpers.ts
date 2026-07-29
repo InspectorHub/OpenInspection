@@ -1,3 +1,4 @@
+import { isAdminRole } from "~/lib/access";
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
@@ -68,8 +69,8 @@ export function addDays(d: Date, n: number) {
 }
 
 export function defaultCalendarScope(role: string | null | undefined): CalendarScope {
-  // Keep in sync with isAdminRole — owners/managers open Team; inspectors open My.
-  return role === "owner" || role === "manager" ? "team" : "my";
+  // Owners/managers open Team; inspectors open My.
+  return isAdminRole(role) ? "team" : "my";
 }
 
 export function calendarItemToEvent(item: CalendarItem): CalendarEvent {

@@ -221,6 +221,9 @@ export default defineConfig({
         // the shared admin + a real inspection id (the `api` project it in
         // turn depends on already seeds the 8 default role profiles).
         { name: 'people-role-profiles', testMatch: 'people-role-profiles.spec.ts', dependencies: ['editor-seed'] },
+        // Workspace responsive smoke — the authenticated counterpart to
+        // public-pages-responsive. Depends on editor-seed for a login.
+        { name: 'workspace-pages-responsive', testMatch: 'workspace-pages-responsive.spec.ts', dependencies: ['editor-seed'] },
         // Issue #250 — settings-communication sticky section-nav (scroll-spy).
         { name: 'settings-communication-nav', testMatch: 'settings-communication-nav.spec.ts', dependencies: ['editor-seed'] },
         // Spec 2 Task 8 — role-aware report sending (final task of the

@@ -128,7 +128,7 @@ describe('PortalService.listRecipientInspections — capability-driven role filt
         } as never);
         await seedRoleProfiles(testDb, TENANT, new Date(1));
         await seedCustomRoles(testDb, TENANT);
-        svc = new PortalService({} as D1Database, { getObserveProgress: async () => { throw new Error('unused in this suite'); } });
+        svc = new PortalService({} as D1Database, { getSectionProgress: async () => { throw new Error('unused in this suite'); } });
     });
 
     it('includes a client-role grant', async () => {
@@ -181,7 +181,7 @@ describe('GET /api/portal/:tenant/exchange — capability-driven role gate', () 
     }
 
     function buildApp() {
-        const portalSvc = new PortalService({} as D1Database, { getObserveProgress: async () => { throw new Error('unused in this suite'); } });
+        const portalSvc = new PortalService({} as D1Database, { getSectionProgress: async () => { throw new Error('unused in this suite'); } });
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
             c.set('tenantId', TENANT);

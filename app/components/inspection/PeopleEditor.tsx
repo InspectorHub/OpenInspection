@@ -126,8 +126,16 @@ export function PeopleEditor({
   const primaryFetcher = useFetcher<typeof action>();
   const expiryFetcher = useFetcher<typeof action>();
 
-  const addSucceeded =
-    addFetcher.state === "idle" && addFetcher.data?.intent === "person-add" && addFetcher.data.ok;
+  // IA-133 — `ok` alone is not "a seat was created". The add is idempotent, so
+  // re-adding someone already on the inspection returns ok with nothing changed.
+  // Closing on that reads as "done", and the modal's own notice had just told the
+  // operator that re-adding reissues a revoked report link — so they walked away
+  // believing they had restored access they had not. Stay open and say so.
+  const addResult = addFetcher.state === "idle" && addFetcher.data?.intent === "person-add"
+    ? addFetcher.data
+    : null;
+  const addAlreadyPresent = addResult?.ok === true && addResult.alreadyPresent === true;
+  const addSucceeded = addResult?.ok === true && !addAlreadyPresent;
   useEffect(() => {
     if (modalOpen && addSucceeded) setModalOpen(false);
   }, [modalOpen, addSucceeded]);
@@ -358,6 +366,7 @@ export function PeopleEditor({
         roleProfiles={roleProfiles}
         isAdmin={isAdmin}
         fetcher={addFetcher}
+        alreadyPresent={addAlreadyPresent}
       />
 
       <Modal
@@ -395,8 +404,17 @@ export function PeopleEditor({
           </>
         }
       >
+        {/* IA-134 — the copy assumed the recipient is holding a WORKING link,
+            and this control is offered on rows whose access is already revoked
+            or expired. In that state the operation is not destruction at all —
+            it is the way BACK, and the only way back, since report tokens are
+            unique per (inspection, recipient) and re-adding someone reissues
+            nothing (IA-133). Describing it as "their link stops working" in the
+            one case where they have no working link is precisely backwards. */}
         <p className="text-[13px] text-ih-fg-3">
-          {m.inspections_hub_people_reset_confirm({ name: resetTarget?.name ?? "" })}
+          {(resetTarget?.access?.status ?? "not_sent") === "active"
+            ? m.inspections_hub_people_reset_confirm({ name: resetTarget?.name ?? "" })
+            : m.inspections_hub_people_reset_confirm_restore({ name: resetTarget?.name ?? "" })}
         </p>
       </Modal>
     </Card>

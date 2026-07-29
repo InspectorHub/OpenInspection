@@ -29,7 +29,7 @@ interface Attachment {
     userId:        string;
     name:          string;
     photoUrl:      string | null;
-    role:          'inspector' | 'observer';
+    role:          'inspector';
     focusItemId:   string | null;
     joinedAt:      number;
     lastHeartbeat: number;
@@ -39,7 +39,7 @@ interface PublicRosterEntry {
     userId:      string;
     name:        string;
     photoUrl:    string | null;
-    role:        'inspector' | 'observer';
+    role:        'inspector';
     focusItemId: string | null;
     joinedAt:    number;
 }
@@ -55,7 +55,9 @@ export class InspectionPresenceDO extends DurableObject {
             const userId   = req.headers.get('x-user-id');
             const name     = req.headers.get('x-user-name') ?? 'Unknown';
             const photoUrl = req.headers.get('x-user-photo-url') || null;
-            const role     = (req.headers.get('x-user-role') === 'observer') ? 'observer' : 'inspector';
+            // Presence is staff-only; the read-only observer role was retired
+            // with its landing page, so every attendee attaches as an inspector.
+            const role     = 'inspector' as const;
             if (!userId) return new Response('unauthorized', { status: 401 });
 
             if (req.headers.get('Upgrade') !== 'websocket') {
@@ -113,8 +115,6 @@ export class InspectionPresenceDO extends DurableObject {
         }
 
         if (msg.type === 'focus') {
-            // Observers are read-only and never broadcast focus.
-            if (att.role === 'observer') return;
             att.focusItemId = typeof msg.itemId === 'string' ? msg.itemId : null;
             att.lastHeartbeat = Date.now();
             ws.serializeAttachment(att);

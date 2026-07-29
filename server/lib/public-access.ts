@@ -15,6 +15,7 @@ import { verifyJwt, type JwtKeyring } from './jwt-keyring';
 import { classifyJwtPayload } from './auth/jwt-claims';
 import type { HonoConfig } from '../types/hono';
 import { portalLinkState, type PortalLinkState } from './portal-link-state';
+import { bearerToken } from './auth-helpers';
 
 // A role-profile KEY (tenant.contact_role_profiles.key) — free-form, not a
 // fixed set. `client` remains the seeded default; validation against the
@@ -75,34 +76,6 @@ export async function classifyPortalAccess(
     const row = await svc.resolveToken(token);
     if (!row || row.inspectionId !== requestedInspectionId) return 'unknown';
     return portalLinkState(row, now);
-}
-
-/**
- * Guard for the public live-observer view (`/observe/inspections/:id`). The
- * OBSERVER link is a DISTINCT capability from the portal token — it is resolved
- * via ObserverLinkService.claim(), which short-circuits on revoked/expired and
- * returns the row's tenantId. We return the AUTHORITATIVE tenantId (from the
- * claimed link, never the URL) only when the link grants access to exactly the
- * requested inspection; otherwise null (→ caller 404s).
- */
-type ObserverClaim =
-    | { kind: 'ok'; inspectionId: string; tenantId: string }
-    | { kind: 'expired' | 'revoked' | 'not_found' };
-
-export interface ObserverAccessResolver {
-    claim(token: string): Promise<ObserverClaim>;
-}
-
-export async function resolveObserverAccess(
-    svc: ObserverAccessResolver,
-    token: string | undefined,
-    requestedInspectionId: string,
-): Promise<{ tenantId: string } | null> {
-    if (!token) return null;
-    const claim = await svc.claim(token);
-    if (claim.kind !== 'ok') return null;
-    if (claim.inspectionId !== requestedInspectionId) return null;
-    return { tenantId: claim.tenantId };
 }
 
 /**
@@ -223,8 +196,7 @@ async function resolveAgentSessionToken(
 export async function resolveAgentSession(
     c: Context<HonoConfig>,
 ): Promise<{ userId: string } | null> {
-    const authHeader = c.req.header('Authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    const token = bearerToken(c);
     if (!token) return null;
     const keyring = await c.var.keyringPromise?.catch(() => undefined);
     const kv = c.env?.TENANT_CACHE;
@@ -244,8 +216,7 @@ export async function resolveAgentSession(
  * Returns the resolved tenantId, or null on any failure.
  */
 export async function resolveOwnerPreview(c: Context<HonoConfig>): Promise<string | null> {
-    const authHeader = c.req.header('Authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    const token = bearerToken(c);
     // Public client viewers carry no Bearer token — bail before touching the
     // keyring or KV so the common (tokenless-public) path stays side-effect-free.
     if (!token) return null;
@@ -261,8 +232,7 @@ export async function resolveOwnerPreview(c: Context<HonoConfig>): Promise<strin
 export async function resolveOwnerPreviewFull(
     c: Context<HonoConfig>,
 ): Promise<{ tenantId: string; userId: string } | null> {
-    const authHeader = c.req.header('Authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    const token = bearerToken(c);
     if (!token) return null;
     const keyring = await c.var.keyringPromise?.catch(() => undefined);
     const kv = c.env?.TENANT_CACHE;

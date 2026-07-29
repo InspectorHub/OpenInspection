@@ -1,5 +1,5 @@
 import type { Role } from "../auth/roles";
-import { ROLE } from "../auth/roles";
+import { isAdminRole } from "../auth/roles";
 import { roleAllowedScopeKinds } from "./scopes";
 
 /**
@@ -38,8 +38,7 @@ export const MODULE_GROUPS: ModuleGroup[] = [
  * rows are hidden from everyone except owner / manager.
  */
 export function visibleModuleGroups(role: Role): ModuleGroup[] {
-  const isAdminRole = role === ROLE.OWNER || role === ROLE.MANAGER;
-  return MODULE_GROUPS.filter((g) => !g.adminOnly || isAdminRole);
+  return MODULE_GROUPS.filter((g) => !g.adminOnly || isAdminRole(role));
 }
 
 /**

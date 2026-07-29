@@ -4,6 +4,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 export function meta() {
   return [{ title: m.agent_portal_inspectors_meta_title() }];
@@ -23,9 +24,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const api = createApi(context, { token });
     const res = await api.agent.inspectors.$get();
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
-    return { inspectors: (body.data ?? []) as Inspector[] };
+    return { inspectors: (body.data ?? []) as Inspector[], loadFailed: false };
   } catch {
-    return { inspectors: [] as Inspector[] };
+    return { inspectors: [] as Inspector[], loadFailed: true };
   }
 }
 
@@ -37,10 +38,13 @@ function initials(name: string | null): string {
 }
 
 export default function AgentInspectorsPage() {
-  const { inspectors } = useLoaderData<typeof loader>();
+  const { inspectors, loadFailed } = useLoaderData<typeof loader>();
 
   return (
     <div className="space-y-6">
+      {/* IA-118 — an empty list here is a conclusion; say when it is not a real one. */}
+      {loadFailed && <LoadFailedNotice />}
+
       <PageHeader title={m.agent_portal_inspectors_title()} meta={m.agent_portal_inspectors_subtitle()} />
 
       {inspectors.length === 0 ? (
