@@ -321,7 +321,13 @@ export default function InspectionEditPage() {
  /* Inspection prefs (tenant clone scope, auto-advance delay, pinned tags) */
  /* ---------------------------------------------------------------- */
 
- const { prefs: inspectionPrefs } = useInspectionPrefs();
+ // IA-130 — `loaded` is not decoration. Until the tenant's prefs come back this
+ // hook reports DEFAULTS, and the editor took them at face value: an inspector
+ // who set auto-advance to "Never" got "keyboard only" for the opening moments
+ // of every session, and forever if the fetch failed. Auto-advance is the core
+ // interaction of a field speed-scan, so behaving differently from the
+ // configuration — silently — is the worst shape this could take.
+ const { prefs: inspectionPrefs, loaded: prefsLoaded } = useInspectionPrefs();
 
  /* ---------------------------------------------------------------- */
  /* Tag library fetch + memos */
@@ -929,7 +935,14 @@ export default function InspectionEditPage() {
  const decision = ratingAdvanceDecision({
  source,
  level,
- mode: inspectionPrefs.autoAdvance,
+ // IA-130 — until the tenant's preference is actually known, do not
+ // advance. Advancing moves the inspector off the item they just rated;
+ // staying put is the recoverable direction (press the key again),
+ // whereas a wrong auto-advance during a speed-scan silently loses their
+ // place. `cloneDefault` below is left ungated on purpose: a clone is
+ // user-initiated and its result is visible immediately, so a
+ // wrong-scope clone announces itself in a way a stolen keystroke does not.
+ mode: prefsLoaded ? inspectionPrefs.autoAdvance : 'off',
  });
  if (decision.focusNotes) {
  const ta = document.getElementById('notes-textarea') as HTMLTextAreaElement | null;
@@ -947,7 +960,7 @@ export default function InspectionEditPage() {
  inspectionPrefs.autoAdvanceDelayMs,
  );
  },
- [state.activeItemId, state.currentSection, findings, state.advanceToNextUnrated, state.ratingLevels, inspectionPrefs.autoAdvance, inspectionPrefs.autoAdvanceDelayMs],
+ [state.activeItemId, state.currentSection, findings, state.advanceToNextUnrated, state.ratingLevels, prefsLoaded, inspectionPrefs.autoAdvance, inspectionPrefs.autoAdvanceDelayMs],
  );
 
  /* ---------------------------------------------------------------- */

@@ -79,9 +79,39 @@ export function useInspectionPrefs() {
         }
     }, [patchFetcher.state, patchFetcher.data]);
 
+    // IA-129 — the value to fall back to if the save fails. Captured at the
+    // moment of the optimistic update, because by the time the failure arrives
+    // `prefs` already contains the change we need to undo.
+    const rollbackTo = useRef<InspectionPrefs | null>(null);
+    const [saveFailed, setSaveFailed] = useState(false);
+
+    // The other half of the echo effect above: a PATCH that comes back NOT ok.
+    // There was no such branch — the optimistic `setPrefs` stood, nothing said
+    // anything, and the control kept showing the value that had just failed to
+    // save. On a page of workspace-wide editor defaults that means an operator
+    // walks away believing they changed how every inspector's editor behaves.
+    // Silence is the wrong answer twice over: it also means the page has no
+    // vocabulary for success, so there was nothing to contrast a failure with.
+    useEffect(() => {
+        if (patchFetcher.state !== 'idle') return;
+        if (patchFetcher.data && patchFetcher.data.ok === false) {
+            if (rollbackTo.current) setPrefs(rollbackTo.current);
+            rollbackTo.current = null;
+            pendingDelta.current = {};
+            setSaveFailed(true);
+        }
+    }, [patchFetcher.state, patchFetcher.data]);
+
     const patch = useCallback((delta: Partial<InspectionPrefs>) => {
         // Optimistic update; the fetcher effect adopts the server echo.
-        setPrefs(prev => ({ ...prev, ...delta }));
+        setPrefs(prev => {
+            // Remember the pre-change state for the rollback above. Only the
+            // FIRST pending change records it, so a burst of edits rolls back to
+            // where the burst started rather than to its second-to-last step.
+            if (!rollbackTo.current) rollbackTo.current = prev;
+            return { ...prev, ...delta };
+        });
+        setSaveFailed(false);
         pendingDelta.current = { ...pendingDelta.current, ...delta };
         patchFetcher.submit(
             { patch: JSON.stringify(pendingDelta.current) },
@@ -89,5 +119,16 @@ export function useInspectionPrefs() {
         );
     }, [patchFetcher]);
 
-    return { prefs, loaded, patch };
+    return {
+        prefs,
+        loaded,
+        patch,
+        /** IA-129 — true when the last save came back not-ok and `prefs` has been
+         *  rolled back. Callers must surface this; a silent revert is its own
+         *  small lie. */
+        saveFailed,
+        /** IA-129 — a save is in flight. Lets a caller say "saving…" so that
+         *  "saved" and "failed" are not the page's only two silent states. */
+        saving: patchFetcher.state !== 'idle',
+    };
 }

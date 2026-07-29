@@ -213,5 +213,6 @@
   "invoices_col_action": "Action",
   "invoices_paid_by": "Paid by:",
   "invoices_mark_paid": "Mark paid",
-  "invoices_footer_note": "“Mark paid” records an offline payment (check, cash, bank transfer) and unlocks the report. Online card payments are marked automatically when the customer pays."
+  "invoices_footer_note": "“Mark paid” records an offline payment (check, cash, bank transfer) and unlocks the report. Online card payments are marked automatically when the customer pays.",
+  "settings_inspection_save_failed": "That change could not be saved and has been undone. Check your connection and try again."
 }

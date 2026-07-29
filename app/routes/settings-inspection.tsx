@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLoaderData, useFetcher } from 'react-router';
-import { Icon, RadioGroup, Button, Modal } from "@core/shared-ui";
+import { Icon, RadioGroup, Button, Modal, Banner } from "@core/shared-ui";
 import { SettingsCrumb } from '~/components/SettingsCrumb';
 import type { Route } from './+types/settings-inspection';
 import { requireToken } from '~/lib/session.server';
@@ -97,7 +97,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function SettingsInspectionPage() {
-    const { prefs, loaded, patch } = useInspectionPrefs();
+    const { prefs, loaded, patch, saveFailed } = useInspectionPrefs();
     const { tags, liveLinks, archiveRevokesAccess: initialArchiveRevokes } = useLoaderData<typeof loader>();
     // IA-100 — optimistic so the checkbox does not appear to ignore a click
     // while the PUT is in flight; the loader revalidation is the source of
@@ -117,6 +117,14 @@ export default function SettingsInspectionPage() {
     return (
         <div className="space-y-8">
             <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: '/settings' }, { label: m.settings_inspection_crumb() }]} />
+            {/* IA-129 — these controls save silently on change, so a failure
+                used to be indistinguishable from a success: the radio stayed
+                where you put it and nothing was said. The value is rolled back
+                now, which without this banner would look like the click simply
+                never registered. */}
+            {saveFailed && (
+                <Banner tone="danger">{m.settings_inspection_save_failed()}</Banner>
+            )}
             <p className="text-[13px] text-ih-fg-3">{m.settings_inspection_intro()}</p>
 
             <section>
