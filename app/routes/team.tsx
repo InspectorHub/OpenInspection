@@ -9,7 +9,7 @@ import { EditMemberDrawer, type EditableMember } from "~/components/modals/EditM
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table } from "@core/shared-ui";
+import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table, Banner } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { isAdminRole } from "~/lib/access";
 
@@ -52,11 +52,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     role = undefined;
   }
 
+  // IA-118 — a fetch failure must not be answered with an empty roster. This
+  // page states who has access to the workspace; "no members" is a claim, and
+  // rendering it because a request failed is the same defect that told an
+  // operator a contact "cannot open any reports" while they held two live
+  // links. Note also that `res.ok === false` used to fall through to the SAME
+  // empty shape as success, so a 500 and an empty team were indistinguishable.
+  let loadFailed = false;
   try {
     const res = await api.team.members.$get();
-    const body = res.ok
-      ? ((await res.json()) as unknown as { data?: { members?: LoaderActiveUser[]; invites?: LoaderInvite[] } })
-      : { data: { members: [], invites: [] } };
+    if (!res.ok) throw new Error(`team members ${res.status}`);
+    const body = (await res.json()) as unknown as { data?: { members?: LoaderActiveUser[]; invites?: LoaderInvite[] } };
     const active: Member[] = (body.data?.members ?? []).map((u) => ({
       id: u.id, name: u.name ?? null, email: u.email, role: u.role,
       status: "active", lastActiveAt: null, token: null, expiresAt: null,
@@ -69,9 +75,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       // at accept time; there is no member row to edit yet.
       permissionOverrides: null,
     }));
-    return { members: [...active, ...pending], canManage: isAdminRole(role) };
+    return { members: [...active, ...pending], canManage: isAdminRole(role), loadFailed };
   } catch {
-    return { members: [] as Member[], canManage: false };
+    // `canManage` is derived from the JWT role, which was resolved BEFORE this
+    // try block and is not in doubt. Returning false here downgraded an owner's
+    // permissions because a list request failed — the page then hid the manage
+    // affordances, which reads as "you are not allowed" rather than "we could
+    // not load this".
+    loadFailed = true;
+    return { members: [] as Member[], canManage: isAdminRole(role), loadFailed };
   }
 }
 
@@ -105,7 +117,7 @@ const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "m
 };
 
 export default function TeamPage() {
-  const { members, canManage } = useLoaderData<typeof loader>();
+  const { members, canManage, loadFailed } = useLoaderData<typeof loader>();
   const cancelFetcher = useFetcher<{ ok?: boolean }>();
   const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean }>();
   const [pendingCancel, setPendingCancel] = useState<{ token: string; email: string } | null>(null);
@@ -162,6 +174,10 @@ export default function TeamPage() {
           { label: m.settings_team_crumb() },
         ]}
       />
+
+      {/* IA-118 — an empty roster is a statement about who can reach this
+          workspace. Say when it is not a real answer. */}
+      {loadFailed && <Banner tone="danger">{m.settings_team_load_failed()}</Banner>}
 
       <PageHeader
         title={m.settings_team_heading()}

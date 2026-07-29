@@ -225,5 +225,7 @@
   "settings_team_invite_expires_in": "Expires in {days}d",
   "settings_team_invite_expired": "Expired {days}d ago",
   "settings_team_cancel_invite_title": "Cancel this invite?",
-  "settings_team_cancel_invite_confirm": "The invite to {email} will be revoked. They will no longer be able to join with the emailed link."
+  "settings_team_cancel_invite_confirm": "The invite to {email} will be revoked. They will no longer be able to join with the emailed link.",
+  "settings_team_load_failed": "The team list could not be loaded, so it may be incomplete. Reload before assuming someone has been removed.",
+  "settings_apps_load_failed": "Connected apps could not be loaded. This is not a confirmation that nothing has access — reload before acting on it."
 }
