@@ -513,6 +513,23 @@ export default tseslint.config(
     // middleware moved out to server/lib/middleware/jwt-auth.ts, where it keeps
     // no-floating-promises and the rest. Keep this file as wiring: `app.use`,
     // `app.route`, and small inline handlers.
+    // The capability resolvers are PURE and are imported into the browser
+    // bundle (app/components/inspection/AddPersonModal.tsx). A DB import here
+    // breaks the client build with a bundler error that reads as a build
+    // problem, not as the design violation it is. Overrides arrive as an
+    // argument; they are never read here.
+    {
+        files: ['server/lib/auth/capabilities.ts', 'server/lib/auth/capability-overrides.ts', 'server/lib/people/capabilities.ts'],
+        rules: {
+            'no-restricted-imports': ['error', {
+                patterns: [
+                    { group: ['drizzle-orm', 'drizzle-orm/*'], message: 'capabilities.ts is pure and ships in the browser bundle — take overrides as an argument, never query for them.' },
+                    { group: ['**/db/schema', '**/db/schema/**'], message: 'capabilities.ts is pure and ships in the browser bundle — take overrides as an argument, never query for them.' },
+                    { group: ['**/services/**'], message: 'capabilities.ts is pure and ships in the browser bundle — take overrides as an argument, never query for them.' },
+                ],
+            }],
+        },
+    },
     {
         files: ['server/index.ts'],
         ...tseslint.configs.disableTypeChecked,
