@@ -30,6 +30,7 @@ export const CAP_LABELS: Record<Capability, string> = {
  get scheduleOthers() { return m.label_cap_schedule_others(); },
  get financial() { return m.label_cap_financial(); },
  get manageContacts() { return m.label_cap_manage_contacts(); },
+ get viewCommunication() { return m.label_cap_view_communication(); },
 };
 
 /**

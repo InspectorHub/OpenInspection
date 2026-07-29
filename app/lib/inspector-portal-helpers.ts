@@ -34,3 +34,19 @@ export function versionDiffHref(inspectionId: string, versionNumber: number): st
   if (versionNumber <= 1) return null;
   return `/version-diff/${inspectionId}?n=${versionNumber}&from=${versionNumber - 1}`;
 }
+
+/**
+ * Task 4 (two-layer role model) — the publish decision off /api/auth/me.
+ *
+ * Reads the SERVER's resolved capability, never the role string. The loader
+ * used to re-implement ROLE_DEFAULTS as `new Set(['owner','manager',
+ * 'inspector']).has(role)`, which ignored permission_overrides — an inspector
+ * with publish withdrawn was shown the Publish button and got a 403 on click.
+ * A body without a capabilities object (an older server, a failed fetch)
+ * resolves false: the submit-only flow is the safe wrong answer.
+ */
+export function publishCapFromMe(meBody: {
+  data?: { user?: { role?: string }; capabilities?: { publish?: boolean } };
+}): boolean {
+  return meBody.data?.capabilities?.publish === true;
+}

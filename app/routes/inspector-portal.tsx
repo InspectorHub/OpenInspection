@@ -35,6 +35,7 @@ import { PublishNotice } from "~/components/inspector-portal/PublishNotice";
 import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEditor";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
+import { publishCapFromMe } from "~/lib/inspector-portal-helpers";
 import {
   toActionResult,
   handlePersonAdd,
@@ -172,20 +173,19 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       ? (((await consentRes.json()) as { data?: { consent?: "granted" | "revoked" | "none" } }).data?.consent ?? "none")
       : "none";
 
-  // Capability: whether the current user can publish reports (owner/manager/inspector).
-  // Best-effort: falls back to false (inspector will see submit-only flow).
-  // The cast mirrors dashboard.tsx — hono/client collapses the typed union.
+  // Publish comes from the server's capability set (see publishCapFromMe for
+  // the full story); isAdmin stays role-derived — the coarse tier is a
+  // different question from a capability and has no override.
   let canPublishCap = false;
-  // Plan 1B Task 5 — same role read also drives the People editor's admin-only
-  // messaging (role-profile management lives behind requireRole('owner','manager')).
   let isAdmin = false;
   const meGet = api.auth?.me?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
   const meRes = meGet ? await meGet().catch(() => null) : null;
   if (meRes && meRes.ok) {
-    const meBody = (await meRes.json().catch(() => ({}))) as { data?: { user?: { role?: string } } };
-    const role = meBody.data?.user?.role ?? 'inspector';
-    canPublishCap = new Set(['owner', 'manager', 'inspector']).has(role);
-    isAdmin = isAdminRole(role);
+    const meBody = (await meRes.json().catch(() => ({}))) as {
+      data?: { user?: { role?: string }; capabilities?: { publish?: boolean } };
+    };
+    canPublishCap = publishCapFromMe(meBody);
+    isAdmin = isAdminRole(meBody.data?.user?.role ?? 'inspector');
   }
 
   // Plan 1B Task 5 — editable People section: every contact/role pairing on
