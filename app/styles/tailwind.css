@@ -144,7 +144,18 @@ html[data-color-scheme="dark"], html[data-color-scheme="field"], .dark {
 
   --ih-bg-app: #0f172a;
   --ih-bg-card: #1e293b;
-  --ih-bg-muted: #1e293b;
+  /* IA-124 — this was #1e293b, i.e. IDENTICAL to --ih-bg-card, so every
+     muted-on-card surface in dark mode was invisible. `bg-ih-bg-muted` appears
+     322 times, 150 of them as `hover:`, which is why the symptom was a scatter
+     of "that button feels dead" reports rather than one obvious break: muted on
+     the APP background still worked, muted on a card did nothing at all.
+     Verified by pixel-comparing the Invoices "View inspection" button before
+     and after hover — no change whatsoever.
+
+     Lighter than the card (not darker) because dark UIs elevate on hover, and
+     because it must also stay clearly apart from --ih-bg-app for the elements
+     that sit directly on the page background. */
+  --ih-bg-muted: #273549;
   --ih-bg-inverse: #f8fafc;
 
   --ih-status-ok-bg: rgba(16, 185, 129, 0.10);
@@ -211,6 +222,27 @@ html[data-color-scheme="field"] {
 .ih-input:focus {
   border-color: var(--ih-primary);
   box-shadow: var(--shadow-ih-focus);
+}
+/* IA-127 — the design system had NO :disabled rule at all, so a disabled Input
+   or Select rendered pixel-identical to a live one. Buttons had always dimmed
+   themselves (Button / IconButton / MenuItem / Pagination each hand-roll
+   `disabled:opacity-* disabled:cursor-not-allowed`); the form controls, which
+   share .ih-input, had nothing. The case that surfaced it: Edit Role locks the
+   Kind select and explains why underneath, and the control still looked exactly
+   like the two live selects below it.
+
+   Deliberately opacity + cursor rather than a background swap — a swap would
+   want --ih-bg-muted, and that token is only just distinguishable from the card
+   again (IA-124). Opacity works in all three themes without another token.
+   The chevron is a SIBLING of the select (Select.tsx draws it outside the
+   control), so it needs dimming of its own or the control fades while its arrow
+   stays bright. */
+.ih-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ih-input:disabled + svg {
+  opacity: 0.55;
 }
 
 .ih-kbd {
