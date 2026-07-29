@@ -7,6 +7,7 @@ import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination, Banne
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { usePagination } from "~/hooks/usePagination";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 export function meta() {
   return [{ title: m.marketplace_meta_title() }];
@@ -21,17 +22,19 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const api = createApi(context, { token });
     const res = await api.marketplace.index.$get({ query: { page, pageSize } });
     if (!res.ok) {
-      return { templates: [] as unknown[], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 } };
+      return { templates: [] as unknown[], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 }, loadFailed: false };
     }
     const body = await res.json() as { data?: unknown[]; meta?: { total: number; page: number; pageSize: number; totalPages: number } };
     return {
       templates: (body.data ?? []) as unknown[],
       meta: body.meta ?? { total: 0, page: 1, pageSize: 50, totalPages: 1 },
+      loadFailed: false,
     };
   } catch {
     return {
       templates: [] as unknown[],
       meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 },
+      loadFailed: true,
     };
   }
 }
@@ -48,7 +51,7 @@ function getTabs() {
 }
 
 export default function MarketplacePage() {
-  const { templates, meta } = useLoaderData<typeof loader>();
+  const { templates, meta, loadFailed } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState("all");
   const { setPage, setPageSize } = usePagination();
 
@@ -74,6 +77,9 @@ export default function MarketplacePage() {
 
   return (
     <div className="space-y-ih-list">
+      {/* IA-118 — an empty list here is a conclusion; say when it is not a real one. */}
+      {loadFailed && <LoadFailedNotice />}
+
       <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.marketplace_heading() }]} />
       <PageHeader
         title={m.marketplace_heading()}

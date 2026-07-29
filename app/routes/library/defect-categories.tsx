@@ -7,6 +7,7 @@ import { PageHeader, Card, Button, EmptyState } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { DefectCategoryEditor, type EditorDefectCategory } from "~/components/DefectCategoryEditor";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 export function meta() {
   return [{ title: m.library_defect_meta_title() }];
@@ -20,9 +21,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const api = createApi(context, { token });
     const res = await api.defectCategories["defect-categories"].$get({}, { headers: { "x-token-relay": "1" } });
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
-    return { categories: (body.data ?? []) as DefectCategory[] };
+    return { categories: (body.data ?? []) as DefectCategory[], loadFailed: false };
   } catch {
-    return { categories: [] as DefectCategory[] };
+    return { categories: [] as DefectCategory[], loadFailed: true };
   }
 }
 
@@ -45,7 +46,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function DefectCategoriesPage() {
-  const { categories } = useLoaderData<typeof loader>();
+  const { categories, loadFailed } = useLoaderData<typeof loader>();
   const deleteFetcher = useFetcher();
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<EditorDefectCategory | null>(null);
@@ -67,6 +68,9 @@ export default function DefectCategoriesPage() {
 
   return (
     <div className="space-y-ih-list">
+      {/* IA-118 — an empty list here is a conclusion; say when it is not a real one. */}
+      {loadFailed && <LoadFailedNotice />}
+
       <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.library_defect_heading() }]} />
       <PageHeader
         title={m.library_defect_heading()}

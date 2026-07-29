@@ -40,6 +40,7 @@ import { InspectionsFilterStrip } from "~/components/dashboard/InspectionsFilter
 import { InspectionsEmptyState } from "~/components/dashboard/InspectionsEmptyState";
 import { InspectionsStatCards } from "~/components/dashboard/InspectionsStatCards";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 // Re-exported for unit tests (tests/web import these from ~/routes/inspections).
 export { tabMatches, matchesWorkflow };
@@ -151,9 +152,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       scheduleSet,
       quotaCaps,
       quotaUsage,
+      loadFailed: false,
     };
   } catch {
-    return emptyDashboard();
+    return emptyDashboard(true);
   }
 }
 
@@ -241,7 +243,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function InspectionsPage() {
-  const { buckets, conciergePending, greeting: _ssrGreeting, tags, checklistDismissed: loaderDismissed, templateCount, serviceCount, scheduleSet, quotaCaps, quotaUsage } = useLoaderData<typeof loader>();
+  const { buckets, conciergePending, greeting: _ssrGreeting, tags, checklistDismissed: loaderDismissed, templateCount, serviceCount, scheduleSet, quotaCaps, quotaUsage, loadFailed } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
   // Scheduled times render in the viewer's effective zone, resolved once here
   // rather than per row (and never left to the browser — see format-date).
@@ -623,6 +625,9 @@ export default function InspectionsPage() {
   return (
     /* ds-allow: page bottom gutter (60px), bespoke page-shell spacing with no token */
     <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-ih-list">
+      {/* IA-118 — an empty dashboard is this page's strongest claim: it says the
+          operator has no work. Do not make it because a request failed. */}
+      {loadFailed && <LoadFailedNotice />}
       {/* F3 — Seat quota banner */}
       {sessionCtx?.seatUsage && (
         <SeatBanner usage={sessionCtx.seatUsage} billingUrl={billingUrl} />

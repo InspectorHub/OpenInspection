@@ -30,9 +30,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   try {
     const api = createApi(context, { token });
     const res = await api.admin["event-types"].$get();
-    if (!res.ok) return { types: [] };
+    if (!res.ok) return { types: [] as EventType[], loadFailed: true };
     const body = await res.json();
-    return { types: ((body as Record<string, unknown>).data ?? []) as EventType[] };
+    return { types: ((body as Record<string, unknown>).data ?? []) as EventType[], loadFailed: false };
   } catch {
     return { types: [] };
   }
