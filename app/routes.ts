@@ -85,6 +85,7 @@ export default [
   route("resources/publish-readiness", "routes/resources/publish-readiness.tsx"),
   route("resources/recent-inspections", "routes/resources/recent-inspections.tsx"),
   route("resources/entity-audit", "routes/resources/entity-audit.tsx"),
+  route("resources/inspection-communication", "routes/resources/inspection-communication.tsx"),
   route("resources/agreement-signers", "routes/resources/agreement-signers.tsx"),
   route("resources/team-members", "routes/resources/team-members.tsx"),
   route("resources/contact-access", "routes/resources/contact-access.tsx"),

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { m } from "~/paraglide/messages";
+import { MessageThread, type ThreadMessage } from "~/components/messaging/MessageThread";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -39,6 +40,13 @@ export function messageRows<
 /*  Section (bare content — no page chrome)                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The client portal's Messages tab. Data/transport layer only: the thread
+ * rendering itself is <MessageThread>, the ONE chat component every portal
+ * shares (Cross-Portal Reuse). This wrapper owns the public-track fetches
+ * (portal session cookie / ?token) and flips the payload's inspector-relative
+ * direction to viewer-relative before handing rows down.
+ */
 export function MessagesSection({
   inspectionId,
   token,
@@ -48,8 +56,6 @@ export function MessagesSection({
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inspection, setInspection] = useState<InspectionInfo | null>(null);
-  const [composeBody, setComposeBody] = useState("");
-  const [sending, setSending] = useState(false);
 
   // Same-origin: the __Host-portal_session cookie is sent automatically. The
   // per-inspection portal ?token is a fallback (email-CTA arrival), appended
@@ -84,28 +90,45 @@ export function MessagesSection({
     loadMessages();
   }, [loadMessages]);
 
-  // Send message
-  async function handleSend() {
-    if (!composeBody.trim() || sending) return;
-    setSending(true);
-    try {
-      const res = await fetch(`${base}${tokenQuery}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: composeBody }),
-      });
-      if (res.ok) {
-        setComposeBody("");
-        loadMessages();
-      }
-    } catch {
-      /* silent */
-    } finally {
-      setSending(false);
-    }
+  async function handleSend(body: string) {
+    const res = await fetch(`${base}${tokenQuery}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body }),
+    });
+    if (!res.ok) throw new Error("send failed");
+    await loadMessages();
   }
 
-  const ordered = messageRows(messages);
+  // Attach: upload first, then send a bodied message carrying the descriptor.
+  async function handleAttach(file: File) {
+    const fd = new FormData();
+    fd.append("file", file);
+    const up = await fetch(`${base}/upload${tokenQuery}`, { method: "POST", body: fd });
+    if (!up.ok) throw new Error("upload failed");
+    const json = (await up.json()) as { data?: { id: string; key: string; name: string; size: number; type: string; uploadedAt: number } };
+    if (!json.data) throw new Error("upload failed");
+    const res = await fetch(`${base}${tokenQuery}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: json.data.name, attachments: [json.data] }),
+    });
+    if (!res.ok) throw new Error("send failed");
+    await loadMessages();
+  }
+
+  // Viewer-relative direction: in the CLIENT's view, their own side is
+  // everything not inspector-authored.
+  const threadMessages: ThreadMessage[] = messageRows(messages).map((msg) => ({
+    id: msg.id,
+    direction: msg.fromRole === "inspector" ? "in" : "out",
+    contactId: "self",
+    fromRole: msg.fromRole,
+    fromName: msg.fromName,
+    body: msg.body,
+    attachments: msg.attachments ?? [],
+    createdAt: typeof msg.createdAt === "number" ? msg.createdAt : new Date(msg.createdAt).getTime(),
+  }));
 
   return (
     <div>
@@ -115,68 +138,14 @@ export function MessagesSection({
           {m.portal_messages_inspection_label({ address: inspection.propertyAddress })}
         </p>
       )}
-
-      {/* Message list */}
-      <div className="space-y-3 max-h-[60vh] overflow-y-auto mb-4">
-        {ordered.map((msg) => (
-          <div
-            key={msg.id}
-            className={`rounded-md p-3 ${
-              msg.fromRole === "client"
-                ? "ml-12 bg-ih-primary-tint"
-                : "mr-12 bg-ih-watch-bg"
-            }`}
-          >
-            <div className="text-xs text-ih-fg-3 mb-1">
-              {msg.fromName || msg.fromRole} &middot;{" "}
-              {new Date(msg.createdAt).toLocaleString()}
-            </div>
-            <p className="text-sm whitespace-pre-wrap text-ih-fg-1">{msg.body}</p>
-            {msg.attachments && msg.attachments.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {msg.attachments.map((a) => (
-                  <a
-                    key={a.id}
-                    href={`${base}/attachments/${encodeURIComponent(a.id)}${tokenQuery}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs bg-ih-bg-card border border-ih-border rounded-lg px-2 py-1 hover:bg-ih-bg-muted"
-                  >
-                    {a.name}
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-        {ordered.length === 0 && (
-          <div className="text-center py-8">
-            <h3 className="font-semibold text-ih-fg-3">{m.portal_messages_empty_title()}</h3>
-            <p className="text-sm text-ih-fg-3 mt-1">{m.portal_messages_empty_body()}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Compose */}
-      <div className="border-t border-ih-border pt-3 bg-ih-bg-card p-4 rounded-md">
-        <textarea
-          value={composeBody}
-          onChange={(e) => setComposeBody(e.target.value)}
-          rows={3}
-          placeholder={m.portal_messages_compose_placeholder()}
-          className="w-full px-3 py-2 rounded-xl border border-ih-border text-sm resize-none bg-ih-bg-card text-ih-fg-1 outline-none focus:border-ih-primary"
-        />
-        <div className="mt-2 flex items-center justify-end">
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!composeBody.trim() || sending}
-            className="px-4 py-2 rounded-xl bg-ih-primary text-ih-primary-fg text-sm font-semibold disabled:opacity-50 transition-opacity"
-          >
-            {sending ? m.portal_messages_send_pending() : m.portal_messages_send()}
-          </button>
-        </div>
-      </div>
+      <MessageThread
+        messages={threadMessages}
+        attachmentHref={(attId) => `${base}/attachments/${encodeURIComponent(attId)}${tokenQuery}`}
+        onSend={handleSend}
+        onAttach={handleAttach}
+        emptyTitle={m.portal_messages_empty_title()}
+        emptyBody={m.portal_messages_empty_body()}
+      />
     </div>
   );
 }

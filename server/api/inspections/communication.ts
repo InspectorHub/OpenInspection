@@ -32,6 +32,7 @@ const DeliverySchema = z.object({
     reasonCode: z.string().nullable().describe('RAW stored reason string for skipped/failed rows. The English mapping lives in the UI.'),
     source: z.enum(['automation', 'manual']).describe('What initiated the send.'),
     automationId: z.string().describe('Rule that fired. Grouping key component.'),
+    automationName: z.string().nullable().describe('Rule name for the notice row title; null when the rule was deleted.'),
     sendAt: z.number().describe('Epoch-ms the firing was scheduled for. Grouping key component — one firing shares one sendAt.'),
     deliveredAt: z.number().nullable().describe('Epoch-ms of confirmed delivery, when known.'),
 });
@@ -56,7 +57,12 @@ const communicationRoute = createRoute(withMcpMetadata({
     tags: ['inspections'],
     summary: "The inspection's Communication payload: person-written messages and platform-sent notices",
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().min(1).describe('Inspection identifier.') }) },
+    request: {
+        params: z.object({ id: z.string().min(1).describe('Inspection identifier.') }),
+        query: z.object({
+            markRead: z.enum(['1']).optional().describe('When set, marks every counterparty-authored message on the inspection read — the caller is DISPLAYING the merged Messages view, where all threads are visible at once. A poll refreshing a closed block must omit it.'),
+        }),
+    },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
@@ -78,6 +84,7 @@ const communicationRoutes = createApiRouter()
     .openapi(communicationRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
+        const { markRead } = c.req.valid('query');
 
         // 404 for another tenant's inspection BEFORE reading anything else.
         const owner = await drizzle(c.env.DB).select({ id: inspections.id })
@@ -90,6 +97,9 @@ const communicationRoutes = createApiRouter()
             c.var.services.message.listForInspection(id, tenantId),
             c.var.services.automation.getCommunicationDeliveries(tenantId, id),
         ]);
+        // After the read, so the rows still carry their unread state in THIS
+        // response and the UI can style them; the next hub load sees zero.
+        if (markRead) await c.var.services.message.markInspectionReadForStaff(id, tenantId);
 
         return c.json({
             success: true as const,

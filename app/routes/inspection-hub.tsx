@@ -57,6 +57,7 @@ import { ServicesCard, type CatalogService } from "~/components/inspection-hub/S
 import { OrderDetailsCard } from "~/components/inspection-hub/OrderDetailsCard";
 import { InvoiceCard } from "~/components/inspection-hub/InvoiceCard";
 import { GateToggle } from "~/components/inspection-hub/GateToggle";
+import { CommunicationSection } from "~/components/inspection-hub/CommunicationSection";
 import { resolveReferralSources } from "../../server/lib/referral-sources";
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspection-hub-helpers";
 import { isAdminRole } from "~/lib/access";
@@ -117,6 +118,7 @@ interface HubData extends HubPayload {
     priceOverride?: number | null;
   }>;
   agreements: Array<{ id: string; name: string }>;
+  communication?: { delivered: number; needsAttention: number; unread: number; rulesActive: number };
 }
 
 interface PeopleAgent {
@@ -760,7 +762,7 @@ export default function InspectionHubPage() {
             isAdmin={isAdmin}
           />
           {peopleCard.client && (
-            <Card className="p-4">
+            <Card className="p-4" id="client-sms-consent">
               <ClientSmsConsent
                 consent={smsConsent}
                 fetcher={attestSms}
@@ -800,6 +802,18 @@ export default function InspectionHubPage() {
         {/* 5. Inspection status — the visit itself. Independent of report
             publishing. */}
         <LifecycleCard status={inspection.status} fetcher={completeInspection} />
+
+        {/* 5b. Communication — what has been said, and what we sent. The
+            client already had a Messages tab; this is the inspector's first
+            surface for the same conversation (IA-105), plus the Outbox that
+            answers "did the agent get the report" without opening email. */}
+        <CommunicationSection
+          inspectionId={inspection.id}
+          counts={hub.communication ?? { delivered: 0, needsAttention: 0, unread: 0, rulesActive: 0 }}
+          reportPublished={reportShipped}
+          threadOptions={people.map((p) => ({ contactId: p.contactId, name: p.name, roleLabel: p.roleLabel ?? null }))}
+          onGetConsent={() => document.getElementById("client-sms-consent")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+        />
 
         {/* 6. Report — the deliverable ------------------------------- */}
         <Card className="p-5">

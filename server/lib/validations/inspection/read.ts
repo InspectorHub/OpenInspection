@@ -188,6 +188,7 @@ export const InspectionHubSchema = z.object({
     delivered:      z.number().describe('Platform notices delivered (status sent, due rows only).'),
     needsAttention: z.number().describe('Platform notices skipped or failed — the count that auto-expands the block.'),
     unread:         z.number().describe('Unread counterparty-authored messages on this inspection.'),
+    rulesActive:    z.number().describe("Active automation rules in the tenant — distinguishes the Outbox's three empty states."),
   }).describe('Communication section header counts, so the section summary renders without a second round trip.'),
 }).openapi('InspectionHub');
 

@@ -39,6 +39,7 @@ import type {
     McpGrantsApi,
     MessageTemplatesApi,
     MessagesApi,
+    InspectorMessagesApi,
     MetricsApi,
     AuditApi,
     NotificationsApi,
@@ -160,6 +161,7 @@ export interface Api {
     mcpGrants:          ReturnType<typeof hc<McpGrantsApi>>;
     messageTemplates:   ReturnType<typeof hc<MessageTemplatesApi>>;
     messages:           ReturnType<typeof hc<MessagesApi>>;
+    inspectorMessages:  ReturnType<typeof hc<InspectorMessagesApi>>;
     metrics:            ReturnType<typeof hc<MetricsApi>>;
     audit:              ReturnType<typeof hc<AuditApi>>;
     notifications:      ReturnType<typeof hc<NotificationsApi>>;
@@ -234,6 +236,7 @@ const MOUNT: Record<keyof Api, string> = {
     mcpGrants:          "/api/mcp",
     messageTemplates:   "/api/message-templates",
     messages:           "/api/messages",
+    inspectorMessages:  "/api/inspections",
     metrics:            "/api/metrics",
     audit:              "/api/audit",
     notifications:      "/api/notifications",
@@ -326,6 +329,7 @@ export function createApi(context: LoadContext, opts: CreateApiOptions = {}): Ap
         mcpGrants:          mk<McpGrantsApi>(MOUNT.mcpGrants),
         messageTemplates:   mk<MessageTemplatesApi>(MOUNT.messageTemplates),
         messages:           mk<MessagesApi>(MOUNT.messages),
+        inspectorMessages:  mk<InspectorMessagesApi>(MOUNT.inspectorMessages),
         metrics:            mk<MetricsApi>(MOUNT.metrics),
         audit:              mk<AuditApi>(MOUNT.audit),
         notifications:      mk<NotificationsApi>(MOUNT.notifications),

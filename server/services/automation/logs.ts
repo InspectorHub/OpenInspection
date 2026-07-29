@@ -1,5 +1,5 @@
 import { eq, and, sql, desc, lte } from 'drizzle-orm';
-import { automationLogs, contactRoleProfiles } from '../../lib/db/schema';
+import { automationLogs, automations, contactRoleProfiles } from '../../lib/db/schema';
 import type { Constructor } from './shared';
 import type { AutomationBase } from './shared';
 
@@ -18,6 +18,8 @@ export interface CommunicationDelivery {
     reasonCode: string | null;
     source: 'automation' | 'manual';
     automationId: string;
+    /** Rule name for the notice row title; null when the rule was deleted. */
+    automationName: string | null;
     sendAt: number;
     deliveredAt: number | null;
 }
@@ -54,6 +56,7 @@ export function AutomationLogs<TBase extends Constructor<AutomationBase>>(Base: 
                 recipientContactId: automationLogs.recipientContactId,
                 roleKey: automationLogs.recipientRoleKey,
                 roleLabel: contactRoleProfiles.label,
+                automationName: automations.name,
                 status: automationLogs.status,
                 error: automationLogs.error,
                 automationId: automationLogs.automationId,
@@ -66,6 +69,10 @@ export function AutomationLogs<TBase extends Constructor<AutomationBase>>(Base: 
                 // inactive duplicate could fan the join out; and a deactivated
                 // role IS the "deleted role" case — its log must fall back to
                 // the raw key, not resurrect a retired label.
+                .leftJoin(automations, and(
+                    eq(automations.tenantId, automationLogs.tenantId),
+                    eq(automations.id, automationLogs.automationId),
+                ))
                 .leftJoin(contactRoleProfiles, and(
                     eq(contactRoleProfiles.tenantId, automationLogs.tenantId),
                     eq(contactRoleProfiles.key, sql`${automationLogs.recipientRoleKey}`),
@@ -91,6 +98,7 @@ export function AutomationLogs<TBase extends Constructor<AutomationBase>>(Base: 
                 // then every row here came from an automation firing.
                 source: 'automation' as const,
                 automationId: r.automationId,
+                automationName: r.automationName ?? null,
                 sendAt: r.sendAt instanceof Date ? r.sendAt.getTime() : Number(r.sendAt),
                 deliveredAt: r.deliveredAt == null ? null : (r.deliveredAt instanceof Date ? r.deliveredAt.getTime() : Number(r.deliveredAt)),
             }));

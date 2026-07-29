@@ -10,12 +10,18 @@
  */
 import { and, eq, isNull, lte, ne, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { automationLogs, inspectionMessages } from './db/schema';
+import { automationLogs, automations, inspectionMessages } from './db/schema';
 
 export interface CommunicationCounts {
     delivered: number;
     needsAttention: number;
     unread: number;
+    /**
+     * Active automation rules in the tenant — lets the Outbox tell its three
+     * empty states apart (report unpublished / no rules / nothing sent yet),
+     * which look identical and mean opposite things.
+     */
+    rulesActive: number;
 }
 
 export async function communicationCounts(
@@ -26,7 +32,7 @@ export async function communicationCounts(
     inspectionId: string,
     now: Date = new Date(),
 ): Promise<CommunicationCounts> {
-    const [deliveryCounts, unreadRow] = await Promise.all([
+    const [deliveryCounts, unreadRow, rulesRow] = await Promise.all([
         db.select({
             delivered: sql<number>`sum(case when ${automationLogs.status} = 'sent' then 1 else 0 end)`,
             needsAttention: sql<number>`sum(case when ${automationLogs.status} in ('failed', 'skipped') then 1 else 0 end)`,
@@ -43,10 +49,14 @@ export async function communicationCounts(
                 ne(inspectionMessages.fromRole, 'inspector'),
                 isNull(inspectionMessages.readAt),
             )).get(),
+        db.select({ c: sql<number>`count(*)` }).from(automations)
+            .where(and(eq(automations.tenantId, tenantId), eq(automations.active, true)))
+            .get(),
     ]);
     return {
         delivered:      Number(deliveryCounts?.delivered ?? 0),
         needsAttention: Number(deliveryCounts?.needsAttention ?? 0),
         unread:         Number(unreadRow?.c ?? 0),
+        rulesActive:    Number(rulesRow?.c ?? 0),
     };
 }

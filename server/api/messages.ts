@@ -212,13 +212,27 @@ export const inspectorMessageRoutes = createApiRouter()
             : await svc.primaryClientThread(tenantId, inspectionId);
         if (contactId && !thread) throw Errors.NotFound('Contact is not on this inspection');
         if (!thread) throw Errors.BadRequest('Inspection has no client to message');
+        // The JWT carries `sub`, not `id`, and no display name (looked up from
+        // the DB when needed) — resolve the author's name so the client's
+        // portal shows who replied instead of a bare role label.
+        const authorId = (jwtUser as { sub?: string } | undefined)?.sub ?? null;
+        let authorName: string | null = (jwtUser as { name?: string } | undefined)?.name ?? null;
+        if (!authorName && authorId) {
+            const { drizzle } = await import('drizzle-orm/d1');
+            const { users } = await import('../lib/db/schema');
+            const { and, eq } = await import('drizzle-orm');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const u = await drizzle(c.env.DB as any).select({ name: users.name }).from(users)
+                .where(and(eq(users.id, authorId), eq(users.tenantId, tenantId))).get();
+            authorName = u?.name ?? null;
+        }
         const row = await svc.createMessage({
             tenantId,
             inspectionId,
             contactId: thread.contactId,
             fromRole: 'inspector',
-            fromUserId: (jwtUser as { id?: string } | undefined)?.id ?? null,
-            fromName: (jwtUser as { name?: string } | undefined)?.name ?? null,
+            fromUserId: authorId,
+            fromName: authorName,
             body,
             attachments: attachments ?? [],
         });
@@ -272,6 +286,7 @@ const messageRoutes = createApiRouter()
     });
 
 export type MessagesApi = typeof messageRoutes;
+export type InspectorMessagesApi = typeof inspectorMessageRoutes;
 
 // ── Client router (resolveClientActor-gated; mounted at /api/public) ──────────
 
