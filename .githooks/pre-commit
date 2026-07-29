@@ -6,6 +6,14 @@
 #     git config core.hooksPath .githooks
 # Bypass (discouraged): git commit --no-verify
 #
+# If you do bypass it AND the commit touches TypeScript, run
+# `npm run type-check:app` (plus type-check:api if server/ moved) immediately
+# afterwards. tsc's incremental build-info is only refreshed by a run that
+# completes, so skipping the hook leaves it describing the PREVIOUS tree and the
+# next type-check pays full cold cost — measured here: 21s warm, 357s cold. That
+# cold run then blows whatever timeout made --no-verify attractive, and the loop
+# feeds itself. Ask how this was measured: by falling into it.
+#
 # Mechanism is .githooks + core.hooksPath (no husky), aligned with the
 # superproject and the portal/cms submodules.
 
@@ -91,7 +99,7 @@ else
     GEN_OK=1
     GEN_NOTE=""
     if needs_paraglide; then
-        if npm run i18n:compile > /dev/null 2>&1; then
+        if npm run i18n:compile:cached > /dev/null 2>&1; then
             GEN_NOTE="${GEN_NOTE}, regenerated messages"
         else
             GEN_OK=0
@@ -104,8 +112,26 @@ else
             GEN_OK=0
         fi
     fi
+    # The api program includes server/** and nothing else, so staged changes
+    # confined to app/ packages/ workers/ cannot affect it. That pass was being
+    # run anyway: 11s warm, and 152s when its build-info had gone cold — paid on
+    # every front-end commit for a program the commit cannot reach.
+    #
+    # Config changes (tsconfig, package.json, vite/react-router config) still run
+    # BOTH, because those can move either program's inputs.
+    APP_ONLY=0
+    if [ -z "$CONFIG_STAGED" ] && [ -z "$(echo "$TS_STAGED" | grep -E '^server/')" ]; then
+        APP_ONLY=1
+    fi
+
     if [ "$GEN_OK" -eq 0 ]; then
         fail "Type generation failed  →  npm run type-check"
+    elif [ "$APP_ONLY" -eq 1 ]; then
+        if npm run type-check:app > /dev/null 2>&1; then
+            pass "Type check passed (tsc, app pass only — no staged server/ changes${GEN_NOTE})"
+        else
+            fail "Type check failed  →  npm run type-check:app"
+        fi
     elif npm run type-check:app > /dev/null 2>&1 && npm run type-check:api > /dev/null 2>&1; then
         pass "Type check passed (tsc${GEN_NOTE})"
     else
