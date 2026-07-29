@@ -8,7 +8,7 @@ import type { Constructor, TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { PeopleService } from '../people.service';
-import { capabilitiesForKind } from '../../lib/people/capabilities';
+import { capabilitiesForProfile } from '../../lib/people/capabilities';
 
 /**
  * Trigger mixin: fan out pending automation_log rows when a domain event fires,
@@ -326,7 +326,7 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             }
             const targets = rule.recipientKind === 'role'
                 ? people.filter(p => p.roleProfileId === rule.recipientRoleProfileId)
-                : people.filter(p => capabilitiesForKind(p.kind).receivesReport);
+                : people.filter(p => capabilitiesForProfile(p.kind, p.capabilityOverrides).receivesReport);
 
             const { normalizeE164 } = await import('../../lib/sms/phone');
             const out: Array<{ contactId: string; roleKey: string; email?: string; phone?: string }> = [];

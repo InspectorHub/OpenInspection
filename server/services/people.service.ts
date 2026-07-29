@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, sql } from 'drizzle-orm';
 import { contacts, contactRoleProfiles, inspectionPeople, messageTemplates } from '../lib/db/schema';
-import { capabilitiesForKind, type RoleCapabilities, type RoleKind } from '../lib/people/capabilities';
+import { capabilitiesForProfile, type RoleCapabilities, type RoleKind } from '../lib/people/capabilities';
 import { PRIMARY_CLIENT_KEY, SECONDARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { Errors } from '../lib/errors';
 
@@ -9,6 +9,8 @@ export interface PersonRow {
     id: string; contactId: string; roleProfileId: string;
     roleKey: string; roleLabel: string; kind: RoleKind;
     name: string; email: string | null; phone: string | null; agency: string | null;
+    /** Raw per-profile overrides; resolve with capabilitiesForProfile(kind, this). */
+    capabilityOverrides: unknown;
 }
 
 export class PeopleService {
@@ -214,6 +216,7 @@ export class PeopleService {
         const rows = await this.db.select({
             id: inspectionPeople.id, contactId: contacts.id, roleProfileId: contactRoleProfiles.id,
             roleKey: contactRoleProfiles.key, roleLabel: contactRoleProfiles.label, kind: contactRoleProfiles.kind,
+            capabilityOverrides: contactRoleProfiles.capabilityOverrides,
             name: contacts.name, email: contacts.email, phone: contacts.phone, agency: contacts.agency,
         }).from(inspectionPeople)
             .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))
@@ -237,17 +240,23 @@ export class PeopleService {
     }
 
     async roleProfileIdsWithCapability(tenantId: string, cap: keyof RoleCapabilities): Promise<string[]> {
-        const rows = await this.db.select({ id: contactRoleProfiles.id, kind: contactRoleProfiles.kind })
+        const rows = await this.db.select({
+            id: contactRoleProfiles.id, kind: contactRoleProfiles.kind,
+            capabilityOverrides: contactRoleProfiles.capabilityOverrides,
+        })
             .from(contactRoleProfiles)
             .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
-        return rows.filter(r => capabilitiesForKind(r.kind as RoleKind)[cap]).map(r => r.id);
+        return rows.filter(r => Boolean(capabilitiesForProfile(r.kind as RoleKind, r.capabilityOverrides)[cap])).map(r => r.id);
     }
 
     async roleKeysWithCapability(tenantId: string, cap: keyof RoleCapabilities): Promise<string[]> {
-        const rows = await this.db.select({ key: contactRoleProfiles.key, kind: contactRoleProfiles.kind })
+        const rows = await this.db.select({
+            key: contactRoleProfiles.key, kind: contactRoleProfiles.kind,
+            capabilityOverrides: contactRoleProfiles.capabilityOverrides,
+        })
             .from(contactRoleProfiles)
             .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
-        return rows.filter(r => capabilitiesForKind(r.kind as RoleKind)[cap]).map(r => r.key);
+        return rows.filter(r => Boolean(capabilitiesForProfile(r.kind as RoleKind, r.capabilityOverrides)[cap])).map(r => r.key);
     }
 
     /**

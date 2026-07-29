@@ -42,6 +42,8 @@ export interface RoleProfile {
   isSystem: boolean;
   sortOrder: number;
   active: boolean;
+  /** Raw per-profile capability overrides; resolve with capabilitiesForProfile. */
+  capabilityOverrides?: unknown;
 }
 
 /** Trimmed view of a message template — just enough for the Select options in RoleProfileModal. */

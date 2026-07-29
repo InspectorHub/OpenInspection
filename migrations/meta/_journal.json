@@ -78,6 +78,20 @@
       "when": 1785338147556,
       "tag": "0010_fluffy_rafael_vega",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1785354047420,
+      "tag": "0011_magenta_warbound",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1785354317907,
+      "tag": "0012_backfill_system_role_capabilities",
+      "breakpoints": true
     }
   ]
 }
