@@ -11,6 +11,10 @@
  * Scope note: this checks SOURCE. Translations under messages/<locale>/ are the
  * point of having translations, and the private superproject's docs are not
  * covered by this rule at all.
+ *
+ * Runs in `npm run lint` (CI's verify job) and deliberately NOT in pre-commit:
+ * it walks the whole tree, and drifting language is not the kind of mistake
+ * that needs catching within seconds of typing it. CI is soon enough.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
