@@ -215,14 +215,26 @@ jobs:
       - test-web
       - build
     steps:
-      - name: Fail if any check did not succeed
+      # Block scalar, not a plain one: a plain YAML scalar may not contain
+      # ": " and `echo "results: …"` does, which is a parse error rather than
+      # the harmless-looking line it resembles.
+      - name: Report results
         run: |
           echo "results: ${{ join(needs.*.result, ', ') }}"
-          if [ -n "$(echo '${{ join(needs.*.result, ",") }}' | tr ',' '\n' | grep -v '^success$' || true)" ]; then
-            echo "::error::One or more checks did not succeed."
-            exit 1
-          fi
-          echo "All checks succeeded."
+      # An EXPRESSION, not shell. GitHub expressions accept only single-quoted
+      # strings; a stray double quote fails the entire WORKFLOW to parse, and
+      # the run then shows zero jobs and "this run likely failed because of a
+      # workflow file issue" — which looks nothing like a syntax error. Local
+      # `yaml.safe_load` does not catch it either: that validates YAML, not
+      # Actions expressions. This is how the first version of this file broke.
+      - name: Fail if any check did not succeed
+        if: >-
+          contains(needs.*.result, 'failure')
+          || contains(needs.*.result, 'cancelled')
+          || contains(needs.*.result, 'skipped')
+        run: |
+          echo "::error::One or more checks did not succeed."
+          exit 1
 
   # Seeded Playwright E2E against the real built worker. Independent of the
   # fan-out above. playwright.config.ts's `webServer` builds the worker and boots
