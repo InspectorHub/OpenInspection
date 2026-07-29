@@ -10,11 +10,13 @@
  * be unit-tested without a Hono context.
  */
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
-import { inspections, inspectionResults } from '../lib/db/schema';
+import { and, eq, gte } from 'drizzle-orm';
+import { inspections, inspectionResults, ratingSystems, templates } from '../lib/db/schema';
 import {
     groupInspectionsByMonth,
-    summariseHeatmap,
+    summariseFindings,
+    type FindingsMatrix,
+    type HeatmapLevel,
     type MonthBucket,
     type HeatmapItem,
 } from '../lib/analytics';
@@ -53,15 +55,70 @@ export class AnalyticsService {
         return { months: buckets };
     }
 
-    async findingsHeatmap(tenantId: string) {
+    /**
+     * Section × rating-level counts for the /metrics findings card.
+     *
+     * Three reads, because the result envelope alone cannot answer the
+     * question (see `summariseFindings`): the envelopes themselves, the
+     * tenant's templates (section id → title), and the tenant's rating systems
+     * (level id → label/colour). Templates and rating systems are both small,
+     * per-tenant tables — the envelopes are the only unbounded read, and
+     * `fromDate` bounds them to the requested window.
+     *
+     * Section titles come from the live templates rather than each inspection's
+     * `template_snapshot`: section ids survive the snapshot copy, so the live
+     * template resolves the same ids without loading one large JSON blob per
+     * inspection. An inspection whose section was since deleted from its
+     * template falls into the "Unknown" row.
+     */
+    async findingsHeatmap(tenantId: string, fromDate?: string): Promise<FindingsMatrix> {
         const db = this.getDrizzle();
-        const rows = await db.select({ data: inspectionResults.data })
+
+        const resultRows = await db.select({ data: inspectionResults.data })
             .from(inspectionResults)
-            .where(eq(inspectionResults.tenantId, tenantId))
+            .innerJoin(inspections, and(
+                eq(inspections.id, inspectionResults.inspectionId),
+                eq(inspections.tenantId, inspectionResults.tenantId),
+            ))
+            .where(fromDate
+                ? and(eq(inspectionResults.tenantId, tenantId), gte(inspections.date, fromDate))
+                : eq(inspectionResults.tenantId, tenantId))
             .all();
-        const envelopes = rows.map(r =>
+
+        const templateRows = await db.select({ schema: templates.schema })
+            .from(templates)
+            .where(eq(templates.tenantId, tenantId))
+            .all();
+
+        const ratingRows = await db.select({ levels: ratingSystems.levels })
+            .from(ratingSystems)
+            .where(eq(ratingSystems.tenantId, tenantId))
+            .all();
+
+        const sectionTitles: Record<string, string> = {};
+        for (const row of templateRows) {
+            const schema = safeJsonParse<{ sections?: Array<{ id?: unknown; title?: unknown; name?: unknown }> }>(row.schema, {});
+            for (const section of schema.sections ?? []) {
+                const id = typeof section?.id === 'string' ? section.id : '';
+                const title = typeof section?.title === 'string' && section.title
+                    ? section.title
+                    : typeof section?.name === 'string' ? section.name : '';
+                if (id && title) sectionTitles[id] ??= title;
+            }
+        }
+
+        const levels: HeatmapLevel[] = [];
+        for (const row of ratingRows) {
+            for (const level of safeJsonParse<HeatmapLevel[]>(row.levels, [])) {
+                if (level && typeof level.id === 'string' && typeof level.label === 'string') {
+                    levels.push({ ...level, abbreviation: level.abbreviation ?? '' });
+                }
+            }
+        }
+
+        const envelopes = resultRows.map(r =>
             safeJsonParse<Record<string, HeatmapItem>>(r.data, {}),
         );
-        return summariseHeatmap(envelopes);
+        return summariseFindings(envelopes, { sectionTitles, levels });
     }
 }

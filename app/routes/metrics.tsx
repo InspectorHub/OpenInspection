@@ -21,28 +21,58 @@ interface MetricsData {
   monthly: { month: string; count: number; revenue: number }[];
   topAgents: { agentName: string; count: number; revenue: number }[];
   byInspector: { inspectorId: string | null; inspectorName: string; count: number; revenue: number; avgTurnaroundDays: number | null }[];
+  // IA-82 — the endpoint has always computed and returned this; nothing rendered
+  // it, so the aggregation ran for no reader.
+  serviceBreakdown: { serviceName: string; count: number; revenue: number }[];
 }
+
+/** Mirrors `FindingsMatrix` from server/lib/analytics.ts. */
+interface FindingsData {
+  columns: { key: string; label: string; color: string }[];
+  rows: { section: string; counts: Record<string, number>; total: number }[];
+  total: number;
+}
+
+type FindingsRow = FindingsData["rows"][number];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const url = new URL(request.url);
   const periodParam = url.searchParams.get("period") ?? "6m";
   const period = (["3m", "6m", "12m"].includes(periodParam) ? periodParam : "6m") as "3m" | "6m" | "12m";
+  const api = createApi(context, { token });
+
+  let data: MetricsData | null = null;
   try {
-    const api = createApi(context, { token });
     const res = await api.metrics.index.$get({ query: { period } });
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
     const d = (body.data ?? {}) as Record<string, unknown>;
-    return { data: (Object.keys(d).length > 0 ? d : null) as MetricsData | null, period };
+    data = (Object.keys(d).length > 0 ? d : null) as MetricsData | null;
   } catch {
-    return { data: null, period };
+    data = null;
   }
+
+  // IA-82 — the findings matrix is a second aggregation with its own endpoint.
+  // It is fetched separately (and fails alone) so a slow or erroring findings
+  // read cannot blank the revenue KPIs, which are the page's primary content.
+  let findings: FindingsData | null = null;
+  try {
+    const res = await api.analytics["findings-heatmap"].$get({ query: { period } });
+    if (res.ok) {
+      const body = (await res.json()) as { data?: FindingsData };
+      findings = body.data ?? null;
+    }
+  } catch {
+    findings = null;
+  }
+
+  return { data, findings, period };
 }
 
 const PERIODS = ["3m", "6m", "12m"] as const;
 
 export default function MetricsPage() {
-  const { data, period: initialPeriod } = useLoaderData<typeof loader>();
+  const { data, findings, period: initialPeriod } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const locale = useDisplayLocale();
   const currency = useDisplayCurrency();
@@ -175,6 +205,62 @@ export default function MetricsPage() {
           </div>
         ) : (
           <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.metrics_no_inspectors()}</p>
+        )}
+      </Card>
+
+      {/* Findings by section — the tenant's own rating levels as columns.
+          Not Inspected / Not Present are excluded server-side: they record the
+          absence of a condition, so counting them would let a mostly-unbuilt
+          section outrank one full of real defects. */}
+      <Card className="p-5">
+        <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_findings_title()}</p>
+        {findings && findings.rows.length > 0 && findings.columns.length > 0 ? (
+          <div className="overflow-x-auto">
+            <Table<FindingsRow>
+              rows={findings.rows}
+              getRowKey={(row) => row.section}
+              columns={[
+                { label: m.metrics_col_section(), cell: (row) => <span className="font-medium text-ih-fg-1">{row.section}</span> },
+                ...findings.columns.map((col) => ({
+                  label: (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: col.color }} />
+                      {col.label}
+                    </span>
+                  ),
+                  align: "center" as const,
+                  cell: (row: FindingsRow) => (
+                    <span className={row.counts[col.key] ? "text-ih-fg-2" : "text-ih-fg-4"}>
+                      {row.counts[col.key] ?? "—"}
+                    </span>
+                  ),
+                })),
+                { label: m.metrics_col_total(), align: "right", cell: (row) => <span className="font-bold text-ih-fg-1">{row.total}</span> },
+              ]}
+            />
+          </div>
+        ) : (
+          <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.metrics_no_findings()}</p>
+        )}
+      </Card>
+
+      {/* Service mix */}
+      <Card className="p-5">
+        <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_services_title()}</p>
+        {data && data.serviceBreakdown?.length > 0 ? (
+          <div className="overflow-x-auto">
+            <Table<MetricsData["serviceBreakdown"][number]>
+              rows={data.serviceBreakdown}
+              getRowKey={(row) => row.serviceName}
+              columns={[
+                { label: m.metrics_col_service(), cell: (row) => <span className="font-medium text-ih-fg-1">{row.serviceName}</span> },
+                { label: m.metrics_col_inspections(), align: "center", cell: (row) => <span className="text-ih-fg-2">{row.count}</span> },
+                { label: m.metrics_col_revenue(), align: "right", cell: (row) => <span className="text-ih-fg-2">{fmt(row.revenue)}</span> },
+              ]}
+            />
+          </div>
+        ) : (
+          <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.metrics_no_services()}</p>
         )}
       </Card>
 

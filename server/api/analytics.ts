@@ -27,10 +27,13 @@ const heatmapRoute = createRoute(withMcpMetadata({
     method:  'get',
     path:    '/findings-heatmap',
     tags: ["metrics"],
-    summary: 'Section × rating bucket counts across this tenant\'s inspections',
+    summary: 'Section × rating-level counts across this tenant\'s inspections',
+    request: { query: z.object({
+        period: z.enum(['3m', '6m', '12m']).default('12m').describe('Trailing window the counts cover, matching the /metrics period selector.'),
+    }).describe('Trailing-window selector.') },
     responses: { 200: { description: 'ok' } },
     operationId: "listAnalyticFindingsHeatmap",
-    description: "Auto-generated placeholder for listAnalyticFindingsHeatmap (GET /findings-heatmap, metrics domain). TODO: replace with a real description sourced from the handler."
+    description: "Counts rated items by template section and rating level over the trailing period. Columns are the tenant's own rating levels minus Not Inspected / Not Present; rows are template sections, ordered by volume."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const analyticsRoutes = createApiRouter()
@@ -44,7 +47,11 @@ const analyticsRoutes = createApiRouter()
     .openapi(heatmapRoute, async (c) => {
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-        const out = await c.var.services.analytics.findingsHeatmap(tenantId);
+        const { period } = c.req.valid('query');
+        const months = period === '3m' ? 3 : period === '6m' ? 6 : 12;
+        const from = new Date();
+        from.setMonth(from.getMonth() - months);
+        const out = await c.var.services.analytics.findingsHeatmap(tenantId, from.toISOString().slice(0, 10));
         return c.json({ success: true as const, data: out }, 200);
     });
 
