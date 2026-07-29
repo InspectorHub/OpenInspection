@@ -35,6 +35,7 @@ import costExportRoutes from './inspections/cost-export';
 import costItemRoutes from './inspections/cost-items';
 import complianceRoutes from './inspections/compliance';
 import peopleRoutes from './inspections/people';
+import communicationRoutes from './inspections/communication';
 import inspectionServiceRoutes from './inspections/services';
 
 export const inspectionsRoutes = createApiRouter()
@@ -46,6 +47,8 @@ export const inspectionsRoutes = createApiRouter()
     .route('/', mediaStudioRoutes)
     .route('/', publishRoutes)
     .route('/', reportDeliveryRoutes)
+    // Communication design §2 — messages + platform notices, two arrays.
+    .route('/', communicationRoutes)
     .route('/', agreementsRoutes)
     .route('/', hierarchyRoutes)
     // Commercial PCA Phase C — cost line CSV export (Task 11).

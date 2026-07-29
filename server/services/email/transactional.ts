@@ -138,7 +138,7 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             recipient: 'client' | 'inspector',
             inspectionId: string,
             message: { body: string; fromName?: string | null },
-            deps: { db: D1Database; kv?: KVNamespace; baseUrl: string; clientViewUrl?: string },
+            deps: { db: D1Database; kv?: KVNamespace; baseUrl: string; clientViewUrl?: string; contactEmail?: string },
         ): Promise<void> {
             if (!this.apiKey) return;
             const throttleKey = `msg_notify:${inspectionId}:${recipient}`;
@@ -166,7 +166,9 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             let to: string | null = null;
             let viewUrl = '';
             if (recipient === 'client') {
-                to = client?.email ?? null;
+                // Per-contact threading: the caller names the THREAD's contact.
+                // Falling back to the primary client keeps legacy callers working.
+                to = deps.contactEmail ?? client?.email ?? null;
                 // The client now reads messages in the unified portal Hub. The caller
                 // (inspector send route) mints a per-recipient portal token and builds
                 // the section deep-link, mirroring the report-ready email. If it is

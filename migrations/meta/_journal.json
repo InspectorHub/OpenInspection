@@ -71,6 +71,13 @@
       "when": 1785246850634,
       "tag": "0009_wealthy_post",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1785338147556,
+      "tag": "0010_fluffy_rafael_vega",
+      "breakpoints": true
     }
   ]
 }

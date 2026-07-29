@@ -184,6 +184,11 @@ export const InspectionHubSchema = z.object({
     ready:         z.boolean().describe('True when every required defect field is filled'),
     blockingCount: z.number().describe('Count of defects blocking publish'),
   }).describe('Report-status gate summary (reuses computePublishReadiness)'),
+  communication: z.object({
+    delivered:      z.number().describe('Platform notices delivered (status sent, due rows only).'),
+    needsAttention: z.number().describe('Platform notices skipped or failed — the count that auto-expands the block.'),
+    unread:         z.number().describe('Unread counterparty-authored messages on this inspection.'),
+  }).describe('Communication section header counts, so the section summary renders without a second round trip.'),
 }).openapi('InspectionHub');
 
 export const InspectionHubResponseSchema = createApiResponseSchema(InspectionHubSchema).openapi('InspectionHubResponse');

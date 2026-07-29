@@ -24,7 +24,7 @@
   "app/components/inspection-edit/CompliancePanel.tsx": 623,
   "app/components/portal/sections/RepairBuilderSection.tsx": 616,
   "app/hooks/useInspection.ts": 600,
-  "server/services/inspection/inspection-publish.service.ts": 591,
+  "server/services/inspection/inspection-publish.service.ts": 596,
   "server/services/marketplace.service.ts": 587,
   "server/services/concierge.service.ts": 586,
   "server/api/auth.ts": 564,

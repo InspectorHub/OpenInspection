@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, isNull, sql } from 'drizzle-orm';
-import { inspectionMessages, inspections } from '../lib/db/schema';
+import { and, eq, isNull, ne, sql } from 'drizzle-orm';
+import { inspectionMessages, inspections, inspectionPeople, contactRoleProfiles, contacts } from '../lib/db/schema';
 import type { MessageAttachment } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import type { NotificationService } from './notification.service';
@@ -8,11 +8,22 @@ import { PeopleService } from './people.service';
 
 interface CreateMessageInput {
     tenantId: string;
-    inspectionId: string;
-    fromRole: 'client' | 'inspector';
+    inspectionId: string | null;
+    /** The counterparty whose thread this message belongs to — never the staff author. */
+    contactId: string;
+    fromRole: 'inspector' | 'client' | 'agent' | 'other';
+    /** Staff author when fromRole === 'inspector'; null when the counterparty sent it. */
+    fromUserId?: string | null;
     fromName?: string | null;
     body: string;
     attachments: MessageAttachment[];
+}
+
+/** The counterparty a portal actor's messages belong to. */
+export interface ThreadContact {
+    contactId: string;
+    name: string | null;
+    email: string | null;
 }
 
 export class MessageService {
@@ -27,7 +38,9 @@ export class MessageService {
             id,
             tenantId: input.tenantId,
             inspectionId: input.inspectionId,
+            contactId: input.contactId,
             fromRole: input.fromRole,
+            fromUserId: input.fromUserId ?? null,
             fromName: input.fromName ?? null,
             body: input.body,
             attachments: input.attachments,
@@ -37,10 +50,10 @@ export class MessageService {
         const [row] = await this.db().select().from(inspectionMessages).where(eq(inspectionMessages.id, id)).limit(1);
         if (!row) throw Errors.Internal('Failed to create message');
 
-        // B3: in-app notification — when a client posts, alert the inspector
-        // who owns this inspection. Inspector-originated messages don't fire
-        // (the client receives them via email separately).
-        if (this.notification && input.fromRole === 'client') {
+        // B3: in-app notification — when a counterparty posts, alert the
+        // inspector who owns this inspection. Staff-originated messages don't
+        // fire (the contact receives them via email separately).
+        if (this.notification && input.fromRole !== 'inspector' && input.inspectionId) {
             const insp = await this.db().select({ inspectorId: inspections.inspectorId, address: inspections.propertyAddress })
                 .from(inspections)
                 .where(and(eq(inspections.id, input.inspectionId), eq(inspections.tenantId, input.tenantId)))
@@ -68,26 +81,124 @@ export class MessageService {
             .orderBy(inspectionMessages.createdAt);
     }
 
-    async markAllReadForRole(inspectionId: string, tenantId: string, fromRole: 'client' | 'inspector') {
+    /**
+     * Mark counterparty-authored messages read across a whole inspection — the
+     * inspector opened the merged view. "Counterparty" is anything not
+     * `inspector`: the old `fromRole = 'client'` filter would leave agent and
+     * other rows permanently unread once those roles start posting
+     * (feedback_audit_downstream_filters_when_adding_fields).
+     */
+    async markInspectionReadForStaff(inspectionId: string, tenantId: string) {
         await this.db().update(inspectionMessages)
             .set({ readAt: new Date() })
             .where(and(
                 eq(inspectionMessages.inspectionId, inspectionId),
                 eq(inspectionMessages.tenantId, tenantId),
-                eq(inspectionMessages.fromRole, fromRole),
+                ne(inspectionMessages.fromRole, 'inspector'),
                 isNull(inspectionMessages.readAt),
             ));
     }
 
+    /**
+     * Mark staff-authored messages read within ONE contact's thread — a portal
+     * viewer opened THEIR thread. Keyed by contact, not inspection: under
+     * per-contact threading an inspection-wide mark would let one viewer clear
+     * unread state on every other participant's thread.
+     */
+    async markThreadReadForContact(tenantId: string, contactId: string, inspectionId: string) {
+        await this.db().update(inspectionMessages)
+            .set({ readAt: new Date() })
+            .where(and(
+                eq(inspectionMessages.tenantId, tenantId),
+                eq(inspectionMessages.contactId, contactId),
+                eq(inspectionMessages.inspectionId, inspectionId),
+                eq(inspectionMessages.fromRole, 'inspector'),
+                isNull(inspectionMessages.readAt),
+            ));
+    }
+
+    /** Unread counterparty-authored messages across the tenant (sidebar badge). */
     async unreadCountForTenant(tenantId: string): Promise<number> {
         const [row] = await this.db().select({ c: sql<number>`count(*)` })
             .from(inspectionMessages)
             .where(and(
                 eq(inspectionMessages.tenantId, tenantId),
-                eq(inspectionMessages.fromRole, 'client'),
+                ne(inspectionMessages.fromRole, 'inspector'),
                 isNull(inspectionMessages.readAt),
             ));
         return Number(row?.c ?? 0);
+    }
+
+    /**
+     * Resolve which contact's thread a portal actor writes into — THEIR OWN
+     * seat on the inspection, matched by the verified email the actor
+     * authenticated with. This is what fixes the co-client attribution bug: a
+     * co-client's message used to be signed with the primary client's name
+     * because attribution went through getPrimaryClient unconditionally.
+     * Falls back to the primary client when no seat matches the email (a
+     * grant issued to an address that was later edited on the contact).
+     */
+    async resolveThreadContact(tenantId: string, inspectionId: string, actorEmail?: string | null): Promise<ThreadContact | null> {
+        if (actorEmail) {
+            const seat = await this.db().select({ contactId: contacts.id, name: contacts.name, email: contacts.email })
+                .from(inspectionPeople)
+                .innerJoin(contacts, eq(inspectionPeople.contactId, contacts.id))
+                .where(and(
+                    eq(inspectionPeople.tenantId, tenantId),
+                    eq(inspectionPeople.inspectionId, inspectionId),
+                    sql`lower(${contacts.email}) = lower(${actorEmail})`,
+                ))
+                .get();
+            if (seat) return seat;
+        }
+        return this.primaryClientThread(tenantId, inspectionId);
+    }
+
+    /**
+     * The primary client's thread — where an inspector's reply goes when no
+     * explicit thread is named (the pre-picker send surface). Kept distinct
+     * from resolveThreadContact so call sites read as what they mean.
+     */
+    async primaryClientThread(tenantId: string, inspectionId: string): Promise<ThreadContact | null> {
+        const primary = await new PeopleService({ DB: this.d1 }).getPrimaryClient(tenantId, inspectionId);
+        return primary ? { contactId: primary.contactId, name: primary.name, email: primary.email } : null;
+    }
+
+    /**
+     * A named contact's seat on this inspection, for an explicit-thread send
+     * (the compose contact picker). Returns null when the contact is not on the
+     * inspection — a send may not invent a thread with a stranger.
+     */
+    async contactOnInspection(tenantId: string, inspectionId: string, contactId: string): Promise<ThreadContact | null> {
+        const seat = await this.db().select({ contactId: contacts.id, name: contacts.name, email: contacts.email })
+            .from(inspectionPeople)
+            .innerJoin(contacts, eq(inspectionPeople.contactId, contacts.id))
+            .where(and(
+                eq(inspectionPeople.tenantId, tenantId),
+                eq(inspectionPeople.inspectionId, inspectionId),
+                eq(inspectionPeople.contactId, contactId),
+            ))
+            .get();
+        return seat ?? null;
+    }
+
+    /**
+     * The role kind a contact holds on this inspection, for stamping fromRole
+     * on counterparty-authored rows. 'other' when the seat's profile has no
+     * recognisable kind.
+     */
+    async roleKindOnInspection(tenantId: string, inspectionId: string, contactId: string): Promise<'client' | 'agent' | 'other'> {
+        const seat = await this.db().select({ kind: contactRoleProfiles.kind })
+            .from(inspectionPeople)
+            .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))
+            .where(and(
+                eq(inspectionPeople.tenantId, tenantId),
+                eq(inspectionPeople.inspectionId, inspectionId),
+                eq(inspectionPeople.contactId, contactId),
+            ))
+            .get();
+        const kind = seat?.kind;
+        return kind === 'client' || kind === 'agent' ? kind : 'other';
     }
 
     /**

@@ -77,6 +77,7 @@ const sendRoute = createRoute(withMcpMetadata({
         body: { content: { 'application/json': { schema: z.object({
             body: z.string().min(1).max(5000).describe('Message body text.'),
             attachments: z.array(AttachmentSchema).max(5).optional().describe('Up to 5 previously-uploaded attachments.'),
+            contactId: z.string().optional().describe('Which contact\'s thread to post into (compose picker). Omitted: the primary client\'s thread. 404 when the contact is not on this inspection.'),
         }).describe('Message payload.') } } },
     },
     responses: {
@@ -190,35 +191,48 @@ export const inspectorMessageRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const svc = c.var.services.message;
         const messages = await svc.listForInspection(inspectionId, tenantId);
-        // Mark all client messages read on inspector view.
-        await svc.markAllReadForRole(inspectionId, tenantId, 'client');
+        // The inspector opened the merged view: mark every counterparty-authored
+        // message on the inspection read (all threads — this is the one surface
+        // that shows them all).
+        await svc.markInspectionReadForStaff(inspectionId, tenantId);
         return c.json({ success: true, data: messages }, 200);
     })
     .openapi(sendRoute, async (c) => {
         const { inspectionId } = c.req.valid('param');
         const tenantId = c.get('tenantId');
-        const { body, attachments } = c.req.valid('json');
+        const { body, attachments, contactId } = c.req.valid('json');
         const jwtUser = c.get('user');
         const svc = c.var.services.message;
+        // Which thread this reply belongs to: the named contact's (compose
+        // picker), else the primary client's. A contactId not seated on this
+        // inspection is a 404, not a silent fallback — falling back would post
+        // the reply into a stranger's thread.
+        const thread = contactId
+            ? await svc.contactOnInspection(tenantId, inspectionId, contactId)
+            : await svc.primaryClientThread(tenantId, inspectionId);
+        if (contactId && !thread) throw Errors.NotFound('Contact is not on this inspection');
+        if (!thread) throw Errors.BadRequest('Inspection has no client to message');
         const row = await svc.createMessage({
             tenantId,
             inspectionId,
+            contactId: thread.contactId,
             fromRole: 'inspector',
+            fromUserId: (jwtUser as { id?: string } | undefined)?.id ?? null,
             fromName: (jwtUser as { name?: string } | undefined)?.name ?? null,
             body,
             attachments: attachments ?? [],
         });
-        // T22: notify client. Build a unified-portal Messages deep-link the same
-        // way the report-ready email does (per-recipient portal token + slug), so
-        // the no-login client lands in the Hub messages tab already authorized.
+        // T22: notify the THREAD's contact — not unconditionally the primary
+        // client. Build a unified-portal Messages deep-link the same way the
+        // report-ready email does (per-recipient portal token + slug), so the
+        // no-login recipient lands in the Hub messages tab already authorized.
         try {
             let clientViewUrl: string | undefined;
             try {
-                const clientEmail = await svc.clientEmailForInspection(inspectionId, tenantId);
-                if (clientEmail) {
+                if (thread.email) {
                     const slug = await resolveTenantSlug(c, tenantId);
                     const portalToken = await c.var.services.portalAccess.issueToken({
-                        tenantId, inspectionId, recipientEmail: clientEmail, role: 'client',
+                        tenantId, inspectionId, recipientEmail: thread.email, role: 'client',
                     });
                     clientViewUrl = buildPortalUrl(getBaseUrl(c), slug, inspectionId, portalToken, 'messages');
                 }
@@ -226,6 +240,7 @@ export const inspectorMessageRoutes = createApiRouter()
             await c.var.services.email.sendMessageNotification('client', inspectionId, row, {
                 db: c.env.DB, kv: c.env.TENANT_CACHE, baseUrl: c.env.APP_BASE_URL || `https://${c.req.header('host') ?? ''}`,
                 clientViewUrl,
+                contactEmail: thread.email ?? undefined,
             });
         } catch { /* silent */ }
         return c.json({ success: true, data: row }, 201);
@@ -275,9 +290,13 @@ clientMessageRoutes.get('/inspections/:id/messages', async (c) => {
     const actor = await resolveClientActor(c, inspectionId);
     if (!actor) return c.json({ error: 'Unauthorized' }, 401);
     const svc = c.var.services.message;
-    const messages = await svc.listForInspection(inspectionId, actor.tenantId);
-    // Mark all inspector messages read on client view.
-    await svc.markAllReadForRole(inspectionId, actor.tenantId, 'inspector');
+    // The portal viewer sees THEIR thread, and marking read is scoped to it —
+    // an inspection-wide mark would clear unread state on every participant's
+    // thread the moment one of them looked (per-contact threading, design §3.9).
+    const thread = await svc.resolveThreadContact(actor.tenantId, inspectionId, actor.ref);
+    const all = await svc.listForInspection(inspectionId, actor.tenantId);
+    const messages = thread ? all.filter((mrow) => mrow.contactId === thread.contactId) : all;
+    if (thread) await svc.markThreadReadForContact(actor.tenantId, thread.contactId, inspectionId);
     return c.json({ success: true, data: messages }, 200);
 });
 
@@ -289,13 +308,17 @@ clientMessageRoutes.post('/inspections/:id/messages', async (c) => {
     const parsed = sendBodySchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: 'Invalid message payload.' }, 400);
     const svc = c.var.services.message;
+    // Attribution goes through the actor's OWN seat (matched by their verified
+    // email), not unconditionally through the primary client — the old path is
+    // why a co-client's messages were signed with the primary client's name.
+    const thread = await svc.resolveThreadContact(actor.tenantId, inspectionId, actor.ref);
+    if (!thread) return c.json({ error: 'No client seat on this inspection.' }, 403);
     const row = await svc.createMessage({
         tenantId: actor.tenantId,
         inspectionId,
+        contactId: thread.contactId,
         fromRole: 'client',
-        // Attribution: prefer the inspection's stored client name; fall back to
-        // the actor's verified email so the inspector sees who replied.
-        fromName: (await svc.clientNameForInspection(inspectionId, actor.tenantId)) ?? actor.ref,
+        fromName: thread.name ?? actor.ref,
         body: parsed.data.body,
         attachments: parsed.data.attachments ?? [],
     });

@@ -16,6 +16,7 @@ import {
     type RequireDefectFields,
     type PublishReadiness,
 } from './shared';
+import { communicationCounts } from '../../lib/communication-counts';
 import { InspectionSubService } from './base';
 import type { InspectionService } from '../inspection.service';
 
@@ -275,6 +276,7 @@ export class InspectionPublishService extends InspectionSubService {
         }>;
         invoice: { id: string; status: string; amountCents: number; sentAt: string | null; paidAt: string | null } | null;
         publishReadiness: { ready: boolean; blockingCount: number };
+        communication: { delivered: number; needsAttention: number; unread: number };
     } | null> {
         const db = this.getDrizzle();
 
@@ -371,6 +373,8 @@ export class InspectionPublishService extends InspectionSubService {
             peopleSvc.contactIdForRole(tenantId, inspectionId, 'listing_agent'),
         ]);
 
+        const communication = await communicationCounts(db, tenantId, inspectionId);
+
         return {
             inspection: {
                 id:                insp.id,
@@ -436,6 +440,7 @@ export class InspectionPublishService extends InspectionSubService {
                 ready:         readiness.ready,
                 blockingCount: readiness.blockingDefects.length,
             },
+            communication,
         };
     }
 
