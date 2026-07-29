@@ -66,7 +66,15 @@ jobs:
       # server/generated/version.ts is git-ignored and produced by the build;
       # type-check imports it, so stamp it on a fresh checkout.
       - run: npm run gen-version
-      - run: npm run i18n:compile
+      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
+      # that those exact inputs produced — unlike a build-info cache, there is no
+      # staleness to reason about. The stamp inside app/paraglide comes back with
+      # it, so the script below sees "unchanged" and skips a ~66s compile.
+      - uses: actions/cache@v4
+        with:
+          path: app/paraglide
+          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
+      - run: npm run i18n:compile:cached
       - run: npx react-router typegen
       - run: npm run type-check:app
 
@@ -97,7 +105,15 @@ jobs:
         with: { node-version: 22.22.x, cache: npm }
       - run: npm ci
       - run: npm run gen-version
-      - run: npm run i18n:compile
+      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
+      # that those exact inputs produced — unlike a build-info cache, there is no
+      # staleness to reason about. The stamp inside app/paraglide comes back with
+      # it, so the script below sees "unchanged" and skips a ~66s compile.
+      - uses: actions/cache@v4
+        with:
+          path: app/paraglide
+          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
+      - run: npm run i18n:compile:cached
       - run: npx react-router typegen
       - run: npm run test:types
 
@@ -116,7 +132,15 @@ jobs:
         with: { node-version: 22.22.x, cache: npm }
       - run: npm ci
       - run: npm run gen-version
-      - run: npm run i18n:compile
+      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
+      # that those exact inputs produced — unlike a build-info cache, there is no
+      # staleness to reason about. The stamp inside app/paraglide comes back with
+      # it, so the script below sees "unchanged" and skips a ~66s compile.
+      - uses: actions/cache@v4
+        with:
+          path: app/paraglide
+          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
+      - run: npm run i18n:compile:cached
       - run: npx react-router typegen
       - run: npm run lint:eslint
 
@@ -131,7 +155,15 @@ jobs:
         with: { node-version: 22.22.x, cache: npm }
       - run: npm ci
       - run: npm run gen-version
-      - run: npm run i18n:compile
+      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
+      # that those exact inputs produced — unlike a build-info cache, there is no
+      # staleness to reason about. The stamp inside app/paraglide comes back with
+      # it, so the script below sees "unchanged" and skips a ~66s compile.
+      - uses: actions/cache@v4
+        with:
+          path: app/paraglide
+          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
+      - run: npm run i18n:compile:cached
       # knip resolves every `./+types/*` import a route file makes, so it needs
       # the generated route types present or it reports the whole of app/routes
       # as unresolved. In the old serial job these existed only because
@@ -179,7 +211,15 @@ jobs:
         with: { node-version: 22.22.x, cache: npm }
       - run: npm ci
       - run: npm run gen-version
-      - run: npm run i18n:compile
+      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
+      # that those exact inputs produced — unlike a build-info cache, there is no
+      # staleness to reason about. The stamp inside app/paraglide comes back with
+      # it, so the script below sees "unchanged" and skips a ~66s compile.
+      - uses: actions/cache@v4
+        with:
+          path: app/paraglide
+          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
+      - run: npm run i18n:compile:cached
       - run: npx react-router typegen
       - run: npm run test:web
 

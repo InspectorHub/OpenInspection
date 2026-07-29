@@ -88,7 +88,8 @@
     "mcp:snapshot": "node scripts/snapshot-openapi.mjs",
     "lint:english": "node scripts/check-english-only.mjs",
     "lint:eslint": "cross-env NODE_OPTIONS=--max-old-space-size=12288 eslint . --cache --cache-strategy content",
-    "lint:gates-full": "npm run lint:ds && npm run lint:svg && npm run lint:erasure && npm run lint:migrefs && npm run lint:english && npm run lint:filesize && npm run lint:dup && npm run lint:tenant-scope && npm run lint:status-literals && npm run lint:tests && npm run lint:deadcode && npm run lint:timestamps && npm run lint:tz && npm run lint:i18n && npm run lint:i18n-catalog && npm run lint:naming"
+    "lint:gates-full": "npm run lint:ds && npm run lint:svg && npm run lint:erasure && npm run lint:migrefs && npm run lint:english && npm run lint:filesize && npm run lint:dup && npm run lint:tenant-scope && npm run lint:status-literals && npm run lint:tests && npm run lint:deadcode && npm run lint:timestamps && npm run lint:tz && npm run lint:i18n && npm run lint:i18n-catalog && npm run lint:naming",
+    "i18n:compile:cached": "node scripts/i18n-compile-if-changed.mjs"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^0.8.1",
