@@ -29,7 +29,7 @@ function renderMetrics(
     {
       path: "/metrics",
       Component: MetricsPage,
-      loader: () => ({ data, findings, period: "6m" }),
+      loader: () => ({ data, findings, range: { from: "2026-04-29", to: "2026-07-29" } }),
     },
   ]);
   return render(<Stub initialEntries={["/metrics"]} />);
@@ -77,7 +77,7 @@ describe("MetricsPage monthly charts", () => {
     expect((await findAllByText("04")).length).toBeGreaterThan(0);
     expect((await findAllByText("05")).length).toBeGreaterThan(0);
     // The empty-state copy must NOT appear when the series has data.
-    expect(queryByText(/No data available for this period/i)).toBeNull();
+    expect(queryByText(/No data in this date range/i)).toBeNull();
   });
 
   it("shows the empty state when the monthly series is absent", async () => {
@@ -90,7 +90,7 @@ describe("MetricsPage monthly charts", () => {
       byInspector: [],
     });
     // Both month cards fall back to their empty copy.
-    const empties = await findAllByText(/available for this period/i);
+    const empties = await findAllByText(/in this date range/i);
     expect(empties.length).toBeGreaterThan(0);
   });
 });
@@ -106,14 +106,21 @@ describe("MetricsPage monthly charts", () => {
  */
 describe("MetricsPage findings matrix", () => {
   const FINDINGS = {
-    columns: [
-      { key: "satisfactory", label: "Satisfactory", color: "#10b981" },
-      { key: "monitor", label: "Monitor", color: "#f59e0b" },
-      { key: "defect", label: "Defect", color: "#ef4444" },
-    ],
-    rows: [
-      { section: "Roof", counts: { satisfactory: 4, defect: 2 }, total: 6 },
-      { section: "Electrical", counts: { monitor: 1 }, total: 1 },
+    systems: [
+      {
+        systemId: "rs-default",
+        systemName: "OpenInspection Default",
+        columns: [
+          { key: "satisfactory", label: "Satisfactory", color: "#10b981" },
+          { key: "monitor", label: "Monitor", color: "#f59e0b" },
+          { key: "defect", label: "Defect", color: "#ef4444" },
+        ],
+        rows: [
+          { section: "Roof", counts: { satisfactory: 4, defect: 2 }, total: 6 },
+          { section: "Electrical", counts: { monitor: 1 }, total: 1 },
+        ],
+        total: 7,
+      },
     ],
     total: 7,
   };
@@ -131,7 +138,7 @@ describe("MetricsPage findings matrix", () => {
     // Section rows.
     await findByText("Roof");
     await findByText("Electrical");
-    expect(queryByText(/No rated findings in this period/i)).toBeNull();
+    expect(queryByText(/No rated findings in this date range/i)).toBeNull();
   });
 
   it("falls back to the empty state when the findings fetch failed", async () => {
@@ -141,7 +148,7 @@ describe("MetricsPage findings matrix", () => {
       { totalInspections: 2, totalRevenue: 0, avgOrderValue: 0, monthly: [], topAgents: [], byInspector: [] },
       null,
     );
-    await findByText(/No rated findings in this period/i);
+    await findByText(/No rated findings in this date range/i);
   });
 });
 

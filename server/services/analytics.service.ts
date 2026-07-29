@@ -10,13 +10,15 @@
  * be unit-tested without a Hono context.
  */
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, gte } from 'drizzle-orm';
+import { and, eq, gte, lte } from 'drizzle-orm';
 import { inspections, inspectionResults, ratingSystems, templates } from '../lib/db/schema';
+import { inclusiveUpperBound, type MetricsWindow } from '../lib/metrics-window';
 import {
     groupInspectionsByMonth,
     summariseFindings,
     type FindingsMatrix,
     type HeatmapLevel,
+    type HeatmapSystem,
     type MonthBucket,
     type HeatmapItem,
 } from '../lib/analytics';
@@ -63,15 +65,23 @@ export class AnalyticsService {
      * tenant's templates (section id → title), and the tenant's rating systems
      * (level id → label/colour). Templates and rating systems are both small,
      * per-tenant tables — the envelopes are the only unbounded read, and
-     * `fromDate` bounds them to the requested window.
+     * `window` bounds them to the range the page is showing.
      *
      * Section titles come from the live templates rather than each inspection's
      * `template_snapshot`: section ids survive the snapshot copy, so the live
      * template resolves the same ids without loading one large JSON blob per
      * inspection. An inspection whose section was since deleted from its
      * template falls into the "Unknown" row.
+     *
+     * Only the rating systems a template can actually resolve to become columns:
+     * the ones templates bind explicitly, plus the tenant default for templates
+     * that bind none. A tenant carrying the four seeded systems has ten distinct
+     * level labels between them — unioning all four produced a ten-column table
+     * where seven columns could never hold a count, because no template in the
+     * tenant uses those systems. Same rule the editor applies when it decides
+     * which levels an inspector may pick.
      */
-    async findingsHeatmap(tenantId: string, fromDate?: string): Promise<FindingsMatrix> {
+    async findingsHeatmap(tenantId: string, window?: MetricsWindow): Promise<FindingsMatrix> {
         const db = this.getDrizzle();
 
         const resultRows = await db.select({ data: inspectionResults.data })
@@ -80,20 +90,29 @@ export class AnalyticsService {
                 eq(inspections.id, inspectionResults.inspectionId),
                 eq(inspections.tenantId, inspectionResults.tenantId),
             ))
-            .where(fromDate
-                ? and(eq(inspectionResults.tenantId, tenantId), gte(inspections.date, fromDate))
+            .where(window
+                ? and(
+                    eq(inspectionResults.tenantId, tenantId),
+                    gte(inspections.date, window.from),
+                    lte(inspections.date, inclusiveUpperBound(window.to)),
+                )
                 : eq(inspectionResults.tenantId, tenantId))
             .all();
 
-        const templateRows = await db.select({ schema: templates.schema })
+        const templateRows = await db.select({ schema: templates.schema, ratingSystemId: templates.ratingSystemId })
             .from(templates)
             .where(eq(templates.tenantId, tenantId))
             .all();
 
-        const ratingRows = await db.select({ levels: ratingSystems.levels })
+        const ratingRows = await db.select({ id: ratingSystems.id, name: ratingSystems.name, isDefault: ratingSystems.isDefault, levels: ratingSystems.levels })
             .from(ratingSystems)
             .where(eq(ratingSystems.tenantId, tenantId))
             .all();
+
+        const boundSystemIds = new Set(
+            templateRows.map(t => t.ratingSystemId).filter((id): id is string => typeof id === 'string' && id.length > 0),
+        );
+        const usesTenantDefault = templateRows.some(t => !t.ratingSystemId);
 
         const sectionTitles: Record<string, string> = {};
         for (const row of templateRows) {
@@ -107,18 +126,22 @@ export class AnalyticsService {
             }
         }
 
-        const levels: HeatmapLevel[] = [];
+        const systems: HeatmapSystem[] = [];
         for (const row of ratingRows) {
+            const inUse = boundSystemIds.has(row.id) || (usesTenantDefault && row.isDefault);
+            if (!inUse) continue;
+            const levels: HeatmapLevel[] = [];
             for (const level of safeJsonParse<HeatmapLevel[]>(row.levels, [])) {
                 if (level && typeof level.id === 'string' && typeof level.label === 'string') {
                     levels.push({ ...level, abbreviation: level.abbreviation ?? '' });
                 }
             }
+            if (levels.length > 0) systems.push({ id: row.id, name: row.name, levels });
         }
 
         const envelopes = resultRows.map(r =>
             safeJsonParse<Record<string, HeatmapItem>>(r.data, {}),
         );
-        return summariseFindings(envelopes, { sectionTitles, levels });
+        return summariseFindings(envelopes, { sectionTitles, systems });
     }
 }

@@ -82,7 +82,10 @@ const LEVELS: HeatmapLevel[] = [
 ];
 
 const SECTIONS = { 'sec-roof': 'Roof', 'sec-elec': 'Electrical' };
-const CTX = { sectionTitles: SECTIONS, levels: LEVELS };
+const CTX = { sectionTitles: SECTIONS, systems: [{ id: 'rs-default', name: 'Default', levels: LEVELS }] };
+
+/** The single-system matrix — what every case below except the multi-system ones asserts on. */
+const only = (out: ReturnType<typeof summariseFindings>) => out.systems[0] ?? { columns: [], rows: [], total: 0, systemId: '', systemName: '' };
 
 /** A findingKey as `applyResultsBatch` writes it: `unit:section:item`. */
 const key = (section: string, item: string) => `_default:${section}:${item}`;
@@ -90,7 +93,7 @@ const key = (section: string, item: string) => `_default:${section}:${item}`;
 describe('summariseFindings (IA-82)', () => {
     it('returns an empty matrix when no inspections exist', () => {
         const out = summariseFindings([], CTX);
-        expect(out.rows).toEqual([]);
+        expect(only(out).rows).toEqual([]);
         expect(out.total).toBe(0);
     });
 
@@ -104,8 +107,8 @@ describe('summariseFindings (IA-82)', () => {
             { [key('sec-elec', 'i-4')]: { rating: 'lv-mon' } },
         ], CTX);
 
-        const roof = out.rows.find(r => r.section === 'Roof');
-        const elec = out.rows.find(r => r.section === 'Electrical');
+        const roof = only(out).rows.find(r => r.section === 'Roof');
+        const elec = only(out).rows.find(r => r.section === 'Electrical');
         expect(roof?.counts.defect).toBe(2);
         expect(roof?.counts.satisfactory).toBe(1);
         expect(roof?.total).toBe(3);
@@ -119,8 +122,8 @@ describe('summariseFindings (IA-82)', () => {
         const out = summariseFindings([
             { [key('sec-roof', 'i-1')]: { rating: 'lv-mon' }, [key('sec-roof', 'i-2')]: { rating: 'lv-mar' } },
         ], CTX);
-        expect(out.columns.map(c => c.key)).toEqual(['satisfactory', 'monitor', 'marginal', 'defect']);
-        const roof = out.rows.find(r => r.section === 'Roof');
+        expect(only(out).columns.map(c => c.key)).toEqual(['satisfactory', 'monitor', 'marginal', 'defect']);
+        const roof = only(out).rows.find(r => r.section === 'Roof');
         expect(roof?.counts.monitor).toBe(1);
         expect(roof?.counts.marginal).toBe(1);
     });
@@ -133,9 +136,9 @@ describe('summariseFindings (IA-82)', () => {
                 [key('sec-roof', 'i-3')]: { rating: 'lv-sat' },
             },
         ], CTX);
-        expect(out.columns.map(c => c.label)).not.toContain('Not Inspected');
-        expect(out.columns.map(c => c.label)).not.toContain('Not Present');
-        expect(out.rows.find(r => r.section === 'Roof')?.total).toBe(1);
+        expect(only(out).columns.map(c => c.label)).not.toContain('Not Inspected');
+        expect(only(out).columns.map(c => c.label)).not.toContain('Not Present');
+        expect(only(out).rows.find(r => r.section === 'Roof')?.total).toBe(1);
         expect(out.unresolved).toBe(0);
     });
 
@@ -143,17 +146,27 @@ describe('summariseFindings (IA-82)', () => {
         const out = summariseFindings([
             { [key('sec-roof', 'i-1')]: { rating: 'Satisfactory' }, [key('sec-roof', 'i-2')]: { rating: 'D' } },
         ], CTX);
-        const roof = out.rows.find(r => r.section === 'Roof');
+        const roof = only(out).rows.find(r => r.section === 'Roof');
         expect(roof?.counts.satisfactory).toBe(1);
         expect(roof?.counts.defect).toBe(1);
         expect(out.unresolved).toBe(0);
     });
 
-    it('files a section the templates no longer define under "Unknown"', () => {
+    it('flags a section the templates no longer define, and sinks it to the bottom', () => {
         const out = summariseFindings([
-            { [key('sec-deleted', 'i-1')]: { rating: 'lv-sat' } },
+            {
+                [key('sec-deleted', 'i-1')]: { rating: 'lv-sat' },
+                [key('sec-deleted', 'i-2')]: { rating: 'lv-sat' },
+                [key('sec-deleted', 'i-3')]: { rating: 'lv-sat' },
+                [key('sec-roof', 'i-4')]: { rating: 'lv-sat' },
+            },
         ], CTX);
-        expect(out.rows.map(r => r.section)).toEqual(['Unknown']);
+        // The catch-all row outweighs Roof 3:1 and still sorts last — it is
+        // bookkeeping, not a section anyone inspected. The flag (not the string)
+        // is what the frontend keys its label off.
+        expect(only(out).rows.map(r => r.section)).toEqual(['Roof', 'Unknown']);
+        expect(only(out).rows[1].unresolvedSection).toBe(true);
+        expect(only(out).rows[0].unresolvedSection).toBeUndefined();
     });
 
     it('counts unmatched ratings as unresolved rather than inventing a column', () => {
@@ -162,7 +175,7 @@ describe('summariseFindings (IA-82)', () => {
         ], CTX);
         expect(out.unresolved).toBe(1);
         expect(out.total).toBe(0);
-        expect(out.rows).toEqual([]);
+        expect(only(out).rows).toEqual([]);
     });
 
     it('ignores items with no rating', () => {
@@ -181,6 +194,93 @@ describe('summariseFindings (IA-82)', () => {
                 [key('sec-roof', 'c')]: { rating: 'lv-def' },
             },
         ], CTX);
-        expect(out.rows.map(r => r.section)).toEqual(['Roof', 'Electrical']);
+        expect(only(out).rows.map(r => r.section)).toEqual(['Roof', 'Electrical']);
+    });
+});
+
+/**
+ * Multiple rating systems in one tenant.
+ *
+ * Systems are NOT commensurable and are never merged into one table. `Defect`
+ * (OI default), `Deficient` (TREC) and `Deficiency` (ITB) name one severity
+ * band in three vocabularies; unioning them produces three sparse columns whose
+ * order is meaningless, because a level's `order` is an index within its own
+ * system. A row total spanning two systems counts real findings but describes a
+ * distribution nobody can compare. So each system gets its own matrix and the
+ * frontend shows one at a time.
+ */
+const TREC: HeatmapLevel[] = [
+    { id: 'tr-ins', label: 'Inspected',     abbreviation: 'I',  color: '#10b981', severity: 'good',        isDefect: false, order: 0 },
+    { id: 'tr-ni',  label: 'Not Inspected', abbreviation: 'NI', color: '#94a3b8', severity: 'minor',       isDefect: false, order: 1 },
+    { id: 'tr-def', label: 'Deficient',     abbreviation: 'D',  color: '#ef4444', severity: 'significant', isDefect: true,  order: 3 },
+];
+
+const MULTI = {
+    sectionTitles: SECTIONS,
+    systems: [
+        { id: 'rs-default', name: 'OpenInspection Default', levels: LEVELS },
+        { id: 'rs-trec',    name: 'TREC (Texas REC)',       levels: TREC },
+    ],
+};
+
+describe('summariseFindings across several rating systems', () => {
+    it('keeps each system in its own matrix rather than merging vocabularies', () => {
+        const out = summariseFindings([
+            {
+                [key('sec-roof', 'i-1')]: { rating: 'lv-def' },  // OI default
+                [key('sec-roof', 'i-2')]: { rating: 'tr-def' },  // TREC
+                [key('sec-elec', 'i-3')]: { rating: 'tr-ins' },  // TREC
+            },
+        ], MULTI);
+
+        expect(out.systems).toHaveLength(2);
+        const trec = out.systems.find(s => s.systemId === 'rs-trec')!;
+        const def = out.systems.find(s => s.systemId === 'rs-default')!;
+
+        // Neither system's columns leak into the other.
+        expect(def.columns.map(c => c.label)).toEqual(['Satisfactory', 'Monitor', 'Marginal', 'Defect']);
+        expect(trec.columns.map(c => c.label)).toEqual(['Inspected', 'Deficient']);
+        expect(trec.total).toBe(2);
+        expect(def.total).toBe(1);
+        // The grand total is the denominator behind "N more findings not shown".
+        expect(out.total).toBe(3);
+    });
+
+    it('orders systems by volume so the busiest is the default view', () => {
+        const out = summariseFindings([
+            {
+                [key('sec-roof', 'a')]: { rating: 'lv-def' },
+                [key('sec-roof', 'b')]: { rating: 'tr-def' },
+                [key('sec-roof', 'c')]: { rating: 'tr-def' },
+                [key('sec-roof', 'd')]: { rating: 'tr-ins' },
+            },
+        ], MULTI);
+        expect(out.systems.map(s => s.systemId)).toEqual(['rs-trec', 'rs-default']);
+    });
+
+    it('omits a system that produced nothing in the window', () => {
+        const out = summariseFindings([
+            { [key('sec-roof', 'a')]: { rating: 'lv-def' } },
+        ], MULTI);
+        // No selector should appear for a system with no findings to show.
+        expect(out.systems.map(s => s.systemId)).toEqual(['rs-default']);
+    });
+
+    it("excludes each system's own Not Inspected level, not just the first system's", () => {
+        const out = summariseFindings([
+            { [key('sec-roof', 'a')]: { rating: 'tr-ni' }, [key('sec-roof', 'b')]: { rating: 'lv-ni' } },
+        ], MULTI);
+        expect(out.total).toBe(0);
+        expect(out.unresolved).toBe(0);
+        expect(out.systems).toEqual([]);
+    });
+
+    it('attributes an ambiguous legacy abbreviation to the first system defining it', () => {
+        // Both systems abbreviate their defect level "D". Once the envelope has
+        // lost the id there is no better answer than a deterministic one — but
+        // it must be deterministic, not dependent on iteration order.
+        const out = summariseFindings([{ [key('sec-roof', 'a')]: { rating: 'D' } }], MULTI);
+        expect(out.systems.map(s => s.systemId)).toEqual(['rs-default']);
+        expect(out.systems[0].rows[0].counts.defect).toBe(1);
     });
 });
