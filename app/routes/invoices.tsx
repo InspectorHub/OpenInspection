@@ -7,6 +7,7 @@ import { PageHeader, Card, StatCard, Button, EmptyState, Table, Pill, Banner, Mo
 import { formatCurrency, formatDate } from "~/lib/format";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 import { NewInvoiceModal, type InspectionOption } from "~/components/invoices/NewInvoiceModal";
 
 export function meta() {
@@ -42,9 +43,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       clientName: (i.clientName as string | null) ?? null,
       date: (i.date as string | null) ?? null,
     }));
-    return { invoices: (body.data ?? []) as InvoiceRow[], inspections };
+    return { invoices: (body.data ?? []) as InvoiceRow[], inspections, loadFailed: false };
   } catch {
-    return { invoices: [] as InvoiceRow[], inspections: [] as InspectionOption[] };
+    // IA-118 — an empty ledger says nothing is outstanding. That is a claim
+    // about money owed to the business, and a failed fetch must not make it.
+    return { invoices: [] as InvoiceRow[], inspections: [] as InspectionOption[], loadFailed: true };
   }
 }
 
@@ -146,7 +149,7 @@ function methodLabel(method: string): string {
 }
 
 export default function InvoicesPage() {
-  const { invoices, inspections } = useLoaderData<typeof loader>();
+  const { invoices, inspections, loadFailed } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const locale = useDisplayLocale();
   const currency = useDisplayCurrency();
@@ -186,6 +189,9 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-ih-list">
+      {/* IA-118 — an empty ledger says nothing is outstanding, which is a claim
+          about money owed. Do not make it on a failed fetch. */}
+      {loadFailed && <LoadFailedNotice what={m.invoices_count_plural()} />}
       {/* IA-97 — title and meta used to render the same sentence twice ("2
           Invoices" over "2 invoices"). Convention across list pages (templates,
           team) is title = the page's name, meta = the counts; the count moves
