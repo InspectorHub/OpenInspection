@@ -3,14 +3,23 @@
  * Track I-a GDPR (spec §11) — erasure-manifest CI lint gate.
  *
  * Asserts the INTERNAL validity of the erasure manifest
- * (`server/lib/compliance/erasure-manifest.ts`) and softly warns when a PII
- * column appears in a manifest-listed table without a covering rule.
+ * (`server/lib/compliance/erasure-manifest.ts`) and HARD-FAILS when a PII
+ * column appears anywhere in the Drizzle schema without either a covering
+ * manifest rule or an explicit ERASURE_OUT_OF_SCOPE entry.
  *
  * This guard is COMPLEMENTARY to:
  *   - tests/unit/erasure-manifest-coverage.spec.ts (manifest <-> orchestrator
  *     binding drift) — that proves every rule is realized by the executor.
- *   - This lint proves every rule is well-formed AND that the manifest's own
- *     tables don't grow an un-cataloged PII column unnoticed.
+ *   - This lint proves every rule is well-formed AND that NO schema table
+ *     grows an un-cataloged PII column unnoticed.
+ *
+ * History note (portal #88 / roadmap §7.5 item 2): this check originally
+ * scanned only the manifest's OWN tables and exited 0 on findings — a probe
+ * that looked conclusive while covering less than the thing it probed. Client
+ * PII sat unlisted in invoices, concierge_confirm_tokens,
+ * inspection_access_tokens, email_suppressions and inspections for months and
+ * the gate could not see any of it. Every column is now in-manifest or
+ * declared out of scope WITH a reason; silence is no longer evidence.
  *
  * Approach (robustness over cleverness): the manifest is TypeScript, so instead
  * of transpiling we parse the rule object literals out of the source text. Each
@@ -23,12 +32,13 @@
  *   - any rule missing a non-empty table / column / category / action
  *   - any action not in {delete,null,hash,retain,anonymize}
  *   - any anonymize/retain rule missing a legalBasis
+ *   - any ERASURE_OUT_OF_SCOPE entry missing a non-empty reason
+ *   - a PII-heuristic column found in ANY schema table that is neither covered
+ *     by a manifest rule nor declared in ERASURE_OUT_OF_SCOPE
  *
- * SOFT warning (exit 0, printed): a PII-heuristic column
- *   (email|phone|ip_address|user_agent|signature|client_name|full_name) found
- *   in a manifest-listed table's Drizzle schema that is NOT covered by any rule
- *   AND not declared in ERASURE_OUT_OF_SCOPE. Catches "added a PII column,
- *   forgot the manifest" without blocking unrelated work.
+ * The heuristic deliberately includes `recipient` (automation_logs.recipient
+ * holds emails and E.164 numbers — renamed from recipient_email, which is how
+ * it escaped the original pattern) and bare `ip`.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -39,10 +49,10 @@ const SCHEMA_DIR = join(ROOT, "server", "lib", "db", "schema");
 
 const VALID_ACTIONS = new Set(["delete", "null", "hash", "retain", "anonymize"]);
 const REQUIRES_BASIS = new Set(["anonymize", "retain"]);
-const PII_HEURISTIC = /(email|phone|ip_address|user_agent|signature|client_name|full_name)/;
+const PII_HEURISTIC = /(email|phone|ip_address|user_agent|signature|client_name|full_name|recipient)/;
+const isPiiColumn = (col) => PII_HEURISTIC.test(col) || col === "ip";
 
 const errors = [];
-const warnings = [];
 
 const src = readFileSync(MANIFEST, "utf8");
 
@@ -132,18 +142,25 @@ rules.forEach((rule, i) => {
 });
 
 // ── Out-of-scope set (table.column the manifest deliberately skips) ───────────
-const outBody = arrayBody(src, "ERASURE_OUT_OF_SCOPE") ?? "";
-const outOfScope = new Set(
-  objectLiterals(outBody)
-    .map(parseRule)
-    .map((r) => `${r.table}.${r.column}`),
-);
+// Every entry MUST carry a reason — an out-of-scope declaration without one is
+// indistinguishable from a shrug, and the reason is what a DSAR audit reads.
+const outBody = arrayBody(src, "ERASURE_OUT_OF_SCOPE");
+if (outBody === null) {
+  console.error("erasure-manifest lint: could not locate ERASURE_OUT_OF_SCOPE array (must be exported).");
+  process.exit(1);
+}
+const outEntries = objectLiterals(outBody).map(parseRule);
+outEntries.forEach((e, i) => {
+  if (!e.reason || e.reason.trim() === "") {
+    errors.push(`ERASURE_OUT_OF_SCOPE #${i + 1} (${e.table ?? "?"}.${e.column ?? "?"}): missing/empty 'reason'.`);
+  }
+});
+const outOfScope = new Set(outEntries.map((r) => `${r.table}.${r.column}`));
 
-// Tables the manifest claims to cover, and the (table.column) pairs it covers.
-const manifestTables = new Set(rules.map((r) => r.table).filter(Boolean));
+// The (table.column) pairs the manifest covers.
 const coveredCols = new Set(rules.map((r) => `${r.table}.${r.column}`));
 
-// ── Heuristic schema coverage warning ────────────────────────────────────────
+// ── Heuristic schema coverage — HARD, whole schema ───────────────────────────
 // Map each `sqliteTable('db_name', { ... })` block to the snake_case column
 // names it declares (the string arg of each `text('col')` / `integer('col')`).
 function* schemaFiles(dir) {
@@ -160,7 +177,6 @@ for (const file of schemaFiles(SCHEMA_DIR)) {
   let tm;
   while ((tm = tableRe.exec(text)) !== null) {
     const tableName = tm[1];
-    if (!manifestTables.has(tableName)) continue;
     // Slice the table body by balanced braces from the matched `{`.
     const open = text.indexOf("{", tm.index);
     let depth = 0;
@@ -180,18 +196,16 @@ for (const file of schemaFiles(SCHEMA_DIR)) {
     let cm;
     while ((cm = colRe.exec(body)) !== null) {
       const col = cm[1];
-      if (!PII_HEURISTIC.test(col)) continue;
+      if (!isPiiColumn(col)) continue;
       const key = `${tableName}.${col}`;
       if (coveredCols.has(key)) continue;
       if (outOfScope.has(key)) continue;
-      warnings.push(`${key} matches the PII heuristic but has no manifest rule and is not in ERASURE_OUT_OF_SCOPE.`);
+      errors.push(`${key} matches the PII heuristic but has no manifest rule and is not in ERASURE_OUT_OF_SCOPE.`);
     }
   }
 }
 
 // ── Report ───────────────────────────────────────────────────────────────────
-for (const w of warnings) console.warn("  WARNING: " + w);
-
 if (errors.length > 0) {
   console.error("\nErasure manifest lint FAILED:\n");
   for (const e of errors) console.error("  " + e);
@@ -200,7 +214,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-  `erasure-manifest lint: OK (${rules.length} rules validated${
-    warnings.length ? `, ${warnings.length} heuristic warning(s)` : ""
-  }).`,
+  `erasure-manifest lint: OK (${rules.length} rules, ${outOfScope.size} out-of-scope declarations).`,
 );
