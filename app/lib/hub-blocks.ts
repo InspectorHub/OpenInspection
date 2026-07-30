@@ -12,6 +12,7 @@
  */
 
 import { isReportPublished, INSPECTION_STATUS } from '~/lib/status';
+import { ROLE_KIND } from '../../server/lib/people/role-kinds';
 import { formatCurrency } from '~/lib/format';
 import { m } from '~/paraglide/messages';
 // Type-only — erased at build, so the API's zod module never reaches the client
@@ -205,12 +206,12 @@ export function latestPublishedAt(versions: Array<{ publishedAt: number | null }
 export function publishNotified(flags: {
     notifyClient?: boolean | undefined;
     notifyAgent?: boolean | undefined;
-}): 'both' | 'client' | 'agent' | 'none' {
+}): 'both' | (typeof ROLE_KIND)['CLIENT' | 'AGENT'] | 'none' {
     const client = flags.notifyClient === true;
     const agent = flags.notifyAgent === true;
     if (client && agent) return 'both';
-    if (client) return 'client';
-    if (agent) return 'agent';
+    if (client) return ROLE_KIND.CLIENT;
+    if (agent) return ROLE_KIND.AGENT;
     return 'none';
 }
 

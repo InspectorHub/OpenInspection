@@ -1,4 +1,4 @@
-import eslint from '@eslint/js';
+﻿import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import react from 'eslint-plugin-react';
@@ -180,13 +180,26 @@ export default tseslint.config(
                 // ROLES / Role in server/lib/auth/roles.ts (the single source of truth).
                 // This prevents typos and stale literals surviving a role rename.
                 // Exempt: roles.ts itself, test files, schema/data/seed files
-                // (see override block below). Includes 'manager' now so the future
-                // admin→manager rename is already guarded on day one.
+                // (see override block below).
+                // 'admin' was DROPPED from the pattern (Task 16, two-layer role model):
+                // it is not a member of ROLES, and keeping it made every OpenAPI
+                // `tags: ['admin']` / `scopes: ['admin']` a false positive — false
+                // positives are what made the directory exemptions necessary. The
+                // future admin→manager rename stays guarded because 'manager' is
+                // already in the pattern.
                 // requireRole(...roles: Role[]) is excluded via :not() because TypeScript
                 // already enforces Role at the call site — a typo there is a compile error.
                 {
-                    selector: "Literal[value=/^(owner|admin|manager|inspector|agent)$/]:not(CallExpression[callee.name='requireRole'] > Literal)",
+                    selector: "Literal[value=/^(owner|manager|inspector|agent)$/]:not(CallExpression[callee.name='requireRole'] > Literal):not(TSLiteralType > Literal)",
                     message: 'Use ROLES / Role from server/lib/auth/roles.ts — no bare role string literals.',
+                },
+                // Task 14 (two-layer role model) — capabilitiesForKind is the KIND
+                // BASELINE; calling it directly skips the per-profile override layer
+                // and silently ignores a tenant's configuration. The one legitimate
+                // call site (inside capabilitiesForProfile) carries an inline disable.
+                {
+                    selector: "CallExpression[callee.name='capabilitiesForKind']",
+                    message: 'Call capabilitiesForProfile(kind, overrides) — capabilitiesForKind is the baseline only, and calling it directly ignores the role profile\'s own overrides.',
                 },
                 // Status taxonomy guard — inspection status literals must derive from
                 // INSPECTION_STATUS / REPORT_STATUS in server/lib/status/*.ts.
@@ -245,9 +258,17 @@ export default tseslint.config(
         //                                  RBAC-specific helpers (can-edit, report-section-numbering)
         //                                  were already fixed to use ROLE.* constants.
         // server/index.ts                — JWT context population; typed as UserRole
-        // app/**                         — UI role strings are typed via the session context
-        //                                  (Role type flows from the loader); display/conditional
-        //                                  logic uses the session role value directly
+        // app/**                         — RE-MEASURED 2026-07-30 (Task 16, two-layer
+        //                                  role model): 80 value-position hits with the
+        //                                  narrowed selector + TSLiteralType exclusion
+        //                                  (24 in app/routes, 56 elsewhere) — the plan's
+        //                                  "4 lines" predates the agent-portal epic.
+        //                                  Removing this exemption is its own PR: give
+        //                                  the contact-party/portal axes constants
+        //                                  (server/lib/people/role-kinds.ts exists now),
+        //                                  convert one directory at a time, then delete.
+        //                                  Do NOT baseline: a baseline freezes the
+        //                                  ambiguity, a constant removes it.
         files: [
             'server/lib/auth/roles.ts',
             'server/lib/db/schema/**/*.ts',
@@ -321,6 +342,14 @@ export default tseslint.config(
                 {
                     selector: "LogicalExpression[operator='||']:has(MemberExpression[property.name='OWNER']):has(MemberExpression[property.name='MANAGER'])",
                     message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to ROLE.OWNER/ROLE.MANAGER inline.',
+                },
+                // Task 14 (two-layer role model) — mirrored from the base list
+                // because this exemption block REPLACES no-restricted-syntax for
+                // its files, and skipping the override layer is exactly as wrong
+                // in server/services as anywhere else.
+                {
+                    selector: "CallExpression[callee.name='capabilitiesForKind']",
+                    message: 'Call capabilitiesForProfile(kind, overrides) — capabilitiesForKind is the baseline only, and calling it directly ignores the role profile\'s own overrides.',
                 },
             ],
         },
@@ -400,6 +429,16 @@ export default tseslint.config(
                 {
                     selector: "CallExpression[callee.name='apiFetch']",
                     message: 'apiFetch was removed. Use createApi(context, { token }) from ~/lib/api-client.server.',
+                },
+                // Task 14 (two-layer role model) — mirrored because flat config
+                // REPLACES a rule per file match. NOTE the role-literal guard is
+                // still absent here on purpose: re-measured 2026-07-30, app/routes
+                // has 24 value-position hits (see the exemption block's app/**
+                // comment) — adding the guard before those are constant-ized would
+                // fail every commit touching those files.
+                {
+                    selector: "CallExpression[callee.name='capabilitiesForKind']",
+                    message: 'Call capabilitiesForProfile(kind, overrides) — capabilitiesForKind is the baseline only, and calling it directly ignores the role profile\'s own overrides.',
                 },
             ],
         },

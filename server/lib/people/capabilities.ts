@@ -1,6 +1,10 @@
 import { coerceOverrides, type BitDecl } from '../auth/capability-overrides';
+import type { RoleKind } from './role-kinds';
 
-export type RoleKind = 'client' | 'agent' | 'other';
+// RoleKind's source of truth moved to role-kinds.ts (Task 16, two-layer role
+// model) so value-position consumers can use ROLE_KIND.* constants; re-exported
+// here so existing imports keep working.
+export type { RoleKind } from './role-kinds';
 export type RepairAccess = 'off' | 'read' | 'readwrite';
 
 export interface RoleCapabilities {
@@ -59,6 +63,7 @@ export function capabilitiesForKind(kind: RoleKind): RoleCapabilities {
  * eslint no-restricted-imports gate on this file states the same rule).
  */
 export function capabilitiesForProfile(kind: RoleKind, overrides: unknown): RoleCapabilities {
+    // eslint-disable-next-line no-restricted-syntax -- the ONE legitimate call site: this IS the override layer the rule sends everyone to.
     const base = capabilitiesForKind(kind);
     const applied = coerceOverrides(CONTACT_BITS, overrides);
     return applied ? { ...base, ...applied } as RoleCapabilities : base;
