@@ -1,25 +1,59 @@
 import { describe, it, expect } from 'vitest';
-import { getLegalLinks, buildTermsAcceptedBlob } from '../../../server/lib/legal-links';
+import {
+    resolveTenantLegalUrls,
+    hostedLegalPaths,
+    buildTermsAcceptedBlob,
+} from '../../../server/lib/legal-links';
 
-describe('legal-links', () => {
-    it('returns null when neither URL is configured (feature off)', () => {
-        expect(getLegalLinks({})).toBeNull();
-        expect(getLegalLinks({ TERMS_URL: '', PRIVACY_URL: '' })).toBeNull();
+describe('resolveTenantLegalUrls', () => {
+    it('defaults to hosted paths under base URL', () => {
+        expect(resolveTenantLegalUrls('acme', 'https://app.example/', null)).toEqual({
+            privacyUrl: 'https://app.example/legal/acme/privacy',
+            termsUrl: 'https://app.example/legal/acme/terms',
+        });
     });
-    it('returns whichever URLs are configured', () => {
-        expect(getLegalLinks({ TERMS_URL: 'https://x/terms' }))
-            .toEqual({ termsUrl: 'https://x/terms', privacyUrl: undefined });
-        expect(getLegalLinks({ TERMS_URL: 'https://x/terms', PRIVACY_URL: 'https://x/privacy' }))
-            .toEqual({ termsUrl: 'https://x/terms', privacyUrl: 'https://x/privacy' });
+
+    it('uses custom URLs when both are set', () => {
+        expect(resolveTenantLegalUrls('acme', 'https://app.example', {
+            legalMode: 'custom',
+            customPrivacyUrl: 'https://acme.com/privacy',
+            customTermsUrl: 'https://acme.com/terms',
+        })).toEqual({
+            privacyUrl: 'https://acme.com/privacy',
+            termsUrl: 'https://acme.com/terms',
+        });
     });
-    it('buildTermsAcceptedBlob stamps time + request context', () => {
+
+    it('falls back to hosted when custom mode is missing a URL', () => {
+        expect(resolveTenantLegalUrls('acme', 'https://app.example', {
+            legalMode: 'custom',
+            customPrivacyUrl: 'https://acme.com/privacy',
+            customTermsUrl: null,
+        })).toEqual({
+            privacyUrl: 'https://app.example/legal/acme/privacy',
+            termsUrl: 'https://app.example/legal/acme/terms',
+        });
+    });
+});
+
+describe('hostedLegalPaths', () => {
+    it('encodes the slug', () => {
+        expect(hostedLegalPaths('acme co')).toEqual({
+            privacyPath: '/legal/acme%20co/privacy',
+            termsPath: '/legal/acme%20co/terms',
+        });
+    });
+});
+
+describe('buildTermsAcceptedBlob', () => {
+    it('stamps both URLs', () => {
         const blob = buildTermsAcceptedBlob(
             { termsUrl: 'https://x/terms', privacyUrl: 'https://x/privacy' },
-            { ip: '1.2.3.4', country: 'US' },
+            { ip: '1.1.1.1' },
         );
         expect(blob.termsUrl).toBe('https://x/terms');
-        expect(blob.ip).toBe('1.2.3.4');
-        expect(blob.country).toBe('US');
-        expect(new Date(blob.at).getTime()).toBeGreaterThan(0);
+        expect(blob.privacyUrl).toBe('https://x/privacy');
+        expect(blob.ip).toBe('1.1.1.1');
+        expect(blob.at).toMatch(/^\d{4}-/);
     });
 });

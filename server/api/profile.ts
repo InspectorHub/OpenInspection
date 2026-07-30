@@ -11,6 +11,8 @@ import { inspectorSignature } from '../lib/inspector-signature';
 import { r2Keys } from '../lib/r2-keys';
 import { isValidTimeZone } from '../lib/tz';
 import { isValidLocale } from '../lib/locale';
+import { getDrizzle } from '../lib/route-helpers';
+import { r2Put } from '../lib/r2/objects';
 
 /**
  * Booking #7 Sprint A — authenticated profile endpoint mounted at
@@ -204,12 +206,12 @@ const profileRoutes = createApiRouter()
         // serving route at /photos/:key is public — keys are unguessable + scoped.
         const key = r2Keys.inspectorPhoto(tenantId, userId, ext);
         const buf = new Uint8Array(await file.arrayBuffer());
-        await c.env.PHOTOS.put(key, buf, { httpMetadata: { contentType: file.type } });
+        await r2Put(c.env.PHOTOS, key, buf, { httpMetadata: { contentType: file.type } });
 
         const host = (c.env.APP_BASE_URL?.replace(/^https?:\/\//, '').replace(/\/$/, '')) || c.req.header('host') || '';
         const proto = c.env.APP_BASE_URL?.startsWith('http://') ? 'http' : 'https';
         const photoUrl = `${proto}://${host}/photos/${key}`;
-        await drizzle(c.env.DB).update(users)
+        await getDrizzle(c).update(users)
             .set({ photoUrl })
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
 

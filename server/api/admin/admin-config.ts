@@ -8,7 +8,6 @@
 // by the admin aggregator, preserving the original paths.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
@@ -19,6 +18,7 @@ import {
 } from '../../lib/validations/admin.schema';
 import { tenantConfigs } from '../../lib/db/schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
+import { getDrizzle } from '../../lib/route-helpers';
 
 
 // ─── Integration Config & Secrets ────────────────────────────────────────────
@@ -357,7 +357,7 @@ const adminConfigRoutes = createApiRouter()
     })
     .openapi(icsTokenRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         const configs = await db
             .select()

@@ -30,4 +30,7 @@ export const PublicBrandSchema = z.object({
     // the UI degrades to "contact the company" rather than inventing a channel.
     supportEmail: z.string().nullable(),
     companyPhone: z.string().nullable(),
+    // Effective Privacy / Terms URLs (hosted /legal/:slug/… or custom).
+    privacyUrl: z.string().nullable(),
+    termsUrl: z.string().nullable(),
 });

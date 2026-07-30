@@ -82,7 +82,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   // any failure degrades to the platform default (EMPTY_BRAND).
   let brand: TenantBrand = EMPTY_BRAND;
   try {
-    brand = await resolveTenantBrand(context, tenant);
+    brand = await resolveTenantBrand(context, tenant, request);
   } catch {
     brand = EMPTY_BRAND;
   }

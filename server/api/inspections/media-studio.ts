@@ -25,6 +25,7 @@ import { inspectionMediaPool, tenantConfigs } from '../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { registerR2VideoRoutes } from './media-video-r2';
+import { getDrizzle } from '../../lib/route-helpers';
 
 /* ── Plan 7 — video walk-through (pluggable backend) ───────────────────────
  *
@@ -416,7 +417,7 @@ const mediaStudioRoutes = createApiRouter()
 
         // Persist posterPct on the pool row (best-effort; the Stream side is the
         // source of truth for the rendered thumbnail).
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         await db.update(inspectionMediaPool)
             .set({ posterPct })
             .where(and(eq(inspectionMediaPool.streamUid, streamUid), eq(inspectionMediaPool.tenantId, tenantId)));
@@ -429,7 +430,7 @@ const mediaStudioRoutes = createApiRouter()
         await c.var.services.inspection.getInspection(id, tenantId);
 
         const { backend, provider } = await resolveVideoBackend(c);
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         if (provider === 'stream') {
             await backend.delete({ provider: 'stream', streamUid: videoRef });

@@ -16,8 +16,8 @@ import { requireRole } from '../lib/middleware/rbac';
 import { EmailValidateBodySchema, EmailValidateOkSchema } from '../lib/validations/integrations.schema';
 import { resolveEmailProvider } from '../lib/email/resolve-provider';
 import { logger } from '../lib/logger';
-import { drizzle } from 'drizzle-orm/d1';
 import { recordIntegrationTest, listIntegrationTestResults, type IntegrationTarget } from '../lib/integration-test-results';
+import { getDrizzle, createDrizzle } from '../lib/route-helpers';
 
 /**
  * Single write point for the four "Test connection" probes in this file — keeps
@@ -34,7 +34,7 @@ async function logTest(
     provider?: string | null,
 ): Promise<void> {
     if (!tenantId) return;
-    await recordIntegrationTest(drizzle(env.DB), {
+    await recordIntegrationTest(createDrizzle(env.DB), {
         tenantId, target, ok, detail, provider: provider ?? null, testedByUserId,
     }).catch(() => {});
 }
@@ -189,7 +189,7 @@ const integrationsRoutes = createApiRouter()
     .openapi(testResultsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-        const data = await listIntegrationTestResults(drizzle(c.env.DB), tenantId);
+        const data = await listIntegrationTestResults(getDrizzle(c), tenantId);
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(stripeTestRoute, async (c) => {
@@ -228,27 +228,15 @@ const integrationsRoutes = createApiRouter()
             await logTest(c.env, tenantId, uid, 'email', false, 'No Resend API key is configured.', 'resend');
             return c.json({ success: false as const, error: { code: 'RESEND_NOT_CONFIGURED', message: 'No Resend API key is configured.' } }, 503);
         }
-        // Auth-only probe: an EMPTY send. A bad key → 401/403; a valid key
-        // (including sending-only restricted keys, which 401 on GET /domains)
-        // → 422 validation error. No email is ever sent.
-        const probe = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-            body: '{}',
-        }).catch(() => null);
-        if (!probe || probe.status === 401 || probe.status === 403) {
+        // Auth-only probe via the Resend provider — no hand-rolled vendor URL.
+        const { ResendProvider } = await import('../lib/email/providers/resend');
+        const provider = new ResendProvider({ apiKey: key });
+        const probe = await provider.probeApiKey();
+        if (!probe.valid) {
             await logTest(c.env, tenantId, uid, 'email', false, 'Resend rejected the stored API key.', 'resend');
             return c.json({ success: false as const, error: { code: 'RESEND_KEY_INVALID', message: 'Resend rejected the stored API key.' } }, 502);
         }
-        // Bonus signal when the key has full access: count verified domains.
-        let domains = 0;
-        const domRes = await fetch('https://api.resend.com/domains', {
-            headers: { Authorization: `Bearer ${key}` },
-        }).catch(() => null);
-        if (domRes?.ok) {
-            const body = (await domRes.json().catch(() => null)) as { data?: unknown[] } | null;
-            domains = Array.isArray(body?.data) ? body.data.length : 0;
-        }
+        const domains = await provider.countVerifiedDomains();
         await logTest(c.env, tenantId, uid, 'email', true, `Resend key valid${domains > 0 ? ` · ${domains} verified domain${domains === 1 ? '' : 's'}` : ''}.`, 'resend');
         return c.json({ success: true as const, data: { domains } }, 200);
     })

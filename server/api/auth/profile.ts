@@ -8,7 +8,6 @@
 // `__Host-` attributes; no JWT signing happens here.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { users } from '../../lib/db/schema';
 import { deleteCookie } from 'hono/cookie';
@@ -17,6 +16,7 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { getDrizzle } from '../../lib/route-helpers';
 
 const skipSetupRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -181,7 +181,7 @@ const profileRoutes = createApiRouter()
         const user = c.get('user');
         if (!user?.sub) throw Errors.Unauthorized('Not signed in');
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
         const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
         onboardingState.skipped = true;
@@ -194,7 +194,7 @@ const profileRoutes = createApiRouter()
         const user = c.get('user');
         if (!user?.sub) throw Errors.Unauthorized('Not signed in');
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
         const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
         onboardingState.checklistDismissed = true;
@@ -209,7 +209,7 @@ const profileRoutes = createApiRouter()
 
         const { flag } = c.req.valid('json') as { flag: OnboardingFlag };
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
         const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
         onboardingState[flag] = true;
@@ -223,7 +223,7 @@ const profileRoutes = createApiRouter()
         if (!user?.sub) throw Errors.Unauthorized();
 
         // Email is stored only in the DB, never the JWT.
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const row = await db.select({
             email: users.email,
             name: users.name,
@@ -273,7 +273,7 @@ const profileRoutes = createApiRouter()
         if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber || null;
 
         if (Object.keys(updates).length > 0) {
-            const db = drizzle(c.env.DB);
+            const db = getDrizzle(c);
             await db.update(users).set(updates).where(eq(users.id, user.sub)).run();
         }
 

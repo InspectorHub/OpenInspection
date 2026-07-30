@@ -2,12 +2,12 @@ import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { MetricsQuerySchema, MetricsApiResponseSchema } from '../lib/validations/metrics.schema';
-import { drizzle } from 'drizzle-orm/d1';
 import { inspections, inspectionServices, contacts, users, reportVersions } from '../lib/db/schema';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { sumEffectivePriceCentsSql } from '../lib/effective-price.sql';
 import { inclusiveUpperBound, resolveMetricsWindow } from '../lib/metrics-window';
+import { getDrizzle } from '../lib/route-helpers';
 
 const metricsRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
@@ -22,7 +22,7 @@ const metricsRoutes = createApiRouter()
 }, { scopes: ['read'], tier: 'extended' })), async (c) => {
     const tenantId = c.get('tenantId');
     const { from, to } = resolveMetricsWindow(c.req.valid('query'));
-    const db = drizzle(c.env.DB);
+    const db = getDrizzle(c);
 
     // Both bounds are inclusive. `inspections.date` may hold a bare civil date
     // or a full ISO instant, so the upper bound carries a sentinel that sorts

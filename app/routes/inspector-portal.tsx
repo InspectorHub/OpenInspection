@@ -34,6 +34,7 @@ import { CreateReinspectionModal } from "~/components/inspector-portal/CreateRei
 import { PublishNotice } from "~/components/inspector-portal/PublishNotice";
 import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEditor";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
+import { SendSmsModal } from "~/components/inspection/SendSmsModal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { publishCapFromMe } from "~/lib/inspector-portal-helpers";
 import {
@@ -450,6 +451,17 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     return toActionResult(res, "send-report", m.inspections_hub_error_send_report());
   }
 
+  // Communication A3.4 — manual SMS via the shared TCPA core. Recipients are
+  // contactId+roleKey only (no free-typed numbers).
+  if (intent === "send-sms") {
+    const recipients = JSON.parse(String(formData.get("recipients") ?? "[]"));
+    const res = await api.inspections[":id"]["send-sms"].$post({
+      param: { id },
+      json: { recipients },
+    });
+    return toActionResult(res, "send-sms", m.inspections_hub_error_send_sms());
+  }
+
   return { ok: false, intent: undefined, error: m.inspections_hub_error_unknown_action() };
 }
 
@@ -606,6 +618,8 @@ export default function InspectionHubPage() {
   // component itself derives submitting/error/auto-close from the fetcher.
   const [sendReportOpen, setSendReportOpen] = useState(false);
   const sendReportFetcher = useFetcher<typeof action>();
+  const [sendSmsOpen, setSendSmsOpen] = useState(false);
+  const sendSmsFetcher = useFetcher<typeof action>();
 
   const reinspectModal = useModalFetcher<typeof action>("create-reinspection", { closeOnSuccess: false });
   const createReinspection = reinspectModal.fetcher;
@@ -853,6 +867,15 @@ export default function InspectionHubPage() {
                     {m.inspections_hub_report_send()}
                   </Button>
                 )}
+                {canPublishCap && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setSendSmsOpen(true)}
+                  >
+                    {m.inspections_hub_report_send_sms()}
+                  </Button>
+                )}
                 {reportActionList.includes('unpublish') && (
                   <unpublishReport.Form method="post">
                     <input type="hidden" name="intent" value="unpublish" />
@@ -1092,6 +1115,14 @@ export default function InspectionHubPage() {
           roleProfiles={roleProfiles}
           fetcher={sendReportFetcher}
           onClose={() => setSendReportOpen(false)}
+        />
+      )}
+
+      {sendSmsOpen && (
+        <SendSmsModal
+          people={people}
+          fetcher={sendSmsFetcher}
+          onClose={() => setSendSmsOpen(false)}
         />
       )}
 

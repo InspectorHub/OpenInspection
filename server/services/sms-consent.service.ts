@@ -26,15 +26,22 @@ export class SmsConsentService {
         return row ? { version: row.version, text: row.text } : null;
     }
 
-    /** Append a consent event for a client contact, stamping the current disclosure version. */
+    /**
+     * Append a consent event, stamping the current disclosure version.
+     * Capture paths today are consumer-only; `recipientType` defaults to
+     * `'client'`. A3.2 widened the column so a future agent/other capture can
+     * pass the matching type from `CONSENT_BASIS_BY_KIND` without another
+     * migration.
+     */
     async record(
         tenantId: string, contactId: string, action: ConsentAction, capturedVia: CapturedVia,
-        meta: { ip?: string | undefined; userAgent?: string | undefined },
+        meta: { ip?: string | undefined; userAgent?: string | undefined; recipientType?: import('../lib/sms/consent-basis').ConsentRecipientType },
     ) {
         const db = this.getDrizzle();
         const disc = await this.currentDisclosure();
         const row = {
-            id: nanoid(), tenantId, contactId, recipientType: 'client' as const,
+            id: nanoid(), tenantId, contactId,
+            recipientType: meta.recipientType ?? ('client' as const),
             action, disclosureVersion: disc?.version ?? 0, capturedVia,
             ip: meta.ip ?? null, userAgent: meta.userAgent ?? null, createdAt: new Date(),
         };

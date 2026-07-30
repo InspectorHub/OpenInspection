@@ -12,6 +12,7 @@ export type AuditAction =
     | 'inspection.status_changed'
     | 'inspection.complete'
     | 'inspection.send_pdf'
+    | 'inspection.send_sms'
     | 'inspection.send_text_fallback'
     | 'inspection.bulk_assign'
     | 'inspection.bulk_status'

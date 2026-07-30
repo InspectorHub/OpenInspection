@@ -16,6 +16,7 @@ import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
 import InspectionList, { type InspectionRow } from "~/components/portal/InspectionList";
+import { PublicLegalFooter } from "~/components/PublicLegalFooter";
 import { signOut } from "~/components/portal/sign-out";
 import { m } from "~/paraglide/messages";
 
@@ -41,7 +42,7 @@ export async function loader({
   // EMPTY_BRAND (platform default) on any failure.
   let brand: TenantBrand = EMPTY_BRAND;
   try {
-    brand = await resolveTenantBrand(context, tenant);
+    brand = await resolveTenantBrand(context, tenant, request);
   } catch {
     brand = EMPTY_BRAND;
   }
@@ -144,6 +145,7 @@ export default function PortalLanding() {
           rows={data.inspections}
           hrefFor={(id) => `/portal/${data.tenant}/i/${id}`}
         />
+        <PublicLegalFooter privacyUrl={data.brand.privacyUrl} termsUrl={data.brand.termsUrl} />
       </div>
     );
   }
@@ -198,6 +200,7 @@ export default function PortalLanding() {
           </button>
         </Form>
       )}
+      <PublicLegalFooter privacyUrl={data.brand.privacyUrl} termsUrl={data.brand.termsUrl} />
     </div>
   );
 }

@@ -11,12 +11,12 @@
  */
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenants, users as usersTbl } from '../lib/db/schema';
 import { summariseSeats } from '../lib/billing-summary';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { getDrizzle } from '../lib/route-helpers';
 
 const summaryRoute = createRoute(withMcpMetadata({
     method:  'get',
@@ -36,7 +36,7 @@ const billingRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized();
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const tenant = await db.select({
             maxUsers: tenants.maxUsers,
             tier:     tenants.tier,

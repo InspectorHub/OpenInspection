@@ -14,7 +14,7 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, resolveTenantSlug } from '../../lib/url';
 import { lookupSenderSignature, buildSignUrl } from '../../lib/signature-helpers';
-import { getTenantId } from '../../lib/route-helpers';
+import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { agreements as agreementsTable, agreementRequests as agreementRequestsTable } from '../../lib/db/schema';
@@ -134,7 +134,7 @@ const getSignerLinkRoute = createRoute(withMcpMetadata({
 const adminEsignRoutes = createApiRouter()
     .openapi(listSigningRequestsRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const rows = await db
             .select({
                 id: agreementRequestsTable.id,

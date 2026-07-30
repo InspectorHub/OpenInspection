@@ -136,12 +136,9 @@ export function OutboxList({
                           </button>
                         )}
                         {/* Channel-faithful by design: a resend goes through the
-                            SAME provider the row failed on. Email rows re-enter
-                            the send-report path (email provider); SMS resend
-                            arrives with A3's manual-SMS endpoint and its TCPA
-                            gate — an email endpoint must never be the fallback
-                            for an SMS failure, so no button until then. */}
-                        {onResend && r.source === "manual" && r.status === "failed" && r.roleKey && r.channel === "email" && (
+                            SAME provider the row failed on. Email → send-report;
+                            SMS → send-sms (A3). Never cross channels. */}
+                        {onResend && r.source === "manual" && r.status === "failed" && r.roleKey && (r.channel === "email" || r.channel === "sms") && (
                           <button
                             type="button"
                             onClick={() => onResend(r)}

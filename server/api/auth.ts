@@ -1,6 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { users } from '../lib/db/schema';
 import { setCookie } from 'hono/cookie';
@@ -26,6 +25,7 @@ import { safeReturnTo } from '../lib/mcp/safe-return-to';
 import { findGlobalAgentById } from '../services/agent/account';
 import totpRoutes from './auth/totp';
 import profileRoutes from './auth/profile';
+import { getDrizzle } from '../lib/route-helpers';
 
 // --- Routes ---
 
@@ -407,7 +407,7 @@ const coreAuthRoutes = createApiRouter()
             return c.redirect('/agent-dashboard', 302);
         }
 
-        const d = drizzle(c.env.DB);
+        const d = getDrizzle(c);
         // Excludes soft-deleted (removed member) rows — a portal handoff must
         // not mint a session cookie for a member who has been removed from
         // this workspace.
@@ -474,7 +474,7 @@ const coreAuthRoutes = createApiRouter()
         // 1. Safety Check: Only allow if no tenant-scoped users exist.
         // Agent Accounts A1 — global agents (tenant_id IS NULL) are unrelated to
         // first-time tenant initialization, so they must not block setup.
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const existingTenantUser = await db.select().from(users).where(sql`${users.tenantId} IS NOT NULL`).limit(1).get();
         if (existingTenantUser) {
             return c.json({ success: false, error: { code: 'already_initialized', message: 'System already initialized' } }, 409);

@@ -36,6 +36,7 @@ import { getBaseUrl, resolveTenantSlug } from '../lib/url';
 import type { HonoConfig } from '../types/hono';
 import { r2Keys } from '../lib/r2-keys';
 import { messageThreadRoutes } from './messages-threads';
+import { r2Get } from '../lib/r2/objects';
 
 const AttachmentSchema = z.object({
     id: z.string().describe('Stable attachment identifier within the message.'),
@@ -272,7 +273,7 @@ export const inspectorMessageRoutes = createApiRouter()
         const att = await c.var.services.message.resolveAttachmentForInspection(inspectionId, tenantId, attachmentId);
         if (!att) throw Errors.NotFound('Attachment not found');
         if (!c.env.PHOTOS) throw Errors.NotFound('Storage not available');
-        const obj = await c.env.PHOTOS.get(att.key);
+        const obj = await r2Get(c.env.PHOTOS, att.key);
         if (!obj) throw Errors.NotFound('Attachment not found');
         return streamAttachment(obj, att);
     });
@@ -373,7 +374,7 @@ clientMessageRoutes.get('/inspections/:id/messages/attachments/:attachmentId', a
     const att = await c.var.services.message.resolveAttachmentForInspection(inspectionId, actor.tenantId, attachmentId);
     if (!att) return c.json({ error: 'Not found' }, 404);
     if (!c.env.PHOTOS) return c.json({ error: 'Not found' }, 404);
-    const obj = await c.env.PHOTOS.get(att.key);
+    const obj = await r2Get(c.env.PHOTOS, att.key);
     if (!obj) return c.json({ error: 'Not found' }, 404);
     return streamAttachment(obj, att);
 });

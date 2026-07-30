@@ -16,11 +16,10 @@ import { buildRenderReportUrl } from '../../lib/public-urls';
 import { logger } from '../../lib/logger';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { PublishInspectionSchema, CreateReinspectionSchema, CancelInspectionSchema } from '../../lib/validations/inspection.schema';
-import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { eq, and } from 'drizzle-orm';
-import { getTenantId } from '../../lib/route-helpers';
+import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 
 /**
@@ -293,7 +292,7 @@ const publishRoutes = createApiRouter()
             return c.json({ success: true }, 200);
         }
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         await db.update(inspectionTable).set({ status: INSPECTION_STATUS.COMPLETED }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
         // Task 9a (people-role-profiles) — resolve the recipient via the

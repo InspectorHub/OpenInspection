@@ -1,23 +1,23 @@
 // @vitest-environment node
 /**
  * Per-tenant legal pages (TFV/A2P compliance URLs).
- *
- * Tests the loader and pure helpers from `routes/public/legal.tsx`:
- *   - /legal/<slug>/privacy → 200, contains company name + SMS clause
- *   - /legal/<slug>/terms  → 200, contains company name
- *   - unknown tenant       → 404
- *   - unknown doc type     → 404
- *   - mergeCompany()       → replaces {{company}} token
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ---------------------------------------------------------------------------
-// Mock resolveTenantBrand so tests don't need a real Hono context or D1.
-// ---------------------------------------------------------------------------
-const mockResolveTenantBrand = vi.fn();
+const mockLegalGet = vi.fn();
 
-vi.mock('~/lib/tenant-brand.server', () => ({
-  resolveTenantBrand: (...args: unknown[]) => mockResolveTenantBrand(...args),
+vi.mock('~/lib/api-client.server', () => ({
+  createApi: () => ({
+    publicReport: {
+      legal: {
+        ':tenant': {
+          ':doc': {
+            $get: (...args: unknown[]) => mockLegalGet(...args),
+          },
+        },
+      },
+    },
+  }),
 }));
 
 import {
@@ -26,10 +26,6 @@ import {
   SMS_CLAUSE_TEXT,
   SMS_CLAUSE_HEADING,
 } from '~/routes/public/legal';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 type LoaderArgs = Parameters<typeof loader>[0];
 
@@ -41,7 +37,6 @@ function makeArgs(tenant: string, doc: string): LoaderArgs {
   } as unknown as LoaderArgs;
 }
 
-/** Calls the loader and asserts it throws a Response with the given status. */
 async function expect404(args: LoaderArgs) {
   let thrown: unknown;
   try {
@@ -53,17 +48,9 @@ async function expect404(args: LoaderArgs) {
   expect((thrown as Response).status).toBe(404);
 }
 
-// ---------------------------------------------------------------------------
-// Setup
-// ---------------------------------------------------------------------------
-
 beforeEach(() => {
-  mockResolveTenantBrand.mockReset();
+  mockLegalGet.mockReset();
 });
-
-// ---------------------------------------------------------------------------
-// mergeCompany — pure helper
-// ---------------------------------------------------------------------------
 
 describe('mergeCompany', () => {
   it('replaces {{company}} with the provided name', () => {
@@ -88,10 +75,6 @@ describe('mergeCompany', () => {
     expect(mergeCompany('No token here.', 'Acme')).toBe('No token here.');
   });
 });
-
-// ---------------------------------------------------------------------------
-// SMS clause constants — must contain Twilio-required strings
-// ---------------------------------------------------------------------------
 
 describe('SMS_CLAUSE_TEXT', () => {
   it('contains the STOP opt-out keyword', () => {
@@ -121,16 +104,13 @@ describe('SMS_CLAUSE_TEXT', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// loader — known tenant, privacy
-// ---------------------------------------------------------------------------
-
 describe('loader /legal/:tenant/privacy', () => {
   beforeEach(() => {
-    mockResolveTenantBrand.mockResolvedValue({
-      companyName: 'Acme Inspections',
-      primaryColor: null,
-      logoUrl: null,
+    mockLegalGet.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: { companyName: 'Acme Inspections', body: null },
+      }),
     });
   });
 
@@ -139,82 +119,66 @@ describe('loader /legal/:tenant/privacy', () => {
     expect(data.companyName).toBe('Acme Inspections');
     expect(data.doc).toBe('privacy');
     expect(data.tenantSlug).toBe('acme');
+    expect(data.customBody).toBeNull();
   });
 
-  it('passes the tenant slug through to resolveTenantBrand', async () => {
+  it('returns custom body when configured', async () => {
+    mockLegalGet.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: { companyName: 'Acme Inspections', body: 'Custom privacy text' },
+      }),
+    });
+    const data = await loader(makeArgs('acme', 'privacy'));
+    expect(data.customBody).toBe('Custom privacy text');
+  });
+
+  it('requests the privacy doc for the tenant slug', async () => {
     await loader(makeArgs('acme', 'privacy'));
-    expect(mockResolveTenantBrand).toHaveBeenCalledWith(
-      expect.anything(), // context
-      'acme',
-    );
+    expect(mockLegalGet).toHaveBeenCalledWith({
+      param: { tenant: 'acme', doc: 'privacy' },
+    });
   });
 
   it('the SMS clause text contains the company name after mergeCompany', () => {
     const merged = mergeCompany(SMS_CLAUSE_TEXT, 'Acme Inspections');
     expect(merged).toContain('Acme Inspections');
-    expect(merged).toContain('STOP');
-    expect(merged).toContain('Twilio, Inc.');
+    expect(merged).not.toContain('{{company}}');
   });
 });
 
-// ---------------------------------------------------------------------------
-// loader — known tenant, terms
-// ---------------------------------------------------------------------------
-
 describe('loader /legal/:tenant/terms', () => {
   beforeEach(() => {
-    mockResolveTenantBrand.mockResolvedValue({
-      companyName: 'Sunrise Home Inspections',
-      primaryColor: null,
-      logoUrl: null,
+    mockLegalGet.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: { companyName: 'Acme Inspections', body: null },
+      }),
     });
   });
 
-  it('returns 200 with the company name for a known tenant', async () => {
-    const data = await loader(makeArgs('sunrise', 'terms'));
-    expect(data.companyName).toBe('Sunrise Home Inspections');
+  it('returns 200 with the company name', async () => {
+    const data = await loader(makeArgs('acme', 'terms'));
+    expect(data.companyName).toBe('Acme Inspections');
     expect(data.doc).toBe('terms');
   });
 });
 
-// ---------------------------------------------------------------------------
-// loader — unknown tenant → 404
-// ---------------------------------------------------------------------------
-
-describe('loader — unknown tenant → 404', () => {
-  beforeEach(() => {
-    // resolveTenantBrand returns companyName: null for unknown slugs
-    // (the brand endpoint returns !ok, so EMPTY_BRAND is used).
-    mockResolveTenantBrand.mockResolvedValue({
-      companyName: null,
-      primaryColor: null,
-      logoUrl: null,
-    });
-  });
-
-  it('throws a 404 Response when the tenant brand resolves to null name', async () => {
-    await expect404(makeArgs('no-such-tenant', 'privacy'));
-  });
-
-  it('throws 404 for terms with unknown tenant too', async () => {
-    await expect404(makeArgs('ghost-co', 'terms'));
-  });
-});
-
-// ---------------------------------------------------------------------------
-// loader — unknown doc → 404 (regardless of tenant)
-// ---------------------------------------------------------------------------
-
-describe('loader — unknown doc → 404', () => {
-  it('throws 404 for an unrecognized doc type', async () => {
+describe('loader errors', () => {
+  it('404s for an unknown doc type', async () => {
     await expect404(makeArgs('acme', 'cookies'));
   });
 
-  it('throws 404 for an empty doc', async () => {
-    await expect404(makeArgs('acme', ''));
+  it('404s when the API returns not ok', async () => {
+    mockLegalGet.mockResolvedValue({ ok: false });
+    await expect404(makeArgs('missing', 'privacy'));
   });
 
-  it('throws 404 for "disclaimer" (not in allowed set)', async () => {
-    await expect404(makeArgs('acme', 'disclaimer'));
+  it('404s when company name is missing', async () => {
+    mockLegalGet.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { companyName: '', body: null } }),
+    });
+    await expect404(makeArgs('acme', 'privacy'));
   });
 });

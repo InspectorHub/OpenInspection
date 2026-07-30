@@ -122,10 +122,21 @@ export function CommunicationSection({
 
     function handleResend(row: DeliveryRow) {
         // Channel-faithful: the resend rides the row's OWN channel so it reaches
-        // the same provider that failed. The send-report endpoint accepts email
-        // today; when A3's manual-SMS endpoint lands, SMS rows route there —
-        // never through the email path as a fallback.
-        if (!row.roleKey || row.channel !== "email") return;
+        // the same provider that failed. Email → send-report; SMS → send-sms.
+        // An email endpoint must never be the fallback for an SMS failure.
+        if (!row.roleKey) return;
+        if (row.channel === "sms") {
+            if (!row.recipientContactId) return;
+            resend.submit(
+                {
+                    intent: "send-sms",
+                    recipients: JSON.stringify([{ contactId: row.recipientContactId, roleKey: row.roleKey }]),
+                },
+                { method: "post" },
+            );
+            return;
+        }
+        if (row.channel !== "email") return;
         const recipient = row.recipientContactId
             ? { contactId: row.recipientContactId, roleKey: row.roleKey }
             : { email: row.recipient, roleKey: row.roleKey };

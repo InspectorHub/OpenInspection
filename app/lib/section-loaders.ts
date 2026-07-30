@@ -84,7 +84,7 @@ export async function loadReportSection(
         param: { tenant, id: inspectionId },
         query: { token: token || undefined },
       }),
-      resolveTenantBrand(context, tenant),
+      resolveTenantBrand(context, tenant, request),
     ]);
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as unknown as ReportLoaderResult | undefined;

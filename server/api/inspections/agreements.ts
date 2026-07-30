@@ -13,12 +13,12 @@ import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { safeISODate } from '../../lib/date';
 import { SendAgreementRequestSchema, AgreementRequestCreatedSchema } from '../../lib/validations/inspection.schema';
-import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable, agreements, agreementRequests, agreementSigners } from '../../lib/db/schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
 import { eq, and, asc } from 'drizzle-orm';
 import { resolveSignatureInspector } from '../../lib/signature-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { getDrizzle } from '../../lib/route-helpers';
 
 /**
  * POST /api/inspections/:id/agreement-requests
@@ -58,7 +58,7 @@ const agreementsRoutes = createApiRouter()
         const tenantId = c.get('tenantId') as string;
         const { id }   = c.req.valid('param');
         const body     = c.req.valid('json');
-        const db       = drizzle(c.env.DB);
+        const db       = getDrizzle(c);
 
         // 404 if the inspection is missing or belongs to another tenant.
         const inspection = await db.select().from(inspectionTable)
@@ -164,7 +164,7 @@ const agreementsRoutes = createApiRouter()
     .get('/:id/sign-status', async (c) => {
         const id = c.req.param('id') as string;
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         // Track I-a — signed truth rides the envelope: a signed agreement_requests
         // row for this inspection (any channel — emailed OR on-site) lights it.
@@ -180,7 +180,7 @@ const agreementsRoutes = createApiRouter()
     .get('/:id/agreement', async (c) => {
         const id = c.req.param('id') as string;
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const svc = c.var.services.agreement;
 
         // Verify inspection exists (404 distinct from "no template").
@@ -224,7 +224,7 @@ const agreementsRoutes = createApiRouter()
     .post('/:id/sign', async (c) => {
         const id = c.req.param('id') as string;
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const svc = c.var.services.agreement;
 
         // Verify inspection exists

@@ -7,7 +7,6 @@
 // aggregator, preserving the original paths.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, or, like, asc as ascDz, desc as descDz, sql as sqlTpl } from 'drizzle-orm';
 import { buildMeta } from '../../lib/validations/pagination.schema';
 import { requireRole } from '../../lib/middleware/rbac';
@@ -25,6 +24,7 @@ import {
 import { comments } from '../../lib/db/schema';
 import { commentUsage } from '../../lib/db/schema/inspection';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
+import { getDrizzle } from '../../lib/route-helpers';
 
 
 // --- Comments Library ---
@@ -157,7 +157,7 @@ const adminCommentsRoutes = createApiRouter()
         // touch endpoint above and the rest of admin.ts).
         const userId = c.get('user')?.sub ?? '';
         const auto = filterMode === 'auto';
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         // Filters layered defensively: tenantId always first (multi-tenant
         // isolation rule from CLAUDE.md). `sectionId` / `triggerCode` are
         // explicit user-typed filters and always apply; `severity` / `section`
@@ -254,7 +254,7 @@ const adminCommentsRoutes = createApiRouter()
     .openapi(createCommentRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { text, category, severity, section, repairSummary, estimateMinCents, estimateMaxCents, recommendedContractorTypeId } = c.req.valid('json');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const row = {
             id: crypto.randomUUID(),
             tenantId,
@@ -285,7 +285,7 @@ const adminCommentsRoutes = createApiRouter()
     .openapi(deleteCommentRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const existing = await db.select().from(comments)
             .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Comment not found');
@@ -300,7 +300,7 @@ const adminCommentsRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         const { text, category, severity, section, repairSummary, estimateMinCents, estimateMaxCents, recommendedContractorTypeId } = c.req.valid('json');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const existing = await db.select().from(comments)
             .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Comment not found');
@@ -337,7 +337,7 @@ const adminCommentsRoutes = createApiRouter()
         const userId = c.get('user')?.sub ?? '';
         if (!userId) throw Errors.Unauthorized();
         const now = new Date();
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         const existing = await db.select().from(commentUsage)
             .where(and(

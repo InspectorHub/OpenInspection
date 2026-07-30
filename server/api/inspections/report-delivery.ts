@@ -23,7 +23,6 @@ import {
     ReportDataResponseSchema,
 } from '../../lib/validations/inspection.schema';
 import { SendReportSchema, SendReportResponseDataSchema } from '../../lib/validations/send-report.schema';
-import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable, contacts, tenants } from '../../lib/db/schema';
 import { makeManualSendLogger } from '../../services/automation/manual-log';
 import { eq, and } from 'drizzle-orm';
@@ -472,7 +471,7 @@ const reportDeliveryRoutes = createApiRouter()
         // to a tenants.slug lookup by the verified tenantId.
         let tenantSlug = c.get('requestedTenantSlug') ?? '';
         if (!tenantSlug) {
-            const row = await drizzle(c.env.DB).select({ slug: tenants.slug })
+            const row = await getDrizzle(c).select({ slug: tenants.slug })
                 .from(tenants)
                 .where(eq(tenants.id, tenantId))
                 .get();

@@ -5,7 +5,6 @@
 // bookingService.fulfillBooking() (single-point review preserved).
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenants } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
@@ -15,6 +14,7 @@ import {
     BookingResponseSchema
 } from '../../lib/validations/booking.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { getDrizzle } from '../../lib/route-helpers';
 
 /**
  * POST /api/public/book
@@ -57,7 +57,7 @@ const createBookingRoutes = createApiRouter()
         // (SINGLE_TENANT_ID / requestedTenantSlug) pointed at the WRONG tenant
         // whenever the fixed tenant differed from the page's tenant, and at no
         // tenant at all in saas mode (this path is not slug-routed).
-        const tenantRow = await drizzle(c.env.DB)
+        const tenantRow = await getDrizzle(c)
             .select({ id: tenants.id })
             .from(tenants).where(eq(tenants.slug, body.tenant)).get();
         if (!tenantRow) throw Errors.NotFound('Tenant not found.');

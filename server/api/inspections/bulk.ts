@@ -16,12 +16,12 @@ import {
     InspectionCountsSchema,
     DashboardResponseSchema,
 } from '../../lib/validations/inspection.schema';
-import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { syncInspectionAssignmentsBatch } from '../../lib/db/assignment-links';
 import { findScheduleConflicts } from '../../lib/schedule-conflicts';
 import { eq, inArray, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { getDrizzle } from '../../lib/route-helpers';
 
 // --- GET /api/inspections/dashboard — Spec 3A ---
 const dashboardRoute = createRoute(withMcpMetadata({
@@ -247,7 +247,7 @@ const bulkRoutes = createApiRouter()
     .openapi(bulkUpdateRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         if (body.action === 'assignInspector') {
             if (!body.inspectorId) throw Errors.BadRequest('inspectorId is required for assignInspector.');
@@ -303,7 +303,7 @@ const bulkRoutes = createApiRouter()
     .openapi(scheduleConflictsRoute, async (c) => {
         const { inspectorId, date, excludeId } = c.req.valid('query');
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         // Solo wizard flow sends no inspectorId — the inspection will be
         // assigned to the creator, so that is who we check against.
         const targetId = inspectorId || c.get('user').sub;

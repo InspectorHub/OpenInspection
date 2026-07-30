@@ -15,10 +15,10 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
-import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { inspections } from '../../lib/db/schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { getDrizzle } from '../../lib/route-helpers';
 
 const DeliverySchema = z.object({
     id: z.string().describe('Log row id.'),
@@ -87,7 +87,7 @@ const communicationRoutes = createApiRouter()
         const { markRead } = c.req.valid('query');
 
         // 404 for another tenant's inspection BEFORE reading anything else.
-        const owner = await drizzle(c.env.DB).select({ id: inspections.id })
+        const owner = await getDrizzle(c).select({ id: inspections.id })
             .from(inspections)
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
             .get();

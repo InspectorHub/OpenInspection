@@ -1,7 +1,6 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { capabilitiesForProfile, type RoleKind } from '../lib/people/capabilities';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
@@ -26,6 +25,7 @@ import {
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import agentPhotoRoutes from './agent/photo';
+import { getDrizzle } from '../lib/route-helpers';
 
 /**
  * GET /api/agents/my-reports
@@ -245,7 +245,7 @@ const agentRoutes = createApiRouter()
         const user = c.get('user');
         const userRole = c.get('userRole');
         const { agentId: queryAgentId } = c.req.valid('query');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         // Admins/owners can pass ?agentId= to view any agent's reports
         const agentId =
@@ -304,7 +304,7 @@ const agentRoutes = createApiRouter()
         await requireRole('owner', 'manager', 'inspector', 'agent')(c, async () => {});
 
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         // Task 9 (two-layer role model) — attribution reads the explicit
         // referred_by_contact_id column, not the buyer_agent seat. The old

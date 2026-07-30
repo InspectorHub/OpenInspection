@@ -17,8 +17,10 @@ export interface SessionContext {
     tenantStatus: string;
     currentUserSlug: string | null;
     bookingHost: string | null;
-    /** PRIVACY_URL env value (operator-configured), or null when unset. */
+    /** Effective Privacy URL for this tenant (hosted /legal/… or custom). */
     privacyUrl: string | null;
+    /** Effective Terms URL for this tenant. */
+    termsUrl: string | null;
     /** Tenant default display timezone (IANA name; 'UTC' when unset). */
     defaultTimezone: string;
     /** Tenant default display locale (BCP-47; 'en-US' when unset). */

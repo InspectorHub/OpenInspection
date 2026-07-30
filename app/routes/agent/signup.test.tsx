@@ -30,10 +30,6 @@ vi.mock("~/lib/api-client.server", () => ({
   })),
 }));
 
-vi.mock("~/lib/legal-links.server", () => ({
-  readLegalLinks: vi.fn(() => null),
-}));
-
 import { loader, action } from "~/routes/agent/signup";
 
 type LoaderArgs = Parameters<typeof loader>[0];

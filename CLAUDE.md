@@ -178,8 +178,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 | `INSPECTION_DOC` | No | Durable Object binding (`class_name: InspectionDocDO`) for collaborative inspection editing (#181 — Yjs CRDT host; one DO per inspection, tenant-scoped `idFromName`). Declared in `wrangler.jsonc` (committed) and must be added to `wrangler.saas.jsonc` (gitignored) with the matching `v2` SQLite-class migration. When absent the collab routes return `501` and fail closed — editing falls back to a single-client Y.Doc with no realtime sync. See `docs/developers/collab-editing.md`. |
 | `TURNSTILE_SECRET_KEY` | No | Server-side Turnstile verification — `POST /api/book` enforces this when set. Use test secret `1x0000000000000000000000000000000AA` for local dev. |
 | `APP_BASE_URL` | No | Public URL for OAuth and link generation |
-| `TERMS_URL` | No | Optional URL of the operator's Terms of Service. When set (with or without `PRIVACY_URL`), account-creating public forms require an acceptance checkbox and stamp an acceptance record on the user row. |
-| `PRIVACY_URL` | No | Optional URL of the operator's Privacy Policy. When set, public pages render a privacy-notice footer link. |
+| `APP_BASE_URL` | No | Public origin used when building absolute links (reports, hosted `/legal/:tenant/…` Privacy & Terms). |
 | `RESEND_API_KEY`| No | Platform-default email delivery (Resend). Tenants may switch to their OWN Resend key + verified sender via Settings → Communication (per-tenant override; the email pipeline resolves own-vs-platform explicitly). |
 | `GEMINI_API_KEY`| No | DEPRECATED as a platform key — AI assistance is strictly bring-your-own-key: `AIService` reads the tenant's own stored key (Settings → Advanced) and ignores this env. AI features stay off until a tenant configures a key. |
 | `APP_MODE` | No | `standalone` (default) or `saas` — controls tenant resolution |

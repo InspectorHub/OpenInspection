@@ -1740,6 +1740,36 @@
     "description": "Renders the report PDF once and sends it (or a text-only fallback if rendering fails) to every recipient in the request body, each with their own role-keyed portal link. Per-recipient failures (no resolvable email, unknown roleKey, send failure) are collected in the response and do not fail the whole request."
   },
   {
+    "operationId": "createInspectionSendSms",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/send-sms",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id whose seated people receive the SMS.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id whose seated people receive the SMS."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/SendSms"
+      }
+    },
+    "summary": "Send a manual SMS to people on the inspection",
+    "description": "Manual SMS via the shared sendOneSms core (TCPA consent, managed-send, quota). Recipients must be people already on the inspection who have a phone — no free-typed numbers."
+  },
+  {
     "operationId": "createInspectionShareAgent",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/share-agent",
@@ -7431,6 +7461,45 @@
     },
     "summary": "Public invoice for an inspection (pay-link landing)",
     "description": "Public, no-login invoice for an inspection, gated by the recipient's portal token (?token=) or the unified-portal session cookie. Only client/co_client grants are accepted; tenantId comes from the resolved grant, never the URL."
+  },
+  {
+    "operationId": "getPublicLegalDoc",
+    "method": "GET",
+    "pathTemplate": "/api/public/legal/{tenant}/{doc}",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug"
+          }
+        },
+        {
+          "name": "doc",
+          "in": "path",
+          "required": true,
+          "description": "Which legal document",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "privacy",
+              "terms"
+            ],
+            "description": "Which legal document"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Hosted Privacy or Terms page content for a tenant",
+    "description": "Returns company name + optional custom Privacy/Terms body for /legal/:tenant/:doc pages."
   },
   {
     "operationId": "getPublicReport",

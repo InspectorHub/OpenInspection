@@ -1,6 +1,5 @@
 import type { Context } from 'hono';
 import { createRoute, z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import type { HonoConfig } from '../types/hono';
 import { inspections, tenants } from '../lib/db/schema';
@@ -18,11 +17,12 @@ import { servePhotoObject, imagesBinding } from '../lib/media/serve-photo';
 import { InvoiceNotPayableError } from '../lib/stripe-helpers';
 import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
-import { getBookingHost } from '../lib/url';
+import { getBookingHost, getBaseUrl } from '../lib/url';
 import { publicReportAccessAllowed } from '../lib/report-access';
 import publicVerifyRoutes from './public/verify';
 import publicInspectorProfileRoutes from './public/inspector-profile';
 import { PublicInvoiceBodySchema } from '../lib/validations/invoice.schema';
+import { getDrizzle } from '../lib/route-helpers';
 
 /**
  * Render-token access path for headless PDF generation. The Cloudflare Browser
@@ -272,7 +272,7 @@ const publicReportRoutes = createApiRouter()
         if (!tenantId && render) {
             const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
             if (r) {
-                const db = drizzle(c.env.DB);
+                const db = getDrizzle(c);
                 const row = await db.select({ tenantId: inspections.tenantId })
                     .from(inspections).where(eq(inspections.id, id)).get();
                 if (row) { tenantId = row.tenantId; renderMode = true; }
@@ -304,7 +304,7 @@ const publicReportRoutes = createApiRouter()
         }
         // Publish gate: client/token access is revoked while the report is not
         // published (owner-preview + render-token bypass — they may view drafts).
-        const gateRow = await drizzle(c.env.DB)
+        const gateRow = await getDrizzle(c)
             .select({ reportStatus: inspections.reportStatus })
             .from(inspections)
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
@@ -349,7 +349,7 @@ const publicReportRoutes = createApiRouter()
         if (!tenantId && render) {
             const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
             if (r) {
-                const db = drizzle(c.env.DB);
+                const db = getDrizzle(c);
                 const row = await db.select({ tenantId: inspections.tenantId })
                     .from(inspections).where(eq(inspections.id, id)).get();
                 if (row) { tenantId = row.tenantId; renderMode = true; }
@@ -360,7 +360,7 @@ const publicReportRoutes = createApiRouter()
         // against this tenant + inspection below).
         if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
         if (!tenantId) return c.notFound();
-        const photoGate = await drizzle(c.env.DB)
+        const photoGate = await getDrizzle(c)
             .select({ reportStatus: inspections.reportStatus })
             .from(inspections)
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
@@ -393,7 +393,7 @@ const publicReportRoutes = createApiRouter()
             return c.json({ success: false as const, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);
         }
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const insp = await db
             .select({ status: inspections.status, reportStatus: inspections.reportStatus, dataVersion: inspections.dataVersion })
             .from(inspections)
@@ -434,11 +434,14 @@ const publicReportRoutes = createApiRouter()
         if (!inv) return c.json({ success: true as const, data: null }, 200);
         // A-10 — ship the tenant brand with the invoice so the public pay page
         // renders the inspector's branding (no tenant slug in /invoice/:id URLs).
-        const brand = await c.var.services.branding.getBrand(tenantId);
+        const tenantRow = await getDrizzle(c).select({ slug: tenants.slug })
+            .from(tenants).where(eq(tenants.id, tenantId)).get();
+        const brand = await c.var.services.branding.getBrand(tenantId, {
+            slug: tenantRow?.slug ?? null,
+            baseUrl: getBaseUrl(c),
+        });
         // IA-44 — and the slug, so the page can hand off to the slug-keyed Hub
         // once payment succeeds.
-        const tenantRow = await drizzle(c.env.DB).select({ slug: tenants.slug })
-            .from(tenants).where(eq(tenants.id, tenantId)).get();
         // IA-86 — project through the declared shape instead of spreading the
         // row. `PublicInvoiceBodySchema` always described what a payer may see,
         // but hono/zod-openapi does not validate or trim RESPONSES, so the
@@ -468,6 +471,8 @@ const publicReportRoutes = createApiRouter()
             defaultTimezone: brand?.defaultTimezone ?? 'UTC',
             supportEmail: brand?.supportEmail ?? null,
             companyPhone: brand?.companyPhone ?? null,
+            privacyUrl: brand?.privacyUrl ?? null,
+            termsUrl: brand?.termsUrl ?? null,
         };
         const view = PublicInvoiceBodySchema.parse({ ...inv, lineItems, brand: brandView, tenantSlug: tenantRow?.slug ?? null });
         return c.json({ success: true as const, data: view }, 200);

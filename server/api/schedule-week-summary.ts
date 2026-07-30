@@ -1,6 +1,5 @@
 import { createRoute } from '@hono/zod-openapi';
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
 import { requireRole } from '../lib/middleware/rbac';
 import { createApiRouter } from '../lib/openapi-router';
 import { availability, availabilityOverrides } from '../lib/db/schema';
@@ -17,6 +16,7 @@ import {
 } from '../lib/validations/schedule-week-summary.schema';
 import { BookingService } from '../services/booking.service';
 import { isAdminRole } from '../lib/auth/roles';
+import { getDrizzle } from '../lib/route-helpers';
 
 const WEEK_LENGTH = 7;
 const DAY_MS = 86_400_000;
@@ -91,7 +91,7 @@ const scheduleWeekSummaryRoutes = createApiRouter()
         const end = dates[WEEK_LENGTH - 1];
 
         const service = new BookingService(c.env.DB);
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         // Day-invariant setup resolved once for the whole week rather than per day.
         const [allQualified, holidayConfig, customHolidays] = await Promise.all([

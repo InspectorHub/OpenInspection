@@ -1,5 +1,4 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
@@ -15,6 +14,7 @@ import { managedSendAllowed } from '../lib/sms/managed-send-gate';
 import { maybeMetering } from '../services/metering.service';
 import { currentPeriodKey } from '../lib/usage/period';
 import { tenantConfigs } from '../lib/db/schema';
+import { getDrizzle } from '../lib/route-helpers';
 import {
     CreateMessageTemplateSchema, UpdateMessageTemplateSchema, PreviewMessageTemplateSchema,
     TestSendMessageTemplateSchema, MessageTemplateSchema, MessageTemplateListResponseSchema,
@@ -161,7 +161,7 @@ const messageTemplateRoutes = createApiRouter()
             // template test-send is a real send and must not bypass either the
             // compliance gate or the quota cap the standalone SMS test endpoint
             // already enforces.
-            const db = drizzle(c.env.DB);
+            const db = getDrizzle(c);
             let cfgRow: { smsMode: string; smsByoProvider: string | null } | null | undefined;
             try {
                 cfgRow = await db.select({ smsMode: tenantConfigs.smsMode, smsByoProvider: tenantConfigs.smsByoProvider })

@@ -94,7 +94,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  param: { tenant: params.tenant ?? "", id: params.id ?? "" },
  query: { token, render },
  }),
- resolveTenantBrand(context, params.tenant),
+ resolveTenantBrand(context, params.tenant, request),
  ]);
  const body = res.ok ? await res.json() : {};
  const d = ((body as Record<string, unknown>).data ?? {}) as unknown as LoaderResult | undefined;

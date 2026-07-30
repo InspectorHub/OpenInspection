@@ -15,7 +15,6 @@ import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
-import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable, inspectionResults, users } from '../../lib/db/schema';
 import { deleteInspectionCascade } from '../../services/inspection/inspection-cascade';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
@@ -28,6 +27,7 @@ import { readTenantTier } from '../../features/plan-quota/guard';
 import { noticeFor } from '../../features/plan-quota/notice';
 import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/email/build-email-service';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
+import { getDrizzle } from '../../lib/route-helpers';
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
@@ -280,7 +280,7 @@ const coreRoutes = createApiRouter()
 
         // Cascade-delete every inspection-scoped row + R2 asset (D1 does not honor
         // FK cascades at runtime). Ownership verified by getInspection above.
-        await deleteInspectionCascade(drizzle(c.env.DB), c.env.PHOTOS, tenantId, id);
+        await deleteInspectionCascade(getDrizzle(c), c.env.PHOTOS, tenantId, id);
 
         auditFromContext(c, 'inspection.delete', 'inspection', {
             entityId: id,
@@ -292,7 +292,7 @@ const coreRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
 
@@ -486,7 +486,7 @@ const coreRoutes = createApiRouter()
         const svc      = c.var.services.inspection;
         try {
             const { inspection, template } = await svc.getInspection(id, tenantId);
-            const db = drizzle(c.env.DB);
+            const db = getDrizzle(c);
             const results = await db.select().from(inspectionResults)
                 .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId))).get();
             return c.json({ success: true, data: { inspection, template: template || null, results: results || null, base: null } });
