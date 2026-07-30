@@ -13,8 +13,14 @@
  * report that was never published — clients would receive a link to an
  * unpublished report. `report.published` is a report event and now fires from
  * publish only; /complete is a pure order-lifecycle action. This spec asserts
- * the trigger is NOT called and no inline send happens; the in-app admin
- * notification (createForAllAdmins) still fires directly from the route.
+ * the trigger is NOT called and no inline send happens.
+ *
+ * B3 — the route's own staff notification is gone too. It was raised directly,
+ * outside the automation engine, and typed `report.published` even though the
+ * route completes an inspection rather than publishing a report. The office
+ * alert is now the seeded `Office alert — inspection completed` rule; the
+ * positive assertion lives in tests/unit/automations/staff-alerts-via-rules.spec.ts,
+ * and what this spec owes is proof the direct path is gone.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
@@ -149,16 +155,18 @@ describe('POST /api/inspections/:id/complete — primary-client resolution (Task
         expect(sendInspectionReportPdf).not.toHaveBeenCalled();
         expect(sendReportReady).not.toHaveBeenCalled();
 
-        // The in-app admin notification still fires, and its metadata carries the
-        // primary-client email resolved via PeopleService (Task 9a).
-        expect(createForAllAdmins).toHaveBeenCalledTimes(1);
-        expect(createForAllAdmins.mock.calls[0][1]).toMatchObject({
-            type: 'report.published',
-            metadata: { clientEmail: 'jane@example.com' },
-        });
+        // B3 — the route no longer writes a staff notification itself. It used
+        // to raise one TYPED `report.published` from the COMPLETE route, which
+        // was a mislabel on top of being unconfigurable; the office alert is
+        // now the seeded `Office alert — inspection completed` rule, fired via
+        // the `inspection.completed` trigger. The positive assertion lives in
+        // tests/unit/automations/staff-alerts-via-rules.spec.ts — this spec
+        // owns the route's side effects, and what it owes is proof that the
+        // direct path is gone.
+        expect(createForAllAdmins).not.toHaveBeenCalled();
     });
 
-    it('no primary client at all — no delivery, notification carries clientEmail:null', async () => {
+    it('no primary client at all — still no delivery, and still no direct notification', async () => {
         // Remove the seeded inspection_people row so getPrimaryClient resolves null.
         const { eq } = await import('drizzle-orm');
         await db.delete(schema.inspectionPeople).where(eq(schema.inspectionPeople.inspectionId, INSP_ID));
@@ -177,10 +185,10 @@ describe('POST /api/inspections/:id/complete — primary-client resolution (Task
         expect(sendReportReady).not.toHaveBeenCalled();
         expect(sendInspectionReportPdf).not.toHaveBeenCalled();
 
-        // The in-app notification still fires (unconditional in production), but its
-        // clientEmail metadata is null now that there is no primary client.
-        expect(createForAllAdmins).toHaveBeenCalledTimes(1);
-        expect(createForAllAdmins.mock.calls[0][1]).toMatchObject({ metadata: { clientEmail: null } });
+        // Same as above: the direct notification is gone regardless of whether a
+        // primary client resolves. The primary-client lookup that fed its
+        // metadata went with it — nothing else on this route read it.
+        expect(createForAllAdmins).not.toHaveBeenCalled();
     });
 
     it('already-completed inspection short-circuits — no notification', async () => {

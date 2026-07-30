@@ -35,8 +35,14 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
                     // so this map is normally fully populated; a seed whose key is still
                     // missing is skipped below (not inserted with a null profile id) and
                     // picked up on the next ensureSeeds call once the profile exists.
-                    const neededKeys = [...new Set(
-                        toInsert.map(s => s.recipientRoleKey).filter((k): k is NonNullable<typeof k> => !!k)
+                    // Not every seed targets a role — B3's staff alerts address
+                    // `users` and carry no role key at all.
+                    const neededKeys: string[] = [...new Set(
+                        toInsert.flatMap(s =>
+                            'recipientRoleKey' in s && typeof s.recipientRoleKey === 'string'
+                                ? [s.recipientRoleKey as string]
+                                : [],
+                        ),
                     )];
                     const profileRows = neededKeys.length
                         ? await db.select({ key: contactRoleProfiles.key, id: contactRoleProfiles.id })
@@ -55,12 +61,13 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
                     const CHUNK_SIZE = 7;
                     const rows: (typeof automations.$inferInsert)[] = [];
                     for (const seed of toInsert) {
+                        const seedRoleKey = 'recipientRoleKey' in seed ? seed.recipientRoleKey : null;
                         let recipientRoleProfileId: string | null = null;
-                        if (seed.recipientRoleKey) {
-                            recipientRoleProfileId = profileIdByKey.get(seed.recipientRoleKey) ?? null;
+                        if (seedRoleKey) {
+                            recipientRoleProfileId = profileIdByKey.get(seedRoleKey) ?? null;
                             if (!recipientRoleProfileId) {
                                 logger.warn('AutomationService.ensureSeeds: role profile not yet seeded, skipping rule (will retry)',
-                                    { tenantId, name: seed.name, recipientRoleKey: seed.recipientRoleKey });
+                                    { tenantId, name: seed.name, recipientRoleKey: seedRoleKey });
                                 continue;
                             }
                         }

@@ -6,6 +6,7 @@ import { wallClockToEpochMs, resolveTenantTimeZone } from '../lib/tz';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
+import { fireAutomation } from './inspection/shared';
 import type { HonoConfig } from '../types/hono';
 import type { PublicBookingSchema } from '../lib/validations/booking.schema';
 import type { z } from '@hono/zod-openapi';
@@ -863,16 +864,14 @@ export class BookingService {
             );
         }
 
-        // B3: in-app notification for the inspector workspace
+        // B3 — the office alert is a rule now (`Office alert — new booking`,
+        // recipientKind 'staff', channel in_app). `booking.received` is its own
+        // trigger rather than a reuse of `inspection.created`: a booking is a
+        // stranger arriving through the public form, while an inspection can
+        // also be created by the office itself, and alerting someone about
+        // their own action is noise.
         c.executionCtx.waitUntil(
-            c.var.services.notification.createForAllAdmins(tenantId, {
-                type: 'booking.received',
-                title: `New booking — ${body.address ?? 'no address'}`,
-                body: body.clientName ? `From ${body.clientName}` : null,
-                entityType: 'inspection',
-                entityId: inspectionId,
-                metadata: { source: isWidgetSubmit ? 'widget' : 'public_form' },
-            })
+            fireAutomation(c.env.DB, tenantId, inspectionId, 'booking.received'),
         );
 
         return c.json({

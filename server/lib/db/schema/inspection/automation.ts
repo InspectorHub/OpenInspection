@@ -18,6 +18,15 @@ export const automations = sqliteTable('automations', {
             'agreement.signer_signed',
             'agreement.viewed', 'agreement.declined', 'agreement.expired',
             'event.created', 'event.completed',
+            // B3 — two events that raised a hard-coded staff alert but had no
+            // trigger to hang a rule on. `booking.received` is NOT
+            // `inspection.created`: a booking is a stranger arriving through
+            // the public form, while an inspection can also be created by the
+            // office itself, and alerting someone about their own action is
+            // noise. `inspection.completed` is likewise not `report.published`
+            // — the completion route had been raising a notice TYPED
+            // report.published, which is a mislabel this migration retires.
+            'booking.received', 'inspection.completed',
             // Track J (D7) — the one time-relative trigger. Cron-fired by
             // AutomationService.enqueueReminders(); delayMinutes is the lead
             // time BEFORE inspections.date (not a post-event delay).

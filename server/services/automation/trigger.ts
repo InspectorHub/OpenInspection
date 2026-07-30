@@ -192,15 +192,28 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                         err instanceof Error ? err : undefined);
                 }
             }
-            if (logs.length > 0 && this.notification) {
-                await this.notification.createForAllAdmins(ctx.tenantId, {
-                    type: ctx.triggerEvent,
-                    title: this.titleFor(ctx.triggerEvent, insp),
-                    entityType: 'inspection',
-                    entityId: ctx.inspectionId,
-                    metadata: { fromAutomation: true, rules: filteredRules.length },
-                });
-            }
+            // B3 — the blanket "any event with logs also alerts every admin"
+            // notification is GONE. It fired outside the engine, so it could not
+            // be seen, renamed or switched off, and it double-notified whenever
+            // a staff rule already covered the same event. The seeded
+            // `Office alert — …` rules (recipientKind 'staff', channel in_app)
+            // now do the same job through the same path as every other
+            // recipient, which is what makes automations the single config
+            // surface rather than one of two.
+            //
+            // ENQUEUE vs DELIVERY, decided here because B3 is where it starts to
+            // matter: the office alert appears at ENQUEUE time, not when flush()
+            // settles the row. The header is written above, and the inbox
+            // reveals it once `send_at` passes (§3.14) — the cron only moves the
+            // Outbox status from "Sending" to "Delivered".
+            //
+            // The alternative — hold the notice back until the cron marks it
+            // sent — was rejected: for a zero-delay rule it would add up to five
+            // minutes of latency to an alert whose whole value is immediacy,
+            // and it would make the office's view of an event depend on a
+            // scheduled job rather than on the event. A DELAYED rule still
+            // behaves correctly because the reader-side `send_at` filter, not
+            // the delivery status, is what gates visibility.
             logger.info('AutomationService: enqueued', { event: ctx.triggerEvent, count: logs.length });
         }
 

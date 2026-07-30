@@ -230,4 +230,116 @@ export const AUTOMATION_SEEDS = [
         isDefault: true,
         defaultActive: false,
     },
+
+    // ── Internal staff alerts (B3) ─────────────────────────────────────────
+    // These replace the four hard-coded `createForAllAdmins` call sites. They
+    // are `in_app` only — an internal alert is not an email — and addressed to
+    // `staff`, which is the same owners+managers audience the direct calls
+    // had. Seeded ACTIVE so the migration preserves coverage exactly: an
+    // office that gets an alert today still gets one, now from a rule they can
+    // rename, reword or switch off.
+    //
+    // `inAppTitle` / `inAppBody` are the twelve literals (IA-115), now
+    // template text: `backfillAutomationTemplates` turns each into a
+    // message_templates(channel='in_app') row the operator owns.
+    {
+        name:            'Office alert — new booking',
+        trigger:         'booking.received' as const,
+        recipientKind:   'staff' as const,
+        delayMinutes:    0,
+        subjectTemplate: '',
+        bodyTemplate:    '',
+        channels:        ['in_app'],
+        inAppTitle:      'New booking — {{property_address}}',
+        inAppBody:       'A new booking came in for {{scheduled_date}}.',
+        isDefault: true,
+    },
+    {
+        name:            'Office alert — inspection scheduled',
+        trigger:         'inspection.created' as const,
+        recipientKind:   'staff' as const,
+        delayMinutes:    0,
+        subjectTemplate: '',
+        bodyTemplate:    '',
+        channels:        ['in_app'],
+        inAppTitle:      'New inspection scheduled — {{property_address}}',
+        isDefault: true,
+    },
+    {
+        name:            'Office alert — inspection confirmed',
+        trigger:         'inspection.confirmed' as const,
+        recipientKind:   'staff' as const,
+        delayMinutes:    0,
+        subjectTemplate: '',
+        bodyTemplate:    '',
+        channels:        ['in_app'],
+        inAppTitle:      'Inspection confirmed — {{property_address}}',
+        isDefault: true,
+    },
+    {
+        name:            'Office alert — inspection cancelled',
+        trigger:         'inspection.cancelled' as const,
+        recipientKind:   'staff' as const,
+        delayMinutes:    0,
+        subjectTemplate: '',
+        bodyTemplate:    '',
+        channels:        ['in_app'],
+        inAppTitle:      'Inspection cancelled — {{property_address}}',
+        isDefault: true,
+    },
+    {
+        name:            'Office alert — inspection completed',
+        trigger:         'inspection.completed' as const,
+        recipientKind:   'staff' as const,
+        delayMinutes:    0,
+        subjectTemplate: '',
+        bodyTemplate:    '',
+        channels:        ['in_app'],
+        inAppTitle:      'Inspection completed — {{property_address}}',
+        isDefault: true,
+    },
+    {
+        name:            'Office alert — report published',
+        trigger:         'report.published' as const,
+        recipientKind:   'staff' as const,
+        delayMinutes:    0,
+        subjectTemplate: '',
+        bodyTemplate:    '',
+        channels:        ['in_app'],
+        inAppTitle:      'Report published — {{property_address}}',
+        isDefault: true,
+    },
+    {
+        name:            'Office alert — invoice created',
+        trigger:         'invoice.created' as const,
+        recipientKind:   'staff' as const,
+        delayMinutes:    0,
+        subjectTemplate: '',
+        bodyTemplate:    '',
+        channels:        ['in_app'],
+        inAppTitle:      'Invoice created — {{property_address}}',
+        isDefault: true,
+    },
+    {
+        name:            'Office alert — payment received',
+        trigger:         'payment.received' as const,
+        recipientKind:   'staff' as const,
+        delayMinutes:    0,
+        subjectTemplate: '',
+        bodyTemplate:    '',
+        channels:        ['in_app'],
+        inAppTitle:      'Payment received — {{property_address}}',
+        isDefault: true,
+    },
+    {
+        name:            'Office alert — agreement signed',
+        trigger:         'agreement.signed' as const,
+        recipientKind:   'staff' as const,
+        delayMinutes:    0,
+        subjectTemplate: '',
+        bodyTemplate:    '',
+        channels:        ['in_app'],
+        inAppTitle:      'Agreement signed — {{property_address}}',
+        isDefault: true,
+    },
 ] as const;

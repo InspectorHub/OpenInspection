@@ -7,6 +7,9 @@ const AUTOMATION_TRIGGERS = [
     'agreement.signer_signed',
     'agreement.viewed', 'agreement.declined', 'agreement.expired',
     'event.created', 'event.completed',
+    // B3 — see the schema comment: a booking is not any inspection creation,
+    // and completing an inspection is not publishing its report.
+    'booking.received', 'inspection.completed',
     'inspection.reminder',
 ] as const;
 

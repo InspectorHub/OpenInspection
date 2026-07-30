@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { automations, messageTemplates } from '../lib/db/schema';
+import { AUTOMATION_SEEDS } from '../data/automation-seeds';
 
 /** Collect {{var}} token names from one or more template strings. */
 function extractVars(...sources: (string | null | undefined)[]): string[] {
@@ -33,7 +34,13 @@ export async function backfillAutomationTemplates(db: D1Database, tenantId: stri
     for (const a of rules) {
         const patch: Partial<typeof automations.$inferInsert> = {};
 
-        if (!a.emailTemplateId) {
+        const channels = parseChannels(a.channels);
+
+        // Only give a rule an EMAIL template when it actually has an email
+        // channel. B3's staff alerts are in-app only, and creating an email
+        // template for them would put a row in the operator's template library
+        // that nothing can ever send.
+        if (channels.includes('email') && !a.emailTemplateId) {
             const id = nanoid();
             await d.insert(messageTemplates).values({
                 id, tenantId, name: `${a.name} — Email`, channel: 'email',
@@ -45,7 +52,6 @@ export async function backfillAutomationTemplates(db: D1Database, tenantId: stri
             created++;
         }
 
-        const channels = parseChannels(a.channels);
         if (channels.includes('sms') && a.smsBody?.trim() && !a.smsTemplateId) {
             const id = nanoid();
             await d.insert(messageTemplates).values({
@@ -55,6 +61,29 @@ export async function backfillAutomationTemplates(db: D1Database, tenantId: stri
                 isSeeded: true, createdAt: now, updatedAt: now,
             });
             patch.smsTemplateId = id;
+            created++;
+        }
+
+        // B3 (IA-115) — the in-app wording. `subject` is the notice TITLE and
+        // `body` its body (see the message_templates schema comment), so the
+        // literal that used to live in `titleFor` becomes a row the operator
+        // can rewrite.
+        // The wording lives in the SEED, not on the row: `automations` has no
+        // title column and adding one would duplicate what the template is
+        // for. Matched on (name, trigger), the same key ensureSeeds uses to
+        // decide a rule already exists.
+        const seed = AUTOMATION_SEEDS.find(
+            (x) => x.name === a.name && x.trigger === a.trigger,
+        ) as { inAppTitle?: string; inAppBody?: string } | undefined;
+        if (channels.includes('in_app') && seed?.inAppTitle?.trim() && !a.inAppTemplateId) {
+            const id = nanoid();
+            await d.insert(messageTemplates).values({
+                id, tenantId, name: `${a.name} — In-app`, channel: 'in_app',
+                subject: seed.inAppTitle, body: seed.inAppBody ?? '',
+                variables: JSON.stringify(extractVars(seed.inAppTitle, seed.inAppBody)),
+                isSeeded: true, createdAt: now, updatedAt: now,
+            });
+            patch.inAppTemplateId = id;
             created++;
         }
 
