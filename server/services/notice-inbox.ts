@@ -23,7 +23,7 @@
  * all. The cross-recipient test is the one that matters
  * (`tests/unit/notifications/notice-inbox.spec.ts`).
  */
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { notifications, automationLogs, contacts, tenants } from '../lib/db/schema';
 
 /** Accepts the D1 drizzle instance or the better-sqlite3 test db. */
@@ -63,6 +63,23 @@ export interface NoticeRow {
 
 const toMs = (v: Date | number | null | undefined): number | null =>
     v == null ? null : v instanceof Date ? v.getTime() : Number(v);
+
+/**
+ * Only notices that have actually been dispatched (design §3.14).
+ *
+ * `trigger()` writes every log the instant a rule fires — delay and all — so
+ * `send_at` is the ONLY thing between a delayed automation and the recipient's
+ * bell. A "three days after the report" notice appearing the moment the report
+ * is published is not an early notification, it is a wrong one. A header with
+ * no attempt at all is likewise invisible here: "nothing dispatched yet" is a
+ * legible state for the SENDER (§3.13), but there is nothing to tell a
+ * recipient about.
+ */
+function dispatchedNoticeIds(db: AnyDb) {
+    return db.select({ id: automationLogs.noticeId })
+        .from(automationLogs)
+        .where(lte(automationLogs.sendAt, new Date()));
+}
 
 /* ------------------------------------------------------------------ */
 /*  Who am I — the two resolvers                                       */
@@ -122,7 +139,10 @@ export async function listNoticesForContacts(
     if (contactIds.length === 0) return [];
     const limit = Math.min(params.limit ?? 50, 100);
 
-    const conds = [inArray(notifications.contactId, contactIds)];
+    const conds = [
+        inArray(notifications.contactId, contactIds),
+        inArray(notifications.id, dispatchedNoticeIds(db)),
+    ];
     if (!params.includeArchived) conds.push(isNull(notifications.archivedAt));
 
     const headers = await db.select({
@@ -221,6 +241,9 @@ export async function unreadNoticeCountForContacts(db: AnyDb, contactIds: string
         .from(notifications)
         .where(and(
             inArray(notifications.contactId, contactIds),
+            // The badge counts what the reader can actually open — same
+            // dispatched-only rule as the list above.
+            inArray(notifications.id, dispatchedNoticeIds(db)),
             isNull(notifications.readAt),
             isNull(notifications.archivedAt),
         ))

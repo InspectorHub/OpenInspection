@@ -16,6 +16,7 @@
  *   the recipient tidying their inbox cannot edit the sender's audit trail.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -87,8 +88,11 @@ async function notice(opts: {
         archivedAt: opts.archivedAt ?? null,
         createdAt,
     });
+    // A notice with no delivery attempt is invisible to its recipient by
+    // design (§3.14), so the DEFAULT fixture carries one — the bare-header
+    // case is written out explicitly where it is the subject of the test.
     let i = 0;
-    for (const ch of opts.channels ?? []) {
+    for (const ch of opts.channels ?? [{ channel: 'email' as const, recipient: 'x@x.com', status: 'sent' as const }]) {
         await db.insert(schema.automationLogs).values({
             id: `${opts.id}-log-${i++}`,
             tenantId: opts.tenantId ?? TENANT_A,
@@ -199,6 +203,47 @@ describe('notice inbox — outward recipients (C3)', () => {
         await notice({ id: 'n-ray', contactId: CONTACT_RAY });
         await archiveNotice(db, [CONTACT_JANE], 'n-ray');
         expect(await listNoticesForContacts(db, { contactIds: [CONTACT_RAY] })).toHaveLength(1);
+    });
+
+    // Design §3.14 — trigger() writes the log the instant a rule fires, delay
+    // and all, so `send_at` is the ONLY thing standing between a delayed
+    // automation and a recipient's bell. A "3 days after the report" notice
+    // that shows up the moment the report is published is not an early
+    // notification, it is a wrong one.
+    it('a notice whose delivery is still in the future does not surface early', async () => {
+        const future = new Date(Date.now() + 3 * 86_400_000);
+        await notice({
+            id: 'n-later',
+            contactId: CONTACT_JANE,
+            createdAt: new Date(),
+            channels: [{ channel: 'email', recipient: 'jane@x.com', status: 'pending' }],
+        });
+        // Push its one attempt out past now.
+        await db.update(schema.automationLogs)
+            .set({ sendAt: future })
+            .where(eq(schema.automationLogs.noticeId, 'n-later'));
+
+        expect(await listNoticesForContacts(db, { contactIds: [CONTACT_JANE] })).toHaveLength(0);
+        expect(await unreadNoticeCountForContacts(db, [CONTACT_JANE])).toBe(0);
+    });
+
+    it('the same notice appears once its send time has passed', async () => {
+        await notice({
+            id: 'n-due',
+            contactId: CONTACT_JANE,
+            createdAt: new Date(Date.now() - 60_000),
+            channels: [{ channel: 'email', recipient: 'jane@x.com', status: 'pending' }],
+        });
+        const rows = await listNoticesForContacts(db, { contactIds: [CONTACT_JANE] });
+        expect(rows.map((r) => r.id)).toEqual(['n-due']);
+        expect(await unreadNoticeCountForContacts(db, [CONTACT_JANE])).toBe(1);
+    });
+
+    it('a header with NO delivery attempt at all stays out of the inbox', async () => {
+        // "Nothing dispatched yet" is a legible state for the SENDER (§3.13),
+        // but there is nothing to tell a recipient about it.
+        await notice({ id: 'n-bare', contactId: CONTACT_JANE, channels: [] });
+        expect(await listNoticesForContacts(db, { contactIds: [CONTACT_JANE] })).toHaveLength(0);
     });
 
     it('an empty contact set reads nothing rather than everything', async () => {
