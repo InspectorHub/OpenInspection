@@ -4684,6 +4684,38 @@
           "smsTemplateId": {
             "type": "string",
             "description": "Optional message-template id used for SMS notices to this role."
+          },
+          "capabilityOverrides": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "receivesReport": {
+                "type": "boolean",
+                "description": "Whether this role receives the report."
+              },
+              "selfRetrieveReport": {
+                "type": "boolean",
+                "description": "Whether this role may fetch the report itself."
+              },
+              "canHaveAccount": {
+                "type": "boolean",
+                "description": "Whether this role may hold a portal account."
+              },
+              "showsInAgentPortal": {
+                "type": "boolean",
+                "description": "Whether the inspection appears in this role's own agent portal list."
+              },
+              "canAccessRepairList": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "read",
+                  "readwrite"
+                ],
+                "description": "Access to the buyer's repair list, resolved against the tenant policy by taking the stricter of the two."
+              }
+            },
+            "description": "Per-profile overrides layered on the kind baseline."
           }
         },
         "required": [
@@ -19577,6 +19609,38 @@
           "active": {
             "type": "boolean",
             "description": "Set to false to deactivate the profile (rejected with 409 for isSystem profiles)."
+          },
+          "capabilityOverrides": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "receivesReport": {
+                "type": "boolean",
+                "description": "Whether this role receives the report."
+              },
+              "selfRetrieveReport": {
+                "type": "boolean",
+                "description": "Whether this role may fetch the report itself."
+              },
+              "canHaveAccount": {
+                "type": "boolean",
+                "description": "Whether this role may hold a portal account."
+              },
+              "showsInAgentPortal": {
+                "type": "boolean",
+                "description": "Whether the inspection appears in this role's own agent portal list."
+              },
+              "canAccessRepairList": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "read",
+                  "readwrite"
+                ],
+                "description": "Access to the buyer's repair list, resolved against the tenant policy by taking the stricter of the two."
+              }
+            },
+            "description": "Per-profile overrides layered on the kind baseline."
           }
         }
       }
