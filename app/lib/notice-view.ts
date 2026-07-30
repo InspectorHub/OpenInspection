@@ -56,6 +56,19 @@ export type NoticeRemedy =
 const SMS_CONSENT = "no sms consent";
 
 /**
+ * The recipient asked us to stop.
+ *
+ * This DOES keep the "Turn on texts" remedy. What STOP forbids is SENDING
+ * until they opt back in; it does not forbid offering a way back. The remedy
+ * is a link the reader clicks in their own authenticated portal — that is
+ * opt-in machinery, not outbound traffic — and it lands on the double-opt-in
+ * page, which re-shows the full disclosure and records a fresh consent event.
+ * The alternative, hiding it, leaves someone who changed their mind with no
+ * path except remembering to text START to a number they may have deleted.
+ */
+const SMS_OPT_OUT = "sms opt-out";
+
+/**
  * A delivery failure that means THE ADDRESS is wrong, enumerated rather than
  * inferred. Any other failure (a provider outage, a reset connection) is ours,
  * and telling someone their address is wrong because our sender hiccuped is
@@ -120,6 +133,7 @@ export function channelLabel(channel: string): string {
 export function noticeReasonText(attempt: NoticeChannelAttempt): string | null {
   const raw = (attempt.reasonCode ?? "").trim().toLowerCase();
   if (attempt.channel === "sms" && raw === SMS_CONSENT) return m.notice_reason_no_sms_consent();
+  if (attempt.channel === "sms" && raw === SMS_OPT_OUT) return m.notice_reason_sms_opt_out();
   if (attempt.channel === "email" && attempt.status === "failed" && ADDRESS_REJECTED.test(raw)) {
     return m.notice_reason_bounced({ address: attempt.recipient });
   }
@@ -135,11 +149,15 @@ export function noticeRemedy(
   row: NoticeRowData,
   opts: { emailComposer: boolean },
 ): NoticeRemedy | null {
-  const smsSkipped = row.channels.find(
-    (c) => c.channel === "sms"
-      && (c.status === "skipped" || c.status === "failed")
-      && (c.reasonCode ?? "").trim().toLowerCase() === SMS_CONSENT,
-  );
+  // Both SMS consent states get the same way back in: never opted in, and
+  // opted out then changed their mind. See SMS_OPT_OUT above for why the
+  // second one is offered rather than hidden.
+  const smsSkipped = row.channels.find((c) => {
+    if (c.channel !== "sms") return false;
+    if (c.status !== "skipped" && c.status !== "failed") return false;
+    const raw = (c.reasonCode ?? "").trim().toLowerCase();
+    return raw === SMS_CONSENT || raw === SMS_OPT_OUT;
+  });
   if (smsSkipped) return { kind: "sms-consent", noticeId: row.id };
 
   if (!opts.emailComposer) return null;

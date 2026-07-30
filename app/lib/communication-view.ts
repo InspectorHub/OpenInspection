@@ -124,6 +124,10 @@ export function reasonText(reasonCode: string | null): string | null {
   const norm = reasonCode.trim().toLowerCase();
   switch (norm) {
     case "no sms consent":          return m.comm_reason_no_sms_consent();
+    // Distinct from the above on purpose: "opted out" is an instruction from
+    // the recipient that the operator must not work around, while "never opted
+    // in" is a gap they may legitimately close by asking.
+    case "sms opt-out":             return m.comm_reason_sms_opt_out();
     case "review_url not configured": return m.comm_reason_no_review_url();
     case "sms not configured":      return m.comm_reason_sms_not_configured();
     case "email not configured":    return m.comm_reason_email_not_configured();

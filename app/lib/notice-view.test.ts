@@ -97,6 +97,14 @@ describe("noticeRemedy", () => {
     expect(r).toBeNull();
   });
 
+  it("still offers a way back to someone who replied STOP", () => {
+    // STOP forbids SENDING until they opt back in; it does not forbid offering
+    // a way back. The remedy is a link they click in their own portal, landing
+    // on the double-opt-in page — opt-in machinery, not outbound traffic.
+    const optedOut = notice([channel({ channel: "sms", status: "skipped", reasonCode: "sms opt-out" })]);
+    expect(noticeRemedy(optedOut, { emailComposer: true })).toMatchObject({ kind: "sms-consent" });
+  });
+
   it("never leaks an operator-only reason as a remedy", () => {
     for (const raw of ["no email template", "sms not configured", "managed_not_approved", "review_url not configured"]) {
       expect(noticeRemedy(notice([channel({ status: "skipped", reasonCode: raw })]), { emailComposer: true })).toBeNull();

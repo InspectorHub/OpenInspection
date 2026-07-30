@@ -116,11 +116,25 @@ export async function sendOneSms(args: SendOneSmsArgs): Promise<void> {
         db.update(automationLogs).set({ status: 'skipped', error: reason })
             .where(and(eq(automationLogs.id, log.id), eq(automationLogs.tenantId, inspection.tenantId)));
 
-    // Consent gate — client kind only (agents/inspector/other implied; D5 + A3.2).
+    // Consent gate. Two DIFFERENT rules, and conflating them is what let a
+    // revoked agent keep receiving texts:
+    //
+    //   - **Revocation binds everyone.** Honoring STOP does not depend on the
+    //     basis the first message was sent under — it is the one CTIA rule that
+    //     is universal, and both published documents warrant it (ToS: STOP is
+    //     honored "for all outbound recipients"; privacy notice: business
+    //     counterparties keep STOP available). The inbound webhook matches
+    //     contacts by PHONE with no kind filter, so it records revocations for
+    //     agents and other business counterparties too — they were simply never
+    //     read, because this whole block used to sit inside the express branch.
+    //   - **Express consent is required only of consumers** (client kind).
+    //     Agents / other business counterparties / staff are implied
+    //     (D5 + A3.2); absence of a granted row is not a reason to withhold.
+    //
     // Keyed on the PER-RECIPIENT role stamped on the log, not the rule's
     // recipientKind. IA-109: gate on KIND, not one KEY.
     const roleKind = await resolveRecipientRoleKind(db, inspection.tenantId, log.recipientRoleKey);
-    if (requiresExpressSmsConsent(roleKind)) {
+    {
         const { SmsConsentService } = await import('../sms-consent.service');
         const consentSvc = new SmsConsentService(rawDb);
         // The contact this log is addressed to, stamped at enqueue.
@@ -136,9 +150,21 @@ export async function sendOneSms(args: SendOneSmsArgs): Promise<void> {
             log.recipientRoleKey === PRIMARY_CLIENT_KEY || log.recipientRoleKey == null;
         const contactId = log.recipientContactId
             ?? (isPrimaryClientLog ? inspection.clientContactId : null);
-        if (!contactId) return void (await skip('no sms consent'));
-        const latest = await consentSvc.getLatest(inspection.tenantId, contactId);
-        if (latest !== 'granted') return void (await skip('no sms consent'));
+
+        if (!contactId) {
+            // No identifiable contact: a consumer fails closed (nothing to check
+            // consent against). An implied-basis recipient has no ledger to
+            // consult either, so there is no revocation that could apply.
+            if (requiresExpressSmsConsent(roleKind)) return void (await skip('no sms consent'));
+        } else {
+            const latest = await consentSvc.getLatest(inspection.tenantId, contactId);
+            // Distinct reason string: "opted out" and "never opted in" are
+            // different facts, and the Outbox/inbox reason maps read them.
+            if (latest === 'revoked') return void (await skip('sms opt-out'));
+            if (requiresExpressSmsConsent(roleKind) && latest !== 'granted') {
+                return void (await skip('no sms consent'));
+            }
+        }
     }
 
     const resolved = await sms.resolveProvider(inspection.tenantId);

@@ -209,6 +209,44 @@ describe('manual SMS send (A3.4/A3.5)', () => {
         expect(rows[0].recipientRoleKey).toBe('buyer_agent');
     });
 
+    // A revocation binds EVERY recipient, whatever basis the first message was
+    // sent under. This is the one CTIA requirement that is not
+    // consent-basis-dependent, and both published documents warrant it: the ToS
+    // says STOP is honored "for all outbound recipients" and the privacy notice
+    // tells business counterparties that "STOP remains available".
+    //
+    // Before this, the whole ledger lookup — revocation included — sat inside
+    // the express-consent branch, which is client-kind only. The STOP webhook
+    // matches contacts by PHONE with no kind filter, so an agent's STOP was
+    // recorded and then ignored: the revocation existed in the ledger and the
+    // texts kept going out.
+    it('agent who replied STOP → skipped, even though agents need no express consent', async () => {
+        await new SmsConsentService({} as D1Database).record(TENANT, AGENT, 'revoked', 'admin', {});
+
+        const res = await buildApp().fetch(post({
+            recipients: [{ contactId: AGENT, roleKey: 'buyer_agent' }],
+        }), ENV, CTX);
+
+        expect(res.status).toBe(200);
+        expect(sendMessage).not.toHaveBeenCalled();
+        const rows = await manualSmsRows();
+        expect(rows[0].status).toBe('skipped');
+        expect(rows[0].error).toMatch(/opt.?out/i);
+    });
+
+    it('agent who replied STOP and then START → sends again', async () => {
+        const svc = new SmsConsentService({} as D1Database);
+        await svc.record(TENANT, AGENT, 'revoked', 'admin', {});
+        await svc.record(TENANT, AGENT, 'granted', 'admin', {});
+
+        const res = await buildApp().fetch(post({
+            recipients: [{ contactId: AGENT, roleKey: 'buyer_agent' }],
+        }), ENV, CTX);
+
+        expect(res.status).toBe(200);
+        expect(sendMessage).toHaveBeenCalledTimes(1);
+    });
+
     it('no phone on file → skipped before provider, no ledger row written for that path', async () => {
         // Seated but phoneless: rejected before insert so the Outbox stays clean.
         const res = await buildApp().fetch(post({
