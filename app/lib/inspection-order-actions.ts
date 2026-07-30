@@ -26,6 +26,7 @@ const ORDER_FIELDS = [
     "closingDate",
     "referenceNumber",
     "referralSource",
+    "referredByContactId",
     "paymentRequired",
     "agreementRequired",
 ] as const;

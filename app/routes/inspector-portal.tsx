@@ -99,6 +99,8 @@ interface HubData extends HubPayload {
     closingDate: string | null;
     referenceNumber: string | null;
     referralSource: string | null;
+    referredByContactId?: string | null;
+    referredByName?: string | null;
     // reportStatus is inherited from HubPayload["inspection"] but listed here for clarity
   };
   tenantSlug: string;
@@ -1000,6 +1002,8 @@ export default function InspectionHubPage() {
           referenceNumber={inspection.referenceNumber}
           referralSource={inspection.referralSource}
           referralSources={referralSources}
+          referredByContactId={inspection.referredByContactId ?? null}
+          referredByName={inspection.referredByName ?? null}
         />
 
       </div>
