@@ -6,6 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { createSessionWithToken } from "~/lib/session.server";
 import { makeAgentLoginSchema, makeAgentLoginLinkSchema } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
+import { Input, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -144,37 +145,23 @@ export default function AgentLoginPage() {
     >
       <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate className="space-y-4">
         <input type="hidden" name="intent" value="password" />
-        <div>
-          <label htmlFor={fields.email.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-            {m.auth_login_email_label()}
-          </label>
-          <input
-            id={fields.email.id}
-            name={fields.email.name}
-            type="email"
-            autoFocus
-            aria-invalid={fields.email.errors ? true : undefined}
-            className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
-          />
-          {fields.email.errors && (
-            <p className="mt-1 text-xs text-ih-bad-fg">{fields.email.errors[0]}</p>
-          )}
-        </div>
-        <div>
-          <label htmlFor={fields.password.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-            {m.auth_login_password_label()}
-          </label>
-          <input
-            id={fields.password.id}
-            name={fields.password.name}
-            type="password"
-            aria-invalid={fields.password.errors ? true : undefined}
-            className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
-          />
-          {fields.password.errors && (
-            <p className="mt-1 text-xs text-ih-bad-fg">{fields.password.errors[0]}</p>
-          )}
-        </div>
+        <Input
+          id={fields.email.id}
+          name={fields.email.name}
+          type="email"
+          autoFocus
+          label={m.auth_login_email_label()}
+          aria-invalid={fields.email.errors ? true : undefined}
+          error={fields.email.errors?.[0]}
+        />
+        <Input
+          id={fields.password.id}
+          name={fields.password.name}
+          type="password"
+          label={m.auth_login_password_label()}
+          aria-invalid={fields.password.errors ? true : undefined}
+          error={fields.password.errors?.[0]}
+        />
 
         {form.errors && (
           <div className="px-3 py-2 rounded-lg bg-ih-bad-bg border border-ih-bad text-sm text-ih-bad-fg">
@@ -182,13 +169,9 @@ export default function AgentLoginPage() {
           </div>
         )}
 
-        <button
-          type="submit"
-          disabled={isSubmittingPassword}
-          className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-        >
+        <Button type="submit" variant="primary" size="lg" disabled={isSubmittingPassword} className="w-full">
           {isSubmittingPassword ? m.auth_agent_login_submit_pending() : m.auth_agent_login_submit()}
-        </button>
+        </Button>
       </Form>
 
       <div className="my-4 flex items-center gap-3">
@@ -207,28 +190,17 @@ export default function AgentLoginPage() {
         className="space-y-2"
       >
         <input type="hidden" name="intent" value="link" />
-        <div>
-          <label htmlFor={linkFields.email.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-            {m.auth_login_email_label()}
-          </label>
-          <input
-            id={linkFields.email.id}
-            name={linkFields.email.name}
-            type="email"
-            aria-invalid={linkFields.email.errors ? true : undefined}
-            className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
-          />
-          {linkFields.email.errors && (
-            <p className="mt-1 text-xs text-ih-bad-fg">{linkFields.email.errors[0]}</p>
-          )}
-        </div>
-        <button
-          type="submit"
-          disabled={isSubmittingLink}
-          className="text-sm font-bold text-ih-primary hover:underline"
-        >
+        <Input
+          id={linkFields.email.id}
+          name={linkFields.email.name}
+          type="email"
+          label={m.auth_login_email_label()}
+          aria-invalid={linkFields.email.errors ? true : undefined}
+          error={linkFields.email.errors?.[0]}
+        />
+        <Button type="submit" variant="link" size="sm" disabled={isSubmittingLink} className="px-0">
           {isSubmittingLink ? m.auth_agent_login_link_submit_pending() : m.auth_agent_login_link_cta()}
-        </button>
+        </Button>
       </Form>
     </AuthShell>
   );

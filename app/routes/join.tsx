@@ -5,6 +5,7 @@ import type { Route } from "./+types/join";
 import { createApi } from "~/lib/api-client.server";
 import { makeJoinSchema, makePasswordHint } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
+import { Input, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -119,38 +120,24 @@ export default function JoinPage() {
     >
         <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate className="space-y-4">
           <input type="hidden" name="token" value={token} />
-          <div>
-            <label htmlFor={fields.name.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-              {m.auth_join_name_label()}
-            </label>
-            <input
-              id={fields.name.id}
-              name={fields.name.name}
-              type="text"
-              autoFocus
-              aria-invalid={fields.name.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
-            />
-            {fields.name.errors && (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.name.errors[0]}</p>
-            )}
-          </div>
-          <div>
-            <label htmlFor={fields.password.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-              {m.auth_login_password_label()}
-            </label>
-            <input
-              id={fields.password.id}
-              name={fields.password.name}
-              type="password"
-              aria-invalid={fields.password.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
-            />
-            <p className="mt-1 text-xs text-ih-fg-3">{makePasswordHint()}</p>
-            {fields.password.errors && (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.password.errors[0]}</p>
-            )}
-          </div>
+          <Input
+            id={fields.name.id}
+            name={fields.name.name}
+            type="text"
+            autoFocus
+            label={m.auth_join_name_label()}
+            aria-invalid={fields.name.errors ? true : undefined}
+            error={fields.name.errors?.[0]}
+          />
+          <Input
+            id={fields.password.id}
+            name={fields.password.name}
+            type="password"
+            label={m.auth_login_password_label()}
+            aria-invalid={fields.password.errors ? true : undefined}
+            hint={makePasswordHint()}
+            error={fields.password.errors?.[0]}
+          />
 
           {form.errors && (
             <div className="px-3 py-2 rounded-lg bg-ih-bad-bg border border-ih-bad text-sm text-ih-bad-fg">
@@ -158,13 +145,9 @@ export default function JoinPage() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
+          <Button type="submit" variant="primary" size="lg" disabled={isSubmitting} className="w-full">
             {isSubmitting ? m.auth_join_submit_pending() : m.auth_join_submit()}
-          </button>
+          </Button>
         </Form>
     </AuthShell>
   );

@@ -6,6 +6,7 @@ import { getToken, createSessionWithToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeLoginSchema } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
+import { Input, Button } from "@core/shared-ui";
 import { safeReturnTo } from "../../server/lib/mcp/safe-return-to";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
@@ -121,45 +122,33 @@ export default function LoginPage() {
           {returnTo ? (
             <input type="hidden" name="returnTo" value={returnTo} />
           ) : null}
-          <div>
-            <label htmlFor={fields.email.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-              {m.auth_login_email_label()}
-            </label>
-            <input
-              id={fields.email.id}
-              name={fields.email.name}
-              type="email"
-              autoFocus
-              aria-invalid={fields.email.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
-            />
-            {/* Reserve the error slot's height so the onBlur validation message
-                doesn't shift the "Forgot password?" link below it (which would
-                let a click land above the moved link and miss). */}
-            <p className="mt-1 min-h-4 text-xs text-ih-bad-fg" aria-live="polite">
-              {fields.email.errors?.[0] ?? ""}
-            </p>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label htmlFor={fields.password.id} className="block text-xs font-bold text-ih-fg-3">
-                {m.auth_login_password_label()}
-              </label>
+          {/* `reserveErrorSpace`: these fields validate on blur, and without a
+              held-open error slot the message pushes the "Forgot password?"
+              link down mid-click. */}
+          <Input
+            id={fields.email.id}
+            name={fields.email.name}
+            type="email"
+            autoFocus
+            label={m.auth_login_email_label()}
+            aria-invalid={fields.email.errors ? true : undefined}
+            error={fields.email.errors?.[0]}
+            reserveErrorSpace
+          />
+          <Input
+            id={fields.password.id}
+            name={fields.password.name}
+            type="password"
+            label={m.auth_login_password_label()}
+            labelAction={
               <a href="/forgot-password" className="text-xs font-bold text-ih-primary hover:underline">
                 {m.auth_login_forgot_link()}
               </a>
-            </div>
-            <input
-              id={fields.password.id}
-              name={fields.password.name}
-              type="password"
-              aria-invalid={fields.password.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
-            />
-            <p className="mt-1 min-h-4 text-xs text-ih-bad-fg" aria-live="polite">
-              {fields.password.errors?.[0] ?? ""}
-            </p>
-          </div>
+            }
+            aria-invalid={fields.password.errors ? true : undefined}
+            error={fields.password.errors?.[0]}
+            reserveErrorSpace
+          />
 
           {form.errors && (
             <div className="px-3 py-2 rounded-lg bg-ih-bad-bg border border-ih-bad text-sm text-ih-bad-fg">
@@ -167,13 +156,9 @@ export default function LoginPage() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
+          <Button type="submit" variant="primary" size="lg" disabled={isSubmitting} className="w-full">
             {isSubmitting ? m.auth_login_submit_pending() : m.auth_login_submit()}
-          </button>
+          </Button>
         </Form>
     </AuthShell>
   );

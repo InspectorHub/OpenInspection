@@ -5,6 +5,7 @@ import type { Route } from "./+types/setup";
 import { getToken, createSessionWithToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeSetupSchema } from "~/lib/forms/auth.schema";
+import { Input, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -115,90 +116,54 @@ export default function SetupPage() {
           noValidate
           className="space-y-4"
         >
-          <div>
-            <label htmlFor={fields.workspaceName.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-              {m.auth_setup_company_label()}
-            </label>
-            <input
-              id={fields.workspaceName.id}
-              name={fields.workspaceName.name}
-              type="text"
-              autoFocus
-              placeholder={m.auth_setup_company_placeholder()}
-              aria-invalid={fields.workspaceName.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
-            />
-            {fields.workspaceName.errors && (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.workspaceName.errors[0]}</p>
-            )}
-          </div>
-          <div>
-            <label htmlFor={fields.adminName.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-              {m.auth_setup_name_label()}
-            </label>
-            <input
-              id={fields.adminName.id}
-              name={fields.adminName.name}
-              type="text"
-              autoComplete="name"
-              placeholder={m.auth_setup_name_placeholder()}
-              aria-invalid={fields.adminName.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
-            />
-            {fields.adminName.errors ? (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.adminName.errors[0]}</p>
-            ) : (
-              <p className="mt-1 text-[11px] text-ih-fg-3">
-                {m.auth_setup_name_help()}
-              </p>
-            )}
-          </div>
-          <div>
-            <label htmlFor={fields.email.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-              {m.auth_setup_email_label()}
-            </label>
-            <input
-              id={fields.email.id}
-              name={fields.email.name}
-              type="email"
-              aria-invalid={fields.email.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
-            />
-            {fields.email.errors && (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.email.errors[0]}</p>
-            )}
-          </div>
-          <div>
-            <label htmlFor={fields.password.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-              {m.auth_login_password_label()}
-            </label>
-            <input
-              id={fields.password.id}
-              name={fields.password.name}
-              type="password"
-              aria-invalid={fields.password.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
-            />
-            {fields.password.errors && (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.password.errors[0]}</p>
-            )}
-          </div>
-          <div>
-            <label htmlFor={fields.setupCode.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-              {m.auth_setup_code_label()}
-            </label>
-            <input
-              id={fields.setupCode.id}
-              name={fields.setupCode.name}
-              type="text"
-              placeholder={m.auth_setup_code_placeholder()}
-              aria-invalid={fields.setupCode.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none font-mono"
-            />
-            {fields.setupCode.errors ? (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.setupCode.errors[0]}</p>
-            ) : (
-              <p className="mt-1 text-[11px] text-ih-fg-3">
+          <Input
+            id={fields.workspaceName.id}
+            name={fields.workspaceName.name}
+            type="text"
+            autoFocus
+            placeholder={m.auth_setup_company_placeholder()}
+            label={m.auth_setup_company_label()}
+            aria-invalid={fields.workspaceName.errors ? true : undefined}
+            error={fields.workspaceName.errors?.[0]}
+          />
+          <Input
+            id={fields.adminName.id}
+            name={fields.adminName.name}
+            type="text"
+            autoComplete="name"
+            placeholder={m.auth_setup_name_placeholder()}
+            label={m.auth_setup_name_label()}
+            aria-invalid={fields.adminName.errors ? true : undefined}
+            hint={m.auth_setup_name_help()}
+            error={fields.adminName.errors?.[0]}
+          />
+          <Input
+            id={fields.email.id}
+            name={fields.email.name}
+            type="email"
+            label={m.auth_setup_email_label()}
+            aria-invalid={fields.email.errors ? true : undefined}
+            error={fields.email.errors?.[0]}
+          />
+          <Input
+            id={fields.password.id}
+            name={fields.password.name}
+            type="password"
+            label={m.auth_login_password_label()}
+            aria-invalid={fields.password.errors ? true : undefined}
+            error={fields.password.errors?.[0]}
+          />
+          <Input
+            id={fields.setupCode.id}
+            name={fields.setupCode.name}
+            type="text"
+            placeholder={m.auth_setup_code_placeholder()}
+            label={m.auth_setup_code_label()}
+            className="font-mono"
+            aria-invalid={fields.setupCode.errors ? true : undefined}
+            error={fields.setupCode.errors?.[0]}
+            hint={
+              <>
                 <span className="font-medium text-ih-fg-2">{m.auth_setup_code_help_required()}</span>{" "}
                 {m.auth_setup_code_help_enter_prefix()}{" "}
                 <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-3 font-mono text-[10px]">SETUP_CODE</code>{" "}
@@ -213,9 +178,9 @@ export default function SetupPage() {
                 >
                   {m.auth_setup_code_help_link()}
                 </a>
-              </p>
-            )}
-          </div>
+              </>
+            }
+          />
 
           {form.errors && (
             <div className="px-3 py-2 rounded-lg bg-ih-bad-bg border border-ih-bad text-sm text-ih-bad-fg">
@@ -223,13 +188,9 @@ export default function SetupPage() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
+          <Button type="submit" variant="primary" size="lg" disabled={isSubmitting} className="w-full">
             {isSubmitting ? m.auth_setup_submit_pending() : m.auth_setup_submit()}
-          </button>
+          </Button>
         </Form>
       </div>
     </div>
