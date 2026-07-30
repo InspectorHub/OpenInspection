@@ -50,3 +50,15 @@ export function publishCapFromMe(meBody: {
 }): boolean {
   return meBody.data?.capabilities?.publish === true;
 }
+
+/**
+ * Roadmap §7.5 item 1 — whether the viewer may see the Communication section.
+ * Same fail-closed contract as publishCapFromMe: the server's resolved bit or
+ * nothing. The API 403s the payload anyway; hiding the section keeps the page
+ * from rendering a card whose every expand would error.
+ */
+export function viewCommunicationCapFromMe(meBody: {
+  data?: { capabilities?: { viewCommunication?: boolean } };
+}): boolean {
+  return meBody.data?.capabilities?.viewCommunication === true;
+}

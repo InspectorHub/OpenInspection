@@ -36,7 +36,7 @@ import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEdit
 import { SendReportModal } from "~/components/inspection/SendReportModal";
 import { SendSmsModal } from "~/components/inspection/SendSmsModal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
-import { publishCapFromMe } from "~/lib/inspector-portal-helpers";
+import { publishCapFromMe, viewCommunicationCapFromMe } from "~/lib/inspector-portal-helpers";
 import {
   toActionResult,
   handlePersonAdd,
@@ -180,14 +180,16 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   // the full story); isAdmin stays role-derived — the coarse tier is a
   // different question from a capability and has no override.
   let canPublishCap = false;
+  let canViewCommunication = false;
   let isAdmin = false;
   const meGet = api.auth?.me?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
   const meRes = meGet ? await meGet().catch(() => null) : null;
   if (meRes && meRes.ok) {
     const meBody = (await meRes.json().catch(() => ({}))) as {
-      data?: { user?: { role?: string }; capabilities?: { publish?: boolean } };
+      data?: { user?: { role?: string }; capabilities?: { publish?: boolean; viewCommunication?: boolean } };
     };
     canPublishCap = publishCapFromMe(meBody);
+    canViewCommunication = viewCommunicationCapFromMe(meBody);
     isAdmin = isAdminRole(meBody.data?.user?.role ?? 'inspector');
   }
 
@@ -283,7 +285,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       : [];
 
   return {
-    hub, smsConsent, reinspectCandidates, canPublishCap, documents, people, roleProfiles, isAdmin, versions,
+    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, documents, people, roleProfiles, isAdmin, versions,
     members, serviceCatalog, referralSources,
   };
 }
@@ -490,7 +492,7 @@ export function reportActions(
 
 export default function InspectionHubPage() {
   const {
-    hub, smsConsent, reinspectCandidates, canPublishCap, documents, people, roleProfiles, isAdmin, versions,
+    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, documents, people, roleProfiles, isAdmin, versions,
     members, serviceCatalog, referralSources,
   } = useLoaderData<typeof loader>();
   // `peopleCard` is the read-only getPeopleCard() projection (client/agents/
@@ -822,14 +824,19 @@ export default function InspectionHubPage() {
         {/* 5b. Communication — what has been said, and what we sent. The
             client already had a Messages tab; this is the inspector's first
             surface for the same conversation (IA-105), plus the Outbox that
-            answers "did the agent get the report" without opening email. */}
-        <CommunicationSection
-          inspectionId={inspection.id}
-          counts={hub.communication ?? { delivered: 0, needsAttention: 0, unread: 0, rulesActive: 0 }}
-          reportPublished={reportShipped}
-          threadOptions={people.map((p) => ({ contactId: p.contactId, name: p.name, roleLabel: p.roleLabel ?? null }))}
-          onGetConsent={() => document.getElementById("client-sms-consent")?.scrollIntoView({ behavior: "smooth", block: "center" })}
-        />
+            answers "did the agent get the report" without opening email.
+            Gated on the SERVER's viewCommunication bit (§7.5 item 1): the
+            payload endpoint 403s a withdrawn viewer, so rendering the card
+            would only produce a section whose every expand errors. */}
+        {canViewCommunication && (
+          <CommunicationSection
+            inspectionId={inspection.id}
+            counts={hub.communication ?? { delivered: 0, needsAttention: 0, unread: 0, rulesActive: 0 }}
+            reportPublished={reportShipped}
+            threadOptions={people.map((p) => ({ contactId: p.contactId, name: p.name, roleLabel: p.roleLabel ?? null }))}
+            onGetConsent={() => document.getElementById("client-sms-consent")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+          />
+        )}
 
         {/* 6. Report — the deliverable ------------------------------- */}
         <Card className="p-5">

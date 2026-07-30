@@ -9,12 +9,14 @@
  *
  * This endpoint superseded `GET /api/automations/logs/{inspectionId}` — a fully
  * defined route that never had a caller. Money redaction does not apply (no
- * money in this payload); recipient emails and phones DO go over the wire, and
- * the stated decision (design §6 Q3 pending) is that `requireRole` is the gate.
+ * money in this payload); recipient emails and phones DO go over the wire,
+ * which is exactly what the `viewCommunication` capability exists to gate
+ * (design §6 Q3, resolved) — role gate first, capability layered on top.
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
+import { requireCapability } from '../../lib/middleware/require-capability';
 import { and, eq } from 'drizzle-orm';
 import { inspections } from '../../lib/db/schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
@@ -56,7 +58,7 @@ const communicationRoute = createRoute(withMcpMetadata({
     path: '/{id}/communication',
     tags: ['inspections'],
     summary: "The inspection's Communication payload: person-written messages and platform-sent notices",
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('viewCommunication')] as const,
     request: {
         params: z.object({ id: z.string().min(1).describe('Inspection identifier.') }),
         query: z.object({
@@ -78,7 +80,7 @@ const communicationRoute = createRoute(withMcpMetadata({
     },
     operationId: 'getInspectionCommunication',
     description: "Returns the inspection's communication in two never-interleaved arrays: messages (written by people — the client, agents, staff) and deliveries (sent by the platform — automation emails and SMS with their per-recipient outcome and raw skip/fail reason).",
-}, { scopes: ['read'], tier: 'extended' }));
+}, { scopes: ['read'], tier: 'extended', capability: 'viewCommunication' }));
 
 const communicationRoutes = createApiRouter()
     .openapi(communicationRoute, async (c) => {
