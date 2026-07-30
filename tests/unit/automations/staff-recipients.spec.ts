@@ -140,7 +140,7 @@ describe('staff recipients (B2)', () => {
         await createHeadersForInsertedLogs(
             db,
             { tenantId: T, inspectionId: INSP, triggerEvent: 'report.published' },
-            'Report published',
+            () => ({ title: 'Report published', body: null }),
             [{ id: 'log-staff-1', automationId: null, sendAt: new Date(0), recipientContactId: 'u-owner', recipientRoleKey: STAFF_ROLE_KEY }],
         );
 

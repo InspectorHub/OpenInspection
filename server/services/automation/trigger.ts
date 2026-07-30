@@ -2,10 +2,11 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { automations, automationLogs, inspections } from '../../lib/db/schema';
 import { nanoid } from 'nanoid';
-import { createHeadersForInsertedLogs } from './notice-headers';
+import { createHeadersForInsertedLogs, type NoticeWording } from './notice-headers';
 import { logger } from '../../lib/logger';
 import { createOiTemplateStore } from './template-store';
 import { resolveRuleRecipients, type ResolvedRecipient } from './recipients';
+import { interpolate } from './shared';
 import type { AutomationChannel, RecipientKind, Constructor, TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
@@ -160,7 +161,31 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 // and legacy/failed stamps are what the backfill script and the
                 // Outbox's interim-key fallback exist for.
                 try {
-                    await createHeadersForInsertedLogs(db, ctx, this.titleFor(ctx.triggerEvent, insp), inserted);
+                    // B3 (IA-115) — the wording comes from each rule's in-app
+                    // template when it has one. Resolved ONCE per firing rather
+                    // than once per header: a rule fanning out to eight staff
+                    // would otherwise re-read the same template eight times.
+                    const wordingByRule = new Map<string, NoticeWording>();
+                    for (const rule of filteredRules) {
+                        if (!rule.inAppTemplateId) continue;
+                        const tpl = await store.resolve(ctx.tenantId, rule.inAppTemplateId);
+                        if (!tpl || tpl.channel !== 'in_app') continue;
+                        const vars = {
+                            property_address: insp.propertyAddress || 'inspection',
+                            company_name: ctx.companyName,
+                            scheduled_date: insp.date ?? '',
+                        };
+                        wordingByRule.set(rule.id, {
+                            title: interpolate(tpl.subject ?? '', vars) || this.titleFor(ctx.triggerEvent, insp),
+                            body: tpl.body ? interpolate(tpl.body, vars) : null,
+                        });
+                    }
+                    const fallback: NoticeWording = { title: this.titleFor(ctx.triggerEvent, insp), body: null };
+                    await createHeadersForInsertedLogs(
+                        db, ctx,
+                        (automationId) => (automationId && wordingByRule.get(automationId)) || fallback,
+                        inserted,
+                    );
                 } catch (err) {
                     logger.error('AutomationService.trigger: notice-header creation failed',
                         { event: ctx.triggerEvent },

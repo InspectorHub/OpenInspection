@@ -62,6 +62,18 @@ export const automations = sqliteTable('automations', {
     active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // B3 (IA-115) — references a message_templates(channel='in_app') row: the
+    // notice's TITLE (that template's `subject`) and body. Its own column
+    // rather than a reuse of email_template_id because a rule with
+    // `channels: ["email","in_app"]` has both, and one slot would make the two
+    // channels fight over it.
+    //
+    // Null = no in-app wording chosen; the trigger path falls back to the
+    // built-in `titleFor` literal. Fail-SOFT on purpose, unlike the email
+    // path's fail-closed skip: an email with no template has nothing to send,
+    // but a notice header already exists and hiding it would lose the event.
+    // Appended at table end for D1 rebuild safety.
+    inAppTemplateId: text('in_app_template_id'),
 }, (t) => [
     index('idx_automations_tenant').on(t.tenantId),
 ]);

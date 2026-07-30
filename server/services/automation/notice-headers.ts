@@ -83,10 +83,20 @@ export async function insertNoticeHeader(rawDb: AnyDb, input: NoticeHeaderInput)
  * Called with rows the insert ACTUALLY returned — a report.published retry
  * conflicts away via onConflictDoNothing and must not orphan fresh headers.
  */
+export interface NoticeWording {
+    title: string;
+    body: string | null;
+}
+
 export async function createHeadersForInsertedLogs(
     rawDb: AnyDb,
     ctx: { tenantId: string; inspectionId: string; triggerEvent: string },
-    title: string,
+    /**
+     * The wording for one rule's notice (B3/IA-115). Per-RULE, not per-batch:
+     * two rules on the same event can carry different in-app templates, and a
+     * single title for the whole firing would silently pick one of them.
+     */
+    wordingFor: (automationId: string | null) => NoticeWording,
     inserted: Array<{ id: string; automationId: string | null; sendAt: Date | number;
         recipientContactId: string | null; recipientRoleKey: string | null }>,
 ): Promise<void> {
@@ -105,14 +115,14 @@ export async function createHeadersForInsertedLogs(
         groups.set(key, g);
     }
     for (const g of groups.values()) {
-        // The title is the same hardcoded-English helper the staff alert uses
-        // (IA-115); Track B moves both onto message_templates.
+        const wording = wordingFor(g.automationId);
         const noticeId = await insertNoticeHeader(db, {
             tenantId: ctx.tenantId,
             userId: g.userId,
             contactId: g.contactId,
             type: ctx.triggerEvent,
-            title,
+            title: wording.title,
+            body: wording.body,
             inspectionId: ctx.inspectionId,
             entityType: 'inspection',
             entityId: ctx.inspectionId,

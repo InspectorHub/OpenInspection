@@ -120,6 +120,13 @@
       "when": 1785395795418,
       "tag": "0016_empty_ultragirl",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1785421496479,
+      "tag": "0017_strange_multiple_man",
+      "breakpoints": true
     }
   ]
 }
