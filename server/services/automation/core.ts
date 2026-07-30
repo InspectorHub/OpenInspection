@@ -4,7 +4,7 @@ import { AUTOMATION_SEEDS } from '../../data/automation-seeds';
 import { nanoid } from 'nanoid';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
-import { SMS_DISCLOSURE_V1, AUTOMATION_CHANNELS, type AutomationChannel, type Constructor } from './shared';
+import { SMS_DISCLOSURE_V1, AUTOMATION_CHANNELS, type AutomationChannel, type RecipientKind, type Constructor } from './shared';
 import type { AutomationBase } from './shared';
 
 /**
@@ -131,7 +131,7 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
 
         async create(tenantId: string, data: {
             name: string; trigger: string;
-            recipientKind: 'role' | 'inspector' | 'all'; recipientRoleProfileId?: string | null;
+            recipientKind: RecipientKind; recipientRoleProfileId?: string | null;
             delayMinutes: number;
             conditions?: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
             channels?: ('email' | 'sms')[];
@@ -163,7 +163,7 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
 
         async update(tenantId: string, id: string, data: Partial<{
             name: string; trigger: string;
-            recipientKind: 'role' | 'inspector' | 'all'; recipientRoleProfileId: string | null;
+            recipientKind: RecipientKind; recipientRoleProfileId: string | null;
             delayMinutes: number; active: boolean;
             conditions: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
             channels: ('email' | 'sms')[];

@@ -5,11 +5,10 @@ import { nanoid } from 'nanoid';
 import { createHeadersForInsertedLogs } from './notice-headers';
 import { logger } from '../../lib/logger';
 import { createOiTemplateStore } from './template-store';
-import type { AutomationChannel, Constructor, TriggerContext } from './shared';
+import { resolveRuleRecipients, type ResolvedRecipient } from './recipients';
+import type { AutomationChannel, RecipientKind, Constructor, TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
-import { PeopleService } from '../people.service';
-import { capabilitiesForProfile } from '../../lib/people/capabilities';
 
 /**
  * Trigger mixin: fan out pending automation_log rows when a domain event fires,
@@ -203,9 +202,17 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
         // Public (was `private` on the monolith) so the reminders mixin can call it
         // through a typed cross-mixin contract; no runtime behavior change.
         async resolveAddress(
-            recipientKind: 'role' | 'inspector' | 'all', recipientRoleProfileId: string | null, channel: 'email' | 'sms',
+            recipientKind: RecipientKind, recipientRoleProfileId: string | null, channel: AutomationChannel,
             insp: typeof inspections.$inferSelect, db: DrizzleD1Database,
         ): Promise<string | null> {
+            // B2 — `staff` is a MULTI-recipient kind and this function answers
+            // with one address, so there is no honest answer to give. Only the
+            // reminder path still calls it (trigger() moved to
+            // resolveRecipients); a staff reminder therefore enqueues nothing
+            // rather than picking an arbitrary admin. If staff reminders are
+            // ever wanted, reminders.ts moves onto resolveRecipients too — the
+            // same change trigger() already made.
+            if (recipientKind === 'staff') return null;
             const { contacts, users, inspectionPeople, contactRoleProfiles } = await import('../../lib/db/schema');
             // Join order mirrors api/metrics.ts / data.service.ts: contact_role_profiles
             // filtered to (tenant, key, active) FIRST, then inspection_people scoped to
@@ -286,95 +293,13 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             return normalizeE164(raw);
         }
 
-        /**
-         * Spec 2 Task 1 — role-driven recipient resolution: returns EVERY matching
-         * recipient (not just the single client address `resolveAddress` targets),
-         * so a later task can send one message per recipient. Pure resolver: never
-         * throws, never writes `automation_logs` (that stays the flush loop's job
-         * — see `trigger()` above, untouched by this method). An addr-less person
-         * is logged and skipped, not treated as an error.
-         *
-         * 'all' = every `receivesReport` person on the inspection's people list —
-         * currently client/agent/other all set `receivesReport: true`
-         * (`lib/people/capabilities.ts`), so 'all' is effectively "everyone".
-         *
-         * 'inspector' has no `inspection_people` row — the inspector is a `users`
-         * row, not a contact — so it's resolved the same way `resolveAddress`'s
-         * inspector branch does (lead falls back to assigned), not via
-         * PeopleService. `contactId` on the returned recipient is therefore
-         * best-effort: the inspector's user id, not a real `contacts` row id.
-         */
+        /** See recipients.ts — extracted for the file-size ratchet. */
         async resolveRecipients(
-            rule: { recipientKind: 'role' | 'inspector' | 'all'; recipientRoleProfileId: string | null },
+            rule: { recipientKind: RecipientKind; recipientRoleProfileId: string | null },
             inspection: typeof inspections.$inferSelect,
             channel: AutomationChannel,
-        ): Promise<Array<{ contactId: string; roleKey: string; email?: string; phone?: string }>> {
-            if (rule.recipientKind === 'inspector') {
-                const inspectorId = inspection.leadInspectorId ?? inspection.inspectorId ?? null;
-                if (!inspectorId) return [];
-                const { users } = await import('../../lib/db/schema');
-                const db = this.getDrizzle();
-                // Try/catch (not `.get().catch()`) — the latter only behaves as a
-                // Promise against the real async D1 driver, not the synchronous
-                // better-sqlite3 test driver (same posture as resolveAddress's
-                // contactForRole above).
-                let u: { email: string | null; phone: string | null } | null;
-                try {
-                    u = (await db.select({ email: users.email, phone: users.phone }).from(users)
-                        .where(eq(users.id, inspectorId)).get()) ?? null;
-                } catch {
-                    u = null;
-                }
-                // sms addresses must be normalized to E.164 here — this is the ONLY
-                // path that produces automation_logs.recipient for sms (unlike
-                // resolveAddress, which normalizes internally); sms.ts sends
-                // log.recipient as-is with no send-time re-normalization.
-                const { normalizeE164 } = await import('../../lib/sms/phone');
-                const addr = channel === 'email' ? (u?.email ?? null) : normalizeE164(u?.phone ?? null);
-                if (!addr) return [];
-                return [{
-                    contactId: inspectorId ?? '',
-                    roleKey: 'inspector',
-                    ...(channel === 'email' ? { email: addr } : { phone: addr }),
-                }];
-            }
-
-            // Honor the "never throws" contract (see the doc comment above): the
-            // inspector branch already guards its query, but a bare listPeople()
-            // here would propagate a transient D1 error out of the per-rule loop
-            // in trigger(), aborting the ENTIRE fan-out for every rule/recipient
-            // with no retry (publish marks status='completed' first). Fail to an
-            // empty recipient set for this rule/channel instead — same posture as
-            // resolveAddress/contactForRole.
-            let people: Awaited<ReturnType<PeopleService['listPeople']>>;
-            try {
-                people = await new PeopleService({ DB: this.db }).listPeople(inspection.tenantId, inspection.id);
-            } catch (err) {
-                logger.error('resolveRecipients: listPeople failed; skipping this rule\'s recipients', {
-                    inspectionId: inspection.id, tenantId: inspection.tenantId, channel,
-                }, err instanceof Error ? err : undefined);
-                return [];
-            }
-            const targets = rule.recipientKind === 'role'
-                ? people.filter(p => p.roleProfileId === rule.recipientRoleProfileId)
-                : people.filter(p => capabilitiesForProfile(p.kind, p.capabilityOverrides).receivesReport);
-
-            const { normalizeE164 } = await import('../../lib/sms/phone');
-            const out: Array<{ contactId: string; roleKey: string; email?: string; phone?: string }> = [];
-            for (const p of targets) {
-                const addr = channel === 'email' ? p.email : normalizeE164(p.phone);
-                if (!addr) {
-                    logger.info('resolveRecipients: skipping addr-less person', {
-                        inspectionId: inspection.id, contactId: p.contactId, roleKey: p.roleKey, channel,
-                    });
-                    continue;
-                }
-                out.push({
-                    contactId: p.contactId, roleKey: p.roleKey,
-                    ...(channel === 'email' ? { email: addr } : { phone: addr }),
-                });
-            }
-            return out;
+        ): Promise<ResolvedRecipient[]> {
+            return resolveRuleRecipients(this.db, rule, inspection, channel);
         }
 
         protected titleFor(event: string, insp: typeof inspections.$inferSelect): string {

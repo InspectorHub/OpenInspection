@@ -111,6 +111,21 @@ export const notifications = sqliteTable('notifications', {
     index('idx_notifications_tenant_user_created').on(t.tenantId, t.userId, t.createdAt),
     index('idx_notifications_tenant_user_unread').on(t.tenantId, t.userId, t.readAt),
     // C3 — the contact-recipient inbox read (agent/client Notices).
+    //
+    // NOT tenant-prefixed in practice, and that is the point: an agent's inbox
+    // spans every workspace that has them as a contact, so it reads
+    // `contact_id IN (...)` with no tenant filter at all (notice-inbox.ts).
+    // The leading tenant_id costs nothing for the client read, which always
+    // knows its tenant, and the contact ids are themselves tenant-scoped rows,
+    // so the cross-tenant read stays correct without one.
+    //
+    // B2 decision, recorded because the queue asked: an AGENT is never
+    // addressed on the `user_id` side, even though a global agent has a `users`
+    // row. Agents are contacts in each workspace (IA-104 put the account
+    // binding on `contacts.agent_user_id`), so the `(tenant_id, user_id)`
+    // indexes above never have to answer for a row whose user carries no
+    // tenant. The user side is staff only: owners, managers, inspectors — all
+    // of whom have a tenant_id by construction.
     index('idx_notifications_tenant_contact_created').on(t.tenantId, t.contactId, t.createdAt),
 ]);
 

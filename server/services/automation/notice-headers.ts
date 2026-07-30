@@ -14,8 +14,10 @@
  * only gate. Every header write goes through this function.
  */
 import { inArray } from 'drizzle-orm';
-import { notifications, automationLogs } from '../../lib/db/schema';
+import { automationLogs } from '../../lib/db/schema';
+import { insertNotificationRow } from '../notification.service';
 import { nanoid } from 'nanoid';
+import { isStaffRecipient } from './shared';
 
 export interface NoticeHeaderInput {
     tenantId: string;
@@ -46,7 +48,10 @@ export async function insertNoticeHeader(rawDb: AnyDb, input: NoticeHeaderInput)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = rawDb as any;
     const id = nanoid();
-    await db.insert(notifications).values({
+    // The row write itself belongs to NotificationService — one owner for this
+    // table (lint:provider-helpers). What stays here is what a header MEANS:
+    // the XOR above, the id, and the defaults below.
+    await insertNotificationRow(db, {
         id,
         tenantId: input.tenantId,
         userId,
@@ -68,11 +73,12 @@ export async function insertNoticeHeader(rawDb: AnyDb, input: NoticeHeaderInput)
 /**
  * Group freshly-inserted `automation_logs` rows by (rule firing x recipient),
  * write one notice header per group, and stamp `notice_id` onto that
- * recipient's channel rows. The inspector recipient is a USER:
- * resolveRecipients stuffs the user id into `contactId` with roleKey
- * 'inspector', so it maps to the header's user_id side of the XOR. A row
- * whose recipient resolves to neither keeps notice_id NULL and the Outbox
- * grouping falls back to the interim (automation_id, send_at) key.
+ * recipient's channel rows. Staff recipients are USERS: resolveRecipients
+ * stuffs the user id into `contactId` for the inspector and staff kinds, and
+ * `isStaffRecipient` (shared.ts) decides which side of the header's XOR that
+ * lands on — one rule, so the two kinds cannot drift apart. A row whose
+ * recipient resolves to neither keeps notice_id NULL and the Outbox grouping
+ * falls back to the interim (automation_id, send_at) key.
  *
  * Called with rows the insert ACTUALLY returned — a report.published retry
  * conflicts away via onConflictDoNothing and must not orphan fresh headers.
@@ -88,7 +94,7 @@ export async function createHeadersForInsertedLogs(
     const db = rawDb as any;
     const groups = new Map<string, { ids: string[]; userId: string | null; contactId: string | null; automationId: string | null }>();
     for (const row of inserted) {
-        const isStaff = row.recipientRoleKey === 'inspector';
+        const isStaff = isStaffRecipient(row.recipientRoleKey);
         const userId = isStaff && row.recipientContactId ? row.recipientContactId : null;
         const contactId = !isStaff && row.recipientContactId ? row.recipientContactId : null;
         if (!userId && !contactId) continue;

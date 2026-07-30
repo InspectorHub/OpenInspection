@@ -29,7 +29,12 @@ export const automations = sqliteTable('automations', {
     // are role-independent and always carry a null profile id. Invariant:
     // recipient_role_profile_id is set iff kind='role'; when set it holds a
     // contact_role_profiles.id (app-layer link, no FK per Schema Rules).
-    recipientKind: text('recipient_kind', { enum: ['role', 'inspector', 'all'] }).notNull(),
+    // B2 — `staff` addresses the workspace's OWNERS + MANAGERS (`users` rows,
+    // the set createForAllAdmins names), which is what the hard-coded internal
+    // alerts B3 migrates all target. It is the second kind whose recipients are
+    // users rather than contacts; `isStaffRecipient` (automation/shared.ts) is
+    // the one place that distinction is decided. Type-layer only — no DDL.
+    recipientKind: text('recipient_kind', { enum: ['role', 'inspector', 'all', 'staff'] }).notNull(),
     recipientRoleProfileId: text('recipient_role_profile_id'),
     delayMinutes: integer('delay_minutes').notNull().default(0),
     // -- DEAD (2026-06-26, SP2): embedded email subject/body retired. Automations

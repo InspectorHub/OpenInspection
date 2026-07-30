@@ -82,6 +82,30 @@ export type FlushInspection = Pick<typeof inspections.$inferSelect,
 export type AutomationChannel = typeof automationLogs.$inferSelect['channel'];
 export const AUTOMATION_CHANNELS: readonly AutomationChannel[] = ['email', 'sms', 'in_app'];
 
+/**
+ * The role key stamped on a log whose recipient is the workspace's admin
+ * staff (B2). Distinct from 'inspector', which names one particular user.
+ */
+export const STAFF_ROLE_KEY = 'staff';
+
+/** Derived from the column so widening the schema propagates. */
+export type RecipientKind = typeof automations.$inferSelect['recipientKind'];
+
+/**
+ * True when a log's `recipient_role_key` names a `users` row rather than a
+ * `contacts` row.
+ *
+ * This is the discriminator C1's header writer needs: `notifications` asserts
+ * user_id XOR contact_id, so mislabelling a staff recipient does not produce
+ * a subtly-wrong row — it throws. The inspector kind already had the property
+ * and encoded it as a bare `roleKey === 'inspector'` comparison inside the
+ * header writer; a second kind with the same property is the point at which
+ * that becomes one rule instead of two literals drifting apart.
+ */
+export function isStaffRecipient(roleKey: string | null | undefined): boolean {
+    return roleKey === 'inspector' || roleKey === STAFF_ROLE_KEY;
+}
+
 export interface HasParseChannels {
     parseChannels(raw: string | null): AutomationChannel[];
 }
@@ -90,7 +114,7 @@ export interface HasEnsureSeeds {
 }
 export interface HasResolveAddress {
     resolveAddress(
-        recipientKind: 'role' | 'inspector' | 'all', recipientRoleProfileId: string | null, channel: AutomationChannel,
+        recipientKind: RecipientKind, recipientRoleProfileId: string | null, channel: AutomationChannel,
         insp: typeof inspections.$inferSelect, db: DrizzleD1Database,
     ): Promise<string | null>;
 }

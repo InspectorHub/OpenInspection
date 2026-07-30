@@ -14557,7 +14557,7 @@
         }
       }
     },
-    "summary": "Mark notices read",
+    "summary": "Mark the caller notices as read",
     "description": "Marks the given notice ids read, or every unread notice when ids is omitted. The ownership predicate is part of the UPDATE, so another recipient's id matches no row."
   },
   {

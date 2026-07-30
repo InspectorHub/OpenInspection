@@ -150,7 +150,3 @@ export function noticeRemedy(
   return null;
 }
 
-/** True when anything about this notice did not reach the reader. */
-export function noticeNeedsAttention(row: NoticeRowData): boolean {
-  return row.channels.some((c) => c.status === "failed" || c.status === "skipped");
-}

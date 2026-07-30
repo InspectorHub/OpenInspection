@@ -30,7 +30,7 @@ import { notifications, automationLogs, contacts, tenants } from '../lib/db/sche
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDb = any;
 
-export interface NoticeChannelAttempt {
+interface NoticeChannelAttempt {
     channel: string;
     status: 'pending' | 'sent' | 'failed' | 'skipped';
     /** The RAW stored reason. The audience-specific wording lives in the UI —

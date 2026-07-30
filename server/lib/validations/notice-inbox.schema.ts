@@ -11,7 +11,7 @@ import { z } from '@hono/zod-openapi';
  * own — scope by construction rather than by filtering.
  */
 
-export const NoticeChannelSchema = z.object({
+const NoticeChannelSchema = z.object({
     channel: z.string().describe('Delivery channel for this attempt (email, sms, ...).'),
     status: z.enum(['pending', 'sent', 'failed', 'skipped']).describe('Outcome of this one channel attempt.'),
     reasonCode: z.string().nullable().describe('Raw stored reason for a skip/failure; the reader-facing wording is mapped in the UI (operator and client maps differ deliberately).'),
@@ -20,7 +20,7 @@ export const NoticeChannelSchema = z.object({
     sendAt: z.number().describe('Epoch ms the attempt was enqueued for.'),
 });
 
-export const NoticeRowSchema = z.object({
+const NoticeRowSchema = z.object({
     id: z.string().describe('Notice header id.'),
     tenantId: z.string().describe('Company this notice came from (an agent inbox spans several).'),
     type: z.string().describe('The event that produced the notice (report.published, ...).'),

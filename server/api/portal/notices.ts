@@ -72,7 +72,7 @@ const markReadRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{tenant}/notices/mark-read',
     tags: ['public'],
-    summary: 'Mark notices read',
+    summary: 'Mark the caller notices as read',
     request: {
         params: TenantParam,
         body: { content: { 'application/json': { schema: NoticeMarkReadSchema } } },

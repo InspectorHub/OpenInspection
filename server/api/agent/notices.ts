@@ -156,5 +156,3 @@ export const agentNoticeRoutes = createApiRouter()
     });
 
 export type AgentNoticesApi = typeof agentNoticeRoutes;
-
-export default agentNoticeRoutes;
