@@ -336,6 +336,34 @@
     "description": "Auto-generated placeholder for approveInspection (POST /{id}/concierge/approve, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "archiveAgentNotice",
+    "method": "DELETE",
+    "pathTemplate": "/api/agent/notices/{id}",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Notice header id to dismiss.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notice header id to dismiss."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Dismiss (archive) an agent notice",
+    "description": "Archives the notice for this agent. Never a row deletion, and never a write to automation_logs — the sending company keeps its delivery record."
+  },
+  {
     "operationId": "attachInspection",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/media/attach",
@@ -8806,6 +8834,22 @@
     "description": "Auto-generated placeholder for listAgentMyReports (GET /my-reports, agents domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "listAgentNotices",
+    "method": "GET",
+    "pathTemplate": "/api/agent/notices",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List the notices addressed to the signed-in agent",
+    "description": "Returns the notices addressed to this agent across every company that has them as a contact, each with its own per-channel delivery attempts. Addressed by contact id (contacts.agent_user_id), never by matching an email or the delivery ledger recipient string. Another recipient's rows are unreachable by construction — the notice header is per-recipient."
+  },
+  {
     "operationId": "listAgentReferrals",
     "method": "GET",
     "pathTemplate": "/api/agent/referrals",
@@ -11456,6 +11500,35 @@
     },
     "summary": "Move the primary-client seat to this person",
     "description": "Atomically swaps the primary-client role onto this person; the previous primary client becomes a co-client and stays on the inspection with their access intact. \"Exactly one primary client\" is upheld by this swap rather than by refusing a second add."
+  },
+  {
+    "operationId": "markAgentNoticesRead",
+    "method": "POST",
+    "pathTemplate": "/api/agent/notices/mark-read",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxItems": 200,
+            "description": "Notice ids to mark read. Omit to mark every unread notice read."
+          }
+        }
+      }
+    },
+    "summary": "Mark agent notices read",
+    "description": "Marks the given notice ids read, or every unread notice when ids is omitted. The ownership predicate is part of the UPDATE."
   },
   {
     "operationId": "markAllReadNotification",
@@ -14220,6 +14293,42 @@
     "description": "Auto-generated placeholder for patchTenantTenantConfig (PATCH /tenant-config, admin domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "portalArchiveNotice",
+    "method": "DELETE",
+    "pathTemplate": "/api/portal/{tenant}/notices/{id}",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Notice header id to dismiss.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notice header id to dismiss."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Dismiss (archive) a notice",
+    "description": "Archives the notice for this recipient. Never a row deletion, and never a write to automation_logs: a recipient tidying their own inbox cannot edit the sending company's delivery record, which the inspector's Outbox keeps forever."
+  },
+  {
     "operationId": "portalExchangeToken",
     "method": "GET",
     "pathTemplate": "/api/portal/{tenant}/exchange",
@@ -14335,6 +14444,31 @@
     "description": "Returns a six-dimension status snapshot (status / agreement / payment / report / progress / unread messages) for one inspection. Asserts the inspection is in the recipient's accessible set for this tenant+email before returning data (403 otherwise)."
   },
   {
+    "operationId": "portalListNotices",
+    "method": "GET",
+    "pathTemplate": "/api/portal/{tenant}/notices",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the notices addressed to the signed-in recipient",
+    "description": "Returns the notices addressed to the session email in this tenant, each with its own per-channel delivery attempts. Addressed by contact id (resolved from the verified session email), never by matching the delivery ledger recipient string — an SMS attempt's recipient is a phone number. A recipient can only ever reach their own rows: the notice header is per-recipient by construction."
+  },
+  {
     "operationId": "portalLogout",
     "method": "POST",
     "pathTemplate": "/api/portal/{tenant}/logout",
@@ -14358,6 +14492,44 @@
     },
     "summary": "Sign out of the client portal",
     "description": "Signs the recipient out of the unified client portal by clearing the __Host-portal_session cookie. Idempotent and tenant-agnostic — clearing the cookie works regardless of whether a session exists or the slug resolves, so it is NOT behind the session middleware and always returns 200 { ok: true }."
+  },
+  {
+    "operationId": "portalMarkNoticesRead",
+    "method": "POST",
+    "pathTemplate": "/api/portal/{tenant}/notices/mark-read",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxItems": 200,
+            "description": "Notice ids to mark read. Omit to mark every unread notice read."
+          }
+        }
+      }
+    },
+    "summary": "Mark notices read",
+    "description": "Marks the given notice ids read, or every unread notice when ids is omitted. The ownership predicate is part of the UPDATE, so another recipient's id matches no row."
   },
   {
     "operationId": "portalMe",

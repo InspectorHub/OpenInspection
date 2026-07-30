@@ -54,6 +54,7 @@ import agentsRoutes from './api/agents';
 import agentSignupRoutes from './api/agent-signup';
 import { agentMagicLoginRequestRoutes, agentMagicLoginRedeemRoutes } from './api/agent/magic-login';
 import { agentReportContextRoutes } from './api/agent/report-context'; // Spec 3 Task 3
+import { agentNoticeRoutes } from './api/agent/notices'; // C3 — agent Notices inbox
 import { agentLoginRoutes } from './api/agent/login'; // Spec 3 Task 5
 import placesRoutes from './api/places';
 import { availabilityRoutes } from './api/availability';
@@ -88,6 +89,7 @@ import inspectionTypesRoutes from './api/inspection-types';
 import inspectionRequestsRoutes from './api/inspection-requests';
 import repairBuilderRoutes from './api/repair-builder';
 import portalRoutes from './api/portal';
+import portalNoticeRoutes from './api/portal/notices';
 import tagsRoutes, { inspectionTagRoutes } from './api/tags';
 import publicSlugRoutes from './api/public-slug';
 import publicShareRoutes from './api/public-share';
@@ -354,6 +356,8 @@ const routes = app
   // Unified client portal — magic-link request/redeem + session-gated data routes.
   // The :tenant slug lives inside the route definitions (tenantRouter resolves it).
   .route('/api/portal', portalRoutes)
+  // C3 — the client's Notices inbox, its own module under the same prefix.
+  .route('/api/portal', portalNoticeRoutes)
   .route('/api/admin', adminRoutes)
   // Branding sub-router — extracted to fix hono/client type-collapse (C-10)
   .route('/api/admin', adminBrandingRoutes)
@@ -375,6 +379,7 @@ const routes = app
   // (not under /api — see workers/app.ts's explicit forward for that path).
   .route('/api/agent', agentMagicLoginRequestRoutes)
   .route('/api/agent', agentReportContextRoutes) // Spec 3 Task 3 — POST /api/agent/report-context
+  .route('/api/agent', agentNoticeRoutes) // C3 — the agent's Notices inbox
   // Spec 3 Task 5 — POST /api/agent/login + POST /api/agent/login-link (core
   // dual-mode front door: password primary, magic-link fallback).
   .route('/api/agent', agentLoginRoutes)
