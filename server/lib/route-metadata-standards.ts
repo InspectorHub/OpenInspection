@@ -8,6 +8,7 @@
  * vendor extensions. The route-metadata vitest gate (tests/unit/route-
  * metadata.spec.ts) enforces this on CI.
  */
+import type { Capability } from './auth/capabilities';
 
 export const VALID_TAGS = [
     'auth', 'inspections', 'bookings', 'templates', 'team',
@@ -50,11 +51,16 @@ export const PRIMARY_TIER_CAP = 45;
 // C-10. The runtime spread below is unchanged; this only sharpens the type.
 export function withMcpMetadata<const T extends Record<string, unknown>>(
     route: T,
-    meta: { scopes: readonly ValidScope[]; tier: ValidTier }
-): T & { 'x-scopes': readonly ValidScope[]; 'x-tier': ValidTier } {
+    // `capability` DECLARES the requireCapability guard the route mounts, as the
+    // `x-capability` vendor extension. Declaration and enforcement are held
+    // together by tests/unit/platform/authorization-surface.spec.ts (IA-98):
+    // declaring without mounting fails, and mounting without declaring fails.
+    meta: { scopes: readonly ValidScope[]; tier: ValidTier; capability?: Capability }
+): T & { 'x-scopes': readonly ValidScope[]; 'x-tier': ValidTier; 'x-capability'?: Capability } {
     return {
         ...route,
         'x-scopes': meta.scopes,
         'x-tier': meta.tier,
+        ...(meta.capability ? { 'x-capability': meta.capability } : {}),
     };
 }

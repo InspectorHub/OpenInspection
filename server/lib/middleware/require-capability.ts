@@ -71,10 +71,16 @@ export async function capabilitiesFor(
 export const requireCapability = (
     cap: Capability,
     resolveOverrides: OverrideResolver = resolveOverridesFromDb,
-) => async (c: Context, next: Next) => {
-    const caps = await capabilitiesFor(c, resolveOverrides);
-    if (!caps[cap]) {
-        throw Errors.Forbidden(`Requires the '${cap}' capability`);
-    }
-    return next();
+) => {
+    const handler = async (c: Context, next: Next) => {
+        const caps = await capabilitiesFor(c, resolveOverrides);
+        if (!caps[cap]) {
+            throw Errors.Forbidden(`Requires the '${cap}' capability`);
+        }
+        return next();
+    };
+    // Tag the closure with the capability it enforces, so the
+    // authorization-surface gate (tests/unit/platform) can compare what a route
+    // MOUNTS against what its metadata DECLARES. A closure is otherwise opaque.
+    return Object.assign(handler, { capability: cap });
 };

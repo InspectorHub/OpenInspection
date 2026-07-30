@@ -135,7 +135,7 @@ const bulkUpdateRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "bulkInspection"
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'scheduleOthers' }));
 
 /**
  * GET /api/inspections/counts

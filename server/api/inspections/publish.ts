@@ -144,7 +144,7 @@ const returnReportRoute = createRoute(withMcpMetadata({
     },
     operationId: 'returnReport',
     description: 'Transitions reportStatus from submitted → in_progress. Requires publish capability.',
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
  * POST /api/inspections/:id/unpublish
@@ -170,7 +170,7 @@ const unpublishReportRoute = createRoute(withMcpMetadata({
     },
     operationId: 'unpublishReport',
     description: 'Transitions reportStatus from published → in_progress. Requires publish capability.',
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
  * POST /api/inspections/:id/publish
@@ -206,7 +206,7 @@ const publishRoute = createRoute(withMcpMetadata({
     },
     operationId: "publishInspection",
     description: "Auto-generated placeholder for publishInspection (POST /{id}/publish, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
  * Issue #119 (Re-inspections) Task 4 — POST /api/inspections/:id/reinspect

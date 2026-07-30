@@ -74,7 +74,7 @@ const createContactRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "createContact",
     description: "Auto-generated placeholder for createContact (POST /, contacts domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'primary' }));
+}, { scopes: ['write'], tier: 'primary', capability: 'manageContacts' }));
 
 const updateContactRoute = createRoute(withMcpMetadata({
     method: 'put', path: '/{id}',
@@ -94,7 +94,7 @@ const updateContactRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "replaceContact",
     description: "Auto-generated placeholder for replaceContact (PUT /{id}, contacts domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'manageContacts' }));
 
 const deleteContactRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
@@ -111,7 +111,7 @@ const deleteContactRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "deleteContact",
     description: "Auto-generated placeholder for deleteContact (DELETE /{id}, contacts domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'primary' }));
+}, { scopes: ['write'], tier: 'primary', capability: 'manageContacts' }));
 
 /**
  * POST /api/contacts/:id/restore — undo an archive (IA-120).
@@ -140,7 +140,7 @@ const restoreContactRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "restoreContact",
     description: "Clears archived_at on a tenant-owned contact. Report links revoked at archive time are NOT reissued."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'manageContacts' }));
 
 /**
  * GET /api/contacts/:id/access — every inspection this contact can still open
@@ -206,7 +206,7 @@ const revokeContactAccessRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "revokeContactAccess",
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'manageContacts' }));
 
 const contactRoutes = createApiRouter()
     .openapi(listContactsRoute, async (c) => {
