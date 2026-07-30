@@ -33,7 +33,9 @@ import {
     markAllNoticesRead,
     archiveNotice,
     contactIdsForEmail,
+    getOwnedNotice,
 } from '../../services/notice-inbox';
+import { mintOptinToken } from '../../lib/sms/optin-token';
 
 const TenantParam = z.object({
     tenant: z.string().describe('Tenant slug (resolves the tenant from the URL path).'),
@@ -106,6 +108,33 @@ const archiveRoute = createRoute(withMcpMetadata({
         "company's delivery record, which the inspector's Outbox keeps forever.",
 }, { scopes: [], tier: 'extended' }));
 
+const optinLinkRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/{tenant}/notices/{id}/optin-link',
+    tags: ['public'],
+    summary: 'Mint the SMS opt-in link for a notice the caller owns',
+    request: {
+        params: TenantParam.extend({ id: z.string().min(1).describe('Notice header id whose contact should be opted in.') }),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({
+                success: z.literal(true).describe('Always true on a 200.'),
+                data: z.object({ url: z.string().describe('Relative URL of the double-opt-in page.') }).describe('Where to send the recipient.'),
+            }) } },
+            description: 'The opt-in page URL for this notice\'s contact.',
+        },
+        401: { description: 'No valid portal session cookie' },
+        404: { description: 'Tenant slug not found, or the notice is not the caller\'s' },
+    },
+    operationId: 'portalNoticeOptinLink',
+    description:
+        "Mints the sealed double-opt-in token for the CONTACT the notice is addressed to, so " +
+        'the "Turn on texts" remedy leads somewhere real. Keyed to a notice the caller already ' +
+        'owns rather than to a caller-supplied contact id, so it cannot be aimed at anyone else. ' +
+        'Consent itself is still granted on the opt-in page — this only builds the link.',
+}, { scopes: [], tier: 'extended' }));
+
 const router = createApiRouter();
 router.use('/:tenant/notices', portalSessionGuard);
 router.use('/:tenant/notices/*', portalSessionGuard);
@@ -140,6 +169,17 @@ const portalNoticeRoutes = router
         const { id } = c.req.valid('param');
         await archiveNotice(db, contactIds, id);
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(optinLinkRoute, async (c) => {
+        const tenantId = resolveTenantId(c);
+        if (!tenantId) return c.json({ error: 'Tenant not found' }, 404);
+        const db = getDrizzle(c);
+        const contactIds = await contactIdsForEmail(db, tenantId, c.get('portalEmail') as string);
+        const { id } = c.req.valid('param');
+        const owned = await getOwnedNotice(db, contactIds, id);
+        if (!owned) return c.json({ error: 'Not found' }, 404);
+        const token = await mintOptinToken(owned.tenantId, owned.contactId, c.env.JWT_SECRET);
+        return c.json({ success: true as const, data: { url: `/sms-optin/${encodeURIComponent(token)}` } }, 200);
     });
 
 export type PortalNoticesApi = typeof portalNoticeRoutes;

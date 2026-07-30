@@ -138,6 +138,21 @@ describe('client portal Notices routes', () => {
         expect(logs.find((l) => l.id === 'l-jane')!.status).toBe('sent');
     });
 
+    it('the opt-in link is minted for the notice\'s own contact, and 404s on anyone else\'s notice', async () => {
+        const app = buildApp();
+        const cookie = await sessionCookie('jane@x.com');
+        const mine = await app.request(`/api/portal/${SLUG}/notices/n-jane/optin-link`, { headers: { cookie } }, reqEnv());
+        expect(mine.status).toBe(200);
+        const body = (await mine.json()) as { data: { url: string } };
+        // `<tenantId>~<sealed contactId>` — the tenant travels in clear so the
+        // server can pick the key; the contact is sealed under it.
+        expect(body.data.url).toMatch(/^\/sms-optin\/.+/);
+        expect(decodeURIComponent(body.data.url)).toContain(TENANT);
+
+        const theirs = await app.request(`/api/portal/${SLUG}/notices/n-ray/optin-link`, { headers: { cookie } }, reqEnv());
+        expect(theirs.status).toBe(404);
+    });
+
     it("a dismissal aimed at someone else's notice changes nothing", async () => {
         const res = await buildApp().request(
             `/api/portal/${SLUG}/notices/n-ray`,

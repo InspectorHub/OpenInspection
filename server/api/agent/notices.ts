@@ -25,7 +25,9 @@ import {
     markAllNoticesRead,
     archiveNotice,
     contactIdsForAgent,
+    getOwnedNotice,
 } from '../../services/notice-inbox';
+import { mintOptinToken } from '../../lib/sms/optin-token';
 
 const listRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -79,6 +81,32 @@ const archiveRoute = createRoute(withMcpMetadata({
     description: 'Archives the notice for this agent. Never a row deletion, and never a write to automation_logs — the sending company keeps its delivery record.',
 }, { scopes: ['agent'], tier: 'extended' }));
 
+const optinLinkRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/notices/{id}/optin-link',
+    tags: ['agents'],
+    summary: 'Mint the SMS opt-in link for a notice the agent owns',
+    request: { params: z.object({ id: z.string().min(1).describe('Notice header id whose contact should be opted in.') }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({
+                success: z.literal(true).describe('Always true on a 200.'),
+                data: z.object({ url: z.string().describe('Relative URL of the double-opt-in page.') }).describe('Where to send the agent.'),
+            }) } },
+            description: "The opt-in page URL for this notice's contact.",
+        },
+        401: { description: 'Unauthorized' },
+        403: { description: 'Forbidden' },
+        404: { description: 'The notice is not this agent\'s' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'agentNoticeOptinLink',
+    description:
+        "Mints the sealed double-opt-in token for the contact row the notice is addressed to — " +
+        'the agent\'s own contact in the sending company. Keyed to a notice the caller already ' +
+        'owns, so it cannot be aimed at anyone else.',
+}, { scopes: ['agent'], tier: 'extended' }));
+
 /** Mounted under the /api/agent router group (see server/api/agent.ts). */
 export const agentNoticeRoutes = createApiRouter()
     .openapi(listRoute, async (c) => {
@@ -113,6 +141,18 @@ export const agentNoticeRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         await archiveNotice(db, contactIds, id);
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(optinLinkRoute, async (c) => {
+        await requireRole('agent')(c, async () => {});
+        const user = c.get('user');
+        if (!user?.sub) throw Errors.Unauthorized();
+        const db = getDrizzle(c);
+        const contactIds = await contactIdsForAgent(db, user.sub);
+        const { id } = c.req.valid('param');
+        const owned = await getOwnedNotice(db, contactIds, id);
+        if (!owned) return c.json({ error: 'Not found' }, 404);
+        const token = await mintOptinToken(owned.tenantId, owned.contactId, c.env.JWT_SECRET);
+        return c.json({ success: true as const, data: { url: `/sms-optin/${encodeURIComponent(token)}` } }, 200);
     });
 
 export default agentNoticeRoutes;

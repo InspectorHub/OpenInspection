@@ -181,6 +181,27 @@ export async function listNoticesForContacts(
     }));
 }
 
+/**
+ * One notice, but only if it is the caller's. Ownership is in the WHERE rather
+ * than checked after the read, so there is no window where a handler holds a
+ * row it is not allowed to act on. Used by the SMS remedy, which mints an
+ * opt-in token for the notice's own contact.
+ */
+export async function getOwnedNotice(
+    db: AnyDb, contactIds: string[], id: string,
+): Promise<{ id: string; tenantId: string; contactId: string } | null> {
+    if (contactIds.length === 0) return null;
+    const row = await db.select({
+        id: notifications.id,
+        tenantId: notifications.tenantId,
+        contactId: notifications.contactId,
+    })
+        .from(notifications)
+        .where(and(eq(notifications.id, id), inArray(notifications.contactId, contactIds)))
+        .get();
+    return row?.contactId ? { id: row.id, tenantId: row.tenantId, contactId: row.contactId } : null;
+}
+
 export async function unreadNoticeCountForContacts(db: AnyDb, contactIds: string[]): Promise<number> {
     if (contactIds.length === 0) return 0;
     const row = await db.select({ c: sql<number>`count(*)` })

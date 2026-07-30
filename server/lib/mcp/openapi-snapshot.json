@@ -250,6 +250,34 @@
     "description": "Public, unauthenticated endpoint. ALWAYS returns 200 { sent: true } regardless of whether the email has a global agent account, to prevent account enumeration. When it does, an email with a one-time sign-in link (900 second TTL) is sent — the send itself is deferred so the response is timing-identical either way."
   },
   {
+    "operationId": "agentNoticeOptinLink",
+    "method": "GET",
+    "pathTemplate": "/api/agent/notices/{id}/optin-link",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Notice header id whose contact should be opted in.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notice header id whose contact should be opted in."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Mint the SMS opt-in link for a notice the agent owns",
+    "description": "Mints the sealed double-opt-in token for the contact row the notice is addressed to — the agent's own contact in the sending company. Keyed to a notice the caller already owns, so it cannot be aimed at anyone else."
+  },
+  {
     "operationId": "applyTenantReportLinkExpiry",
     "method": "POST",
     "pathTemplate": "/api/tenant/inspection-prefs/report-link-expiry",
@@ -14555,6 +14583,42 @@
     },
     "summary": "List the signed-in recipient's inspections",
     "description": "Returns the session email plus every inspection the recipient can access in this tenant via a live client/co_client access token. Gated by the __Host-portal_session cookie; tenant is resolved from the path slug."
+  },
+  {
+    "operationId": "portalNoticeOptinLink",
+    "method": "GET",
+    "pathTemplate": "/api/portal/{tenant}/notices/{id}/optin-link",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Notice header id whose contact should be opted in.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notice header id whose contact should be opted in."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Mint the SMS opt-in link for a notice the caller owns",
+    "description": "Mints the sealed double-opt-in token for the CONTACT the notice is addressed to, so the \"Turn on texts\" remedy leads somewhere real. Keyed to a notice the caller already owns rather than to a caller-supplied contact id, so it cannot be aimed at anyone else. Consent itself is still granted on the opt-in page — this only builds the link."
   },
   {
     "operationId": "portalRedeemLink",
