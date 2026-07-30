@@ -13,7 +13,7 @@
  */
 
 /** A bit is either a boolean, or an enum listing its allowed values. */
-export type BitSpec = 'boolean' | readonly string[];
+type BitSpec = 'boolean' | readonly string[];
 export type BitDecl = Record<string, BitSpec>;
 export type OverridesFor<D extends BitDecl> = Partial<Record<keyof D, boolean | string>>;
 

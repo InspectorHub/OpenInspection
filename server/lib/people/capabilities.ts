@@ -5,7 +5,7 @@ import type { RoleKind } from './role-kinds';
 // model) so value-position consumers can use ROLE_KIND.* constants; re-exported
 // here so existing imports keep working.
 export type { RoleKind } from './role-kinds';
-export type RepairAccess = 'off' | 'read' | 'readwrite';
+type RepairAccess = 'off' | 'read' | 'readwrite';
 
 export interface RoleCapabilities {
     receivesReport: boolean;

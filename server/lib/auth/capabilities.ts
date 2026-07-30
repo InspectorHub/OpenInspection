@@ -1,10 +1,10 @@
 import type { Role } from './roles';
-import { coerceOverrides as coerceWith, whitelistOverrides as whitelistWith, type BitDecl } from './capability-overrides';
+import { coerceOverrides as coerceWith, type BitDecl } from './capability-overrides';
 
 export const TOGGLEABLE = ['publish', 'scheduleOthers', 'financial', 'manageContacts', 'viewCommunication'] as const;
 
 /** The declared shape of every staff bit. All boolean today; see capability-overrides.ts. */
-export const STAFF_BITS: BitDecl = Object.fromEntries(TOGGLEABLE.map(c => [c, 'boolean'])) as BitDecl;
+const STAFF_BITS: BitDecl = Object.fromEntries(TOGGLEABLE.map(c => [c, 'boolean'])) as BitDecl;
 
 export type Capability = typeof TOGGLEABLE[number];
 export type CapabilitySet = Record<Capability, boolean>;
@@ -45,8 +45,4 @@ export function getCapabilities(role: Role, overrides: PermissionOverrides | nul
  */
 export function coerceOverrides(value: unknown): PermissionOverrides | null {
   return coerceWith(STAFF_BITS, value) as PermissionOverrides | null;
-}
-
-export function whitelistOverrides(parsed: Record<string, unknown>): PermissionOverrides | null {
-  return whitelistWith(STAFF_BITS, parsed) as PermissionOverrides | null;
 }

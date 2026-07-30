@@ -6,11 +6,9 @@
  * from here so the role-literal guard can stop exempting whole directories on
  * account of this axis.
  */
-export const ROLE_KINDS = ['client', 'agent', 'other'] as const;
-export type RoleKind = typeof ROLE_KINDS[number];
-
 export const ROLE_KIND = {
     CLIENT: 'client',
     AGENT: 'agent',
     OTHER: 'other',
-} as const satisfies Record<string, RoleKind>;
+} as const;
+export type RoleKind = (typeof ROLE_KIND)[keyof typeof ROLE_KIND];
