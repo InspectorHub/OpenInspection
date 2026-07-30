@@ -33,7 +33,12 @@ const cfg =
   process.env.WRANGLER_CONFIG ||
   (existsSync('wrangler.local.jsonc') ? 'wrangler.local.jsonc' : 'wrangler.jsonc');
 
-const q = (s) => '"' + String(s).replace(/"/g, '\\"') + '"';
+// Backslash FIRST, then quote — escaping the quote first would re-escape the
+// backslashes this step introduces. Without the backslash rule a value ending
+// in `\` escapes the closing quote and the rest of the command line becomes
+// argument data (CodeQL js/incomplete-sanitization). Titles and property
+// addresses reach this from the database, so it is reachable, not theoretical.
+const q = (s) => '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
 
 function d1(command, { json = true } = {}) {
   const cmd = [

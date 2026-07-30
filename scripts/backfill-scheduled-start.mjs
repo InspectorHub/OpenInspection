@@ -34,7 +34,11 @@ const cfg =
 
 // Windows-safe: a spawned arg list under shell:true loses its quoting, so the
 // command line is assembled as one string with the SQL double-quoted.
-const q = (s) => '"' + String(s).replace(/"/g, '\\"') + '"';
+// Backslash FIRST, then quote — escaping the quote first would re-escape the
+// backslashes this step introduces. Without the backslash rule a value ending
+// in `\` escapes the closing quote and the rest of the command line becomes
+// argument data (CodeQL js/incomplete-sanitization).
+const q = (s) => '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
 
 function d1(command, { json = true } = {}) {
   const cmd = [
