@@ -5,7 +5,7 @@ import { nanoid } from 'nanoid';
 import { createHeadersForInsertedLogs } from './notice-headers';
 import { logger } from '../../lib/logger';
 import { createOiTemplateStore } from './template-store';
-import type { Constructor, TriggerContext } from './shared';
+import type { AutomationChannel, Constructor, TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { PeopleService } from '../people.service';
@@ -104,7 +104,14 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                     }
                     const sendAt = new Date(now.getTime() + rule.delayMinutes * 60_000);
                     for (const r of recipients) {
-                        const addr = channel === 'email' ? r.email : r.phone;
+                        // B1 — `in_app` resolves the EMAIL address, and an
+                        // address-less recipient is skipped for the same reason
+                        // an email one is: every inbox that renders a notice
+                        // (client portal, agent portal) authenticates by email,
+                        // so a notice nobody can sign in to read is not a
+                        // delivery. The address is a label here — the header's
+                        // `contact_id` is the identity.
+                        const addr = channel === 'sms' ? r.phone : r.email;
                         if (!addr) continue; // resolveRecipients already logged/skipped addr-less people; belt-and-braces
                         // IA-109 — carry the contact id through. The resolver has
                         // it; dropping it forced the SMS consent gate to guess
@@ -300,7 +307,7 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
         async resolveRecipients(
             rule: { recipientKind: 'role' | 'inspector' | 'all'; recipientRoleProfileId: string | null },
             inspection: typeof inspections.$inferSelect,
-            channel: 'email' | 'sms',
+            channel: AutomationChannel,
         ): Promise<Array<{ contactId: string; roleKey: string; email?: string; phone?: string }>> {
             if (rule.recipientKind === 'inspector') {
                 const inspectorId = inspection.leadInspectorId ?? inspection.inspectorId ?? null;

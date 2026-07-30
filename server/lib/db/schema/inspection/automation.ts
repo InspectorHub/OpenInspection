@@ -76,7 +76,13 @@ export const automationLogs = sqliteTable('automation_logs', {
     // recipient. Null for logs with no role context (legacy/reminder/inspector).
     recipientRoleKey: text('recipient_role_key'),
     // Track L — the log's own delivery channel (a multi-channel rule emits one log each).
-    channel: text('channel', { enum: ['email', 'sms'] }).notNull().default('email'),
+    //
+    // B1 — `in_app` joined email/sms. It is a delivery like the others in every
+    // way the ledger cares about (one row, a status, a send time), and unlike
+    // them in one: nothing leaves the building. The notice HEADER is what the
+    // recipient reads, and flush() only settles this row's status — see
+    // delivery.ts. Type-layer only; SQLite stores text either way, so no DDL.
+    channel: text('channel', { enum: ['email', 'sms', 'in_app'] }).notNull().default('email'),
     sendAt: integer('send_at', { mode: 'timestamp_ms' }).notNull(),
     deliveredAt: integer('delivered_at', { mode: 'timestamp_ms' }),
     status: text('status', { enum: ['pending', 'sent', 'failed', 'skipped'] }).notNull().default('pending'),
@@ -113,6 +119,22 @@ export const automationLogs = sqliteTable('automation_logs', {
     // for multi-recipient/multi-channel rules, where each recipient/channel still
     // gets its own distinct row. Partial (event_id present) so legacy rows that
     // predate event-id stamping aren't forced unique on a NULL key.
+    //
+    // LIMIT, decided B1 (2026-07-30) and asserted by
+    // tests/unit/automations/in-app-channel.spec.ts: this index dedupes NOTHING
+    // when `automation_id IS NULL`, because SQLite treats NULLs in a unique
+    // index as distinct from each other. A ruleless row can therefore be
+    // inserted twice under one event_id, and `onConflictDoNothing` will not
+    // catch it.
+    //
+    // Left as-is rather than re-keyed on `coalesce(automation_id, '')`, because
+    // the exposure is empty by construction: manual sends write terminal rows
+    // one per press with no event_id, and B3 migrates the hard-coded call sites
+    // ONTO rules, so the rows it creates carry an automation_id and are covered.
+    // The rule to keep: **anything that relies on event_id idempotency must
+    // carry an automation_id.** If a path ever needs ruleless dedup, re-key the
+    // index — do not add an app-level pre-check, which has the read-then-write
+    // race this index exists to remove.
     uniqueIndex('uq_automation_logs_event')
         .on(t.automationId, t.inspectionId, t.eventId, t.channel, t.recipient)
         .where(sql`event_id IS NOT NULL`),

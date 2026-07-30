@@ -45,7 +45,7 @@ export type Constructor<T = object> = new (...args: any[]) => T;
 // they impose no runtime cost (type-layer only).
 
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import type { automations, inspections } from '../../lib/db/schema';
+import type { automations, automationLogs, inspections } from '../../lib/db/schema';
 
 // The inspection columns the cron flush path actually consumes (condition
 // evaluation + SMS consent + base template vars). The flush query MUST project
@@ -73,15 +73,24 @@ export type FlushInspection = Pick<typeof inspections.$inferSelect,
     clientName: string | null;
 };
 
+/**
+ * The channels a rule can fan out to, derived from the column's own enum so
+ * widening the schema propagates instead of being remembered. `in_app` (B1)
+ * delivers nothing outward — the notice header IS the delivery — but it is a
+ * first-class channel everywhere the ledger is concerned.
+ */
+export type AutomationChannel = typeof automationLogs.$inferSelect['channel'];
+export const AUTOMATION_CHANNELS: readonly AutomationChannel[] = ['email', 'sms', 'in_app'];
+
 export interface HasParseChannels {
-    parseChannels(raw: string | null): ('email' | 'sms')[];
+    parseChannels(raw: string | null): AutomationChannel[];
 }
 export interface HasEnsureSeeds {
     ensureSeeds(tenantId: string): Promise<void>;
 }
 export interface HasResolveAddress {
     resolveAddress(
-        recipientKind: 'role' | 'inspector' | 'all', recipientRoleProfileId: string | null, channel: 'email' | 'sms',
+        recipientKind: 'role' | 'inspector' | 'all', recipientRoleProfileId: string | null, channel: AutomationChannel,
         insp: typeof inspections.$inferSelect, db: DrizzleD1Database,
     ): Promise<string | null>;
 }

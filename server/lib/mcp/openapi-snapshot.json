@@ -4417,7 +4417,8 @@
             "type": "string",
             "enum": [
               "email",
-              "sms"
+              "sms",
+              "in_app"
             ],
             "description": "Delivery channel: email or sms."
           },
@@ -14804,7 +14805,8 @@
             "type": "string",
             "enum": [
               "email",
-              "sms"
+              "sms",
+              "in_app"
             ],
             "description": "Delivery channel for the preview: email or sms."
           },
@@ -16870,7 +16872,8 @@
             "type": "string",
             "enum": [
               "email",
-              "sms"
+              "sms",
+              "in_app"
             ],
             "description": "Delivery channel for the test send: email or sms."
           },

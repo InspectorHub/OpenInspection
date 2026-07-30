@@ -14,9 +14,16 @@ export const messageTemplates = sqliteTable('message_templates', {
     id:        text('id').primaryKey(),
     tenantId:  text('tenant_id').notNull(),
     name:      text('name').notNull(),
-    channel:   text('channel', { enum: ['email', 'sms'] }).notNull(),
-    subject:   text('subject'),                 // email only; null for sms
-    body:      text('body').notNull(),          // email HTML / sms plain-text
+    // B1 — `in_app` templates carry a notice's wording. Type-layer only.
+    channel:   text('channel', { enum: ['email', 'sms', 'in_app'] }).notNull(),
+    // `subject` is REUSED as the in-app notice TITLE rather than given a
+    // column of its own: a notice header has exactly one short line above its
+    // body, which is the same shape and the same authoring job as an email
+    // subject. A parallel `title` column would mean every template editor,
+    // validator and seed had to learn which of two near-identical fields
+    // applies to which channel.
+    subject:   text('subject'),                 // email subject / in_app notice title; null for sms
+    body:      text('body').notNull(),          // email HTML / sms plain-text / in_app notice body
     variables: text('variables'),               // JSON string[] of declared merge vars
     isSeeded:  integer('is_seeded', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { MessageTemplateService } from '../services/message-template.service';
+import { MessageTemplateService, type TemplateChannel } from '../services/message-template.service';
 import { smsSegmentInfo } from '../lib/sms/segments';
 import { interpolate } from '../services/automation/shared';
 import { buildTenantEmailService } from '../lib/email/build-email-service';
@@ -100,7 +100,7 @@ const messageTemplateRoutes = createApiRouter()
     .openapi(createMtRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const body = c.req.valid('json');
-        const createPayload: { name: string; channel: 'email' | 'sms'; subject: string | null; body: string; variables?: string[] } = {
+        const createPayload: { name: string; channel: TemplateChannel; subject: string | null; body: string; variables?: string[] } = {
             name: body.name, channel: body.channel, subject: body.subject ?? null, body: body.body,
         };
         if (body.variables !== undefined) createPayload.variables = body.variables;

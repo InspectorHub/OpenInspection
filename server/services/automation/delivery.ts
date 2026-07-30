@@ -1,20 +1,16 @@
-import { eq, and, lte, ne, desc } from 'drizzle-orm';
+import { eq, and, lte, ne, or, isNull, desc } from 'drizzle-orm';
 import { automations, automationLogs, inspections, tenants, tenantConfigs, contacts, contactRoleProfiles, inspectionPeople, reportVersions } from '../../lib/db/schema';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../../lib/tz';
-import { resolveLocale } from '../../lib/locale';
-import { formatDateTime } from '../../lib/format';
 import { logger } from '../../lib/logger';
 import type { EmailService } from '../email.service';
-import { type Constructor, oiClock } from './shared';
-import { deliverAction } from '../../lib/automation-core';
-import { buildBaseTemplateVars } from './template-vars';
-import { createOiTemplateStore } from './template-store';
+import type { Constructor } from './shared';
 import type { AutomationBase, HasEvaluateConditions, HasDeliverSms } from './shared';
 import type { SmsRuntime } from './sms';
 import type { ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 import { deliverReportEmail, type ReportDeliveryDeps } from './report-email';
+import { deliverTemplatedEmail } from './deliver-email';
 
 /**
  * The flush query's SELECT projection. `inspection` is narrowed to the
@@ -86,9 +82,17 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             // clientContactId/clientName; they add no extra SELECTed columns
             // (FLUSH_SELECTION only projects contacts.id/contacts.name from them),
             // so the column-budget total is unaffected.
+            // B1 — LEFT join on automations, not inner. A log's rule is optional:
+            // manual sends have written `automation_id IS NULL` since A2 (they
+            // survive only because they are inserted already-terminal, so flush
+            // never had to see one), and an `in_app` row enqueued outside a rule
+            // is the first PENDING one. Under the inner join such a row is not
+            // skipped with an error — it is silently absent from the result set,
+            // stays pending forever, and nothing anywhere says why. Every
+            // `automation.*` read below therefore has an explicit null story.
             const baseSelect = () => db.select(FLUSH_SELECTION)
                 .from(automationLogs)
-                .innerJoin(automations, eq(automationLogs.automationId, automations.id))
+                .leftJoin(automations, eq(automationLogs.automationId, automations.id))
                 .innerJoin(inspections, eq(automationLogs.inspectionId, inspections.id))
                 .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
                 .leftJoin(contactRoleProfiles, and(
@@ -112,8 +116,15 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                 .where(and(
                     eq(automationLogs.status, 'pending'),
                     lte(automationLogs.sendAt, now),
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    ne(automations.trigger, 'inspection.reminder' as any),
+                    // `ne()` is NULL-blind in SQL — a ruleless row would fail
+                    // this predicate and vanish from BOTH batches. It belongs to
+                    // the non-reminder one (nothing recomputes its due time), so
+                    // say so explicitly.
+                    or(
+                        isNull(automationLogs.automationId),
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        ne(automations.trigger, 'inspection.reminder' as any),
+                    ),
                 ))
                 .limit(batchSize);
 
@@ -139,6 +150,11 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                 }
             }
             const dueReminders = reminderRows.filter(({ automation, inspection }) => {
+                // `automation` is non-null here by construction — the query
+                // matched on automations.trigger, which no NULL row can satisfy
+                // — but the left join types it nullable, so say it rather than
+                // assert it.
+                if (!automation) return false;
                 const tz = reminderTzByTenant.get(inspection.tenantId) ?? 'UTC';
                 const inspMs = wallClockToEpochMs(inspection.date, '09:00', tz);
                 if (Number.isNaN(inspMs)) return false;
@@ -195,9 +211,35 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
 
             for (const { log, automation, inspection, tenant } of pending) {
                 try {
-                    const verdict = await this.evaluateConditions(db, automation, inspection);
+                    // A ruleless row has no conditions to re-check — there is no
+                    // rule to have carried any. Skipping the call is not a
+                    // shortcut: passing a null through would make every
+                    // condition read defensive for a case that cannot occur.
+                    const verdict = automation
+                        ? await this.evaluateConditions(db, automation, inspection)
+                        : { ok: true as const };
                     if (!verdict.ok) {
                         await db.update(automationLogs).set({ status: 'skipped', error: verdict.reason })
+                            .where(eq(automationLogs.id, log.id));
+                        continue;
+                    }
+
+                    // B1 — `in_app` settles here and goes no further. The notice
+                    // HEADER (C1) is what the recipient reads and it was written
+                    // at enqueue; their inbox reveals it when `send_at` passes
+                    // (§3.14). So there is nothing to dispatch, and this row's
+                    // job is to stop saying "Sending" in the Outbox.
+                    //
+                    // Deliberately BEFORE the quota and consent paths, not
+                    // exempted inside them: nothing leaves the building, so
+                    // there is no provider to meter and no carrier rule to
+                    // satisfy. Charging a plan quota for a row in our own
+                    // database would be inventing a cost; running the TCPA gate
+                    // over a notice that was never a text message would be
+                    // asserting a legal duty that does not apply.
+                    if (log.channel === 'in_app') {
+                        await db.update(automationLogs)
+                            .set({ status: 'sent', deliveredAt: new Date() })
                             .where(eq(automationLogs.id, log.id));
                         continue;
                     }
@@ -206,6 +248,17 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // creds + consent in deliverSms; the email path delegates to the
                     // per-tenant EmailService (metering + per-tenant key resolution by construction).
                     if (log.channel === 'sms') {
+                        // deliverSms reads the rule for its template and its
+                        // consent context. A ruleless SMS row is not a thing any
+                        // path creates today — manual SMS logs its own terminal
+                        // row — so record the contradiction instead of
+                        // inventing a default template for it.
+                        if (!automation) {
+                            await db.update(automationLogs)
+                                .set({ status: 'failed', error: 'sms log has no automation' })
+                                .where(eq(automationLogs.id, log.id));
+                            continue;
+                        }
                         await this.deliverSms(db, { log, automation, inspection, tenant }, sms, appName, appHost, env, quotaGuard);
                         continue;
                     }
@@ -216,168 +269,22 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // existing test, or a deploy missing JWT_SECRET) falls through
                     // unchanged to the generic template path below. SMS report links
                     // stay generic — out of scope (deliverSms above is untouched).
-                    if (log.channel === 'email' && automation.trigger === 'report.published' && reportDelivery) {
+                    if (log.channel === 'email' && automation?.trigger === 'report.published' && reportDelivery) {
                         const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
                         await deliverReportEmail(db, { log, inspection, tenant }, emailSvc, appBaseUrl, reportDelivery, pdfMemo);
                         continue;
                     }
 
-                    // SP2 — resolve the referenced email template (replaces the
-                    // embedded subject_template / body_template, now frozen DEAD).
-                    // Skip fail-closed when the rule has no resolvable email template.
-                    const store = createOiTemplateStore(this.db);
-                    const tpl = automation.emailTemplateId
-                        ? await store.resolve(inspection.tenantId, automation.emailTemplateId)
-                        : null;
-                    if (!tpl || tpl.channel !== 'email') {
-                        await db.update(automationLogs).set({ status: 'skipped', error: 'no email template' })
-                            .where(eq(automationLogs.id, log.id));
-                        continue;
-                    }
-                    const subjectSource = tpl.subject ?? '';
-                    const bodySource = tpl.body;
-
-                    const vars: Record<string, string> = {
-                        ...buildBaseTemplateVars(inspection, tenant, appName, appHost, {
-                            summary: automation.trigger === 'report.amended'
-                                ? await latestSummary(inspection.id, inspection.tenantId)
-                                : '',
-                        }),
-                        inspector_name:   '',
-                        invoice_url:      `${appBaseUrl}/invoices`,
-                        payment_url:      `${appBaseUrl}/invoices`,
-                        // Spec 4D — event-related vars (populated below if log.eventId set)
-                        event_type_name:      '',
-                        event_scheduled_at:   '',
-                        event_inspector_name: '',
-                    };
-
-                    // Spec 4D — populate event vars when log was created by EventService.
-                    // Spec 4D event-vars apply only to logs linked to a real inspection
-                    // event. Track J reminders reuse event_id as a "reminder:<rule>:<insp>"
-                    // dedup key that never matches an inspectionEvents row, so skip the
-                    // lookup. Spec 2 Task 3 — report.published logs reuse event_id the same
-                    // way with an "auto:report.published:<insp>" dedup key (see trigger.ts);
-                    // also never a real inspectionEvents row, so skip it too.
-                    if (log.eventId && !log.eventId.startsWith('reminder:') && !log.eventId.startsWith('auto:')) {
-                        try {
-                            const { eventTypes, inspectionEvents } = await import('../../lib/db/schema');
-                            const ev = await db.select().from(inspectionEvents).where(eq(inspectionEvents.id, log.eventId)).get();
-                            if (ev) {
-                                const et = await db.select().from(eventTypes).where(eq(eventTypes.id, ev.eventTypeId as string)).get();
-                                vars.event_type_name    = (et?.name as string) ?? '';
-                                // Format the client-facing scheduled time in the RECIPIENT
-                                // tenant's locale + timezone (external client -> tenant defaults),
-                                // not the server default (which anchored UTC with no locale).
-                                const cfg = await db.select({ defaultLocale: tenantConfigs.defaultLocale, defaultTimezone: tenantConfigs.defaultTimezone })
-                                    .from(tenantConfigs).where(eq(tenantConfigs.tenantId, inspection.tenantId)).get();
-                                vars.event_scheduled_at = ev.scheduledAt
-                                    ? formatDateTime(ev.scheduledAt as Date, {
-                                          locale: resolveLocale(cfg?.defaultLocale),
-                                          timeZone: resolveTenantTimeZone(cfg?.defaultTimezone),
-                                      })
-                                    : '';
-                            }
-                        } catch (err) {
-                            logger.error('Failed to load event vars for automation log', { logId: log.id, eventId: log.eventId }, err instanceof Error ? err : undefined);
-                        }
-                    }
-
-                    // Lazy: only create agreement_request when this rule actually needs it
-                    const needsAgreementUrl = bodySource.includes('{{agreement_sign_url}}') ||
-                                              subjectSource.includes('{{agreement_sign_url}}');
-                    if (needsAgreementUrl) {
-                        if (!this.agreementService) {
-                            await db.update(automationLogs).set({ status: 'failed', error: 'AgreementService not configured' })
-                                .where(eq(automationLogs.id, log.id));
-                            continue;
-                        }
-                        try {
-                            const ar = await this.agreementService.findOrCreate(inspection.tenantId, inspection.id);
-                            vars.agreement_sign_url = `${appBaseUrl}/sign-agreement/${ar.token}`;
-                        } catch (e) {
-                            const errMsg = e instanceof Error ? e.message : 'Failed to create agreement_request';
-                            await db.update(automationLogs).set({ status: 'failed', error: errMsg.slice(0, 500) })
-                                .where(eq(automationLogs.id, log.id));
-                            continue;
-                        }
-                    }
-
-                    const needsReviewUrl = bodySource.includes('{{review_url}}') ||
-                                           subjectSource.includes('{{review_url}}');
-                    if (needsReviewUrl) {
-                        const cfg = await db.select({ reviewUrl: tenantConfigs.reviewUrl }).from(tenantConfigs)
-                            .where(eq(tenantConfigs.tenantId, inspection.tenantId)).get();
-                        if (!cfg?.reviewUrl) {
-                            await db.update(automationLogs).set({ status: 'skipped', error: 'review_url not configured' })
-                                .where(eq(automationLogs.id, log.id));
-                            continue;
-                        }
-                        vars.review_url = cfg.reviewUrl;
-                    }
-
-                    // Build the OI adapters for this log and delegate the
-                    // email send + log write to the shared automation core.
-                    // SP2: the subject/body come from the referenced message_template
-                    // (resolved above into subjectSource/bodySource), so the inline
-                    // TemplateStore returns those resolved strings. requiredVars
-                    // carries the fail-closed review_url value resolved above
-                    // (undefined → core skips with "review_url not configured",
-                    //  byte-identical to the former hardcoded guard).
+                    // The generic templated-email path lives in deliver-email.ts
+                    // (file-size ratchet); it owns every outcome write on that
+                    // branch, so there is nothing to interpret here.
                     const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
-
-                    const templateStore = {
-                        resolve: async () => ({
-                            channel: 'email' as const,
-                            subject: subjectSource,
-                            body: bodySource,
-                            variables: tpl.variables,
-                        }),
-                    };
-                    const transport = {
-                        sendEmail: async (a: { to: string; subject: string; html: string }) => {
-                            const { delivered } = await emailSvc.sendEmail([a.to], a.subject, a.html);
-                            // OI maps "not delivered" (e.g. email not configured) to a
-                            // SKIPPED log, not a failure. Encode that as a sentinel the
-                            // logger adapter below translates.
-                            return delivered
-                                ? { ok: true as const }
-                                : { ok: false as const, error: '__email_not_configured__' };
-                        },
-                        sendSms: async () => ({ ok: false as const, error: 'sms not routed here' }),
-                    };
-                    const loggerAdapter = {
-                        record: async (row: { logId: string; status: 'sent' | 'failed' | 'skipped'; error?: string; deliveredAtMs?: number }) => {
-                            // Translate the email-not-configured sentinel back to OI's
-                            // historical "skipped / email not configured" outcome.
-                            if (row.status === 'failed' && row.error === '__email_not_configured__') {
-                                await db.update(automationLogs).set({ status: 'skipped', error: 'email not configured' })
-                                    .where(eq(automationLogs.id, log.id));
-                                return;
-                            }
-                            if (row.status === 'sent') {
-                                await db.update(automationLogs).set({
-                                    status: 'sent',
-                                    deliveredAt: new Date(row.deliveredAtMs ?? Date.now()),
-                                }).where(eq(automationLogs.id, log.id));
-                                return;
-                            }
-                            await db.update(automationLogs).set({ status: row.status, ...(row.error !== undefined ? { error: row.error } : {}) })
-                                .where(eq(automationLogs.id, log.id));
-                        },
-                    };
-
-                    await deliverAction({
-                        tenantId: inspection.tenantId,
-                        logId: log.id,
-                        to: log.recipient,
-                        action: { channel: 'email', templateId: automation.id },
-                        vars,
-                        // Fail-closed vars: review_url was either resolved into `vars`
-                        // above or the rule didn't reference it. Pass the resolved value
-                        // (or undefined) so the core's requiredVars reproduces the skip.
-                        requiredVars: { review_url: vars.review_url },
-                        deps: { templates: templateStore, transport, logger: loggerAdapter, clock: oiClock },
+                    await deliverTemplatedEmail(db, { log, automation, inspection, tenant }, {
+                        rawDb: this.db,
+                        agreementService: this.agreementService,
+                        latestSummary,
+                        emailSvc,
+                        appName, appHost, appBaseUrl,
                     });
                 } catch (err) {
                     await db.update(automationLogs).set({

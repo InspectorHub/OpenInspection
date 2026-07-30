@@ -4,7 +4,7 @@ import { AUTOMATION_SEEDS } from '../../data/automation-seeds';
 import { nanoid } from 'nanoid';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
-import { SMS_DISCLOSURE_V1, type Constructor } from './shared';
+import { SMS_DISCLOSURE_V1, AUTOMATION_CHANNELS, type AutomationChannel, type Constructor } from './shared';
 import type { AutomationBase } from './shared';
 
 /**
@@ -124,7 +124,7 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
          * JSON `channels` column to a `string[]`. Keeps the typed response honest
          * (AutomationSchema.channels is `string[]`) without changing the DB column.
          */
-        protected serializeRow<T extends { channels: string | null }>(row: T): Omit<T, 'channels'> & { channels: ('email' | 'sms')[] } {
+        protected serializeRow<T extends { channels: string | null }>(row: T): Omit<T, 'channels'> & { channels: AutomationChannel[] } {
             const { channels, ...rest } = row;
             return { ...rest, channels: this.parseChannels(channels) };
         }
@@ -205,11 +205,16 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
          */
         // Public (was `private` on the monolith) so later mixins in the chain can
         // call it through a typed cross-mixin contract; no runtime behavior change.
-        parseChannels(raw: string | null): ('email' | 'sms')[] {
+        parseChannels(raw: string | null): AutomationChannel[] {
             if (!raw) return ['email'];
             try {
                 const arr = JSON.parse(raw);
-                const valid = Array.isArray(arr) ? arr.filter((c) => c === 'email' || c === 'sms') : [];
+                // Filtering against the known set (rather than trusting the
+                // JSON) is what keeps a typo in the column from fanning out a
+                // log row on a channel no delivery path handles.
+                const valid = Array.isArray(arr)
+                    ? arr.filter((c): c is AutomationChannel => AUTOMATION_CHANNELS.includes(c))
+                    : [];
                 return valid.length ? valid : ['email'];
             } catch { return ['email']; }
         }
