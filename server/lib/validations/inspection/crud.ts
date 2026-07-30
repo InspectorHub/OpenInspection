@@ -116,7 +116,17 @@ export const UpdateInspectionSchema = z.object({
     // the People card, not this metadata route). Zod strips unknown keys, so
     // any legacy caller still posting these two fields degrades to a no-op on
     // them (same "unrecognised field" no-op as templateId used to before B-22).
-    date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe date field for the OpenInspection MCP integration'),
+    //
+    // `date` accepts a full ISO datetime (the settings sheet's shape) OR a bare
+    // civil `YYYY-MM-DD` (what the calendar drag posts — MonthView/WeekView/
+    // DayView all pass `dateStr`). The bare form was rejected by `.datetime()`,
+    // which 400'd every drag while the calendar action swallowed `res.ok` — the
+    // reschedule persisted nothing. The handler keeps the stored time suffix
+    // and moves `scheduled_start_ms` with the civil day (roadmap §7.5 item 3).
+    date: z.union([
+        z.string().datetime(),
+        z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    ]).optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('New date: ISO datetime or bare YYYY-MM-DD (calendar drag). Moves the scheduled instant with it, preserving tenant wall-clock time.'),
     // A plain string, and nullable — for the same two reasons `templateId`
     // below is:
     //   - `users.id` is a `text` column. Freshly registered users get a

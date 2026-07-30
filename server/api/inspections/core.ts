@@ -16,6 +16,7 @@ import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/valida
 import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
 import { inspections as inspectionTable, inspectionResults, users } from '../../lib/db/schema';
+import { datePatchValues } from '../../services/inspection/reschedule-date';
 import { deleteInspectionCascade } from '../../services/inspection/inspection-cascade';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { eq, and, isNull } from 'drizzle-orm';
@@ -340,6 +341,12 @@ const coreRoutes = createApiRouter()
             }
         }
 
+        // A date PATCH moves the scheduled instant with the civil day
+        // (§7.5 item 3) — see services/inspection/reschedule-date.ts.
+        const updateValues: Record<string, unknown> = typeof body.date === 'string'
+            ? await datePatchValues(db, tenantId, id, body as Record<string, unknown> & { date: string })
+            : body;
+
         // Tenant-ownership pre-check above guards access. The validated `body`
         // can legitimately be empty: the settings sheet forwards its whole form
         // and the BFF sanitizer drops empty-string "unchanged" fields, so a save
@@ -347,8 +354,8 @@ const coreRoutes = createApiRouter()
         // arrives as `{}`. drizzle throws "No values to set" on `.set({})`, which
         // used to surface as a 500 → the sheet's "Error — try again". Treat the
         // no-op as a successful save instead of writing an empty UPDATE.
-        if (Object.keys(body).length > 0) {
-            await db.update(inspectionTable).set(body).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
+        if (Object.keys(updateValues).length > 0) {
+            await db.update(inspectionTable).set(updateValues).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
         }
 
         // DB-8: re-sync link table when inspectorId is explicitly updated.

@@ -70,6 +70,16 @@ export function epochMsToRfc3339(ms: number, ianaTz: string): string {
   );
 }
 
+/** Wall-clock `HH:MM` of instant `ms` in `ianaTz`. */
+export function epochMsToWallClockHm(ms: number, ianaTz: string): string {
+  return epochMsToRfc3339(ms, ianaTz).slice(11, 16);
+}
+
+/** Civil `YYYY-MM-DD` of instant `ms` in `ianaTz`. */
+export function epochMsToCivilDate(ms: number, ianaTz: string): string {
+  return epochMsToRfc3339(ms, ianaTz).slice(0, 10);
+}
+
 /** `YYYY-MM-DD` + `HH:MM` interpreted as local wall-clock in `ianaTz` -> UTC epoch ms. */
 export function wallClockToEpochMs(dateYmd: string, timeHm: string, ianaTz: string): number {
   const [y, mo, d] = dateYmd.split('-').map(Number);
