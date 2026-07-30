@@ -29,7 +29,7 @@ import { m } from "~/paraglide/messages";
 import { BlockHeading } from "./BlockHeading";
 import { OutboxList } from "./OutboxList";
 import { MessageThread, type ThreadMessage } from "~/components/messaging/MessageThread";
-import { groupDeliveries } from "~/lib/communication-view";
+import { groupDeliveries, type DeliveryRow } from "~/lib/communication-view";
 import type { CommunicationPayload } from "~/routes/resources/inspection-communication";
 
 export interface CommunicationCounts {
@@ -68,6 +68,10 @@ export function CommunicationSection({
     const [outboxOpen, setOutboxOpen] = useState(counts.needsAttention > 0);
     const payload = useFetcher<CommunicationPayload>();
     const send = useFetcher<{ ok: boolean }>();
+    // Resend posts to the PAGE action's send-report intent (BFF — the browser
+    // never calls /api directly), so a failed manual row re-sends to exactly
+    // that one recipient with the role it was originally addressed under.
+    const resend = useFetcher<{ ok: boolean }>();
     const [recipientId, setRecipientId] = useState<string>("");
     // Optimistic bubbles: rendered immediately, dropped once the reload lands.
     const [pendingSends, setPendingSends] = useState<ThreadMessage[]>([]);
@@ -107,8 +111,29 @@ export function CommunicationSection({
             setPendingSends([]);
             load();
         }
-         
+
     }, [sendState, send.data, load]);
+
+    // A completed resend: refresh so the new ledger row replaces the failed one's story.
+    const resendState = resend.state;
+    useEffect(() => {
+        if (resendState === "idle" && resend.data) load();
+    }, [resendState, resend.data, load]);
+
+    function handleResend(row: DeliveryRow) {
+        // Channel-faithful: the resend rides the row's OWN channel so it reaches
+        // the same provider that failed. The send-report endpoint accepts email
+        // today; when A3's manual-SMS endpoint lands, SMS rows route there —
+        // never through the email path as a fallback.
+        if (!row.roleKey || row.channel !== "email") return;
+        const recipient = row.recipientContactId
+            ? { contactId: row.recipientContactId, roleKey: row.roleKey }
+            : { email: row.recipient, roleKey: row.roleKey };
+        resend.submit(
+            { intent: "send-report", recipients: JSON.stringify([recipient]), channels: JSON.stringify([row.channel]) },
+            { method: "post" },
+        );
+    }
 
     const messages = payload.data?.messages ?? [];
     const deliveries = payload.data?.deliveries ?? [];
@@ -230,7 +255,7 @@ export function CommunicationSection({
                     payload.state === "loading" && !loaded ? (
                         <p className="text-[12px] text-ih-fg-4 py-4 text-center">{m.comm_loading()}</p>
                     ) : groups.length > 0 ? (
-                        <OutboxList groups={groups} onGetConsent={onGetConsent} />
+                        <OutboxList groups={groups} onGetConsent={onGetConsent} onResend={handleResend} />
                     ) : (
                         <p className="text-[12px] text-ih-fg-4 py-4 text-center">{outboxEmpty}</p>
                     )

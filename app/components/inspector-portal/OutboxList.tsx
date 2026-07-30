@@ -17,7 +17,7 @@
 import { useState } from "react";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
-import { reasonText, type NoticeGroup, type NoticeChannel } from "~/lib/communication-view";
+import { reasonText, type NoticeGroup, type NoticeChannel, type DeliveryRow } from "~/lib/communication-view";
 
 function channelIcon(channel: string) {
   // Known channels get a glyph; anything else gets a neutral dot. The LABEL
@@ -57,10 +57,14 @@ const STATUS_LABEL: Record<string, () => string> = {
 export function OutboxList({
   groups,
   onGetConsent,
+  onResend,
 }: {
   groups: NoticeGroup[];
   /** Scrolls to / opens the SMS-consent control on the People card. */
   onGetConsent?: () => void;
+  /** Re-issues a FAILED manual send to that one recipient (A2.2). Automation
+   *  rows never offer it — re-firing a rule is the Automations page's job. */
+  onResend?: (row: DeliveryRow) => void;
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const timeZone = useDisplayTimeZone();
@@ -129,6 +133,21 @@ export function OutboxList({
                             className="mt-1 inline-flex h-7 items-center px-2.5 rounded-lg border border-ih-border bg-ih-bg-card text-[11px] font-semibold text-ih-fg-2 hover:text-ih-fg-1 transition-colors"
                           >
                             {m.comm_action_get_consent()}
+                          </button>
+                        )}
+                        {/* Channel-faithful by design: a resend goes through the
+                            SAME provider the row failed on. Email rows re-enter
+                            the send-report path (email provider); SMS resend
+                            arrives with A3's manual-SMS endpoint and its TCPA
+                            gate — an email endpoint must never be the fallback
+                            for an SMS failure, so no button until then. */}
+                        {onResend && r.source === "manual" && r.status === "failed" && r.roleKey && r.channel === "email" && (
+                          <button
+                            type="button"
+                            onClick={() => onResend(r)}
+                            className="mt-1 ml-1.5 inline-flex h-7 items-center px-2.5 rounded-lg border border-ih-border bg-ih-bg-card text-[11px] font-semibold text-ih-fg-2 hover:text-ih-fg-1 transition-colors"
+                          >
+                            {m.comm_action_resend()}
                           </button>
                         )}
                       </span>

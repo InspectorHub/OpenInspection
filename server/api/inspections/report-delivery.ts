@@ -25,6 +25,7 @@ import {
 import { SendReportSchema, SendReportResponseDataSchema } from '../../lib/validations/send-report.schema';
 import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable, contacts, tenants } from '../../lib/db/schema';
+import { makeManualSendLogger } from '../../services/automation/manual-log';
 import { eq, and } from 'drizzle-orm';
 import { resolveSignatureInspector } from '../../lib/signature-helpers';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
@@ -354,6 +355,11 @@ const reportDeliveryRoutes = createApiRouter()
         const sentTo: string[] = [];
         const skipped: Array<{ recipient: string; reason: string }> = [];
 
+        // A2.2 — manual sends land in the SAME ledger the automations write,
+        // with `automation_id IS NULL` as the manual marker; one factory call =
+        // one shared sendAt = one Outbox notice for the whole batch.
+        const logManualSend = makeManualSendLogger(db, tenantId, id);
+
         for (const recipient of recipients) {
             const recipientLabel = recipient.contactId ?? recipient.email ?? 'unknown';
             try {
@@ -367,7 +373,9 @@ const reportDeliveryRoutes = createApiRouter()
                     recipientEmail = contactRow?.email ?? null;
                 }
                 if (!recipientEmail) {
-                    skipped.push({ recipient: recipientLabel, reason: 'No email on file for this recipient' });
+                    const reason = 'No email on file for this recipient';
+                    skipped.push({ recipient: recipientLabel, reason });
+                    await logManualSend({ recipient: recipientLabel, contactId: recipient.contactId ?? null, roleKey: recipient.roleKey, status: 'skipped', error: reason });
                     continue;
                 }
 
@@ -424,9 +432,12 @@ const reportDeliveryRoutes = createApiRouter()
                     metadata: { recipient: recipientEmail, roleKey: recipient.roleKey },
                 });
                 sentTo.push(recipientEmail);
+                await logManualSend({ recipient: recipientEmail, contactId: recipient.contactId ?? null, roleKey: recipient.roleKey, status: 'sent' });
             } catch (err) {
                 logger.error('[send-report-pdf] recipient send failed', { inspectionId: id, recipient: recipientLabel }, err instanceof Error ? err : undefined);
-                skipped.push({ recipient: recipientLabel, reason: err instanceof Error ? err.message : 'Send failed' });
+                const reason = err instanceof Error ? err.message : 'Send failed';
+                skipped.push({ recipient: recipientLabel, reason });
+                await logManualSend({ recipient: recipientLabel, contactId: recipient.contactId ?? null, roleKey: recipient.roleKey, status: 'failed', error: reason });
             }
         }
 

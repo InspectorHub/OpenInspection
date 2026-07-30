@@ -31,7 +31,7 @@ const DeliverySchema = z.object({
     status: z.enum(['pending', 'sent', 'failed', 'skipped']).describe('Delivery outcome.'),
     reasonCode: z.string().nullable().describe('RAW stored reason string for skipped/failed rows. The English mapping lives in the UI.'),
     source: z.enum(['automation', 'manual']).describe('What initiated the send.'),
-    automationId: z.string().describe('Rule that fired. Grouping key component.'),
+    automationId: z.string().nullable().describe('Rule that fired; null for manual sends. Grouping key component.'),
     automationName: z.string().nullable().describe('Rule name for the notice row title; null when the rule was deleted.'),
     sendAt: z.number().describe('Epoch-ms the firing was scheduled for. Grouping key component — one firing shares one sendAt.'),
     deliveredAt: z.number().nullable().describe('Epoch-ms of confirmed delivery, when known.'),

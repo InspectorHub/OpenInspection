@@ -17,7 +17,8 @@ export interface CommunicationDelivery {
     /** RAW stored reason string, untouched — the English mapping lives in the UI. */
     reasonCode: string | null;
     source: 'automation' | 'manual';
-    automationId: string;
+    /** Null for manual sends — `automation_id IS NULL` IS the manual marker. */
+    automationId: string | null;
     /** Rule name for the notice row title; null when the rule was deleted. */
     automationName: string | null;
     sendAt: number;
@@ -94,10 +95,8 @@ export function AutomationLogs<TBase extends Constructor<AutomationBase>>(Base: 
                 roleLabel: r.roleLabel ?? null,
                 status: r.status,
                 reasonCode: r.error ?? null,
-                // Manual sends land in A2 with their own source stamp; until
-                // then every row here came from an automation firing.
-                source: 'automation' as const,
-                automationId: r.automationId,
+                source: (r.automationId == null ? 'manual' : 'automation') as 'manual' | 'automation',
+                automationId: r.automationId ?? null,
                 automationName: r.automationName ?? null,
                 sendAt: r.sendAt instanceof Date ? r.sendAt.getTime() : Number(r.sendAt),
                 deliveredAt: r.deliveredAt == null ? null : (r.deliveredAt instanceof Date ? r.deliveredAt.getTime() : Number(r.deliveredAt)),

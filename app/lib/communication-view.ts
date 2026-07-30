@@ -14,7 +14,8 @@ export interface DeliveryRow {
   status: "pending" | "sent" | "failed" | "skipped";
   reasonCode: string | null;
   source: "automation" | "manual";
-  automationId: string;
+  /** Null for manual sends; the grouping key stringifies it, so a manual batch still groups on its shared sendAt. */
+  automationId: string | null;
   automationName: string | null;
   sendAt: number;
   deliveredAt: number | null;
@@ -45,7 +46,7 @@ export interface NoticeChannel {
 
 export interface NoticeGroup {
   key: string;
-  automationId: string;
+  automationId: string | null;
   sendAt: number;
   channels: NoticeChannel[];
   recipients: DeliveryRow[];

@@ -64,7 +64,10 @@ export const automations = sqliteTable('automations', {
 export const automationLogs = sqliteTable('automation_logs', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
-    automationId: text('automation_id').notNull(),
+    // Nullable since Communication A2: `automation_id IS NULL` means a MANUAL
+    // send (an operator pressing Send report), logged into the same ledger so
+    // the Outbox answers "what left this office" regardless of who pressed it.
+    automationId: text('automation_id'),
     inspectionId: text('inspection_id').notNull(),
     // Track L — holds the email address for email logs, the E.164 phone for sms logs.
     recipient: text('recipient').notNull(),   // RENAMED from recipient_email (0025)

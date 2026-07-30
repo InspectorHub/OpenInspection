@@ -99,6 +99,13 @@
       "when": 1785366771398,
       "tag": "0013_hard_mysterio",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1785376765611,
+      "tag": "0014_curvy_quicksilver",
+      "breakpoints": true
     }
   ]
 }

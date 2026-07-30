@@ -167,6 +167,7 @@ export function RoleProfileModal({
           label={m.contacts_roles_modal_email_template_label()}
           defaultValue={profile?.emailTemplateId ?? ""}
           options={emailOptions}
+          hint={m.contacts_roles_modal_email_template_hint()}
         />
 
         <Select
