@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router";
 import { m } from "~/paraglide/messages";
 import { MessageThread, type ThreadMessage } from "~/components/messaging/MessageThread";
 
@@ -56,6 +57,11 @@ export function MessagesSection({
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inspection, setInspection] = useState<InspectionInfo | null>(null);
+  // The Notices email remedy deep-links here with ?prefill=email — the remedy
+  // is a message, not a form (design §3.16), so the composer opens with the
+  // first line already written.
+  const [searchParams] = useSearchParams();
+  const prefill = searchParams.get("prefill");
 
   // Same-origin: the __Host-portal_session cookie is sent automatically. The
   // per-inspection portal ?token is a fallback (email-CTA arrival), appended
@@ -140,6 +146,7 @@ export function MessagesSection({
       )}
       <MessageThread
         messages={threadMessages}
+        initialDraft={prefill === "email" ? m.notice_draft_new_email() : ""}
         attachmentHref={(attId) => `${base}/attachments/${encodeURIComponent(attId)}${tokenQuery}`}
         onSend={handleSend}
         onAttach={handleAttach}

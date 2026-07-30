@@ -53,6 +53,11 @@ export interface MessageThreadProps {
   showAuthorRole?: boolean;
   /** Compose slot addition (e.g. the recipient chip); renders above the box. */
   composeExtra?: React.ReactNode;
+  /** Opening text for the composer. Used by the Notices email remedy, which is
+   *  a message rather than a form: there is no self-service email change, so
+   *  the recipient tells us the new address in the thread and the inspector
+   *  updates the contact. Initial value only — typing is never overridden. */
+  initialDraft?: string;
   emptyTitle: string;
   emptyBody: string;
 }
@@ -67,9 +72,9 @@ function roleLabel(fromRole: string): string {
 }
 
 export function MessageThread({
-  messages, attachmentHref, onSend, onAttach, showAuthorRole = false, composeExtra, emptyTitle, emptyBody,
+  messages, attachmentHref, onSend, onAttach, showAuthorRole = false, composeExtra, initialDraft = "", emptyTitle, emptyBody,
 }: MessageThreadProps) {
-  const [composeBody, setComposeBody] = useState("");
+  const [composeBody, setComposeBody] = useState(initialDraft);
   const [sending, setSending] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
   const [uploading, setUploading] = useState(false);

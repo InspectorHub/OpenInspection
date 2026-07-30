@@ -48,6 +48,8 @@ export type { AuditApi }              from '../../server/api/audit';
 export type { NotificationsApi }      from '../../server/api/notifications';
 export type { PlacesApi }             from '../../server/api/places';
 export type { PortalApi }             from '../../server/api/portal';
+export type { PortalNoticesApi }      from '../../server/api/portal/notices';
+export type { AgentNoticesApi }       from '../../server/api/agent/notices';
 export type { ProfileApi }            from '../../server/api/profile';
 export type { PublicShareApi }        from '../../server/api/public-share';
 export type { PublicReportApi }       from '../../server/api/public-report';

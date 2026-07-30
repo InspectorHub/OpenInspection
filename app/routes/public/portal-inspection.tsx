@@ -54,6 +54,17 @@ import {
 } from "~/lib/section-loaders";
 import { loadAgentReportContext, type AgentReportContext } from "~/lib/agent-report-context";
 import { resolvePortalSession } from "~/lib/portal-exchange";
+import {
+  loadPortalNotices,
+  handlePortalNoticeIntent,
+  EMPTY_NOTICES,
+  type PortalNoticesPayload,
+} from "~/lib/portal-notices";
+import { PortalNoticeBell } from "~/components/portal/hub/PortalNoticeBell";
+import {
+  handleAgentMagicLogin,
+  type AgentMagicLoginActionResult,
+} from "~/lib/agent-magic-login-action";
 import { HubSectionSlot } from "~/components/portal/hub/HubSectionSlot";
 import type { TenantBrand } from "~/lib/brand";
 import { m } from "~/paraglide/messages";
@@ -187,6 +198,13 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     progress = { ...progress, date: formatInspectionDateTime(progress.date, undefined, brand.defaultTimezone) };
   }
 
+  // Step 4a — the Notices bell (C3). Rides the loader rather than opening on
+  // demand so the unread badge is right before the panel is ever opened.
+  // Skipped for an agent token, which mints no session and has no inbox here.
+  const noticesPayload = isAgentToken
+    ? EMPTY_NOTICES
+    : await loadPortalNotices(api, tenant, cookieForApi);
+
   // Step 4b — agent report-landing context (Spec 3 Task 3): resolves whether
   // ctx.token's recipient is an agent and, if so, whether they already have a
   // global agent account — the Report section CTA (magic-login vs signup)
@@ -195,7 +213,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 
   // Step 5 — render the hub.
   return new Response(
-    JSON.stringify({ overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement, agentReport }),
+    JSON.stringify({ overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement, agentReport, notices: noticesPayload }),
     {
       headers: {
         "Content-Type": "application/json",
@@ -214,43 +232,26 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 /* action pattern (intent-dispatch, createApi(context) relay).          */
 /* ------------------------------------------------------------------ */
 
-type AgentMagicLoginActionResult =
-  | { ok: true; intent: "agent-magic-login"; sent: boolean }
-  | { ok: false; intent: "agent-magic-login"; error?: string }
-  | { ok: false; intent: string };
-
 export async function action({ request, params, context }: Route.ActionArgs) {
   const formData = await request.formData();
-  const intent = formData.get("intent");
+  const intent = String(formData.get("intent") ?? "");
   const tenant = params.tenant ?? "";
   const inspectionId = params.inspectionId ?? "";
+  const api = createApi(context);
+
+  // C3 — the Notices bell's writes. The session cookie travels explicitly
+  // because the typed client does not forward the browser's.
+  const noticeResult = await handlePortalNoticeIntent(
+    api, tenant, request.headers.get("cookie") ?? "", intent,
+    String(formData.get("noticeId") ?? ""),
+  );
+  if (noticeResult) return noticeResult;
 
   if (intent === "agent-magic-login") {
-    const token = String(formData.get("token") ?? "");
-    // IA-47 — derive returnTo server-side (never from the client) so the redeem
-    // step lands the agent back on this exact report page instead of the
-    // dashboard. Server-derived → not an open-redirect vector.
-    const returnTo = `/portal/${tenant}/i/${inspectionId}?token=${encodeURIComponent(token)}&section=report`;
-    const api = createApi(context);
-    try {
-      const res = (await api.agentMagicLogin["magic-login"].request.$post({
-        json: { tenant, inspectionId, token, returnTo },
-      })) as unknown as Response;
-      if (!res.ok) {
-        return { ok: false, intent: "agent-magic-login" } satisfies AgentMagicLoginActionResult;
-      }
-      const body = (await res.json()) as { data?: { sent?: boolean } };
-      return {
-        ok: true,
-        intent: "agent-magic-login",
-        sent: body.data?.sent ?? true,
-      } satisfies AgentMagicLoginActionResult;
-    } catch {
-      return { ok: false, intent: "agent-magic-login" } satisfies AgentMagicLoginActionResult;
-    }
+    return handleAgentMagicLogin(api, tenant, inspectionId, String(formData.get("token") ?? ""));
   }
 
-  return { ok: false, intent: String(intent ?? "") } satisfies AgentMagicLoginActionResult;
+  return { ok: false, intent } satisfies AgentMagicLoginActionResult;
 }
 
 /* ------------------------------------------------------------------ */
@@ -258,7 +259,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function PortalInspection() {
-  const { overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement, agentReport } = useLoaderData<typeof loader>() as {
+  const { overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement, agentReport, notices } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
     ctx: { tenant: string; inspectionId: string; token: string; signerToken: string | null };
     section: HubSection;
@@ -270,6 +271,7 @@ export default function PortalInspection() {
     invoice: InvoiceLoaderResult | null;
     agreement: AgreementLoaderResult | null;
     agentReport: AgentReportContext | null;
+    notices: PortalNoticesPayload;
   };
   const revalidator = useRevalidator();
   const [searchParams] = useSearchParams();
@@ -379,6 +381,11 @@ export default function PortalInspection() {
       sectionSlot={sectionSlot}
       agentMode={isAgent}
       onSignOut={isAgent ? undefined : () => void signOut(tenant)}
+      bellSlot={
+        isAgent ? undefined : (
+          <PortalNoticeBell notices={notices.notices} unread={notices.unread} ctx={ctx} />
+        )
+      }
     />
   );
 }

@@ -148,7 +148,13 @@ export function Popover({ open, onClose, anchorRef, children, align = "right" }:
       role="dialog"
       aria-modal="false"
       style={style}
-      className="z-50 bg-ih-bg-card border border-ih-border rounded-ih-card shadow-ih-popover"
+      /* border-STRONG, not border: a popover is frequently anchored to a
+         control that already sits on a card (the sidebar, a toolbar), and
+         `--ih-bg-card` on `--ih-bg-card` with a hairline border reads as one
+         continuous surface — the panel's edge disappears exactly where it
+         matters most. The strong token is the same hue one step up, so this
+         separates without turning into a frame. */
+      className="z-50 bg-ih-bg-card border border-ih-border-strong rounded-ih-card shadow-ih-popover"
     >
       {children}
     </div>

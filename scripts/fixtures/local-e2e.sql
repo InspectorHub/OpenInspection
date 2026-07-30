@@ -72,3 +72,50 @@ INSERT OR REPLACE INTO message_templates
  ('fx-tpl-agent-sms', :TENANT, 'Agent report SMS', 'sms', NULL,
   'Report ready for {{property_address}}: {{report_url}}',
   0, 1785200000041, 1785200000041);
+
+-- ── Notices (Track C3) ─────────────────────────────────────────────────────
+-- One notice HEADER per recipient x notice, with its per-channel delivery
+-- attempts hanging off `notice_id`. Seeded because the three inbox states are
+-- otherwise unreachable by clicking: a clean delivery, a skip the recipient
+-- can clear themselves ("Turn on texts"), and a bounce that names the address.
+--
+-- The client rows go to fx-contact-client and the agent rows to
+-- fx-contact-agent, so the same fixture exercises BOTH bells: the client's
+-- one-company inbox and the agent's cross-company one.
+INSERT OR REPLACE INTO notifications
+  (id, tenant_id, user_id, contact_id, inspection_id, type, title, body, entity_type, entity_id, read_at, archived_at, created_at) VALUES
+ ('fx-notice-client-report',  :TENANT, NULL, 'fx-contact-client', :INSP_A, 'report.published',     'Report ready',  NULL, 'inspection', :INSP_A, NULL,          NULL, 1785380000000),
+ ('fx-notice-client-invoice', :TENANT, NULL, 'fx-contact-client', :INSP_A, 'invoice.created',      'Invoice ready', NULL, 'inspection', :INSP_A, NULL,          NULL, 1785370000000),
+ ('fx-notice-client-read',    :TENANT, NULL, 'fx-contact-client', :INSP_A, 'inspection.confirmed', 'Confirmed',     NULL, 'inspection', :INSP_A, 1785360001000, NULL, 1785360000000),
+ ('fx-notice-agent-report',   :TENANT, NULL, 'fx-contact-agent',  :INSP_A, 'report.published',     'Report ready',  NULL, 'inspection', :INSP_A, NULL,          NULL, 1785380000000),
+ ('fx-notice-agent-invoice',  :TENANT, NULL, 'fx-contact-agent',  :INSP_B, 'invoice.created',      'Invoice ready', NULL, 'inspection', :INSP_B, NULL,          NULL, 1785350000000);
+
+-- Delivery details. `recipient` is an ADDRESS on email rows and a PHONE on sms
+-- rows — which is exactly why the inbox reads by contact_id and never by
+-- matching this column.
+INSERT OR REPLACE INTO automation_logs
+  (id, tenant_id, automation_id, inspection_id, recipient, recipient_role_key, channel, send_at, delivered_at, status, error, event_id, recipient_contact_id, notice_id) VALUES
+ ('fx-log-client-1', :TENANT, NULL, :INSP_A, 'dana.reyes@example.com',    'client',      'email', 1785380000000, 1785380004000, 'sent',    NULL,                          NULL, 'fx-contact-client', 'fx-notice-client-report'),
+ ('fx-log-client-2', :TENANT, NULL, :INSP_A, '+15551110001',              'client',      'sms',   1785380000000, NULL,           'skipped', 'no sms consent',              NULL, 'fx-contact-client', 'fx-notice-client-report'),
+ ('fx-log-client-3', :TENANT, NULL, :INSP_A, 'dana.old@example.com',      'client',      'email', 1785370000000, NULL,           'failed',  '550 mailbox unavailable',     NULL, 'fx-contact-client', 'fx-notice-client-invoice'),
+ ('fx-log-client-4', :TENANT, NULL, :INSP_A, 'dana.reyes@example.com',    'client',      'email', 1785360000000, 1785360002000, 'sent',    NULL,                          NULL, 'fx-contact-client', 'fx-notice-client-read'),
+ ('fx-log-agent-1',  :TENANT, NULL, :INSP_A, 'rosa@northside.example.com','buyer_agent', 'email', 1785380000000, 1785380005000, 'sent',    NULL,                          NULL, 'fx-contact-agent',  'fx-notice-agent-report'),
+ ('fx-log-agent-2',  :TENANT, NULL, :INSP_A, '+15551110002',              'buyer_agent', 'sms',   1785380000000, NULL,           'skipped', 'no sms consent',              NULL, 'fx-contact-agent',  'fx-notice-agent-report'),
+-- An UNRECOGNIZED failure: the reader must get a flat "Not delivered" with no
+-- explanation and no button, never our provider's wording.
+ ('fx-log-agent-3',  :TENANT, NULL, :INSP_B, 'rosa@northside.example.com','buyer_agent', 'email', 1785350000000, NULL,           'failed',  'connection reset by peer',    NULL, 'fx-contact-agent',  'fx-notice-agent-invoice');
+
+-- ── Staff notices (the inspector portal's own bell) ─────────────────────────
+-- user_id side of the XOR: these are the OLD semantics ("tell the staff a rule
+-- fired"), which Track B migrates. Seeded for every owner/manager so the bell
+-- has rows whichever seat you log in as.
+INSERT OR REPLACE INTO notifications
+  (id, tenant_id, user_id, contact_id, inspection_id, type, title, body, entity_type, entity_id, read_at, archived_at, created_at)
+SELECT 'fx-notice-staff-' || u.id, :TENANT, u.id, NULL, NULL, 'booking.received', 'New booking request',
+       'Dana Reyes requested an inspection.', 'inspection', NULL, NULL, NULL, 1785380000000
+  FROM users u WHERE u.tenant_id = :TENANT AND u.role IN ('owner', 'manager');
+INSERT OR REPLACE INTO notifications
+  (id, tenant_id, user_id, contact_id, inspection_id, type, title, body, entity_type, entity_id, read_at, archived_at, created_at)
+SELECT 'fx-notice-staff2-' || u.id, :TENANT, u.id, NULL, NULL, 'agreement.signed', 'Agreement signed',
+       NULL, 'inspection', NULL, 1785370001000, NULL, 1785370000000
+  FROM users u WHERE u.tenant_id = :TENANT AND u.role IN ('owner', 'manager');

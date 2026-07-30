@@ -71,6 +71,7 @@ export default function ClientPortalHub({
   sectionSlot,
   onSignOut,
   agentMode = false,
+  bellSlot,
 }: {
   overview: StatusOverview;
   ctx: HubLinkCtx;
@@ -93,6 +94,10 @@ export default function ClientPortalHub({
    *  hides the client-only tab bar — an agent has no overview/agreement/payment/
    *  messages/repair/documents hub, only the report + the AgentReportActions CTA. */
   agentMode?: boolean;
+  /** Notices bell (design §3.15: a bell is always "sent to me"). Supplied by
+   *  the route so this component stays presentational; omitted in agent mode,
+   *  where the viewer holds a report token and has no inbox here. */
+  bellSlot?: React.ReactNode;
 }) {
   return (
     <div style={brandTokens(brand?.primaryColor)} className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -125,6 +130,7 @@ export default function ClientPortalHub({
             portal is heavily mobile, so the control stays visible at every width
             and the header wraps rather than colliding with the address. */}
         <div className="flex items-center gap-2 shrink-0">
+          {bellSlot}
           <ThemeSegmentControl />
           {onSignOut && (
             <button
