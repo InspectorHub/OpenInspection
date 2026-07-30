@@ -24,7 +24,7 @@
  * (`tests/unit/notifications/notice-inbox.spec.ts`).
  */
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
-import { notifications, automationLogs, contacts } from '../lib/db/schema';
+import { notifications, automationLogs, contacts, tenants } from '../lib/db/schema';
 
 /** Accepts the D1 drizzle instance or the better-sqlite3 test db. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -54,6 +54,10 @@ export interface NoticeRow {
     readAt: number | null;
     /** The recipient contact this notice is addressed to (never another party). */
     contactId: string;
+    /** Sending company's display name. Always resolved, rendered only by the
+     *  agent inbox — theirs is the one that spans companies, so "who sent
+     *  this" is information a single-company client inbox does not need. */
+    companyName: string | null;
     channels: NoticeChannelAttempt[];
 }
 
@@ -152,6 +156,14 @@ export async function listNoticesForContacts(
         .from(automationLogs)
         .where(inArray(automationLogs.noticeId, ids));
 
+    const tenantIds = [...new Set(headers.map((h: { tenantId: string }) => h.tenantId))] as string[];
+    const companyRows = await db.select({ id: tenants.id, name: tenants.name })
+        .from(tenants)
+        .where(inArray(tenants.id, tenantIds));
+    const companyById = new Map<string, string>(
+        companyRows.map((t: { id: string; name: string }) => [t.id, t.name]),
+    );
+
     const byNotice = new Map<string, NoticeChannelAttempt[]>();
     for (const log of logs) {
         const key = log.noticeId as string;
@@ -175,6 +187,7 @@ export async function listNoticesForContacts(
         body: (h.body ?? null) as string | null,
         inspectionId: (h.inspectionId ?? null) as string | null,
         contactId: h.contactId as string,
+        companyName: companyById.get(h.tenantId as string) ?? null,
         readAt: toMs(h.readAt as Date | null),
         createdAt: toMs(h.createdAt as Date) ?? 0,
         channels: byNotice.get(h.id as string) ?? [],

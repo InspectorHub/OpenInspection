@@ -155,4 +155,6 @@ export const agentNoticeRoutes = createApiRouter()
         return c.json({ success: true as const, data: { url: `/sms-optin/${encodeURIComponent(token)}` } }, 200);
     });
 
+export type AgentNoticesApi = typeof agentNoticeRoutes;
+
 export default agentNoticeRoutes;

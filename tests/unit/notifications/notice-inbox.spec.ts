@@ -150,6 +150,10 @@ describe('notice inbox — outward recipients (C3)', () => {
         const rows = await listNoticesForContacts(db, { contactIds: ids });
         // Newest first.
         expect(rows.map((r) => r.id)).toEqual(['n-b', 'n-a']);
+        // An inbox spanning companies has to say which one sent each notice,
+        // so the name is resolved here rather than left as a tenant id the UI
+        // would have to look up.
+        expect(rows.map((r) => r.companyName)).toEqual(['B', 'A']);
     });
 
     it('the client lookup is tenant-scoped: the same email in another tenant is a different person here', async () => {

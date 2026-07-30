@@ -27,6 +27,7 @@ export const NoticeRowSchema = z.object({
     title: z.string().describe('Notice title.'),
     body: z.string().nullable().describe('Optional notice body.'),
     inspectionId: z.string().nullable().describe('The inspection this notice concerns, when it concerns one.'),
+    companyName: z.string().nullable().describe('Sending company display name; rendered by the agent inbox, which spans companies.'),
     createdAt: z.number().describe('Epoch ms the notice was created.'),
     readAt: z.number().nullable().describe('Epoch ms the recipient read it, or null when unread.'),
     channels: z.array(NoticeChannelSchema).describe('Per-channel delivery attempts belonging to this notice.'),
