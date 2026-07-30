@@ -1,9 +1,12 @@
 /**
  * <OutboxList> — the record of what the platform sent (design §3.3).
  *
- * One row = one NOTICE, grouped on `(automation_id, send_at)` — a report
- * publish to four people over two channels is one row, not eight. The
- * grouping itself lives in `groupDeliveries` (app/lib/communication-view.ts).
+ * One row = one NOTICE. Since C1 (design §3.13) the key is `notice_id` — one
+ * header per recipient x notice, so a stamped publish to four people over two
+ * channels is four rows with the channels folded inside each; legacy rows
+ * without a header keep the interim `(automation_id, send_at)` key and fold
+ * per firing. The grouping itself lives in `groupDeliveries`
+ * (app/lib/communication-view.ts).
  *
  * The row's signature is per-channel delivered/total counts. An icon never
  * carries state alone: every count is text beside the icon plus a

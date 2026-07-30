@@ -31,6 +31,7 @@ const delivery = (over: Partial<DeliveryRow>): DeliveryRow => ({
   source: "automation",
   automationId: "auto-1",
   automationName: "Report ready",
+  noticeId: null,
   sendAt: 1_000,
   deliveredAt: null,
   ...over,
@@ -72,6 +73,33 @@ describe("groupDeliveries", () => {
       delivery({ status: "skipped", reasonCode: "no sms consent" }),
     ]);
     expect(groups[0].channels[0].tone).toBe("bad");
+  });
+
+  // C1 (design §3.13) — the real grouping key. One header per recipient x
+  // notice, so stamped rows group per RECIPIENT spanning that recipient's
+  // channels; legacy rows (notice_id NULL) keep the interim key above.
+  it("rows with notice_id group per header — one group per recipient, channels folded inside", () => {
+    const rows = [
+      delivery({ recipient: "jane@x.com", channel: "email", noticeId: "n-jane" }),
+      delivery({ recipient: "jane@x.com", channel: "sms", noticeId: "n-jane" }),
+      delivery({ recipient: "agent@x.com", channel: "email", noticeId: "n-agent" }),
+      delivery({ recipient: "agent@x.com", channel: "sms", noticeId: "n-agent", status: "skipped", reasonCode: "no sms consent" }),
+    ];
+    const groups = groupDeliveries(rows);
+    expect(groups).toHaveLength(2);
+    const jane = groups.find((g) => g.recipients[0].recipient === "jane@x.com")!;
+    expect(jane.recipients).toHaveLength(2);
+    expect(jane.channels.map((c) => c.channel).sort()).toEqual(["email", "sms"]);
+    const agent = groups.find((g) => g.recipients[0].recipient === "agent@x.com")!;
+    expect(agent.needsAttention).toBe(true);
+  });
+
+  it("a stamped row never joins the fallback group even when automation_id and send_at collide", () => {
+    const rows = [
+      delivery({ noticeId: "n-1" }),
+      delivery({ noticeId: null }), // legacy row, same automationId + sendAt
+    ];
+    expect(groupDeliveries(rows)).toHaveLength(2);
   });
 });
 

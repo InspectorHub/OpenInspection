@@ -30,7 +30,7 @@ const PAYLOAD: CommunicationPayload = {
       id: "d1", channel: "sms", recipient: "+15550001111", recipientContactId: "c1",
       roleKey: "client", roleLabel: "Client", status: "skipped",
       reasonCode: "no sms consent", source: "automation",
-      automationId: "a1", automationName: "Report ready",
+      automationId: "a1", automationName: "Report ready", noticeId: null,
       sendAt: Date.UTC(2026, 6, 29, 14), deliveredAt: null,
     },
   ],

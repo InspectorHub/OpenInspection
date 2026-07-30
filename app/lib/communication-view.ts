@@ -17,6 +17,9 @@ export interface DeliveryRow {
   /** Null for manual sends; the grouping key stringifies it, so a manual batch still groups on its shared sendAt. */
   automationId: string | null;
   automationName: string | null;
+  /** C1 — the notice header this attempt belongs to. The REAL grouping key;
+   *  null on legacy rows, which keep the interim (automationId, sendAt) key. */
+  noticeId: string | null;
   sendAt: number;
   deliveredAt: number | null;
 }
@@ -55,17 +58,21 @@ export interface NoticeGroup {
 }
 
 /**
- * Group log rows into notices on `(automation_id, send_at)` — one firing
- * computes `sendAt` once outside both its loops, so every row it emits shares
- * the value. Do NOT group on `event_id`: it is set for `report.published` and
+ * Group log rows into notices. The REAL key is `notice_id` (C1, design §3.13):
+ * one header per recipient x notice, so a stamped row groups with its
+ * recipient's other channel attempts. Legacy rows (`notice_id` NULL — written
+ * before C1, or a recipient that resolves to neither a user nor a contact)
+ * fall back to the interim `(automation_id, send_at)` key: one firing computes
+ * `sendAt` once outside both its loops, so every row it emits shares the
+ * value. Do NOT group on `event_id`: it is set for `report.published` and
  * nothing else, deliberately, so every other trigger's rows carry NULL and
- * would collapse into one giant group. Track C swaps this key for `notice_id`;
- * keeping the grouping in this one function makes that swap one edit.
+ * would collapse into one giant group. The `n:`/`f:` prefixes keep the two key
+ * spaces disjoint — a stamped row must never join a fallback group.
  */
 export function groupDeliveries(rows: DeliveryRow[]): NoticeGroup[] {
   const byKey = new Map<string, DeliveryRow[]>();
   for (const row of rows) {
-    const key = `${row.automationId}:${row.sendAt}`;
+    const key = row.noticeId ? `n:${row.noticeId}` : `f:${row.automationId}:${row.sendAt}`;
     const list = byKey.get(key) ?? [];
     list.push(row);
     byKey.set(key, list);
