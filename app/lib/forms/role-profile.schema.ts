@@ -22,5 +22,14 @@ export function makeRoleProfileSchema() {
     kind: z.enum(["client", "agent", "other"]).optional(),
     emailTemplateId: z.string().optional(),
     smsTemplateId: z.string().optional(),
+    // Capability controls (checkboxes submit "on"; absent means unchecked).
+    // Mirrors CapabilityOverridesSchema server-side — the server remains the
+    // authoritative validator; these exist so the fields are declared, not to
+    // gate submission.
+    cap_receivesReport: z.string().optional(),
+    cap_selfRetrieveReport: z.string().optional(),
+    cap_canHaveAccount: z.string().optional(),
+    cap_showsInAgentPortal: z.string().optional(),
+    cap_canAccessRepairList: z.enum(["off", "read", "readwrite"]).optional(),
   });
 }

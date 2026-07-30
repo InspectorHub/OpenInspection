@@ -14,6 +14,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { CreateRoleProfileSchema, UpdateRoleProfileSchema, RoleProfileSchema } from '../lib/validations/role-profile.schema';
+import { auditFromContext } from '../lib/audit';
 
 const RoleProfileListResponseSchema = z.object({
     success: z.literal(true),
@@ -112,7 +113,16 @@ const roleProfilesRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         const patch = c.req.valid('json');
-        await c.var.services.people.updateProfile(tenantId, id, patch);
+        const { capabilityDiff } = await c.var.services.people.updateProfile(tenantId, id, patch);
+        // Role-profile edits are permission-bearing now, so they join the audit
+        // trail staff permission_overrides changes already have — before/after
+        // resolved sets, not just "role updated".
+        if (capabilityDiff) {
+            auditFromContext(c, 'role_profile.capabilities_updated', 'contact_role_profile', {
+                entityId: id,
+                metadata: capabilityDiff,
+            });
+        }
         return c.json({ success: true as const, data: { updated: true as const } }, 200);
     })
     .openapi(deleteRoute, async (c) => {

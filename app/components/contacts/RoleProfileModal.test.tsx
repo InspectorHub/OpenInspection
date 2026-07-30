@@ -53,6 +53,36 @@ beforeEach(() => {
   fetcherData = undefined;
 });
 
+describe("RoleProfileModal — capability editor", () => {
+  const clientProfile = {
+    id: "crp-client", key: "client", label: "Client", kind: "client" as const,
+    emailTemplateId: null, smsTemplateId: null, isSystem: true, sortOrder: 1, active: true,
+    capabilityOverrides: null,
+  };
+
+  it("disables canHaveAccount for a client-kind role and says why", () => {
+    // Disabled with a visible reason, NOT hidden — a hidden control and an
+    // inert one read identically, and only one of them is honest.
+    const { container, getByText } = render(
+      <RoleProfileModal open onClose={() => {}} profile={clientProfile} templates={[]} />,
+    );
+    const box = container.querySelector('input[name="cap_canHaveAccount"]') as HTMLInputElement;
+    expect(box).toBeTruthy();
+    expect(box.disabled).toBe(true);
+    expect(getByText(/not yet available/i)).toBeTruthy();
+  });
+
+  it("renders every capability bit as a form control", () => {
+    const { container } = render(
+      <RoleProfileModal open onClose={() => {}} profile={clientProfile} templates={[]} />,
+    );
+    for (const name of ["cap_receivesReport", "cap_selfRetrieveReport", "cap_canHaveAccount", "cap_showsInAgentPortal"]) {
+      expect(container.querySelector(`input[name="${name}"]`), name).toBeTruthy();
+    }
+    expect(container.querySelector('select[name="cap_canAccessRepairList"]')).toBeTruthy();
+  });
+});
+
 describe("RoleProfileModal — auto-close on save", () => {
   it("closes once the save it started actually settles", () => {
     const onClose = vi.fn();

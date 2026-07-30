@@ -107,7 +107,11 @@ export type AuditAction =
     // says their old link still opens / stopped opening — what happened?".
     // Metadata carries the previous token's HASH; the plaintext is never logged.
     | 'portal_access.rotated'
-    | 'portal_access.revoked';
+    | 'portal_access.revoked'
+    // Two-layer role model — a role profile's capability overrides changed.
+    // Metadata carries the RESOLVED before/after sets, so "who widened this,
+    // and when" is answerable without replaying kind baselines by hand.
+    | 'role_profile.capabilities_updated';
 
 interface AuditParams {
     db: D1Database;
