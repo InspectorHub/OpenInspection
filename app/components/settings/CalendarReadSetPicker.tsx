@@ -140,7 +140,7 @@ export function CalendarReadSetPicker({ picker }: { picker: CalendarPickerData }
               data-testid="calpicker-save"
               onClick={save}
               disabled={saving}
-              className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
+              className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
             >
               {saving ? m.settings_calpicker_saving() : m.settings_calpicker_save()}
             </button>

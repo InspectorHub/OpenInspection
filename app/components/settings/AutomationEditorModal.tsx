@@ -66,7 +66,7 @@ export function AutomationEditorModal({
           <button type="button" onClick={onClose} className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-fg-2">{m.common_cancel()}</button>
           <button type="submit" form="automation-editor-form" disabled={submitting || saveBlocked}
             title={noChannel ? m.settings_automations_pick_channel_title() : undefined}
-            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] disabled:opacity-50">{m.common_save()}</button>
+            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] disabled:opacity-50">{m.common_save()}</button>
         </>
       }
     >

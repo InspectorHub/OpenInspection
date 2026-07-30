@@ -264,7 +264,7 @@ export function EmailDeliveryPanel({
                 </span>
               );
             })()}
-            <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
+            <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
               {m.common_save()}
             </button>
           </div>

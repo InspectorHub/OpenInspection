@@ -108,7 +108,7 @@ export default function SettingsBillingPage() {
                 </div>
                 {portalUrl && (
                   <a href={portalUrl} target="_blank" rel="noopener noreferrer"
-                    className="px-4 py-2 rounded-md bg-ih-primary hover:bg-ih-primary-600 text-white text-[12px] font-bold inline-flex items-center gap-1.5 transition-colors">
+                    className="px-4 py-2 rounded-md bg-ih-primary hover:bg-ih-primary-600 text-ih-fg-inverse text-[12px] font-bold inline-flex items-center gap-1.5 transition-colors">
                     {m.settings_billing_open_portal()}
                     <ArrowIcon />
                   </a>

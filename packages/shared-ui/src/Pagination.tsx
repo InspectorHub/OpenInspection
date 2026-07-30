@@ -66,7 +66,7 @@ const baseBtnClass =
 const inactiveBtnClass =
   "border border-ih-border bg-ih-bg-card text-ih-fg-1 hover:bg-ih-bg-muted";
 
-const activeBtnClass = "bg-ih-primary text-white";
+const activeBtnClass = "bg-ih-primary text-ih-fg-inverse";
 
 export function Pagination({
   page,

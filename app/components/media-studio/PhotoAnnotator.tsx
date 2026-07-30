@@ -413,7 +413,7 @@ export function PhotoAnnotator({
 
         <button
           onClick={handleSave}
-          className="h-8 px-4 rounded-md bg-ih-primary text-white text-[12px] font-bold hover:bg-ih-primary-600 transition-colors flex items-center gap-1.5"
+          className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 transition-colors flex items-center gap-1.5"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -587,7 +587,7 @@ export function PhotoAnnotator({
                       </button>
                       <button
                         onClick={commitLabel}
-                        className="px-2 py-0.5 rounded text-[10px] font-bold text-white bg-ih-primary hover:bg-ih-primary-600"
+                        className="px-2 py-0.5 rounded text-[10px] font-bold text-ih-fg-inverse bg-ih-primary hover:bg-ih-primary-600"
                       >
                         {m.common_add()}
                       </button>

@@ -118,7 +118,7 @@ export default function SmsOptinPage() {
                     <button
                         type="submit"
                         disabled={submitting}
-                        className="w-full px-4 py-3 rounded-xl bg-ih-primary text-white text-sm font-semibold disabled:opacity-50 transition-opacity"
+                        className="w-full px-4 py-3 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold disabled:opacity-50 transition-opacity"
                     >
                         {submitting ? m.sms_optin_submit_pending() : m.sms_optin_submit()}
                     </button>

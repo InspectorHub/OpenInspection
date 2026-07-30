@@ -38,7 +38,7 @@ export function CalendarEventModal({ event, open, displayTz, locale, onClose }: 
                 navigate(`/inspections/${typeof inspectionId === "string" ? inspectionId : event.id}`);
                 onClose();
               }}
-              className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600"
+              className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600"
             >
               {m.calendar_event_open_inspection()}
             </button>

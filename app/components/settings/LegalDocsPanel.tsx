@@ -180,7 +180,7 @@ export function LegalDocsPanel({ initial }: { initial: LegalDocsInitial }) {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+          className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
         >
           {saving ? m.settings_compliance_saving() : m.common_save()}
         </button>
@@ -219,7 +219,7 @@ function UrlCopyRow({
             <button
               type="button"
               onClick={onCopy}
-              className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors shrink-0"
+              className="h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors shrink-0"
             >
               {copied ? m.settings_common_copied() : m.settings_compliance_legal_copy()}
             </button>

@@ -190,7 +190,7 @@ export function HolidayAdvancedDetails({
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+            className="h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
           >
             {saving ? m.settings_holiday_save_pending() : m.settings_holiday_save()}
           </button>

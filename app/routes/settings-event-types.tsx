@@ -131,7 +131,7 @@ export default function SettingsEventTypes() {
         </p>
         <button
           onClick={openCreate}
-          className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
+          className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
         >
           {m.settings_event_types_add_button()}
         </button>
@@ -217,7 +217,7 @@ export default function SettingsEventTypes() {
             <button
               onClick={save}
               disabled={saving}
-              className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
             >
               {saving ? m.settings_common_saving() : m.common_save()}
             </button>

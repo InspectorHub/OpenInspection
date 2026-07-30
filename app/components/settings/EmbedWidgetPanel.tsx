@@ -58,7 +58,7 @@ export function EmbedWidgetPanel({ tenant }: { tenant: string | null | undefined
           <span className="text-[12px] font-bold text-ih-fg-2">{m.settings_embed_code_label()}</span>
           <button
             onClick={() => copy(snippet)}
-            className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors"
+            className="h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors"
           >
             {copied ? m.settings_common_copied() : m.settings_embed_copy_snippet()}
           </button>

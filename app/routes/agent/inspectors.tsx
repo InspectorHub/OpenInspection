@@ -89,7 +89,7 @@ export default function AgentInspectorsPage() {
                     const url = `https://${row.tenantSlug}.inspectorhub.io/book/${row.inspectorSlug}`;
                     navigator.clipboard.writeText(url);
                   }}
-                  className="w-full h-9 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors uppercase tracking-wide mt-auto"
+                  className="w-full h-9 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors uppercase tracking-wide mt-auto"
                 >
                   {m.agent_portal_inspectors_copy_link()}
                 </button>

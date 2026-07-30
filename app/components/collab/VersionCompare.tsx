@@ -88,7 +88,7 @@ export function VersionCompare({
                 {/* Header */}
                 <header className="px-6 py-4 border-b border-ih-border flex items-center gap-4">
                     <span
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-ih-primary text-white flex-shrink-0"
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-ih-primary text-ih-fg-inverse flex-shrink-0"
                         aria-hidden="true"
                     >
                         <svg
@@ -192,7 +192,7 @@ export function VersionCompare({
                                                         )
                                                     }
                                                     disabled={busy || !onRecoverField}
-                                                    className="h-8 px-3 rounded-md text-[12px] font-bold bg-ih-primary text-white hover:bg-ih-primary-600 disabled:opacity-50 transition-colors whitespace-nowrap"
+                                                    className="h-8 px-3 rounded-md text-[12px] font-bold bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600 disabled:opacity-50 transition-colors whitespace-nowrap"
                                                     title={m.editor_collab_recover_title()}
                                                 >
                                                     {m.editor_collab_recover_value()}

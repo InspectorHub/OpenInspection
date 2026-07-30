@@ -52,7 +52,7 @@ export function AnnotationToolbar({ tool, caption, onSelectTool, onCaptionChange
             key={t.id}
             onClick={() => onSelectTool(t.id)}
             className={`h-9 px-3 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-colors ${
-              tool === t.id ? "bg-ih-primary text-white" : "text-white/60 hover:bg-white/10 hover:text-white/80"
+              tool === t.id ? "bg-ih-primary text-ih-fg-inverse" : "text-ih-fg-inverse/60 hover:bg-white/10 hover:text-ih-fg-inverse/80"
             }`}
             title={toolLabel(t.id)}
           >

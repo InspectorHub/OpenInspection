@@ -192,7 +192,7 @@ export default function SettingsAutomations() {
       <div className="flex items-center justify-between gap-4">
         <p className="text-[13px] text-ih-fg-3">{m.settings_automations_intro()}</p>
         <button onClick={() => setEditing("new")}
-          className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
+          className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
           {m.settings_automations_new_button()}
         </button>
       </div>

@@ -315,7 +315,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
                         >
                           <img src={p.url} alt={p.label || m.editor_settings_cover_photo_alt()} className="w-full h-full object-cover" loading="lazy" />
                           {selected && (
-                            <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-white text-[9px] font-bold text-center py-0.5">{m.editor_settings_cover_badge()}</span>
+                            <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-ih-fg-inverse text-[9px] font-bold text-center py-0.5">{m.editor_settings_cover_badge()}</span>
                           )}
                         </button>
                       );

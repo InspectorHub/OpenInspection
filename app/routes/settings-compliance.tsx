@@ -253,7 +253,7 @@ function RetentionWindow({ initialYears }: { initialYears: number }) {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+          className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
         >
           {saving ? m.settings_compliance_saving() : m.common_save()}
         </button>

@@ -15,7 +15,7 @@ export function ConfirmDialog({
   const confirmClass =
     tone === "danger"
       ? "bg-ih-bad-fg text-white hover:opacity-90"
-      : "bg-ih-primary text-white hover:opacity-90";
+      : "bg-ih-primary text-ih-fg-inverse hover:opacity-90";
   return (
     <Modal
       open={open}

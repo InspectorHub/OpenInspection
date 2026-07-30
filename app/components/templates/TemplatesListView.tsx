@@ -47,7 +47,7 @@ export function TemplatesListView({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setImportOpen(true)}
-                  className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
+                  className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
                 >
                   <Icon name="download" size={16} strokeWidth={1.75} />
                   {m.templates_import_title()}
@@ -67,7 +67,7 @@ export function TemplatesListView({
             label: m.templates_col_name(),
             cell: (t) => (
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-ih-primary-tint rounded-lg flex items-center justify-center text-ih-primary group-hover:bg-ih-primary group-hover:text-white transition-all shrink-0">
+                <div className="w-9 h-9 bg-ih-primary-tint rounded-lg flex items-center justify-center text-ih-primary group-hover:bg-ih-primary group-hover:text-ih-fg-inverse transition-all shrink-0">
                   <TemplateIcon />
                 </div>
                 <div>

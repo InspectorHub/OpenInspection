@@ -199,7 +199,7 @@ export default function AgentSignupPage() {
                 key={v.num}
                 className="flex gap-3.5 py-4 border-t border-white/[0.08] last:border-b"
               >
-                <span className="w-7 h-7 rounded-full bg-ih-primary text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                <span className="w-7 h-7 rounded-full bg-ih-primary text-ih-fg-inverse flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
                   {v.num}
                 </span>
                 {/* ds-allow: light tint text on the fixed-dark marketing panel */}
@@ -289,7 +289,7 @@ export default function AgentSignupPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-white bg-ih-primary rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-ih-fg-inverse bg-ih-primary rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
             >
               {submitting ? m.auth_agent_signup_submit_pending() : m.auth_agent_signup_submit()}
             </button>
