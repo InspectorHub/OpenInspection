@@ -21,6 +21,10 @@ export interface CommunicationDelivery {
     automationId: string | null;
     /** Rule name for the notice row title; null when the rule was deleted. */
     automationName: string | null;
+    /** C1 — the notice header this attempt belongs to; the Outbox grouping
+     *  key. Null on legacy rows until the backfill script stamps them (the
+     *  grouping falls back to the interim (automation_id, send_at) key). */
+    noticeId: string | null;
     sendAt: number;
     deliveredAt: number | null;
 }
@@ -61,6 +65,7 @@ export function AutomationLogs<TBase extends Constructor<AutomationBase>>(Base: 
                 status: automationLogs.status,
                 error: automationLogs.error,
                 automationId: automationLogs.automationId,
+                noticeId: automationLogs.noticeId,
                 sendAt: automationLogs.sendAt,
                 deliveredAt: automationLogs.deliveredAt,
             })
@@ -98,6 +103,7 @@ export function AutomationLogs<TBase extends Constructor<AutomationBase>>(Base: 
                 source: (r.automationId == null ? 'manual' : 'automation') as 'manual' | 'automation',
                 automationId: r.automationId ?? null,
                 automationName: r.automationName ?? null,
+                noticeId: r.noticeId ?? null,
                 sendAt: r.sendAt instanceof Date ? r.sendAt.getTime() : Number(r.sendAt),
                 deliveredAt: r.deliveredAt == null ? null : (r.deliveredAt instanceof Date ? r.deliveredAt.getTime() : Number(r.deliveredAt)),
             }));

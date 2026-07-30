@@ -96,6 +96,15 @@ export const automationLogs = sqliteTable('automation_logs', {
     // the gate closed (see automation/sms.ts) rather than sending.
     // Appended at table end for D1 rebuild safety.
     recipientContactId: text('recipient_contact_id'),
+    // Communication C1 (design §3.13) — the NOTICE HEADER this channel-attempt
+    // belongs to (notifications.id). The header carries the recipient and read
+    // state; this row carries one channel's delivery outcome. App-layer soft
+    // reference, no .references() per Schema Rules. Nullable: legacy rows are
+    // stamped by scripts/backfill-notice-headers.mjs, and a row whose
+    // recipient resolves to neither a contact nor a user keeps NULL (the
+    // Outbox grouping falls back to the interim (automation_id, send_at) key).
+    // Appended at table end for D1 rebuild safety.
+    noticeId: text('notice_id'),
 }, (t) => [
     index('idx_automation_logs_pending').on(t.tenantId, t.status, t.sendAt),
     index('idx_automation_logs_insp').on(t.inspectionId),

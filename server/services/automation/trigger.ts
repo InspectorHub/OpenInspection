@@ -2,6 +2,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { automations, automationLogs, inspections } from '../../lib/db/schema';
 import { nanoid } from 'nanoid';
+import { createHeadersForInsertedLogs } from './notice-headers';
 import { logger } from '../../lib/logger';
 import { createOiTemplateStore } from './template-store';
 import type { Constructor, TriggerContext } from './shared';
@@ -120,6 +121,8 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             logger.info('AutomationService.trigger: logs prepared',
                 { event: ctx.triggerEvent, count: logs.length });
             if (logs.length > 0) {
+                let inserted: Array<{ id: string; automationId: string | null; sendAt: Date | number;
+                    recipientContactId: string | null; recipientRoleKey: string | null }> = [];
                 try {
                     // .onConflictDoNothing() covers the uq_automation_logs_event partial
                     // unique index: a report.published retry produces the SAME
@@ -127,7 +130,14 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                     // is silently skipped (no duplicate log, no double-send). NULL-eventId
                     // logs (all other triggers) never conflict, so this is a harmless
                     // no-op for them — behavior there is unchanged.
-                    await db.insert(automationLogs).values(logs).onConflictDoNothing();
+                    inserted = await db.insert(automationLogs).values(logs).onConflictDoNothing()
+                        .returning({
+                            id: automationLogs.id,
+                            automationId: automationLogs.automationId,
+                            sendAt: automationLogs.sendAt,
+                            recipientContactId: automationLogs.recipientContactId,
+                            recipientRoleKey: automationLogs.recipientRoleKey,
+                        });
                     logger.info('AutomationService.trigger: logs inserted',
                         { event: ctx.triggerEvent, count: logs.length });
                 } catch (err) {
@@ -135,6 +145,20 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                         { event: ctx.triggerEvent, count: logs.length },
                         err instanceof Error ? err : undefined);
                     throw err;
+                }
+                // C1 (design §3.13) — one notice HEADER per (rule firing x
+                // recipient), each of that recipient's channel rows stamped with
+                // it. Only rows that ACTUALLY inserted get headers — a
+                // report.published retry conflicts away and must not orphan a
+                // fresh header set. Best-effort: the ledger is already durable,
+                // and legacy/failed stamps are what the backfill script and the
+                // Outbox's interim-key fallback exist for.
+                try {
+                    await createHeadersForInsertedLogs(db, ctx, this.titleFor(ctx.triggerEvent, insp), inserted);
+                } catch (err) {
+                    logger.error('AutomationService.trigger: notice-header creation failed',
+                        { event: ctx.triggerEvent },
+                        err instanceof Error ? err : undefined);
                 }
             }
             if (logs.length > 0 && this.notification) {
@@ -358,5 +382,6 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 default:                     return `${event} — ${addr}`;
             }
         }
+
     };
 }

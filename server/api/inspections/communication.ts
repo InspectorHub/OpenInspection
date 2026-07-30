@@ -35,6 +35,7 @@ const DeliverySchema = z.object({
     source: z.enum(['automation', 'manual']).describe('What initiated the send.'),
     automationId: z.string().nullable().describe('Rule that fired; null for manual sends. Grouping key component.'),
     automationName: z.string().nullable().describe('Rule name for the notice row title; null when the rule was deleted.'),
+    noticeId: z.string().nullable().describe('Notice header this attempt belongs to (C1) — the Outbox grouping key. Null on legacy rows; grouping falls back to (automationId, sendAt).'),
     sendAt: z.number().describe('Epoch-ms the firing was scheduled for. Grouping key component — one firing shares one sendAt.'),
     deliveredAt: z.number().nullable().describe('Epoch-ms of confirmed delivery, when known.'),
 });
