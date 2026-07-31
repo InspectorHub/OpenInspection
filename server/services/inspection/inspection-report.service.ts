@@ -479,10 +479,13 @@ export class InspectionReportService extends InspectionSubService {
         let inspectorName: string | null = null;
         let inspectorLicense: string | null = null;
         if (inspection.inspectorId) {
-            const inspector = await db.select({ name: users.name, email: users.email, licenseNumber: users.licenseNumber })
+            const inspector = await db.select({ name: users.name, email: users.email })
                 .from(users).where(eq(users.id, inspection.inspectorId)).get();
             inspectorName = inspector?.name || (inspector?.email?.split('@')[0] ?? null);
-            inspectorLicense = inspector?.licenseNumber ?? null;
+            // `users.license_number` is frozen. The licence is a credential row
+            // now, seeded ahead of the voluntary badges by the backfill.
+            inspectorLicense = await new CredentialService(this.db)
+                .primaryLicenseNumber(tenantId, inspection.inspectorId);
         }
 
         // Inspector Credentials & Association Badges (Spec B).
@@ -900,7 +903,7 @@ export class InspectionReportService extends InspectionSubService {
      *    showLicense + companyAddress) from tenant_configs (default ON).
      *  - address: the inspection's property address (footer fallback when the
      *    tenant has no companyAddress configured).
-     *  - license: the assigned inspector's users.licenseNumber (or null when no
+     *  - license: the assigned inspector's licence credential row (or null when no
      *    inspector is assigned / the user row carries no license).
      *
      * All reads are filtered by tenantId so a footer can never leak a foreign
@@ -929,15 +932,11 @@ export class InspectionReportService extends InspectionSubService {
             .where(eq(tenantConfigs.tenantId, tenantId))
             .get();
 
-        let license: string | null = null;
-        if (insp?.inspectorId) {
-            const owner = await db
-                .select({ licenseNumber: users.licenseNumber })
-                .from(users)
-                .where(and(eq(users.id, insp.inspectorId), eq(users.tenantId, tenantId)))
-                .get();
-            license = owner?.licenseNumber ?? null;
-        }
+        // PDF footer licence — same source as the report payload's, so the two
+        // can never print different numbers for the same inspector.
+        const license: string | null = insp?.inspectorId
+            ? await new CredentialService(this.db).primaryLicenseNumber(tenantId, insp.inspectorId)
+            : null;
 
         return {
             settings: resolvePdfSettings(cfg),

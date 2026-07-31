@@ -116,3 +116,57 @@ describe('CredentialService.listRenderable', () => {
     expect((await svc.listRenderable(T, U)).map((c) => c.label)).toEqual(['Mine']);
   });
 });
+
+/**
+ * `primaryLicenseNumber` — the one string the surfaces that cannot show a list
+ * are allowed to print.
+ *
+ * The PDF footer prints `· Lic. <n>` and the report signature block carries a
+ * single licence. `users.license_number` used to answer this and is now frozen,
+ * so the answer comes from the credential the backfill seeded at
+ * `sort_order = -1` — which is precisely why that sort order was chosen instead
+ * of 0, and why this rule can be stated as "first active credential carrying a
+ * member number, in the inspector own order".
+ */
+describe('CredentialService.primaryLicenseNumber', () => {
+  let svc: CredentialService;
+  let testDb: BetterSQLite3Database<typeof schema>;
+
+  beforeEach(async () => {
+    const f = createTestDb(); testDb = f.db; await setupSchema(f.sqlite);
+    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+    svc = new CredentialService({} as D1Database);
+  });
+
+  it('returns the licence, not a voluntary badge that happens to sort first', async () => {
+    await svc.create(T, U, { label: 'InterNACHI CPI', memberNumber: 'N-1', sortOrder: 0 });
+    await svc.create(T, U, { label: 'Licensed home inspector', memberNumber: 'TX-9001', sortOrder: -1 });
+    expect(await svc.primaryLicenseNumber(T, U)).toBe('TX-9001');
+  });
+
+  it('skips credentials with no member number — a badge image is not a licence', async () => {
+    await svc.create(T, U, { label: 'Association logo', sortOrder: -2 });
+    await svc.create(T, U, { label: 'Licensed home inspector', memberNumber: 'TX-9001', sortOrder: -1 });
+    expect(await svc.primaryLicenseNumber(T, U)).toBe('TX-9001');
+  });
+
+  it('skips an inactive licence', async () => {
+    const a = await svc.create(T, U, { label: 'Old licence', memberNumber: 'TX-OLD', sortOrder: -1 });
+    await testDb.update(schema.inspectorCredentials).set({ active: false })
+      .where(eq(schema.inspectorCredentials.id, a.id));
+    await svc.create(T, U, { label: 'Current licence', memberNumber: 'TX-NEW', sortOrder: 0 });
+    expect(await svc.primaryLicenseNumber(T, U)).toBe('TX-NEW');
+  });
+
+  it('returns null when there is nothing to print', async () => {
+    // The callers omit the line rather than printing an empty one.
+    expect(await svc.primaryLicenseNumber(T, U)).toBeNull();
+    await svc.create(T, U, { label: 'Badge only' });
+    expect(await svc.primaryLicenseNumber(T, U)).toBeNull();
+  });
+
+  it('never reads another user licence', async () => {
+    await svc.create(T, U2, { label: 'Licensed home inspector', memberNumber: 'NOT-MINE', sortOrder: -1 });
+    expect(await svc.primaryLicenseNumber(T, U)).toBeNull();
+  });
+});

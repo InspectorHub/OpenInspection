@@ -21,7 +21,6 @@ export type SenderSignature = {
     name: string | null;
     email: string | null;
     phone: string | null;
-    licenseNumber: string | null;
     signatureEnabled: boolean | null;
     /**
      * Spec B — the sender's active credentials. This field is why the badges
@@ -84,7 +83,6 @@ export async function resolveSignatureInspector(
             name:             users.name,
             email:            users.email,
             phone:            users.phone,
-            licenseNumber:    users.licenseNumber,
             slug:             users.slug,
             signatureEnabled: users.signatureEnabled,
         }).from(users).where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId))).get();
@@ -113,7 +111,6 @@ export async function lookupSenderSignature(c: Context<HonoConfig>, tenantId: st
             name:             users.name,
             email:            users.email,
             phone:            users.phone,
-            licenseNumber:    users.licenseNumber,
             signatureEnabled: users.signatureEnabled,
         }).from(users)
             .where(and(eq(users.id, senderId), eq(users.tenantId, tenantId)))

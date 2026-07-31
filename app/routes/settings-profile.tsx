@@ -29,7 +29,6 @@ interface Profile {
   name?: string | null;
   email?: string | null;
   phone?: string | null;
-  licenseNumber?: string | null;
   // DB-12 / IA-26 — slug omitted; inspector booking slugs are frozen.
   photoUrl?: string | null;
   signatureEnabled?: boolean;
@@ -194,7 +193,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const v = submission.value;
   const body: Record<string, unknown> = {};
   // DB-12 / IA-26 — "slug" intentionally removed; inspector booking slugs frozen.
-  for (const key of ["name", "phone", "licenseNumber"] as const) {
+  for (const key of ["name", "phone"] as const) {
     if (v[key] !== undefined) body[key] = v[key];
   }
   // Per-user timezone override. The <select> always submits a value; an empty
@@ -383,18 +382,6 @@ export default function SettingsProfilePage() {
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
               {fields.phone.errors && (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.phone.errors[0]}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <label htmlFor={fields.licenseNumber.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_license_label()}</label>
-              <input type="text" id={fields.licenseNumber.id} name={fields.licenseNumber.name} defaultValue={profile.licenseNumber ?? ""}
-                placeholder={m.settings_profile_license_placeholder()}
-                aria-invalid={fields.licenseNumber.errors ? true : undefined}
-                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
-              {fields.licenseNumber.errors ? (
-                <p className="mt-1 text-xs text-ih-bad-fg">{fields.licenseNumber.errors[0]}</p>
-              ) : (
-                <p className="text-[11px] text-ih-fg-3">{m.settings_profile_license_hint()}</p>
               )}
             </div>
           </div>

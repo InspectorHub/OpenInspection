@@ -14440,11 +14440,6 @@
             "maxLength": 30,
             "description": "Contact phone number for the inspector profile"
           },
-          "licenseNumber": {
-            "type": "string",
-            "maxLength": 50,
-            "description": "Professional inspector license or certification number"
-          },
           "signatureEnabled": {
             "type": "boolean",
             "description": "Whether the inspector business-card footer is added to outbound emails"
@@ -14461,7 +14456,7 @@
       }
     },
     "summary": "Update current user profile",
-    "description": "Partially updates the authenticated user's profile (name, phone, licenseNumber). DB-12: slug is frozen for inspectors — the field is silently stripped if sent. Agent slugs use POST /api/agent/profile."
+    "description": "Partially updates the authenticated user's profile (name, phone). DB-12: slug is frozen for inspectors — the field is silently stripped if sent. Agent slugs use POST /api/agent/profile."
   },
   {
     "operationId": "patchTenantAttentionThreshold",
@@ -20248,11 +20243,6 @@
             "type": "string",
             "maxLength": 30,
             "description": "Contact phone number; included on reports if set."
-          },
-          "licenseNumber": {
-            "type": "string",
-            "maxLength": 50,
-            "description": "Inspector license number; printed on reports as a credential."
           }
         },
         "description": "TODO describe schema field for the OpenInspection MCP integration"

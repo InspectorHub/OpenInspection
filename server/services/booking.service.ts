@@ -815,7 +815,6 @@ export class BookingService {
                 name:          inspector.name ?? null,
                 email:         inspector.email ?? null,
                 phone:         inspector.phone ?? null,
-                licenseNumber: inspector.licenseNumber ?? null,
                 slug:          inspector.slug ?? null,
                 credentials:   bookingCreds,
             } : undefined;

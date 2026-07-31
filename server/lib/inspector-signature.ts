@@ -20,6 +20,12 @@ export interface SignatureUser {
     name?: string | null;
     email?: string | null;
     phone?: string | null;
+    /**
+     * @deprecated FROZEN. `users.license_number` is retired — the licence is a
+     * credential row now and arrives in `credentials`. The field stays on the
+     * type only so a caller that still passes it does not fail to compile; it
+     * is not rendered. Remove once no caller sets it.
+     */
     licenseNumber?: string | null;
     /**
      * DB-12 / IA-26 — inspector booking slugs are retired. This field is
@@ -64,7 +70,6 @@ const phoneTel = (raw: string | null | undefined): string | null => {
 
 export function inspectorSignature(user: SignatureUser, host: string): SignatureOutput {
     const name      = user.name          ? escapeHtml(user.name)          : null;
-    const license   = user.licenseNumber ? escapeHtml(user.licenseNumber) : null;
     const email     = user.email         ? escapeHtml(user.email)         : null;
     const phoneRaw  = user.phone         ? escapeHtml(user.phone)         : null;
     const phoneE164 = phoneTel(user.phone ?? null);
@@ -76,7 +81,10 @@ export function inspectorSignature(user: SignatureUser, host: string): Signature
 
     const htmlLines: string[] = [];
     if (name)    htmlLines.push(`<strong>— ${name}</strong>`);
-    if (license) htmlLines.push(`<span style="color:#475569">Licensed home inspector · ${license}</span>`);
+    // The hard-coded "Licensed home inspector · <n>" line is gone: the licence
+    // is a credential row and renders below with the rest of them, under the
+    // label the backfill gave it. Two sources for one line is how a recipient
+    // ends up reading the licence twice.
     // Credential badges (Spec B): images in HTML, all credentials also as text.
     const creds = (user.credentials ?? []).filter((c) => c.imageUrl || (c.label ?? '').trim());
     if (creds.length) {
@@ -100,7 +108,6 @@ export function inspectorSignature(user: SignatureUser, host: string): Signature
 
     const textLines: string[] = ['--'];
     if (user.name)    textLines.push(`— ${user.name}`);
-    if (user.licenseNumber) textLines.push(`Licensed home inspector · ${user.licenseNumber}`);
     const credTextAll = (user.credentials ?? [])
         .map((c) => (c.memberNumber ? `${c.label} #${c.memberNumber}` : c.label))
         .filter((t) => (t ?? '').trim())

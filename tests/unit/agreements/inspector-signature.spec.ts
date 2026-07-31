@@ -5,9 +5,13 @@ const FULL_USER = {
     name: 'Mike Reynolds',
     email: 'mike@acme.test',
     phone: '(303) 555-0142',
-    licenseNumber: 'TX-INSP-9001',
     slug: 'mike',        // retained for API stability (DB-12); no longer used for URL
     tenantSlug: 'acme',
+    // The licence is a CREDENTIAL now, sorted ahead of voluntary badges by the
+    // backfill. `users.license_number` is frozen and no longer rendered.
+    credentials: [
+        { label: 'Licensed home inspector', memberNumber: 'TX-INSP-9001', imageUrl: null },
+    ],
 } as const;
 
 const HOST = 'app.inspectorhub.io';
@@ -72,10 +76,23 @@ describe('inspectorSignature — Sprint B-4 / DB-12', () => {
         expect(sig.text).not.toContain('Book again');
     });
 
-    it('omits license line when licenseNumber is null', () => {
-        const sig = inspectorSignature({ ...FULL_USER, licenseNumber: null }, HOST);
+    it('omits the licence line when there is no licence credential', () => {
+        const sig = inspectorSignature({ ...FULL_USER, credentials: [] }, HOST);
         expect(sig.html).not.toContain('Licensed home inspector');
         expect(sig.text).not.toContain('Licensed home inspector');
+    });
+
+    it('IGNORES the retired users.license_number entirely', () => {
+        // The stronger claim, and the one that matters during the transition: a
+        // caller that still passes the frozen column must not put a second
+        // licence line on the signature beside the credential one. Two sources
+        // for one line is how a recipient reads the licence twice.
+        const sig = inspectorSignature(
+            { ...FULL_USER, credentials: [], licenseNumber: 'TX-STALE-1' },
+            HOST,
+        );
+        expect(sig.html).not.toContain('TX-STALE-1');
+        expect(sig.text).not.toContain('TX-STALE-1');
     });
 
     it('omits everything when user has no fields at all', () => {
@@ -89,10 +106,10 @@ describe('inspectorSignature — Sprint B-4 / DB-12', () => {
         const sig = inspectorSignature(FULL_USER, HOST);
         expect(sig).toMatchInlineSnapshot(`
           {
-            "html": "<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-family:-apple-system,Segoe UI,sans-serif;font-size:13px;line-height:1.5;color:#0f172a"><strong>— Mike Reynolds</strong><br><span style="color:#475569">Licensed home inspector · TX-INSP-9001</span><br>📞 <a href="tel:+13035550142">(303) 555-0142</a> ✉️ <a href="mailto:mike@acme.test">mike@acme.test</a><br>Book again: <a href="https://app.inspectorhub.io/book/acme">https://app.inspectorhub.io/book/acme</a></div>",
+            "html": "<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-family:-apple-system,Segoe UI,sans-serif;font-size:13px;line-height:1.5;color:#0f172a"><strong>— Mike Reynolds</strong><br><span style="color:#475569">Licensed home inspector #TX-INSP-9001</span><br>📞 <a href="tel:+13035550142">(303) 555-0142</a> ✉️ <a href="mailto:mike@acme.test">mike@acme.test</a><br>Book again: <a href="https://app.inspectorhub.io/book/acme">https://app.inspectorhub.io/book/acme</a></div>",
             "text": "--
           — Mike Reynolds
-          Licensed home inspector · TX-INSP-9001
+          Licensed home inspector #TX-INSP-9001
           (303) 555-0142 · mike@acme.test
           Book again: https://app.inspectorhub.io/book/acme",
           }

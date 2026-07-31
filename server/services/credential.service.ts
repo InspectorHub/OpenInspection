@@ -64,6 +64,25 @@ export class CredentialService {
       }));
   }
 
+  /**
+   * The inspector's LICENCE NUMBER, for the surfaces that render one string.
+   *
+   * The PDF footer prints `· Lic. <n>` and the report signature block carries a
+   * single licence — neither can show a list. `users.license_number` used to
+   * answer this; it is frozen, and the licence now lives as a credential row
+   * seeded at `sort_order = -1` by the backfill, which is exactly why that sort
+   * order was chosen rather than 0. So "first active credential carrying a
+   * member number, in the inspector's own order" IS the licence.
+   *
+   * Null when they have none, and the callers omit the line rather than
+   * printing an empty one.
+   */
+  async primaryLicenseNumber(tenantId: string, userId: string): Promise<string | null> {
+    const rows = await this.listByUser(tenantId, userId);
+    const licensed = rows.find((cr) => cr.active && (cr.memberNumber ?? '').trim());
+    return licensed?.memberNumber?.trim() || null;
+  }
+
   async create(
     tenantId: string,
     userId: string,

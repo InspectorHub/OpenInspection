@@ -36,7 +36,6 @@ const getProfileRoute = createRoute(withMcpMetadata({
                         name: z.string().nullable(),
                         email: z.string(),
                         phone: z.string().nullable(),
-                        licenseNumber: z.string().nullable(),
                         slug: z.string().nullable(),
                         photoUrl: z.string().nullable(),
                         signatureEnabled: z.boolean(),
@@ -59,7 +58,6 @@ const getProfileRoute = createRoute(withMcpMetadata({
 export const PatchProfileSchema = z.object({
     name: z.string().max(100).optional().describe('Display name shown on reports and the booking page'),
     phone: z.string().max(30).optional().describe('Contact phone number for the inspector profile'),
-    licenseNumber: z.string().max(50).optional().describe('Professional inspector license or certification number'),
     signatureEnabled: z.boolean().optional().describe('Whether the inspector business-card footer is added to outbound emails'),
     timezone: z.string().refine((v) => v === '' || isValidTimeZone(v), 'Invalid timezone').optional().describe('Per-user display timezone (IANA). Empty string clears the override (inherit tenant).'),
     locale: z.string().refine((v) => v === '' || isValidLocale(v), 'Invalid locale').optional().describe('Per-user display locale (BCP-47). Empty string clears the override (inherit tenant).'),
@@ -71,7 +69,7 @@ const patchProfileRoute = createRoute(withMcpMetadata({
     operationId: 'patchMyProfile',
     tags: ['profile'],
     summary: 'Update current user profile',
-    description: 'Partially updates the authenticated user\'s profile (name, phone, licenseNumber). DB-12: slug is frozen for inspectors — the field is silently stripped if sent. Agent slugs use POST /api/agent/profile.',
+    description: 'Partially updates the authenticated user\'s profile (name, phone). DB-12: slug is frozen for inspectors — the field is silently stripped if sent. Agent slugs use POST /api/agent/profile.',
     request: {
         body: {
             content: {
@@ -132,7 +130,6 @@ const profileRoutes = createApiRouter()
             name: users.name,
             email: users.email,
             phone: users.phone,
-            licenseNumber: users.licenseNumber,
             slug: users.slug,
             photoUrl: users.photoUrl,
             signatureEnabled: users.signatureEnabled,
@@ -156,7 +153,7 @@ const profileRoutes = createApiRouter()
         const signaturePreviewHtml = (row.name ?? '').trim()
           ? inspectorSignature({
               name: row.name, email: row.email, phone: row.phone,
-              licenseNumber: row.licenseNumber, tenantSlug, credentials,
+              tenantSlug, credentials,
             }, host).html
           : '';
 
@@ -175,7 +172,6 @@ const profileRoutes = createApiRouter()
 
         if (body.name !== undefined) updates.name = body.name;
         if (body.phone !== undefined) updates.phone = body.phone;
-        if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber;
         if (body.signatureEnabled !== undefined) updates.signatureEnabled = body.signatureEnabled;
         // Per-user timezone override: empty string clears it (NULL = inherit tenant).
         if (body.timezone !== undefined) updates.timezone = body.timezone === '' ? null : body.timezone;
