@@ -97,6 +97,45 @@ describe('preference port', () => {
         expect(await port().isMuted('booking-confirmation', ADDR)).toBe(true);
     });
 
+    it('crosses the id spaces in BOTH directions, and that is deliberate', async () => {
+        // Deviation D3 in the spec. `autoLinkSameEmail` exists specifically so
+        // one email is both a `users` row and several `contacts` rows, so the
+        // boundary honours a mute held on either side. The consequence worth
+        // pinning: if a tenant also keeps a STAFF address in `contacts`, that
+        // person's mute crosses both identities. That is the intent — they are
+        // one human with one inbox — and a later change that narrows the lookup
+        // to a single space must fail here rather than quietly halve the control.
+        await seedContact();
+        await db.insert(schema.users).values({
+            id: 'u1', tenantId: TENANT, email: ADDR, passwordHash: 'x', role: 'inspector', createdAt: new Date(),
+        } as never);
+
+        // Muted on the CONTACT side; the address is also a user.
+        await mute('booking-confirmation', 'c1', 'contact');
+        expect(await port().isMuted('booking-confirmation', ADDR)).toBe(true);
+    });
+
+    it('does not cross identities ACROSS tenants', async () => {
+        // The cross-identity rule is inside one tenant. The same address being
+        // a user here and a contact somewhere else is two relationships, not one.
+        await seedContact();
+        // `users.tenant_id` carries a legacy FK, so the other tenant has to
+        // exist before a user can live in it.
+        await db.insert(schema.tenants).values({
+            id: 't-other', name: 'Other', slug: 't-other', status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        } as never);
+        await db.insert(schema.users).values({
+            id: 'u-other', tenantId: 't-other', email: ADDR, passwordHash: 'x', role: 'owner', createdAt: new Date(),
+        } as never);
+        await db.insert(schema.notificationPreferences).values({
+            id: 'np-x', tenantId: 't-other', subjectKind: 'user', subjectId: 'u-other',
+            classId: 'booking-confirmation', channel: 'email', enabled: false,
+            createdAt: new Date(), updatedAt: new Date(),
+        } as never);
+        expect(await port().isMuted('booking-confirmation', ADDR)).toBe(false);
+    });
+
     it('is tenant-scoped — another tenant’s mute does not reach here', async () => {
         await seedContact();
         await db.insert(schema.notificationPreferences).values({

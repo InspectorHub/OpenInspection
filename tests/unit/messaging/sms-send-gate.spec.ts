@@ -125,6 +125,26 @@ describe('smsSendGate — purpose: test', () => {
             .toEqual({ allowed: false, reason: 'sms opt-out' });
     });
 
+    it('blocks when ANY contact on that number revoked — deliberate, and not new', async () => {
+        // Deviation D5 in the spec. Two people sharing a number (a couple, an
+        // office line) means one person's STOP withholds the other's message.
+        // That is not introduced here: the inbound STOP webhook already records
+        // a revocation against EVERY contact matching the number, so the ledger
+        // was always number-shaped. Reading it any other way would honour a
+        // revocation for one row and ignore it for its twin.
+        //
+        // Pinned so a later change that narrows this to "the addressed contact
+        // only" fails here rather than quietly resuming texts to a number that
+        // asked us to stop.
+        await seedContact('c-quiet', PHONE);
+        await seedContact('c-loud', PHONE);
+        await seedConsent('s-loud', 'c-loud', 'granted');
+        await seedConsent('s-quiet', 'c-quiet', 'revoked');
+
+        expect(await gate({ purpose: 'test' }))
+            .toEqual({ allowed: false, reason: 'sms opt-out' });
+    });
+
     it('leaves an unrelated contact alone', async () => {
         await seedContact('c1', '+15550001111');
         await seedConsent('s1', 'c1', 'revoked');
