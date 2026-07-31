@@ -16,7 +16,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // eslint-disable-next-line import/order
-import { buildNotificationPreferences } from '../../../server/lib/notifications/preference-port';
+import { buildNotificationPreferences, isPreferenceMuted } from '../../../server/lib/notifications/preference-port';
 // eslint-disable-next-line import/order
 import { EmailBaseService } from '../../../server/services/email/base';
 // eslint-disable-next-line import/order
@@ -244,5 +244,51 @@ describe('the seam is actually connected', () => {
         await svc.sendEmail([ADDR], 'S', 'H', undefined, { classId: 'password-reset' });
 
         expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('in-app honours the same decision', () => {
+    /**
+     * A notice header is `user_id XOR contact_id` by construction, so the in-app
+     * path already knows its subject and needs none of the address resolution
+     * the email path exists to do. What it must NOT have is its own copy of the
+     * decision — particularly the required check, which is the thing keeping the
+     * screen's promise and the send path's behaviour in agreement.
+     */
+    it('withholds an in-app notice the recipient switched off', async () => {
+        await db.insert(schema.notificationPreferences).values({
+            id: 'np-inapp', tenantId: TENANT, subjectKind: 'contact', subjectId: 'c1',
+            classId: 'message-notification', channel: 'in_app', enabled: false,
+            createdAt: new Date(), updatedAt: new Date(),
+        } as never);
+        expect(await isPreferenceMuted(db, TENANT, 'message-notification', 'in_app',
+            [{ kind: 'contact', id: 'c1' }])).toBe(true);
+    });
+
+    it('does not confuse the two channels — muting email leaves in-app alone', async () => {
+        await db.insert(schema.notificationPreferences).values({
+            id: 'np-email-only', tenantId: TENANT, subjectKind: 'contact', subjectId: 'c1',
+            classId: 'message-notification', channel: 'email', enabled: false,
+            createdAt: new Date(), updatedAt: new Date(),
+        } as never);
+        expect(await isPreferenceMuted(db, TENANT, 'message-notification', 'in_app',
+            [{ kind: 'contact', id: 'c1' }])).toBe(false);
+    });
+
+    it('refuses to withhold a required in-app notice — office alerts are dispatch', async () => {
+        // §2.5: an individual cannot mute their own dispatch. The operator's
+        // control is the rule's active flag, not this row.
+        await db.insert(schema.notificationPreferences).values({
+            id: 'np-office', tenantId: TENANT, subjectKind: 'user', subjectId: 'u1',
+            classId: 'office-alert-new-booking', channel: 'in_app', enabled: false,
+            createdAt: new Date(), updatedAt: new Date(),
+        } as never);
+        expect(await isPreferenceMuted(db, TENANT, 'office-alert-new-booking', 'in_app',
+            [{ kind: 'user', id: 'u1' }])).toBe(false);
+    });
+
+    it('sends when the subject holds no row at all', async () => {
+        expect(await isPreferenceMuted(db, TENANT, 'message-notification', 'in_app',
+            [{ kind: 'contact', id: 'c1' }])).toBe(false);
     });
 });

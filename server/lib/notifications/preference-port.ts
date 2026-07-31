@@ -18,6 +18,65 @@ export interface NotificationPreferencePort {
     isMuted(classId: string, email: string): Promise<boolean>;
 }
 
+/** A row in `notification_preferences` is keyed on one of these. */
+export interface PreferenceSubject {
+    kind: 'user' | 'contact';
+    id: string;
+}
+
+/**
+ * The decision itself, for callers that already KNOW who the subject is.
+ *
+ * The in-app path does: a notice header is `user_id XOR contact_id` by
+ * construction, so it has the subject in hand and needs none of the
+ * address-resolution the email path exists to do. Sharing this function rather
+ * than the port is what keeps the two channels answering the same question —
+ * the required check in particular must not exist twice.
+ *
+ * THE REQUIRED CHECK COMES FIRST, before any lookup: a class the recipient is
+ * told is always sent stays unmutable even if a row says otherwise, and
+ * `isSuppressible` fails closed on ids it has never heard of.
+ */
+export async function isPreferenceMuted(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    d: { select: (...args: any[]) => any },
+    tenantId: string,
+    classId: string,
+    channel: 'email' | 'sms' | 'in_app',
+    subjects: PreferenceSubject[],
+): Promise<boolean> {
+    if (!isSuppressible(classId)) return false;
+    if (subjects.length === 0) return false;
+
+    const byKind = (kind: 'user' | 'contact') =>
+        subjects.filter((s) => s.kind === kind).map((s) => s.id);
+    const userIds = byKind('user');
+    const contactIds = byKind('contact');
+
+    const match = [
+        userIds.length
+            ? and(eq(notificationPreferences.subjectKind, 'user'), inArray(notificationPreferences.subjectId, userIds))
+            : undefined,
+        contactIds.length
+            ? and(eq(notificationPreferences.subjectKind, 'contact'), inArray(notificationPreferences.subjectId, contactIds))
+            : undefined,
+    ].filter(Boolean);
+
+    const row = await d.select({ enabled: notificationPreferences.enabled })
+        .from(notificationPreferences)
+        .where(and(
+            eq(notificationPreferences.tenantId, tenantId),
+            eq(notificationPreferences.classId, classId),
+            eq(notificationPreferences.channel, channel),
+            match.length === 1 ? match[0] : or(...match),
+            eq(notificationPreferences.enabled, false),
+        ))
+        .get();
+
+    // Absence is not "off": no row means the class default applies.
+    return !!row;
+}
+
 /**
  * Build the tenant-scoped preference port for the email channel.
  *
@@ -42,8 +101,7 @@ export interface NotificationPreferencePort {
 export function buildNotificationPreferences(db: D1Database, tenantId: string): NotificationPreferencePort {
     return {
         async isMuted(classId: string, email: string): Promise<boolean> {
-            // A required class is never withheld — checked before any lookup, so
-            // no row can ever override it.
+            // Cheap exit before touching the DB at all.
             if (!isSuppressible(classId)) return false;
 
             const d = drizzle(db);
@@ -55,32 +113,11 @@ export function buildNotificationPreferences(db: D1Database, tenantId: string): 
                 d.select({ id: contacts.id }).from(contacts)
                     .where(and(eq(contacts.tenantId, tenantId), eq(contacts.email, normalized))).all(),
             ]);
-            const userIds = userRows.map((r) => r.id);
-            const contactIds = contactRows.map((r) => r.id);
-            if (userIds.length === 0 && contactIds.length === 0) return false;
-
-            const subjectMatch = [
-                userIds.length
-                    ? and(eq(notificationPreferences.subjectKind, 'user'), inArray(notificationPreferences.subjectId, userIds))
-                    : undefined,
-                contactIds.length
-                    ? and(eq(notificationPreferences.subjectKind, 'contact'), inArray(notificationPreferences.subjectId, contactIds))
-                    : undefined,
-            ].filter(Boolean);
-
-            const row = await d.select({ enabled: notificationPreferences.enabled })
-                .from(notificationPreferences)
-                .where(and(
-                    eq(notificationPreferences.tenantId, tenantId),
-                    eq(notificationPreferences.classId, classId),
-                    eq(notificationPreferences.channel, 'email'),
-                    subjectMatch.length === 1 ? subjectMatch[0] : or(...subjectMatch),
-                    eq(notificationPreferences.enabled, false),
-                ))
-                .get();
-
-            // Absence is not "off": no row means the class default applies.
-            return !!row;
+            const subjects: PreferenceSubject[] = [
+                ...userRows.map((r) => ({ kind: 'user' as const, id: r.id })),
+                ...contactRows.map((r) => ({ kind: 'contact' as const, id: r.id })),
+            ];
+            return isPreferenceMuted(d, tenantId, classId, 'email', subjects);
         },
     };
 }

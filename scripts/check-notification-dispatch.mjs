@@ -150,7 +150,12 @@ for (const file of SCANNED) {
   if (!allowed(r, SEND_EMAIL_ALLOW)) {
     for (const m of source.matchAll(SEND_EMAIL_RE)) {
       const args = callArgs(source, m.index + m[0].length - 1);
-      if (!/\bclassId\s*:/.test(args)) {
+      // `classId:` OR the shorthand `{ classId }`. Under
+      // exactOptionalPropertyTypes the idiom for an optional class is a
+      // conditional spread — `classId ? { classId } : {}` — which has no
+      // colon, and requiring one reported a classified send as unclassified.
+      // The gate found that on itself.
+      if (!/\bclassId\s*[:,}]/.test(args)) {
         add(file, raw, m.index, 'unclassified-send', '.sendEmail( … ) with no classId');
       }
     }
