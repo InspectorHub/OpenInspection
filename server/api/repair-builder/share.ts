@@ -81,12 +81,3 @@ export const shareEmailRoute = createRoute(withMcpMetadata({
     operationId: 'emailRepairRequestShare',
     description: 'Sends the share URL to a contractor or other recipient. Rate-limited. Report must be published.',
 }, { scopes: [], tier: 'extended' }));
-
-export function escapeHtmlShare(s: string): string {
-    return s
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}

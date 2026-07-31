@@ -18,6 +18,14 @@
  * account, hides money they owe or are owed, or destroys their only copy of
  * something they signed. It is not a synonym for "important".
  *
+ * One more case earns it, found while converting the hand-built sends: a
+ * ONE-OFF transmission the sender explicitly asked for, to an address they
+ * typed, where the recipient has no account and no ongoing relationship with
+ * us. A preference is a standing choice about a stream; a single share is not a
+ * stream, so there is no preference to express and nowhere to store one. The
+ * only thing "suppressible" could mean there is the operator switch — which
+ * would make a send button report success and do nothing.
+ *
  * The authority for each value is the inventory in
  * `docs/superpowers/specs/2026-07-31-notification-preferences-design.md` §2.
  * `classes.test.ts` makes that authority executable: every class must be placed
@@ -46,8 +54,6 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     { id: 'workspace-invitation', label: 'Workspace invitation',    category: 'transactional', required: true,  channels: ['email'] },
     { id: 'agent-invite',         label: 'Partner agent invite',    category: 'transactional', required: true,  channels: ['email'] },
     { id: 'agent-login-link',     label: 'Agent sign-in link',      category: 'transactional', required: true,  channels: ['email'] },
-    // No registry entry yet — the route hand-builds the HTML. P3 converts it;
-    // the class exists now so the gate can already see it (spec §2.0 #9).
     { id: 'client-portal-login',  label: 'Client portal sign-in link', category: 'transactional', required: true, channels: ['email'] },
 
     // ─── money and legal record (spec §2.1)
@@ -57,6 +63,10 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     { id: 'payment-request',      label: 'Invoice',                 category: 'transactional', required: true,  channels: ['email'] },
     { id: 'report-ready',         label: 'Your report is ready',    category: 'transactional', required: true,  channels: ['email'] },
     { id: 'report-ready-pdf',     label: 'Your report (PDF)',       category: 'transactional', required: true,  channels: ['email'] },
+    // A one-off share to a typed-in address — see the third `required: true`
+    // case in the header. Not "important enough to force"; there is simply no
+    // standing relationship for a preference to attach to.
+    { id: 'repair-request-share', label: 'Repair request shared with you', category: 'transactional', required: true, channels: ['email'] },
 
     // ─── the workspace can no longer do its job (spec §2.6 shape)
     // Warns the owner they are at / near the free-tier inspection limit. Muting
@@ -66,7 +76,12 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     // Found while converting call sites, NOT by the §5.0 route census: it is a
     // hand-built send INSIDE the email service, where a sweep of routes cannot
     // see it. Add it to the spec's §2.4b list.
+    //
+    // Two ids, not one with a variable: "you have one left" and "you have none
+    // left" are different messages, and a recipient reading a list of what we
+    // send should see both.
     { id: 'usage-quota-warning',  label: 'Free inspections running out', category: 'operational', required: true, channels: ['email'] },
+    { id: 'usage-quota-reached',  label: 'Free inspections used up',     category: 'operational', required: true, channels: ['email'] },
 
     // ─── your inspection (spec §2.2) — the recipient may switch these off
     { id: 'booking-confirmation', label: 'Booking confirmation',    category: 'transactional', required: false, channels: ['email', 'sms'] },

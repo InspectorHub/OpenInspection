@@ -9502,7 +9502,7 @@
       "body": null
     },
     "summary": "List editable email templates",
-    "description": "Returns all 17 editable email templates merged with the tenant's saved overrides. The password-reset template (non-editable) is excluded."
+    "description": "Returns the editable email templates merged with the tenant's saved overrides. Non-editable, platform-owned templates (password reset, usage-quota notices) are excluded."
   },
   {
     "operationId": "listEventTypes",

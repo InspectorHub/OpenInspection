@@ -8,11 +8,14 @@ const EXAMPLES: Record<string, string> = {
   viewUrl: 'https://app.example.com/messages/abc123', acceptUrl: 'https://app.example.com/accept/abc123',
   payUrl: 'https://app.example.com/invoice/abc123',
   inviteLink: 'https://app.example.com/join/abc123', resetLink: 'https://app.example.com/reset/abc123',
+  loginUrl: 'https://app.example.com/auth?link=abc123', shareUrl: 'https://app.example.com/repair-request/abc123',
+  billingPortalUrl: 'https://app.example.com/billing',
   clientName: 'Jordan Smith', inspectorName: 'Alex Rivera', agentName: 'Pat Lee',
-  tenantName: 'Acme Inspections', agreementName: 'Inspection Agreement',
+  tenantName: 'Acme Inspections', workspaceName: 'Acme Inspections', agreementName: 'Inspection Agreement',
   date: 'July 1, 2026', time: '3:00 PM', amount: '$350.00',
   confirmationId: 'A1B2C3', signedAtUtc: '2026-07-01T15:00:00Z', ipAddress: '203.0.113.7',
   fromName: 'Alex Rivera', snippet: 'Thanks — see you then!', envelopeId: 'ENV-12345',
+  message: 'Could you quote items 2 and 3?', reason: 'The seller asked to reschedule.',
 };
 
 /** Phase 3 — sample values for every declared variable, used by template preview. */

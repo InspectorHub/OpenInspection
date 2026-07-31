@@ -38,7 +38,7 @@ export class EmailTemplateRenderer {
     const ctaLabelKey = d.cta?.labelBlockKey;
     const paragraphs = d.blocks
       .filter(b => b.key !== 'heading' && b.key !== ctaLabelKey)
-      .map(b => blockValues.get(b.key) ?? '');
+      .map(b => nl2br(blockValues.get(b.key) ?? ''));
 
     let cta: { label: string; url: string } | undefined;
     if (d.cta) {
@@ -77,6 +77,18 @@ export class EmailTemplateRenderer {
     }
     return parts.join('\n');
   }
+}
+
+/**
+ * Turn the newlines in a resolved paragraph into line breaks.
+ *
+ * Every `multiline: true` block invites an author — or a sender writing a note
+ * into a form — to press Enter, and HTML would otherwise collapse it. Runs on
+ * text `interpolate()` has ALREADY escaped, so the only `<` left is the one
+ * added here; no author-supplied markup becomes live.
+ */
+function nl2br(s: string): string {
+  return s.replace(/\r?\n/g, '<br />');
 }
 
 /** Reverse the HTML-entity encoding interpolate() added, so the subject is plain text (not entity-encoded). */

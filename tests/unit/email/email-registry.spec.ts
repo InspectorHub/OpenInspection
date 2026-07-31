@@ -1,17 +1,24 @@
 import { describe, it, expect } from 'vitest';
 import { REGISTRY, getDescriptor } from '../../../server/lib/email-templates/registry';
+import { sampleDataFor } from '../../../server/lib/email-templates/sample-data';
 
 describe('email template registry', () => {
-  it('has exactly 20 descriptors', () => {
-    expect(REGISTRY.length).toBe(20);
+  // A hand-maintained count is the only tripwire for a template being DELETED
+  // by accident — nothing else in the suite notices a shrinking registry (an
+  // orphaned class is legal, since a class may exist before its template does).
+  it('has exactly 24 descriptors — bump deliberately when adding one', () => {
+    expect(REGISTRY.length).toBe(24);
   });
   it('every trigger is unique', () => {
     const t = REGISTRY.map(d => d.trigger);
-    expect(new Set(t).size).toBe(20);
+    expect(new Set(t).size).toBe(REGISTRY.length);
   });
-  it('marks exactly one non-editable (platform) trigger: password-reset', () => {
+  it('marks exactly the platform-owned triggers non-editable', () => {
+    // Non-editable == "this is OUR message, on OUR footing": account recovery
+    // and our own billing. A tenant rewriting either would be rewriting
+    // something they are not the author of.
     const platform = REGISTRY.filter(d => !d.editable).map(d => d.trigger);
-    expect(platform).toEqual(['password-reset']);
+    expect(platform).toEqual(['password-reset', 'usage-quota-warning', 'usage-quota-reached']);
   });
   // Which triggers are `required` is no longer asserted here. A hardcoded pair
   // in this file was a snapshot of the answer, and the answer was wrong: only
@@ -39,6 +46,20 @@ describe('email template registry', () => {
         }
       }
     }
+  });
+  it('every declared variable has a preview example', () => {
+    // `sampleDataFor` falls back to the literal `{name}` when a variable has no
+    // example, so the preview an admin uses to check their copy silently shows
+    // `{loginUrl}` where the button link should be — and the CTA renders with a
+    // junk href. Nothing failed; it just looked wrong to whoever opened it.
+    const missing: string[] = [];
+    for (const d of REGISTRY) {
+      const sample = sampleDataFor(d);
+      for (const v of d.variables) {
+        if (sample[v.name] === `{${v.name}}`) missing.push(`${d.trigger}.${v.name}`);
+      }
+    }
+    expect(missing).toEqual([]);
   });
   it('getDescriptor returns by trigger and undefined for unknown', () => {
     expect(getDescriptor('report-ready')?.name).toBeTruthy();

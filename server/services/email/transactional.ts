@@ -24,6 +24,28 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
         }
 
         /**
+         * The client portal's magic sign-in link.
+         *
+         * The route used to build this HTML itself and call `sendEmail`
+         * directly, which meant it carried no notification class and could not
+         * be tenant-branded, edited or translated — the same three things every
+         * other account-access email already had. The caller still owns the
+         * link (it mints the token and knows the tenant slug); everything after
+         * that is this method's.
+         */
+        async sendClientPortalLogin(to: string, loginUrl: string) {
+            const fallbackBody = `<p>Click the link below to access your inspections. This link expires in 15 minutes.</p>
+             <p><a href="${loginUrl}" style="background:#4f46e5;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">Open my portal</a></p>
+             <p style="font-size:12px;color:#999;">If you didn't request this, you can safely ignore this email. Link: ${loginUrl}</p>`;
+            const rendered = this.renderOr('client-portal-login', { loginUrl }, {
+                subject: 'Sign in to your client portal',
+                html: fallbackBody,
+            });
+            if (!rendered.enabled) return;
+            await this.sendRendered(rendered, [to]);
+        }
+
+        /**
          * Sends a workspace invitation email.
          */
         async sendInvitation(to: string, inviteLink: string) {
@@ -83,9 +105,12 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
          * require a subscription). Recipient is the tenant owner (same
          * `role: 'owner'` lookup used by autoLinkSameEmail in agent/signup.ts).
          *
-         * Copy is inline (unlike the registry-driven methods above) — this is a
-         * platform system notice, not a tenant-customizable transactional email,
-         * so there is no tenant-override surface to wire it into.
+         * Registry-driven like everything else, but `editable: false` +
+         * `brand: 'platform'`: this is OUR message about OUR billing, so a
+         * tenant gets the shared layout without the ability to rewrite it. The
+         * two thresholds are two templates rather than one with a variable —
+         * "one left" and "none left" are different messages, and a recipient
+         * reading a list of what we send should see both.
          *
          * Deduplicated via `quota-notice:{tenantId}:{n}` in KV so a retried
          * request — or the benign race of two concurrent creates both reading
@@ -118,17 +143,21 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             const cta = deps.billingPortalUrl
                 ? `<p><a href="${deps.billingPortalUrl}" style="background:#4f46e5;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">Manage subscription</a></p>`
                 : '';
-            const subject = n === 4 ? 'One free inspection left' : "You've used your 5 free inspections";
-            const html = n === 4
-                ? `<p>Your ${appName} workspace has used 4 of your 5 free inspections. You have one free inspection left.</p>${cta}`
-                : `<p>Your ${appName} workspace has used your 5 free inspections — everything stays usable; subscribe to create new ones.</p>${cta}`;
-
-            // Hand-built HTML, not a registry template — so it names its class
-            // explicitly. This send was absent from the §5.0 raw-call-site audit
-            // because that census swept ROUTES, and this one lives inside the
-            // email service itself. Moving it onto a template is P3's job; making
-            // the boundary able to see it is this one's.
-            await this.sendEmail([owner.email], subject, html, undefined, { classId: 'usage-quota-warning' });
+            const trigger = n === 4 ? 'usage-quota-warning' : 'usage-quota-reached';
+            const rendered = this.renderOr(trigger, {
+                workspaceName: this.appName,
+                billingPortalUrl: deps.billingPortalUrl ?? '',
+            }, {
+                subject: n === 4 ? 'One free inspection left' : "You've used your 5 free inspections",
+                html: n === 4
+                    ? `<p>Your ${appName} workspace has used 4 of your 5 free inspections. You have one free inspection left.</p>${cta}`
+                    : `<p>Your ${appName} workspace has used your 5 free inspections — everything stays usable; subscribe to create new ones.</p>${cta}`,
+            });
+            // No `enabled` check: both descriptors are `required`, so the
+            // renderer cannot return a disabled result. Guarding anyway would
+            // imply a tenant can switch off the warning that they are about to
+            // lose the ability to create inspections.
+            await this.sendRendered(rendered, [owner.email]);
 
             if (deps.kv) await deps.kv.put(dedupeKey, '1');
         }

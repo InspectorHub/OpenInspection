@@ -16,6 +16,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 import emailTemplateRoutes from '../../../server/api/email-templates';
+import { REGISTRY } from '../../../server/lib/email-templates/registry';
 
 const TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -62,14 +63,20 @@ describe('GET /api/admin/email-templates', () => {
         vi.clearAllMocks();
     });
 
-    it('returns 200 with 19 items, no password-reset, correct fields', async () => {
+    it('lists every editable template and no platform-owned one, with correct fields', async () => {
         const app = buildApp();
         const res = await app.request('/api/admin/email-templates', {}, { DB: {} });
         expect(res.status).toBe(200);
         const body = await res.json() as { success: boolean; data: Array<{ trigger: string; name: string; required: boolean; enabled: boolean; isCustomized: boolean; subject: string; category: string }> };
         expect(body.success).toBe(true);
-        expect(body.data).toHaveLength(19);
-        expect(body.data.every(t => t.trigger !== 'password-reset')).toBe(true);
+        expect(body.data).toHaveLength(21);
+        // The editor lists what a TENANT may rewrite. Account recovery and our
+        // own billing notices are ours, so they must never appear here — assert
+        // the rule, not just its first instance.
+        const listed = new Set(body.data.map(t => t.trigger));
+        for (const d of REGISTRY.filter(x => !x.editable)) {
+            expect(listed.has(d.trigger), `${d.trigger} is not editable and must not be listed`).toBe(false);
+        }
         for (const item of body.data) {
             expect(typeof item.trigger).toBe('string');
             expect(typeof item.name).toBe('string');

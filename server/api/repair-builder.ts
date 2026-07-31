@@ -25,7 +25,6 @@ import {
     shareViewRoute,
     sharePdfRoute,
     shareEmailRoute,
-    escapeHtmlShare,
 } from './repair-builder/share';
 
 // ---------------------------------------------------------------------------
@@ -479,35 +478,15 @@ const repairBuilderRoutes = createApiRouter()
         await checkRateLimit(c, 'book');
 
         const baseUrl = getBaseUrl(c);
-        const shareUrl = `${baseUrl}/repair-request/${shareToken}`;
-        const safeAddress = escapeHtmlShare(propertyAddress || 'your property');
-        const safeMessage = body.message
-            ? escapeHtmlShare(body.message).replace(/\n/g, '<br/>')
-            : '';
 
-        const html = `
-            <div style="font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #0f172a;">
-                <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #64748b; margin: 0 0 4px;">Repair Request</p>
-                <h1 style="font-size: 22px; line-height: 1.25; font-weight: 600; margin: 0 0 16px;">${safeAddress}</h1>
-                <p style="font-size: 14px; line-height: 1.5; color: #475569;">
-                    A repair request list has been shared with you. Click the link below to review the items.
-                </p>
-                ${safeMessage ? `
-                <div style="margin-top: 20px; padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
-                    <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: #64748b; margin: 0 0 8px;">Message</p>
-                    <p style="font-size: 14px; line-height: 1.6; margin: 0; white-space: pre-wrap;">${safeMessage}</p>
-                </div>` : ''}
-                <p style="margin-top: 24px;">
-                    <a href="${shareUrl}" style="display: inline-block; padding: 10px 16px; background: #0f172a; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700;">View repair request</a>
-                </p>
-            </div>
-        `;
-
-        await c.var.services.email.sendEmail(
-            [body.to],
-            `Repair request — ${propertyAddress || 'your property'}`,
-            html,
-        );
+        // The route owns the LINK; the email service owns the email. Building
+        // the HTML here is what left this send unbranded, uneditable and
+        // unclassified while every registry-backed send was none of those.
+        await c.var.services.email.sendRepairRequestShare(body.to, {
+            propertyAddress: propertyAddress || '',
+            shareUrl: `${baseUrl}/repair-request/${shareToken}`,
+            message: body.message,
+        });
 
         return c.json({ success: true as const }, 200);
     });

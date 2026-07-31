@@ -27,7 +27,7 @@ const SECRET = 'test-jwt-secret';
 
 describe('portal API', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
-    let sendEmail: ReturnType<typeof vi.fn>;
+    let sendClientPortalLogin: ReturnType<typeof vi.fn>;
 
     async function seedInspection(id: string, overrides: Partial<typeof schema.inspections.$inferInsert> = {}) {
         await testDb.insert(schema.inspections).values({
@@ -105,7 +105,7 @@ describe('portal API', () => {
 
     function buildApp(tenantId: string | null = TENANT) {
         const portalSvc = new PortalService({} as D1Database, inspStub);
-        sendEmail = vi.fn().mockResolvedValue({ delivered: true });
+        sendClientPortalLogin = vi.fn().mockResolvedValue(undefined);
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
             if (tenantId) {
@@ -114,7 +114,7 @@ describe('portal API', () => {
             }
             c.set('services', {
                 portal: portalSvc,
-                email: { sendEmail },
+                email: { sendClientPortalLogin },
                 portalAccess: makePortalAccessStub(),
                 // Hub exchange (server/api/portal.ts) now resolves the
                 // self-retrieve role-key set via PeopleService instead of a
@@ -178,9 +178,14 @@ describe('portal API', () => {
         expect(res.status).toBe(200);
         const json = await res.json();
         expect(json.data.sent).toBe(true);
-        expect(sendEmail).toHaveBeenCalledTimes(1);
-        const htmlArg = sendEmail.mock.calls[0][2] as string;
-        expect(htmlArg).toContain('/portal/acme/auth?link=');
+        // The route's job is the LINK; the email body is the email service's
+        // (see `sendClientPortalLogin` — it renders the branded template and
+        // stamps the notification class). Assert the handover, not the HTML.
+        expect(sendClientPortalLogin).toHaveBeenCalledTimes(1);
+        expect(sendClientPortalLogin).toHaveBeenCalledWith(
+            'a@x.com',
+            expect.stringContaining('/portal/acme/auth?link='),
+        );
     });
 
     it('POST /request-link returns 200 for an UNKNOWN email and does NOT send (no enumeration)', async () => {
@@ -195,7 +200,7 @@ describe('portal API', () => {
         expect(res.status).toBe(200);
         const json = await res.json();
         expect(json.data.sent).toBe(true);
-        expect(sendEmail).not.toHaveBeenCalled();
+        expect(sendClientPortalLogin).not.toHaveBeenCalled();
     });
 
     it('POST /request-link returns 404 when the tenant slug is unresolved', async () => {

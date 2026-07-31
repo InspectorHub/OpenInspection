@@ -34,7 +34,10 @@ const NEVER_OFF = [
     'report-ready', 'report-ready-pdf',
     // Not §2.0/§2.1 but the same harm: muting it means the workspace hits the
     // free-tier wall with no warning.
-    'usage-quota-warning',
+    'usage-quota-warning', 'usage-quota-reached',
+    // A one-off share to a typed-in address: no account, no relationship, so no
+    // preference can exist. See the third `required: true` case in classes.ts.
+    'repair-request-share',
 ];
 
 /** Spec §2.2-§2.4 — the recipient's call. */

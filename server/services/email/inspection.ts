@@ -87,6 +87,36 @@ export function InspectionEmailMixin<TBase extends Constructor>(Base: TBase) {
         }
 
         /**
+         * Shares a repair request with an address the sender typed — usually a
+         * contractor, an agent, or the other side of the transaction.
+         *
+         * The route built this HTML itself, hardcoding a slate button that
+         * ignored the company's colour and logo. Everything a recipient sees of
+         * the inspector's brand was missing from the one email an inspector's
+         * client sends on their behalf.
+         *
+         * `message` is the sender's optional note; when they wrote none, the
+         * template's block resolves to nothing and the layout drops it.
+         */
+        async sendRepairRequestShare(
+            to: string,
+            args: { propertyAddress: string; shareUrl: string; message?: string | undefined },
+        ): Promise<void> {
+            const address = args.propertyAddress || 'your property';
+            const rendered = this.renderOr('repair-request-share', {
+                propertyAddress: address,
+                shareUrl: args.shareUrl,
+                message: args.message ?? '',
+            }, {
+                subject: `Repair request — ${address}`,
+                html: `<p>A repair request list for ${address} has been shared with you.</p>
+                 <p><a href="${args.shareUrl}">View repair request</a></p>`,
+            });
+            if (!rendered.enabled) return;
+            await this.sendRendered(rendered, [to]);
+        }
+
+        /**
          * Sends a booking confirmation email.
          *
          * Sprint 1 C-10 — accepts an optional `icsEvent`; when provided,
