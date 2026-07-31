@@ -1,5 +1,8 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
-import { contacts, smsConsentLog } from '../db/schema';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { contacts, smsConsentLog, users } from '../db/schema';
+
+/** The BASIS a reader is reachable under — what the ledger's audit column means. */
+const basisFor = (a: Audience) => (a === 'client' ? 'client' as const : a === 'agent' ? 'agent' as const : 'staff' as const);
 import type { Audience } from './classes';
 
 /**
@@ -28,8 +31,11 @@ export interface SmsConsentBlock {
     at: string | null;
     /** How it was captured — booking form, opt-in link, or by an admin. */
     capturedVia: 'booking_form' | 'optin_link' | 'admin' | null;
-    /** The contact rows this reader is, so a Stop knows what to write. */
-    contactIds: string[];
+    /**
+     * WHO a Stop writes against. A client or agent resolves to `contacts` rows;
+     * a staff member is a single `users` row and has no contact at all.
+     */
+    subjects: Array<{ kind: 'contact' | 'user'; id: string }>;
     /**
      * The disclosure the reader must SEE before granting, and its version.
      *
@@ -43,28 +49,36 @@ export interface SmsConsentBlock {
 /**
  * Read the SMS consent block for one reader.
  *
- * @returns `null` when the block must NOT render — which today is every staff
- *          reader. Consent attaches to a `contacts` row and a staff member is a
- *          `users` row; there is also no user-facing notification class that is
- *          both staff-addressed and SMS, so there is nothing to revoke.
- *          Inventing a staff consent row to make the screen look uniform would
- *          be a control over nothing, which is worse than no control (§4.2).
+ * STAFF ARE SUPPORTED, and the ledger says so honestly rather than uniformly.
+ * A staff subject is a `users` row with `contact_id` left NULL and
+ * `recipient_type: 'staff'` — internal-operational under account/employment
+ * terms, never consumer consent. They are never GRANTED here (they are implied,
+ * like agents); the only staff row that is ever written is a revocation,
+ * because a STOP binds whatever basis the first message was sent under.
+ *
+ * @returns `null` only when there is no subject at all to consent for.
  */
 export async function readSmsConsent(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     db: any,
     tenantId: string,
     audience: Audience,
-    contactIds: string[],
+    subjects: Array<{ kind: 'contact' | 'user'; id: string }>,
     disclosure: { version: number; text: string } | null,
 ): Promise<SmsConsentBlock | null> {
-    if (contactIds.length === 0) return null;
+    if (subjects.length === 0) return null;
 
-    const rows = await db.select({ phone: contacts.phone })
-        .from(contacts)
-        .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, contactIds)))
-        .all();
-    const phone = rows.map((r: { phone: string | null }) => r.phone).find(Boolean) ?? null;
+    const contactIds = subjects.filter((s) => s.kind === 'contact').map((s) => s.id);
+    const userIds = subjects.filter((s) => s.kind === 'user').map((s) => s.id);
+
+    const phoneRows = contactIds.length
+        ? await db.select({ phone: contacts.phone }).from(contacts)
+            .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, contactIds))).all()
+        : userIds.length
+            ? await db.select({ phone: users.phone }).from(users)
+                .where(inArray(users.id, userIds)).all()
+            : [];
+    const phone = phoneRows.map((r: { phone: string | null }) => r.phone).find(Boolean) ?? null;
 
     // The LATEST row across every identity this reader holds. Revocation binds
     // regardless of which contact row carried the original grant — the same
@@ -77,29 +91,32 @@ export async function readSmsConsent(
     }).from(smsConsentLog)
         .where(and(
             eq(smsConsentLog.tenantId, tenantId),
-            inArray(smsConsentLog.contactId, contactIds),
+            inArray(smsConsentLog.subjectId, subjects.map((s) => s.id)),
         ))
-        .orderBy(desc(smsConsentLog.createdAt)).limit(1).get();
+        // Insertion order breaks a same-millisecond tie: a STOP and a START recorded
+        // in the same millisecond otherwise resolve arbitrarily, and for a consent
+        // ledger "which one is latest" must never be a coin toss.
+        .orderBy(desc(smsConsentLog.createdAt), desc(sql`rowid`)).limit(1).get();
 
     if (latest?.action === 'revoked') {
         return {
             phone, state: 'revoked',
-            at: toIso(latest.createdAt), capturedVia: latest.capturedVia ?? null, contactIds, disclosure,
+            at: toIso(latest.createdAt), capturedVia: latest.capturedVia ?? null, subjects, disclosure,
         };
     }
     if (latest?.action === 'granted') {
         return {
             phone, state: 'granted',
-            at: toIso(latest.createdAt), capturedVia: latest.capturedVia ?? null, contactIds, disclosure,
+            at: toIso(latest.createdAt), capturedVia: latest.capturedVia ?? null, subjects, disclosure,
         };
     }
 
     // Nothing on file. What that MEANS depends on who is asking: a business
-    // counterparty is reachable under an existing relationship, a consumer is
-    // not reachable at all until they say so.
+    // counterparty and a staff member are reachable under an existing
+    // relationship, a consumer is not reachable at all until they say so.
     return {
-        phone, state: audience === 'agent' ? 'implied' : 'none',
-        at: null, capturedVia: null, contactIds, disclosure,
+        phone, state: audience === 'client' ? 'none' : 'implied',
+        at: null, capturedVia: null, subjects, disclosure,
     };
 }
 
@@ -131,7 +148,11 @@ export interface ConsentRecorder {
     record(
         tenantId: string, contactId: string, action: 'granted' | 'revoked',
         capturedVia: 'booking_form' | 'optin_link' | 'admin' | 'settings_page',
-        meta: { ip?: string | undefined; userAgent?: string | undefined; recipientType?: 'client' | 'agent' | 'other' },
+        meta: {
+            ip?: string | undefined; userAgent?: string | undefined;
+            recipientType?: 'client' | 'agent' | 'other' | 'staff';
+            subjectKind?: 'contact' | 'user';
+        },
     ): Promise<unknown>;
 }
 
@@ -150,9 +171,14 @@ export async function grantSms(
     audience: Audience,
     meta: { ip?: string | undefined; userAgent?: string | undefined },
 ): Promise<void> {
-    const recipientType = audience === 'agent' ? 'agent' as const : 'client' as const;
-    for (const contactId of block.contactIds) {
-        await recorder.record(tenantId, contactId, 'granted', 'settings_page', { ...meta, recipientType });
+    // Only consumers are ever GRANTED here. Agents and staff are implied, and
+    // writing a grant for them would put non-consumer messaging inside the
+    // consumer consent evidence (docs/sms-compliance.md).
+    if (audience !== 'client') return;
+    for (const s of block.subjects) {
+        await recorder.record(tenantId, s.id, 'granted', 'settings_page', {
+            ...meta, recipientType: 'client', subjectKind: s.kind,
+        });
     }
 }
 
@@ -168,8 +194,9 @@ export async function revokeChannel(
     // ledger says which basis the person was reachable under, and stamping
     // everyone 'client' would make the evidence wrong in the one direction that
     // matters to a carrier audit.
-    const recipientType = audience === 'agent' ? 'agent' as const : 'client' as const;
-    for (const contactId of block.contactIds) {
-        await recorder.record(tenantId, contactId, 'revoked', 'optin_link', { recipientType });
+    for (const s of block.subjects) {
+        await recorder.record(tenantId, s.id, 'revoked', 'optin_link', {
+            recipientType: basisFor(audience), subjectKind: s.kind,
+        });
     }
 }

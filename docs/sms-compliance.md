@@ -27,7 +27,14 @@ Those effective URLs appear in booking footers, the client portal, invoices, and
 |---|---|---|
 | Clients / consumers | Express — recorded opt-in before send | Recorded opt-in; retain proof |
 | Agents / other parties on the job | Implied — phone on file for the transaction | Established business relationship; STOP still applies |
-| Staff | Account / employment terms | Internal; not the consumer consent ledger |
+| Staff | Account / employment terms | Internal; no recorded opt-in — STOP still applies |
+
+**STOP works for everyone, opt-in evidence is consumers only.** Agents and staff
+are never asked for express consent, so no `granted` row is ever recorded for
+them. A STOP from any of them IS recorded and honoured, because a request to be
+left alone binds whatever basis the first message was sent under. That keeps the
+answer to "show us your opt-in proof" pointing at consumers alone, which is what
+a carrier is asking about, while nobody who says stop keeps getting texts.
 
 ---
 

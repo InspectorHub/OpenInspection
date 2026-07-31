@@ -41,8 +41,22 @@ async function seedContact(id: string, phone: string | null) {
 }
 async function seedConsent(id: string, contactId: string, action: 'granted' | 'revoked', at = new Date()) {
     await db.insert(schema.smsConsentLog).values({
-        id, tenantId: TENANT, contactId, recipientType: 'client',
+        id, tenantId: TENANT, contactId,
+        // The subject pair is what the gate reads — `contact_id` alone no
+        // longer answers, because a staff subject has none.
+        subjectKind: 'contact', subjectId: contactId,
+        recipientType: 'client',
         action, disclosureVersion: 1, capturedVia: 'admin', createdAt: at,
+    } as never);
+}
+
+/** A staff STOP: a `users` subject, with no contact at all. */
+async function seedStaffRevocation(id: string, userId: string) {
+    await db.insert(schema.smsConsentLog).values({
+        id, tenantId: TENANT, contactId: null,
+        subjectKind: 'user', subjectId: userId,
+        recipientType: 'staff', action: 'revoked',
+        disclosureVersion: 1, capturedVia: 'optin_link', createdAt: new Date(),
     } as never);
 }
 const gate = (over: Partial<Parameters<typeof smsSendGate>[0]> = {}) =>
@@ -224,6 +238,39 @@ describe('smsSendGate — the recipient’s own preference', () => {
         // preference table says, so the order of the two checks is load-bearing.
         await seedContact('c1', PHONE);
         const r = await gate({ contactId: 'c1', roleKind: 'client', classId: 'inspection-reminder' });
+        expect(r).toEqual({ allowed: false, reason: 'no sms consent' });
+    });
+});
+
+describe('smsSendGate — a staff STOP', () => {
+    /**
+     * Staff are a `users` row and have no contact, so before the subject pair
+     * existed the ledger could not record their STOP at all. They are never
+     * GRANTED here — internal messaging is implied under account terms — but a
+     * revocation binds whatever the basis was, which is the one CTIA rule that
+     * is universal.
+     */
+    it('honours a revocation recorded against a users subject', async () => {
+        await seedStaffRevocation('sc-staff', 'u-staff');
+        const r = await gate({ contactId: 'u-staff', roleKind: 'other' });
+        expect(r.allowed).toBe(false);
+    });
+
+    it('still sends to a staff member who never stopped', async () => {
+        // Staff have no `RoleKind` at all — the vocabulary is client/agent/other,
+        // which is the same fact that makes them a `users` subject rather than a
+        // contact. They ride the implied path, like a business counterparty.
+        await seedContact('c-staff', PHONE);
+        const r = await gate({ contactId: 'c-staff', roleKind: 'other' });
+        expect(r.allowed).toBe(true);
+    });
+
+    it('requires express consent for a kind it does not recognise', async () => {
+        // Fail CLOSED. This used to throw: indexing the basis map with an
+        // unknown value and reading `.basis` of undefined, which in a
+        // compliance gate is worse than either answer.
+        await seedContact('c-x', PHONE);
+        const r = await gate({ contactId: 'c-x', roleKind: 'not-a-kind' as never });
         expect(r).toEqual({ allowed: false, reason: 'no sms consent' });
     });
 });

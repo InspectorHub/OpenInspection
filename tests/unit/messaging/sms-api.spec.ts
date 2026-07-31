@@ -1566,6 +1566,9 @@ describe('POST /sms/test — STOP revocation', () => {
         } as never);
         await db.insert(schema.smsConsentLog).values({
             id: 'sc-stop', tenantId: TENANT, contactId: 'c-stop', recipientType: 'client',
+            // The gate reads the SUBJECT pair, not `contact_id` — that is what
+            // lets a staff `users` subject record a STOP at all.
+            subjectKind: 'contact', subjectId: 'c-stop',
             action: 'revoked', disclosureVersion: 1, capturedVia: 'admin', createdAt: new Date(),
         } as never);
         const sendMessage = stubProvider();

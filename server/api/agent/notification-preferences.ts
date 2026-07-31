@@ -178,7 +178,7 @@ const agentNotificationPreferenceRoutes = createApiRouter()
                 // Consent is per COMPANY, like everything else on this screen:
                 // it attaches to the contact row that company holds.
                 smsConsent: selected
-                    ? await readSmsConsent(db, selected.tenantId, 'agent', [selected.contactId], disclosure)
+                    ? await readSmsConsent(db, selected.tenantId, 'agent', [{ kind: 'contact' as const, id: selected.contactId }], disclosure)
                     : null,
             },
         }, 200);
@@ -232,7 +232,7 @@ const agentNotificationPreferenceRoutes = createApiRouter()
             // A whole-channel stop is also a consent act on SMS (§4.2), and an
             // agent's revocation is recorded AS an agent's.
             if (action === 'disable' && channel === 'sms' && !classId) {
-                const block = await readSmsConsent(db, t.tenantId, 'agent', [t.contactId], null);
+                const block = await readSmsConsent(db, t.tenantId, 'agent', [{ kind: 'contact' as const, id: t.contactId }], null);
                 await revokeChannel(new SmsConsentService(c.env.DB), t.tenantId, 'sms', block, 'agent');
             }
         }

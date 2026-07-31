@@ -20,7 +20,7 @@
  * body template, and the provider call itself. This function decides whether
  * the send may happen; it does not perform it.
  */
-import { and, eq, desc } from 'drizzle-orm';
+import { and, eq, desc, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { contacts, smsConsentLog, tenantConfigs } from '../db/schema';
 import { managedSendAllowed, type ManagedSendGateEnv } from './managed-send-gate';
@@ -94,11 +94,18 @@ async function latestConsent(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     db: DrizzleD1Database<any>,
     tenantId: string,
-    contactId: string,
+    subjectId: string,
 ): Promise<'granted' | 'revoked' | null> {
+    // Keyed on `subject_id`, not `contact_id`, so a STAFF revocation (a `users`
+    // subject, whose `contact_id` is null) is honoured by the same lookup. The
+    // two agree for every contact row — the backfill set subject_id from
+    // contact_id — so this widens the gate without changing any existing answer.
     const row = await db.select({ action: smsConsentLog.action }).from(smsConsentLog)
-        .where(and(eq(smsConsentLog.tenantId, tenantId), eq(smsConsentLog.contactId, contactId)))
-        .orderBy(desc(smsConsentLog.createdAt)).limit(1).get();
+        .where(and(eq(smsConsentLog.tenantId, tenantId), eq(smsConsentLog.subjectId, subjectId)))
+        // Insertion order breaks a same-millisecond tie: a STOP and a START recorded
+        // in the same millisecond otherwise resolve arbitrarily, and for a consent
+        // ledger "which one is latest" must never be a coin toss.
+        .orderBy(desc(smsConsentLog.createdAt), desc(sql`rowid`)).limit(1).get();
     return (row?.action as 'granted' | 'revoked' | undefined) ?? null;
 }
 

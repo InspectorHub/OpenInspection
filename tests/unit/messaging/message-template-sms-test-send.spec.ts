@@ -143,6 +143,8 @@ describe('POST /api/message-templates/test-send (SMS) — STOP revocation', () =
         } as never);
         await db.insert(schema.smsConsentLog).values({
             id: 'sc-1', tenantId: TENANT, contactId: 'c-stop', recipientType: 'client',
+            // The gate reads the SUBJECT pair, not `contact_id`.
+            subjectKind: 'contact', subjectId: 'c-stop',
             action: 'revoked', disclosureVersion: 1, capturedVia: 'admin', createdAt: new Date(),
         } as never);
     }
@@ -164,6 +166,8 @@ describe('POST /api/message-templates/test-send (SMS) — STOP revocation', () =
         await seedRevoked('+15559991234');
         await db.insert(schema.smsConsentLog).values({
             id: 'sc-2', tenantId: TENANT, contactId: 'c-stop', recipientType: 'client',
+            // The gate reads the SUBJECT pair, not `contact_id`.
+            subjectKind: 'contact', subjectId: 'c-stop',
             action: 'granted', disclosureVersion: 1, capturedVia: 'admin',
             createdAt: new Date(Date.now() + 1000),
         } as never);

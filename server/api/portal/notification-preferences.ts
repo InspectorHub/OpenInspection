@@ -70,6 +70,9 @@ const BulkSchema = z.object({
     classId: z.string().optional().describe('Limit to one notification (a row).'),
 });
 
+/** A client is only ever `contacts` rows — they have no account. */
+const asContacts = (ids: string[]) => ids.map((id) => ({ kind: 'contact' as const, id }));
+
 function resolveTenantId(c: Context<HonoConfig>): string | null {
     return c.get('tenantId') || c.get('resolvedTenantId') || null;
 }
@@ -196,7 +199,7 @@ const portalNotificationPreferenceRoutes = router
             }
         }
         const disclosure = await new SmsConsentService(c.env.DB).currentDisclosure();
-        const smsConsent = await readSmsConsent(db, tenantId, 'client', contactIds, disclosure);
+        const smsConsent = await readSmsConsent(db, tenantId, 'client', asContacts(contactIds), disclosure);
         return c.json({
             success: true as const,
             data: { ...buildScreenModel('client', chosen), smsConsent },
@@ -239,7 +242,7 @@ const portalNotificationPreferenceRoutes = router
         // Switching a whole channel off is also a CONSENT act on SMS, and the
         // ledger has to carry it wherever the reader stopped from (§4.2).
         if (change.action === 'disable' && change.channel === 'sms' && !change.classId) {
-            const block = await readSmsConsent(db, tenantId, 'client', contactIds, null);
+            const block = await readSmsConsent(db, tenantId, 'client', asContacts(contactIds), null);
             await revokeChannel(new SmsConsentService(c.env.DB), tenantId, 'sms', block, 'client');
         }
         return c.json({ success: true as const }, 200);
@@ -260,7 +263,7 @@ const portalNotificationPreferenceRoutes = router
 
         const db = getDrizzle(c);
         const contactIds = await contactIdsForEmail(db, tenantId, c.get('portalEmail') as string);
-        const block = await readSmsConsent(db, tenantId, 'client', contactIds, disclosure);
+        const block = await readSmsConsent(db, tenantId, 'client', asContacts(contactIds), disclosure);
         if (!block) throw Errors.BadRequest('There is nothing to change here.');
 
         await grantSms(svc, tenantId, block, 'client', {

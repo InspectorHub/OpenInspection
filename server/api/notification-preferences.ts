@@ -4,6 +4,8 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { getDrizzle } from '../lib/route-helpers';
 import { buildScreenModel } from '../lib/notifications/screen-model';
 import { applyBulk, assertChoosable, readChoices, writeChoice } from '../lib/notifications/preference-write';
+import { readSmsConsent, revokeChannel } from '../lib/notifications/channel-consent';
+import { SmsConsentService } from '../services/sms-consent.service';
 
 /**
  * The signed-in reader's own notification preferences (spec §4).
@@ -39,8 +41,14 @@ const ScreenResponseSchema = z.object({
                 email: z.string(), sms: z.string(), in_app: z.string(),
             }),
         })),
-        /** Always null for staff — see the GET handler. */
-        smsConsent: z.null(),
+        smsConsent: z.object({
+            phone: z.string().nullable(),
+            state: z.enum(['granted', 'implied', 'revoked', 'none']),
+            at: z.string().nullable(),
+            capturedVia: z.enum(['booking_form', 'optin_link', 'admin', 'settings_page']).nullable(),
+            subjects: z.array(z.object({ kind: z.enum(['contact', 'user']), id: z.string() })),
+            disclosure: z.object({ version: z.number(), text: z.string() }).nullable(),
+        }).nullable(),
     }),
 }).openapi('NotificationPreferencesScreen');
 
@@ -124,13 +132,15 @@ const notificationPreferenceRoutes = createApiRouter()
         // small — a row that restates the default would make the table grow
         // with the user base instead of with the decisions (§3.2).
         const chosen = await readChoices(db, tenantId, 'user', userId);
-        // No SMS consent block for staff: consent attaches to a `contacts` row
-        // and a staff member is a `users` row, and no user-facing class is both
-        // staff-addressed and SMS. Rendering an empty block would be a control
-        // over nothing (§4.2).
+        // A staff member IS a valid consent subject now — a `users` row, with
+        // `contact_id` left null. They are never granted (implied, like an
+        // agent); the block exists so their STOP has somewhere to land.
+        const smsConsent = await readSmsConsent(
+            db, tenantId, 'staff', [{ kind: 'user', id: userId }], null,
+        );
         return c.json({
             success: true as const,
-            data: { ...buildScreenModel('staff', chosen), smsConsent: null },
+            data: { ...buildScreenModel('staff', chosen), smsConsent },
         }, 200);
     })
     .openapi(saveRoute, async (c) => {
@@ -152,9 +162,16 @@ const notificationPreferenceRoutes = createApiRouter()
         const tenantId = c.get('tenantId') as string;
         const userId = c.get('user')?.sub as string;
         const change = c.req.valid('json');
+        const db = getDrizzle(c);
         const stored = await applyBulk(
-            getDrizzle(c), { tenantId, subjectKind: 'user', subjectId: userId }, 'staff', change,
+            db, { tenantId, subjectKind: 'user', subjectId: userId }, 'staff', change,
         );
+        // Stopping the whole text channel is a consent act here too — recorded
+        // as `staff` basis, so it never reads as consumer evidence.
+        if (change.action === 'disable' && change.channel === 'sms' && !change.classId) {
+            const block = await readSmsConsent(db, tenantId, 'staff', [{ kind: 'user', id: userId }], null);
+            await revokeChannel(new SmsConsentService(c.env.DB), tenantId, 'sms', block, 'staff');
+        }
         return c.json({ success: true as const, stored }, 200);
     });
 
