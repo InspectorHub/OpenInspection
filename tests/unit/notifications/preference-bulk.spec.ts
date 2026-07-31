@@ -40,15 +40,13 @@ describe('bulk preference changes', () => {
     it('turns off every choosable cell an AGENT has — storing only what differs', async () => {
         await applyBulk(db, SUBJECT, 'agent', { action: 'disable' });
 
-        // One FEWER row than there are cells: `agent-invoice-paid` already
-        // defaults to off, so switching it off matches the default and stores
-        // nothing (§3.2). This is the storage rule, not an off-by-one.
-        const cells = classesFor('agent')
-            .filter((c) => !c.required)
-            .reduce((n, c) => n + c.channels.length, 0);
-        const defaultOff = classesFor('agent')
-            .filter((c) => !c.required && !defaultEnabled(c.id))
-            .reduce((n, c) => n + c.channels.length, 0);
+        // Every choosable class x every channel — the grid offers all three
+        // regardless of what the class declares today. Fewer rows than cells,
+        // because `agent-invoice-paid` already defaults to off and switching it
+        // off matches the default, storing nothing (§3.2).
+        const choosable = classesFor('agent').filter((c) => !c.required);
+        const cells = choosable.length * 3;
+        const defaultOff = choosable.filter((c) => !defaultEnabled(c.id)).length * 3;
         expect(defaultOff).toBeGreaterThan(0);
 
         expect(await rows()).toHaveLength(cells - defaultOff);
@@ -62,15 +60,19 @@ describe('bulk preference changes', () => {
         expect(ids.has('password-reset')).toBe(false);
     });
 
-    it('never writes a channel the notification does not use', async () => {
-        // The em dash is not a control, so a column action must skip it rather
-        // than switch it on — otherwise a row would carry a preference behind a
-        // cell the screen renders as a dash.
+    it('DOES write a channel the notification does not send on yet', async () => {
+        // The inverse of the rule this file first pinned, and deliberate: a
+        // preference is a statement of intent, so "no texts about this" is
+        // stored now and becomes effective the moment a text exists. Narrowing
+        // the write to today's channels would silently drop the answer.
         await applyBulk(db, SUBJECT, 'agent', { action: 'disable', channel: 'sms' });
-        for (const r of await rows()) {
-            const cls = classesFor('agent').find((c) => c.id === r.classId)!;
-            expect(cls.channels).toContain('sms');
-        }
+        const written = await rows();
+        expect(written.length).toBeGreaterThan(0);
+        expect(written.every((r) => r.channel === 'sms')).toBe(true);
+
+        const declaresSms = classesFor('agent')
+            .filter((c) => !c.required && c.channels.includes('sms'));
+        expect(declaresSms.length).toBeLessThan(written.length);
     });
 
     it('never reaches a class this audience is not addressed by', async () => {
@@ -95,8 +97,8 @@ describe('bulk preference changes', () => {
         // "reset" must remove that row and leave the class silent.
         await applyBulk(db, SUBJECT, 'agent', { action: 'enable' });
         const paid = (await rows()).filter((r) => r.classId === 'agent-invoice-paid');
-        expect(paid).toHaveLength(1);
-        expect(paid[0].enabled).toBe(true);
+        expect(paid).toHaveLength(3); // one per channel
+        expect(paid.every((r) => r.enabled === true)).toBe(true);
 
         await applyBulk(db, SUBJECT, 'agent', { action: 'reset' });
         expect(await rows()).toHaveLength(0);

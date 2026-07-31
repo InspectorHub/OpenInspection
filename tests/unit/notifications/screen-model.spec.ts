@@ -47,14 +47,22 @@ describe('notifications screen model', () => {
         expect(m.youChoose.length).toBeGreaterThan(0);
     });
 
-    it('marks a channel the class never uses as unavailable, not as off', () => {
-        // §4: `—` is distinct from "off". A review request has no in-app form;
-        // an off-switch for it would be a lie about what exists, and a reader
-        // who turned it on would be right to expect something.
+    it('offers EVERY channel on every row, whatever the class declares today', () => {
+        // A review request has no in-app form in the code right now. The screen
+        // still offers the switch, because the reader's "not in-app, thanks" is
+        // a true sentence today and the answer must not be lost between now and
+        // whenever someone writes that form. The switch's meaningful direction
+        // is OFF, and OFF always works.
         const row = buildScreenModel('client', noChoices).youChoose.find((r) => r.id === 'review-request')!;
         expect(row.channels.email).toBe('on');
-        expect(row.channels.in_app).toBe('unavailable');
-        expect(row.channels.sms).toBe('unavailable');
+        expect(row.channels.in_app).toBe('on');
+        expect(row.channels.sms).toBe('on');
+    });
+
+    it('honours a choice made on a channel the class does not send on yet', () => {
+        const off = buildScreenModel('client', new Map([['review-request:sms', false]]))
+            .youChoose.find((r) => r.id === 'review-request')!;
+        expect(off.channels.sms).toBe('off');
     });
 
     it('reads absence as the CLASS default, which is usually but not always on', () => {

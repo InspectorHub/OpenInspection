@@ -15,17 +15,15 @@ import { NOTIFICATION_CLASSES, defaultEnabled, type Audience, type NotificationC
  * appears in all three or none.
  */
 
-/** A channel's state on a row. `unavailable` is NOT "off" — see below. */
-export type ChannelState = 'on' | 'off' | 'unavailable';
+/** A channel's state on a row. */
+export type ChannelState = 'on' | 'off';
 
 export interface ScreenRow {
     id: string;
     label: string;
     /**
-     * Per channel. `unavailable` means the class never uses it, which §4 renders
-     * as `—`: showing an off-switch for a channel that does not exist is a lie
-     * about what exists, and a reader who flips it would be right to expect
-     * something to change.
+     * Every channel, always — see `buildScreenModel` for why the screen does
+     * not narrow this to what the class or the tenant can send today.
      */
     channels: Record<'email' | 'sms' | 'in_app', ChannelState>;
 }
@@ -46,6 +44,22 @@ export function classesFor(audience: Audience): NotificationClass[] {
 }
 
 /**
+ * EVERY CLASS SHOWS EVERY CHANNEL, and the screen reads neither the class's
+ * own `channels` list nor the tenant's automation rules and templates.
+ *
+ * A preference is a statement of INTENT — "do not text me about bookings" — and
+ * that sentence is true and worth storing before anyone has written the text.
+ * When the content and the rule are completed the stored answer simply takes
+ * effect, with no screen that changed shape underneath the reader and no
+ * decision silently lost in between.
+ *
+ * The asymmetry is what makes this safe: the switch's meaningful direction is
+ * OFF, and OFF always works. A channel left ON that nothing sends yet is not a
+ * broken promise, it is just quiet.
+ *
+ * `classes.ts`'s `channels` is still the truth about what the CODE can send and
+ * still gates the send path; it just no longer decides what the screen offers.
+ *
  * @param chosen  `${classId}:${channel}` → the explicit choice this subject
  *                stored, for the rows they actually hold. A class with NO entry
  *                falls back to its own default, which is usually "send" but is
@@ -65,8 +79,7 @@ export function buildScreenModel(audience: Audience, chosen: ReadonlyMap<string,
                 label: c.label,
                 channels: Object.fromEntries(CHANNELS.map((ch) => [
                     ch,
-                    !c.channels.includes(ch) ? 'unavailable'
-                        : (chosen.get(`${c.id}:${ch}`) ?? defaultEnabled(c.id)) ? 'on' : 'off',
+                    (chosen.get(`${c.id}:${ch}`) ?? defaultEnabled(c.id)) ? 'on' : 'off',
                 ])) as ScreenRow['channels'],
             })),
     };

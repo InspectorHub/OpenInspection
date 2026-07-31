@@ -88,12 +88,12 @@ const SAMPLE_SCREEN = {
     {
       id: "agent-new-referral",
       label: "A new referral is booked",
-      channels: { email: "on", sms: "unavailable", in_app: "unavailable" },
+      channels: { email: "on", sms: "on", in_app: "on" },
     },
     {
       id: "agent-report-ready",
       label: "A report is ready to read",
-      channels: { email: "off", sms: "unavailable", in_app: "unavailable" },
+      channels: { email: "off", sms: "on", in_app: "on" },
     },
   ],
 };
@@ -237,14 +237,14 @@ describe("AgentSettingsProfilePage rendering", () => {
     await findByDisplayValue("Acme Inspections");
   });
 
-  it("shows a switched-off notification as unchecked, and an off-channel as neither", async () => {
+  it("shows a switched-off notification as unchecked, on the channel it was switched off on", async () => {
     const { findAllByRole, getByText } = renderPage();
     const boxes = await findAllByRole("checkbox") as HTMLInputElement[];
-    // agent-new-referral email = on, agent-report-ready email = off. The two
-    // rows contribute one checkbox each; the sms/in_app cells are em dashes,
-    // which is what "unavailable" must look like — NOT an unchecked box.
-    const notifBoxes = boxes.filter((b) => (b.getAttribute("aria-label") ?? "").includes("—"));
-    expect(notifBoxes.map((b) => b.checked)).toEqual([true, false]);
+    // Every row offers all three channels now, so each contributes three cells.
+    // The fixture has agent-new-referral email = on, agent-report-ready email
+    // = off; the rest default to on.
+    const email = boxes.filter((b) => (b.getAttribute("aria-label") ?? "").endsWith("Email"));
+    expect(email.map((b) => b.checked)).toEqual([true, false]);
     expect(getByText("A new referral is booked")).toBeTruthy();
   });
 

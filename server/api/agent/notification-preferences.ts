@@ -173,7 +173,7 @@ const agentNotificationPreferenceRoutes = createApiRouter()
 
         // Refused at the edge as well as at the send boundary — the boundary is
         // what makes a preference true, this is what keeps the screen honest.
-        assertChoosable(classId, channel, 'agent');
+        assertChoosable(classId, 'agent');
 
         const db = getDrizzle(c);
         const companies = await listAgentCompanies(db, agentUserId);

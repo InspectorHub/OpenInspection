@@ -158,7 +158,7 @@ const portalNotificationPreferenceRoutes = router
 
         // Refused at the edge as well as at the send boundary — the boundary is
         // what makes a preference true, this is what keeps the screen honest.
-        assertChoosable(classId, channel, 'client');
+        assertChoosable(classId, 'client');
 
         const db = getDrizzle(c);
         const contactIds = await contactIdsForEmail(db, tenantId, c.get('portalEmail') as string);

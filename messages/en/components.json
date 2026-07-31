@@ -158,10 +158,9 @@
   "notif_prefs_bulk_column": "Turn {channel} on or off for every notification",
   "notif_prefs_bulk_row": "Turn {notification} on or off on every channel",
   "notif_prefs_save_failed": "Couldn't save that. Please try again.",
-  "notif_prefs_legend": "A dash means we don't send that notification on that channel, so there's nothing to switch.",
+  "notif_prefs_legend": "Every notification is listed here, on every channel. Switching one off applies straight away, and keeps applying if we start sending it a new way later.",
   "notif_prefs_choose_empty": "Nothing here yet. When there is something you can switch off, it will appear here.",
   "notif_prefs_channel_email": "Email",
   "notif_prefs_channel_sms": "Text",
-  "notif_prefs_channel_in_app": "In-app",
-  "notif_prefs_channel_unavailable": "Not sent by {channel}"
+  "notif_prefs_channel_in_app": "In-app"
 }

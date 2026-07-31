@@ -17,6 +17,10 @@ import { Errors } from '../errors';
  * — nobody reports mail they did not receive.
  */
 
+/** Every channel the grid offers — see `buildScreenModel` for why it is not
+ *  narrowed to what a class declares today. */
+const ALL_CHANNELS = ['email', 'sms', 'in_app'] as const;
+
 export interface PreferenceWrite {
     tenantId: string;
     subjectKind: 'user' | 'contact';
@@ -29,17 +33,22 @@ export interface PreferenceWrite {
 /**
  * Refuse anything the send boundary would not honour, for this reader.
  *
+ * There is no CHANNEL check, and its absence is the point: the screen offers
+ * every channel for every notification, because a preference is a statement of
+ * intent worth storing before the content to send exists (`buildScreenModel`).
+ *
  * Ordering is deliberate: unknown class first (nothing else can be checked
- * without it), then required, then the channel, then the audience. Each throws
- * a 400 with a sentence a reader could act on rather than a code.
+ * without it), then required, then the audience. Each throws a 400 with a
+ * sentence a reader could act on rather than a code.
  */
-export function assertChoosable(classId: string, channel: string, audience: Audience): void {
+export function assertChoosable(classId: string, audience: Audience): void {
     const cls = notificationClass(classId);
     if (!cls) throw Errors.BadRequest('Unknown notification.');
     if (!isSuppressible(classId)) throw Errors.BadRequest('This notification is always sent.');
-    if (!cls.channels.includes(channel as 'email' | 'sms' | 'in_app')) {
-        throw Errors.BadRequest('This notification is not sent on that channel.');
-    }
+    // NO channel check. The screen offers every channel for every notification,
+    // because a preference is a statement of intent that is worth storing
+    // before the content exists — see `buildScreenModel`. A row for a channel
+    // nothing sends yet is inert, and becomes effective the moment it does.
     // A class this reader is never addressed by cannot take effect for them, and
     // the row would be one they can neither see nor clear — nothing renders it.
     if (!cls.audience.includes(audience) || cls.recipientFacing === false) {
@@ -130,12 +139,10 @@ export interface BulkChange {
  * OFF (`agent-invoice-paid`, whose column defaulted to false). Treating them as
  * synonyms would silently switch that one on.
  *
- * The cells it touches come from `classesFor(audience)` intersected with each
- * class's own channel list, so a bulk change can never reach a class this
- * reader is not addressed by, a class that is always sent, or a channel the
- * class never uses — the three refusals `assertChoosable` makes one at a time,
- * made structural instead. A row's `unavailable` cells are skipped rather than
- * switched on, which is the whole reason the em dash is not a control.
+ * The cells it touches come from `classesFor(audience)`, so a bulk change can
+ * never reach a class this reader is not addressed by or one that is always
+ * sent — two of the refusals `assertChoosable` makes one at a time, made
+ * structural instead. Every channel is in scope, matching what the grid shows.
  */
 export async function applyBulk(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -147,7 +154,7 @@ export async function applyBulk(
     const targets = classesFor(audience)
         .filter((c) => !c.required)
         .filter((c) => !change.classId || c.id === change.classId)
-        .flatMap((c) => c.channels
+        .flatMap((c) => ALL_CHANNELS
             .filter((ch) => !change.channel || ch === change.channel)
             .map((ch) => ({ cls: c, channel: ch })));
 

@@ -12,8 +12,8 @@ import { render, fireEvent } from "@testing-library/react";
 import { NotificationPreferences, type ChoiceRow } from "./NotificationPreferences";
 
 const rows: ChoiceRow[] = [
-  { id: "a", label: "Alpha", channels: { email: "on", sms: "unavailable", in_app: "unavailable" } },
-  { id: "b", label: "Beta", channels: { email: "off", sms: "unavailable", in_app: "on" } },
+  { id: "a", label: "Alpha", channels: { email: "on", sms: "on", in_app: "on" } },
+  { id: "b", label: "Beta", channels: { email: "off", sms: "on", in_app: "on" } },
 ];
 
 function setup(over: Partial<Parameters<typeof NotificationPreferences>[0]> = {}) {
@@ -37,13 +37,15 @@ const byLabel = (c: ReturnType<typeof setup>, startsWith: string) =>
   boxes(c).find((b) => (b.getAttribute("aria-label") ?? "").startsWith(startsWith))!;
 
 describe("bulk controls", () => {
-  it("renders NO control for a channel every row is unavailable on", () => {
-    // Text is an em dash on both rows. A checkbox there would be a control
-    // over nothing.
+  it("offers every channel on every row", () => {
+    // The screen reads neither the class's own channel list nor the tenant's
+    // templates: a preference is a statement of intent worth storing before
+    // the content exists.
     const c = setup();
-    expect(boxes(c).some((b) => (b.getAttribute("aria-label") ?? "").includes("Text"))).toBe(false);
-    // In-app has one real cell, so it keeps its control.
-    expect(byLabel(c, "Turn In-app")).toBeTruthy();
+    for (const ch of ["Email", "Text", "In-app"]) {
+      expect(byLabel(c, `Turn ${ch}`)).toBeTruthy();
+    }
+    expect(boxes(c).filter((b) => (b.getAttribute("aria-label") ?? "").startsWith("Alpha"))).toHaveLength(3);
   });
 
   it("shows a partly-on column as indeterminate, not as unchecked", () => {
@@ -89,9 +91,10 @@ describe("bulk controls", () => {
     expect(c.queryByText(/^Saved$/)).toBeNull();
   });
 
-  it("says what the dash means, rather than leaving it to be guessed", () => {
-    // A reader who has to ask will guess "off", which is the wrong answer.
+  it("says that a choice keeps applying if we start sending a new way later", () => {
+    // Otherwise a reader switching off a channel nothing uses yet has no way
+    // to know the answer was kept rather than ignored.
     const c = setup();
-    expect(c.getByText(/dash means/i)).toBeTruthy();
+    expect(c.getByText(/keeps applying/i)).toBeTruthy();
   });
 });

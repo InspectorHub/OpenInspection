@@ -132,7 +132,7 @@ const notificationPreferenceRoutes = createApiRouter()
         // Refused at the edge as well as at the send boundary. The boundary is
         // what makes it true; this is what makes it HONEST — a screen that
         // accepts the change and then ignores it is worse than one that says no.
-        assertChoosable(classId, channel, 'staff');
+        assertChoosable(classId, 'staff');
 
         await writeChoice(getDrizzle(c), {
             tenantId, subjectKind: 'user', subjectId: userId, classId, channel, enabled,

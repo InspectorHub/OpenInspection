@@ -27,7 +27,7 @@ import { m } from "~/paraglide/messages";
  * implementation would drift, and only one of the three would get the next fix.
  */
 
-export type ChannelState = "on" | "off" | "unavailable";
+export type ChannelState = "on" | "off";
 export type ChannelId = "email" | "sms" | "in_app";
 
 export interface AlwaysSentItem {
@@ -72,15 +72,9 @@ export interface NotificationPreferencesProps {
     onBulk?: (enabled: boolean, scope: { channel?: ChannelId; classId?: string }) => void;
 }
 
-/** All | none | some of the cells in scope are on. `unavailable` never counts. */
+/** All | none | some of the cells in scope are on. */
 type BulkState = "all" | "none" | "some";
 
-/**
- * @returns `null` when the scope contains NO selectable cell — a column whose
- *          every row is an em dash, say. That must render no control at all:
- *          an empty checkbox there reads as "all off" and does nothing when
- *          clicked, which is precisely the lie the em dash exists to avoid.
- */
 function bulkStateOf(
     rows: ChoiceRow[],
     scope: { channel?: ChannelId; classId?: string },
@@ -90,10 +84,7 @@ function bulkStateOf(
         if (scope.classId && r.id !== scope.classId) continue;
         for (const c of CHANNELS) {
             if (scope.channel && c.id !== scope.channel) continue;
-            const st = r.channels[c.id];
-            // An em dash is not a control, so it is not a vote either — a column
-            // whose only rows are unavailable must not read as "all off".
-            if (st !== "unavailable") cells.push(st);
+            cells.push(r.channels[c.id]);
         }
     }
     if (cells.length === 0) return null;
@@ -140,29 +131,19 @@ function ChannelCell({
     onChange: NotificationPreferencesProps["onChange"];
     busy: boolean;
 }) {
-    const state = row.channels[channel];
     return (
         <div role="cell" className="flex items-center gap-2 sm:justify-center">
             {/* The channel name repeats per cell on narrow screens, where the
                 column header is not there to supply it. Hidden from AT on wide
                 screens only — the checkbox keeps its own full label either way. */}
             <span className="text-[12px] text-ih-fg-3 sm:hidden">{channelLabel}</span>
-            {state === "unavailable" ? (
-                <>
-                    <span aria-hidden="true" className="text-ih-fg-4 select-none">—</span>
-                    <span className="sr-only">
-                        {m.notif_prefs_channel_unavailable({ channel: channelLabel })}
-                    </span>
-                </>
-            ) : (
-                <Checkbox
-                    bare
-                    checked={state === "on"}
-                    disabled={busy}
-                    aria-label={`${row.label} — ${channelLabel}`}
-                    onChange={(e) => onChange(row.id, channel, e.currentTarget.checked)}
-                />
-            )}
+            <Checkbox
+                bare
+                checked={row.channels[channel] === "on"}
+                disabled={busy}
+                aria-label={`${row.label} — ${channelLabel}`}
+                onChange={(e) => onChange(row.id, channel, e.currentTarget.checked)}
+            />
         </div>
     );
 }
@@ -299,9 +280,10 @@ export function NotificationPreferences({
                                 </div>
                             ))}
                         </div>
-                        {/* The em dash needs saying once. A reader who has to
-                            ask what a symbol means has been left to guess, and
-                            the guess here ("it's off") is the wrong one. */}
+                        {/* Every notification shows every channel, always. A
+                            channel with nothing behind it yet is quiet, not
+                            broken — and switching it off now is honoured the
+                            moment something does send on it. */}
                         <p className="text-[12px] text-ih-fg-4 mt-3">{m.notif_prefs_legend()}</p>
                     </div>
                 )}
