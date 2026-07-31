@@ -6,6 +6,8 @@ import { getDrizzle } from '../../lib/route-helpers';
 import { buildScreenModel } from '../../lib/notifications/screen-model';
 import { applyBulk, assertChoosable, readChoices, writeChoice } from '../../lib/notifications/preference-write';
 import { listAgentCompanies } from '../../services/agent/companies';
+import { readSmsConsent, revokeChannel } from '../../lib/notifications/channel-consent';
+import { SmsConsentService } from '../../services/sms-consent.service';
 import { Errors } from '../../lib/errors';
 
 /**
@@ -36,6 +38,14 @@ const CompanySchema = z.object({
     name: z.string().describe('Company name as the agent knows it.'),
 });
 
+const SmsConsentSchema = z.object({
+    phone: z.string().nullable(),
+    state: z.enum(['granted', 'implied', 'revoked', 'none']),
+    at: z.string().nullable(),
+    capturedVia: z.enum(['booking_form', 'optin_link', 'admin']).nullable(),
+    contactIds: z.array(z.string()),
+}).nullable().describe('Null when this reader has no SMS identity to consent with.');
+
 const ScreenResponseSchema = z.object({
     success: z.literal(true),
     data: z.object({
@@ -49,6 +59,7 @@ const ScreenResponseSchema = z.object({
             label: z.string(),
             channels: z.object({ email: z.string(), sms: z.string(), in_app: z.string() }),
         })),
+        smsConsent: SmsConsentSchema,
     }),
 }).openapi('AgentNotificationPreferencesScreen');
 
@@ -163,6 +174,11 @@ const agentNotificationPreferenceRoutes = createApiRouter()
                 companies: companies.map((x) => ({ id: x.tenantId, name: x.name })),
                 selected: selected?.tenantId ?? null,
                 ...buildScreenModel('agent', chosen),
+                // Consent is per COMPANY, like everything else on this screen:
+                // it attaches to the contact row that company holds.
+                smsConsent: selected
+                    ? await readSmsConsent(db, selected.tenantId, 'agent', [selected.contactId])
+                    : null,
             },
         }, 200);
     })
@@ -212,6 +228,12 @@ const agentNotificationPreferenceRoutes = createApiRouter()
                 'agent',
                 { action, ...(channel ? { channel } : {}), ...(classId ? { classId } : {}) },
             );
+            // A whole-channel stop is also a consent act on SMS (§4.2), and an
+            // agent's revocation is recorded AS an agent's.
+            if (action === 'disable' && channel === 'sms' && !classId) {
+                const block = await readSmsConsent(db, t.tenantId, 'agent', [t.contactId]);
+                await revokeChannel(new SmsConsentService(c.env.DB), t.tenantId, 'sms', block, 'agent');
+            }
         }
         return c.json({ success: true as const, applied: targets.length }, 200);
     });

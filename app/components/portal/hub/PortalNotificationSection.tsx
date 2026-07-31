@@ -5,6 +5,7 @@ import {
   type ChannelId,
   type ChoiceRow,
 } from "~/components/notifications/NotificationPreferences";
+import { SmsConsentBlock, type SmsConsent } from "~/components/notifications/SmsConsentBlock";
 import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { m } from "~/paraglide/messages";
 
@@ -20,11 +21,14 @@ import { m } from "~/paraglide/messages";
  * route's job rather than this one's.
  */
 export function PortalNotificationSection({
-  alwaysSent, youChoose, error,
+  alwaysSent, youChoose, error, smsConsent, manageTextsHref,
 }: {
   alwaysSent: AlwaysSentItem[];
   youChoose: ChoiceRow[];
   error: string | null;
+  /** Null when this reader has no SMS identity — the block does not render. */
+  smsConsent: SmsConsent | null;
+  manageTextsHref?: string | undefined;
 }) {
   const fetcher = useFetcher<{ ok?: boolean; intent?: string; error?: string }>();
   const result = fetcher.data?.intent === "notification-preference" || fetcher.data?.intent === "notification-bulk"
@@ -72,6 +76,16 @@ export function PortalNotificationSection({
         status={status}
         onBulk={bulk}
       />
+      {smsConsent && (
+        // Stopping texts is BOTH a consent act and a cascade over the Text
+        // column — one request, so the two can never disagree.
+        <SmsConsentBlock
+          consent={smsConsent}
+          manageHref={manageTextsHref}
+          onStop={() => bulk(false, { channel: "sms" })}
+          busy={fetcher.state !== "idle"}
+        />
+      )}
     </div>
   );
 }

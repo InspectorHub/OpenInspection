@@ -2,6 +2,7 @@ import { createApi } from "~/lib/api-client.server";
 import { m } from "~/paraglide/messages";
 import type { LoadContext } from "~/lib/load-context";
 import type { AlwaysSentItem, ChoiceRow } from "~/components/notifications/NotificationPreferences";
+import type { SmsConsent } from "~/components/notifications/SmsConsentBlock";
 
 /**
  * The client Hub's notification-settings seam (spec §4.1) — its own module
@@ -14,6 +15,8 @@ export interface NotificationsLoaderResult {
     alwaysSent: AlwaysSentItem[];
     youChoose: ChoiceRow[];
     error: string | null;
+    /** Null when this reader has no SMS identity to consent with (§4.2). */
+    smsConsent: SmsConsent | null;
 }
 
 /**
@@ -36,13 +39,15 @@ export async function loadNotificationsSection(
             { headers: { Cookie: cookieForApi } },
         );
         if (!res.ok) {
-            return { alwaysSent: [], youChoose: [], error: m.helper_section_service_unavailable() };
+            return { alwaysSent: [], youChoose: [], smsConsent: null, error: m.helper_section_service_unavailable() };
         }
-        const body = (await res.json()) as { data?: { alwaysSent: AlwaysSentItem[]; youChoose: ChoiceRow[] } };
-        const d = body.data ?? { alwaysSent: [], youChoose: [] };
-        return { alwaysSent: d.alwaysSent, youChoose: d.youChoose, error: null };
+        const body = (await res.json()) as {
+            data?: { alwaysSent: AlwaysSentItem[]; youChoose: ChoiceRow[]; smsConsent: SmsConsent | null };
+        };
+        const d = body.data ?? { alwaysSent: [], youChoose: [], smsConsent: null };
+        return { alwaysSent: d.alwaysSent, youChoose: d.youChoose, smsConsent: d.smsConsent ?? null, error: null };
     } catch {
-        return { alwaysSent: [], youChoose: [], error: m.helper_section_service_unavailable() };
+        return { alwaysSent: [], youChoose: [], smsConsent: null, error: m.helper_section_service_unavailable() };
     }
 }
 

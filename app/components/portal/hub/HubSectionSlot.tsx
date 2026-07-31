@@ -88,6 +88,7 @@ export function HubSectionSlot({
         alwaysSent={notifications.alwaysSent}
         youChoose={notifications.youChoose}
         error={notifications.error}
+        smsConsent={notifications.smsConsent}
       />
     );
   } else if (section === "documents") {

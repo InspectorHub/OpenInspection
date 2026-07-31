@@ -8,6 +8,8 @@ import type { HonoConfig } from '../../types/hono';
 import { buildScreenModel } from '../../lib/notifications/screen-model';
 import { applyBulk, assertChoosable, readChoices, writeChoice } from '../../lib/notifications/preference-write';
 import { contactIdsForEmail } from '../../services/notice-inbox';
+import { readSmsConsent, revokeChannel } from '../../lib/notifications/channel-consent';
+import { SmsConsentService } from '../../services/sms-consent.service';
 import { Errors } from '../../lib/errors';
 
 /**
@@ -31,6 +33,14 @@ const TenantParam = z.object({
     tenant: z.string().describe('Tenant slug (resolves the tenant from the URL path).'),
 });
 
+const SmsConsentSchema = z.object({
+    phone: z.string().nullable(),
+    state: z.enum(['granted', 'implied', 'revoked', 'none']),
+    at: z.string().nullable(),
+    capturedVia: z.enum(['booking_form', 'optin_link', 'admin']).nullable(),
+    contactIds: z.array(z.string()),
+}).nullable().describe('Null when this reader has no SMS identity to consent with.');
+
 const ScreenResponseSchema = z.object({
     success: z.literal(true),
     data: z.object({
@@ -42,6 +52,7 @@ const ScreenResponseSchema = z.object({
             label: z.string(),
             channels: z.object({ email: z.string(), sms: z.string(), in_app: z.string() }),
         })),
+        smsConsent: SmsConsentSchema,
     }),
 }).openapi('PortalNotificationPreferencesScreen');
 
@@ -50,6 +61,7 @@ const SaveSchema = z.object({
     channel: z.enum(['email', 'sms', 'in_app']).describe('Which channel this choice applies to.'),
     enabled: z.boolean().describe('True to receive it again; false to switch it off.'),
 });
+
 
 const BulkSchema = z.object({
     action: z.enum(['enable', 'disable', 'reset'])
@@ -149,7 +161,11 @@ const portalNotificationPreferenceRoutes = router
                 if (!chosen.has(key) || enabled === false) chosen.set(key, enabled);
             }
         }
-        return c.json({ success: true as const, data: buildScreenModel('client', chosen) }, 200);
+        const smsConsent = await readSmsConsent(db, tenantId, 'client', contactIds);
+        return c.json({
+            success: true as const,
+            data: { ...buildScreenModel('client', chosen), smsConsent },
+        }, 200);
     })
     .openapi(saveRoute, async (c) => {
         const tenantId = resolveTenantId(c);
@@ -184,6 +200,12 @@ const portalNotificationPreferenceRoutes = router
         if (contactIds.length === 0) throw Errors.BadRequest('There is nothing to change here.');
         for (const subjectId of contactIds) {
             await applyBulk(db, { tenantId, subjectKind: 'contact', subjectId }, 'client', change);
+        }
+        // Switching a whole channel off is also a CONSENT act on SMS, and the
+        // ledger has to carry it wherever the reader stopped from (§4.2).
+        if (change.action === 'disable' && change.channel === 'sms' && !change.classId) {
+            const block = await readSmsConsent(db, tenantId, 'client', contactIds);
+            await revokeChannel(new SmsConsentService(c.env.DB), tenantId, 'sms', block, 'client');
         }
         return c.json({ success: true as const }, 200);
     });

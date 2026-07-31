@@ -13,6 +13,8 @@ import {
   type ChoiceRow,
 } from "~/components/notifications/NotificationPreferences";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
+import { SmsConsentBlock, type SmsConsent } from "~/components/notifications/SmsConsentBlock";
+import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { m } from "~/paraglide/messages";
 
@@ -41,10 +43,12 @@ interface NotificationScreen {
   /** The read failed. NOT the same as "no company has added you yet" — one is
    *  a broken page, the other is an invitation to wait. */
   error: string | null;
+  /** Consent is per COMPANY too — it attaches to that company's contact row. */
+  smsConsent: SmsConsent | null;
 }
 
 const FAILED_SCREEN = (): NotificationScreen => ({
-  companies: [], selected: null, alwaysSent: [], youChoose: [],
+  companies: [], selected: null, alwaysSent: [], youChoose: [], smsConsent: null,
   error: m.settings_notifications_unavailable(),
 });
 
@@ -160,6 +164,7 @@ export default function AgentSettingsProfilePage() {
   // on screen when the reader looks up from the switch they just moved.
   const notifyStatus = notifyFetcher.state !== "idle" ? "saving" as const : "idle" as const;
   const navigate = useNavigate();
+  const locale = useDisplayLocale();
 
   const tzFetcher = useFetcher<typeof action>();
   const tzResult = tzFetcher.data?.intent === "save-timezone" ? tzFetcher.data : null;
@@ -299,6 +304,16 @@ export default function AgentSettingsProfilePage() {
                 onBulk={bulkNotification}
               />
             </div>
+            {notifications.smsConsent && (
+              <div className="mt-5">
+                <SmsConsentBlock
+                  consent={notifications.smsConsent}
+                  locale={locale}
+                  onStop={() => bulkNotification(false, { channel: "sms" })}
+                  busy={notifyFetcher.state !== "idle"}
+                />
+              </div>
+            )}
           </>
         )}
       </section>

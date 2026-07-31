@@ -39,6 +39,8 @@ const ScreenResponseSchema = z.object({
                 email: z.string(), sms: z.string(), in_app: z.string(),
             }),
         })),
+        /** Always null for staff — see the GET handler. */
+        smsConsent: z.null(),
     }),
 }).openapi('NotificationPreferencesScreen');
 
@@ -122,7 +124,14 @@ const notificationPreferenceRoutes = createApiRouter()
         // small — a row that restates the default would make the table grow
         // with the user base instead of with the decisions (§3.2).
         const chosen = await readChoices(db, tenantId, 'user', userId);
-        return c.json({ success: true as const, data: buildScreenModel('staff', chosen) }, 200);
+        // No SMS consent block for staff: consent attaches to a `contacts` row
+        // and a staff member is a `users` row, and no user-facing class is both
+        // staff-addressed and SMS. Rendering an empty block would be a control
+        // over nothing (§4.2).
+        return c.json({
+            success: true as const,
+            data: { ...buildScreenModel('staff', chosen), smsConsent: null },
+        }, 200);
     })
     .openapi(saveRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
