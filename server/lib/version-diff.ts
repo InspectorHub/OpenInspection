@@ -55,30 +55,30 @@ export interface SnapshotInspector {
 export const SNAPSHOT_SCHEMA_VERSION = 2;
 
 /**
- * The credentials a PINNED version should render, or null when the snapshot
- * cannot answer.
+ * The inspector a PINNED version credits, or null when the snapshot cannot say.
  *
- * Null and `[]` are different answers and the caller must not conflate them:
+ * Returns the WHOLE person, not just their badges, because everything the report
+ * shows about them has to come from the same place. Pinning the badge strip and
+ * leaving the name and licence line to resolve live produces one document
+ * carrying two answers about one person — an inspector who renews their licence
+ * gets the old number in the strip and the new one on the signature block.
  *
- *   null — this snapshot predates the credential capture (schema v1), so there
- *          is nothing recorded and the live state is the only thing there is to
- *          show. Those reports WERE rendered live when they were delivered;
- *          pretending otherwise would be inventing history rather than
- *          recording it.
- *   []   — the inspector held no credentials on publish day. A real answer, and
- *          rendering live state over it would resurrect badges the delivered
- *          document never carried.
+ * Null means "this snapshot cannot answer": no version pinned, a v1 row written
+ * before inspectors were captured, or an empty list. Live resolution applies in
+ * all three. It does NOT mean "held no credentials" — that is a lead whose
+ * `credentials` is `[]`, which is a real answer, and rendering live state over
+ * it would resurrect badges the delivered document never carried.
  *
- * OPTION A on the cover: the LEAD's badges only, matching the report's single
- * inspector name and single signer. The snapshot keeps the helpers' too, so
- * crediting them later is a rendering decision rather than a migration.
+ * OPTION A on the cover: the LEAD only, matching the report's single inspector
+ * name and single signer. The snapshot keeps the helpers, so crediting them
+ * later is a rendering decision rather than a migration.
  */
-export function pinnedLeadCredentials(
+export function pinnedLead(
     snapshot: Snapshot | null | undefined,
-): SnapshotInspector['credentials'] | null {
-    if (!snapshot?.inspectors) return null;
-    const lead = snapshot.inspectors.find((i) => i.role === 'lead') ?? snapshot.inspectors[0];
-    return lead?.credentials ?? [];
+): SnapshotInspector | null {
+    const inspectors = snapshot?.inspectors;
+    if (!inspectors?.length) return null;
+    return inspectors.find((i) => i.role === 'lead') ?? inspectors[0] ?? null;
 }
 
 export interface Snapshot {

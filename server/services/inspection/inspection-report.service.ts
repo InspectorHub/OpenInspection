@@ -1,8 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, asc } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits } from '../../lib/db/schema';
-import { CredentialService } from '../credential.service';
-import { pinnedLeadCredentials } from '../../lib/version-diff';
+import { CredentialService, primaryLicenseOf, type RenderableCredential } from '../credential.service';
+import { pinnedLead } from '../../lib/version-diff';
 import { loadPinnedSnapshot } from '../../lib/report-snapshot';
 import { buildUnitConditionMatrix, defectCountsByUnit } from '../../lib/unit-scope';
 import { Errors } from '../../lib/errors';
@@ -476,37 +476,30 @@ export class InspectionReportService extends InspectionSubService {
         const numberedSections = photoNumbering.sections as typeof sections;
         const photoAppendix: AppendixPhoto[] = photoNumbering.appendix;
 
+        // THE INSPECTOR, RESOLVED ONCE. Name, licence and badges are three facts
+        // about one person on one document, so they come from one source or the
+        // report contradicts itself: pinning the badges alone gave a renewed
+        // inspector the old number in the cover strip and the new one on the
+        // signature block.
+        //
+        // `users.license_number` is frozen; the licence is a credential row now,
+        // seeded ahead of the voluntary badges by the backfill.
+        const lead = pinnedLead(pinned);
         let inspectorName: string | null = null;
         let inspectorLicense: string | null = null;
-        if (inspection.inspectorId) {
+        let credentialSnapshot: RenderableCredential[] = [];
+        if (lead) {
+            inspectorName = lead.name;
+            inspectorLicense = primaryLicenseOf(lead.credentials);
+            credentialSnapshot = lead.credentials;
+        } else if (inspection.inspectorId) {
             const inspector = await db.select({ name: users.name, email: users.email })
                 .from(users).where(eq(users.id, inspection.inspectorId)).get();
             inspectorName = inspector?.name || (inspector?.email?.split('@')[0] ?? null);
-            // `users.license_number` is frozen. The licence is a credential row
-            // now, seeded ahead of the voluntary badges by the backfill.
-            inspectorLicense = await new CredentialService(this.db)
-                .primaryLicenseNumber(tenantId, inspection.inspectorId);
+            credentialSnapshot = await new CredentialService(this.db)
+                .listRenderable(tenantId, inspection.inspectorId);
+            inspectorLicense = primaryLicenseOf(credentialSnapshot);
         }
-
-        // Inspector Credentials & Association Badges (Spec B).
-        //
-        // A PINNED VERSION RENDERS WHAT IT FROZE. Resolving these live — which is
-        // what happened before the snapshot carried them — meant an inspector who
-        // left an association silently rewrote the cover of every report they had
-        // ever delivered. Option A on the cover: only the LEAD's badges render,
-        // matching the report's single inspector name and single signer. The
-        // snapshot keeps the helpers' too, so crediting them later is a rendering
-        // decision rather than a migration.
-        // `null` means the snapshot cannot answer (v1, or no version pinned) and
-        // live is the only thing there is to show; `[]` means the inspector held
-        // none on publish day, and rendering live over it would resurrect badges
-        // the delivered document never carried.
-        const frozenCredentials = pinnedLeadCredentials(pinned);
-        const credentialSnapshot: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }> =
-            frozenCredentials
-            ?? (inspection.inspectorId
-                ? await new CredentialService(this.db).listRenderable(tenantId, inspection.inspectorId)
-                : []);
 
         // Sprint 2 S2-4 — per-tenant flag controls whether the published
         // report renders "Estimated cost: $X – $Y" badges on defect cards.

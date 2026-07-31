@@ -16,6 +16,25 @@ export type InspectorCredential = InferSelectModel<typeof inspectorCredentials>;
  * `inspectorSignature()` does — because a relative path in an email resolves
  * against the recipient's mail client, which is nowhere.
  */
+/**
+ * The LICENCE among a set of credentials, or null.
+ *
+ * A free function over the list rather than a method that queries, because two
+ * callers need the same answer from two different SOURCES: the live report reads
+ * current rows, and a pinned published version reads the ones its snapshot
+ * froze. When the rule lived inside the DB method, the pinned path could not
+ * reach it — so it called the live one, and a report ended up showing a frozen
+ * badge strip beside a licence line resolved from today. Same document, two
+ * numbers, for an inspector who had renewed.
+ *
+ * "First entry carrying a member number, in the inspector's own order" works
+ * because the backfill seeds the licence at `sort_order = -1`; that sort order
+ * was chosen for exactly this.
+ */
+export function primaryLicenseOf(credentials: RenderableCredential[]): string | null {
+  return credentials.find((c) => (c.memberNumber ?? '').trim())?.memberNumber?.trim() || null;
+}
+
 export interface RenderableCredential {
   label: string;
   memberNumber: string | null;
@@ -78,9 +97,7 @@ export class CredentialService {
    * printing an empty one.
    */
   async primaryLicenseNumber(tenantId: string, userId: string): Promise<string | null> {
-    const rows = await this.listByUser(tenantId, userId);
-    const licensed = rows.find((cr) => cr.active && (cr.memberNumber ?? '').trim());
-    return licensed?.memberNumber?.trim() || null;
+    return primaryLicenseOf(await this.listRenderable(tenantId, userId));
   }
 
   async create(

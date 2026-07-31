@@ -15,7 +15,8 @@
 import { describe, it, expect } from 'vitest';
 import { signRenderToken, verifyRenderToken } from '../../../server/lib/render-token';
 import { buildRenderReportUrl } from '../../../server/lib/public-urls';
-import { pinnedLeadCredentials, type Snapshot } from '../../../server/lib/version-diff';
+import { pinnedLead, type Snapshot } from '../../../server/lib/version-diff';
+import { primaryLicenseOf } from '../../../server/services/credential.service';
 
 const SECRET = 'test-secret';
 const INSPECTION = 'insp-1';
@@ -75,58 +76,110 @@ describe('buildRenderReportUrl', () => {
 });
 
 /**
- * Which credentials a pinned read renders.
+ * Who a pinned read credits, and with what.
  *
- * NULL AND `[]` ARE DIFFERENT ANSWERS, and conflating them is the whole hazard:
- * one means "this report predates the capture, live state is all there is", the
- * other means "the inspector held none on publish day". As JSON they look
- * identical; on a cover page they are opposites, and the wrong one either hides
- * a badge a document carried or resurrects one it never did.
+ * NULL AND `[]` ARE DIFFERENT ANSWERS, and conflating them is the hazard on the
+ * credentials: one means "this report predates the capture, live is all there
+ * is", the other means "the inspector held none on publish day". As JSON they
+ * look identical; on a cover page they are opposites, and the wrong one either
+ * hides a badge a document carried or resurrects one it never did.
  */
-describe('pinnedLeadCredentials', () => {
-    const cred = (label: string) => ({ label, memberNumber: null, imageUrl: null });
+describe('pinnedLead', () => {
+    const cred = (label: string, memberNumber: string | null = null) => ({ label, memberNumber, imageUrl: null });
     const snap = (inspectors?: Snapshot['inspectors']): Snapshot =>
         ({ data: {}, units: [], ...(inspectors ? { inspectors } : {}) });
 
     it('returns null when nothing is pinned at all', () => {
-        expect(pinnedLeadCredentials(null)).toBeNull();
-        expect(pinnedLeadCredentials(undefined)).toBeNull();
+        expect(pinnedLead(null)).toBeNull();
+        expect(pinnedLead(undefined)).toBeNull();
     });
 
     it('returns null for a v1 snapshot, so live fills in', () => {
         // Those reports WERE rendered live when they were delivered. Serving an
         // empty strip instead would be inventing history, not recording it.
-        expect(pinnedLeadCredentials(snap())).toBeNull();
+        expect(pinnedLead(snap())).toBeNull();
     });
 
-    it('returns an EMPTY LIST when the lead held none — not null', () => {
+    it('returns null for an empty inspector list', () => {
+        expect(pinnedLead(snap([]))).toBeNull();
+    });
+
+    it('returns a lead who held NO credentials — that is a real answer, not a gap', () => {
         // The distinction that stops live state leaking back into a frozen
-        // document. `?? live` on a null is the fallback; `?? live` on `[]` is not.
-        const out = pinnedLeadCredentials(snap([
+        // document: this must not be null, or the `?? live` fallback fires.
+        const lead = pinnedLead(snap([
             { userId: 'u1', name: 'Dana', role: 'lead', credentials: [] },
         ]));
-        expect(out).toEqual([]);
-        expect(out).not.toBeNull();
+        expect(lead).not.toBeNull();
+        expect(lead!.credentials).toEqual([]);
     });
 
-    it('renders the LEAD only, whatever order the inspectors are in', () => {
-        const out = pinnedLeadCredentials(snap([
+    it('picks the LEAD, whatever order the inspectors are in', () => {
+        const lead = pinnedLead(snap([
             { userId: 'u2', name: 'Sam', role: 'helper', credentials: [cred('Helper cert')] },
             { userId: 'u1', name: 'Dana', role: 'lead', credentials: [cred('Lead cert')] },
         ]));
         // Option A. Pooling both would put an unattributed claim on the cover
         // that neither person made.
-        expect(out!.map((c) => c.label)).toEqual(['Lead cert']);
+        expect(lead!.userId).toBe('u1');
+        expect(lead!.credentials.map((c) => c.label)).toEqual(['Lead cert']);
     });
 
     it('falls back to the first inspector when no one is marked lead', () => {
-        const out = pinnedLeadCredentials(snap([
+        const lead = pinnedLead(snap([
             { userId: 'u2', name: 'Sam', role: 'helper', credentials: [cred('Only cert')] },
         ]));
-        expect(out!.map((c) => c.label)).toEqual(['Only cert']);
+        expect(lead!.userId).toBe('u2');
     });
 
-    it('survives an inspectors array that is present but empty', () => {
-        expect(pinnedLeadCredentials(snap([]))).toEqual([]);
+    /**
+     * The defect this shape exists to prevent.
+     *
+     * Name, licence and badges are three facts about ONE person on ONE document.
+     * Pinning the badge strip and leaving the other two to resolve live gave a
+     * renewed inspector the old number in the strip and the new one on the
+     * signature block — the same document asserting two licence numbers.
+     */
+    it('carries the name and the licence alongside the badges, from one source', () => {
+        const lead = pinnedLead(snap([{
+            userId: 'u1', name: 'Dana Lead', role: 'lead',
+            credentials: [cred('Licensed home inspector', 'TX-9001'), cred('InterNACHI CPI', 'N-1')],
+        }]))!;
+        expect(lead.name).toBe('Dana Lead');
+        expect(primaryLicenseOf(lead.credentials)).toBe('TX-9001');
+        expect(lead.credentials).toHaveLength(2);
+    });
+});
+
+/**
+ * `primaryLicenseOf` is a free function over a LIST precisely so the live path
+ * and the pinned path can apply one rule to two different sources. When it lived
+ * inside the DB method, the pinned path could not reach it.
+ */
+describe('primaryLicenseOf', () => {
+    const c = (label: string, memberNumber: string | null) => ({ label, memberNumber, imageUrl: null });
+
+    it('takes the first entry carrying a member number, in order', () => {
+        // Order is the inspector's own, and the backfill seeds the licence at
+        // sort_order -1 — which is why "first" means "the licence".
+        expect(primaryLicenseOf([
+            c('Licensed home inspector', 'TX-9001'),
+            c('InterNACHI CPI', 'N-1'),
+        ])).toBe('TX-9001');
+    });
+
+    it('skips entries with no number — a badge image is not a licence', () => {
+        expect(primaryLicenseOf([
+            c('Association logo', null),
+            c('Licensed home inspector', 'TX-9001'),
+        ])).toBe('TX-9001');
+    });
+
+    it('treats a blank number as absent', () => {
+        expect(primaryLicenseOf([c('Licensed home inspector', '   ')])).toBeNull();
+    });
+
+    it('returns null for an empty list, so the caller omits the line', () => {
+        expect(primaryLicenseOf([])).toBeNull();
     });
 });
