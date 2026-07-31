@@ -74,6 +74,20 @@ export class EmailBaseService {
          * `meter` is.
          */
         protected quota?: { preflight: () => Promise<void> },
+        /**
+         * The recipient's own kill switch. When injected, `sendEmail` drops any
+         * recipient who switched this notification CLASS off — which is only
+         * possible for a class `isSuppressible()` allows, checked inside the
+         * port before any lookup, so a preference can never silence something
+         * the recipient is told is always sent.
+         *
+         * Absent (standalone, legacy callers) ⇒ no gate. Deliberately the same
+         * shape and the same wiring as `suppression`: same boundary, same kind
+         * of answer. They stay separate because they are different facts —
+         * suppression is about an ADDRESS being undeliverable, a preference is
+         * about one KIND of message being unwanted.
+         */
+        protected preferences?: { isMuted(classId: string, email: string): Promise<boolean> },
     ) {
         this.provider = provider ?? new ResendProvider({ apiKey: this.apiKey });
     }
@@ -220,6 +234,37 @@ export class EmailBaseService {
             }
             // Some allowed: send to the remaining recipients only.
             to = allowed;
+        }
+
+        // The recipient's preference. Only reachable when the send NAMED what
+        // it is — an unclassified send cannot be matched against "Jane muted
+        // review requests", and applying a preference by guesswork would be
+        // worse than applying none. FAIL-OPEN per recipient, exactly like the
+        // suppression gate above: a failed query must never be the reason
+        // someone did not hear from us, because nobody reports mail that never
+        // arrived.
+        if (this.preferences && opts?.classId) {
+            const classId = opts.classId;
+            const checked = await Promise.all(
+                to.map(async (addr) => {
+                    try {
+                        return { addr, muted: await this.preferences!.isMuted(classId, addr) };
+                    } catch {
+                        return { addr, muted: false };
+                    }
+                }),
+            );
+            const wanted = checked.filter((r) => !r.muted).map((r) => r.addr);
+            if (wanted.length !== to.length) {
+                // NO email/PII in the log — count and class only.
+                logger.info('[email] recipient(s) muted this class — skipping', {
+                    classId, mutedCount: to.length - wanted.length,
+                });
+            }
+            // Same benign skip shape as the missing-key / all-suppressed paths:
+            // a value existing callers already treat as "not sent", never a throw.
+            if (wanted.length === 0) return { delivered: false };
+            to = wanted;
         }
 
         const resolved = this.identity
