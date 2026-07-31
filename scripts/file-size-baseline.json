@@ -11,7 +11,7 @@
   "app/components/portal/sections/ReportView.tsx": 806,
   "app/routes/settings-communication.tsx": 777,
   "server/services/inspection.service.ts": 755,
-  "server/api/inspections/report-delivery.ts": 733,
+  "server/api/inspections/report-delivery.ts": 736,
   "app/routes/settings-communication-templates.tsx": 731,
   "server/services/inspection/inspection-analytics.service.ts": 727,
   "app/routes/template-edit.tsx": 719,

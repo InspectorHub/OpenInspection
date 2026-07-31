@@ -34,7 +34,14 @@
  */
 import type { AutomationChannel } from '../../services/automation/shared';
 
-export type NotificationCategory = 'transactional' | 'operational' | 'marketing';
+/**
+ * `diagnostic` is not a notification anyone receives by being someone — it
+ * only ever goes to whoever pressed the button. It is in this vocabulary
+ * because the send boundary must be able to say WHAT it is sending, and
+ * "nothing" is not an answer. The preferences screen filters it out: there is
+ * no preference to express about your own test.
+ */
+export type NotificationCategory = 'transactional' | 'operational' | 'marketing' | 'diagnostic';
 
 export interface NotificationClass {
     /** Stable id. For registry-backed email this IS the template trigger. */
@@ -82,6 +89,12 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     // send should see both.
     { id: 'usage-quota-warning',  label: 'Free inspections running out', category: 'operational', required: true, channels: ['email'] },
     { id: 'usage-quota-reached',  label: 'Free inspections used up',     category: 'operational', required: true, channels: ['email'] },
+
+    // ─── not a notification to anyone but the sender
+    // An admin sending their own message template to their own address to see
+    // what it looks like. Classified so the boundary is never handed a send it
+    // cannot name; `diagnostic` keeps it off the recipient's screen.
+    { id: 'admin-test-send',      label: 'Test send (admin)',            category: 'diagnostic', required: true, channels: ['email', 'sms'] },
 
     // ─── your inspection (spec §2.2) — the recipient may switch these off
     { id: 'booking-confirmation', label: 'Booking confirmation',    category: 'transactional', required: false, channels: ['email', 'sms'] },

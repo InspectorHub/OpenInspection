@@ -38,6 +38,9 @@ const NEVER_OFF = [
     // A one-off share to a typed-in address: no account, no relationship, so no
     // preference can exist. See the third `required: true` case in classes.ts.
     'repair-request-share',
+    // Only ever sent to whoever pressed the button — see the `diagnostic`
+    // category. Nobody else can have a preference about it.
+    'admin-test-send',
 ];
 
 /** Spec §2.2-§2.4 — the recipient's call. */

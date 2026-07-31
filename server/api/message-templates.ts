@@ -208,7 +208,13 @@ const messageTemplateRoutes = createApiRouter()
             ? (c.get('tenantTier') ?? await readTenantTier(c.env.DB, tenantId))
             : undefined;
         const emailSvc = await buildTenantEmailService(c.env, tenantId, quotaGuard, tenantTier);
-        const { delivered } = await emailSvc.sendEmail([to], interpolate(subject ?? '', vars), interpolate(body, vars));
+        // `diagnostic`: this only ever reaches whoever pressed the button, so
+        // there is no recipient who could hold a preference about it — but the
+        // boundary still has to be able to say what it is sending.
+        const { delivered } = await emailSvc.sendEmail(
+            [to], interpolate(subject ?? '', vars), interpolate(body, vars),
+            undefined, { classId: 'admin-test-send' },
+        );
         return delivered ? c.json({ success: true }, 200) : c.json({ success: false, error: 'Email is not configured.' }, 200);
     });
 
