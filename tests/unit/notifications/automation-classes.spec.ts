@@ -79,6 +79,29 @@ describe('automation seed classes', () => {
         expect(wrong).toEqual([]);
     });
 
+    it('agrees with the seed about WHOSE notification it is', () => {
+        // §2's "Who" column, made executable — the same treatment "Off?" got.
+        // The screen filters on `audience`, so a class that disagrees with the
+        // rule that sends it shows a client an office alert, or hides an agent
+        // notification from the agent.
+        const audienceOf = (seed: { recipientKind?: string; recipientRoleKey?: string }) => {
+            if (seed.recipientKind === 'staff' || seed.recipientKind === 'inspector') return 'staff';
+            if (seed.recipientRoleKey === 'buyer_agent' || seed.recipientRoleKey === 'listing_agent') return 'agent';
+            return 'client';
+        };
+        const wrong: string[] = [];
+        for (const seed of AUTOMATION_SEEDS) {
+            const id = automationClassId(seed);
+            if (!id) continue;
+            const expected = audienceOf(seed);
+            const cls = notificationClass(id)!;
+            if (!cls.audience.includes(expected)) {
+                wrong.push(`${id} sends to ${expected} but its audience is [${cls.audience.join(', ')}]`);
+            }
+        }
+        expect(wrong).toEqual([]);
+    });
+
     it('returns undefined for a rule the tenant wrote', () => {
         // Unclassified, therefore unmutable by a recipient — the operator can
         // still disable the rule. Never a guess.
