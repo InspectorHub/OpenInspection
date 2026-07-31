@@ -7,7 +7,7 @@ export const REGISTRY: EmailTemplateDescriptor[] = [
     name: 'Password reset',
     category: 'system',
     editable: false,
-    required: false,
+    required: true,
     brand: 'platform',
     defaultSubject: 'Reset your password',
     blocks: [
@@ -26,7 +26,7 @@ export const REGISTRY: EmailTemplateDescriptor[] = [
     name: 'Workspace invitation',
     category: 'system',
     editable: true,
-    required: false,
+    required: true,
     brand: 'tenant',
     defaultSubject: "You've been invited to join a workspace",
     blocks: [
@@ -47,7 +47,7 @@ export const REGISTRY: EmailTemplateDescriptor[] = [
     name: 'Partner agent invite',
     category: 'agent',
     editable: true,
-    required: false,
+    required: true,
     brand: 'tenant',
     defaultSubject: '{{inspectorName}} invited you to be a partner agent',
     blocks: [
@@ -75,7 +75,7 @@ export const REGISTRY: EmailTemplateDescriptor[] = [
     name: 'Agent sign-in link',
     category: 'agent',
     editable: true,
-    required: false,
+    required: true,
     brand: 'platform',
     defaultSubject: 'Sign in to your agent account',
     blocks: [
@@ -115,7 +115,7 @@ export const REGISTRY: EmailTemplateDescriptor[] = [
     name: 'Report ready',
     category: 'client',
     editable: true,
-    required: false,
+    required: true,
     brand: 'tenant',
     defaultSubject: 'Property Inspection Report: {{address}}',
     blocks: [
@@ -135,7 +135,7 @@ export const REGISTRY: EmailTemplateDescriptor[] = [
     name: 'Report ready (PDF)',
     category: 'client',
     editable: true,
-    required: false,
+    required: true,
     brand: 'tenant',
     defaultSubject: 'Property Inspection Report: {{address}}',
     blocks: [
@@ -156,7 +156,7 @@ export const REGISTRY: EmailTemplateDescriptor[] = [
     name: 'Agreement signing request',
     category: 'client',
     editable: true,
-    required: false,
+    required: true,
     brand: 'tenant',
     defaultSubject: 'Please sign: {{agreementName}}',
     blocks: [
@@ -177,7 +177,7 @@ export const REGISTRY: EmailTemplateDescriptor[] = [
     name: 'Payment request',
     category: 'client',
     editable: true,
-    required: false,
+    required: true,
     brand: 'tenant',
     defaultSubject: 'Payment request: {{amount}}',
     blocks: [

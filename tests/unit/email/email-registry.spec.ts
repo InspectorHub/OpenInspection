@@ -13,10 +13,14 @@ describe('email template registry', () => {
     const platform = REGISTRY.filter(d => !d.editable).map(d => d.trigger);
     expect(platform).toEqual(['password-reset']);
   });
-  it('marks exactly the two required triggers', () => {
-    const req = REGISTRY.filter(d => d.required).map(d => d.trigger).sort();
-    expect(req).toEqual(['agreement-signed', 'evidence-pack']);
-  });
+  // Which triggers are `required` is no longer asserted here. A hardcoded pair
+  // in this file was a snapshot of the answer, and the answer was wrong: only
+  // 2 of 20 were marked, so a tenant could disable the password-reset email and
+  // lock every user out of account recovery. The authority is now the class
+  // vocabulary, and `tests/unit/notifications/classes.spec.ts` asserts three
+  // things this line could not — that every trigger HAS a class, that the
+  // operator's kill switch agrees with the recipient's, and that a newly added
+  // notification fails the build until someone decides whether it may be muted.
   it('every cta references an existing block key + declared variable', () => {
     for (const d of REGISTRY) {
       if (!d.cta) continue;
