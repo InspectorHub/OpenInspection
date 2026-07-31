@@ -30,6 +30,7 @@
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { gateStamp } from './lib/gate-stamp.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const SERVER = join(ROOT, 'server');
@@ -77,6 +78,12 @@ function callArgs(source, openParenIdx) {
   }
   return source.slice(openParenIdx + 1);
 }
+
+// Nothing here reads anything but `server/**`, so a run whose inputs are
+// byte-identical to the last one can only reach the same verdict.
+const SCANNED = walkFiles(SERVER);
+const stamp = gateStamp('notification-dispatch', new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'), SCANNED);
+if (stamp.hit) process.exit(0);
 
 const failures = [];
 const add = (file, raw, index, rule, snippet) =>
@@ -131,7 +138,7 @@ const MANAGED_GATE_ALLOW = [
 
 const allowed = (r, list) => list.some((re) => re.test(r));
 
-for (const file of walkFiles(SERVER)) {
+for (const file of SCANNED) {
   const r = rel(file);
   const raw = readFileSync(file, 'utf8');
   const source = stripComments(raw);
@@ -183,4 +190,5 @@ if (failures.length) {
   process.exit(1);
 }
 
+stamp.save();
 console.log('Notification-dispatch gate: OK (0 unclassified sends, 0 route-built HTML, 1 gate chain).');

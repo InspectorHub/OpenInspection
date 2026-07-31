@@ -44,7 +44,7 @@ import { logger } from '../logger';
  *   is a test — a tenant testing against a number that texted STOP should be
  *   told so, not quietly sent to.
  */
-export type SmsPurpose = 'notification' | 'test';
+type SmsPurpose = 'notification' | 'test';
 
 export type SmsGateOutcome =
     | { allowed: true; smsMode: string; companyPhone: string | null; reviewUrl: string | null }

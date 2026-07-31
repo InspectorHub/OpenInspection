@@ -41,7 +41,7 @@ import type { AutomationChannel } from '../../services/automation/shared';
  * "nothing" is not an answer. The preferences screen filters it out: there is
  * no preference to express about your own test.
  */
-export type NotificationCategory = 'transactional' | 'operational' | 'marketing' | 'diagnostic';
+type NotificationCategory = 'transactional' | 'operational' | 'marketing' | 'diagnostic';
 
 export interface NotificationClass {
     /** Stable id. For registry-backed email this IS the template trigger. */
