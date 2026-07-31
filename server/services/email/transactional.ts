@@ -20,7 +20,7 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
                 html: fallbackBody,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([to], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [to]);
         }
 
         /**
@@ -35,7 +35,7 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
                 html: fallbackBody,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([to], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [to]);
         }
 
         /**
@@ -68,10 +68,9 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
                 host,
             );
             if (!rendered.enabled) return;
-            await this.sendEmail(
+            await this.sendRendered(
+                rendered,
                 [to],
-                rendered.subject,
-                rendered.html,
                 undefined,
                 { inspector },
             );
@@ -124,7 +123,12 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
                 ? `<p>Your ${appName} workspace has used 4 of your 5 free inspections. You have one free inspection left.</p>${cta}`
                 : `<p>Your ${appName} workspace has used your 5 free inspections — everything stays usable; subscribe to create new ones.</p>${cta}`;
 
-            await this.sendEmail([owner.email], subject, html);
+            // Hand-built HTML, not a registry template — so it names its class
+            // explicitly. This send was absent from the §5.0 raw-call-site audit
+            // because that census swept ROUTES, and this one lives inside the
+            // email service itself. Moving it onto a template is P3's job; making
+            // the boundary able to see it is this one's.
+            await this.sendEmail([owner.email], subject, html, undefined, { classId: 'usage-quota-warning' });
 
             if (deps.kv) await deps.kv.put(dedupeKey, '1');
         }
@@ -199,7 +203,7 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
                 html: fallbackBody,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([to], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [to]);
             if (deps.kv) await deps.kv.put(throttleKey, '1', { expirationTtl: 300 });
         }
 
@@ -235,7 +239,7 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
                 html,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([to], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [to]);
             if (deps.kv) await deps.kv.put(throttleKey, '1', { expirationTtl: 300 });
         }
     };

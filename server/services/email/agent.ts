@@ -48,7 +48,7 @@ export function AgentEmailMixin<TBase extends Constructor>(Base: TBase) {
                 html: fallbackBody,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([to], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [to]);
         }
 
         /**
@@ -80,10 +80,9 @@ export function AgentEmailMixin<TBase extends Constructor>(Base: TBase) {
                 host,
             );
             if (!rendered.enabled) return;
-            await this.sendEmail(
+            await this.sendRendered(
+                rendered,
                 [to],
-                rendered.subject,
-                rendered.html,
                 undefined,
                 { inspector },
             );
@@ -110,7 +109,7 @@ export function AgentEmailMixin<TBase extends Constructor>(Base: TBase) {
                 html: fallbackBody,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([to], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [to]);
         }
 
         /**
@@ -141,7 +140,7 @@ export function AgentEmailMixin<TBase extends Constructor>(Base: TBase) {
                 html: fallbackBody,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([agent.email], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [agent.email]);
         }
 
         /**
@@ -172,7 +171,7 @@ export function AgentEmailMixin<TBase extends Constructor>(Base: TBase) {
                 html: fallbackBody,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([agent.email], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [agent.email]);
         }
 
         /**
@@ -200,7 +199,7 @@ export function AgentEmailMixin<TBase extends Constructor>(Base: TBase) {
                 html: fallbackBody,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([agent.email], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [agent.email]);
         }
     };
 }

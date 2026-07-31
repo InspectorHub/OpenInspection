@@ -23,7 +23,7 @@ export class EmailTemplateRenderer {
 
     const override = this.config.overrides?.get(trigger);
     const enabled = d.required ? true : (override?.enabled ?? true);
-    if (!enabled) return { subject: '', html: '', enabled: false };
+    if (!enabled) return { trigger, subject: '', html: '', enabled: false };
 
     const allowed = d.variables.map(v => v.name);
     const resolve = (s: string) => interpolate(s, data, allowed);
@@ -58,7 +58,7 @@ export class EmailTemplateRenderer {
       ...(systemHtml !== undefined ? { systemHtml } : {}),
       ...(opts?.signatureHtml ? { signatureHtml: opts.signatureHtml } : {}),
     });
-    return { subject, html, enabled: true };
+    return { trigger, subject, html, enabled: true };
   }
 
   private buildSystemBlocks(d: EmailTemplateDescriptor, data: Record<string, unknown>): string | undefined {

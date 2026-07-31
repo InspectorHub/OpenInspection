@@ -58,6 +58,16 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     { id: 'report-ready',         label: 'Your report is ready',    category: 'transactional', required: true,  channels: ['email'] },
     { id: 'report-ready-pdf',     label: 'Your report (PDF)',       category: 'transactional', required: true,  channels: ['email'] },
 
+    // ─── the workspace can no longer do its job (spec §2.6 shape)
+    // Warns the owner they are at / near the free-tier inspection limit. Muting
+    // it means hitting the wall with no warning, which is the same harm as
+    // hiding money owed — so it is not the recipient's to switch off. SaaS only;
+    // standalone has no quota (spec §2.6b).
+    // Found while converting call sites, NOT by the §5.0 route census: it is a
+    // hand-built send INSIDE the email service, where a sweep of routes cannot
+    // see it. Add it to the spec's §2.4b list.
+    { id: 'usage-quota-warning',  label: 'Free inspections running out', category: 'operational', required: true, channels: ['email'] },
+
     // ─── your inspection (spec §2.2) — the recipient may switch these off
     { id: 'booking-confirmation', label: 'Booking confirmation',    category: 'transactional', required: false, channels: ['email', 'sms'] },
     { id: 'message-notification', label: 'New message from your inspector', category: 'transactional', required: false, channels: ['email', 'in_app'] },

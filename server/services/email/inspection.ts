@@ -33,10 +33,9 @@ export function InspectionEmailMixin<TBase extends Constructor>(Base: TBase) {
                 host,
             );
             if (!rendered.enabled) return false;
-            const { delivered } = await this.sendEmail(
+            const { delivered } = await this.sendRendered(
+                rendered,
                 [to],
-                rendered.subject,
-                rendered.html,
                 undefined,
                 { inspector },
             );
@@ -78,10 +77,9 @@ export function InspectionEmailMixin<TBase extends Constructor>(Base: TBase) {
                 host,
             );
             if (!rendered.enabled) return false;
-            const { delivered } = await this.sendEmail(
+            const { delivered } = await this.sendRendered(
+                rendered,
                 [to],
-                rendered.subject,
-                rendered.html,
                 [{ filename: `${safeAddress}-report.pdf`, content: pdfBytes }],
                 { inspector },
             );
@@ -143,10 +141,13 @@ export function InspectionEmailMixin<TBase extends Constructor>(Base: TBase) {
                     Prefer text updates? <a href="${smsOptinUrl}" style="color:#4f46e5; font-weight:600;">Also text me appointment &amp; report updates</a>. Message &amp; data rates may apply; reply STOP to opt out.
                </p>`
                 : '';
-            await this.sendEmail(
+            // The opt-in block is appended to the BODY, so the rendered result is
+            // spread rather than replaced — the trigger it carries is what makes
+            // this a `booking-confirmation` at the send boundary, and rebuilding
+            // the object from scratch would drop it.
+            await this.sendRendered(
+                { ...rendered, html: optinBlock ? `${rendered.html}${optinBlock}` : rendered.html },
                 [to],
-                rendered.subject,
-                optinBlock ? `${rendered.html}${optinBlock}` : rendered.html,
                 attachments,
                 { inspector },
             );

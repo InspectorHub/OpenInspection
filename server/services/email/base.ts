@@ -82,7 +82,33 @@ export class EmailBaseService {
      *  otherwise use the provided fallback (keeps no-renderer unit tests working). */
     protected renderOr(trigger: string, data: Record<string, unknown>, fallback: { subject: string; html: string }, opts?: { signatureHtml?: string }): RenderResult {
         if (this.renderer) return this.renderer.render(trigger, data, opts);
-        return { subject: fallback.subject, html: fallback.html, enabled: true };
+        return { trigger, subject: fallback.subject, html: fallback.html, enabled: true };
+    }
+
+    /**
+     * Send something the registry rendered, carrying its trigger as the
+     * notification class.
+     *
+     * Every domain mixin already had the same two lines — `renderOr(trigger, …)`
+     * then `sendEmail(to, rendered.subject, rendered.html)` — which meant ~20
+     * separate places would each have had to remember to name a class.
+     *
+     * The trigger is NOT a parameter here. It rides inside `RenderResult`,
+     * stamped by whatever rendered it, because a second argument would have
+     * been a second chance to be wrong: a call site could render
+     * `booking-confirmation` and declare `report-ready`, and no test would see
+     * it. With one source there is nothing to keep in sync.
+     */
+    protected async sendRendered(
+        rendered: RenderResult,
+        to: string[],
+        attachments?: Array<{ filename: string; content: ArrayBuffer | string; contentType?: string }>,
+        opts?: { inspector?: SenderInspector | undefined },
+    ): Promise<{ delivered: boolean }> {
+        return this.sendEmail(to, rendered.subject, rendered.html, attachments, {
+            ...opts,
+            classId: rendered.trigger,
+        });
     }
 
     /** Single gate for the email footer signature: requires inspector + host,
@@ -132,7 +158,26 @@ export class EmailBaseService {
         subject: string,
         html: string,
         attachments?: Array<{ filename: string; content: ArrayBuffer | string; contentType?: string }>,
-        opts?: { inspector?: SenderInspector | undefined },
+        opts?: {
+            inspector?: SenderInspector | undefined;
+            /**
+             * WHAT is being sent — a `NOTIFICATION_CLASSES` id (for registry-backed
+             * mail, the template trigger).
+             *
+             * The boundary used to see only an address and a rendered string, so a
+             * recipient-preference check placed here had nothing to check against:
+             * "an email to jane@x.com" cannot be matched to "Jane muted review
+             * requests". Enforcement itself lands with the preference table; this
+             * is the field that makes it possible.
+             *
+             * Prefer `sendRendered()` over passing this by hand — it derives the id
+             * from the same trigger that rendered the body, so the two cannot
+             * disagree. When absent, the send is treated as UNCLASSIFIED and
+             * therefore never suppressible (`isSuppressible` fails closed): an
+             * unclassified notification still goes out, it just cannot be muted.
+             */
+            classId?: string;
+        },
     ): Promise<{ delivered: boolean }> {
         // Free-tier pre-flight quota gate — runs BEFORE any provider request is
         // built. A quota block throws here, so no provider HTTP call is made

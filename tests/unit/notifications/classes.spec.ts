@@ -32,6 +32,9 @@ const NEVER_OFF = [
     'client-portal-login',
     'agreement-request', 'agreement-signed', 'evidence-pack', 'payment-request',
     'report-ready', 'report-ready-pdf',
+    // Not §2.0/§2.1 but the same harm: muting it means the workspace hits the
+    // free-tier wall with no warning.
+    'usage-quota-warning',
 ];
 
 /** Spec §2.2-§2.4 — the recipient's call. */
