@@ -27,7 +27,7 @@ import { m } from "~/paraglide/messages";
  * implementation would drift, and only one of the three would get the next fix.
  */
 
-export type ChannelState = "on" | "off";
+type ChannelState = "on" | "off";
 export type ChannelId = "email" | "sms" | "in_app";
 
 export interface AlwaysSentItem {

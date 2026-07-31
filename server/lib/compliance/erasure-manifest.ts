@@ -201,6 +201,6 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // said at a date, which is the one thing it exists to answer. Listed rather
     // than left silent because the PII heuristic does not flag any column here,
     // and silence is not the same as a decision.
-    { table: 'tenant_legal_versions', column: 'body_snapshot',            reason: "the company's own published policy text, not a data subject's data" },
+    { table: 'tenant_legal_versions', column: 'body_snapshot',            reason: 'company-authored policy text, not personal data of any data subject' },
     { table: 'tenant_legal_versions', column: 'published_by_user_id',     reason: 'staff author reference — not consumer-DSAR scope' },
 ];

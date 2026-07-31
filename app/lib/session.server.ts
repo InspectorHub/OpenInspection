@@ -182,7 +182,7 @@ function isTokenExpired(token: string, nowMs: number): boolean {
  * The prefix is the whole rule: `/contacts` and `/inspections/agent-notes` are
  * staff pages ABOUT agents and stay on the staff door.
  */
-export function loginPathFor(request: Request): "/login" | "/agent-login" {
+function loginPathFor(request: Request): "/login" | "/agent-login" {
   return new URL(request.url).pathname.startsWith("/agent-") ? "/agent-login" : "/login";
 }
 

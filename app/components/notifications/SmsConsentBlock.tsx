@@ -20,7 +20,7 @@ import { m } from "~/paraglide/messages";
  * IS a button.
  */
 
-export type SmsConsentState = "granted" | "implied" | "revoked" | "none";
+type SmsConsentState = "granted" | "implied" | "revoked" | "none";
 
 export interface SmsConsent {
     phone: string | null;

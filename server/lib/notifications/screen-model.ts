@@ -16,9 +16,9 @@ import { NOTIFICATION_CLASSES, defaultEnabled, type Audience, type NotificationC
  */
 
 /** A channel's state on a row. */
-export type ChannelState = 'on' | 'off';
+type ChannelState = 'on' | 'off';
 
-export interface ScreenRow {
+interface ScreenRow {
     id: string;
     label: string;
     /**

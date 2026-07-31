@@ -2,7 +2,6 @@ import { useFetcher } from "react-router";
 import {
     NotificationPreferences,
     type AlwaysSentItem,
-    type ChannelId,
     type ChoiceRow,
 } from "~/components/notifications/NotificationPreferences";
 import { SmsConsentBlock, type SmsConsent } from "~/components/notifications/SmsConsentBlock";
@@ -120,5 +119,3 @@ export function NotificationSettings({
         </div>
     );
 }
-
-export type { ChannelId };
