@@ -34,7 +34,7 @@ import { getDrizzle } from '../lib/route-helpers';
  */
 export async function resolveRenderAccess(
     render: string | undefined, requestedId: string, secret: string,
-): Promise<{ inspectionId: string } | null> {
+): Promise<{ inspectionId: string; versionNumber?: number } | null> {
     if (!render) return null;
     const v = await verifyRenderToken(render, secret);
     if (!v || v.inspectionId !== requestedId) return null;
@@ -269,13 +269,18 @@ const publicReportRoutes = createApiRouter()
         // and pass it as `?render=`. Resolve tenantId from the inspection row so the
         // headless browser can load the full report without any user credential.
         let renderMode = false;
+        // A version named INSIDE the signed render token, when the caller is
+        // materialising a specific published version (the verify page's frozen
+        // PDF). Never read from the query string: a link holder who could append
+        // `&v=1` would be asking the renderer for a version they were never sent.
+        let pinnedVersion: number | undefined;
         if (!tenantId && render) {
             const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
             if (r) {
                 const db = getDrizzle(c);
                 const row = await db.select({ tenantId: inspections.tenantId })
                     .from(inspections).where(eq(inspections.id, id)).get();
-                if (row) { tenantId = row.tenantId; renderMode = true; }
+                if (row) { tenantId = row.tenantId; renderMode = true; pinnedVersion = r.versionNumber; }
             }
         }
         // Owner-session preview: an authenticated tenant user (inspector/admin)
@@ -337,7 +342,7 @@ const publicReportRoutes = createApiRouter()
             streamCustomerSubdomain,
             appBaseUrl,
             r2BaseUrl: `/api/inspections/${id}/media/video`,
-        });
+        }, pinnedVersion);
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(reportPhotoRoute, async (c) => {

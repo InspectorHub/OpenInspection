@@ -178,7 +178,12 @@ const publicVerifyRoutes = createApiRouter()
         // getOrRender will return cached row on content-hash hit; on miss it
         // renders once and stores with versionNumber so subsequent hits are instant.
         const tenantSlug = await resolveTenantSlug(c, tenantId);
-        const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, inspectionId, c.env.JWT_SECRET);
+        // The version travels into the render so the frozen PDF renders what
+        // that version FROZE. Before this the URL named no version, so the
+        // "frozen" artifact was whatever the live page said the first time
+        // somebody asked for it — which may be long after publication. The
+        // freezing was a caching side effect, not a property of the document.
+        const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, inspectionId, c.env.JWT_SECRET, versionNumber);
 
         // Use contentHash from the snapshot row if available; fall back to live hash
         // so even legacy rows (no contentHash) get a rendered PDF.

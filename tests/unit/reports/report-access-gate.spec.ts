@@ -131,7 +131,12 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
         const { app, getReportData } = buildApp();
         const res = await app.request(`/api/public/report/acme/${INSP_ID}?token=tok`);
         expect(res.status).toBe(200);
-        expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function), expect.any(Object));
+        expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function), expect.any(Object),
+            // 5th arg: the pinned version. `undefined` on every path that is not
+            // materialising a specific published version — asserted rather than
+            // omitted, because a NUMBER leaking in here would mean an ordinary
+            // client read was being served a frozen snapshot.
+            undefined);
     });
 
     it('owner-preview bypasses the gate (200 even when report_status=in_progress)', async () => {
@@ -146,7 +151,12 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
             headers: { Authorization: `Bearer ${ownerJwt}` },
         });
         expect(res.status).toBe(200);
-        expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function), expect.any(Object));
+        expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function), expect.any(Object),
+            // 5th arg: the pinned version. `undefined` on every path that is not
+            // materialising a specific published version — asserted rather than
+            // omitted, because a NUMBER leaking in here would mean an ordinary
+            // client read was being served a frozen snapshot.
+            undefined);
     });
 });
 

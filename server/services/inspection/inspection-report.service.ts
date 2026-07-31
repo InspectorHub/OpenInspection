@@ -1,6 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, asc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits, inspectorCredentials } from '../../lib/db/schema';
+import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits } from '../../lib/db/schema';
+import { CredentialService } from '../credential.service';
+import { pinnedLeadCredentials } from '../../lib/version-diff';
+import { loadPinnedSnapshot } from '../../lib/report-snapshot';
 import { buildUnitConditionMatrix, defectCountsByUnit } from '../../lib/unit-scope';
 import { Errors } from '../../lib/errors';
 import { resolveTenantTimeZone } from '../../lib/tz';
@@ -105,8 +108,24 @@ export class InspectionReportService extends InspectionSubService {
         // report + PDF render chain can branch. Absent (legacy callers) ⇒ photos
         // resolve exactly as before (image only).
         videoCtx?: ReportMediaContext,
+        /**
+         * When set, this read is serving a SPECIFIC published version, and the
+         * fields the snapshot captured are taken from it rather than resolved
+         * live. Only a signed render token can name one (render-token.ts), so a
+         * link holder cannot ask for a version they were never sent.
+         */
+        versionNumber?: number,
     ) {
         const db = this.getDrizzle();
+
+        // Spec B §1 — a published version renders what it FROZE. Loaded up front
+        // so the live resolutions below can be overlaid rather than duplicated:
+        // everything the snapshot does not carry still comes from live tables,
+        // which is the honest scope of this change and is stated on the payload
+        // itself via `snapshotSchemaVersion`.
+        const pinned = typeof versionNumber === 'number'
+            ? await loadPinnedSnapshot(this.getDrizzle(), tenantId, inspectionId, versionNumber)
+            : null;
 
         const inspection = await db.select().from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
@@ -466,18 +485,25 @@ export class InspectionReportService extends InspectionSubService {
             inspectorLicense = inspector?.licenseNumber ?? null;
         }
 
-        // Inspector Credentials & Association Badges (Spec B) — the inspector's
-        // active credentials, resolved to public asset URLs and snapshotted into
-        // the report payload. Empty rows (no image, blank label) are dropped.
-        let credentialSnapshot: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }> = [];
-        if (inspection.inspectorId) {
-            const credRows = await db.select().from(inspectorCredentials)
-                .where(and(eq(inspectorCredentials.tenantId, tenantId), eq(inspectorCredentials.userId, inspection.inspectorId), eq(inspectorCredentials.active, true)))
-                .orderBy(asc(inspectorCredentials.sortOrder), asc(inspectorCredentials.createdAt)).all();
-            credentialSnapshot = credRows
-                .filter((c) => c.imageR2Key || (c.label ?? '').trim())
-                .map((c) => ({ label: c.label, memberNumber: c.memberNumber, imageUrl: c.imageR2Key ? `/api/public/brand-asset?key=${encodeURIComponent(c.imageR2Key)}` : null }));
-        }
+        // Inspector Credentials & Association Badges (Spec B).
+        //
+        // A PINNED VERSION RENDERS WHAT IT FROZE. Resolving these live — which is
+        // what happened before the snapshot carried them — meant an inspector who
+        // left an association silently rewrote the cover of every report they had
+        // ever delivered. Option A on the cover: only the LEAD's badges render,
+        // matching the report's single inspector name and single signer. The
+        // snapshot keeps the helpers' too, so crediting them later is a rendering
+        // decision rather than a migration.
+        // `null` means the snapshot cannot answer (v1, or no version pinned) and
+        // live is the only thing there is to show; `[]` means the inspector held
+        // none on publish day, and rendering live over it would resurrect badges
+        // the delivered document never carried.
+        const frozenCredentials = pinnedLeadCredentials(pinned);
+        const credentialSnapshot: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }> =
+            frozenCredentials
+            ?? (inspection.inspectorId
+                ? await new CredentialService(this.db).listRenderable(tenantId, inspection.inspectorId)
+                : []);
 
         // Sprint 2 S2-4 — per-tenant flag controls whether the published
         // report renders "Estimated cost: $X – $Y" badges on defect cards.
@@ -526,7 +552,10 @@ export class InspectionReportService extends InspectionSubService {
         }
         // Report Style Presets (Plan 1a) — three-tier resolution + field-level tweaks.
         const insp = inspection as { profileOverride?: string | null; badgeLayoutOverride?: string | null; reportPhotoColumns?: number | null };
-        const styleProfile = resolveProfile(
+        // Same rule as the badges: a pinned version keeps the appearance it was
+        // published under, so a tenant switching their house style cannot
+        // restyle documents that were already delivered.
+        const styleProfile = (pinned?.styleProfile as ReturnType<typeof resolveProfile> | undefined) ?? resolveProfile(
             { profileOverride: insp.profileOverride ?? null, badgeLayoutOverride: insp.badgeLayoutOverride ?? null, reportPhotoColumns: insp.reportPhotoColumns ?? null },
             template ? { defaultProfileId: (template as { defaultProfileId?: string | null }).defaultProfileId ?? null } : null,
             { defaultProfileId: tenantDefaultProfileId },

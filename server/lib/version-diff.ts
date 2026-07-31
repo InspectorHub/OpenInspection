@@ -9,10 +9,88 @@
  * are skipped on field walks so version bumps don't show as changes.
  */
 
+/**
+ * One inspector as the report presents them, with the credentials they held on
+ * publish day.
+ *
+ * A LIST FROM DAY ONE even though only the lead is populated. An inspection can
+ * have more than one inspector (`leadInspectorId` + `helperInspectorIds`), and
+ * the report shows a single name today. Which of them the cover should credit is
+ * a product question, not this change's; what this change fixes is that the
+ * answer must not cost a migration of every stored snapshot to revisit. A scalar
+ * that becomes a list AFTER snapshots exist is exactly that migration. Getting
+ * the shape right while the field is empty is free.
+ *
+ * A badge is a claim about a PERSON on a document about an INSPECTION, so the
+ * role travels with it — an unattributed pool of five badges would turn a
+ * per-person claim into a per-inspection one that nobody made.
+ */
+export interface SnapshotInspector {
+    userId:      string;
+    name:        string | null;
+    role:        'lead' | 'helper';
+    credentials: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }>;
+}
+
+/**
+ * SNAPSHOT SCHEMA VERSIONS
+ *
+ * 1 — `{ inspection, data, units }`. Every row written before the credential
+ *     snapshot. Absent `schemaVersion` means 1; the field did not exist.
+ * 2 — adds `inspectors` and `styleProfile`.
+ *
+ * The version exists so a READER can tell "this report predates credentials"
+ * from "this inspector held none" — two states that look identical as an empty
+ * array and mean opposite things on a cover page.
+ *
+ * It is NOT a hashing basis. `report_versions.content_hash` is the SHA-256 of
+ * the stored `snapshot_json` STRING, and `verifyByToken` recomputes it from that
+ * same stored column — so a row written under v1 keeps hashing to exactly what
+ * it hashed to, whatever later versions contain. Growing this type cannot
+ * invalidate a signature that already exists, and no dual-basis verifier is
+ * needed. `report-version-service.spec.ts` pins that directly, because it is the
+ * kind of reasoning that is easy to get wrong in the safe direction and
+ * expensive to get wrong in the other.
+ */
+export const SNAPSHOT_SCHEMA_VERSION = 2;
+
+/**
+ * The credentials a PINNED version should render, or null when the snapshot
+ * cannot answer.
+ *
+ * Null and `[]` are different answers and the caller must not conflate them:
+ *
+ *   null — this snapshot predates the credential capture (schema v1), so there
+ *          is nothing recorded and the live state is the only thing there is to
+ *          show. Those reports WERE rendered live when they were delivered;
+ *          pretending otherwise would be inventing history rather than
+ *          recording it.
+ *   []   — the inspector held no credentials on publish day. A real answer, and
+ *          rendering live state over it would resurrect badges the delivered
+ *          document never carried.
+ *
+ * OPTION A on the cover: the LEAD's badges only, matching the report's single
+ * inspector name and single signer. The snapshot keeps the helpers' too, so
+ * crediting them later is a rendering decision rather than a migration.
+ */
+export function pinnedLeadCredentials(
+    snapshot: Snapshot | null | undefined,
+): SnapshotInspector['credentials'] | null {
+    if (!snapshot?.inspectors) return null;
+    const lead = snapshot.inspectors.find((i) => i.role === 'lead') ?? snapshot.inspectors[0];
+    return lead?.credentials ?? [];
+}
+
 export interface Snapshot {
+    /** Absent on rows written before the credential snapshot — treat as 1. */
+    schemaVersion?: number;
     inspection?: Record<string, unknown>;
     data:        Record<string, Record<string, unknown>>;
     units:       Array<{ id: string; [key: string]: unknown }>;
+    /** v2+. The people the report credits, and what they held on publish day. */
+    inspectors?: SnapshotInspector[];
+    /** v2+. The appearance profile resolved at publish (Report Style Presets). */
+    styleProfile?: Record<string, unknown> | null;
 }
 
 interface ItemDiff {
