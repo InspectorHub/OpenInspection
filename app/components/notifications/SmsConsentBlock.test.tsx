@@ -10,14 +10,24 @@ import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { SmsConsentBlock, type SmsConsent } from "./SmsConsentBlock";
 
-const base: SmsConsent = { phone: "+1 555 000 1111", state: "granted", at: "2026-06-12T00:00:00.000Z", capturedVia: "booking_form" };
+const DISCLOSURE = { version: 3, text: "Message and data rates may apply." };
+const base: SmsConsent = {
+  phone: "+1 555 000 1111", state: "granted", at: "2026-06-12T00:00:00.000Z",
+  capturedVia: "booking_form", disclosure: DISCLOSURE,
+};
 
 function setup(consent: Partial<SmsConsent> = {}, manageHref?: string) {
   const onStop = vi.fn();
+  const onGrant = vi.fn();
   const utils = render(
-    <SmsConsentBlock consent={{ ...base, ...consent }} onStop={onStop} manageHref={manageHref} />,
+    <SmsConsentBlock
+      consent={{ ...base, ...consent }}
+      onStop={onStop}
+      onGrant={onGrant}
+      manageHref={manageHref}
+    />,
   );
-  return { ...utils, onStop };
+  return { ...utils, onStop, onGrant };
 }
 
 describe("SMS consent block", () => {
@@ -42,10 +52,31 @@ describe("SMS consent block", () => {
     expect(c.onStop).toHaveBeenCalled();
   });
 
-  it("offers NO way to switch consent back on, only a way out to the opt-in page", () => {
-    const c = setup({ state: "revoked" }, "/sms-optin/abc");
+  it("offers a way BACK ON after a stop — otherwise the block is a dead end", () => {
+    // Shipped as a dead end and caught in the browser: stopped, no Stop button
+    // (correct), and no way to return (not).
+    const c = setup({ state: "revoked" });
     expect(c.queryByText(/Stop texts/i)).toBeNull();
-    expect(c.getByText(/Manage texts/i)).toBeTruthy();
+    expect(c.getByText(/Turn texts on/i)).toBeTruthy();
+  });
+
+  it("will not grant until the reader has acknowledged the disclosure", () => {
+    // The disclosure is on screen and its VERSION travels with the grant. That
+    // is the whole difference between recording consent and inventing it.
+    const c = setup({ state: "revoked" });
+    const button = c.getByText(/Turn texts on/i).closest("button")!;
+    expect(button.disabled).toBe(true);
+
+    c.container.querySelector<HTMLInputElement>("input[type=checkbox]")!.click();
+    expect(c.getByText(/Turn texts on/i).closest("button")!.disabled).toBe(false);
+    c.getByText(/Turn texts on/i).closest("button")!.click();
+    expect(c.onGrant).toHaveBeenCalledWith(3);
+  });
+
+  it("offers no inline grant when there is no disclosure to show", () => {
+    // No text means nothing the reader could have agreed to.
+    const c = setup({ state: "revoked", disclosure: null });
+    expect(c.queryByText(/Turn texts on/i)).toBeNull();
   });
 
   it("says an agent is reachable under the relationship, without claiming a grant", () => {

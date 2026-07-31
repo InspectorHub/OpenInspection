@@ -70,6 +70,16 @@ export interface NotificationPreferencesProps {
      * single choosable row should do, since there the one cell IS the control.
      */
     onBulk?: (enabled: boolean, scope: { channel?: ChannelId; classId?: string }) => void;
+    /**
+     * Channels the reader cannot currently receive at all, with the reason.
+     *
+     * A revoked SMS consent makes every per-notification Text choice moot — no
+     * text can arrive whatever the row says — so the column is DISABLED rather
+     * than merely unchecked. Leaving it live would let someone tick "yes, text
+     * me about bookings" while consent says we may not text them at all, which
+     * is a screen disagreeing with the send gate.
+     */
+    lockedChannels?: Partial<Record<ChannelId, string>>;
 }
 
 /** All | none | some of the cells in scope are on. */
@@ -123,13 +133,14 @@ const CHANNELS: ReadonlyArray<{ id: ChannelId; label: () => string }> = [
 ];
 
 function ChannelCell({
-    row, channel, channelLabel, onChange, busy,
+    row, channel, channelLabel, onChange, busy, lockedReason,
 }: {
     row: ChoiceRow;
     channel: ChannelId;
     channelLabel: string;
     onChange: NotificationPreferencesProps["onChange"];
     busy: boolean;
+    lockedReason?: string | undefined;
 }) {
     return (
         <div role="cell" className="flex items-center gap-2 sm:justify-center">
@@ -140,8 +151,9 @@ function ChannelCell({
             <Checkbox
                 bare
                 checked={row.channels[channel] === "on"}
-                disabled={busy}
+                disabled={busy || !!lockedReason}
                 aria-label={`${row.label} — ${channelLabel}`}
+                {...(lockedReason ? { title: lockedReason } : {})}
                 onChange={(e) => onChange(row.id, channel, e.currentTarget.checked)}
             />
         </div>
@@ -150,6 +162,7 @@ function ChannelCell({
 
 export function NotificationPreferences({
     alwaysSent, youChoose, onChange, busy = false, status = "idle", onBulk,
+    lockedChannels = {},
 }: NotificationPreferencesProps) {
     // With one row there is nothing to batch: the row, the column and the grid
     // all resolve to the same single cell, and three extra controls saying so
@@ -238,7 +251,7 @@ export function NotificationPreferences({
                                     <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-wider">
                                         {c.label()}
                                     </span>
-                                    {bulk && bulkStateOf(youChoose, { channel: c.id }) && (
+                                    {bulk && !lockedChannels[c.id] && bulkStateOf(youChoose, { channel: c.id }) && (
                                         <BulkBox
                                             state={bulkStateOf(youChoose, { channel: c.id })!}
                                             label={m.notif_prefs_bulk_column({ channel: c.label() })}
@@ -275,6 +288,7 @@ export function NotificationPreferences({
                                             channelLabel={c.label()}
                                             onChange={onChange}
                                             busy={busy}
+                                            lockedReason={lockedChannels[c.id]}
                                         />
                                     ))}
                                 </div>

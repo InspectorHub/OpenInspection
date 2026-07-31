@@ -67,7 +67,10 @@ export const smsConsentLog = sqliteTable('sms_consent_log', {
     recipientType:     text('recipient_type', { enum: ['client', 'agent', 'other'] }).notNull(),
     action:            text('action', { enum: ['granted', 'revoked'] }).notNull(),
     disclosureVersion: integer('disclosure_version').notNull(),
-    capturedVia:       text('captured_via', { enum: ['booking_form', 'optin_link', 'admin'] }).notNull(),
+    // `settings_page` is a grant made inline on the notifications screen, with
+    // the disclosure rendered there. Type-layer only — the DDL is plain text,
+    // so widening this costs no migration.
+    capturedVia:       text('captured_via', { enum: ['booking_form', 'optin_link', 'admin', 'settings_page'] }).notNull(),
     ip:                text('ip'),
     userAgent:         text('user_agent'),
     createdAt:         integer('created_at', { mode: 'timestamp_ms' }).notNull(),

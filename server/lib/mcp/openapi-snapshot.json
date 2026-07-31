@@ -14625,6 +14625,42 @@
     "description": "Returns the notifications addressed to the signed-in recipient in this tenant, split into the ones that cannot be switched off and the ones they choose. Channels a class never uses are reported as \"unavailable\", which is not the same as \"off\"."
   },
   {
+    "operationId": "portalGrantSmsConsent",
+    "method": "PUT",
+    "pathTemplate": "/api/portal/{tenant}/notification-preferences/sms-consent",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "disclosureVersion": {
+            "type": "integer",
+            "description": "The version of the disclosure that was on screen when they agreed."
+          }
+        },
+        "required": [
+          "disclosureVersion"
+        ]
+      }
+    },
+    "summary": "Record that this reader agreed to receive texts",
+    "description": "Appends a granted row to the SMS consent ledger, stamped with the disclosure the reader saw, their ip and their user agent. A separate route from the preference writes because it is a legal record, not a setting."
+  },
+  {
     "operationId": "portalInspectionObserve",
     "method": "GET",
     "pathTemplate": "/api/portal/{tenant}/inspections/{inspectionId}/observe",

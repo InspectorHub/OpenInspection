@@ -162,6 +162,9 @@ export default function AgentSettingsProfilePage() {
   const [applyAll, setApplyAll] = useState(false);
   // "saved" persists after the fetcher goes idle, so the confirmation is still
   // on screen when the reader looks up from the switch they just moved.
+  const sc = notifications.smsConsent;
+  // No consent means no text can arrive, whatever a row says.
+  const smsUnavailable = !!sc && (sc.state === "revoked" || sc.state === "none");
   const notifyStatus = notifyFetcher.state !== "idle" ? "saving" as const : "idle" as const;
   const navigate = useNavigate();
   const locale = useDisplayLocale();
@@ -294,16 +297,6 @@ export default function AgentSettingsProfilePage() {
                 {m.agent_portal_settings_notify_apply_all({ count: notifications.companies.length })}
               </label>
             )}
-            <div className="mt-5">
-              <NotificationPreferences
-                alwaysSent={notifications.alwaysSent}
-                youChoose={notifications.youChoose}
-                onChange={saveNotification}
-                busy={notifyFetcher.state !== "idle"}
-                status={notifyStatus}
-                onBulk={bulkNotification}
-              />
-            </div>
             {notifications.smsConsent && (
               <div className="mt-5">
                 <SmsConsentBlock
@@ -314,6 +307,27 @@ export default function AgentSettingsProfilePage() {
                 />
               </div>
             )}
+            {notifications.smsConsent && (
+              <div className="mt-5">
+                <SmsConsentBlock
+                  consent={notifications.smsConsent}
+                  locale={locale}
+                  onStop={() => bulkNotification(false, { channel: "sms" })}
+                  busy={notifyFetcher.state !== "idle"}
+                />
+              </div>
+            )}
+            <div className="mt-5">
+              <NotificationPreferences
+                alwaysSent={notifications.alwaysSent}
+                youChoose={notifications.youChoose}
+                onChange={saveNotification}
+                busy={notifyFetcher.state !== "idle"}
+                status={notifyStatus}
+                onBulk={bulkNotification}
+                lockedChannels={smsUnavailable ? { sms: m.notif_prefs_sms_locked() } : {}}
+              />
+            </div>
           </>
         )}
       </section>

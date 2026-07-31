@@ -54,6 +54,7 @@ import {
 } from "~/lib/section-loaders";
 import {
   bulkPortalNotificationChoice,
+  grantPortalSmsConsent,
   loadNotificationsSection,
   savePortalNotificationChoice,
   type NotificationsLoaderResult,
@@ -252,6 +253,11 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 
   // C3 — the Notices bell's writes. The session cookie travels explicitly
   // because the typed client does not forward the browser's.
+  if (intent === "notification-sms-grant") {
+    const r = await grantPortalSmsConsent(context, tenant, request, formData);
+    return { ...r, intent };
+  }
+
   if (intent === "notification-bulk") {
     const r = await bulkPortalNotificationChoice(
       context, tenant, request.headers.get("cookie") ?? "", formData,

@@ -1,4 +1,5 @@
-import { Button } from "@core/shared-ui";
+import { useState } from "react";
+import { Button, Checkbox } from "@core/shared-ui";
 import { formatDate } from "~/lib/format";
 import { m } from "~/paraglide/messages";
 
@@ -24,22 +25,33 @@ export interface SmsConsent {
     phone: string | null;
     state: SmsConsentState;
     at: string | null;
-    capturedVia: "booking_form" | "optin_link" | "admin" | null;
+    capturedVia: "booking_form" | "optin_link" | "admin" | "settings_page" | null;
+    /** What the reader must SEE before granting, and the version recorded. */
+    disclosure: { version: number; text: string } | null;
 }
 
 const SOURCE = {
+    settings_page: () => m.notif_prefs_source_settings_page(),
     booking_form: () => m.notif_prefs_source_booking_form(),
     optin_link: () => m.notif_prefs_source_optin_link(),
     admin: () => m.notif_prefs_source_admin(),
 };
 
 export function SmsConsentBlock({
-    consent, manageHref, onStop, busy = false, locale = "en-US",
+    consent, manageHref, onStop, onGrant, busy = false, locale = "en-US",
 }: {
     consent: SmsConsent;
     /** The opt-in page — where consent can be granted with its disclosure. */
     manageHref?: string | undefined;
     onStop: () => void;
+    /**
+     * Grant, with the disclosure version the reader actually saw.
+     *
+     * Absent ⇒ no inline grant is offered. The version is passed back rather
+     * than looked up server-side because that is the whole difference between
+     * recording consent and inventing it.
+     */
+    onGrant?: ((disclosureVersion: number) => void) | undefined;
     busy?: boolean;
     /**
      * The APP's locale, passed in rather than read from a hook.
@@ -54,6 +66,8 @@ export function SmsConsentBlock({
 }) {
     const day = (iso: string | null) => (iso ? formatDate(iso, { locale }) : "");
     const on = consent.state === "granted" || consent.state === "implied";
+    const [ack, setAck] = useState(false);
+    const canGrant = !on && !!onGrant && !!consent.disclosure;
 
     return (
         <section aria-labelledby="notif-sms-h" className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
@@ -83,7 +97,36 @@ export function SmsConsentBlock({
                 <p className="text-[13px] text-ih-fg-3 mt-1">{m.notif_prefs_sms_implied()}</p>
             )}
 
+            {canGrant && (
+                // The disclosure is on screen BEFORE the acknowledgement, and
+                // its version travels with the grant. That is what makes an
+                // inline switch a record rather than a claim.
+                <div className="mt-4 space-y-3">
+                    <details className="text-[13px]">
+                        <summary className="cursor-pointer select-none text-ih-fg-2 font-medium focus-visible:outline-2 focus-visible:outline-ih-primary rounded-sm">
+                            {m.notif_prefs_sms_disclosure_show()}
+                        </summary>
+                        <p className="mt-2 text-[13px] text-ih-fg-3 max-w-prose whitespace-pre-line">
+                            {consent.disclosure!.text}
+                        </p>
+                    </details>
+                    <label className="flex items-start gap-2 text-[13px] text-ih-fg-2">
+                        <Checkbox bare checked={ack} disabled={busy} onChange={(e) => setAck(e.currentTarget.checked)} />
+                        {m.notif_prefs_sms_grant_ack()}
+                    </label>
+                </div>
+            )}
+
             <div className="flex items-center gap-3 mt-4 flex-wrap">
+                {canGrant && (
+                    <Button
+                        variant="primary"
+                        disabled={!ack || busy}
+                        onClick={() => onGrant!(consent.disclosure!.version)}
+                    >
+                        {m.notif_prefs_sms_grant()}
+                    </Button>
+                )}
                 {on && (
                     <Button variant="secondary" onClick={onStop} disabled={busy}>
                         {m.notif_prefs_sms_stop()}

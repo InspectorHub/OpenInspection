@@ -31,7 +31,9 @@ export function PortalNotificationSection({
   manageTextsHref?: string | undefined;
 }) {
   const fetcher = useFetcher<{ ok?: boolean; intent?: string; error?: string }>();
-  const result = fetcher.data?.intent === "notification-preference" || fetcher.data?.intent === "notification-bulk"
+  const result = fetcher.data?.intent === "notification-preference"
+    || fetcher.data?.intent === "notification-bulk"
+    || fetcher.data?.intent === "notification-sms-grant"
     ? fetcher.data : null;
   const saveError = result && result.ok === false ? result.error : null;
   useNotificationSaveToast({ data: result, failed: !!saveError, error: saveError });
@@ -39,6 +41,16 @@ export function PortalNotificationSection({
   // "saved" persists after the fetcher goes idle, so the confirmation is still
   // on screen when the reader looks up from the switch they just moved.
   const status = fetcher.state !== "idle" ? "saving" as const : "idle" as const;
+  // No consent means no text can arrive, whatever a row says — so the column is
+  // disabled rather than merely unchecked.
+  const smsUnavailable = !!smsConsent && (smsConsent.state === "revoked" || smsConsent.state === "none");
+
+  function grantSms(disclosureVersion: number) {
+    fetcher.submit(
+      { intent: "notification-sms-grant", disclosureVersion: String(disclosureVersion) },
+      { method: "post" },
+    );
+  }
 
   function bulk(enabled: boolean, scope: { channel?: ChannelId; classId?: string }) {
     fetcher.submit(
@@ -68,6 +80,18 @@ export function PortalNotificationSection({
       {/* Only the LOAD failure stays inline — it explains why the grid below
           is missing, so it belongs where the grid would have been. */}
       {error && <p className="text-[13px] text-ih-bad-fg">{error}</p>}
+      {smsConsent && (
+        // ABOVE the grid, because consent is the gate and the grid is what
+        // happens behind it. Stopping here is one request: the ledger entry and
+        // the Text-column cascade, so the two can never disagree.
+        <SmsConsentBlock
+          consent={smsConsent}
+          manageHref={manageTextsHref}
+          onStop={() => bulk(false, { channel: "sms" })}
+          onGrant={grantSms}
+          busy={fetcher.state !== "idle"}
+        />
+      )}
       <NotificationPreferences
         alwaysSent={alwaysSent}
         youChoose={youChoose}
@@ -75,17 +99,8 @@ export function PortalNotificationSection({
         busy={fetcher.state !== "idle"}
         status={status}
         onBulk={bulk}
+        lockedChannels={smsUnavailable ? { sms: m.notif_prefs_sms_locked() } : {}}
       />
-      {smsConsent && (
-        // Stopping texts is BOTH a consent act and a cascade over the Text
-        // column — one request, so the two can never disagree.
-        <SmsConsentBlock
-          consent={smsConsent}
-          manageHref={manageTextsHref}
-          onStop={() => bulk(false, { channel: "sms" })}
-          busy={fetcher.state !== "idle"}
-        />
-      )}
     </div>
   );
 }

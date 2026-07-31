@@ -8,7 +8,7 @@ import type { HonoConfig } from '../../types/hono';
 import { buildScreenModel } from '../../lib/notifications/screen-model';
 import { applyBulk, assertChoosable, readChoices, writeChoice } from '../../lib/notifications/preference-write';
 import { contactIdsForEmail } from '../../services/notice-inbox';
-import { readSmsConsent, revokeChannel } from '../../lib/notifications/channel-consent';
+import { grantSms, readSmsConsent, revokeChannel } from '../../lib/notifications/channel-consent';
 import { SmsConsentService } from '../../services/sms-consent.service';
 import { Errors } from '../../lib/errors';
 
@@ -141,9 +141,43 @@ const bulkRoute = createRoute(withMcpMetadata({
         'notifications are never touched.',
 }, { scopes: [], tier: 'extended' }));
 
+const grantRoute = createRoute(withMcpMetadata({
+    method: 'put',
+    path: '/{tenant}/notification-preferences/sms-consent',
+    tags: ['public'],
+    summary: 'Record that this reader agreed to receive texts',
+    request: {
+        params: TenantParam,
+        body: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        disclosureVersion: z.number().int()
+                            .describe('The version of the disclosure that was on screen when they agreed.'),
+                    }),
+                },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } },
+            description: 'Recorded.',
+        },
+        400: { description: 'No current disclosure, or a version that is not the current one' },
+        401: { description: 'No valid portal session cookie' },
+    },
+    operationId: 'portalGrantSmsConsent',
+    description:
+        'Appends a granted row to the SMS consent ledger, stamped with the disclosure the ' +
+        'reader saw, their ip and their user agent. A separate route from the preference ' +
+        'writes because it is a legal record, not a setting.',
+}, { scopes: [], tier: 'extended' }));
+
 const router = createApiRouter();
 router.use('/:tenant/notification-preferences', portalSessionGuard);
 router.use('/:tenant/notification-preferences/bulk', portalSessionGuard);
+router.use('/:tenant/notification-preferences/sms-consent', portalSessionGuard);
 
 const portalNotificationPreferenceRoutes = router
     .openapi(getScreenRoute, async (c) => {
@@ -161,7 +195,8 @@ const portalNotificationPreferenceRoutes = router
                 if (!chosen.has(key) || enabled === false) chosen.set(key, enabled);
             }
         }
-        const smsConsent = await readSmsConsent(db, tenantId, 'client', contactIds);
+        const disclosure = await new SmsConsentService(c.env.DB).currentDisclosure();
+        const smsConsent = await readSmsConsent(db, tenantId, 'client', contactIds, disclosure);
         return c.json({
             success: true as const,
             data: { ...buildScreenModel('client', chosen), smsConsent },
@@ -204,9 +239,34 @@ const portalNotificationPreferenceRoutes = router
         // Switching a whole channel off is also a CONSENT act on SMS, and the
         // ledger has to carry it wherever the reader stopped from (§4.2).
         if (change.action === 'disable' && change.channel === 'sms' && !change.classId) {
-            const block = await readSmsConsent(db, tenantId, 'client', contactIds);
+            const block = await readSmsConsent(db, tenantId, 'client', contactIds, null);
             await revokeChannel(new SmsConsentService(c.env.DB), tenantId, 'sms', block, 'client');
         }
+        return c.json({ success: true as const }, 200);
+    })
+    .openapi(grantRoute, async (c) => {
+        const tenantId = resolveTenantId(c);
+        if (!tenantId) throw Errors.NotFound('Company not found.');
+        const { disclosureVersion } = c.req.valid('json');
+
+        const svc = new SmsConsentService(c.env.DB);
+        const disclosure = await svc.currentDisclosure();
+        // The version must be the CURRENT one. A stale version means the reader
+        // agreed to text they are no longer being shown, and recording it would
+        // put a claim in the ledger the disclosure does not support.
+        if (!disclosure || disclosure.version !== disclosureVersion) {
+            throw Errors.BadRequest('Please reload and read the current terms before agreeing.');
+        }
+
+        const db = getDrizzle(c);
+        const contactIds = await contactIdsForEmail(db, tenantId, c.get('portalEmail') as string);
+        const block = await readSmsConsent(db, tenantId, 'client', contactIds, disclosure);
+        if (!block) throw Errors.BadRequest('There is nothing to change here.');
+
+        await grantSms(svc, tenantId, block, 'client', {
+            ip: c.req.header('cf-connecting-ip'),
+            userAgent: c.req.header('user-agent'),
+        });
         return c.json({ success: true as const }, 200);
     });
 

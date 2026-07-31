@@ -77,6 +77,26 @@ describe("bulk controls", () => {
     expect(c.onBulk).toHaveBeenCalledWith(true, {});
   });
 
+  it("DISABLES a locked channel rather than just showing it off", () => {
+    // A revoked SMS consent makes every per-notification Text choice moot: no
+    // text can arrive whatever the row says. Leaving the column live would let
+    // someone tick "yes, text me" while consent says we may not — a screen
+    // disagreeing with the send gate.
+    const c = setup({ lockedChannels: { sms: "Text is switched off above." } });
+    const sms = boxes(c).filter((b) => (b.getAttribute("aria-label") ?? "").endsWith("Text"));
+    expect(sms.length).toBeGreaterThan(0);
+    expect(sms.every((b) => b.disabled)).toBe(true);
+    // ...and its bulk control goes with it: a select-all over cells that
+    // cannot change is the empty-column lie again.
+    expect(boxes(c).some((b) => (b.getAttribute("aria-label") ?? "").startsWith("Turn Text"))).toBe(false);
+  });
+
+  it("leaves the OTHER channels alone when one is locked", () => {
+    const c = setup({ lockedChannels: { sms: "off" } });
+    const email = boxes(c).filter((b) => (b.getAttribute("aria-label") ?? "").endsWith("Email"));
+    expect(email.every((b) => !b.disabled)).toBe(true);
+  });
+
   it("renders no bulk controls at all for a single-row screen", () => {
     // The row, the column and the grid all resolve to the same cell there.
     const c = setup({ youChoose: [rows[0]] });

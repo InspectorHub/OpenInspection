@@ -30,6 +30,14 @@ export interface SmsConsentBlock {
     capturedVia: 'booking_form' | 'optin_link' | 'admin' | null;
     /** The contact rows this reader is, so a Stop knows what to write. */
     contactIds: string[];
+    /**
+     * The disclosure the reader must SEE before granting, and its version.
+     *
+     * Carried with the state because granting inline is only honest if the
+     * text was on screen when they agreed — shipping the state without the
+     * text is what would turn an inline switch into manufactured evidence.
+     */
+    disclosure: { version: number; text: string } | null;
 }
 
 /**
@@ -48,6 +56,7 @@ export async function readSmsConsent(
     tenantId: string,
     audience: Audience,
     contactIds: string[],
+    disclosure: { version: number; text: string } | null,
 ): Promise<SmsConsentBlock | null> {
     if (contactIds.length === 0) return null;
 
@@ -75,13 +84,13 @@ export async function readSmsConsent(
     if (latest?.action === 'revoked') {
         return {
             phone, state: 'revoked',
-            at: toIso(latest.createdAt), capturedVia: latest.capturedVia ?? null, contactIds,
+            at: toIso(latest.createdAt), capturedVia: latest.capturedVia ?? null, contactIds, disclosure,
         };
     }
     if (latest?.action === 'granted') {
         return {
             phone, state: 'granted',
-            at: toIso(latest.createdAt), capturedVia: latest.capturedVia ?? null, contactIds,
+            at: toIso(latest.createdAt), capturedVia: latest.capturedVia ?? null, contactIds, disclosure,
         };
     }
 
@@ -90,7 +99,7 @@ export async function readSmsConsent(
     // not reachable at all until they say so.
     return {
         phone, state: audience === 'agent' ? 'implied' : 'none',
-        at: null, capturedVia: null, contactIds,
+        at: null, capturedVia: null, contactIds, disclosure,
     };
 }
 
@@ -121,9 +130,30 @@ function toIso(v: unknown): string | null {
 export interface ConsentRecorder {
     record(
         tenantId: string, contactId: string, action: 'granted' | 'revoked',
-        capturedVia: 'booking_form' | 'optin_link' | 'admin',
+        capturedVia: 'booking_form' | 'optin_link' | 'admin' | 'settings_page',
         meta: { ip?: string | undefined; userAgent?: string | undefined; recipientType?: 'client' | 'agent' | 'other' },
     ): Promise<unknown>;
+}
+
+/**
+ * Record that this reader granted the text channel, from this screen.
+ *
+ * Only legitimate when the disclosure was RENDERED and its version comes back
+ * with the acknowledgement — which is why the version is a parameter and not
+ * something this function looks up. A caller that could pass any version would
+ * be able to record consent to text the reader never saw.
+ */
+export async function grantSms(
+    recorder: ConsentRecorder,
+    tenantId: string,
+    block: SmsConsentBlock,
+    audience: Audience,
+    meta: { ip?: string | undefined; userAgent?: string | undefined },
+): Promise<void> {
+    const recipientType = audience === 'agent' ? 'agent' as const : 'client' as const;
+    for (const contactId of block.contactIds) {
+        await recorder.record(tenantId, contactId, 'granted', 'settings_page', { ...meta, recipientType });
+    }
 }
 
 export async function revokeChannel(

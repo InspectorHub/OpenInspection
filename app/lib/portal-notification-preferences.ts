@@ -101,3 +101,44 @@ export async function bulkPortalNotificationChoice(
     );
     return res.ok ? { ok: true } : { ok: false, error: m.portal_notif_save_error() };
 }
+
+/** Cookie plus the two evidence headers, omitting any the request lacks. */
+function forwardedEvidence(request: Request): Record<string, string> {
+    const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for");
+    const ua = request.headers.get("user-agent");
+    return {
+        Cookie: request.headers.get("cookie") ?? "",
+        ...(ip ? { "cf-connecting-ip": ip } : {}),
+        ...(ua ? { "user-agent": ua } : {}),
+    };
+}
+
+/**
+ * Record an inline SMS consent grant, carrying the version that was on screen.
+ *
+ * THE IP AND USER AGENT ARE FORWARDED EXPLICITLY, and they have to be. The BFF
+ * calls the API in-process over the `API_WORKER` binding, so the browser's
+ * `cf-connecting-ip` and `user-agent` never reach the handler on their own —
+ * the ledger recorded nulls for both, which are the two fields that make a
+ * consent row defensible in a carrier audit. Verified in the browser; nothing
+ * in the type system or the tests would have said a word.
+ */
+export async function grantPortalSmsConsent(
+    context: LoadContext,
+    tenant: string,
+    request: Request,
+    formData: FormData,
+): Promise<{ ok: boolean; error?: string }> {
+    const api = createApi(context);
+    const res = await api.portalNotificationPrefs[":tenant"]["notification-preferences"]["sms-consent"].$put(
+        {
+            param: { tenant },
+            json: { disclosureVersion: Number(formData.get("disclosureVersion") ?? 0) },
+        },
+        // Absent headers are OMITTED, not sent empty. An empty string would be
+        // stored as one, and a consent row claiming "we recorded an ip and it
+        // was blank" is worse evidence than one that plainly has none.
+        { headers: forwardedEvidence(request) },
+    );
+    return res.ok ? { ok: true } : { ok: false, error: m.portal_notif_save_error() };
+}

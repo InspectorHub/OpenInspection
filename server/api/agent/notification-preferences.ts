@@ -157,6 +157,7 @@ const agentNotificationPreferenceRoutes = createApiRouter()
         const db = getDrizzle(c);
 
         const companies = await listAgentCompanies(db, agentUserId);
+        const disclosure = await new SmsConsentService(c.env.DB).currentDisclosure();
         const { companyId } = c.req.valid('query');
         const selected = companyId
             ? companies.find((x) => x.tenantId === companyId)
@@ -177,7 +178,7 @@ const agentNotificationPreferenceRoutes = createApiRouter()
                 // Consent is per COMPANY, like everything else on this screen:
                 // it attaches to the contact row that company holds.
                 smsConsent: selected
-                    ? await readSmsConsent(db, selected.tenantId, 'agent', [selected.contactId])
+                    ? await readSmsConsent(db, selected.tenantId, 'agent', [selected.contactId], disclosure)
                     : null,
             },
         }, 200);
@@ -231,7 +232,7 @@ const agentNotificationPreferenceRoutes = createApiRouter()
             // A whole-channel stop is also a consent act on SMS (§4.2), and an
             // agent's revocation is recorded AS an agent's.
             if (action === 'disable' && channel === 'sms' && !classId) {
-                const block = await readSmsConsent(db, t.tenantId, 'agent', [t.contactId]);
+                const block = await readSmsConsent(db, t.tenantId, 'agent', [t.contactId], null);
                 await revokeChannel(new SmsConsentService(c.env.DB), t.tenantId, 'sms', block, 'agent');
             }
         }
