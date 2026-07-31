@@ -38,9 +38,19 @@ const NEVER_OFF = [
     // A one-off share to a typed-in address: no account, no relationship, so no
     // preference can exist. See the third `required: true` case in classes.ts.
     'repair-request-share',
-    // Only ever sent to whoever pressed the button — see the `diagnostic`
-    // category. Nobody else can have a preference about it.
+    // Only ever sent to whoever pressed the button — see `recipientFacing`.
+    // Nobody else can have a preference about it.
     'admin-test-send',
+    // §2.5 — work notifications to employees. The company decides; an
+    // individual cannot mute their own dispatch. The operator's control is the
+    // automation rule's own active flag, not this field.
+    'inspector-payment-received', 'inspector-agreement-signed',
+    'inspector-agreement-declined', 'inspector-agreement-viewed',
+    'office-alert-new-booking', 'office-alert-inspection-scheduled',
+    'office-alert-inspection-confirmed', 'office-alert-inspection-cancelled',
+    'office-alert-inspection-completed', 'office-alert-report-published',
+    'office-alert-invoice-created', 'office-alert-payment-received',
+    'office-alert-agreement-signed',
 ];
 
 /** Spec §2.2-§2.4 — the recipient's call. */
@@ -49,6 +59,13 @@ const RECIPIENT_MAY_MUTE = [
     'agent-new-referral', 'agent-report-ready', 'agent-invoice-paid',
     'concierge-client-confirm', 'concierge-inspector-review',
     'concierge-confirmed-agent', 'concierge-cancelled-agent',
+    // §2.2 / §2.3 — seeded automation rules the recipient may switch off.
+    // §5.3 settles the sharpest pair outright: report-ready is required,
+    // post-inspection-followup and review-request are not.
+    'inspection-reminder', 'inspection-cancelled', 'report-amended',
+    'report-ready-listing-agent', 'booking-confirmation-buyers-agent',
+    'report-amended-buyers-agent', 'event-reminder', 'event-followup',
+    'post-inspection-followup', 'review-request',
 ];
 
 describe('notification classes', () => {

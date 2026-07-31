@@ -119,6 +119,59 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     { id: 'agent-report-ready',   label: 'A report is ready to read', category: 'transactional', required: false, channels: ['email'] },
     { id: 'agent-invoice-paid',   label: 'An invoice is paid',      category: 'transactional', required: false, channels: ['email'] },
 
+    // ─── automation rules the tenant did not write (spec §2.2, §2.3, §2.5)
+    //
+    // These are the SEEDED rules in `server/data/automation-seeds.ts` — every
+    // scheduled or automatic send in the product lives there. The class is the
+    // SEED's semantic identity, never its trigger: `report.published` alone
+    // carries five different seeds, and three of them go to the same client
+    // saying three different things. §5.3 settles the sharpest case outright —
+    // "report-ready is required and post-inspection follow-up / review request
+    // are not". A trigger-keyed class could not hold both answers.
+    //
+    // Seeds whose notification ALREADY has a class reuse it (Booking
+    // Confirmation, Report Ready, Invoice, the two agreement ones): the manual
+    // path and the automatic path are the same thing arriving, and two switches
+    // for one notification is how a control comes to half-work.
+    //
+    // The staff and inspector ones are `required` because §2.5 marks them
+    // Operator, not You: an individual cannot mute their own dispatch. The
+    // operator's control is the RULE's own active flag, which is why one
+    // `required` flag still suffices here.
+    { id: 'inspection-reminder',          label: 'Reminder before your inspection', category: 'transactional', required: false, channels: ['email', 'sms'] },
+    // email only: the Cancellation Notice seed carries no `smsBody`. §2.2 lists
+    // sms for this row, but that is the channel the product INTENDS, not one it
+    // has content for — and a switch for a message that can never be sent is a
+    // control that lies.
+    { id: 'inspection-cancelled',         label: 'Your inspection was cancelled',   category: 'transactional', required: false, channels: ['email'] },
+    { id: 'report-amended',               label: 'Your report was updated',         category: 'transactional', required: false, channels: ['email'] },
+    { id: 'report-ready-listing-agent',   label: 'A report is ready (listing agent)', category: 'transactional', required: false, channels: ['email'] },
+    { id: 'booking-confirmation-buyers-agent', label: 'An inspection you referred is booked', category: 'transactional', required: false, channels: ['email'] },
+    { id: 'report-amended-buyers-agent',  label: 'A report you follow was updated',  category: 'transactional', required: false, channels: ['email'] },
+    { id: 'event-reminder',               label: 'Reminder before your appointment', category: 'transactional', required: false, channels: ['email'] },
+    { id: 'event-followup',               label: 'Your results are ready',          category: 'transactional', required: false, channels: ['email'] },
+    { id: 'post-inspection-followup',     label: 'Following up after your inspection', category: 'transactional', required: false, channels: ['email'] },
+    { id: 'review-request',               label: 'How did we do?',                  category: 'marketing',     required: false, channels: ['email'] },
+
+    // Inspector work notifications — §2.5, Operator's call, not the individual's.
+    { id: 'inspector-payment-received',   label: 'A payment came in',               category: 'operational', required: true, channels: ['email'] },
+    { id: 'inspector-agreement-signed',   label: 'A client signed the agreement',   category: 'operational', required: true, channels: ['email'] },
+    { id: 'inspector-agreement-declined', label: 'A client declined the agreement', category: 'operational', required: true, channels: ['email'] },
+    { id: 'inspector-agreement-viewed',   label: 'A client opened the agreement',   category: 'operational', required: true, channels: ['email'] },
+
+    // Office alerts — nine events, nine classes. §2.5 lists them as one row for
+    // brevity; they are nine distinct things that happened, and collapsing them
+    // would be the same mistake as keying on the trigger.
+    { id: 'office-alert-new-booking',             label: 'Office: a new booking arrived',      category: 'operational', required: true, channels: ['in_app'] },
+    { id: 'office-alert-inspection-scheduled',    label: 'Office: an inspection was scheduled', category: 'operational', required: true, channels: ['in_app'] },
+    { id: 'office-alert-inspection-confirmed',    label: 'Office: an inspection was confirmed', category: 'operational', required: true, channels: ['in_app'] },
+    { id: 'office-alert-inspection-cancelled',    label: 'Office: an inspection was cancelled', category: 'operational', required: true, channels: ['in_app'] },
+    { id: 'office-alert-inspection-completed',    label: 'Office: an inspection was completed', category: 'operational', required: true, channels: ['in_app'] },
+    { id: 'office-alert-report-published',        label: 'Office: a report was published',      category: 'operational', required: true, channels: ['in_app'] },
+    { id: 'office-alert-invoice-created',         label: 'Office: an invoice was created',      category: 'operational', required: true, channels: ['in_app'] },
+    { id: 'office-alert-payment-received',        label: 'Office: a payment was received',      category: 'operational', required: true, channels: ['in_app'] },
+    { id: 'office-alert-agreement-signed',        label: 'Office: an agreement was signed',     category: 'operational', required: true, channels: ['in_app'] },
+
     // ─── concierge (spec §2.4)
     { id: 'concierge-client-confirm',    label: 'Booking confirmed',            category: 'transactional', required: false, channels: ['email'] },
     { id: 'concierge-inspector-review',  label: 'A booking needs your review',  category: 'operational',   required: false, channels: ['email'] },

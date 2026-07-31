@@ -110,11 +110,9 @@ const SEND_EMAIL_ALLOW = [
   // the RenderResult, and `sendEmail` is the boundary being annotated.
   /^server\/services\/email\//,
   /^server\/lib\/email\//,
-  // The tenant-configured automation RULES layer. Its class model is a real
-  // open question (a rule's template is tenant-authored, so there is no fixed
-  // class id) and V2 decides it. Inventing one here would prejudge that, and a
-  // wrong class is worse than a stated absence.
-  /^server\/services\/automation\/deliver-email\.ts$/,
+  // The generic transport seam under the rules layer. It receives an already
+  // classified send from `deliver-email.ts` and only forwards it; there is no
+  // class to name at this level because it does not know what it is carrying.
   /^server\/lib\/automation-core\/deliver\.ts$/,
 ];
 
