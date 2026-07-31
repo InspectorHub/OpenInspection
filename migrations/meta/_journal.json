@@ -127,6 +127,13 @@
       "when": 1785421496479,
       "tag": "0017_strange_multiple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1785470983411,
+      "tag": "0018_charming_wild_pack",
+      "breakpoints": true
     }
   ]
 }

@@ -40,6 +40,7 @@ import { and, eq, inArray, or } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import {
     contacts,
+    notificationPreferences,
     inspectionPeople,
     agreementRequests,
     agreementSigners,
@@ -277,6 +278,23 @@ export async function runErasure(
         .where(and(eq(contacts.tenantId, tenantId), eq(contacts.email, subjectEmail)))
         .all();
     const subjectContactIds = (subjectContactRows as Array<{ id: string }>).map((c) => c.id);
+
+    // A preference row is keyed on a contact id, and contact ids are reused.
+    // Leaving these behind gives the NEXT person at that id the erased
+    // subject's mute settings — invisibly, and in the direction that withholds
+    // mail. Scoped to `subject_kind = 'contact'`: a staff member's own
+    // preferences are not a consumer data subject's.
+    await step('notification_preferences', 'delete', {}, async () => {
+        if (subjectContactIds.length === 0) return 0;
+        const res = await db.delete(notificationPreferences)
+            .where(and(
+                eq(notificationPreferences.tenantId, tenantId),
+                eq(notificationPreferences.subjectKind, 'contact'),
+                inArray(notificationPreferences.subjectId, subjectContactIds),
+            ))
+            .run();
+        return changeCount(res);
+    });
 
     // The money record is the tenant's ledger (P-4 authority chain) and stays;
     // only the denormalized client identity is nulled.

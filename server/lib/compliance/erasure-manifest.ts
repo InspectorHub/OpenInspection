@@ -89,6 +89,16 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // the subject's rows (via contacts.email), not a column to null.
     { table: 'inspection_people', column: 'contact_id', category: 'user.contact.email', action: 'delete' },
 
+    // ── notification_preferences (orphan cleanup) ─────────────────────────────
+    // No PII of its own — an answer to "send me this or don't", keyed on the
+    // contact id. Ids are REUSED after an erasure, so a surviving row hands the
+    // next person at that id the erased subject's mute settings: silently, and
+    // in the direction that withholds mail nobody asked to withhold. Deleted
+    // BEFORE the contacts delete, via the same contact-id resolution.
+    // Staff rows (`subject_kind = 'user'`) are untouched — employees are not
+    // consumer data subjects (see ERASURE_OUT_OF_SCOPE below).
+    { table: 'notification_preferences', column: 'subject_id', category: 'user.contact.email', action: 'delete' },
+
     // ── invoices (#88) ────────────────────────────────────────────────────────
     // The money record is the tenant's ledger (P-4 authority chain) and stays;
     // the denormalized client identity is nulled in place. Rows are located by
