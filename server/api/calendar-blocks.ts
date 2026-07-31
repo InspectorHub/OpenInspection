@@ -1,12 +1,12 @@
 import { createRoute } from '@hono/zod-openapi';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
 import { calendarBlocks, users } from '../lib/db/schema';
 import { safeISODate } from '../lib/date';
 import { requireRole } from '../lib/middleware/rbac';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { isAdminRole } from '../lib/auth/roles';
+import { getDrizzle, type AppDrizzle } from '../lib/route-helpers';
 import {
     CalendarBlockErrorSchema,
     CalendarBlockListResponseSchema,
@@ -136,7 +136,7 @@ function serializeBlock(block: typeof calendarBlocks.$inferSelect) {
 }
 
 async function tenantUserExists(
-    db: ReturnType<typeof drizzle>,
+    db: AppDrizzle,
     tenantId: string,
     userId: string,
 ): Promise<boolean> {
@@ -159,7 +159,7 @@ const calendarBlockRoutes = createApiRouter()
             return c.json(errorResponse('Inspectors can only create their own calendar blocks', 'FORBIDDEN'), 403);
         }
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         if (!await tenantUserExists(db, tenantId, targetUserId)) {
             return c.json(errorResponse('Target user not found', 'NOT_FOUND'), 404);
         }
@@ -192,7 +192,7 @@ const calendarBlockRoutes = createApiRouter()
             return c.json(errorResponse('Inspectors can only list their own calendar blocks', 'FORBIDDEN'), 403);
         }
 
-        const rows = await drizzle(c.env.DB).select()
+        const rows = await getDrizzle(c).select()
             .from(calendarBlocks)
             .where(and(
                 eq(calendarBlocks.tenantId, tenantId),
@@ -213,7 +213,7 @@ const calendarBlockRoutes = createApiRouter()
         const role = c.get('userRole');
         const { id } = c.req.valid('param');
         const input = c.req.valid('json');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const existing = await db.select().from(calendarBlocks)
             .where(and(eq(calendarBlocks.tenantId, tenantId), eq(calendarBlocks.id, id)))
             .get();
@@ -263,7 +263,7 @@ const calendarBlockRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const role = c.get('userRole');
         const { id } = c.req.valid('param');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const existing = await db.select({ userId: calendarBlocks.userId })
             .from(calendarBlocks)
             .where(and(eq(calendarBlocks.tenantId, tenantId), eq(calendarBlocks.id, id)))

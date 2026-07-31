@@ -33,7 +33,7 @@ export function CreateTemplateModal({
           type="button"
           onClick={handleCreate}
           disabled={!newName.trim()}
-          className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {m.templates_create_submit()}
         </button>

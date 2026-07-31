@@ -1,10 +1,11 @@
-import { useLoaderData } from "react-router";
+import { useFetcher, useLoaderData, useRevalidator } from "react-router";
+import { useEffect } from "react";
 import type { Route } from "./+types/notifications";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, EmptyState, Banner } from "@core/shared-ui";
-import { formatRelativeTime } from "~/lib/format";
-import { useDisplayLocale } from "~/hooks/useSessionContext";
+import { NoticeList } from "~/components/notices/NoticeList";
+import type { NoticeRowData } from "~/lib/notice-view";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -52,7 +53,29 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 export default function NotificationsPage() {
   const { notifications, loadFailed } = useLoaderData<typeof loader>();
-  const locale = useDisplayLocale();
+  const fetcher = useFetcher<{ ok?: boolean }>();
+  const revalidator = useRevalidator();
+
+  // A dismissal changes what the loader returned; re-read rather than patch a
+  // local copy that can disagree with the server.
+  useEffect(() => {
+    if (fetcher.data?.ok) revalidator.revalidate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetcher.data]);
+
+  // The staff DTO speaks ISO strings and carries no channels — a staff alert
+  // was never dispatched anywhere. Same mapping as the bell's resource route.
+  const notices: NoticeRowData[] = notifications.map((n) => ({
+    id: n.id,
+    tenantId: "",
+    type: n.type,
+    title: n.title,
+    body: n.body,
+    inspectionId: n.entityType === "inspection" ? n.entityId : null,
+    createdAt: Date.parse(n.createdAt),
+    readAt: n.readAt ? Date.parse(n.readAt) : null,
+    channels: [],
+  }));
 
   return (
     <div className="space-y-ih-list">
@@ -71,20 +94,25 @@ export default function NotificationsPage() {
           />
         </Card>
       ) : (
-        <div className="space-y-2">
-          {notifications.map((n) => (
-            <Card key={n.id} className="p-3">
-              <p className="text-[13px] font-medium text-ih-fg-1">{n.title}</p>
-              {/* `body` is optional in the DTO — several notification types carry
-                  only a title, so an empty paragraph would just reintroduce the
-                  blank row this page was full of. */}
-              {n.body && <p className="text-[13px] text-ih-fg-2 mt-0.5">{n.body}</p>}
-              <p className="text-[11px] text-ih-fg-4 mt-1">
-                {formatRelativeTime(n.createdAt, { locale })}
-              </p>
-            </Card>
-          ))}
-        </div>
+        /* C4 — the SAME <NoticeList> the client, agent and staff bells render.
+           A staff alert carries no channels, so the row shows no delivery line
+           and no remedy without this page asking for a variant. Dismissing is
+           the only action a staff notice has; the page is the full history the
+           bell's panel truncates. */
+        <Card className="p-0">
+          <NoticeList
+            notices={notices}
+            emailComposer={false}
+            emptyBody={m.notice_empty_body_staff()}
+            onDismiss={(id) =>
+              fetcher.submit(
+                { intent: "notice-dismiss", noticeId: id },
+                { method: "post", action: "/resources/staff-notices" },
+              )
+            }
+            onRemedy={() => {}}
+          />
+        </Card>
       )}
     </div>
   );

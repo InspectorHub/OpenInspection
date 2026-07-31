@@ -7,7 +7,7 @@ import { brandTokens, EMPTY_BRAND } from "~/lib/brand";
 import type { RawInvoice } from "~/lib/section-loaders";
 import { formatDate } from "~/lib/format";
 import { portalHubUrl } from "~/lib/portal-hub-url";
-import { readLegalLinks } from "~/lib/legal-links.server";
+import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { PaymentSection, type InvoiceData } from "~/components/portal/sections/PaymentSection";
 import { m } from "~/paraglide/messages";
 
@@ -16,7 +16,6 @@ export function meta() {
 }
 
 export async function loader({ params, request, context }: Route.LoaderArgs) {
-  const privacyUrl = readLegalLinks(context)?.privacyUrl ?? null;
   const url = new URL(request.url);
   // IA-34 — the invoice endpoint is gated by resolveClientActor; the emailed
   // pay link carries the recipient's portal token, which we forward verbatim.
@@ -42,6 +41,10 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
         portalHubUrl({ tenant: d.tenantSlug, inspectionId: id, token, section: "payment", justPaid: true }),
       );
     }
+
+    const brand = d?.tenantSlug
+      ? await resolveTenantBrand(context, d.tenantSlug, request)
+      : (d?.brand ?? EMPTY_BRAND);
 
     const invoice: InvoiceData | null = d
       ? {
@@ -69,16 +72,16 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
         : m.invoice_error_not_found();
     return {
       invoice,
-      brand: d?.brand ?? EMPTY_BRAND,
+      brand,
       error,
       id,
       token,
-      privacyUrl,
+      privacyUrl: brand.privacyUrl,
     };
   } catch (err) {
     // A thrown `redirect()` is a Response — never swallow it as a fetch failure.
     if (err instanceof Response) throw err;
-    return { invoice: null, brand: EMPTY_BRAND, error: m.invoice_error_service_unavailable(), id, token, privacyUrl };
+    return { invoice: null, brand: EMPTY_BRAND, error: m.invoice_error_service_unavailable(), id, token, privacyUrl: null };
   }
 }
 

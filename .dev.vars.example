@@ -48,14 +48,18 @@ TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 GOOGLE_CLIENT_ID=your_google_client_id_here
 GOOGLE_CLIENT_SECRET=your_google_client_secret_here
 
-# Optional: Public base URL for this worker (used to build OAuth redirect URIs)
-APP_BASE_URL=http://localhost:8788
+# Optional: Public base URL for this worker (OAuth redirects, email links,
+# hosted Privacy/Terms absolute URLs, sidebar legal links). Must match the
+# origin you open in the browser — including port (wrangler often uses 8787
+# or 8788). Without this, in-process API calls may emit `http://localhost/...`
+# without a port and TFV / footer links break locally.
+APP_BASE_URL=http://127.0.0.1:8787
 
 # Optional: Legal document links (self-host operators). When either URL is set, account-creating
 # public forms (agent signup, guest join) require an acceptance checkbox, and the acceptance blob
 # (URL + timestamp + IP + country) is stored on the user row. Unset = feature is entirely off.
-# TERMS_URL=https://yourdomain.com/terms
-# PRIVACY_URL=https://yourdomain.com/privacy
+# TERMS_URL / PRIVACY_URL removed — configure per-tenant Privacy & Terms in
+# Settings → Compliance (hosted /legal/:slug/… or custom website URLs).
 
 # Optional: Cloudflare account credentials — required for silo mode (per-tenant D1 databases)
 # Create an API token at dash.cloudflare.com → My Profile → API Tokens with D1:Edit permission

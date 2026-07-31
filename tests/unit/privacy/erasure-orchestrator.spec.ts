@@ -401,3 +401,114 @@ describe('runErasure', () => {
         expect(decisions.some(d => d.error)).toBe(true);
     });
 });
+
+/**
+ * Portal #88 / roadmap §7.5 item 2 — the five PII residences the original
+ * manifest could not see (its gate scanned only its own tables and exited 0).
+ * Each case seeds the subject's PII in one of them plus a second party's row
+ * that must remain untouched.
+ */
+describe('runErasure — the residences the original manifest missed (#88)', () => {
+    let db: BetterSQLite3Database<typeof schema>;
+
+    const INSP = 'insp-88';
+
+    beforeEach(async () => {
+        const fixture = createTestDb();
+        db = fixture.db;
+        await setupSchema(fixture.sqlite);
+        await seedTenants(db);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (mockDrizzle as any).mockReturnValue(db);
+        await db.insert(schema.inspections).values({
+            id: INSP, tenantId: TENANT_A, propertyAddress: '2 Elm St',
+            date: '2026-06-02', status: 'completed', paymentStatus: 'unpaid', price: 40000, createdAt: new Date(),
+        });
+        await db.insert(schema.contacts).values({
+            id: 'contact-88', tenantId: TENANT_A, type: 'client',
+            name: 'Jane Subject', email: SUBJECT_EMAIL, phone: '555-1111', createdAt: new Date(),
+        });
+    });
+
+    const run = () => runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
+
+    it('invoices: identity nulled in place, the financial record kept, other invoices untouched', async () => {
+        await db.insert(schema.invoices).values([
+            // Matched by client_email.
+            { id: 'inv-email', tenantId: TENANT_A, inspectionId: INSP, clientName: 'Jane Subject', clientEmail: SUBJECT_EMAIL, amountCents: 12300, createdAt: new Date() },
+            // Matched only through the subject's contact id (email never denormalized).
+            { id: 'inv-contact', tenantId: TENANT_A, contactId: 'contact-88', clientName: 'Jane Subject', clientEmail: null, amountCents: 4500, createdAt: new Date() },
+            { id: 'inv-other', tenantId: TENANT_A, clientName: 'John Other', clientEmail: OTHER_EMAIL, amountCents: 9900, createdAt: new Date() },
+        ]);
+
+        await run();
+
+        const byEmail = await db.select().from(schema.invoices).where(eq(schema.invoices.id, 'inv-email')).get();
+        expect(byEmail?.clientName).toBeNull();
+        expect(byEmail?.clientEmail).toBeNull();
+        expect(byEmail?.amountCents).toBe(12300); // the money record survives
+
+        const byContact = await db.select().from(schema.invoices).where(eq(schema.invoices.id, 'inv-contact')).get();
+        expect(byContact?.clientName).toBeNull();
+
+        const other = await db.select().from(schema.invoices).where(eq(schema.invoices.id, 'inv-other')).get();
+        expect(other?.clientName).toBe('John Other');
+        expect(other?.clientEmail).toBe(OTHER_EMAIL);
+    });
+
+    it('concierge_confirm_tokens: the subject rows are deleted, other recipients kept', async () => {
+        await db.insert(schema.conciergeConfirmTokens).values([
+            { token: 'cct-subject', inspectionId: INSP, tenantId: TENANT_A, clientEmail: SUBJECT_EMAIL, expiresAt: new Date(Date.now() + 86400_000), createdAt: new Date() },
+            { token: 'cct-other', inspectionId: INSP, tenantId: TENANT_A, clientEmail: OTHER_EMAIL, expiresAt: new Date(Date.now() + 86400_000), createdAt: new Date() },
+        ]);
+
+        await run();
+
+        const rows = await db.select().from(schema.conciergeConfirmTokens).all();
+        expect(rows.map((r) => r.token)).toEqual(['cct-other']);
+    });
+
+    it('inspection_access_tokens: the subject rows are deleted — portal access is revoked', async () => {
+        await db.insert(schema.inspectionAccessTokens).values([
+            { id: 'iat-subject', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: SUBJECT_EMAIL, token: 'tok-s', createdAt: new Date() },
+            { id: 'iat-other', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: OTHER_EMAIL, token: 'tok-o', createdAt: new Date() },
+        ]);
+
+        await run();
+
+        const rows = await db.select().from(schema.inspectionAccessTokens).all();
+        expect(rows.map((r) => r.id)).toEqual(['iat-other']);
+    });
+
+    it('inspection_requests: identity cleared in place (row kept — inspections.request_id references it)', async () => {
+        await db.insert(schema.inspectionRequests).values([
+            { id: 'ir-subject', tenantId: TENANT_A, clientName: 'Jane Subject', clientEmail: SUBJECT_EMAIL, clientPhone: '555-1111', propertyAddress: '2 Elm St', scheduledAt: new Date(), createdAt: new Date(), updatedAt: new Date() },
+            { id: 'ir-other', tenantId: TENANT_A, clientName: 'John Other', clientEmail: OTHER_EMAIL, clientPhone: '555-2222', propertyAddress: '3 Oak St', scheduledAt: new Date(), createdAt: new Date(), updatedAt: new Date() },
+        ]);
+
+        await run();
+
+        const subject = await db.select().from(schema.inspectionRequests).where(eq(schema.inspectionRequests.id, 'ir-subject')).get();
+        expect(subject).toBeDefined(); // the row survives (frozen FK from inspections)
+        expect(subject?.clientName).toBe('[erased]');
+        expect(subject?.clientEmail).toBeNull();
+        expect(subject?.clientPhone).toBeNull();
+        expect(subject?.propertyAddress).toBe('2 Elm St'); // the business record survives
+
+        const other = await db.select().from(schema.inspectionRequests).where(eq(schema.inspectionRequests.id, 'ir-other')).get();
+        expect(other?.clientName).toBe('John Other');
+    });
+
+    it('email_suppressions: the opt-out row is RETAINED — deleting it would resume sending to someone who objected', async () => {
+        await db.insert(schema.emailSuppressions).values({
+            id: 'sup-subject', tenantId: TENANT_A, email: SUBJECT_EMAIL, reason: 'complaint', sourceProvider: 'resend', createdAt: new Date(),
+        });
+
+        const summary = await run();
+
+        const rows = await db.select().from(schema.emailSuppressions).all();
+        expect(rows.length).toBe(1);
+        expect(rows[0].email).toBe(SUBJECT_EMAIL);
+        expect(summary.status).toBe('completed');
+    });
+});

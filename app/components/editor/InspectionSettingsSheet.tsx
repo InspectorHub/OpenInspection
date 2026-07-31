@@ -16,7 +16,7 @@ import { CLIENT_PROFILE_LIST } from "~/lib/report-style/profiles-client";
  * the closing date, the reference number, the referral source, the price and
  * the two delivery gates. Those are facts about the job, not about the report,
  * and putting them here meant the only way to change a price was to open the
- * report editor and find an unlabelled gear. They live on the inspection hub
+ * report editor and find an unlabelled gear. They live on the inspector portal
  * now, on the card for the thing each one affects (IA-87).
  */
 interface SettingsForm {
@@ -315,7 +315,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
                         >
                           <img src={p.url} alt={p.label || m.editor_settings_cover_photo_alt()} className="w-full h-full object-cover" loading="lazy" />
                           {selected && (
-                            <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-white text-[9px] font-bold text-center py-0.5">{m.editor_settings_cover_badge()}</span>
+                            <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-ih-fg-inverse text-[9px] font-bold text-center py-0.5">{m.editor_settings_cover_badge()}</span>
                           )}
                         </button>
                       );

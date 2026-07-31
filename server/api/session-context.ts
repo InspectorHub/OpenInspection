@@ -1,6 +1,5 @@
 import {} from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { users, tenantConfigs, tenants } from '../lib/db/schema';
 import { getSeatUsage } from '../features/seat-quota';
@@ -8,6 +7,9 @@ import { resolveLocale } from '../lib/locale';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { mcpEnabled } from '../lib/mcp/flag';
+import { getDrizzle } from '../lib/route-helpers';
+import { getBaseUrl } from '../lib/url';
+import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
 
 /**
  * Session context endpoint for the React Router v7 frontend layout.
@@ -44,9 +46,14 @@ const sessionContextRoutes = createApiRouter()
         let tenantLocale = 'en-US';
         let tenantCurrency = 'USD';
         let archiveRevokesAccess = false;
+        let legalCfg: {
+            legalMode: LegalMode;
+            customPrivacyUrl: string | null;
+            customTermsUrl: string | null;
+        } | null = null;
         if (tenantId) {
             try {
-                const db = drizzle(c.env.DB);
+                const db = getDrizzle(c);
                 const row = await db.select({ name: users.name, email: users.email, timezone: users.timezone, locale: users.locale })
                     .from(users)
                     .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
@@ -65,6 +72,9 @@ const sessionContextRoutes = createApiRouter()
                     // archiving also revokes report links, so it needs the
                     // policy, not just the link count.
                     archiveRevokesAccess: tenantConfigs.archiveRevokesAccess,
+                    legalMode: tenantConfigs.legalMode,
+                    customPrivacyUrl: tenantConfigs.customPrivacyUrl,
+                    customTermsUrl: tenantConfigs.customTermsUrl,
                 })
                     .from(tenantConfigs)
                     .where(eq(tenantConfigs.tenantId, tenantId))
@@ -73,6 +83,13 @@ const sessionContextRoutes = createApiRouter()
                 tenantLocale = resolveLocale(cfg?.defaultLocale);
                 if (cfg?.currency) tenantCurrency = cfg.currency;
                 archiveRevokesAccess = cfg?.archiveRevokesAccess ?? false;
+                legalCfg = cfg
+                    ? {
+                        legalMode: (cfg.legalMode as LegalMode | null) ?? 'hosted',
+                        customPrivacyUrl: cfg.customPrivacyUrl,
+                        customTermsUrl: cfg.customTermsUrl,
+                    }
+                    : null;
             } catch (e) {
                 logger.warn('[session-context] user lookup failed', { userId: user.sub, error: (e as Error).message });
             }
@@ -101,7 +118,7 @@ const sessionContextRoutes = createApiRouter()
         let videoProvider: 'r2' | 'stream' = 'r2';
         if (tenantId) {
             try {
-                const db = drizzle(c.env.DB);
+                const db = getDrizzle(c);
                 const isSaas = c.env.APP_MODE === 'saas';
                 if (isSaas) {
                     const tenantRow = await db
@@ -158,7 +175,7 @@ const sessionContextRoutes = createApiRouter()
         let collabEditing = false;
         if (tenantId) {
             try {
-                const db = drizzle(c.env.DB);
+                const db = getDrizzle(c);
                 const row = await db
                     .select({ collabEditing: tenantConfigs.collabEditing })
                     .from(tenantConfigs)
@@ -170,7 +187,19 @@ const sessionContextRoutes = createApiRouter()
             }
         }
 
-        const privacyUrl = c.env.PRIVACY_URL?.trim() || null;
+        const tenantSlug = branding?.tenantSlug?.trim() || null;
+        let privacyUrl: string | null = null;
+        let termsUrl: string | null = null;
+        if (tenantSlug) {
+            const links = resolveTenantLegalUrls(tenantSlug, getBaseUrl(c), legalCfg);
+            privacyUrl = links.privacyUrl;
+            termsUrl = links.termsUrl;
+        }
+
+        let unreadMessages = 0;
+        try {
+            unreadMessages = await c.var.services.message.unreadCountForTenant(tenantId);
+        } catch { /* badge degrades to 0; the layout must never fail on it */ }
 
         return c.json({
             success: true,
@@ -187,6 +216,7 @@ const sessionContextRoutes = createApiRouter()
                     currentUserSlug: branding?.currentUserSlug || null,
                     bookingHost: branding?.bookingHost || null,
                     privacyUrl,
+                    termsUrl,
                     defaultTimezone: tenantTimezone,
                     defaultLocale: tenantLocale,
                     currency: tenantCurrency,
@@ -209,6 +239,9 @@ const sessionContextRoutes = createApiRouter()
                 seatUsage,
                 videoProvider,
                 collabEditing,
+                // Track D — the sidebar Messages badge. One indexed count
+                // (idx_msg_unread) per layout load; refreshes on navigation.
+                unreadMessages,
             },
         });
     });

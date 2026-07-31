@@ -20,10 +20,11 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
-import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import { deleteCookie, setCookie } from 'hono/cookie';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { signMagicLink, verifyMagicLink, verifyPortalSession, signPortalSession } from '../lib/portal-session';
+import { signMagicLink, verifyMagicLink, signPortalSession } from '../lib/portal-session';
+import { portalSessionGuard } from '../lib/middleware/portal-session-guard';
 import { resolvePortalAccess } from '../lib/public-access';
 import { getBaseUrl } from '../lib/url';
 import { logger } from '../lib/logger';
@@ -36,26 +37,6 @@ import { authCookieOptions, AUTH_COOKIE_NAME, portalSessionCookieOptions, PORTAL
 /** Resolves the path-derived tenantId, or null when the slug is unknown. */
 function resolveTenantId(c: Context<HonoConfig>): string | null {
     return c.get('tenantId') || c.get('resolvedTenantId') || null;
-}
-
-// ---------------------------------------------------------------------------
-// Session middleware (applied only to /me and /inspections/*)
-// ---------------------------------------------------------------------------
-
-/**
- * Reads + verifies the `__Host-portal_session` cookie. On success sets
- * `portalEmail` on the context; on missing/invalid returns 401. Tenant-agnostic
- * by design — the cookie carries only a verified email.
- */
-async function portalSession(c: Context<HonoConfig>, next: () => Promise<void>) {
-    const cookie = getCookie(c, PORTAL_SESSION_COOKIE_NAME);
-    const verified = cookie ? await verifyPortalSession(c.env.JWT_SECRET, cookie) : null;
-    if (!verified) {
-        return c.json({ error: 'Not authenticated' }, 401);
-    }
-    c.set('portalEmail', verified.email);
-    await next();
-    return;
 }
 
 // ---------------------------------------------------------------------------
@@ -307,8 +288,8 @@ const observeRoute = createRoute(withMcpMetadata({
 const portalRouter = createApiRouter();
 
 // Session gate covers only the data routes (NOT request-link / redeem / exchange).
-portalRouter.use('/:tenant/me', portalSession);
-portalRouter.use('/:tenant/inspections/*', portalSession);
+portalRouter.use('/:tenant/me', portalSessionGuard);
+portalRouter.use('/:tenant/inspections/*', portalSessionGuard);
 
 // IMPORTANT: capture the fluent `.openapi()` chain into the exported binding so
 // `typeof portalRoutes` carries every registered route into PortalApi. Assigning

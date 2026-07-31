@@ -1,11 +1,13 @@
-import { useState } from "react";
 import { useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/metrics";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Table } from "@core/shared-ui";
 import { formatDollars } from "~/lib/money";
-import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
+import { useDisplayLocale, useDisplayCurrency, useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { DateRangePicker } from "~/components/metrics/DateRangePicker";
+import { FindingsBySection, type FindingsData } from "~/components/metrics/FindingsBySection";
+import { civilToday, normaliseRange, type MetricsRange } from "~/lib/metrics-range";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -21,32 +23,64 @@ interface MetricsData {
   monthly: { month: string; count: number; revenue: number }[];
   topAgents: { agentName: string; count: number; revenue: number }[];
   byInspector: { inspectorId: string | null; inspectorName: string; count: number; revenue: number; avgTurnaroundDays: number | null }[];
+  // IA-82 — the endpoint has always computed and returned this; nothing rendered
+  // it, so the aggregation ran for no reader.
+  serviceBreakdown: { serviceName: string; count: number; revenue: number }[];
 }
+
+
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const url = new URL(request.url);
-  const periodParam = url.searchParams.get("period") ?? "6m";
-  const period = (["3m", "6m", "12m"].includes(periodParam) ? periodParam : "6m") as "3m" | "6m" | "12m";
+  // The window is whatever the URL says, resolved rather than validated: a
+  // hand-edited or stale query string must still render a page. The server
+  // resolves independently — this is a public endpoint, not only our caller.
+  const range = normaliseRange(
+    url.searchParams.get("from"),
+    url.searchParams.get("to"),
+    civilToday("UTC"),
+  );
+  const query = { from: range.from, to: range.to };
+  const api = createApi(context, { token });
+
+  let data: MetricsData | null = null;
   try {
-    const api = createApi(context, { token });
-    const res = await api.metrics.index.$get({ query: { period } });
+    const res = await api.metrics.index.$get({ query });
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
     const d = (body.data ?? {}) as Record<string, unknown>;
-    return { data: (Object.keys(d).length > 0 ? d : null) as MetricsData | null, period };
+    data = (Object.keys(d).length > 0 ? d : null) as MetricsData | null;
   } catch {
-    return { data: null, period };
+    data = null;
   }
+
+  // IA-82 — the findings matrix is a second aggregation with its own endpoint.
+  // It is fetched separately (and fails alone) so a slow or erroring findings
+  // read cannot blank the revenue KPIs, which are the page's primary content.
+  let findings: FindingsData | null = null;
+  try {
+    const res = await api.analytics["findings-heatmap"].$get({ query });
+    if (res.ok) {
+      const body = (await res.json()) as { data?: FindingsData };
+      findings = body.data ?? null;
+    }
+  } catch {
+    findings = null;
+  }
+
+  return { data, findings, range };
 }
 
-const PERIODS = ["3m", "6m", "12m"] as const;
-
 export default function MetricsPage() {
-  const { data, period: initialPeriod } = useLoaderData<typeof loader>();
+  const { data, findings, range } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const locale = useDisplayLocale();
   const currency = useDisplayCurrency();
-  const [period, setPeriod] = useState<string>(initialPeriod || "6m");
+  const timeZone = useDisplayTimeZone();
+  // Presets resolve against the VIEWER's calendar day. The loader runs on the
+  // edge and has no viewer zone, so it defaults on the UTC day; the moment the
+  // page hydrates, "last 7 days" means seven days on the reader's own calendar.
+  const today = civilToday(timeZone);
 
   // Every revenue figure from /api/metrics is integer CENTS, and formatDollars
   // takes integer cents — so it is passed straight through.
@@ -60,9 +94,8 @@ export default function MetricsPage() {
   // finally made a wrong scale show up, as $83,000 for two jobs worth $830.
   const fmt = (n: number) => formatDollars(n, { locale, currency });
 
-  const changePeriod = (p: string) => {
-    setPeriod(p);
-    navigate(`/metrics?period=${p}`, { replace: true });
+  const changeRange = (next: MetricsRange) => {
+    navigate(`/metrics?from=${next.from}&to=${next.to}`, { replace: true });
   };
 
   const kpis = [
@@ -77,21 +110,7 @@ export default function MetricsPage() {
         title={m.metrics_heading()}
         meta={data ? m.metrics_meta({ count: data.totalInspections }) : m.metrics_loading()}
         actions={
-          <div className="flex gap-1 bg-ih-bg-muted rounded-md p-1">
-            {PERIODS.map((p) => (
-              <button
-                key={p}
-                onClick={() => changePeriod(p)}
-                className={`h-6 px-3 rounded text-[12px] font-bold transition-all ${
-                  period === p
-                    ? "bg-ih-bg-card shadow-ih-card text-ih-fg-1"
-                    : "text-ih-fg-4"
-                }`}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
+          <DateRangePicker range={range} today={today} locale={locale} onChange={changeRange} />
         }
       />
 
@@ -175,6 +194,28 @@ export default function MetricsPage() {
           </div>
         ) : (
           <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.metrics_no_inspectors()}</p>
+        )}
+      </Card>
+
+      <FindingsBySection findings={findings} />
+
+      {/* Service mix */}
+      <Card className="p-5">
+        <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_services_title()}</p>
+        {data && data.serviceBreakdown?.length > 0 ? (
+          <div className="overflow-x-auto">
+            <Table<MetricsData["serviceBreakdown"][number]>
+              rows={data.serviceBreakdown}
+              getRowKey={(row) => row.serviceName}
+              columns={[
+                { label: m.metrics_col_service(), cell: (row) => <span className="font-medium text-ih-fg-1">{row.serviceName}</span> },
+                { label: m.metrics_col_inspections(), align: "center", cell: (row) => <span className="text-ih-fg-2">{row.count}</span> },
+                { label: m.metrics_col_revenue(), align: "right", cell: (row) => <span className="text-ih-fg-2">{fmt(row.revenue)}</span> },
+              ]}
+            />
+          </div>
+        ) : (
+          <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.metrics_no_services()}</p>
         )}
       </Card>
 

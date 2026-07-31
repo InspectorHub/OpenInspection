@@ -23,7 +23,7 @@ export function CompanyBookingLinksPanel({
         <button
           type="button"
           onClick={() => copy(companyUrl, "company")}
-          className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors shrink-0"
+          className="h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors shrink-0"
         >
           {copiedField === "company" ? m.settings_common_copied() : m.common_copy()}
         </button>

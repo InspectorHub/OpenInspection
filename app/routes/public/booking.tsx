@@ -4,7 +4,6 @@ import { createApi } from "~/lib/api-client.server";
 import { getToken } from "~/lib/session.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
-import { readLegalLinks } from "~/lib/legal-links.server";
 import type { CompanyProfile } from "~/components/booking/booking-constants";
 import { useBookingFormState } from "~/components/booking/useBookingFormState";
 import { BookingWizard } from "~/components/booking/BookingWizard";
@@ -40,7 +39,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     const api = createApi(context);
     const [res, brand] = await Promise.all([
       api.bookings.book[":tenant"].$get({ param: { tenant: params.tenant ?? "" } }),
-      resolveTenantBrand(context, params.tenant),
+      resolveTenantBrand(context, params.tenant, request),
     ]);
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
@@ -58,7 +57,6 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       }
     }
 
-    const legal = readLegalLinks(context);
     return {
       profile: (Object.keys(d).length > 0 ? d : null) as CompanyProfile | null,
       preselected,
@@ -66,8 +64,8 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       tenant: params.tenant,
       agentRefSlug,
       brand,
-      privacyUrl: legal?.privacyUrl ?? null,
-      termsUrl: legal?.termsUrl ?? null,
+      privacyUrl: brand.privacyUrl,
+      termsUrl: brand.termsUrl,
       agentBooking: await resolveAgentBooking(context, request, params.tenant ?? ""),
     };
   } catch {
@@ -165,11 +163,18 @@ export default function BookingPage() {
   }
 
   if (profile.bookingOpen === false) {
-    return <BookingNotOpenState profile={profile} brand={brand} />;
+    return (
+      <BookingNotOpenState
+        profile={profile}
+        brand={brand}
+        privacyUrl={privacyUrl}
+        termsUrl={termsUrl}
+      />
+    );
   }
 
   return (
-    <BookingShell profile={profile} brand={brand} privacyUrl={privacyUrl}>
+    <BookingShell profile={profile} brand={brand} privacyUrl={privacyUrl} termsUrl={termsUrl}>
       <BookingWizard
         profile={profile}
         privacyUrl={privacyUrl}

@@ -17,6 +17,9 @@ export interface TenantBrand {
    *  company without a way to reach it only says who to blame. */
   supportEmail: string | null;
   companyPhone: string | null;
+  /** Effective Privacy / Terms URLs for footers (hosted or custom). */
+  privacyUrl: string | null;
+  termsUrl: string | null;
 }
 
 export const EMPTY_BRAND: TenantBrand = {
@@ -26,6 +29,8 @@ export const EMPTY_BRAND: TenantBrand = {
   defaultTimezone: "UTC",
   supportEmail: null,
   companyPhone: null,
+  privacyUrl: null,
+  termsUrl: null,
 };
 
 /**

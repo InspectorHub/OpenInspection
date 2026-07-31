@@ -1,6 +1,5 @@
 import { createRoute } from '@hono/zod-openapi';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
 import { tenantCustomHolidays } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import {
@@ -12,6 +11,7 @@ import { resolveCompanyClosedDates } from '../../lib/holidays/resolve-closed-dat
 import { requireRole } from '../../lib/middleware/rbac';
 import { createApiRouter } from '../../lib/openapi-router';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { getDrizzle } from '../../lib/route-helpers';
 import {
     CreateCustomHolidaySchema,
     CustomHolidayErrorSchema,
@@ -132,7 +132,7 @@ const adminHolidayRoutes = createApiRouter()
     .openapi(listRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { year } = c.req.valid('query');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         let rows;
         if (year) {
             const start = `${year}-01-01`;
@@ -155,7 +155,7 @@ const adminHolidayRoutes = createApiRouter()
     .openapi(createRouteDef, async (c) => {
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const existing = await db.select({ id: tenantCustomHolidays.id })
             .from(tenantCustomHolidays)
             .where(and(
@@ -184,7 +184,7 @@ const adminHolidayRoutes = createApiRouter()
     .openapi(deleteRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const row = await db.select().from(tenantCustomHolidays).where(and(
             eq(tenantCustomHolidays.tenantId, tenantId),
             eq(tenantCustomHolidays.id, id),

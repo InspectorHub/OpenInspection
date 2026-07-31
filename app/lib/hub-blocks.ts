@@ -4,7 +4,7 @@
  * `deriveBlockStates(hub)` collapses the aggregate hub payload into the three
  * status pills the page renders (agreement / invoice / report). It is a pure
  * function with no React or network dependency so every status branch is unit
- * testable in isolation (see tests/web/unit/inspection-hub.spec.ts).
+ * testable in isolation (see tests/unit/inspections/inspector-portal.spec.ts).
  *
  * `formatCents` is the cents → "$X.XX" formatter used by the Services block.
  * It delegates to the shared locale-aware formatter; locale/currency default to
@@ -12,6 +12,7 @@
  */
 
 import { isReportPublished, INSPECTION_STATUS } from '~/lib/status';
+import { ROLE_KIND } from '../../server/lib/people/role-kinds';
 import { formatCurrency } from '~/lib/format';
 import { m } from '~/paraglide/messages';
 // Type-only — erased at build, so the API's zod module never reaches the client
@@ -22,7 +23,7 @@ import type { InspectionHubSchema } from '../../server/lib/validations/inspectio
 /**
  * Pill tone union — kept in sync with packages/shared-ui/src/Pill.tsx.
  * @public — consumed via an inline `import("~/lib/hub-blocks").PillTone` type
- * reference in inspection-hub.tsx, which knip cannot trace (dynamic-import blind spot).
+ * reference in inspector-portal.tsx, which knip cannot trace (dynamic-import blind spot).
  */
 export type PillTone =
     | 'sat'
@@ -205,12 +206,12 @@ export function latestPublishedAt(versions: Array<{ publishedAt: number | null }
 export function publishNotified(flags: {
     notifyClient?: boolean | undefined;
     notifyAgent?: boolean | undefined;
-}): 'both' | 'client' | 'agent' | 'none' {
+}): 'both' | (typeof ROLE_KIND)['CLIENT' | 'AGENT'] | 'none' {
     const client = flags.notifyClient === true;
     const agent = flags.notifyAgent === true;
     if (client && agent) return 'both';
-    if (client) return 'client';
-    if (agent) return 'agent';
+    if (client) return ROLE_KIND.CLIENT;
+    if (agent) return ROLE_KIND.AGENT;
     return 'none';
 }
 

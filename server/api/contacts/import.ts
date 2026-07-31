@@ -1,5 +1,4 @@
 import { createRoute } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import {
@@ -8,6 +7,7 @@ import {
 } from '../../lib/validations/contact.schema';
 import { parseCsvPreview, importContacts } from '../../services/contacts-import.service';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { getDrizzle } from '../../lib/route-helpers';
 
 // ─── CSV bulk import (preview + commit) ─────────────────────────────────────
 const importPreviewRoute = createRoute(withMcpMetadata({
@@ -55,7 +55,7 @@ const contactsImportRoutes = createApiRouter()
     .openapi(importRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { csv, mapping } = c.req.valid('json');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const data = await importContacts(db, tenantId, csv, mapping);
         return c.json({ success: true as const, data }, 200);
     });

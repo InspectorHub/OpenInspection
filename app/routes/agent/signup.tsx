@@ -5,8 +5,6 @@ import type { Route } from "./+types/signup";
 import { createApi } from "~/lib/api-client.server";
 import { createSessionWithToken } from "~/lib/session.server";
 import { makeAgentSignupSchema } from "~/lib/forms/auth.schema";
-import { readLegalLinks } from "~/lib/legal-links.server";
-import { LegalCheckbox } from "~/components/LegalCheckbox";
 import { safeReturnTo } from "../../../server/lib/mcp/safe-return-to";
 import { m } from "~/paraglide/messages";
 
@@ -18,8 +16,7 @@ export function meta() {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request, context }: Route.LoaderArgs) {
-  const legal = readLegalLinks(context);
+export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   // Report-link conversion (Task 3's CTA): prefill the email of the
   // recipient the report was shared with, and preserve a same-origin
@@ -28,7 +25,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // ?returnTo=https://evil.com or //evil.com is discarded here.
   const email = url.searchParams.get("email") ?? "";
   const returnTo = safeReturnTo(url.searchParams.get("returnTo"), "");
-  return { legal, email, returnTo };
+  return { email, returnTo };
 }
 
 /* ------------------------------------------------------------------ */
@@ -65,7 +62,6 @@ export async function action({ request, context }: Route.ActionArgs) {
     email,
     password,
     ...(turnstileTokenRaw ? { turnstileToken: String(turnstileTokenRaw) } : {}),
-    termsAccepted: fd.get("termsAccepted") === "on",
   };
 
   const api = createApi(context);
@@ -151,7 +147,7 @@ function makeValueProps() {
 /* ------------------------------------------------------------------ */
 
 export default function AgentSignupPage() {
-  const { legal, email, returnTo } = useLoaderData<typeof loader>();
+  const { email, returnTo } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
@@ -203,7 +199,7 @@ export default function AgentSignupPage() {
                 key={v.num}
                 className="flex gap-3.5 py-4 border-t border-white/[0.08] last:border-b"
               >
-                <span className="w-7 h-7 rounded-full bg-ih-primary text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                <span className="w-7 h-7 rounded-full bg-ih-primary text-ih-fg-inverse flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
                   {v.num}
                 </span>
                 {/* ds-allow: light tint text on the fixed-dark marketing panel */}
@@ -290,12 +286,10 @@ export default function AgentSignupPage() {
               </div>
             </div>
 
-            {legal && <LegalCheckbox legal={legal} />}
-
             <button
               type="submit"
               disabled={submitting}
-              className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-white bg-ih-primary rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-ih-fg-inverse bg-ih-primary rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
             >
               {submitting ? m.auth_agent_signup_submit_pending() : m.auth_agent_signup_submit()}
             </button>

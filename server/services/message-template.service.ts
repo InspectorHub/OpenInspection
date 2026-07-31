@@ -4,8 +4,11 @@ import { nanoid } from 'nanoid';
 import { messageTemplates, automations } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 
+/** Derived from the column's enum so widening the schema propagates here. */
+export type TemplateChannel = typeof messageTemplates.$inferSelect['channel'];
+
 export interface MessageTemplateRow {
-    id: string; tenantId: string; name: string; channel: 'email' | 'sms';
+    id: string; tenantId: string; name: string; channel: TemplateChannel;
     subject: string | null; body: string; variables: string[];
     isSeeded: boolean; createdAt: number; updatedAt: number;
 }
@@ -37,7 +40,7 @@ export class MessageTemplateService {
     constructor(private db: D1Database) {}
     private get drizzle() { return drizzle(this.db); }
 
-    async list(tenantId: string, channel?: 'email' | 'sms'): Promise<MessageTemplateRow[]> {
+    async list(tenantId: string, channel?: TemplateChannel): Promise<MessageTemplateRow[]> {
         const where = channel
             ? and(eq(messageTemplates.tenantId, tenantId), eq(messageTemplates.channel, channel))
             : eq(messageTemplates.tenantId, tenantId);
@@ -51,12 +54,14 @@ export class MessageTemplateService {
         return row ? serialize(row) : null;
     }
 
-    async create(tenantId: string, data: { name: string; channel: 'email' | 'sms'; subject?: string | null; body: string; variables?: string[] }): Promise<MessageTemplateRow> {
+    async create(tenantId: string, data: { name: string; channel: TemplateChannel; subject?: string | null; body: string; variables?: string[] }): Promise<MessageTemplateRow> {
         const id = nanoid();
         const now = new Date();
         await this.drizzle.insert(messageTemplates).values({
             id, tenantId, name: data.name, channel: data.channel,
-            subject: data.channel === 'email' ? (data.subject ?? null) : null,
+            // `subject` is the email subject AND the in-app notice title
+            // (see the schema comment); only SMS has nowhere to put one.
+            subject: data.channel === 'sms' ? null : (data.subject ?? null),
             body: data.body, variables: JSON.stringify(data.variables ?? []),
             isSeeded: false, createdAt: now, updatedAt: now,
         });
@@ -71,7 +76,7 @@ export class MessageTemplateService {
         if ('body' in data) patch.body = data.body;
         if ('variables' in data) patch.variables = JSON.stringify(data.variables ?? []);
         // subject only meaningful for email; ignore on sms.
-        if ('subject' in data && existing.channel === 'email') patch.subject = data.subject ?? null;
+        if ('subject' in data && existing.channel !== 'sms') patch.subject = data.subject ?? null;
         await this.drizzle.update(messageTemplates).set(patch)
             .where(and(eq(messageTemplates.id, id), eq(messageTemplates.tenantId, tenantId)));
         return (await this.get(tenantId, id))!;

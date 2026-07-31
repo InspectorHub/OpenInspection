@@ -24,10 +24,17 @@ export async function resolveTenantSlug(c: Context<HonoConfig>, tenantId: string
  * Prefers the APP_BASE_URL env var when set.
  */
 export function getBaseUrl(c: Context<HonoConfig>): string {
-    if (c.env.APP_BASE_URL) return c.env.APP_BASE_URL;
+    if (c.env.APP_BASE_URL) return c.env.APP_BASE_URL.replace(/\/$/, '');
+    const hostHdr = c.req.header('host');
+    try {
+        const u = new URL(c.req.url);
+        // Host header reflects the browser-facing host when present. Fall back
+        // to the request URL origin (includes port) — never bare "localhost".
+        if (hostHdr) return `${u.protocol}//${hostHdr}`;
+        if (u.host) return u.origin;
+    } catch { /* fall through */ }
     const protocol = c.req.url.startsWith('https') ? 'https' : 'http';
-    const host = c.req.header('host') || 'localhost';
-    return `${protocol}://${host}`;
+    return `${protocol}://${hostHdr || 'localhost'}`;
 }
 
 /**

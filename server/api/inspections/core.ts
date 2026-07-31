@@ -15,8 +15,8 @@ import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
-import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable, inspectionResults, users } from '../../lib/db/schema';
+import { datePatchValues } from '../../services/inspection/reschedule-date';
 import { deleteInspectionCascade } from '../../services/inspection/inspection-cascade';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { eq, and, isNull } from 'drizzle-orm';
@@ -28,6 +28,7 @@ import { readTenantTier } from '../../features/plan-quota/guard';
 import { noticeFor } from '../../features/plan-quota/notice';
 import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/email/build-email-service';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
+import { getDrizzle } from '../../lib/route-helpers';
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
@@ -280,7 +281,7 @@ const coreRoutes = createApiRouter()
 
         // Cascade-delete every inspection-scoped row + R2 asset (D1 does not honor
         // FK cascades at runtime). Ownership verified by getInspection above.
-        await deleteInspectionCascade(drizzle(c.env.DB), c.env.PHOTOS, tenantId, id);
+        await deleteInspectionCascade(getDrizzle(c), c.env.PHOTOS, tenantId, id);
 
         auditFromContext(c, 'inspection.delete', 'inspection', {
             entityId: id,
@@ -292,7 +293,7 @@ const coreRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
 
@@ -326,6 +327,26 @@ const coreRoutes = createApiRouter()
             }
         }
 
+        // Task 8 — a referrer must be one of THIS tenant's contacts. Reject a
+        // foreign or unknown id with a 400 rather than writing a dangling soft
+        // reference (the column has no FK by Schema Rules, so the app layer is
+        // the only guard).
+        if (typeof body.referredByContactId === 'string' && body.referredByContactId) {
+            const { contacts } = await import('../../lib/db/schema');
+            const owner = await db.select({ id: contacts.id }).from(contacts)
+                .where(and(eq(contacts.id, body.referredByContactId), eq(contacts.tenantId, tenantId)))
+                .get();
+            if (!owner) {
+                return c.json({ success: false as const, error: { code: 'INVALID_REFERRER', message: 'referredByContactId is not a contact in this tenant' } }, 400);
+            }
+        }
+
+        // A date PATCH moves the scheduled instant with the civil day
+        // (§7.5 item 3) — see services/inspection/reschedule-date.ts.
+        const updateValues: Record<string, unknown> = typeof body.date === 'string'
+            ? await datePatchValues(db, tenantId, id, body as Record<string, unknown> & { date: string })
+            : body;
+
         // Tenant-ownership pre-check above guards access. The validated `body`
         // can legitimately be empty: the settings sheet forwards its whole form
         // and the BFF sanitizer drops empty-string "unchanged" fields, so a save
@@ -333,8 +354,8 @@ const coreRoutes = createApiRouter()
         // arrives as `{}`. drizzle throws "No values to set" on `.set({})`, which
         // used to surface as a 500 → the sheet's "Error — try again". Treat the
         // no-op as a successful save instead of writing an empty UPDATE.
-        if (Object.keys(body).length > 0) {
-            await db.update(inspectionTable).set(body).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
+        if (Object.keys(updateValues).length > 0) {
+            await db.update(inspectionTable).set(updateValues).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
         }
 
         // DB-8: re-sync link table when inspectorId is explicitly updated.
@@ -472,7 +493,7 @@ const coreRoutes = createApiRouter()
         const svc      = c.var.services.inspection;
         try {
             const { inspection, template } = await svc.getInspection(id, tenantId);
-            const db = drizzle(c.env.DB);
+            const db = getDrizzle(c);
             const results = await db.select().from(inspectionResults)
                 .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId))).get();
             return c.json({ success: true, data: { inspection, template: template || null, results: results || null, base: null } });

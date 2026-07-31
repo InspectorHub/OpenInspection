@@ -206,7 +206,7 @@ export default function RepairItemsPage() {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">{m.common_cancel()}</button>
-              <button onClick={() => submit(form.id ? "update" : "create")} disabled={!form.name.trim() || !form.defaultRepairSummary.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50">{m.common_save()}</button>
+              <button onClick={() => submit(form.id ? "update" : "create")} disabled={!form.name.trim() || !form.defaultRepairSummary.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50">{m.common_save()}</button>
             </div>
           </div>
         </div>

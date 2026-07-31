@@ -23,8 +23,8 @@ import {
     ReportDataResponseSchema,
 } from '../../lib/validations/inspection.schema';
 import { SendReportSchema, SendReportResponseDataSchema } from '../../lib/validations/send-report.schema';
-import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable, contacts, tenants } from '../../lib/db/schema';
+import { makeManualSendLogger } from '../../services/automation/manual-log';
 import { eq, and } from 'drizzle-orm';
 import { resolveSignatureInspector } from '../../lib/signature-helpers';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
@@ -189,7 +189,7 @@ const hubRoute = createRoute(withMcpMetadata({
         404: { description: 'Inspection not found in this tenant' },
     },
     operationId: 'getInspectionHub',
-    description: 'Returns one aggregate payload for the inspection hub page so the loader makes a single round trip: core inspection fields, the people card, booked service lines, the tenant agreement templates, this inspection\'s agreement requests, the most recent invoice, and the publish-readiness summary.',
+    description: 'Returns one aggregate payload for the inspector portal page so the loader makes a single round trip: core inspection fields, the people card, booked service lines, the tenant agreement templates, this inspection\'s agreement requests, the most recent invoice, and the publish-readiness summary.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 // ── Spec 5A — report PDF render pipeline (download side) ───────────────────
@@ -354,6 +354,11 @@ const reportDeliveryRoutes = createApiRouter()
         const sentTo: string[] = [];
         const skipped: Array<{ recipient: string; reason: string }> = [];
 
+        // A2.2 — manual sends land in the SAME ledger the automations write,
+        // with `automation_id IS NULL` as the manual marker; one factory call =
+        // one shared sendAt = one Outbox notice for the whole batch.
+        const logManualSend = makeManualSendLogger(db, tenantId, id);
+
         for (const recipient of recipients) {
             const recipientLabel = recipient.contactId ?? recipient.email ?? 'unknown';
             try {
@@ -367,7 +372,9 @@ const reportDeliveryRoutes = createApiRouter()
                     recipientEmail = contactRow?.email ?? null;
                 }
                 if (!recipientEmail) {
-                    skipped.push({ recipient: recipientLabel, reason: 'No email on file for this recipient' });
+                    const reason = 'No email on file for this recipient';
+                    skipped.push({ recipient: recipientLabel, reason });
+                    await logManualSend({ recipient: recipientLabel, contactId: recipient.contactId ?? null, roleKey: recipient.roleKey, status: 'skipped', error: reason });
                     continue;
                 }
 
@@ -424,9 +431,12 @@ const reportDeliveryRoutes = createApiRouter()
                     metadata: { recipient: recipientEmail, roleKey: recipient.roleKey },
                 });
                 sentTo.push(recipientEmail);
+                await logManualSend({ recipient: recipientEmail, contactId: recipient.contactId ?? null, roleKey: recipient.roleKey, status: 'sent' });
             } catch (err) {
                 logger.error('[send-report-pdf] recipient send failed', { inspectionId: id, recipient: recipientLabel }, err instanceof Error ? err : undefined);
-                skipped.push({ recipient: recipientLabel, reason: err instanceof Error ? err.message : 'Send failed' });
+                const reason = err instanceof Error ? err.message : 'Send failed';
+                skipped.push({ recipient: recipientLabel, reason });
+                await logManualSend({ recipient: recipientLabel, contactId: recipient.contactId ?? null, roleKey: recipient.roleKey, status: 'failed', error: reason });
             }
         }
 
@@ -461,7 +471,7 @@ const reportDeliveryRoutes = createApiRouter()
         // to a tenants.slug lookup by the verified tenantId.
         let tenantSlug = c.get('requestedTenantSlug') ?? '';
         if (!tenantSlug) {
-            const row = await drizzle(c.env.DB).select({ slug: tenants.slug })
+            const row = await getDrizzle(c).select({ slug: tenants.slug })
                 .from(tenants)
                 .where(eq(tenants.id, tenantId))
                 .get();

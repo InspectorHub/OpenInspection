@@ -47,7 +47,7 @@ const listInvoicesRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "listInvoices",
     description: "Auto-generated placeholder for listInvoices (GET /, invoices domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['read'], tier: 'primary' }));
+}, { scopes: ['read'], tier: 'primary', capability: 'financial' }));
 
 const createInvoiceRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',

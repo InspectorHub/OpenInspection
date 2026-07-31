@@ -23,9 +23,9 @@ import { loadAgentReportContext } from "~/lib/agent-report-context";
  * Placeholder StatusOverview for an agent-kind token. Agents have no client
  * hub, so the loader forces `section: "report"` and never renders
  * InspectionStatusCards (mounts only on activeSection === "overview" — see
- * InspectionHub.tsx) and HubSectionSlot's "report" branch never reads
+ * ClientPortalHub.tsx) and HubSectionSlot's "report" branch never reads
  * `overview` at all (see hub/HubSectionSlot.tsx) — the ONLY overview fields
- * InspectionHub itself reads on a non-overview section are `.address` /
+ * ClientPortalHub itself reads on a non-overview section are `.address` /
  * `.date` for the page header, which the loader backfills from the
  * (already token-scoped) report payload once loadReportSection returns.
  */

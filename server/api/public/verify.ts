@@ -1,5 +1,4 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { inspections, reportVersions } from '../../lib/db/schema';
 import { createApiRouter } from '../../lib/openapi-router';
@@ -9,6 +8,7 @@ import { loadVerifyData, loadReportVerifyData } from '../../lib/verify-data';
 import { buildRenderReportUrl } from '../../lib/public-urls';
 import { getBookingHost, resolveTenantSlug } from '../../lib/url';
 import { isReportPublished } from '../../lib/status/report-status';
+import { getDrizzle } from '../../lib/route-helpers';
 
 // Public e-sign verifier (Spec 5H P2, court-friendly). Reuses the raw siblings'
 // loadVerifyData; this is the base JSON route the verify page consumes.
@@ -149,7 +149,7 @@ const publicVerifyRoutes = createApiRouter()
         // Resolve token → report_versions row to get tenantId + versionNumber.
         // loadReportVerifyData only returns inspectionId from verifyByToken, so
         // we query the row directly for the tenantId we need.
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const versionRow = await db.select({
             tenantId:      reportVersions.tenantId,
             inspectionId:  reportVersions.inspectionId,

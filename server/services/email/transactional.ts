@@ -138,7 +138,7 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             recipient: 'client' | 'inspector',
             inspectionId: string,
             message: { body: string; fromName?: string | null },
-            deps: { db: D1Database; kv?: KVNamespace; baseUrl: string; clientViewUrl?: string },
+            deps: { db: D1Database; kv?: KVNamespace; baseUrl: string; clientViewUrl?: string; contactEmail?: string },
         ): Promise<void> {
             if (!this.apiKey) return;
             const throttleKey = `msg_notify:${inspectionId}:${recipient}`;
@@ -166,7 +166,9 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             let to: string | null = null;
             let viewUrl = '';
             if (recipient === 'client') {
-                to = client?.email ?? null;
+                // Per-contact threading: the caller names the THREAD's contact.
+                // Falling back to the primary client keeps legacy callers working.
+                to = deps.contactEmail ?? client?.email ?? null;
                 // The client now reads messages in the unified portal Hub. The caller
                 // (inspector send route) mints a per-recipient portal token and builds
                 // the section deep-link, mirroring the report-ready email. If it is
@@ -195,6 +197,42 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             const rendered = this.renderOr('message-notification', { fromName, propertyAddress: insp.propertyAddress ?? '', snippet, viewUrl }, {
                 subject: `New message — ${insp.propertyAddress ?? 'inspection'}`,
                 html: fallbackBody,
+            });
+            if (!rendered.enabled) return;
+            await this.sendEmail([to], rendered.subject, rendered.html);
+            if (deps.kv) await deps.kv.put(throttleKey, '1', { expirationTtl: 300 });
+        }
+
+        /**
+         * Track D — nudge for a company-inbox message with NO inspection
+         * attached (pre-booking outreach). The per-inspection notification
+         * above needs an inspection row for its address and deep link; this one
+         * deliberately has neither: plain body, no portal link, because the
+         * contact-facing surface for a no-inspection thread does not exist yet
+         * (Track C3). Without this email the message would be invisible to its
+         * recipient entirely.
+         */
+        async sendContactMessageNotification(
+            to: string,
+            message: { body: string; fromName?: string | null },
+            deps: { kv?: KVNamespace },
+        ): Promise<void> {
+            if (!this.apiKey || !to) return;
+            const throttleKey = `msg_notify:contact:${to}`;
+            if (deps.kv) {
+                const recent = await deps.kv.get(throttleKey);
+                if (recent) return;
+            }
+            const fromName = (message.fromName ?? 'your inspector').toString();
+            const snippet = message.body.length > 200 ? message.body.slice(0, 197) + '...' : message.body;
+            const html = `
+            <p>New message from <strong>${escapeHtml(fromName)}</strong>:</p>
+            <blockquote style="border-left:3px solid #ccc;padding-left:12px;color:#555">${escapeHtml(snippet)}</blockquote>
+            <p>Reply to this email to get in touch.</p>
+        `;
+            const rendered = this.renderOr('message-notification', { fromName, propertyAddress: '', snippet, viewUrl: '' }, {
+                subject: `New message from ${fromName}`,
+                html,
             });
             if (!rendered.enabled) return;
             await this.sendEmail([to], rendered.subject, rendered.html);

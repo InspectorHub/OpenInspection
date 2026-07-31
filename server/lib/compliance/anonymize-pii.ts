@@ -45,3 +45,16 @@ export const ANONYMIZE_REQUEST_PII = {
     clientName: null,
     clientEmail: ERASED_SENTINEL,
 } as const;
+
+/**
+ * Identity SET for `inspection_requests` (#88). The ROW survives —
+ * `inspections.request_id` carries a frozen legacy FK to it — so identity is
+ * cleared in place: NOT NULL `client_name` -> sentinel, nullable
+ * `client_email`/`client_phone` -> NULL. Clearing `client_email` also clears
+ * the erasure locator, which is what makes a re-run idempotent (matches 0).
+ */
+export const ANONYMIZE_BOOKING_REQUEST_PII = {
+    clientName: ERASED_SENTINEL,
+    clientEmail: null,
+    clientPhone: null,
+} as const;

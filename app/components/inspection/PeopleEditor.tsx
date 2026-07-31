@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useFetcher } from "react-router";
 import { Card, Pill, Button, Modal } from "@core/shared-ui";
-import type { action } from "~/routes/inspection-hub";
+import type { action } from "~/routes/inspector-portal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { AddPersonModal } from "./AddPersonModal";
-import { BlockHeading } from "~/components/inspection-hub/BlockHeading";
+import { BlockHeading } from "~/components/inspector-portal/BlockHeading";
 import { LinkExpiryControl } from "./LinkExpiryControl";
 import { PRIMARY_CLIENT_KEY } from "../../../server/lib/people/default-role-profiles";
 import { isSoleClient } from "../../../server/lib/people/primary-client";

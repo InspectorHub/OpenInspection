@@ -124,7 +124,7 @@ export default function VersionDiffPage() {
  <p className="text-ih-fg-3 mt-2">{error}</p>
  <a
  href={`/inspections/${inspectionId}/edit`}
- className="inline-flex items-center mt-4 h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
+ className="inline-flex items-center mt-4 h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
  >
  {m.misc_version_diff_back_inspection()}
  </a>

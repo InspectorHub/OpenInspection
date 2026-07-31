@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { useFetcher } from "react-router";
 import { Modal, Button, Checkbox, Input, Select } from "@core/shared-ui";
-import type { action } from "~/routes/inspection-hub";
+import type { action } from "~/routes/inspector-portal";
 import type { PersonRow } from "./PeopleEditor";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { m } from "~/paraglide/messages";

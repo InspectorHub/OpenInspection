@@ -21,7 +21,7 @@ export interface Rule {
   id: string; name: string; trigger: string;
   // Spec 2 Task 0: recipientKind + recipientRoleProfileId replace the fixed
   // `recipient` enum. recipientRoleProfileId is set iff recipientKind==='role'.
-  recipientKind: "role" | "inspector" | "all"; recipientRoleProfileId: string | null;
+  recipientKind: RecipientKindOption; recipientRoleProfileId: string | null;
   delayMinutes: number;
   // Track L: channels[] supersedes the dead `channel` shadow.
   conditions: string | null; channels: string[];
@@ -52,13 +52,20 @@ export const TRIGGER_LABELS: Record<string, string> = {
   get "agreement.expired"() { return m.label_trigger_agreement_expired(); },
   get "event.created"() { return m.label_trigger_event_created(); },
   get "event.completed"() { return m.label_trigger_event_completed(); },
+  get "booking.received"() { return m.label_trigger_booking_received(); },
+  get "inspection.completed"() { return m.label_trigger_inspection_completed(); },
 };
 // Spec 2 Task 0 — recipientKind options. Labels are getters (paraglide locale
 // resolves at access time, matching TRIGGER_LABELS above).
-export const RECIPIENT_KIND_LABELS: Record<"role" | "inspector" | "all", string> = {
+/** Derived so a widened schema enum surfaces here as a type error, not a blank
+ *  <option>. `automation-ui-labels.spec.ts` asserts the map is complete. */
+export type RecipientKindOption = "role" | "inspector" | "all" | "staff";
+
+export const RECIPIENT_KIND_LABELS: Record<RecipientKindOption, string> = {
   get role() { return m.settings_automations_recipient_kind_role(); },
   get inspector() { return m.settings_automations_recipient_kind_inspector(); },
   get all() { return m.settings_automations_recipient_kind_all(); },
+  get staff() { return m.settings_automations_recipient_kind_staff(); },
 };
 
 export interface Conditions { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[]; }
@@ -143,7 +150,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     });
     // Track L (Task 9) — multi-channel: read the checked channels; >=1 is enforced
     // client-side (the Save button disables when none) AND server-side (zod .min(1)).
-    const rawChannels = form.getAll("channels").map(String).filter((c) => c === "email" || c === "sms");
+    // The filter must list every channel the schema accepts. It did not when
+    // `in_app` was added, so saving an in-app rule dropped its only channel,
+    // fell through to the email default below, and quietly turned an office
+    // alert into a template-less email rule that skips at flush.
+    const rawChannels = form.getAll("channels").map(String)
+      .filter((c) => c === "email" || c === "sms" || c === "in_app");
     // Default to email-only when none checked (client-side guard also enforces this).
     const channels = rawChannels.length ? rawChannels : ["email"];
     // SP2 Task 12: submit template ids instead of embedded body content.
@@ -192,7 +204,7 @@ export default function SettingsAutomations() {
       <div className="flex items-center justify-between gap-4">
         <p className="text-[13px] text-ih-fg-3">{m.settings_automations_intro()}</p>
         <button onClick={() => setEditing("new")}
-          className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
+          className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
           {m.settings_automations_new_button()}
         </button>
       </div>

@@ -234,7 +234,7 @@ describe('TenantPurgeService.purge', () => {
             lineItems: [{ description: 'Inspection', amountCents: 5000 }], createdAt: new Date(),
         } as never);
         await testDb.insert(schema.inspectionMessages).values({
-            id: 'msg-1', tenantId: TENANT, inspectionId: 'i-1', fromRole: 'client',
+            id: 'msg-1', tenantId: TENANT, inspectionId: 'i-1', contactId: 'c-purge-1', fromRole: 'client',
             body: 'When is my report ready?', createdAt: new Date(),
         } as never);
         await testDb.insert(schema.inspectionAccessTokens).values({

@@ -132,7 +132,7 @@ export function PosterPicker({
             type="button"
             onClick={setPoster}
             disabled={unavailable || saving}
-            className="min-h-[44px] rounded-xl bg-ih-primary px-5 text-[14px] font-bold text-white hover:bg-ih-primary-600 disabled:opacity-50"
+            className="min-h-[44px] rounded-xl bg-ih-primary px-5 text-[14px] font-bold text-ih-fg-inverse hover:bg-ih-primary-600 disabled:opacity-50"
           >
             {m.media_poster_set()}
           </button>

@@ -36,18 +36,23 @@
  * manifest anonymize/delete/null rule is referenced in this file, preventing
  * silent manifest↔orchestrator drift.
  */
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import {
     contacts,
     inspectionPeople,
     agreementRequests,
     agreementSigners,
+    invoices,
+    conciergeConfirmTokens,
+    inspectionAccessTokens,
+    inspectionRequests,
     erasureLog,
 } from '../db/schema';
 import {
     ANONYMIZE_SIGNER_PII,
     ANONYMIZE_REQUEST_PII,
+    ANONYMIZE_BOOKING_REQUEST_PII,
 } from './anonymize-pii';
 
 /** A single recorded erasure decision (serialized into `decisions_json`). */
@@ -264,7 +269,58 @@ export async function runErasure(
         });
     }
 
-    // ── 3) Non-agreement client PII lives on `contacts` now (the
+    // ── 3) #88 residences: invoices, tokens, booking requests ────────────────
+    // Resolve the subject's contact id(s) BEFORE the contacts delete below, so
+    // an invoice carrying only the contact reference (client_email never
+    // denormalized) is still found.
+    const subjectContactRows = await db.select({ id: contacts.id }).from(contacts)
+        .where(and(eq(contacts.tenantId, tenantId), eq(contacts.email, subjectEmail)))
+        .all();
+    const subjectContactIds = (subjectContactRows as Array<{ id: string }>).map((c) => c.id);
+
+    // The money record is the tenant's ledger (P-4 authority chain) and stays;
+    // only the denormalized client identity is nulled.
+    await step('invoices', 'null', {}, async () => {
+        const match = subjectContactIds.length > 0
+            ? or(eq(invoices.clientEmail, subjectEmail), inArray(invoices.contactId, subjectContactIds))
+            : eq(invoices.clientEmail, subjectEmail);
+        const res = await db.update(invoices)
+            .set({ clientName: null, clientEmail: null })
+            .where(and(eq(invoices.tenantId, tenantId), match))
+            .run();
+        return changeCount(res);
+    });
+
+    // Single-use concierge magic-link tokens addressed to the subject.
+    await step('concierge_confirm_tokens', 'delete', {}, async () => {
+        const res = await db.delete(conciergeConfirmTokens)
+            .where(and(eq(conciergeConfirmTokens.tenantId, tenantId), eq(conciergeConfirmTokens.clientEmail, subjectEmail)))
+            .run();
+        return changeCount(res);
+    });
+
+    // Persistent portal links — deleting them deliberately REVOKES portal
+    // access: an erased subject's magic links must stop working.
+    await step('inspection_access_tokens', 'delete', {}, async () => {
+        const res = await db.delete(inspectionAccessTokens)
+            .where(and(eq(inspectionAccessTokens.tenantId, tenantId), eq(inspectionAccessTokens.recipientEmail, subjectEmail)))
+            .run();
+        return changeCount(res);
+    });
+
+    // Booking requests: the ROW survives (`inspections.request_id` carries a
+    // frozen legacy FK to it), identity cleared in place via the shared SET.
+    await step('inspection_requests', 'anonymize', { legalBasis: 'art_17_3_e' }, async () => {
+        const res = await db.update(inspectionRequests)
+            .set(ANONYMIZE_BOOKING_REQUEST_PII)
+            .where(and(eq(inspectionRequests.tenantId, tenantId), eq(inspectionRequests.clientEmail, subjectEmail)))
+            .run();
+        const c = changeCount(res);
+        retainedCount += c; // rows retained with identity cleared under Art. 17(3)(e)
+        return c;
+    });
+
+    // ── 4) Non-agreement client PII lives on `contacts` now (the
     // `inspections.client_*` columns are a frozen, unread cache dropped in a
     // later migration — the erasure orchestrator no longer writes them). ────
     //

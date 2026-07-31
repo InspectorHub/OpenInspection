@@ -347,3 +347,8 @@ export async function validateTwilioSignature(
     for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ presented.charCodeAt(i);
     return diff === 0;
 }
+
+/** Public constructor for non-send Twilio REST surfaces (toll-free list, TCR). */
+export function createTwilioClient(creds: Pick<TwilioCreds, 'sid' | 'token'> & Partial<TwilioCreds>): TwilioClient {
+    return new TwilioClient(creds as TwilioCreds);
+}

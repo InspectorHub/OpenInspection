@@ -22,13 +22,13 @@ describe("the disclosure initial state reflects the role template", () => {
     it("inspector defaults: publish on, the rest off", () => {
         const caps = getCapabilities("inspector", null);
         expect(caps).toEqual({
-            publish: true, scheduleOthers: false, financial: false, manageContacts: false,
+            publish: true, scheduleOthers: false, financial: false, manageContacts: false, viewCommunication: true,
         });
     });
     it("manager defaults: all four on", () => {
         const caps = getCapabilities("manager", null);
         expect(caps).toEqual({
-            publish: true, scheduleOthers: true, financial: true, manageContacts: true,
+            publish: true, scheduleOthers: true, financial: true, manageContacts: true, viewCommunication: true,
         });
     });
 });

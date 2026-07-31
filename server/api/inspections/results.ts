@@ -24,10 +24,10 @@ import { AggregatedRecommendationsResponseSchema } from '../../lib/validations/r
 import { aggregateAttachedRecommendations } from '../../lib/aggregate-recommendations';
 import { findingsForUnit } from '../../lib/finding-key';
 import { applyResultsBatch } from '../../services/inspection-results.service';
-import { drizzle } from 'drizzle-orm/d1';
 import { inspectionResults } from '../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { getDrizzle } from '../../lib/route-helpers';
 
 /**
  * Round-2 backlog G1 (Spectora §E.2) — GET /api/inspections/:id/property-facts
@@ -356,7 +356,7 @@ const resultsRoutes = createApiRouter()
     .openapi(getResultsRoute, async (c) => {
         const { id } = c.req.valid('param');
         const { scope } = c.req.valid('query');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         await c.var.services.inspection.getInspection(id, c.get('tenantId'));
         const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, c.get('tenantId')))).get();
         const data = (results?.data || {}) as Record<string, unknown>;
@@ -389,7 +389,7 @@ const resultsRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId') as string;
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const row = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId))).get();
         const { items, totals } = aggregateAttachedRecommendations(row?.data as Record<string, unknown> | undefined);
@@ -418,7 +418,7 @@ const resultsRoutes = createApiRouter()
             throw Errors.NotFound('Inspection not found');
         }
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const data = await applyResultsBatch(db, id, patches, { tenantId, userId });
         auditFromContext(c, 'inspection.results_batch_patched', 'inspection', {
             entityId: id, metadata: { applied: data.applied, by: userId },

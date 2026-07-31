@@ -2,13 +2,14 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { automations, automationLogs, inspections } from '../../lib/db/schema';
 import { nanoid } from 'nanoid';
+import { createHeadersForInsertedLogs, type NoticeWording } from './notice-headers';
 import { logger } from '../../lib/logger';
 import { createOiTemplateStore } from './template-store';
-import type { Constructor, TriggerContext } from './shared';
+import { resolveRuleRecipients, type ResolvedRecipient } from './recipients';
+import { interpolate } from './shared';
+import type { AutomationChannel, RecipientKind, Constructor, TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
-import { PeopleService } from '../people.service';
-import { capabilitiesForKind } from '../../lib/people/capabilities';
 
 /**
  * Trigger mixin: fan out pending automation_log rows when a domain event fires,
@@ -103,7 +104,14 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                     }
                     const sendAt = new Date(now.getTime() + rule.delayMinutes * 60_000);
                     for (const r of recipients) {
-                        const addr = channel === 'email' ? r.email : r.phone;
+                        // B1 — `in_app` resolves the EMAIL address, and an
+                        // address-less recipient is skipped for the same reason
+                        // an email one is: every inbox that renders a notice
+                        // (client portal, agent portal) authenticates by email,
+                        // so a notice nobody can sign in to read is not a
+                        // delivery. The address is a label here — the header's
+                        // `contact_id` is the identity.
+                        const addr = channel === 'sms' ? r.phone : r.email;
                         if (!addr) continue; // resolveRecipients already logged/skipped addr-less people; belt-and-braces
                         // IA-109 — carry the contact id through. The resolver has
                         // it; dropping it forced the SMS consent gate to guess
@@ -120,6 +128,8 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             logger.info('AutomationService.trigger: logs prepared',
                 { event: ctx.triggerEvent, count: logs.length });
             if (logs.length > 0) {
+                let inserted: Array<{ id: string; automationId: string | null; sendAt: Date | number;
+                    recipientContactId: string | null; recipientRoleKey: string | null }> = [];
                 try {
                     // .onConflictDoNothing() covers the uq_automation_logs_event partial
                     // unique index: a report.published retry produces the SAME
@@ -127,7 +137,14 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                     // is silently skipped (no duplicate log, no double-send). NULL-eventId
                     // logs (all other triggers) never conflict, so this is a harmless
                     // no-op for them — behavior there is unchanged.
-                    await db.insert(automationLogs).values(logs).onConflictDoNothing();
+                    inserted = await db.insert(automationLogs).values(logs).onConflictDoNothing()
+                        .returning({
+                            id: automationLogs.id,
+                            automationId: automationLogs.automationId,
+                            sendAt: automationLogs.sendAt,
+                            recipientContactId: automationLogs.recipientContactId,
+                            recipientRoleKey: automationLogs.recipientRoleKey,
+                        });
                     logger.info('AutomationService.trigger: logs inserted',
                         { event: ctx.triggerEvent, count: logs.length });
                 } catch (err) {
@@ -136,16 +153,67 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                         err instanceof Error ? err : undefined);
                     throw err;
                 }
+                // C1 (design §3.13) — one notice HEADER per (rule firing x
+                // recipient), each of that recipient's channel rows stamped with
+                // it. Only rows that ACTUALLY inserted get headers — a
+                // report.published retry conflicts away and must not orphan a
+                // fresh header set. Best-effort: the ledger is already durable,
+                // and legacy/failed stamps are what the backfill script and the
+                // Outbox's interim-key fallback exist for.
+                try {
+                    // B3 (IA-115) — the wording comes from each rule's in-app
+                    // template when it has one. Resolved ONCE per firing rather
+                    // than once per header: a rule fanning out to eight staff
+                    // would otherwise re-read the same template eight times.
+                    const wordingByRule = new Map<string, NoticeWording>();
+                    for (const rule of filteredRules) {
+                        if (!rule.inAppTemplateId) continue;
+                        const tpl = await store.resolve(ctx.tenantId, rule.inAppTemplateId);
+                        if (!tpl || tpl.channel !== 'in_app') continue;
+                        const vars = {
+                            property_address: insp.propertyAddress || 'inspection',
+                            company_name: ctx.companyName,
+                            scheduled_date: insp.date ?? '',
+                        };
+                        wordingByRule.set(rule.id, {
+                            title: interpolate(tpl.subject ?? '', vars) || this.titleFor(ctx.triggerEvent, insp),
+                            body: tpl.body ? interpolate(tpl.body, vars) : null,
+                        });
+                    }
+                    const fallback: NoticeWording = { title: this.titleFor(ctx.triggerEvent, insp), body: null };
+                    await createHeadersForInsertedLogs(
+                        db, ctx,
+                        (automationId) => (automationId && wordingByRule.get(automationId)) || fallback,
+                        inserted,
+                    );
+                } catch (err) {
+                    logger.error('AutomationService.trigger: notice-header creation failed',
+                        { event: ctx.triggerEvent },
+                        err instanceof Error ? err : undefined);
+                }
             }
-            if (logs.length > 0 && this.notification) {
-                await this.notification.createForAllAdmins(ctx.tenantId, {
-                    type: ctx.triggerEvent,
-                    title: this.titleFor(ctx.triggerEvent, insp),
-                    entityType: 'inspection',
-                    entityId: ctx.inspectionId,
-                    metadata: { fromAutomation: true, rules: filteredRules.length },
-                });
-            }
+            // B3 — the blanket "any event with logs also alerts every admin"
+            // notification is GONE. It fired outside the engine, so it could not
+            // be seen, renamed or switched off, and it double-notified whenever
+            // a staff rule already covered the same event. The seeded
+            // `Office alert — …` rules (recipientKind 'staff', channel in_app)
+            // now do the same job through the same path as every other
+            // recipient, which is what makes automations the single config
+            // surface rather than one of two.
+            //
+            // ENQUEUE vs DELIVERY, decided here because B3 is where it starts to
+            // matter: the office alert appears at ENQUEUE time, not when flush()
+            // settles the row. The header is written above, and the inbox
+            // reveals it once `send_at` passes (§3.14) — the cron only moves the
+            // Outbox status from "Sending" to "Delivered".
+            //
+            // The alternative — hold the notice back until the cron marks it
+            // sent — was rejected: for a zero-delay rule it would add up to five
+            // minutes of latency to an alert whose whole value is immediacy,
+            // and it would make the office's view of an event depend on a
+            // scheduled job rather than on the event. A DELAYED rule still
+            // behaves correctly because the reader-side `send_at` filter, not
+            // the delivery status, is what gates visibility.
             logger.info('AutomationService: enqueued', { event: ctx.triggerEvent, count: logs.length });
         }
 
@@ -172,9 +240,17 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
         // Public (was `private` on the monolith) so the reminders mixin can call it
         // through a typed cross-mixin contract; no runtime behavior change.
         async resolveAddress(
-            recipientKind: 'role' | 'inspector' | 'all', recipientRoleProfileId: string | null, channel: 'email' | 'sms',
+            recipientKind: RecipientKind, recipientRoleProfileId: string | null, channel: AutomationChannel,
             insp: typeof inspections.$inferSelect, db: DrizzleD1Database,
         ): Promise<string | null> {
+            // B2 — `staff` is a MULTI-recipient kind and this function answers
+            // with one address, so there is no honest answer to give. Only the
+            // reminder path still calls it (trigger() moved to
+            // resolveRecipients); a staff reminder therefore enqueues nothing
+            // rather than picking an arbitrary admin. If staff reminders are
+            // ever wanted, reminders.ts moves onto resolveRecipients too — the
+            // same change trigger() already made.
+            if (recipientKind === 'staff') return null;
             const { contacts, users, inspectionPeople, contactRoleProfiles } = await import('../../lib/db/schema');
             // Join order mirrors api/metrics.ts / data.service.ts: contact_role_profiles
             // filtered to (tenant, key, active) FIRST, then inspection_people scoped to
@@ -255,95 +331,13 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             return normalizeE164(raw);
         }
 
-        /**
-         * Spec 2 Task 1 — role-driven recipient resolution: returns EVERY matching
-         * recipient (not just the single client address `resolveAddress` targets),
-         * so a later task can send one message per recipient. Pure resolver: never
-         * throws, never writes `automation_logs` (that stays the flush loop's job
-         * — see `trigger()` above, untouched by this method). An addr-less person
-         * is logged and skipped, not treated as an error.
-         *
-         * 'all' = every `receivesReport` person on the inspection's people list —
-         * currently client/agent/other all set `receivesReport: true`
-         * (`lib/people/capabilities.ts`), so 'all' is effectively "everyone".
-         *
-         * 'inspector' has no `inspection_people` row — the inspector is a `users`
-         * row, not a contact — so it's resolved the same way `resolveAddress`'s
-         * inspector branch does (lead falls back to assigned), not via
-         * PeopleService. `contactId` on the returned recipient is therefore
-         * best-effort: the inspector's user id, not a real `contacts` row id.
-         */
+        /** See recipients.ts — extracted for the file-size ratchet. */
         async resolveRecipients(
-            rule: { recipientKind: 'role' | 'inspector' | 'all'; recipientRoleProfileId: string | null },
+            rule: { recipientKind: RecipientKind; recipientRoleProfileId: string | null },
             inspection: typeof inspections.$inferSelect,
-            channel: 'email' | 'sms',
-        ): Promise<Array<{ contactId: string; roleKey: string; email?: string; phone?: string }>> {
-            if (rule.recipientKind === 'inspector') {
-                const inspectorId = inspection.leadInspectorId ?? inspection.inspectorId ?? null;
-                if (!inspectorId) return [];
-                const { users } = await import('../../lib/db/schema');
-                const db = this.getDrizzle();
-                // Try/catch (not `.get().catch()`) — the latter only behaves as a
-                // Promise against the real async D1 driver, not the synchronous
-                // better-sqlite3 test driver (same posture as resolveAddress's
-                // contactForRole above).
-                let u: { email: string | null; phone: string | null } | null;
-                try {
-                    u = (await db.select({ email: users.email, phone: users.phone }).from(users)
-                        .where(eq(users.id, inspectorId)).get()) ?? null;
-                } catch {
-                    u = null;
-                }
-                // sms addresses must be normalized to E.164 here — this is the ONLY
-                // path that produces automation_logs.recipient for sms (unlike
-                // resolveAddress, which normalizes internally); sms.ts sends
-                // log.recipient as-is with no send-time re-normalization.
-                const { normalizeE164 } = await import('../../lib/sms/phone');
-                const addr = channel === 'email' ? (u?.email ?? null) : normalizeE164(u?.phone ?? null);
-                if (!addr) return [];
-                return [{
-                    contactId: inspectorId ?? '',
-                    roleKey: 'inspector',
-                    ...(channel === 'email' ? { email: addr } : { phone: addr }),
-                }];
-            }
-
-            // Honor the "never throws" contract (see the doc comment above): the
-            // inspector branch already guards its query, but a bare listPeople()
-            // here would propagate a transient D1 error out of the per-rule loop
-            // in trigger(), aborting the ENTIRE fan-out for every rule/recipient
-            // with no retry (publish marks status='completed' first). Fail to an
-            // empty recipient set for this rule/channel instead — same posture as
-            // resolveAddress/contactForRole.
-            let people: Awaited<ReturnType<PeopleService['listPeople']>>;
-            try {
-                people = await new PeopleService({ DB: this.db }).listPeople(inspection.tenantId, inspection.id);
-            } catch (err) {
-                logger.error('resolveRecipients: listPeople failed; skipping this rule\'s recipients', {
-                    inspectionId: inspection.id, tenantId: inspection.tenantId, channel,
-                }, err instanceof Error ? err : undefined);
-                return [];
-            }
-            const targets = rule.recipientKind === 'role'
-                ? people.filter(p => p.roleProfileId === rule.recipientRoleProfileId)
-                : people.filter(p => capabilitiesForKind(p.kind).receivesReport);
-
-            const { normalizeE164 } = await import('../../lib/sms/phone');
-            const out: Array<{ contactId: string; roleKey: string; email?: string; phone?: string }> = [];
-            for (const p of targets) {
-                const addr = channel === 'email' ? p.email : normalizeE164(p.phone);
-                if (!addr) {
-                    logger.info('resolveRecipients: skipping addr-less person', {
-                        inspectionId: inspection.id, contactId: p.contactId, roleKey: p.roleKey, channel,
-                    });
-                    continue;
-                }
-                out.push({
-                    contactId: p.contactId, roleKey: p.roleKey,
-                    ...(channel === 'email' ? { email: addr } : { phone: addr }),
-                });
-            }
-            return out;
+            channel: AutomationChannel,
+        ): Promise<ResolvedRecipient[]> {
+            return resolveRuleRecipients(this.db, rule, inspection, channel);
         }
 
         protected titleFor(event: string, insp: typeof inspections.$inferSelect): string {
@@ -358,5 +352,6 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 default:                     return `${event} — ${addr}`;
             }
         }
+
     };
 }

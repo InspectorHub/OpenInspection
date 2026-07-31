@@ -144,7 +144,7 @@ function ConciergeConfirmBody() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full h-11 rounded-lg bg-ih-primary text-white text-sm font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
+            className="w-full h-11 rounded-lg bg-ih-primary text-ih-fg-inverse text-sm font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
           >
             {submitting ? m.concierge_confirm_submit_pending() : m.concierge_confirm_submit()}
           </button>

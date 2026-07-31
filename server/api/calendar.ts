@@ -1,6 +1,5 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema';
 import { resolveTenantTimeZone } from '../lib/tz';
@@ -47,6 +46,7 @@ import calendarBlockRoutes from './calendar-blocks';
 import calendarItemsRoutes from './calendar-items';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
+import { getDrizzle } from '../lib/route-helpers';
 
 function oauthErrorLanding(c: Context<HonoConfig>, message: string) {
     return c.html(renderCalendarOAuthPopupLanding({
@@ -148,7 +148,7 @@ const calendarRoutes = createApiRouter()
         }
         const timeMin = new Date();
         const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         // A-polish 10b — union busy across the multi-read calendar set (falls
         // back to the write/primary calendar when no read set is configured).
@@ -226,7 +226,7 @@ const calendarRoutes = createApiRouter()
         );
         if (!open) return c.json({ success: true, data: { connected: false } }, 200);
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const readCalendarIds = await resolveReadCalendarIds(db, {
             tenantId,
             connectionId: open.connection.id,
@@ -345,7 +345,7 @@ const calendarRoutes = createApiRouter()
             }
             throw e;
         }
-        await saveReadSet(drizzle(c.env.DB), { tenantId, connectionId: connId, resolved });
+        await saveReadSet(getDrizzle(c), { tenantId, connectionId: connId, resolved });
         return c.json({
             success: true,
             data: { readCalendarIds: resolved.readCalendarIds, writeCalendarId: resolved.writeCalendarId },

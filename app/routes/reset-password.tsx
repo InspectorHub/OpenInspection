@@ -6,6 +6,7 @@ import type { Route } from "./+types/reset-password";
 import { createApi } from "~/lib/api-client.server";
 import { makeResetPasswordSchema, makePasswordHint } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
+import { Input, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import type { WorkerEnv } from "../../workers/env";
@@ -114,23 +115,16 @@ export default function ResetPasswordPage() {
     <AuthShell heading={m.auth_reset_heading()}>
       <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate className="space-y-4">
         <input type="hidden" name="token" value={token} />
-        <div>
-          <label htmlFor={fields.newPassword.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-            {m.auth_reset_password_label()}
-          </label>
-          <input
-            id={fields.newPassword.id}
-            name={fields.newPassword.name}
-            type="password"
-            autoFocus
-            aria-invalid={fields.newPassword.errors ? true : undefined}
-            className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
-          />
-          <p className="mt-1 text-xs text-ih-fg-3">{makePasswordHint()}</p>
-          {fields.newPassword.errors && (
-            <p className="mt-1 text-xs text-ih-bad-fg">{fields.newPassword.errors[0]}</p>
-          )}
-        </div>
+        <Input
+          id={fields.newPassword.id}
+          name={fields.newPassword.name}
+          type="password"
+          autoFocus
+          label={m.auth_reset_password_label()}
+          aria-invalid={fields.newPassword.errors ? true : undefined}
+          hint={makePasswordHint()}
+          error={fields.newPassword.errors?.[0]}
+        />
 
         {form.errors && (
           <div className="px-3 py-2 rounded-lg bg-ih-bad-bg border border-ih-bad text-sm text-ih-bad-fg">
@@ -138,13 +132,9 @@ export default function ResetPasswordPage() {
           </div>
         )}
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-        >
+        <Button type="submit" variant="primary" size="lg" disabled={isSubmitting} className="w-full">
           {isSubmitting ? m.auth_reset_submit_pending() : m.auth_reset_submit()}
-        </button>
+        </Button>
       </Form>
     </AuthShell>
   );

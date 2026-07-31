@@ -12,6 +12,7 @@
     "pathPattern": [
       "./messages/{locale}/auth.json",
       "./messages/{locale}/common.json",
+      "./messages/{locale}/communication.json",
       "./messages/{locale}/nav.json",
       "./messages/{locale}/inspections.json",
       "./messages/{locale}/settings.json",

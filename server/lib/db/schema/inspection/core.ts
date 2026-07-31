@@ -179,6 +179,14 @@ export const inspections = sqliteTable('inspections', {
     // migration covers both; resolveProfile already reads it.
     badgeLayoutOverride: text('badge_layout_override', { enum: ['strip', 'inline'] }),
     reportPhotoColumns:  integer('report_photo_columns'),
+    // Who sent us this job. Distinct from `referral_source`, which records the
+    // CHANNEL (Google, Realtor, Past Client) and names nobody. Attribution used
+    // to be inferred from whoever held the buyer_agent role, which credits a
+    // stranger when a past client refers the job and gives a referring listing
+    // agent nothing. Any contact may be the referrer, not only agent-kind ones.
+    // App-layer soft reference to contacts.id; no FK per Schema Rules.
+    // Appended at table end for D1 rebuild safety.
+    referredByContactId: text('referred_by_contact_id'),
 }, (t) => [
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),

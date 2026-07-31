@@ -65,7 +65,7 @@ export function MonthView({
                     setDragTarget(null);
                   }}
                 >
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[12px] font-medium ${isToday(day) ? "bg-ih-primary text-white" : "text-ih-fg-2"}`}>
+                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[12px] font-medium ${isToday(day) ? "bg-ih-primary text-ih-fg-inverse" : "text-ih-fg-2"}`}>
                     {day}
                   </span>
                   <div className="mt-0.5 space-y-0.5">

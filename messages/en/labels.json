@@ -93,5 +93,8 @@
   "label_trigger_agreement_declined": "Agreement declined",
   "label_trigger_agreement_expired": "Agreement expired",
   "label_trigger_event_created": "Event created",
-  "label_trigger_event_completed": "Event completed"
+  "label_trigger_event_completed": "Event completed",
+  "label_cap_view_communication": "View sent messages & notices",
+  "label_trigger_booking_received": "Booking received",
+  "label_trigger_inspection_completed": "Inspection completed"
 }

@@ -52,6 +52,20 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 }
 
+/** The modal's controlled checkboxes always submit the FULL explicit set
+ *  (absent checkbox = unchecked = false), so a partial object never reaches
+ *  the server and the stored overrides read the same way as the seeds. */
+function capabilityOverridesFrom(form: FormData) {
+  const repair = String(form.get("cap_canAccessRepairList") ?? "off");
+  return {
+    receivesReport: form.get("cap_receivesReport") === "on",
+    selfRetrieveReport: form.get("cap_selfRetrieveReport") === "on",
+    canHaveAccount: form.get("cap_canHaveAccount") === "on",
+    showsInAgentPortal: form.get("cap_showsInAgentPortal") === "on",
+    canAccessRepairList: (["off", "read", "readwrite"].includes(repair) ? repair : "off") as "off" | "read" | "readwrite",
+  };
+}
+
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
   const form = await request.formData();
@@ -64,9 +78,10 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!label || !kind) return { ok: false };
     const emailTemplateId = String(form.get("emailTemplateId") ?? "").trim();
     const smsTemplateId = String(form.get("smsTemplateId") ?? "").trim();
-    const body: { label: string; kind: "client" | "agent" | "other"; emailTemplateId?: string; smsTemplateId?: string } = { label, kind };
+    const body: { label: string; kind: "client" | "agent" | "other"; emailTemplateId?: string; smsTemplateId?: string; capabilityOverrides?: ReturnType<typeof capabilityOverridesFrom> } = { label, kind };
     if (emailTemplateId) body.emailTemplateId = emailTemplateId;
     if (smsTemplateId) body.smsTemplateId = smsTemplateId;
+    body.capabilityOverrides = capabilityOverridesFrom(form);
     const res = await api.roleProfiles.index.$post({ json: body });
     return { ok: res.ok };
   }
@@ -82,6 +97,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         label,
         emailTemplateId: emailTemplateId || null,
         smsTemplateId: smsTemplateId || null,
+        capabilityOverrides: capabilityOverridesFrom(form),
       },
     });
     return { ok: res.ok };

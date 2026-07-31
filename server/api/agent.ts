@@ -1,7 +1,7 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
+import { capabilitiesForProfile, type RoleKind } from '../lib/people/capabilities';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
 import { inspections } from '../lib/db/schema/inspection';
@@ -25,6 +25,7 @@ import {
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import agentPhotoRoutes from './agent/photo';
+import { getDrizzle } from '../lib/route-helpers';
 
 /**
  * GET /api/agents/my-reports
@@ -244,7 +245,7 @@ const agentRoutes = createApiRouter()
         const user = c.get('user');
         const userRole = c.get('userRole');
         const { agentId: queryAgentId } = c.req.valid('query');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         // Admins/owners can pass ?agentId= to view any agent's reports
         const agentId =
@@ -252,25 +253,33 @@ const agentRoutes = createApiRouter()
                 ? (queryAgentId ?? user.sub)
                 : user.sub;
 
-        // Buyer's-agent attribution now lives on inspection_people (role
-        // buyer_agent) rather than the legacy inspections.referredByAgentId
-        // column. Resolve the set of inspection ids first (two-step, rather
-        // than joining inspections directly) so `db.select()` below keeps
-        // returning flat inspection rows unchanged.
-        const buyerAgentRows = await db
-            .select({ inspectionId: inspectionPeople.inspectionId })
+        // Task 9 (two-layer role model) — visibility is the showsInAgentPortal
+        // CAPABILITY, not the buyer_agent key: a listing agent's seat shows
+        // here too, and a seat whose role withdrew the bit does not. Resolve
+        // seat rows with their role kind + overrides, filter on the resolved
+        // capability (SQL cannot call the pure resolver), then fetch the
+        // flat inspection rows unchanged.
+        const seatRows = await db
+            .select({
+                inspectionId: inspectionPeople.inspectionId,
+                kind: contactRoleProfiles.kind,
+                capabilityOverrides: contactRoleProfiles.capabilityOverrides,
+            })
             .from(inspectionPeople)
             .innerJoin(contactRoleProfiles, and(
                 eq(contactRoleProfiles.id, inspectionPeople.roleProfileId),
                 eq(contactRoleProfiles.tenantId, tenantId),
-                eq(contactRoleProfiles.key, 'buyer_agent'),
                 eq(contactRoleProfiles.active, true),
             ))
             .where(and(
                 eq(inspectionPeople.tenantId, tenantId),
                 eq(inspectionPeople.contactId, agentId),
             ));
-        const inspectionIds = buyerAgentRows.map((r) => r.inspectionId);
+        const inspectionIds = [...new Set(
+            seatRows
+                .filter((r) => capabilitiesForProfile(r.kind as RoleKind, r.capabilityOverrides).showsInAgentPortal)
+                .map((r) => r.inspectionId),
+        )];
 
         const rows = inspectionIds.length === 0 ? [] : await db
             .select()
@@ -295,36 +304,28 @@ const agentRoutes = createApiRouter()
         await requireRole('owner', 'manager', 'inspector', 'agent')(c, async () => {});
 
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
-        // JOIN contacts to surface agent name + agency in one query (Round 28
-        // — UI was an orphan; now leaderboard card needs displayable rows).
-        // Buyer's-agent attribution via inspection_people (role buyer_agent)
-        // — contact_role_profiles is joined before inspection_people so the
-        // join stays scoped to buyer_agent only (joining inspection_people
-        // first would fan out over every role on the inspection).
+        // Task 9 (two-layer role model) — attribution reads the explicit
+        // referred_by_contact_id column, not the buyer_agent seat. The old
+        // inference credited a stranger when a past client referred the job;
+        // the cutover is numerically identical because the column was
+        // backfilled from exactly the old join.
         const rows = await db
             .select({
-                agentId: inspectionPeople.contactId,
+                agentId: inspections.referredByContactId,
                 name:    contacts.name,
                 agency:  contacts.agency,
                 email:   contacts.email,
                 total:   sql<number>`count(*)`,
             })
             .from(inspections)
-            .leftJoin(contactRoleProfiles, and(
-                eq(contactRoleProfiles.tenantId, inspections.tenantId),
-                eq(contactRoleProfiles.key, 'buyer_agent'),
-                eq(contactRoleProfiles.active, true),
+            .leftJoin(contacts, and(
+                eq(contacts.id, inspections.referredByContactId),
+                eq(contacts.tenantId, inspections.tenantId),
             ))
-            .leftJoin(inspectionPeople, and(
-                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
-                eq(inspectionPeople.inspectionId, inspections.id),
-                eq(inspectionPeople.tenantId, inspections.tenantId),
-            ))
-            .leftJoin(contacts, eq(inspectionPeople.contactId, contacts.id))
             .where(eq(inspections.tenantId, tenantId))
-            .groupBy(inspectionPeople.contactId, contacts.name, contacts.agency, contacts.email)
+            .groupBy(inspections.referredByContactId, contacts.name, contacts.agency, contacts.email)
             .orderBy(sql`count(*) DESC`);
 
         // Exclude rows where agentId is null (un-referred inspections)

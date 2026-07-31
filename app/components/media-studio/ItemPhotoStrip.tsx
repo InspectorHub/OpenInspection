@@ -338,7 +338,7 @@ export function ItemPhotoStrip({
                 </span>
               )}
               {isCover && !selecting && (
-                <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-white text-[8px] font-bold text-center py-0.5 uppercase tracking-wide">
+                <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-ih-fg-inverse text-[8px] font-bold text-center py-0.5 uppercase tracking-wide">
                   {m.media_strip_cover()}
                 </span>
               )}

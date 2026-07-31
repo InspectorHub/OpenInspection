@@ -1,5 +1,5 @@
 import { eq, and, desc, inArray } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, tenantConfigs, tenants, inspectionServices, agreements, agreementRequests, agreementSigners, invoices } from '../../lib/db/schema';
+import { inspections, inspectionResults, templates, users, tenantConfigs, tenants, inspectionServices, agreements, agreementRequests, agreementSigners, invoices, contacts } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { safeISODate } from '../../lib/date';
 import { resolveLocale } from '../../lib/locale';
@@ -16,6 +16,7 @@ import {
     type RequireDefectFields,
     type PublishReadiness,
 } from './shared';
+import { communicationCounts } from '../../lib/communication-counts';
 import { InspectionSubService } from './base';
 import type { InspectionService } from '../inspection.service';
 
@@ -258,6 +259,8 @@ export class InspectionPublishService extends InspectionSubService {
             closingDate: string | null;
             referenceNumber: string | null;
             referralSource: string | null;
+            referredByContactId: string | null;
+            referredByName: string | null;
         };
         tenantSlug: string;
         people: Awaited<ReturnType<InspectionService['getPeopleCard']>>;
@@ -275,6 +278,7 @@ export class InspectionPublishService extends InspectionSubService {
         }>;
         invoice: { id: string; status: string; amountCents: number; sentAt: string | null; paidAt: string | null } | null;
         publishReadiness: { ready: boolean; blockingCount: number };
+        communication: { delivered: number; needsAttention: number; unread: number };
     } | null> {
         const db = this.getDrizzle();
 
@@ -371,6 +375,19 @@ export class InspectionPublishService extends InspectionSubService {
             peopleSvc.contactIdForRole(tenantId, inspectionId, 'listing_agent'),
         ]);
 
+        const communication = await communicationCounts(db, tenantId, inspectionId);
+
+        // Task 8 — resolve the referrer's display name for the Order details
+        // card. Soft reference: a deleted contact resolves null, and the card
+        // renders the unattributed state rather than a dangling id.
+        let referredByName: string | null = null;
+        if (insp.referredByContactId) {
+            const ref = await db.select({ name: contacts.name }).from(contacts)
+                .where(and(eq(contacts.id, insp.referredByContactId), eq(contacts.tenantId, tenantId)))
+                .get();
+            referredByName = ref?.name ?? null;
+        }
+
         return {
             inspection: {
                 id:                insp.id,
@@ -399,6 +416,8 @@ export class InspectionPublishService extends InspectionSubService {
                 closingDate:       insp.closingDate ?? null,
                 referenceNumber:   insp.referenceNumber ?? null,
                 referralSource:    insp.referralSource ?? null,
+                referredByContactId: insp.referredByContactId ?? null,
+                referredByName,
             },
             tenantSlug,
             people,
@@ -436,6 +455,7 @@ export class InspectionPublishService extends InspectionSubService {
                 ready:         readiness.ready,
                 blockingCount: readiness.blockingDefects.length,
             },
+            communication,
         };
     }
 

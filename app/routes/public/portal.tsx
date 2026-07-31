@@ -16,7 +16,9 @@ import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
 import InspectionList, { type InspectionRow } from "~/components/portal/InspectionList";
+import { PublicLegalFooter } from "~/components/PublicLegalFooter";
 import { signOut } from "~/components/portal/sign-out";
+import { Input, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -41,7 +43,7 @@ export async function loader({
   // EMPTY_BRAND (platform default) on any failure.
   let brand: TenantBrand = EMPTY_BRAND;
   try {
-    brand = await resolveTenantBrand(context, tenant);
+    brand = await resolveTenantBrand(context, tenant, request);
   } catch {
     brand = EMPTY_BRAND;
   }
@@ -144,6 +146,7 @@ export default function PortalLanding() {
           rows={data.inspections}
           hrefFor={(id) => `/portal/${data.tenant}/i/${id}`}
         />
+        <PublicLegalFooter privacyUrl={data.brand.privacyUrl} termsUrl={data.brand.termsUrl} />
       </div>
     );
   }
@@ -171,33 +174,27 @@ export default function PortalLanding() {
           </p>
         </div>
       ) : (
+        /* Same shared-ui controls as /login and /agent-login, so the three
+           sign-in pages stay one design by construction rather than by
+           copy-paste. The tenant's brand accent still applies: brandTokens
+           (on the page wrapper) re-points the primary tokens these
+           components consume. */
         <Form method="post" className="space-y-3">
-          <div>
-            <label
-              htmlFor="portal-email"
-              className="block text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1"
-            >
-              {m.portal_landing_email_label()}
-            </label>
-            <input
-              id="portal-email"
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              placeholder={m.portal_landing_email_placeholder()}
-              className="w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[14px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:outline-none focus:border-ih-primary"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full h-10 rounded-lg bg-ih-primary text-ih-fg-inverse text-[14px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
-          >
+          <Input
+            id="portal-email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            label={m.portal_landing_email_label()}
+            placeholder={m.portal_landing_email_placeholder()}
+          />
+          <Button type="submit" variant="primary" size="lg" disabled={submitting} className="w-full">
             {submitting ? m.portal_landing_submit_pending() : m.portal_landing_submit()}
-          </button>
+          </Button>
         </Form>
       )}
+      <PublicLegalFooter privacyUrl={data.brand.privacyUrl} termsUrl={data.brand.termsUrl} />
     </div>
   );
 }

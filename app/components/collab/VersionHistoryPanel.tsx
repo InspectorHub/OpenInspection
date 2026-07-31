@@ -323,7 +323,7 @@ export function VersionHistoryPanel({
             type="button"
             onClick={handleSaveNow}
             disabled={saving}
-            className="h-9 px-3 rounded-md bg-ih-primary text-white text-[12px] font-bold hover:bg-ih-primary/85 disabled:opacity-50 inline-flex items-center gap-1.5"
+            className="h-9 px-3 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary/85 disabled:opacity-50 inline-flex items-center gap-1.5"
         >
             {saving ? m.editor_collab_saving() : m.editor_collab_save_version_now()}
         </button>
@@ -426,7 +426,7 @@ export function VersionHistoryPanel({
                             type="button"
                             onClick={handleConfirmRestore}
                             disabled={restoring}
-                            className="px-4 h-10 rounded-xl bg-ih-primary text-white text-sm font-semibold hover:bg-ih-primary/85 disabled:opacity-50"
+                            className="px-4 h-10 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold hover:bg-ih-primary/85 disabled:opacity-50"
                         >
                             {restoring ? m.editor_collab_restoring() : m.editor_collab_restore_version()}
                         </button>

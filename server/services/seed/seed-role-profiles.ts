@@ -14,6 +14,7 @@ export async function seedRoleProfiles(db: DrizzleD1Database, tenantId: string, 
         id: `crp_${tenantId}_${p.key}`,
         tenantId, key: p.key, label: p.label, kind: p.kind,
         isSystem: p.isSystem, sortOrder: p.sortOrder, active: true,
+        capabilityOverrides: p.capabilityOverrides as unknown as Record<string, unknown>,
         createdAt: now, updatedAt: now,
     }));
     // onConflictDoNothing guards the check-then-insert race: two concurrent

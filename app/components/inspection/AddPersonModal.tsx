@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { Modal, Button, Input, Select } from "@core/shared-ui";
-import type { action } from "~/routes/inspection-hub";
+import type { action } from "~/routes/inspector-portal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
-import { capabilitiesForKind } from "../../../server/lib/people/capabilities";
+import { capabilitiesForProfile } from "../../../server/lib/people/capabilities";
 import { m } from "~/paraglide/messages";
 
 /** A contact returned by the "search-contacts" hub action intent. */
@@ -98,13 +98,14 @@ export function AddPersonModal({
   const error =
     fetcher.data?.intent === "person-add" && !fetcher.data.ok ? fetcher.data.error : undefined;
 
-  const roleKind = activeRoles.find((r) => r.id === roleProfileId)?.kind;
+  const pickedRole = activeRoles.find((r) => r.id === roleProfileId);
+  const roleKind = pickedRole?.kind;
   // IA-102 — whether picking this role hands the person the report. Derived
   // from the SAME capability table the server enforces with
   // (server/lib/people/capabilities.ts), rather than a list of role keys kept
   // in step by hand: a tenant-custom role must not slip through the notice
   // just because nobody thought to add its key here.
-  const grantsAccess = roleKind ? capabilitiesForKind(roleKind).receivesReport : false;
+  const grantsAccess = roleKind ? capabilitiesForProfile(roleKind, pickedRole?.capabilityOverrides ?? null).receivesReport : false;
   // IA-96 — this was `roleKind === "agent" ? "agent" : "client"`, which
   // collapsed the role's third kind onto "client": adding someone under a
   // contractor role filed them in the client list, where they then turned up

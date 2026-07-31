@@ -105,7 +105,7 @@ export function NewInvoiceModal({
             {m.common_cancel()}
           </button>
           <button type="submit" disabled={busy}
-            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
             {busy ? m.invoices_new_creating() : m.invoices_new_create()}
           </button>
         </div>

@@ -1,24 +1,27 @@
+/**
+ * SMS delivery mixin — REGULATORY (TCPA consent). Thin wrapper: resolves the
+ * automation's SMS template, then hands off to `sendOneSms` (A3.3 extracted
+ * core) so the manual SMS endpoint and the automation flush share one gate.
+ *
+ * Do not re-implement consent / managed-send / quota / review_url here — that
+ * is the whole point of the extraction. Template resolution stays HERE because
+ * automations resolve from `automation.smsTemplateId` while manual sends
+ * resolve from the role profile's `smsTemplateId`.
+ */
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import type { automations, tenants } from '../../lib/db/schema';
+import { automationLogs } from '../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
-import type { automations, tenants} from '../../lib/db/schema';
-import { automationLogs, tenantConfigs, contactRoleProfiles } from '../../lib/db/schema';
-import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
-import { logger } from '../../lib/logger';
-import { currentPeriodKey } from '../../lib/usage/period';
-import { interpolate, type Constructor, type FlushInspection } from './shared';
-import { buildBaseTemplateVars } from './template-vars';
+import type { Constructor, FlushInspection } from './shared';
 import type { AutomationBase } from './shared';
-import { managedSendAllowed, type ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
+import type { ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
+import { sendOneSms } from './send-one-sms';
 
 /**
  * The SMS seam injected into deliverSms/flush: resolves a MessagingProvider and
  * the from-number for the given tenant. The shape mirrors loadProviderForTenant's
  * return — { provider, from } — so wiring is a one-liner in the cron entry.
- *
- * Twilio behavior is byte-identical: the provider is a TwilioClient and `from`
- * is the resolved number, so sendMessage({ from, to, body }) calls the same
- * TwilioClient.messages.create() path as the old sendTwilioSms helper.
  */
 export type SmsRuntime = {
     resolveProvider: (tenantId: string) => Promise<{
@@ -29,78 +32,13 @@ export type SmsRuntime = {
     } | null>;
 } | null | undefined;
 
-/**
- * SMS delivery mixin — REGULATORY (TCPA consent). This is the SMS-consent flow:
- * client logs are gated on a recorded 'granted' consent event before any text is
- * sent (agents/inspector are implied; D5). The consent gate, opt-in ledger lookup,
- * and the fail-closed review_url guard are kept INTACT and byte-identical — do not
- * alter the consent logic. Renders the rule's referenced SMS message_template
- * (SP2; was the embedded smsBody), calls provider.sendMessage(), maps
- * ok→sent / !ok→failed, and meters a successful send. Never throws.
- */
 export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: TBase) {
     return class extends Base {
         /**
-         * The role KIND behind a log's `recipientRoleKey` (IA-109).
-         *
-         * FAILS CLOSED — an unresolvable key returns 'client', which is the
-         * gated answer. That is deliberate and is the opposite of what a
-         * convenience helper usually does: getting this wrong in the permissive
-         * direction texts a consumer without recorded consent, which is a TCPA
-         * violation rather than a bug report. An unknown role should cost us a
-         * skipped message, never an unconsented send.
-         *
-         * `inspector` is the one key with no role-profile row; it is explicitly
-         * implied-consent (D5) and returns 'other'.
+         * Track L — deliver one SMS automation log via the shared sendOneSms core.
+         * Resolves the rule's referenced SMS message_template first; every guard
+         * and the actual send live in sendOneSms. Never throws.
          */
-        private async resolveRecipientRoleKind(
-            db: DrizzleD1Database,
-            tenantId: string,
-            roleKey: string | null,
-        ): Promise<'client' | 'agent' | 'other'> {
-            if (roleKey === 'inspector') return 'other';
-            if (!roleKey) return 'client';
-            // The seeded primary-client key never needs a lookup, and skipping
-            // it keeps the hot path free of a query for the commonest case.
-            if (roleKey === PRIMARY_CLIENT_KEY) return 'client';
-            try {
-                // Uses the handle deliverSms was GIVEN, not this.getDrizzle():
-                // the method already has a db, and reaching for a second one
-                // made the lookup depend on a connection its caller never
-                // supplied.
-                const row = await db
-                    .select({ kind: contactRoleProfiles.kind })
-                    .from(contactRoleProfiles)
-                    .where(and(
-                        eq(contactRoleProfiles.tenantId, tenantId),
-                        eq(contactRoleProfiles.key, roleKey),
-                    ))
-                    .get();
-                return (row?.kind as 'client' | 'agent' | 'other' | undefined) ?? 'client';
-            } catch (err) {
-                logger.warn('[automation.sms] role-kind lookup failed; treating as client (fail closed)', {
-                    tenantId, roleKey, error: err instanceof Error ? err.message : String(err),
-                });
-                return 'client';
-            }
-        }
-
-        /**
-         * Track L — deliver one SMS automation log via the resolved provider. Client
-         * logs are gated on a recorded 'granted' consent event (agents/inspector are
-         * implied; D5); the provider resolves through the injected sms.resolveProvider
-         * (per-tenant Twilio or Telnyx). Renders the rule's referenced SMS
-         * message_template with the var map, fail-closed on an unconfigured
-         * review_url and on a missing/unresolved template. Maps ok→sent /
-         * !ok→failed; every guard skips the log with a reason. Never throws (caller's
-         * try/catch marks failed otherwise).
-         *
-         * Twilio path is byte-for-byte identical: TwilioClient.messages.create({ from, to, body })
-         * produces the same Twilio API call as the former sendTwilioSms helper.
-         */
-        // Public (was `private` on the monolith) so the delivery mixin's flush() can
-        // call it through a typed cross-mixin contract; no runtime behavior change.
-        // The tests already reach it via `(svc as any).deliverSms(...)`.
         async deliverSms(
             db: DrizzleD1Database,
             ctx: { log: typeof automationLogs.$inferSelect; automation: typeof automations.$inferSelect;
@@ -112,132 +50,31 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
         ): Promise<void> {
             const { log, automation, inspection, tenant } = ctx;
             const skip = (reason: string) =>
-                db.update(automationLogs).set({ status: 'skipped', error: reason }).where(and(eq(automationLogs.id, log.id), eq(automationLogs.tenantId, inspection.tenantId)));
+                db.update(automationLogs).set({ status: 'skipped', error: reason })
+                    .where(and(eq(automationLogs.id, log.id), eq(automationLogs.tenantId, inspection.tenantId)));
 
             if (!sms) return void (await skip('sms not configured'));
 
-            // SP2 — resolve the referenced SMS template (was the embedded smsBody,
-            // now frozen DEAD). Fail-closed when the rule has no resolvable sms template.
             const { createOiTemplateStore } = await import('./template-store');
             const tpl = automation.smsTemplateId
                 ? await createOiTemplateStore(this.db).resolve(inspection.tenantId, automation.smsTemplateId)
                 : null;
             if (!tpl || tpl.channel !== 'sms' || !tpl.body.trim()) return void (await skip('no sms template'));
 
-            // Consent gate — client only (agents/inspector implied; D5). Keyed on
-            // the PER-RECIPIENT role stamped on the log (log.recipientRoleKey),
-            // NOT the rule's recipientKind. This fires for the primary-client
-            // recipient whether the rule targets the client directly
-            // (recipientKind='role') OR fans out to everyone (recipientKind='all'):
-            // the old gate keyed on `recipientKind === 'role'` and so never
-            // covered 'all', letting an 'all' rule text the client with no
-            // recorded TCPA consent. resolveRecipients stamps recipientRoleKey
-            // from the contact_role_profiles.key of each resolved person, so
-            // `=== PRIMARY_CLIENT_KEY` is an exact, lookup-free client match.
-            // IA-109 — gate on the role's KIND, not on one role KEY.
-            //
-            // This used to read `=== PRIMARY_CLIENT_KEY`, i.e. the single key
-            // 'client'. But `co_client` is ALSO kind='client'
-            // (default-role-profiles.ts), as is any client-kind role a tenant
-            // invents, and resolveRecipients happily resolves an SMS recipient
-            // for ANY role key with a phone. A co-client was therefore texted
-            // with no consent check at all — the same consumer, the same TCPA
-            // exposure, a different string.
-            //
-            // Note the shape of the previous fix recorded just above: it moved
-            // the gate off `recipientKind === 'role'` because that missed the
-            // 'all' fan-out. This is that bug one level down — still an exact
-            // match against a single value where a CATEGORY was meant.
-            const roleKind = await this.resolveRecipientRoleKind(db, inspection.tenantId, log.recipientRoleKey);
-            if (roleKind === 'client') {
-                const { SmsConsentService } = await import('../sms-consent.service');
-                const consentSvc = new SmsConsentService(this.db);
-                // The contact this log is addressed to, stamped at enqueue.
-                //
-                // Legacy rows predate that column. `inspection.clientContactId`
-                // is the PRIMARY client — and note it is already derived from
-                // inspection_people, not the frozen legacy column (Task 11a) —
-                // so it is a correct fallback for exactly two cases: a log
-                // explicitly keyed to the primary client, and an older log with
-                // no role key at all, which could only ever have been the
-                // primary client.
-                //
-                // For any OTHER client-kind role it names the wrong person, and
-                // consulting it is precisely the bug: a co-client was texted on
-                // the primary client's consent. Those fail closed instead.
-                const isPrimaryClientLog =
-                    log.recipientRoleKey === PRIMARY_CLIENT_KEY || log.recipientRoleKey == null;
-                const contactId = log.recipientContactId
-                    ?? (isPrimaryClientLog ? inspection.clientContactId : null);
-                if (!contactId) return void (await skip('no sms consent'));
-                const latest = await consentSvc.getLatest(inspection.tenantId, contactId);
-                if (latest !== 'granted') return void (await skip('no sms consent'));
-            }
-
-            const resolved = await sms.resolveProvider(inspection.tenantId);
-            if (!resolved) return void (await skip('sms not configured'));
-            const { provider, from, messagingServiceSid } = resolved;
-
-            // Load the tenant config row once for the SMS vars: company_phone is used
-            // unconditionally by the seeded copy ("questions? call {{company_phone}}"),
-            // review_url is the fail-closed consumer below, and smsMode drives the
-            // managed-send compliance gate.
-            const cfg = await db.select({
-                companyPhone: tenantConfigs.companyPhone,
-                reviewUrl:    tenantConfigs.reviewUrl,
-                smsMode:      tenantConfigs.smsMode,
-            }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, inspection.tenantId)).get();
-
-            // Managed-send compliance gate — fail-closed for managed_dedicated and
-            // managed_shared tenants whose compliance is not yet approved. own/platform
-            // tenants are always allowed. Must run BEFORE the provider sends.
-            const gateEnv: ManagedSendGateEnv = env ?? {};
-            const gate = await managedSendAllowed(db, gateEnv, inspection.tenantId, cfg?.smsMode ?? 'platform');
-            if (!gate.allowed) return void (await skip(gate.reason ?? 'managed_not_approved'));
-
-            // Free-tier pre-flight (2026-07) — alongside the managed-compliance gate
-            // above, blocks a free tenant's platform-mode automation sends against the
-            // lifetime sms cap BEFORE any provider call. 'own' mode (BYO) is uncapped.
-            // `quotaGuard` is undefined on deployments with no usage-quota capability
-            // (standalone) — see scheduled.ts wiring. A block throws; the caller's
-            // try/catch (AutomationDelivery.flush) marks the log failed with the
-            // QuotaExhausted message, mirroring the email path's deliverAction throw.
-            if (quotaGuard && cfg?.smsMode !== 'own') {
-                await quotaGuard.checkMessagingQuota(inspection.tenantId, tenant.tier, 'sms');
-            }
-
-            const vars: Record<string, string> = {
-                ...buildBaseTemplateVars(inspection, tenant, appName, appHost),
-                company_phone:    cfg?.companyPhone ?? '',
-            };
-            // review_url fail-closed (same rule as the email path).
-            if (tpl.body.includes('{{review_url}}')) {
-                if (!cfg?.reviewUrl) return void (await skip('review_url not configured'));
-                vars.review_url = cfg.reviewUrl;
-            }
-            const body = interpolate(tpl.body, vars);
-
-            const sendArgs: { from?: string; to: string; body: string; messagingServiceSid?: string } = { to: log.recipient, body };
-            if (from) sendArgs.from = from;
-            if (messagingServiceSid) sendArgs.messagingServiceSid = messagingServiceSid;
-            const res = await provider.sendMessage(sendArgs);
-            if (res.ok) {
-                await db.update(automationLogs).set({ status: 'sent', deliveredAt: new Date() })
-                    .where(and(eq(automationLogs.id, log.id), eq(automationLogs.tenantId, inspection.tenantId)));
-                // WH-2 — seed a 'sent' delivery-status row for the returned message id
-                // (non-fatal; the provider status callback advances it later).
-                const { recordSentStatus } = await import('../../api/sms');
-                await recordSentStatus(db, inspection.tenantId, res.id, Date.now());
-                try {
-                    // Source tagging (2026-07) — 'own' mode is BYO, tagged 'sms_byo' so
-                    // it never counts against the platform free-tier cap.
-                    await this.metering?.record(tenant.id, cfg?.smsMode === 'own' ? 'sms_byo' : 'sms', currentPeriodKey(new Date()));
-                } catch { /* metering must never break delivery */ }
-            } else {
-                await db.update(automationLogs).set({ status: 'failed', error: res.error })
-                    .where(and(eq(automationLogs.id, log.id), eq(automationLogs.tenantId, inspection.tenantId)));
-                logger.error('AutomationService.flush: sms send failed', { logId: log.id });
-            }
+            await sendOneSms({
+                db,
+                rawDb: this.db,
+                log,
+                inspection,
+                tenant,
+                bodyTemplate: tpl.body,
+                sms,
+                appName,
+                appHost,
+                ...(env ? { env } : {}),
+                ...(quotaGuard ? { quotaGuard } : {}),
+                ...(this.metering ? { metering: this.metering } : {}),
+            });
         }
     };
 }

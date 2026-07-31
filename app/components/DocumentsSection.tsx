@@ -1,7 +1,7 @@
 /**
  * Shared per-inspection documents area (unified client portal, section ⑦).
  *
- * Used by BOTH the inspector inspection-hub AND the client portal Hub. Pure
+ * Used by BOTH the inspector portal AND the client portal Hub. Pure
  * presentational + helpers — NO data fetching inside. All upload / delete /
  * download actions are passed in as callbacks/hrefs by the host route.
  *
@@ -266,7 +266,7 @@ export default function DocumentsSection({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="rounded-md bg-ih-primary px-3 py-1.5 text-[13px] font-bold text-white transition-opacity hover:opacity-90"
+                  className="rounded-md bg-ih-primary px-3 py-1.5 text-[13px] font-bold text-ih-fg-inverse transition-opacity hover:opacity-90"
                 >
                   {m.documents_choose_file()}
                 </button>

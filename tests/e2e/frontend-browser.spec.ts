@@ -9,7 +9,7 @@
  * 8789, where the browser can't set the __Host- cookie. We log in via the API
  * (CSRF double-submit) to capture the raw __Host-inspector_token JWT and replay
  * it as a cookie header (getToken() falls back to that cookie) — the same trick
- * as inspection-hub.spec.ts / standalone-browser.spec.ts.
+ * as inspector-portal.spec.ts / standalone-browser.spec.ts.
  */
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';

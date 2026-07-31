@@ -88,4 +88,101 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // soon-to-be-deleted contact id. `column` names the join key used to find
     // the subject's rows (via contacts.email), not a column to null.
     { table: 'inspection_people', column: 'contact_id', category: 'user.contact.email', action: 'delete' },
+
+    // ── invoices (#88) ────────────────────────────────────────────────────────
+    // The money record is the tenant's ledger (P-4 authority chain) and stays;
+    // the denormalized client identity is nulled in place. Rows are located by
+    // client_email OR the subject's contact id (an invoice may carry only the
+    // contact reference, never the email).
+    { table: 'invoices', column: 'client_name',  category: 'user.name',          action: 'null' },
+    { table: 'invoices', column: 'client_email', category: 'user.contact.email', action: 'null' },
+
+    // ── concierge_confirm_tokens (#88) ────────────────────────────────────────
+    // Single-use magic-link tokens addressed to the subject: delete the ROWS
+    // (locator = client_email). Nothing references a token row.
+    { table: 'concierge_confirm_tokens', column: 'client_email', category: 'user.contact.email', action: 'delete' },
+
+    // ── inspection_access_tokens (#88) ────────────────────────────────────────
+    // The subject's persistent portal links: delete the ROWS (locator =
+    // recipient_email). This deliberately REVOKES portal access — an erased
+    // subject's magic links must stop working.
+    { table: 'inspection_access_tokens', column: 'recipient_email', category: 'user.contact.email', action: 'delete' },
+
+    // ── inspection_requests (#88) ─────────────────────────────────────────────
+    // Public booking requests. The ROW must survive — `inspections.request_id`
+    // carries a frozen legacy FK to it — so identity is cleared in place:
+    // nullable email/phone -> NULL, NOT NULL name -> the '[erased]' sentinel.
+    // Basis: the converted request is part of the engagement record the
+    // inspection stands on (same posture as agreement_requests).
+    { table: 'inspection_requests', column: 'client_name',  category: 'user.name',           action: 'anonymize', legalBasis: 'art_17_3_e' },
+    { table: 'inspection_requests', column: 'client_email', category: 'user.contact.email',  action: 'null' },
+    { table: 'inspection_requests', column: 'client_phone', category: 'user.contact.phone_number', action: 'null' },
+
+    // ── email_suppressions (#88) ──────────────────────────────────────────────
+    // APPEND-ONLY opt-out ledger. RETAINED on erasure: the suppression row is
+    // the mechanism that keeps honoring the subject's objection — deleting it
+    // would resume sending if the address ever re-enters the system.
+    { table: 'email_suppressions', column: 'email', category: 'user.contact.email', action: 'retain', legalBasis: 'art_17_3_b' },
+
+    // ── evidence ledgers retained under Art. 17(3) ────────────────────────────
+    // automation_logs.recipient holds emails and E.164 numbers; the ledger is
+    // the delivery/consent evidence trail and is retained permanently (upstream
+    // #276 — indexes, not deletion).
+    { table: 'automation_logs', column: 'recipient', category: 'user.contact', action: 'retain', legalBasis: 'art_17_3_e' },
+    // TCPA consent ledger — append-only proof a grant/revoke happened.
+    { table: 'sms_consent_log', column: 'ip',         category: 'user.device.ip_address',  action: 'retain', legalBasis: 'art_17_3_b' },
+    { table: 'sms_consent_log', column: 'user_agent', category: 'user.device.user_agent',  action: 'retain', legalBasis: 'art_17_3_b' },
+    // The erasure decision record itself (Art. 5(2)/30 accountability — you
+    // cannot prove you honored a request if you delete the record of it).
+    { table: 'erasure_log', column: 'subject_email', category: 'user.contact.email', action: 'retain', legalBasis: 'art_17_3_b' },
+    // Signature evidence kept on a DSAR (the retention sweep destroys it past
+    // the window); the esign audit chain is NEVER touched.
+    { table: 'agreement_signers',  column: 'signature_base64', category: 'user.biometric.signature', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'agreement_requests', column: 'signature_base64', category: 'user.biometric.signature', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'esign_audit_logs',   column: 'signature',        category: 'system.integrity',         action: 'retain', legalBasis: 'art_17_3_e' },
+];
+
+/**
+ * A PII-heuristic column the manifest DELIBERATELY does not act on. Every entry
+ * must say why — the reason is what a DSAR audit reads, and the CI gate
+ * (`scripts/check-erasure-manifest.mjs`) hard-fails an entry without one.
+ */
+export interface ErasureOutOfScopeEntry {
+    table: string;
+    column: string;
+    reason: string;
+}
+
+export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
+    // Columns that ride with a row-delete rule above (per-column scan cannot
+    // see row semantics).
+    { table: 'contacts',            column: 'phone',        reason: 'rides with the contacts row delete (locator = email)' },
+
+    // Staff, not data subjects. Consumer-DSAR erasure never touches employee
+    // accounts; staff offboarding is a separate lifecycle.
+    { table: 'users',               column: 'email',                     reason: 'staff account — not consumer-DSAR scope' },
+    { table: 'users',               column: 'phone',                     reason: 'staff account — not consumer-DSAR scope' },
+    { table: 'users',               column: 'default_signature_base64',  reason: 'inspector (staff) signature asset' },
+    { table: 'users',               column: 'is_signature_enabled',      reason: 'boolean flag, not personal data' },
+    { table: 'tenant_invites',      column: 'email',                     reason: 'staff invite — not consumer-DSAR scope' },
+    { table: 'audit_logs',          column: 'ip_address',                reason: 'staff-action security audit trail' },
+    { table: 'report_signoff',      column: 'signature_ref',             reason: 'inspector (staff) signoff reference' },
+    { table: 'agreement_requests',  column: 'inspector_signature_base64', reason: 'inspector (staff) countersignature' },
+
+    // The controller's own business identity, not a data subject's.
+    { table: 'tenant_configs',      column: 'support_email',    reason: 'company-owned support address' },
+    { table: 'tenant_configs',      column: 'sender_email',     reason: 'company-owned sending address' },
+    { table: 'tenant_configs',      column: 'company_phone',    reason: 'company-owned phone' },
+
+    // Heuristic false positives — config values and references, not PII.
+    { table: 'tenant_configs',        column: 'email_mode',               reason: 'config enum, not personal data' },
+    { table: 'tenant_configs',        column: 'email_byo_provider',       reason: 'config enum, not personal data' },
+    { table: 'automations',           column: 'recipient_kind',           reason: 'config enum, not personal data' },
+    { table: 'automations',           column: 'recipient_role_profile_id', reason: 'role-profile reference, not personal data' },
+    { table: 'automations',           column: 'email_template_id',        reason: 'template reference, not personal data' },
+    { table: 'automation_logs',       column: 'recipient_role_key',       reason: 'role key, not personal data' },
+    { table: 'automation_logs',       column: 'recipient_contact_id',     reason: 'opaque id on the retained evidence ledger (see the automation_logs.recipient retain rule)' },
+    { table: 'contact_role_profiles', column: 'email_template_id',        reason: 'template reference, not personal data' },
+    { table: 'sms_consent_log',       column: 'recipient_type',           reason: 'role-kind enum, not personal data' },
+    { table: 'report_versions',       column: 'signature',                reason: 'report-content integrity seal, not personal data' },
 ];

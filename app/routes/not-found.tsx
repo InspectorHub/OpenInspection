@@ -20,7 +20,7 @@ export default function NotFoundPage() {
         </p>
         <Link
           to="/"
-          className="inline-flex items-center gap-1.5 mt-6 h-9 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors"
+          className="inline-flex items-center gap-1.5 mt-6 h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 transition-colors"
         >
           {m.misc_not_found_home()}
         </Link>

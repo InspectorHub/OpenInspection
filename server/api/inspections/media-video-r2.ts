@@ -16,7 +16,6 @@
  *                   bytes are served. tenantId comes from the JWT middleware.
  */
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { inspectionMediaPool } from '../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { verifyUploadToken } from '../../lib/video-upload-token';
@@ -24,6 +23,8 @@ import { r2Keys } from '../../lib/r2-keys';
 import { logger } from '../../lib/logger';
 import { Errors } from '../../lib/errors';
 import type { HonoConfig } from '../../types/hono';
+import { getDrizzle } from '../../lib/route-helpers';
+import { r2Put, r2Get } from '../../lib/r2/objects';
 
 // ── MIME / extension helpers ─────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
 
         const bytes = await file.arrayBuffer();
         try {
-            await c.env.PHOTOS.put(r2Key, bytes, {
+            await r2Put(c.env.PHOTOS, r2Key, bytes, {
                 httpMetadata: { contentType: mime },
                 customMetadata: { tenantId, inspectionId: claims.inspectionId, mediaId },
             });
@@ -143,7 +144,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
 
         const bytes = await file.arrayBuffer();
         try {
-            await c.env.PHOTOS.put(posterKey, bytes, {
+            await r2Put(c.env.PHOTOS, posterKey, bytes, {
                 httpMetadata: { contentType: mime },
                 customMetadata: { tenantId, inspectionId: claims.inspectionId, mediaId },
             });
@@ -174,7 +175,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
         const tenantId = c.get('tenantId');
         const mediaId = c.req.param('mediaId');
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const row = await db
             .select({ r2Key: inspectionMediaPool.r2Key })
             .from(inspectionMediaPool)
@@ -200,7 +201,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             const start = parseInt(rangeMatch[1], 10);
             const endStr = rangeMatch[2];
 
-            const obj = await c.env.PHOTOS.get(row.r2Key, {
+            const obj = await r2Get(c.env.PHOTOS, row.r2Key, {
                 range: endStr
                     ? { offset: start, length: parseInt(endStr, 10) - start + 1 }
                     : { offset: start },
@@ -226,7 +227,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
         }
 
         // Full-object request.
-        const obj = await c.env.PHOTOS.get(row.r2Key);
+        const obj = await r2Get(c.env.PHOTOS, row.r2Key);
         if (!obj) {
             return c.json({ error: 'Video not found in storage' }, 404);
         }
@@ -253,7 +254,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
         const tenantId = c.get('tenantId');
         const mediaId = c.req.param('mediaId');
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const row = await db
             .select({ posterKey: inspectionMediaPool.posterKey })
             .from(inspectionMediaPool)
@@ -268,7 +269,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             return c.json({ error: 'Poster not found' }, 404);
         }
 
-        const obj = await c.env.PHOTOS.get(row.posterKey);
+        const obj = await r2Get(c.env.PHOTOS, row.posterKey);
         if (!obj) {
             return c.json({ error: 'Poster not found in storage' }, 404);
         }

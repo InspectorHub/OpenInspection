@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { users, inspections, agreementRequests, agreements } from './db/schema';
+import { users, inspections, agreementRequests } from './db/schema';
 import { logger } from './logger';
 import { getBookingHost } from './url';
 import { envelopeVerifyUrl } from './agreement-verify-url';
@@ -34,7 +34,10 @@ export async function runEnvelopeCompletionPipeline(
         agreementId: string;
     },
 ): Promise<void> {
-    const { requestId, tenantId, inspectionId, clientEmail, clientName, agreementId } = args;
+    // `agreementId` stays in the args type — it is part of the completion
+    // payload every caller already has — but nothing in this function reads it
+    // now that the hard-coded office alert is a rule.
+    const { requestId, tenantId, inspectionId, clientEmail, clientName } = args;
 
     // Read request-derived metadata ONCE; reuse across every step below.
     const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
@@ -99,31 +102,11 @@ export async function runEnvelopeCompletionPipeline(
         signerCountry: country,
     });
 
-    // (5) B3 — in-app notification for all admins (fetch agreement name for a
-    // richer title).
-    c.executionCtx.waitUntil((async () => {
-        try {
-            // Fetch the display name directly by agreement id. (Previously this
-            // resolved by the presented signer token, which never matches the
-            // envelope-plaintext lookup → NotFound → notification silently lost.)
-            const agreement = await drizzle(c.env.DB).select({ name: agreements.name })
-                .from(agreements).where(eq(agreements.id, agreementId)).get();
-            await c.var.services.notification.createForAllAdmins(tenantId, {
-                type: 'agreement.signed',
-                title: `Agreement signed — ${agreement?.name ?? 'Agreement'}`,
-                body: clientName ? `By ${clientName}` : null,
-                entityType: 'agreement',
-                entityId: requestId,
-                metadata: {
-                    agreementId,
-                    inspectionId: inspectionId ?? null,
-                    clientEmail,
-                },
-            });
-        } catch (e) {
-            logger.error('agreement.signed notification failed', {}, e instanceof Error ? e : undefined);
-        }
-    })());
+    // (5) B3 — the office alert is a rule now (`Office alert — agreement
+    // signed`, recipientKind 'staff', channel in_app), raised by the
+    // `agreement.signed` trigger step (6) below already fires. The block that
+    // stood here fetched the agreement's display name only to build a
+    // hard-coded title; the rule's template owns that wording instead.
 
     // (6) Spec 2A — envelope-level automation event so per-tenant rules can react.
     if (inspectionId) {

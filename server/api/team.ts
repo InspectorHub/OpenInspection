@@ -1,7 +1,6 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireSeatAvailable } from '../features/seat-quota';
@@ -15,6 +14,7 @@ import {
 } from '../lib/validations/admin.schema';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { getDrizzle } from '../lib/route-helpers';
 
 /**
  * GET /api/team/members
@@ -281,7 +281,7 @@ const teamRoutes = createApiRouter()
         responses: { 200: { description: 'ok' } },
     }, { scopes: ['read'], tier: 'extended' }), async (c) => {
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const row = await db.select({
             teamModeDefault:          tenantConfigs.teamModeDefault,
         }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();

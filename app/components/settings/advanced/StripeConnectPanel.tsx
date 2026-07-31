@@ -79,7 +79,7 @@ export function StripeConnectPanel({ stripeConnected, stripeAccountId, stripeFor
             </div>
           )}
           <button type="submit"
-            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
+            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
             {m.settings_stripeconnect_connect_account()}
           </button>
         </Form>

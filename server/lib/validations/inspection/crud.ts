@@ -116,7 +116,17 @@ export const UpdateInspectionSchema = z.object({
     // the People card, not this metadata route). Zod strips unknown keys, so
     // any legacy caller still posting these two fields degrades to a no-op on
     // them (same "unrecognised field" no-op as templateId used to before B-22).
-    date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe date field for the OpenInspection MCP integration'),
+    //
+    // `date` accepts a full ISO datetime (the settings sheet's shape) OR a bare
+    // civil `YYYY-MM-DD` (what the calendar drag posts — MonthView/WeekView/
+    // DayView all pass `dateStr`). The bare form was rejected by `.datetime()`,
+    // which 400'd every drag while the calendar action swallowed `res.ok` — the
+    // reschedule persisted nothing. The handler keeps the stored time suffix
+    // and moves `scheduled_start_ms` with the civil day (roadmap §7.5 item 3).
+    date: z.union([
+        z.string().datetime(),
+        z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    ]).optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('New date: ISO datetime or bare YYYY-MM-DD (calendar drag). Moves the scheduled instant with it, preserving tenant wall-clock time.'),
     // A plain string, and nullable — for the same two reasons `templateId`
     // below is:
     //   - `users.id` is a `text` column. Freshly registered users get a
@@ -154,6 +164,9 @@ export const UpdateInspectionSchema = z.object({
     // list ("Realtor", "Past Client", ...) plus tenant custom values both
     // round-trip without a separate enum.
     referralSource: z.string().max(100).nullable().optional().openapi({ example: 'Realtor' }).describe('TODO describe referralSource field for the OpenInspection MCP integration'),
+    // Task 8 (two-layer role model) — WHO sent us the job, distinct from the
+    // channel above. Any contact, not only agent-kind ones.
+    referredByContactId: z.string().nullable().optional().describe('Contact who referred this job. Any contact, not only agents; distinct from referral_source, which is the channel.'),
     profileOverride: z.string().nullable().optional().openapi({ example: 'meridian' }).describe('Per-inspection appearance profile override (built-in profile id); NULL inherits'),
     badgeLayoutOverride: z.enum(['strip', 'inline']).nullable().optional().openapi({ example: 'inline' }).describe('Per-inspection credential badge layout override; NULL inherits the profile'),
     reportPhotoColumns: z.number().int().min(1).max(4).nullable().optional().openapi({ example: 2 }).describe('Per-inspection report photo grid columns (1-4); NULL inherits the profile'),

@@ -51,11 +51,20 @@ export const smsDisclosureVersions = sqliteTable('sms_disclosure_versions', {
 
 // Track L (D7) — append-only SMS consent ledger (mirrors erasure_log). Current
 // consent state = latest event per (tenant_id, contact_id). Never updated/deleted.
+//
+// Communication A3.2 — `recipient_type` widened from `['client']` to mirror
+// RoleKind so non-client rows can be stamped honestly. Consent BASIS per kind
+// (express vs implied) lives in `server/lib/sms/consent-basis.ts` (D5):
+//   client → express (TCPA recorded grant required)
+//   agent  → implied (B2B phone-on-file)
+//   other  → implied (Attorney / TC / Insurance / Title — business counterparties)
+// Capture paths today still only write consumer (`client`) rows; the enum is
+// the vocabulary the gate and any future capture path share.
 export const smsConsentLog = sqliteTable('sms_consent_log', {
     id:                text('id').primaryKey(),
     tenantId:          text('tenant_id').notNull(),
-    contactId:         text('contact_id').notNull(),   // the consumer (client) contact
-    recipientType:     text('recipient_type', { enum: ['client'] }).notNull(),
+    contactId:         text('contact_id').notNull(),   // the contact the consent attaches to
+    recipientType:     text('recipient_type', { enum: ['client', 'agent', 'other'] }).notNull(),
     action:            text('action', { enum: ['granted', 'revoked'] }).notNull(),
     disclosureVersion: integer('disclosure_version').notNull(),
     capturedVia:       text('captured_via', { enum: ['booking_form', 'optin_link', 'admin'] }).notNull(),

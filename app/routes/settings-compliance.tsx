@@ -7,6 +7,8 @@ import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Table, Pill, type PillTone } from "@core/shared-ui";
+import { LegalDocsPanel } from "~/components/settings/LegalDocsPanel";
+import { getBaseUrlFromRequest, rebaseHostedLegalUrl } from "~/lib/legal-base-url";
 import { m } from "~/paraglide/messages";
 
 const DEFAULT_RETENTION_YEARS = 6;
@@ -46,6 +48,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   ]);
 
   let retentionYears = DEFAULT_RETENTION_YEARS;
+  let legal = {
+    legalMode: "hosted" as "hosted" | "custom",
+    customPrivacyUrl: "" as string,
+    customTermsUrl: "" as string,
+    privacyBody: "" as string,
+    termsBody: "" as string,
+    hostedPrivacyUrl: null as string | null,
+    hostedTermsUrl: null as string | null,
+    effectivePrivacyUrl: null as string | null,
+    effectiveTermsUrl: null as string | null,
+  };
   if (configRes?.ok) {
     const body = (await configRes.json()) as Record<string, unknown>;
     const d = (body.data ?? {}) as Record<string, unknown>;
@@ -53,6 +66,34 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     if (Number.isInteger(raw) && raw >= MIN_RETENTION_YEARS && raw <= MAX_RETENTION_YEARS) {
       retentionYears = raw;
     }
+    const origin = getBaseUrlFromRequest(request);
+    const legalMode = d.legalMode === "custom" ? "custom" : "hosted";
+    const hostedPrivacyUrl = rebaseHostedLegalUrl(
+      typeof d.hostedPrivacyUrl === "string" ? d.hostedPrivacyUrl : null,
+      origin,
+    );
+    const hostedTermsUrl = rebaseHostedLegalUrl(
+      typeof d.hostedTermsUrl === "string" ? d.hostedTermsUrl : null,
+      origin,
+    );
+    legal = {
+      legalMode,
+      customPrivacyUrl: typeof d.customPrivacyUrl === "string" ? d.customPrivacyUrl : "",
+      customTermsUrl: typeof d.customTermsUrl === "string" ? d.customTermsUrl : "",
+      privacyBody: typeof d.privacyBody === "string" ? d.privacyBody : "",
+      termsBody: typeof d.termsBody === "string" ? d.termsBody : "",
+      hostedPrivacyUrl,
+      hostedTermsUrl,
+      // Hosted effective URLs share the same origin rewrite; custom keeps absolute.
+      effectivePrivacyUrl:
+        legalMode === "custom" && typeof d.effectivePrivacyUrl === "string"
+          ? d.effectivePrivacyUrl
+          : hostedPrivacyUrl,
+      effectiveTermsUrl:
+        legalMode === "custom" && typeof d.effectiveTermsUrl === "string"
+          ? d.effectiveTermsUrl
+          : hostedTermsUrl,
+    };
   }
 
   let erasureLog: ErasureLogRow[] = [];
@@ -61,7 +102,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     erasureLog = ((body.data ?? []) as ErasureLogRow[]);
   }
 
-  return { retentionYears, erasureLog };
+  return { retentionYears, erasureLog, legal };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -100,6 +141,38 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { ok: true, intent };
   }
 
+  if (intent === "legal-save") {
+    const legalMode = String(form.get("legalMode") ?? "hosted") === "custom" ? "custom" : "hosted";
+    const customPrivacyUrl = String(form.get("customPrivacyUrl") ?? "").trim();
+    const customTermsUrl = String(form.get("customTermsUrl") ?? "").trim();
+    const privacyBody = String(form.get("privacyBody") ?? "");
+    const termsBody = String(form.get("termsBody") ?? "");
+    if (legalMode === "custom" && (!customPrivacyUrl || !customTermsUrl)) {
+      return {
+        ok: false,
+        intent,
+        message: m.settings_compliance_legal_custom_required(),
+      };
+    }
+    const res = await api.admin["tenant-config"].$patch({
+      json: {
+        legalMode,
+        customPrivacyUrl: legalMode === "custom" ? customPrivacyUrl : null,
+        customTermsUrl: legalMode === "custom" ? customTermsUrl : null,
+        privacyBody: privacyBody.trim() ? privacyBody : null,
+        termsBody: termsBody.trim() ? termsBody : null,
+      },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as
+        | string
+        | undefined;
+      return { ok: false, intent, message };
+    }
+    return { ok: true, intent };
+  }
+
   return { ok: false, intent };
 }
 
@@ -115,6 +188,7 @@ export default function SettingsCompliancePage() {
       </p>
 
       <RetentionWindow initialYears={data.retentionYears} />
+      <LegalDocsPanel initial={data.legal} />
       <ErasureLogView rows={data.erasureLog} />
     </div>
   );
@@ -179,7 +253,7 @@ function RetentionWindow({ initialYears }: { initialYears: number }) {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+          className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
         >
           {saving ? m.settings_compliance_saving() : m.common_save()}
         </button>
@@ -197,7 +271,6 @@ function RetentionWindow({ initialYears }: { initialYears: number }) {
     </section>
   );
 }
-
 /* ------------------------------------------------------------------ */
 /*  Erasure log (read-only accountability record)                     */
 /* ------------------------------------------------------------------ */

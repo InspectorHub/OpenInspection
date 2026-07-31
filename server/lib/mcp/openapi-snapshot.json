@@ -250,6 +250,34 @@
     "description": "Public, unauthenticated endpoint. ALWAYS returns 200 { sent: true } regardless of whether the email has a global agent account, to prevent account enumeration. When it does, an email with a one-time sign-in link (900 second TTL) is sent — the send itself is deferred so the response is timing-identical either way."
   },
   {
+    "operationId": "agentNoticeOptinLink",
+    "method": "GET",
+    "pathTemplate": "/api/agent/notices/{id}/optin-link",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Notice header id whose contact should be opted in.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notice header id whose contact should be opted in."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Mint the SMS opt-in link for a notice the agent owns",
+    "description": "Mints the sealed double-opt-in token for the contact row the notice is addressed to — the agent's own contact in the sending company. Keyed to a notice the caller already owns, so it cannot be aimed at anyone else."
+  },
+  {
     "operationId": "applyTenantReportLinkExpiry",
     "method": "POST",
     "pathTemplate": "/api/tenant/inspection-prefs/report-link-expiry",
@@ -334,6 +362,34 @@
     },
     "summary": "Approve a concierge booking awaiting inspector review",
     "description": "Auto-generated placeholder for approveInspection (POST /{id}/concierge/approve, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "archiveAgentNotice",
+    "method": "DELETE",
+    "pathTemplate": "/api/agent/notices/{id}",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Notice header id to dismiss.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notice header id to dismiss."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Dismiss (archive) an agent notice",
+    "description": "Archives the notice for this agent. Never a row deletion, and never a write to automation_logs — the sending company keeps its delivery record."
   },
   {
     "operationId": "attachInspection",
@@ -1738,6 +1794,36 @@
     },
     "summary": "Send the inspection report to one or more role-keyed recipients",
     "description": "Renders the report PDF once and sends it (or a text-only fallback if rendering fails) to every recipient in the request body, each with their own role-keyed portal link. Per-recipient failures (no resolvable email, unknown roleKey, send failure) are collected in the response and do not fail the whole request."
+  },
+  {
+    "operationId": "createInspectionSendSms",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/send-sms",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id whose seated people receive the SMS.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id whose seated people receive the SMS."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/SendSms"
+      }
+    },
+    "summary": "Send a manual SMS to people on the inspection",
+    "description": "Manual SMS via the shared sendOneSms core (TCPA consent, managed-send, quota). Recipients must be people already on the inspection who have a phone — no free-typed numbers."
   },
   {
     "operationId": "createInspectionShareAgent",
@@ -4292,6 +4378,10 @@
             },
             "maxItems": 5,
             "description": "Up to 5 previously-uploaded attachments."
+          },
+          "contactId": {
+            "type": "string",
+            "description": "Which contact's thread to post into (compose picker). Omitted: the primary client's thread. 404 when the contact is not on this inspection."
           }
         },
         "required": [
@@ -4327,7 +4417,8 @@
             "type": "string",
             "enum": [
               "email",
-              "sms"
+              "sms",
+              "in_app"
             ],
             "description": "Delivery channel: email or sms."
           },
@@ -4680,6 +4771,38 @@
           "smsTemplateId": {
             "type": "string",
             "description": "Optional message-template id used for SMS notices to this role."
+          },
+          "capabilityOverrides": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "receivesReport": {
+                "type": "boolean",
+                "description": "Whether this role receives the report."
+              },
+              "selfRetrieveReport": {
+                "type": "boolean",
+                "description": "Whether this role may fetch the report itself."
+              },
+              "canHaveAccount": {
+                "type": "boolean",
+                "description": "Whether this role may hold a portal account."
+              },
+              "showsInAgentPortal": {
+                "type": "boolean",
+                "description": "Whether the inspection appears in this role's own agent portal list."
+              },
+              "canAccessRepairList": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "read",
+                  "readwrite"
+                ],
+                "description": "Access to the buyer's repair list, resolved against the tenant policy by taking the stricter of the two."
+              }
+            },
+            "description": "Per-profile overrides layered on the kind baseline."
           }
         },
         "required": [
@@ -6640,33 +6763,6 @@
     "description": "Public, unauthenticated read-only probe for the portal report-landing BFF loader. Resolves the report token to a role kind and, for agent-kind tokens only, whether a global agent account exists for the recipient email. A bad/expired/mismatched token replies 200 with kind: null rather than 401 — this is a context probe, not an auth check."
   },
   {
-    "operationId": "getAutomationLog",
-    "method": "GET",
-    "pathTemplate": "/api/automations/logs/{inspectionId}",
-    "scopes": [
-      "read"
-    ],
-    "tag": "automations",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [
-        {
-          "name": "inspectionId",
-          "in": "path",
-          "required": true,
-          "description": "TODO describe inspectionId field for the OpenInspection MCP integration",
-          "schema": {
-            "type": "string",
-            "description": "TODO describe inspectionId field for the OpenInspection MCP integration"
-          }
-        }
-      ],
-      "body": null
-    },
-    "summary": "Get automation log for current tenant",
-    "description": "Auto-generated placeholder for getAutomationLog (GET /logs/{inspectionId}, automations domain). TODO: replace with a real description sourced from the handler."
-  },
-  {
     "operationId": "getBookingAvailability",
     "method": "GET",
     "pathTemplate": "/api/public/availability/{inspectorId}",
@@ -6896,6 +6992,47 @@
     "description": "Retrieve detailed information about a single inspection."
   },
   {
+    "operationId": "getInspectionCommunication",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/communication",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection identifier."
+          }
+        },
+        {
+          "name": "markRead",
+          "in": "query",
+          "required": false,
+          "description": "When set, marks every counterparty-authored message on the inspection read — the caller is DISPLAYING the merged Messages view, where all threads are visible at once. A poll refreshing a closed block must omit it.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "1"
+            ],
+            "description": "When set, marks every counterparty-authored message on the inspection read — the caller is DISPLAYING the merged Messages view, where all threads are visible at once. A poll refreshing a closed block must omit it."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "The inspection's Communication payload: person-written messages and platform-sent notices",
+    "description": "Returns the inspection's communication in two never-interleaved arrays: messages (written by people — the client, agents, staff) and deliveries (sent by the platform — automation emails and SMS with their per-recipient outcome and raw skip/fail reason)."
+  },
+  {
     "operationId": "getInspectionCompliance",
     "method": "GET",
     "pathTemplate": "/api/inspections/{id}/compliance",
@@ -6987,7 +7124,7 @@
       "body": null
     },
     "summary": "Aggregate hub payload (people, schedule, services, agreement, invoice, report status)",
-    "description": "Returns one aggregate payload for the inspection hub page so the loader makes a single round trip: core inspection fields, the people card, booked service lines, the tenant agreement templates, this inspection's agreement requests, the most recent invoice, and the publish-readiness summary."
+    "description": "Returns one aggregate payload for the inspector portal page so the loader makes a single round trip: core inspection fields, the people card, booked service lines, the tenant agreement templates, this inspection's agreement requests, the most recent invoice, and the publish-readiness summary."
   },
   {
     "operationId": "getInspectionPrefs",
@@ -7224,6 +7361,34 @@
     "description": "Returns the message thread for an inspection (oldest first) and marks all client messages read. Inspector-authenticated."
   },
   {
+    "operationId": "getMessageThread",
+    "method": "GET",
+    "pathTemplate": "/api/messages/threads/{contactId}",
+    "scopes": [
+      "read"
+    ],
+    "tag": "messages",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "contactId",
+          "in": "path",
+          "required": true,
+          "description": "Contact whose thread to read.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact whose thread to read."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "One contact's full thread (marks it read)",
+    "description": "Every message with this contact — across inspections and the rows with no inspection attached — oldest first. Reading it marks the thread's counterparty messages read."
+  },
+  {
     "operationId": "getMyAccount",
     "method": "GET",
     "pathTemplate": "/api/auth/me",
@@ -7353,6 +7518,45 @@
     },
     "summary": "Public invoice for an inspection (pay-link landing)",
     "description": "Public, no-login invoice for an inspection, gated by the recipient's portal token (?token=) or the unified-portal session cookie. Only client/co_client grants are accepted; tenantId comes from the resolved grant, never the URL."
+  },
+  {
+    "operationId": "getPublicLegalDoc",
+    "method": "GET",
+    "pathTemplate": "/api/public/legal/{tenant}/{doc}",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug"
+          }
+        },
+        {
+          "name": "doc",
+          "in": "path",
+          "required": true,
+          "description": "Which legal document",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "privacy",
+              "terms"
+            ],
+            "description": "Which legal document"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Hosted Privacy or Terms page content for a tenant",
+    "description": "Returns company name + optional custom Privacy/Terms body for /legal/:tenant/:doc pages."
   },
   {
     "operationId": "getPublicReport",
@@ -8659,6 +8863,22 @@
     "description": "Auto-generated placeholder for listAgentMyReports (GET /my-reports, agents domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "listAgentNotices",
+    "method": "GET",
+    "pathTemplate": "/api/agent/notices",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List the notices addressed to the signed-in agent",
+    "description": "Returns the notices addressed to this agent across every company that has them as a contact, each with its own per-channel delivery attempts. Addressed by contact id (contacts.agent_user_id), never by matching an email or the delivery ledger recipient string. Another recipient's rows are unreachable by construction — the notice header is per-recipient."
+  },
+  {
     "operationId": "listAgentReferrals",
     "method": "GET",
     "pathTemplate": "/api/agent/referrals",
@@ -8700,11 +8920,34 @@
     "tag": "metrics",
     "tier": "extended",
     "inputSchema": {
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "from",
+          "in": "query",
+          "required": false,
+          "description": "First day of the window (inclusive), YYYY-MM-DD.",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "First day of the window (inclusive), YYYY-MM-DD."
+          }
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "required": false,
+          "description": "Last day of the window (inclusive), YYYY-MM-DD.",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Last day of the window (inclusive), YYYY-MM-DD."
+          }
+        }
+      ],
       "body": null
     },
-    "summary": "Section × rating bucket counts across this tenant's inspections",
-    "description": "Auto-generated placeholder for listAnalyticFindingsHeatmap (GET /findings-heatmap, metrics domain). TODO: replace with a real description sourced from the handler."
+    "summary": "Section × rating-level counts across this tenant's inspections",
+    "description": "Counts rated items by template section and rating level over an inclusive `from`..`to` window. Columns are the tenant's own rating levels minus Not Inspected / Not Present; rows are template sections ordered by volume, with unresolvable sections collected in a flagged catch-all row."
   },
   {
     "operationId": "listAnalyticGrowth",
@@ -10282,6 +10525,22 @@
     "description": "Returns the tenant message templates, optionally filtered by channel (email | sms)."
   },
   {
+    "operationId": "listMessageThreads",
+    "method": "GET",
+    "pathTemplate": "/api/messages/threads",
+    "scopes": [
+      "read"
+    ],
+    "tag": "messages",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Company-wide message inbox: one row per contact thread",
+    "description": "Per-contact thread summaries across every inspection and the no-inspection outreach rows, newest activity first."
+  },
+  {
     "operationId": "listMetrics",
     "method": "GET",
     "pathTemplate": "/api/metrics",
@@ -10293,26 +10552,32 @@
     "inputSchema": {
       "parameters": [
         {
-          "name": "period",
+          "name": "from",
           "in": "query",
           "required": false,
-          "description": "TODO describe period field for the OpenInspection MCP integration",
+          "description": "First day of the window (inclusive), YYYY-MM-DD. Defaults to three months before `to`.",
           "schema": {
             "type": "string",
-            "enum": [
-              "3m",
-              "6m",
-              "12m"
-            ],
-            "default": "12m",
-            "description": "TODO describe period field for the OpenInspection MCP integration"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "First day of the window (inclusive), YYYY-MM-DD. Defaults to three months before `to`."
+          }
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "required": false,
+          "description": "Last day of the window (inclusive), YYYY-MM-DD. Defaults to today.",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Last day of the window (inclusive), YYYY-MM-DD. Defaults to today."
           }
         }
       ],
       "body": null
     },
     "summary": "List metrics for current tenant",
-    "description": "Auto-generated placeholder for listMetrics (GET /, metrics domain). TODO: replace with a real description sourced from the handler."
+    "description": "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, top referring agents, per-inspector productivity, service mix, and paid/unpaid split. Omitting both bounds returns the trailing three months."
   },
   {
     "operationId": "listNotifications",
@@ -11264,6 +11529,35 @@
     },
     "summary": "Move the primary-client seat to this person",
     "description": "Atomically swaps the primary-client role onto this person; the previous primary client becomes a co-client and stays on the inspection with their access intact. \"Exactly one primary client\" is upheld by this swap rather than by refusing a second add."
+  },
+  {
+    "operationId": "markAgentNoticesRead",
+    "method": "POST",
+    "pathTemplate": "/api/agent/notices/mark-read",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxItems": 200,
+            "description": "Notice ids to mark read. Omit to mark every unread notice read."
+          }
+        }
+      }
+    },
+    "summary": "Mark agent notices read",
+    "description": "Marks the given notice ids read, or every unread notice when ids is omitted. The ownership predicate is part of the UPDATE."
   },
   {
     "operationId": "markAllReadNotification",
@@ -14028,6 +14322,42 @@
     "description": "Auto-generated placeholder for patchTenantTenantConfig (PATCH /tenant-config, admin domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "portalArchiveNotice",
+    "method": "DELETE",
+    "pathTemplate": "/api/portal/{tenant}/notices/{id}",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Notice header id to dismiss.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notice header id to dismiss."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Dismiss (archive) a notice",
+    "description": "Archives the notice for this recipient. Never a row deletion, and never a write to automation_logs: a recipient tidying their own inbox cannot edit the sending company's delivery record, which the inspector's Outbox keeps forever."
+  },
+  {
     "operationId": "portalExchangeToken",
     "method": "GET",
     "pathTemplate": "/api/portal/{tenant}/exchange",
@@ -14143,6 +14473,31 @@
     "description": "Returns a six-dimension status snapshot (status / agreement / payment / report / progress / unread messages) for one inspection. Asserts the inspection is in the recipient's accessible set for this tenant+email before returning data (403 otherwise)."
   },
   {
+    "operationId": "portalListNotices",
+    "method": "GET",
+    "pathTemplate": "/api/portal/{tenant}/notices",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the notices addressed to the signed-in recipient",
+    "description": "Returns the notices addressed to the session email in this tenant, each with its own per-channel delivery attempts. Addressed by contact id (resolved from the verified session email), never by matching the delivery ledger recipient string — an SMS attempt's recipient is a phone number. A recipient can only ever reach their own rows: the notice header is per-recipient by construction."
+  },
+  {
     "operationId": "portalLogout",
     "method": "POST",
     "pathTemplate": "/api/portal/{tenant}/logout",
@@ -14168,6 +14523,44 @@
     "description": "Signs the recipient out of the unified client portal by clearing the __Host-portal_session cookie. Idempotent and tenant-agnostic — clearing the cookie works regardless of whether a session exists or the slug resolves, so it is NOT behind the session middleware and always returns 200 { ok: true }."
   },
   {
+    "operationId": "portalMarkNoticesRead",
+    "method": "POST",
+    "pathTemplate": "/api/portal/{tenant}/notices/mark-read",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxItems": 200,
+            "description": "Notice ids to mark read. Omit to mark every unread notice read."
+          }
+        }
+      }
+    },
+    "summary": "Mark the caller notices as read",
+    "description": "Marks the given notice ids read, or every unread notice when ids is omitted. The ownership predicate is part of the UPDATE, so another recipient's id matches no row."
+  },
+  {
     "operationId": "portalMe",
     "method": "GET",
     "pathTemplate": "/api/portal/{tenant}/me",
@@ -14191,6 +14584,42 @@
     },
     "summary": "List the signed-in recipient's inspections",
     "description": "Returns the session email plus every inspection the recipient can access in this tenant via a live client/co_client access token. Gated by the __Host-portal_session cookie; tenant is resolved from the path slug."
+  },
+  {
+    "operationId": "portalNoticeOptinLink",
+    "method": "GET",
+    "pathTemplate": "/api/portal/{tenant}/notices/{id}/optin-link",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Notice header id whose contact should be opted in.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notice header id whose contact should be opted in."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Mint the SMS opt-in link for a notice the caller owns",
+    "description": "Mints the sealed double-opt-in token for the CONTACT the notice is addressed to, so the \"Turn on texts\" remedy leads somewhere real. Keyed to a notice the caller already owns rather than to a caller-supplied contact id, so it cannot be aimed at anyone else. Consent itself is still granted on the opt-in page — this only builds the link."
   },
   {
     "operationId": "portalRedeemLink",
@@ -14376,7 +14805,8 @@
             "type": "string",
             "enum": [
               "email",
-              "sms"
+              "sms",
+              "in_app"
             ],
             "description": "Delivery channel for the preview: email or sms."
           },
@@ -15689,6 +16119,51 @@
     "description": "Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched."
   },
   {
+    "operationId": "sendMessageThread",
+    "method": "POST",
+    "pathTemplate": "/api/messages/threads/{contactId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "messages",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "contactId",
+          "in": "path",
+          "required": true,
+          "description": "Contact whose thread to post into.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact whose thread to post into."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "description": "Message text."
+          },
+          "inspectionId": {
+            "type": "string",
+            "description": "Optional inspection mention — the nullable inspection_id column with a value, nothing more. No parser, no separate mention table."
+          }
+        },
+        "required": [
+          "body"
+        ]
+      }
+    },
+    "summary": "Send into a contact thread, optionally mentioning an inspection",
+    "description": "Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet."
+  },
+  {
     "operationId": "sendTenant",
     "method": "POST",
     "pathTemplate": "/api/admin/agreements/send",
@@ -16397,7 +16872,8 @@
             "type": "string",
             "enum": [
               "email",
-              "sms"
+              "sms",
+              "in_app"
             ],
             "description": "Delivery channel for the test send: email or sms."
           },
@@ -19441,6 +19917,38 @@
           "active": {
             "type": "boolean",
             "description": "Set to false to deactivate the profile (rejected with 409 for isSystem profiles)."
+          },
+          "capabilityOverrides": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "receivesReport": {
+                "type": "boolean",
+                "description": "Whether this role receives the report."
+              },
+              "selfRetrieveReport": {
+                "type": "boolean",
+                "description": "Whether this role may fetch the report itself."
+              },
+              "canHaveAccount": {
+                "type": "boolean",
+                "description": "Whether this role may hold a portal account."
+              },
+              "showsInAgentPortal": {
+                "type": "boolean",
+                "description": "Whether the inspection appears in this role's own agent portal list."
+              },
+              "canAccessRepairList": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "read",
+                  "readwrite"
+                ],
+                "description": "Access to the buyer's repair list, resolved against the tenant policy by taking the stricter of the two."
+              }
+            },
+            "description": "Per-profile overrides layered on the kind baseline."
           }
         }
       }

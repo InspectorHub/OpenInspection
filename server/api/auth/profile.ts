@@ -8,14 +8,15 @@
 // `__Host-` attributes; no JWT signing happens here.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { users } from '../../lib/db/schema';
 import { deleteCookie } from 'hono/cookie';
 import { Errors } from '../../lib/errors';
 import { requireRole } from '../../lib/middleware/rbac';
+import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { getDrizzle } from '../../lib/route-helpers';
 
 const skipSetupRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -111,7 +112,14 @@ const meRoute = createRoute(withMcpMetadata({
                             onboardingState: z.record(z.string(), z.boolean()).nullable().optional().describe('TODO describe onboardingState field for the OpenInspection MCP integration'),
                             totpEnabled: z.boolean().optional().describe('TODO describe totpEnabled field for the OpenInspection MCP integration'),
                             recoveryCodesRemaining: z.number().nullable().optional().describe('TODO describe recoveryCodesRemaining field for the OpenInspection MCP integration'),
-                        }).describe('TODO describe user field for the OpenInspection MCP integration')
+                        }).describe('TODO describe user field for the OpenInspection MCP integration'),
+                        capabilities: z.object({
+                            publish:           z.boolean().describe('May publish and unpublish reports.'),
+                            scheduleOthers:    z.boolean().describe('May schedule inspections for other inspectors.'),
+                            financial:         z.boolean().describe('May see money on inspections, services and invoices.'),
+                            manageContacts:    z.boolean().describe('May create, edit and archive contacts and role profiles.'),
+                            viewCommunication: z.boolean().describe('May read the per-inspection Outbox, including recipient addresses.'),
+                        }).describe('The resolved capability set for this user: role defaults with their own overrides applied. The UI reads this rather than deriving capabilities from the role.')
                     }))
                 }
             },
@@ -173,7 +181,7 @@ const profileRoutes = createApiRouter()
         const user = c.get('user');
         if (!user?.sub) throw Errors.Unauthorized('Not signed in');
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
         const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
         onboardingState.skipped = true;
@@ -186,7 +194,7 @@ const profileRoutes = createApiRouter()
         const user = c.get('user');
         if (!user?.sub) throw Errors.Unauthorized('Not signed in');
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
         const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
         onboardingState.checklistDismissed = true;
@@ -201,7 +209,7 @@ const profileRoutes = createApiRouter()
 
         const { flag } = c.req.valid('json') as { flag: OnboardingFlag };
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
         const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
         onboardingState[flag] = true;
@@ -215,7 +223,7 @@ const profileRoutes = createApiRouter()
         if (!user?.sub) throw Errors.Unauthorized();
 
         // Email is stored only in the DB, never the JWT.
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const row = await db.select({
             email: users.email,
             name: users.name,
@@ -246,7 +254,11 @@ const profileRoutes = createApiRouter()
                     role: c.get('userRole'),
                     totpEnabled: !!row?.totpEnabled,
                     recoveryCodesRemaining,
-                }
+                },
+                // IA-95 (frontend half) — the resolved set, so no page ever
+                // re-derives a capability from the role string and drifts from
+                // permission_overrides.
+                capabilities: await capabilitiesFor(c),
             }
         }, 200);
     })
@@ -261,7 +273,7 @@ const profileRoutes = createApiRouter()
         if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber || null;
 
         if (Object.keys(updates).length > 0) {
-            const db = drizzle(c.env.DB);
+            const db = getDrizzle(c);
             await db.update(users).set(updates).where(eq(users.id, user.sub)).run();
         }
 

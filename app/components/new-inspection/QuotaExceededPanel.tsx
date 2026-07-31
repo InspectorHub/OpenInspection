@@ -29,7 +29,7 @@ export function QuotaExceededPanel({
         {billingPortalUrl && (
           <a
             href={billingPortalUrl}
-            className="h-8 px-4 inline-flex items-center justify-center rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600"
+            className="h-8 px-4 inline-flex items-center justify-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600"
           >
             {m.newinsp_quota_subscribe()}
           </a>

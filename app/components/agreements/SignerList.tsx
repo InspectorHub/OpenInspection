@@ -6,7 +6,7 @@ import { m } from "~/paraglide/messages";
  * Track I-a Task 9 — shared multi-signer list for an agreement envelope.
  *
  * Self-contained: takes a signers array + per-signer action callbacks; it has
- * NO route coupling so the #111 inspection-hub session can mount it later. The
+ * NO route coupling so the #111 inspector-portal session can mount it later. The
  * admin Signing tab wires the callbacks to BFF loaders/fetchers (no client
  * fetch('/api/...')). DS tokens only; admin surface so it inherits light/dark
  * via data-color-scheme (no hardcoded colors).

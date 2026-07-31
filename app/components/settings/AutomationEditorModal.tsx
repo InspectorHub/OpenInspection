@@ -3,7 +3,7 @@ import { Link, useFetcher } from "react-router";
 import { Modal, Icon } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import type { Rule, Svc, TemplateSummary, RoleProfileOption, Conditions } from "~/routes/settings-automations";
-import { TRIGGER_LABELS, RECIPIENT_KIND_LABELS } from "~/routes/settings-automations";
+import { TRIGGER_LABELS, RECIPIENT_KIND_LABELS, type RecipientKindOption } from "~/routes/settings-automations";
 
 /**
  * The "new/edit automation" modal form. Split out of settings-automations.tsx
@@ -30,13 +30,19 @@ export function AutomationEditorModal({
   const initialChannels = rule?.channels?.length ? rule.channels : ["email"];
   const [emailOn, setEmailOn] = useState(initialChannels.includes("email"));
   const [smsOn, setSmsOn] = useState(initialChannels.includes("sms"));
-  const noChannel = !emailOn && !smsOn;
+  // B1/B3 — in-app is a channel like the others here. Without this box, opening
+  // an in-app rule (the seeded `Office alert — …` set) and pressing Save would
+  // submit no channel at all, the action would default it to email, and the
+  // rule would become an email rule with no template — a fail-closed skip that
+  // silently ends the office's alerts.
+  const [inAppOn, setInAppOn] = useState(initialChannels.includes("in_app"));
+  const noChannel = !emailOn && !smsOn && !inAppOn;
   const saveBlocked = noChannel;
 
   // Spec 2 Task 0 — recipientKind drives whether the role-profile select shows.
   // Default a new rule to 'role' (the common case; the picker below defaults
   // its own value to the primary client profile when one exists).
-  const [recipientKind, setRecipientKind] = useState<"role" | "inspector" | "all">(rule?.recipientKind ?? "role");
+  const [recipientKind, setRecipientKind] = useState<RecipientKindOption>(rule?.recipientKind ?? "role");
   const activeRoleProfiles = roleProfiles.filter((p) => p.active);
   const clientProfile = activeRoleProfiles.find((p) => p.key === "client");
 
@@ -66,7 +72,7 @@ export function AutomationEditorModal({
           <button type="button" onClick={onClose} className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-fg-2">{m.common_cancel()}</button>
           <button type="submit" form="automation-editor-form" disabled={submitting || saveBlocked}
             title={noChannel ? m.settings_automations_pick_channel_title() : undefined}
-            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] disabled:opacity-50">{m.common_save()}</button>
+            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] disabled:opacity-50">{m.common_save()}</button>
         </>
       }
     >
@@ -119,9 +125,13 @@ export function AutomationEditorModal({
                 <input type="checkbox" name="channels" value="sms" checked={smsOn}
                   onChange={(e) => setSmsOn(e.target.checked)} /> {m.settings_channel_sms()}
               </label>
+              <label className="flex items-center gap-1.5 text-[13px] text-ih-fg-2">
+                <input type="checkbox" name="channels" value="in_app" checked={inAppOn}
+                  onChange={(e) => setInAppOn(e.target.checked)} /> {m.settings_channel_in_app()}
+              </label>
             </div>
             <select name="recipientKind" value={recipientKind}
-              onChange={(e) => setRecipientKind(e.target.value as "role" | "inspector" | "all")}
+              onChange={(e) => setRecipientKind(e.target.value as RecipientKindOption)}
               className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]">
               {(Object.keys(RECIPIENT_KIND_LABELS) as Array<keyof typeof RECIPIENT_KIND_LABELS>).map((k) => (
                 <option key={k} value={k}>{RECIPIENT_KIND_LABELS[k]}</option>

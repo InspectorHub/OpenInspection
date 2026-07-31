@@ -1,8 +1,17 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from './shared.schema';
 
+/**
+ * An explicit civil-date window, replacing the former `period=3m|6m|12m` enum.
+ * The enum could express only three windows and named them in the system's own
+ * shorthand; a range says what it covers and lets a caller ask for "last week".
+ * Both ends are inclusive and optional — an omitted end resolves server-side.
+ */
+const CivilDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
+
 export const MetricsQuerySchema = z.object({
-    period: z.enum(['3m', '6m', '12m']).default('12m').describe('TODO describe period field for the OpenInspection MCP integration'),
+    from: CivilDate.optional().describe('First day of the window (inclusive), YYYY-MM-DD. Defaults to three months before `to`.'),
+    to:   CivilDate.optional().describe('Last day of the window (inclusive), YYYY-MM-DD. Defaults to today.'),
 });
 
 const MonthlyDataSchema = z.object({
@@ -33,7 +42,9 @@ const ServiceDistributionSchema = z.object({
 });
 
 const MetricsResponseSchema = z.object({
-    period:           z.string().describe('TODO describe period field for the OpenInspection MCP integration'),
+    /** Echoed back so a caller can tell what window the numbers actually cover. */
+    from:             z.string().describe('First day the figures cover (inclusive), YYYY-MM-DD.'),
+    to:               z.string().describe('Last day the figures cover (inclusive), YYYY-MM-DD.'),
     totalRevenue:     z.number().describe('TODO describe totalRevenue field for the OpenInspection MCP integration'),
     totalInspections: z.number().describe('TODO describe totalInspections field for the OpenInspection MCP integration'),
     avgOrderValue:    z.number().describe('TODO describe avgOrderValue field for the OpenInspection MCP integration'),

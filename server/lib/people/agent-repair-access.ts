@@ -29,3 +29,15 @@ export function agentMayReadRepairList(access: AgentRepairAccess): boolean {
 export function agentMayWriteRepairList(access: AgentRepairAccess): boolean {
     return access === 'readwrite';
 }
+
+const RANK: Record<AgentRepairAccess, number> = { off: 0, read: 1, readwrite: 2 };
+
+/**
+ * The effective repair-list access for one agent on one inspection: the
+ * STRICTER of the tenant's policy and the role's own bit. Neither can widen
+ * the other — a tenant on `read` is not overridden to `readwrite` by a role,
+ * and a role on `read` is read-only even where the tenant allows writing.
+ */
+export function effectiveRepairAccess(tenant: AgentRepairAccess, role: AgentRepairAccess): AgentRepairAccess {
+    return RANK[tenant] <= RANK[role] ? tenant : role;
+}

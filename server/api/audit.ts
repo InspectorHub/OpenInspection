@@ -2,10 +2,10 @@ import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { EntityAuditParamsSchema, EntityAuditQuerySchema, EntityAuditResponseSchema } from '../lib/validations/audit.schema';
-import { drizzle } from 'drizzle-orm/d1';
 import { auditLogs, users } from '../lib/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { getDrizzle } from '../lib/route-helpers';
 
 // IA-64 — the change-traceability read seam. Templates and comments are company
 // assets (schema carries only tenant_id, no created_by), and auditFromContext
@@ -35,7 +35,7 @@ const auditRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const { entityId } = c.req.valid('param');
         const { limit } = c.req.valid('query');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         const rows = await db.select({
             id:        auditLogs.id,

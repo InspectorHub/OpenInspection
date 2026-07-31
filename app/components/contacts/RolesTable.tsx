@@ -1,5 +1,7 @@
+import { useRef, useState } from "react";
 import { useFetcher } from "react-router";
-import { Card, Table, Pill, Button, EmptyState, type PillTone } from "@core/shared-ui";
+import { Card, Table, Pill, Button, EmptyState, Popover, type PillTone } from "@core/shared-ui";
+import { CapabilityMatrix } from "./CapabilityMatrix";
 import { m } from "~/paraglide/messages";
 import type { RoleProfile } from "./contacts-helpers";
 
@@ -33,10 +35,26 @@ export function RolesTable({
   onCreate: () => void;
 }) {
   const deleteFetcher = useFetcher();
+  const [matrixOpen, setMatrixOpen] = useState(false);
+  const matrixAnchor = useRef<HTMLButtonElement>(null);
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex justify-end p-3 border-b border-ih-border">
+      <div className="flex items-center justify-end gap-2 p-3 border-b border-ih-border">
+        <button
+          ref={matrixAnchor}
+          type="button"
+          aria-label={m.contacts_roles_matrix_open_aria()}
+          onClick={() => setMatrixOpen((v) => !v)}
+          className="h-7 w-7 rounded-full border border-ih-border text-ih-fg-muted text-sm font-semibold hover:text-ih-fg-1 hover:border-ih-fg-muted transition-colors"
+        >
+          ?
+        </button>
+        <Popover open={matrixOpen} onClose={() => setMatrixOpen(false)} anchorRef={matrixAnchor}>
+          <div className="p-3">
+            <CapabilityMatrix roles={roleProfiles} />
+          </div>
+        </Popover>
         <Button variant="primary" size="sm" onClick={onCreate}>
           {m.contacts_roles_action_add()}
         </Button>

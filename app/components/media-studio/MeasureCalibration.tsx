@@ -62,7 +62,7 @@ export function MeasureCalibration({
         </select>
         <button
           onClick={onCommit}
-          className="h-7 px-3 rounded bg-ih-primary text-white text-[11px] font-bold hover:bg-ih-primary-600"
+          className="h-7 px-3 rounded bg-ih-primary text-ih-fg-inverse text-[11px] font-bold hover:bg-ih-primary-600"
         >
           {m.media_measure_set()}
         </button>

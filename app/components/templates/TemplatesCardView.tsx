@@ -44,7 +44,7 @@ export function TemplatesCardView({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setImportOpen(true)}
-                  className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
+                  className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
                 >
                   <Icon name="download" size={16} strokeWidth={1.75} />
                   {m.templates_import_title()}

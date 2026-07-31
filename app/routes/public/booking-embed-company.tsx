@@ -6,7 +6,6 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/booking-embed-company";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
-import { readLegalLinks } from "~/lib/legal-links.server";
 import { EmbedWizard, type EmbedData } from "./booking-embed-widget";
 import { m } from "~/paraglide/messages";
 
@@ -30,7 +29,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       api.bookings.book[":tenant"].$get({
         param: { tenant: params.tenant ?? "" },
       }),
-      theme === "branded" ? resolveTenantBrand(context, params.tenant) : Promise.resolve(null),
+      resolveTenantBrand(context, params.tenant, request),
     ]);
     const body = res.ok ? await res.json() : {};
     // Shape returned by GET /api/public/book/:tenant (IA-26 company endpoint):
@@ -44,7 +43,6 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
             }
           | null)
       : null;
-    const legal = readLegalLinks(context);
     return {
       data: d
         ? ({
@@ -54,9 +52,10 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
             tenantSlug: params.tenant ?? "",
             siteKey: d.turnstileSiteKey ?? "",
             theme,
-            brand,
+            brand: theme === "branded" ? brand : null,
             bookingOpen: d.bookingOpen !== false,
-            privacyUrl: legal?.privacyUrl ?? null,
+            privacyUrl: brand.privacyUrl,
+            termsUrl: brand.termsUrl,
           } satisfies EmbedData)
         : null,
       error: res.ok ? null : "Not found",

@@ -5,7 +5,6 @@
  *   POST /api/identity/account/delete — soft-delete the caller's account
  */
 import { createRoute } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { createApiRouter } from '../lib/openapi-router';
 import type { HonoConfig } from '../types/hono';
 import type { Context } from 'hono';
@@ -17,6 +16,7 @@ import {
     AccountDeleteResponseSchema,
 } from '../lib/validations/identity.schema';
 import { exportAccount, softDeleteAccount } from '../services/account.service';
+import { getDrizzle } from '../lib/route-helpers';
 
 function getCallerUserId(c: Context<HonoConfig>): string {
     const sub = (c.get('user') as { sub?: string } | undefined)?.sub;
@@ -62,14 +62,14 @@ const accountDeleteRoute = createRoute(withMcpMetadata({
 const identityRoutes = createApiRouter()
     .openapi(accountExportRoute, async (c) => {
         const userId = getCallerUserId(c);
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const data = await exportAccount(db, userId);
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(accountDeleteRoute, async (c) => {
         const userId = getCallerUserId(c);
         const { confirmEmail } = c.req.valid('json');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         try {
             const data = await softDeleteAccount(db, userId, confirmEmail, c.env.TENANT_CACHE);
             return c.json({ success: true as const, data }, 200);

@@ -13,6 +13,11 @@ export interface RoleEmailTemplate {
     roleLabel: string;
 }
 
+export interface RoleSmsTemplate {
+    body: string;
+    roleLabel: string;
+}
+
 /**
  * The email template a role profile names, for the MANUAL report send.
  *
@@ -62,6 +67,46 @@ export async function resolveRoleEmailTemplate(
         return { subject: tpl.subject, body: tpl.body, roleLabel: profile.label };
     } catch (err) {
         logger.warn('[send-report] role template lookup failed; using default copy', {
+            tenantId, roleKey, error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+    }
+}
+
+/**
+ * The SMS template a role profile names, for the MANUAL SMS send (A3.4).
+ *
+ * Same six-way null posture as the email sibling: missing/inactive/wrong-
+ * channel/empty body → null, and the caller falls back to a default. A stale
+ * reference must never be the reason someone is not texted when the operator
+ * pressed Send — the consent gate is the only honest skip.
+ */
+export async function resolveRoleSmsTemplate(
+    db: AnyDrizzle,
+    rawDb: D1Database,
+    tenantId: string,
+    roleKey: string,
+): Promise<RoleSmsTemplate | null> {
+    try {
+        const profile = await db
+            .select({
+                label: contactRoleProfiles.label,
+                smsTemplateId: contactRoleProfiles.smsTemplateId,
+            })
+            .from(contactRoleProfiles)
+            .where(and(
+                eq(contactRoleProfiles.tenantId, tenantId),
+                eq(contactRoleProfiles.key, roleKey),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .get();
+        if (!profile?.smsTemplateId) return null;
+
+        const tpl = await createOiTemplateStore(rawDb).resolve(tenantId, profile.smsTemplateId);
+        if (!tpl || tpl.channel !== 'sms' || !tpl.body.trim()) return null;
+        return { body: tpl.body, roleLabel: profile.label };
+    } catch (err) {
+        logger.warn('[send-sms] role template lookup failed; using default copy', {
             tenantId, roleKey, error: err instanceof Error ? err.message : String(err),
         });
         return null;

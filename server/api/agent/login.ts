@@ -1,6 +1,5 @@
 import { createRoute } from '@hono/zod-openapi';
 import { setCookie } from 'hono/cookie';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { createApiRouter } from '../../lib/openapi-router';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
@@ -14,6 +13,7 @@ import { DUMMY_HASH } from '../../services/auth.service';
 import { findGlobalAgentByEmail } from '../../services/agent/account';
 import { requestMagicLoginByEmail } from '../../services/agent/magic-login.service';
 import { authCookieOptions, AUTH_COOKIE_NAME } from '../../lib/auth-helpers';
+import { getDrizzle } from '../../lib/route-helpers';
 import {
     AgentLoginSchema,
     AgentLoginLinkSchema,
@@ -119,7 +119,7 @@ export const agentLoginRoutes = createApiRouter()
 
         if (needsRehash) {
             const upgraded = await hashPassword(password);
-            await drizzle(c.env.DB).update(users).set({ passwordHash: upgraded }).where(eq(users.id, row.id));
+            await getDrizzle(c).update(users).set({ passwordHash: upgraded }).where(eq(users.id, row.id));
         }
 
         // Agent JWT claim shape mirrors server/api/agent-signup.ts and the

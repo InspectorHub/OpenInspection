@@ -118,7 +118,7 @@ export default function SettingsContractorTypes() {
         <createFetcher.Form method="POST" className="flex gap-2" onSubmit={() => setNewName("")}>
           <input type="hidden" name="intent" value="create" />
           <input name="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={m.settings_contractor_types_name_placeholder()} className={`flex-1 ${INPUT}`} />
-          <button type="submit" disabled={!newName.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold disabled:opacity-50">{m.common_add()}</button>
+          <button type="submit" disabled={!newName.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold disabled:opacity-50">{m.common_add()}</button>
         </createFetcher.Form>
       </div>
 

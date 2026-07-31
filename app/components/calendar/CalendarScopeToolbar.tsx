@@ -40,7 +40,7 @@ export function CalendarScopeToolbar({
           onClick={() => onScopeChange("my")}
           aria-pressed={scope === "my"}
           className={`h-8 rounded px-3 text-[13px] font-bold ${
-            scope === "my" ? "bg-ih-primary text-white" : "text-ih-fg-3 hover:bg-ih-bg-muted"
+            scope === "my" ? "bg-ih-primary text-ih-fg-inverse" : "text-ih-fg-3 hover:bg-ih-bg-muted"
           }`}
         >
           {m.calendar_scope_my()}
@@ -51,7 +51,7 @@ export function CalendarScopeToolbar({
             onClick={() => onScopeChange("team")}
             aria-pressed={scope === "team"}
             className={`h-8 rounded px-3 text-[13px] font-bold ${
-              scope === "team" ? "bg-ih-primary text-white" : "text-ih-fg-3 hover:bg-ih-bg-muted"
+              scope === "team" ? "bg-ih-primary text-ih-fg-inverse" : "text-ih-fg-3 hover:bg-ih-bg-muted"
             }`}
           >
             {m.calendar_scope_team()}
