@@ -93,6 +93,25 @@ describe('notification classes', () => {
         expect(disagree).toEqual([]);
     });
 
+    it('uses only the three categories §3.1 fixes — a compliance taxonomy, not a free field', () => {
+        // transactional / operational / marketing is the vocabulary CAN-SPAM and
+        // GDPR reason in: it says what the CONTENT is. A fourth value was once
+        // added here to mean "only the sender receives it", which is a fact
+        // about the AUDIENCE — two different questions sharing one field. That
+        // belongs on `recipientFacing`, and this keeps it there.
+        const allowed = new Set(['transactional', 'operational', 'marketing']);
+        const rogue = NOTIFICATION_CLASSES.filter((c) => !allowed.has(c.category)).map((c) => `${c.id}: ${c.category}`);
+        expect(rogue).toEqual([]);
+    });
+
+    it('keeps a non-recipient-facing class out of the screen, without hiding it from the boundary', () => {
+        const testSend = notificationClass('admin-test-send')!;
+        expect(testSend.recipientFacing).toBe(false);
+        // Everything a recipient can actually receive stays on the screen.
+        const hidden = NOTIFICATION_CLASSES.filter((c) => c.recipientFacing === false).map((c) => c.id);
+        expect(hidden).toEqual(['admin-test-send']);
+    });
+
     it('treats an unknown class as required — fail closed, never fail quiet', () => {
         expect(isSuppressible('some.future.notification')).toBe(false);
     });
