@@ -42,6 +42,7 @@ const legalDocRoute = createRoute(withMcpMetadata({
                     schema: createApiResponseSchema(z.object({
                         companyName: z.string(),
                         body: z.string().nullable().describe('Custom body when set; null = use built-in template'),
+                        lastUpdated: z.string().nullable().describe('Version of the document currently in force (YYYY-MM-DD in the tenant timezone), or null when nothing has been published yet.'),
                     })),
                 },
             },
@@ -100,7 +101,15 @@ const publicInspectorProfileRoutes = createApiRouter()
         const body = doc === 'privacy'
             ? (cfg?.privacyBody?.trim() || null)
             : (cfg?.termsBody?.trim() || null);
-        return c.json({ success: true as const, data: { companyName, body } }, 200);
+        // "Last updated" comes from the version REGISTRY, never from the config
+        // row's own timestamp: the registry is the only thing that knows a save
+        // changed the text rather than some neighbouring setting. Null until the
+        // tenant has published once, and the page then says nothing rather than
+        // inventing a date.
+        const latest = await c.var.services.legalVersion.latest(row.id, doc);
+        return c.json({ success: true as const, data: {
+            companyName, body, lastUpdated: latest?.version ?? null,
+        } }, 200);
     })
     .openapi(brandAssetRoute, async (c) => {
         const { key } = c.req.valid('query');

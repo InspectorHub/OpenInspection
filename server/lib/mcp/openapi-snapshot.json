@@ -15001,6 +15001,14 @@
             "type": "string",
             "format": "email",
             "description": "Recipient email address requesting a portal magic-link."
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "portal",
+              "notifications"
+            ],
+            "description": "Where the magic-link should land. `portal` (default) = the inspections list; `notifications` = the notification settings page, for a reader arriving from the privacy policy or terms."
           }
         },
         "required": [

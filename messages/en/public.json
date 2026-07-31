@@ -47,7 +47,6 @@
   "public_legal_doc_privacy": "Privacy Policy",
   "public_legal_doc_terms": "Terms of Service",
   "public_legal_title": "{doc} — {company}",
-  "public_legal_effective": "Effective: July 30, 2026",
   "public_legal_powered_by": "Powered by",
   "public_legal_provided_by": ". Inspection services provided by {company}.",
   "agent_portal_dashboard_meta_title": "Agent Dashboard - OpenInspection",
@@ -164,5 +163,6 @@
   "oauth_authorize_aria_write": "Write {module}",
   "oauth_authorize_scope_note": "Ticking Write also grants Read. Access is limited to your role and to what {clientName} requested.",
   "oauth_authorize_submit_pending": "Authorizing…",
-  "oauth_authorize_submit": "Authorize"
+  "oauth_authorize_submit": "Authorize",
+  "public_legal_last_updated": "Last updated {date}"
 }
