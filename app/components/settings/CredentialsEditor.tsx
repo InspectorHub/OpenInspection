@@ -40,12 +40,19 @@ export function CredentialsEditor({
       )}
 
       {credentials.map((c) => (
-        <div key={c.id} className="rounded-md border border-ih-border bg-ih-bg-muted/40 p-3 flex items-start gap-3">
-          <div className="w-24 shrink-0">
+        <div key={c.id} className="rounded-md border border-ih-border bg-ih-bg-muted/40 p-3 flex items-start gap-4">
+          {/* Wide enough for the uploader's own caption. At w-24 it wrapped to
+              three lines and read as a broken layout. */}
+          <div className="w-36 shrink-0">
             <LogoUploader currentUrl={c.imageUrl} uploading={uploadingId === c.id} onSelect={(f) => onUpload(c.id, f)} />
           </div>
           <div className="flex-1 min-w-0">
-            <details>
+            {/* OPEN by default. `onAdd` creates a blank row, so a collapsed
+                one showed an upload box and the word "Details" with nothing
+                saying what the credential is — the two fields are hidden at
+                exactly the moment they are needed. Still collapsible, for a
+                reader who has already filled several in. */}
+            <details open>
               <summary className="text-[12px] text-ih-fg-3 cursor-pointer select-none">{m.settings_profile_credentials_details_summary()}</summary>
               <div className="mt-2 space-y-2">
                 <input

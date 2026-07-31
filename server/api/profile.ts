@@ -1,6 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
+import { CredentialService } from '../services/credential.service';
 import { and, eq } from 'drizzle-orm';
 import { Errors } from '../lib/errors';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
@@ -145,10 +146,26 @@ const profileRoutes = createApiRouter()
 
         const host = new URL(c.req.url).host;
         const tenantSlug = c.get('requestedTenantSlug') ?? null;
+        // The preview MUST carry credentials, or it shows a signature the
+        // reader will never receive. `inspectorSignature` has accepted them
+        // since Spec B; no caller ever supplied them, so the feature was wired
+        // and dead — the badges render nowhere despite the settings copy
+        // promising "shown on your reports, emails, and booking page".
+        const creds = await new CredentialService(c.env.DB).listByUser(tenantId, userId);
+        const credentials = creds
+          .filter((k) => k.active)
+          .map((k) => ({
+              label: k.label,
+              memberNumber: k.memberNumber,
+              imageUrl: k.imageR2Key
+                  ? `/api/public/brand-asset?key=${encodeURIComponent(k.imageR2Key)}`
+                  : null,
+          }));
+
         const signaturePreviewHtml = (row.name ?? '').trim()
           ? inspectorSignature({
               name: row.name, email: row.email, phone: row.phone,
-              licenseNumber: row.licenseNumber, tenantSlug,
+              licenseNumber: row.licenseNumber, tenantSlug, credentials,
             }, host).html
           : '';
 
