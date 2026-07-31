@@ -18,7 +18,7 @@ import { LOCALE_OPTIONS } from "~/lib/locales";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { CredentialsEditor, type EditorCredential } from "~/components/settings/CredentialsEditor";
 import { NotificationPreferencesCard } from "~/components/settings/NotificationPreferencesCard";
-import { bulkNotificationChoice, loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
+import { bulkNotificationChoice, grantNotificationSms, loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -71,6 +71,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "bulk-notification") {
     return { ...(await bulkNotificationChoice(api, fd)), intent };
+  }
+
+  if (intent === "grant-notification-sms") {
+    return { ...(await grantNotificationSms(api, request)), intent };
   }
 
   // Handle save-signature intent from the SignaturePad fetcher
@@ -502,6 +506,7 @@ export default function SettingsProfilePage() {
           alwaysSent={notifications.alwaysSent}
           youChoose={notifications.youChoose}
           loadError={notifications.error}
+          smsConsent={notifications.smsConsent}
         />
       </div>
 

@@ -63,19 +63,30 @@ describe('who may enter the consent ledger', () => {
         expect(rows[0]).toMatchObject({ recipientType: 'agent' });
     });
 
-    it('NEVER records a grant for staff', async () => {
+    it('lets STAFF resume, recorded under their own basis', async () => {
+        // Refusing this outright built a one-way door: a staff member who
+        // stopped could never start again. The separation belongs in the
+        // `recipient_type` column, not in the absence of the row.
         const { rec, rows } = recorder();
         await grantSms(rec, TENANT, block([{ kind: 'user', id: 'u1' }]), 'staff', {});
-        expect(rows).toEqual([]);
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ action: 'granted', recipientType: 'staff', subjectKind: 'user' });
     });
 
-    it('NEVER records a grant for an agent', async () => {
-        // Implied consent has nothing to grant. A `granted` row here would put
-        // B2B messaging inside the consumer evidence — the pollution the
-        // layered program exists to prevent.
+    it('lets an AGENT resume, recorded as an agent', async () => {
         const { rec, rows } = recorder();
         await grantSms(rec, TENANT, block([{ kind: 'contact', id: 'c1' }]), 'agent', {});
-        expect(rows).toEqual([]);
+        expect(rows[0]).toMatchObject({ action: 'granted', recipientType: 'agent' });
+    });
+
+    it('NEVER labels a non-consumer resume as client consent', async () => {
+        // THE invariant the ISV filing rests on. A query counting consumer
+        // opt-in evidence filters `recipient_type = 'client'`, so a staff or
+        // agent row stamped 'client' is the one mistake that would corrupt it.
+        const { rec, rows } = recorder();
+        await grantSms(rec, TENANT, block([{ kind: 'user', id: 'u1' }]), 'staff', {});
+        await grantSms(rec, TENANT, block([{ kind: 'contact', id: 'c1' }]), 'agent', {});
+        expect(rows.some((r) => r.recipientType === 'client')).toBe(false);
     });
 
     it('DOES record a grant for a client, with the evidence fields', async () => {

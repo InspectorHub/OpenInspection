@@ -8643,6 +8643,66 @@
     "description": "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against."
   },
   {
+    "operationId": "grantAgentSmsConsent",
+    "method": "PUT",
+    "pathTemplate": "/api/agent/notification-preferences/sms-consent",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "type": "string",
+            "description": "Tenant id to resume at. Required unless scope is \"all\"."
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "company",
+              "all"
+            ],
+            "description": "\"all\" resumes at every company currently linked to this agent."
+          },
+          "disclosureVersion": {
+            "type": "integer",
+            "description": "Ignored for an agent: implied consent has nothing to disclose."
+          }
+        }
+      }
+    },
+    "summary": "Turn text messages back on at one company",
+    "description": "Withdraws an earlier stop at one company, or at every linked company. Agents are implied, so this records a resume under recipient_type agent — never consumer opt-in evidence."
+  },
+  {
+    "operationId": "grantStaffSmsConsent",
+    "method": "PUT",
+    "pathTemplate": "/api/notification-preferences/sms-consent",
+    "scopes": [
+      "write"
+    ],
+    "tag": "notifications",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "disclosureVersion": {
+            "type": "integer",
+            "description": "Required for an express grant; ignored for an implied resume."
+          }
+        }
+      }
+    },
+    "summary": "Turn text messages back on for this reader",
+    "description": "Appends a granted row for the signed-in staff member. Staff are implied, so this withdraws an earlier stop rather than capturing consent — recorded under recipient_type staff so it never counts as consumer opt-in evidence."
+  },
+  {
     "operationId": "importContacts",
     "method": "POST",
     "pathTemplate": "/api/contacts/import",

@@ -6,16 +6,11 @@ import { createApi } from "~/lib/api-client.server";
 import { toActionResult } from "~/lib/inspector-portal-actions";
 import { PageHeader, Input, Button, Select, Checkbox } from "@core/shared-ui";
 import { BrowserTimezoneHint } from "~/components/settings/BrowserTimezoneHint";
-import {
-  NotificationPreferences,
-  type AlwaysSentItem,
-  type ChannelId,
-  type ChoiceRow,
-} from "~/components/notifications/NotificationPreferences";
+import { NotificationSettings } from "~/components/notifications/NotificationSettings";
+import type { AlwaysSentItem, ChannelId, ChoiceRow } from "~/components/notifications/NotificationPreferences";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
-import { SmsConsentBlock, type SmsConsent } from "~/components/notifications/SmsConsentBlock";
+import type { SmsConsent } from "~/components/notifications/SmsConsentBlock";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
-import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -92,7 +87,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return { agent: profile, notifications };
 }
 
-type ActionIntent = "save-slug" | "save-notifications" | "bulk-notifications" | "save-timezone";
+type ActionIntent = "save-slug" | "save-notifications" | "bulk-notifications" | "grant-notification-sms" | "save-timezone";
 
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
@@ -136,6 +131,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     return toActionResult(res, "bulk-notifications" as const, m.agent_portal_settings_notify_error_generic());
   }
 
+  if (intent === "grant-notification-sms") {
+    const scope = fd.get("scope") === "all" ? ("all" as const) : ("company" as const);
+    const res = await api.agentNotificationPrefs["notification-preferences"]["sms-consent"].$put({
+      json: { scope, ...(scope === "company" ? { companyId: String(fd.get("companyId") ?? "") } : {}) },
+    });
+    return toActionResult(res, "grant-notification-sms" as const, m.agent_portal_settings_notify_error_generic());
+  }
+
   if (intent === "save-timezone") {
     // Empty string clears the override (server persists NULL → per-company tz).
     const timezone = String(fd.get("timezone") ?? "");
@@ -154,18 +157,7 @@ export default function AgentSettingsProfilePage() {
   const slugResult = slugFetcher.data?.intent === "save-slug" ? slugFetcher.data : null;
   const slugError = slugResult && !slugResult.ok ? slugResult.error : null;
 
-  const notifyFetcher = useFetcher<typeof action>();
-  const notifyResult = notifyFetcher.data?.intent === "save-notifications"
-    || notifyFetcher.data?.intent === "bulk-notifications" ? notifyFetcher.data : null;
-  const notifyError = notifyResult && !notifyResult.ok ? notifyResult.error : null;
-  useNotificationSaveToast({ data: notifyResult, failed: !!notifyError, error: notifyError });
   const [applyAll, setApplyAll] = useState(false);
-  // "saved" persists after the fetcher goes idle, so the confirmation is still
-  // on screen when the reader looks up from the switch they just moved.
-  const sc = notifications.smsConsent;
-  // No consent means no text can arrive, whatever a row says.
-  const smsUnavailable = !!sc && (sc.state === "revoked" || sc.state === "none");
-  const notifyStatus = notifyFetcher.state !== "idle" ? "saving" as const : "idle" as const;
   const navigate = useNavigate();
   const locale = useDisplayLocale();
 
@@ -186,34 +178,6 @@ export default function AgentSettingsProfilePage() {
 
   function saveSlug() {
     slugFetcher.submit({ intent: "save-slug", slug }, { method: "post" });
-  }
-
-  function saveNotification(classId: string, channel: ChannelId, enabled: boolean) {
-    notifyFetcher.submit(
-      {
-        intent: "save-notifications",
-        classId,
-        channel,
-        enabled: String(enabled),
-        scope: applyAll ? "all" : "company",
-        companyId: notifications.selected ?? "",
-      },
-      { method: "post" },
-    );
-  }
-
-  function bulkNotification(enabled: boolean, scope: { channel?: ChannelId; classId?: string }) {
-    notifyFetcher.submit(
-      {
-        intent: "bulk-notifications",
-        action: enabled ? "enable" : "disable",
-        ...(scope.channel ? { channel: scope.channel } : {}),
-        ...(scope.classId ? { classId: scope.classId } : {}),
-        scope: applyAll ? "all" : "company",
-        companyId: notifications.selected ?? "",
-      },
-      { method: "post" },
-    );
   }
 
   function selectCompany(id: string) {
@@ -281,7 +245,10 @@ export default function AgentSettingsProfilePage() {
               label={m.agent_portal_settings_notify_company_label()}
               value={notifications.selected ?? ""}
               onChange={(e) => selectCompany(e.target.value)}
-              disabled={notifyFetcher.state !== "idle"}
+              // Not disabled while a preference saves: switching company is a
+              // NAVIGATION, and the reload it triggers re-reads the answer
+              // anyway. The save fetcher now lives inside the shared surface,
+              // which is the right place for it and out of reach from here.
               options={notifications.companies.map((co) => ({ value: co.id, label: co.name }))}
             />
             {notifications.companies.length > 1 && (
@@ -297,35 +264,24 @@ export default function AgentSettingsProfilePage() {
                 {m.agent_portal_settings_notify_apply_all({ count: notifications.companies.length })}
               </label>
             )}
-            {notifications.smsConsent && (
-              <div className="mt-5">
-                <SmsConsentBlock
-                  consent={notifications.smsConsent}
-                  locale={locale}
-                  onStop={() => bulkNotification(false, { channel: "sms" })}
-                  busy={notifyFetcher.state !== "idle"}
-                />
-              </div>
-            )}
-            {notifications.smsConsent && (
-              <div className="mt-5">
-                <SmsConsentBlock
-                  consent={notifications.smsConsent}
-                  locale={locale}
-                  onStop={() => bulkNotification(false, { channel: "sms" })}
-                  busy={notifyFetcher.state !== "idle"}
-                />
-              </div>
-            )}
             <div className="mt-5">
-              <NotificationPreferences
+              <NotificationSettings
                 alwaysSent={notifications.alwaysSent}
                 youChoose={notifications.youChoose}
-                onChange={saveNotification}
-                busy={notifyFetcher.state !== "idle"}
-                status={notifyStatus}
-                onBulk={bulkNotification}
-                lockedChannels={smsUnavailable ? { sms: m.notif_prefs_sms_locked() } : {}}
+                smsConsent={notifications.smsConsent}
+                loadError={notifications.error}
+                locale={locale}
+                // The company scope rides on every submit, because an agent's
+                // preferences are per company.
+                intents={{
+                  save: "save-notifications",
+                  bulk: "bulk-notifications",
+                  grant: "grant-notification-sms",
+                }}
+                extraFields={{
+                  scope: applyAll ? "all" : "company",
+                  companyId: notifications.selected ?? "",
+                }}
               />
             </div>
           </>

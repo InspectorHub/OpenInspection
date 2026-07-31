@@ -3,8 +3,9 @@ import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { getDrizzle } from '../lib/route-helpers';
 import { buildScreenModel } from '../lib/notifications/screen-model';
+import { Errors } from '../lib/errors';
 import { applyBulk, assertChoosable, readChoices, writeChoice } from '../lib/notifications/preference-write';
-import { readSmsConsent, revokeChannel } from '../lib/notifications/channel-consent';
+import { grantSms, readSmsConsent, revokeChannel } from '../lib/notifications/channel-consent';
 import { SmsConsentService } from '../services/sms-consent.service';
 
 /**
@@ -46,6 +47,7 @@ const ScreenResponseSchema = z.object({
             state: z.enum(['granted', 'implied', 'revoked', 'none']),
             at: z.string().nullable(),
             capturedVia: z.enum(['booking_form', 'optin_link', 'admin', 'settings_page']).nullable(),
+            mode: z.enum(['express', 'implied']),
             subjects: z.array(z.object({ kind: z.enum(['contact', 'user']), id: z.string() })),
             disclosure: z.object({ version: z.number(), text: z.string() }).nullable(),
         }).nullable(),
@@ -122,6 +124,36 @@ const bulkRoute = createRoute(withMcpMetadata({
         'always-sent notifications are never touched.',
 }, { scopes: ['write'], tier: 'extended' }));
 
+const grantRoute = createRoute(withMcpMetadata({
+    method: 'put',
+    path: '/notification-preferences/sms-consent',
+    tags: ['notifications'],
+    summary: 'Turn text messages back on for this reader',
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        disclosureVersion: z.number().int().optional()
+                            .describe('Required for an express grant; ignored for an implied resume.'),
+                    }),
+                },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } },
+            description: 'Recorded.',
+        },
+    },
+    operationId: 'grantStaffSmsConsent',
+    description:
+        'Appends a granted row for the signed-in staff member. Staff are implied, so this ' +
+        'withdraws an earlier stop rather than capturing consent — recorded under ' +
+        'recipient_type staff so it never counts as consumer opt-in evidence.',
+}, { scopes: ['write'], tier: 'extended' }));
+
 const notificationPreferenceRoutes = createApiRouter()
     .openapi(getScreenRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
@@ -173,6 +205,18 @@ const notificationPreferenceRoutes = createApiRouter()
             await revokeChannel(new SmsConsentService(c.env.DB), tenantId, 'sms', block, 'staff');
         }
         return c.json({ success: true as const, stored }, 200);
+    })
+    .openapi(grantRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const userId = c.get('user')?.sub as string;
+        const db = getDrizzle(c);
+        const block = await readSmsConsent(db, tenantId, 'staff', [{ kind: 'user', id: userId }], null);
+        if (!block) throw Errors.BadRequest('There is nothing to change here.');
+        await grantSms(new SmsConsentService(c.env.DB), tenantId, block, 'staff', {
+            ip: c.req.header('cf-connecting-ip'),
+            userAgent: c.req.header('user-agent'),
+        });
+        return c.json({ success: true as const }, 200);
     });
 
 export default notificationPreferenceRoutes;

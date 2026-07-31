@@ -168,6 +168,7 @@
   "notif_prefs_sms_stop": "Stop texts",
   "notif_prefs_sms_grant_ack": "Yes, text me at this number.",
   "notif_prefs_sms_grant": "Turn texts on",
+  "notif_prefs_sms_resume": "Turn texts back on",
   "notif_prefs_sms_disclosure_show": "Read what you're agreeing to",
   "notif_prefs_sms_locked": "Text is switched off above, so these do not apply.",
   "notif_prefs_sms_manage": "Manage texts",

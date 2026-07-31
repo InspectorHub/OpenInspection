@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, Checkbox } from "@core/shared-ui";
 import { formatDate } from "~/lib/format";
+import { SmsDisclosure } from "~/components/notifications/SmsDisclosure";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -26,8 +27,18 @@ export interface SmsConsent {
     state: SmsConsentState;
     at: string | null;
     capturedVia: "booking_form" | "optin_link" | "admin" | "settings_page" | null;
+    /**
+     * `express` — a consumer granting consent: the disclosure must be on screen
+     * and acknowledged. `implied` — reachable under an existing relationship
+     * and never granted anything, so turning it back on is a RESUME with
+     * nothing to agree to. Comes from the server, which knows the audience.
+     */
+    mode: "express" | "implied";
     /** What the reader must SEE before granting, and the version recorded. */
     disclosure: { version: number; text: string } | null;
+    /** The same two links the public opt-in page shows. */
+    privacyUrl?: string | null;
+    termsUrl?: string | null;
 }
 
 const SOURCE = {
@@ -39,6 +50,7 @@ const SOURCE = {
 
 export function SmsConsentBlock({
     consent, manageHref, onStop, onGrant, busy = false, locale = "en-US",
+
 }: {
     consent: SmsConsent;
     /** The opt-in page — where consent can be granted with its disclosure. */
@@ -67,7 +79,10 @@ export function SmsConsentBlock({
     const day = (iso: string | null) => (iso ? formatDate(iso, { locale }) : "");
     const on = consent.state === "granted" || consent.state === "implied";
     const [ack, setAck] = useState(false);
-    const canGrant = !on && !!onGrant && !!consent.disclosure;
+    const implied = consent.mode === "implied";
+    // An express grant needs the disclosure on screen; a resume does not,
+    // because there was never a disclosure to agree to.
+    const canGrant = !on && !!onGrant && (implied || !!consent.disclosure);
 
     return (
         <section aria-labelledby="notif-sms-h" className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
@@ -97,7 +112,7 @@ export function SmsConsentBlock({
                 <p className="text-[13px] text-ih-fg-3 mt-1">{m.notif_prefs_sms_implied()}</p>
             )}
 
-            {canGrant && (
+            {canGrant && !implied && (
                 // The disclosure is on screen BEFORE the acknowledgement, and
                 // its version travels with the grant. That is what makes an
                 // inline switch a record rather than a claim.
@@ -106,9 +121,13 @@ export function SmsConsentBlock({
                         <summary className="cursor-pointer select-none text-ih-fg-2 font-medium focus-visible:outline-2 focus-visible:outline-ih-primary rounded-sm">
                             {m.notif_prefs_sms_disclosure_show()}
                         </summary>
-                        <p className="mt-2 text-[13px] text-ih-fg-3 max-w-prose whitespace-pre-line">
-                            {consent.disclosure!.text}
-                        </p>
+                        <div className="mt-2 max-w-prose">
+                            <SmsDisclosure
+                                text={consent.disclosure!.text}
+                                privacyUrl={consent.privacyUrl}
+                                termsUrl={consent.termsUrl}
+                            />
+                        </div>
                     </details>
                     <label className="flex items-start gap-2 text-[13px] text-ih-fg-2">
                         <Checkbox bare checked={ack} disabled={busy} onChange={(e) => setAck(e.currentTarget.checked)} />
@@ -121,10 +140,10 @@ export function SmsConsentBlock({
                 {canGrant && (
                     <Button
                         variant="primary"
-                        disabled={!ack || busy}
-                        onClick={() => onGrant!(consent.disclosure!.version)}
+                        disabled={busy || (!implied && !ack)}
+                        onClick={() => onGrant!(implied ? 0 : consent.disclosure!.version)}
                     >
-                        {m.notif_prefs_sms_grant()}
+                        {implied ? m.notif_prefs_sms_resume() : m.notif_prefs_sms_grant()}
                     </Button>
                 )}
                 {on && (

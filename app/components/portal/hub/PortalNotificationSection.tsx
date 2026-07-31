@@ -1,12 +1,6 @@
-import { useFetcher } from "react-router";
-import {
-  NotificationPreferences,
-  type AlwaysSentItem,
-  type ChannelId,
-  type ChoiceRow,
-} from "~/components/notifications/NotificationPreferences";
-import { SmsConsentBlock, type SmsConsent } from "~/components/notifications/SmsConsentBlock";
-import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
+import { NotificationSettings } from "~/components/notifications/NotificationSettings";
+import type { AlwaysSentItem, ChoiceRow } from "~/components/notifications/NotificationPreferences";
+import type { SmsConsent } from "~/components/notifications/SmsConsentBlock";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -16,9 +10,10 @@ import { m } from "~/paraglide/messages";
  * about this inspection and this is a fact about the reader. The inspection in
  * the URL is only where they happened to be standing when they asked.
  *
- * Same component as staff and agent see (CLAUDE.md, Cross-Portal Reuse); what
- * differs is only who is asked and how the write is authenticated, which is the
- * route's job rather than this one's.
+ * A shell around the same surface staff and agents get (CLAUDE.md, Cross-Portal
+ * Reuse). What differs is only the intent names this route's action listens
+ * for, and that a client is the one audience who can GRANT consent inline —
+ * agents and staff are implied and have nothing to grant.
  */
 export function PortalNotificationSection({
   alwaysSent, youChoose, error, smsConsent, manageTextsHref,
@@ -26,80 +21,26 @@ export function PortalNotificationSection({
   alwaysSent: AlwaysSentItem[];
   youChoose: ChoiceRow[];
   error: string | null;
-  /** Null when this reader has no SMS identity — the block does not render. */
   smsConsent: SmsConsent | null;
   manageTextsHref?: string | undefined;
 }) {
-  const fetcher = useFetcher<{ ok?: boolean; intent?: string; error?: string }>();
-  const result = fetcher.data?.intent === "notification-preference"
-    || fetcher.data?.intent === "notification-bulk"
-    || fetcher.data?.intent === "notification-sms-grant"
-    ? fetcher.data : null;
-  const saveError = result && result.ok === false ? result.error : null;
-  useNotificationSaveToast({ data: result, failed: !!saveError, error: saveError });
-
-  // "saved" persists after the fetcher goes idle, so the confirmation is still
-  // on screen when the reader looks up from the switch they just moved.
-  const status = fetcher.state !== "idle" ? "saving" as const : "idle" as const;
-  // No consent means no text can arrive, whatever a row says — so the column is
-  // disabled rather than merely unchecked.
-  const smsUnavailable = !!smsConsent && (smsConsent.state === "revoked" || smsConsent.state === "none");
-
-  function grantSms(disclosureVersion: number) {
-    fetcher.submit(
-      { intent: "notification-sms-grant", disclosureVersion: String(disclosureVersion) },
-      { method: "post" },
-    );
-  }
-
-  function bulk(enabled: boolean, scope: { channel?: ChannelId; classId?: string }) {
-    fetcher.submit(
-      {
-        intent: "notification-bulk",
-        action: enabled ? "enable" : "disable",
-        ...(scope.channel ? { channel: scope.channel } : {}),
-        ...(scope.classId ? { classId: scope.classId } : {}),
-      },
-      { method: "post" },
-    );
-  }
-
-  function save(classId: string, channel: ChannelId, enabled: boolean) {
-    fetcher.submit(
-      { intent: "notification-preference", classId, channel, enabled: String(enabled) },
-      { method: "post" },
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-lg font-bold text-ih-fg-1">{m.portal_notif_heading()}</h1>
         <p className="text-[13px] text-ih-fg-3 mt-1 max-w-prose">{m.portal_notif_desc()}</p>
       </div>
-      {/* Only the LOAD failure stays inline — it explains why the grid below
-          is missing, so it belongs where the grid would have been. */}
-      {error && <p className="text-[13px] text-ih-bad-fg">{error}</p>}
-      {smsConsent && (
-        // ABOVE the grid, because consent is the gate and the grid is what
-        // happens behind it. Stopping here is one request: the ledger entry and
-        // the Text-column cascade, so the two can never disagree.
-        <SmsConsentBlock
-          consent={smsConsent}
-          manageHref={manageTextsHref}
-          onStop={() => bulk(false, { channel: "sms" })}
-          onGrant={grantSms}
-          busy={fetcher.state !== "idle"}
-        />
-      )}
-      <NotificationPreferences
+      <NotificationSettings
         alwaysSent={alwaysSent}
         youChoose={youChoose}
-        onChange={save}
-        busy={fetcher.state !== "idle"}
-        status={status}
-        onBulk={bulk}
-        lockedChannels={smsUnavailable ? { sms: m.notif_prefs_sms_locked() } : {}}
+        smsConsent={smsConsent}
+        loadError={error}
+        manageHref={manageTextsHref}
+        intents={{
+          save: "notification-preference",
+          bulk: "notification-bulk",
+          grant: "notification-sms-grant",
+        }}
       />
     </div>
   );

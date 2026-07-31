@@ -6,7 +6,7 @@ import { getDrizzle } from '../../lib/route-helpers';
 import { buildScreenModel } from '../../lib/notifications/screen-model';
 import { applyBulk, assertChoosable, readChoices, writeChoice } from '../../lib/notifications/preference-write';
 import { listAgentCompanies } from '../../services/agent/companies';
-import { readSmsConsent, revokeChannel } from '../../lib/notifications/channel-consent';
+import { grantSms, readSmsConsent, revokeChannel } from '../../lib/notifications/channel-consent';
 import { SmsConsentService } from '../../services/sms-consent.service';
 import { Errors } from '../../lib/errors';
 
@@ -150,6 +150,43 @@ const saveRoute = createRoute(withMcpMetadata({
         'class default deletes the row rather than storing it.',
 }, { scopes: ['agent'], tier: 'extended' }));
 
+const grantRoute = createRoute(withMcpMetadata({
+    method: 'put',
+    path: '/notification-preferences/sms-consent',
+    tags: ['agents'],
+    summary: 'Turn text messages back on at one company',
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        companyId: z.string().optional()
+                            .describe('Tenant id to resume at. Required unless scope is "all".'),
+                        scope: z.enum(['company', 'all']).optional()
+                            .describe('"all" resumes at every company currently linked to this agent.'),
+                        disclosureVersion: z.number().int().optional()
+                            .describe('Ignored for an agent: implied consent has nothing to disclose.'),
+                    }),
+                },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), applied: z.number() }) } },
+            description: 'Recorded.',
+        },
+        400: { description: 'A company this agent is not bound to' },
+        401: { description: 'Unauthorized' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'grantAgentSmsConsent',
+    description:
+        'Withdraws an earlier stop at one company, or at every linked company. Agents are ' +
+        'implied, so this records a resume under recipient_type agent — never consumer ' +
+        'opt-in evidence.',
+}, { scopes: ['agent'], tier: 'extended' }));
+
 const agentNotificationPreferenceRoutes = createApiRouter()
     .openapi(getScreenRoute, async (c) => {
         await requireRole('agent')(c, async () => {});
@@ -234,6 +271,28 @@ const agentNotificationPreferenceRoutes = createApiRouter()
             if (action === 'disable' && channel === 'sms' && !classId) {
                 const block = await readSmsConsent(db, t.tenantId, 'agent', [{ kind: 'contact' as const, id: t.contactId }], null);
                 await revokeChannel(new SmsConsentService(c.env.DB), t.tenantId, 'sms', block, 'agent');
+            }
+        }
+        return c.json({ success: true as const, applied: targets.length }, 200);
+    })
+    .openapi(grantRoute, async (c) => {
+        await requireRole('agent')(c, async () => {});
+        const agentUserId = c.get('user').sub;
+        const { companyId, scope } = c.req.valid('json');
+
+        const db = getDrizzle(c);
+        const companies = await listAgentCompanies(db, agentUserId);
+        const targets = scope === 'all' ? companies : companies.filter((x) => x.tenantId === companyId);
+        if (targets.length === 0) throw Errors.BadRequest('You are not currently linked to that company.');
+
+        const svc = new SmsConsentService(c.env.DB);
+        for (const t of targets) {
+            const block = await readSmsConsent(db, t.tenantId, 'agent', [{ kind: 'contact' as const, id: t.contactId }], null);
+            if (block) {
+                await grantSms(svc, t.tenantId, block, 'agent', {
+                    ip: c.req.header('cf-connecting-ip'),
+                    userAgent: c.req.header('user-agent'),
+                });
             }
         }
         return c.json({ success: true as const, applied: targets.length }, 200);

@@ -1,4 +1,5 @@
 import type { AlwaysSentItem, ChoiceRow } from "~/components/notifications/NotificationPreferences";
+import type { SmsConsent } from "~/components/notifications/SmsConsentBlock";
 import type { Api as CoreApi } from "~/lib/api-client.server";
 import { m } from "~/paraglide/messages";
 
@@ -15,6 +16,7 @@ export interface NotificationScreen {
     youChoose: ChoiceRow[];
     /** Set when the read failed. NOT the same as "you have nothing". */
     error: string | null;
+    smsConsent: SmsConsent | null;
 }
 
 /**
@@ -26,7 +28,7 @@ export interface NotificationScreen {
  * Chrome; every unit test called it green because they all stubbed a 200.
  */
 const FAILED = (): NotificationScreen =>
-    ({ alwaysSent: [], youChoose: [], error: m.settings_notifications_unavailable() });
+    ({ alwaysSent: [], youChoose: [], smsConsent: null, error: m.settings_notifications_unavailable() });
 
 /**
  * Only the one client this module touches. Typing it as `any` would be the
@@ -48,7 +50,7 @@ export async function loadNotificationScreen(api: Api): Promise<NotificationScre
         const res = await api.notificationPrefs["notification-preferences"].$get();
         if (!res.ok) return FAILED();
         const body = (await res.json()) as { data?: Omit<NotificationScreen, "error"> };
-        return body.data ? { ...body.data, error: null } : FAILED();
+        return body.data ? { ...body.data, smsConsent: body.data.smsConsent ?? null, error: null } : FAILED();
     } catch {
         return FAILED();
     }
@@ -99,6 +101,24 @@ export async function bulkNotificationChoice(
             ...(classId ? { classId } : {}),
         },
     });
+    return res.ok
+        ? { success: true, error: null }
+        : { success: false, error: m.settings_notifications_error() };
+}
+
+/** Turn text messages back on. Staff are implied, so this is a resume. */
+export async function grantNotificationSms(
+    api: Api,
+    request: Request,
+): Promise<{ success: boolean; error: string | null }> {
+    const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for");
+    const ua = request.headers.get("user-agent");
+    const res = await api.notificationPrefs["notification-preferences"]["sms-consent"].$put(
+        { json: {} },
+        // Absent headers are OMITTED, not sent empty — a consent row claiming
+        // "we recorded an ip and it was blank" is worse than one with none.
+        { headers: { ...(ip ? { "cf-connecting-ip": ip } : {}), ...(ua ? { "user-agent": ua } : {}) } },
+    );
     return res.ok
         ? { success: true, error: null }
         : { success: false, error: m.settings_notifications_error() };

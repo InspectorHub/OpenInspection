@@ -13,7 +13,7 @@ import { SmsConsentBlock, type SmsConsent } from "./SmsConsentBlock";
 const DISCLOSURE = { version: 3, text: "Message and data rates may apply." };
 const base: SmsConsent = {
   phone: "+1 555 000 1111", state: "granted", at: "2026-06-12T00:00:00.000Z",
-  capturedVia: "booking_form", disclosure: DISCLOSURE,
+  capturedVia: "booking_form", disclosure: DISCLOSURE, mode: "express",
 };
 
 function setup(consent: Partial<SmsConsent> = {}, manageHref?: string) {
@@ -73,10 +73,20 @@ describe("SMS consent block", () => {
     expect(c.onGrant).toHaveBeenCalledWith(3);
   });
 
-  it("offers no inline grant when there is no disclosure to show", () => {
+  it("offers no inline grant when an EXPRESS reader has no disclosure to show", () => {
     // No text means nothing the reader could have agreed to.
     const c = setup({ state: "revoked", disclosure: null });
     expect(c.queryByText(/Turn texts on/i)).toBeNull();
+  });
+
+  it("lets an IMPLIED reader resume with no disclosure and no acknowledgement", () => {
+    // Staff and agents never granted anything, so there is nothing to agree
+    // to. Refusing them the button was a one-way door: stopped, no way back.
+    const c = setup({ state: "revoked", disclosure: null, mode: "implied" });
+    const button = c.getByText(/Turn texts back on/i).closest("button")!;
+    expect(button.disabled).toBe(false);
+    button.click();
+    expect(c.onGrant).toHaveBeenCalled();
   });
 
   it("says an agent is reachable under the relationship, without claiming a grant", () => {

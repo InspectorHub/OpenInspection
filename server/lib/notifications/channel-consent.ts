@@ -30,7 +30,15 @@ export interface SmsConsentBlock {
     /** When the state above was recorded. Null for `implied`. */
     at: string | null;
     /** How it was captured — booking form, opt-in link, or by an admin. */
-    capturedVia: 'booking_form' | 'optin_link' | 'admin' | null;
+    capturedVia: 'booking_form' | 'optin_link' | 'admin' | 'settings_page' | null;
+    /**
+     * Whether turning this back on is a GRANT or a RESUME.
+     *
+     * Decided HERE, where the audience is known, rather than by each screen.
+     * Three call sites setting it by hand is three chances for one to ask a
+     * staff member to acknowledge a consumer disclosure they never needed.
+     */
+    mode: 'express' | 'implied';
     /**
      * WHO a Stop writes against. A client or agent resolves to `contacts` rows;
      * a staff member is a single `users` row and has no contact at all.
@@ -102,12 +110,14 @@ export async function readSmsConsent(
         return {
             phone, state: 'revoked',
             at: toIso(latest.createdAt), capturedVia: latest.capturedVia ?? null, subjects, disclosure,
+            mode: audience === 'client' ? 'express' : 'implied',
         };
     }
     if (latest?.action === 'granted') {
         return {
             phone, state: 'granted',
             at: toIso(latest.createdAt), capturedVia: latest.capturedVia ?? null, subjects, disclosure,
+            mode: audience === 'client' ? 'express' : 'implied',
         };
     }
 
@@ -117,6 +127,7 @@ export async function readSmsConsent(
     return {
         phone, state: audience === 'client' ? 'none' : 'implied',
         at: null, capturedVia: null, subjects, disclosure,
+        mode: audience === 'client' ? 'express' : 'implied',
     };
 }
 
@@ -157,12 +168,26 @@ export interface ConsentRecorder {
 }
 
 /**
- * Record that this reader granted the text channel, from this screen.
+ * Record that this reader turned the text channel back on.
  *
- * Only legitimate when the disclosure was RENDERED and its version comes back
- * with the acknowledgement — which is why the version is a parameter and not
- * something this function looks up. A caller that could pass any version would
- * be able to record consent to text the reader never saw.
+ * TWO DIFFERENT ACTS share this row, and the `recipient_type` column is what
+ * keeps them apart:
+ *
+ * - a CLIENT is granting express consent. Only legitimate when the disclosure
+ *   was rendered and its version comes back with the acknowledgement, which is
+ *   why the version is a parameter rather than something looked up here: a
+ *   caller free to pass any version could record consent to text nobody saw.
+ * - a STAFF member or AGENT is RESUMING. They were reachable under an existing
+ *   relationship all along and never granted anything, so there is no
+ *   disclosure to show and nothing to acknowledge — the row withdraws their
+ *   earlier stop.
+ *
+ * An earlier version refused the second case outright, on the reasoning that a
+ * staff `granted` row pollutes consumer evidence. That was too blunt: it built
+ * a one-way door, and a staff member who stopped could never start again. The
+ * separation belongs in the column, not in the absence of the row — a filing
+ * that counts opt-in evidence filters `recipient_type = 'client'`, which is
+ * the whole reason that column is not a boolean.
  */
 export async function grantSms(
     recorder: ConsentRecorder,
@@ -171,13 +196,9 @@ export async function grantSms(
     audience: Audience,
     meta: { ip?: string | undefined; userAgent?: string | undefined },
 ): Promise<void> {
-    // Only consumers are ever GRANTED here. Agents and staff are implied, and
-    // writing a grant for them would put non-consumer messaging inside the
-    // consumer consent evidence (docs/sms-compliance.md).
-    if (audience !== 'client') return;
     for (const s of block.subjects) {
         await recorder.record(tenantId, s.id, 'granted', 'settings_page', {
-            ...meta, recipientType: 'client', subjectKind: s.kind,
+            ...meta, recipientType: basisFor(audience), subjectKind: s.kind,
         });
     }
 }
