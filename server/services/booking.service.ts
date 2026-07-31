@@ -1,7 +1,8 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, gte, lte, sql, inArray, isNull, ne, asc } from 'drizzle-orm';
-import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, tenantConfigs, users, services as servicesTable, contactRoleProfiles, inspectorCredentials, contacts } from '../lib/db/schema';
+import { eq, and, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
+import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, tenantConfigs, users, services as servicesTable, contactRoleProfiles, contacts } from '../lib/db/schema';
+import { CredentialService } from './credential.service';
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../lib/tz';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
@@ -803,12 +804,10 @@ export class BookingService {
             const inspectorEmail = inspector?.email || c.env.SENDER_EMAIL || `noreply@${c.env.APP_NAME?.toLowerCase().replace(/\s/g, '') || 'inspector'}.com`;
 
             // Spec B — the assigned inspector's active credentials, for the footer.
+            // Via the shared mapper, so this footer and the email signature can
+            // never disagree about the badge URL form.
             const bookingCreds = inspector
-                ? (await db.select().from(inspectorCredentials)
-                    .where(and(eq(inspectorCredentials.tenantId, tenantId), eq(inspectorCredentials.userId, inspectorId!), eq(inspectorCredentials.active, true)))
-                    .orderBy(asc(inspectorCredentials.sortOrder)).all())
-                    .filter((cr) => cr.imageR2Key || (cr.label ?? '').trim())
-                    .map((cr) => ({ label: cr.label, memberNumber: cr.memberNumber, imageUrl: cr.imageR2Key ? `/api/public/brand-asset?key=${encodeURIComponent(cr.imageR2Key)}` : null }))
+                ? await new CredentialService(c.env.DB).listRenderable(tenantId, inspectorId!)
                 : [];
             // Sprint B-4a — append inspector signature so customers can rebook
             // with the same inspector via the per-inspector booking link.

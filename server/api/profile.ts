@@ -151,16 +151,7 @@ const profileRoutes = createApiRouter()
         // since Spec B; no caller ever supplied them, so the feature was wired
         // and dead — the badges render nowhere despite the settings copy
         // promising "shown on your reports, emails, and booking page".
-        const creds = await new CredentialService(c.env.DB).listByUser(tenantId, userId);
-        const credentials = creds
-          .filter((k) => k.active)
-          .map((k) => ({
-              label: k.label,
-              memberNumber: k.memberNumber,
-              imageUrl: k.imageR2Key
-                  ? `/api/public/brand-asset?key=${encodeURIComponent(k.imageR2Key)}`
-                  : null,
-          }));
+        const credentials = await new CredentialService(c.env.DB).listRenderable(tenantId, userId);
 
         const signaturePreviewHtml = (row.name ?? '').trim()
           ? inspectorSignature({
