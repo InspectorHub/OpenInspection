@@ -162,9 +162,33 @@ function isTokenExpired(token: string, nowMs: number): boolean {
   }
 }
 
+/**
+ * Which sign-in page a session ends on.
+ *
+ * There are two front doors and they are not interchangeable. `/login` is for
+ * STAFF: an agent has no account there, and under `APP_MODE=saas`
+ * `routes/login.tsx` 302s again to `${PORTAL_API_URL}/login` — out of this
+ * product entirely, onto a portal sign-in an agent cannot use. So an agent sent
+ * to `/login` on logout or on expiry does not land on a login page; they land
+ * on a dead end. Agents sign in at `/agent-login`.
+ *
+ * Derived from the path rather than passed in by each caller, because the
+ * callers are `requireToken` and `destroyUserSession` — one is invoked by every
+ * agent loader and the other by the logout route, and an agent surface added
+ * later would otherwise have to remember to ask. Every agent page is mounted
+ * under the `agent-` prefix (`app/routes.ts`), including `agent-logout`, which
+ * exists so that the teardown route carries the same signal as the pages.
+ *
+ * The prefix is the whole rule: `/contacts` and `/inspections/agent-notes` are
+ * staff pages ABOUT agents and stay on the staff door.
+ */
+export function loginPathFor(request: Request): "/login" | "/agent-login" {
+  return new URL(request.url).pathname.startsWith("/agent-") ? "/agent-login" : "/login";
+}
+
 export async function requireToken(context: LoadContext, request: Request): Promise<string> {
   const token = await getToken(context, request);
-  if (!token) throw redirect("/login");
+  if (!token) throw redirect(loginPathFor(request));
   // An expired session is the ordinary end of a session, not a failure. Without
   // this, the cookie still EXISTS so the loader proceeded, every API call
   // answered 401, and the page fell into its error boundary — the visitor saw
@@ -234,5 +258,5 @@ export async function destroyUserSession(context: LoadContext, request: Request)
     "Set-Cookie",
     "__Host-inspector_token=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
   );
-  return redirect("/login", { headers });
+  return redirect(loginPathFor(request), { headers });
 }

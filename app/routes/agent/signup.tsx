@@ -304,7 +304,10 @@ export default function AgentSignupPage() {
           <p className="mt-6 text-[14px] text-ih-fg-3 text-center">
             {m.auth_agent_signup_have_account()}{" "}
             <Link
-              to="/login"
+              // NOT `/login`: an agent is locked out of the tenant login in
+              // both modes (see routes/agent/login.tsx), so this is the only
+              // sign-in that can accept the account they are being sent to.
+              to="/agent-login"
               className="text-ih-primary font-medium hover:underline"
             >
               {m.auth_agent_signup_login_link()}
