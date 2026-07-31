@@ -72,3 +72,27 @@ export async function savePortalNotificationChoice(
     );
     return res.ok ? { ok: true } : { ok: false, error: m.portal_notif_save_error() };
 }
+
+/** A whole row, column or the entire grid, in one request. */
+export async function bulkPortalNotificationChoice(
+    context: LoadContext,
+    tenant: string,
+    cookie: string,
+    formData: FormData,
+): Promise<{ ok: boolean; error?: string }> {
+    const api = createApi(context);
+    const channel = String(formData.get("channel") ?? "");
+    const classId = String(formData.get("classId") ?? "");
+    const res = await api.portalNotificationPrefs[":tenant"]["notification-preferences"].bulk.$put(
+        {
+            param: { tenant },
+            json: {
+                action: String(formData.get("action") ?? "enable") as "enable" | "disable" | "reset",
+                ...(channel ? { channel: channel as "email" | "sms" | "in_app" } : {}),
+                ...(classId ? { classId } : {}),
+            },
+        },
+        { headers: { Cookie: cookie } },
+    );
+    return res.ok ? { ok: true } : { ok: false, error: m.portal_notif_save_error() };
+}

@@ -13,6 +13,7 @@ import {
   type ChoiceRow,
 } from "~/components/notifications/NotificationPreferences";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
+import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -87,7 +88,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return { agent: profile, notifications };
 }
 
-type ActionIntent = "save-slug" | "save-notifications" | "save-timezone";
+type ActionIntent = "save-slug" | "save-notifications" | "bulk-notifications" | "save-timezone";
 
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
@@ -115,6 +116,22 @@ export async function action({ request, context }: Route.ActionArgs) {
     return toActionResult(res, "save-notifications" as const, m.agent_portal_settings_notify_error_generic());
   }
 
+  if (intent === "bulk-notifications") {
+    const scope = fd.get("scope") === "all" ? ("all" as const) : ("company" as const);
+    const channel = String(fd.get("channel") ?? "");
+    const classId = String(fd.get("classId") ?? "");
+    const res = await api.agentNotificationPrefs["notification-preferences"].bulk.$put({
+      json: {
+        action: String(fd.get("action") ?? "enable") as "enable" | "disable" | "reset",
+        ...(channel ? { channel: channel as ChannelId } : {}),
+        ...(classId ? { classId } : {}),
+        scope,
+        ...(scope === "company" ? { companyId: String(fd.get("companyId") ?? "") } : {}),
+      },
+    });
+    return toActionResult(res, "bulk-notifications" as const, m.agent_portal_settings_notify_error_generic());
+  }
+
   if (intent === "save-timezone") {
     // Empty string clears the override (server persists NULL → per-company tz).
     const timezone = String(fd.get("timezone") ?? "");
@@ -134,14 +151,14 @@ export default function AgentSettingsProfilePage() {
   const slugError = slugResult && !slugResult.ok ? slugResult.error : null;
 
   const notifyFetcher = useFetcher<typeof action>();
-  const notifyResult = notifyFetcher.data?.intent === "save-notifications" ? notifyFetcher.data : null;
+  const notifyResult = notifyFetcher.data?.intent === "save-notifications"
+    || notifyFetcher.data?.intent === "bulk-notifications" ? notifyFetcher.data : null;
   const notifyError = notifyResult && !notifyResult.ok ? notifyResult.error : null;
+  useNotificationSaveToast({ data: notifyResult, failed: !!notifyError, error: notifyError });
   const [applyAll, setApplyAll] = useState(false);
   // "saved" persists after the fetcher goes idle, so the confirmation is still
   // on screen when the reader looks up from the switch they just moved.
-  const notifyStatus = notifyFetcher.state !== "idle" ? "saving" as const
-    : notifyError ? "idle" as const
-      : notifyFetcher.data ? "saved" as const : "idle" as const;
+  const notifyStatus = notifyFetcher.state !== "idle" ? "saving" as const : "idle" as const;
   const navigate = useNavigate();
 
   const tzFetcher = useFetcher<typeof action>();
@@ -170,6 +187,20 @@ export default function AgentSettingsProfilePage() {
         classId,
         channel,
         enabled: String(enabled),
+        scope: applyAll ? "all" : "company",
+        companyId: notifications.selected ?? "",
+      },
+      { method: "post" },
+    );
+  }
+
+  function bulkNotification(enabled: boolean, scope: { channel?: ChannelId; classId?: string }) {
+    notifyFetcher.submit(
+      {
+        intent: "bulk-notifications",
+        action: enabled ? "enable" : "disable",
+        ...(scope.channel ? { channel: scope.channel } : {}),
+        ...(scope.classId ? { classId: scope.classId } : {}),
         scope: applyAll ? "all" : "company",
         companyId: notifications.selected ?? "",
       },
@@ -231,9 +262,6 @@ export default function AgentSettingsProfilePage() {
         <p className="text-[13px] text-ih-fg-3 mb-4">
           {m.agent_portal_settings_notifications_desc()}
         </p>
-        {notifyError && (
-          <p className="text-[12px] text-ih-bad-fg mb-3">{notifyError}</p>
-        )}
 
         {notifications.error ? (
           <p className="text-[13px] text-ih-bad-fg">{notifications.error}</p>
@@ -268,6 +296,7 @@ export default function AgentSettingsProfilePage() {
                 onChange={saveNotification}
                 busy={notifyFetcher.state !== "idle"}
                 status={notifyStatus}
+                onBulk={bulkNotification}
               />
             </div>
           </>

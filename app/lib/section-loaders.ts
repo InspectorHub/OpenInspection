@@ -38,16 +38,29 @@ import type { LoadContext } from "~/lib/load-context";
 /* Section validation */
 /* ------------------------------------------------------------------ */
 
-const HUB_SECTIONS: HubSection[] = [
-  "overview",
-  "report",
-  "agreement",
-  "payment",
-  "progress",
-  "messages",
-  "repair",
-  "documents",
-];
+/**
+ * Every Hub section, as data.
+ *
+ * A `Record<HubSection, true>` rather than an array, so the COMPILER is what
+ * keeps this in sync with the union: adding a member to `HubSection` without
+ * adding it here is a type error, not a section that silently falls back to
+ * the overview. That is exactly how `notifications` shipped unreachable — the
+ * type had it, this list did not, and nothing said so (CLAUDE.md: make a
+ * "must stay in sync" coupling executable, not a comment).
+ */
+const HUB_SECTION_SET: Record<HubSection, true> = {
+  overview: true,
+  report: true,
+  agreement: true,
+  payment: true,
+  progress: true,
+  messages: true,
+  repair: true,
+  documents: true,
+  notifications: true,
+};
+
+const HUB_SECTIONS = Object.keys(HUB_SECTION_SET) as HubSection[];
 
 export function parseSection(v: string | null): HubSection {
   return v !== null && (HUB_SECTIONS as string[]).includes(v) ? (v as HubSection) : "overview";

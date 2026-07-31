@@ -18,7 +18,7 @@ import { LOCALE_OPTIONS } from "~/lib/locales";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { CredentialsEditor, type EditorCredential } from "~/components/settings/CredentialsEditor";
 import { NotificationPreferencesCard } from "~/components/settings/NotificationPreferencesCard";
-import { loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
+import { bulkNotificationChoice, loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -67,6 +67,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "save-notification") {
     return { ...(await saveNotificationChoice(api, fd)), intent };
+  }
+
+  if (intent === "bulk-notification") {
+    return { ...(await bulkNotificationChoice(api, fd)), intent };
   }
 
   // Handle save-signature intent from the SignaturePad fetcher

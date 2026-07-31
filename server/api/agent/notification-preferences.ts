@@ -4,7 +4,7 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
 import { buildScreenModel } from '../../lib/notifications/screen-model';
-import { assertChoosable, readChoices, writeChoice } from '../../lib/notifications/preference-write';
+import { applyBulk, assertChoosable, readChoices, writeChoice } from '../../lib/notifications/preference-write';
 import { listAgentCompanies } from '../../services/agent/companies';
 import { Errors } from '../../lib/errors';
 
@@ -60,6 +60,37 @@ const SaveSchema = z.object({
     scope: z.enum(['company', 'all']).optional()
         .describe('"all" applies the choice to every company currently linked to this agent.'),
 });
+
+const BulkSchema = z.object({
+    action: z.enum(['enable', 'disable', 'reset'])
+        .describe('enable/disable every cell in scope; reset clears them back to defaults.'),
+    channel: z.enum(['email', 'sms', 'in_app']).optional().describe('Limit to one channel (a column).'),
+    classId: z.string().optional().describe('Limit to one notification (a row).'),
+    companyId: z.string().optional().describe('Tenant id to apply this to. Required unless scope is "all".'),
+    scope: z.enum(['company', 'all']).optional().describe('"all" applies to every linked company.'),
+});
+
+const bulkRoute = createRoute(withMcpMetadata({
+    method: 'put',
+    path: '/notification-preferences/bulk',
+    tags: ['agents'],
+    summary: 'Change a whole row, column or grid at a company',
+    request: { body: { content: { 'application/json': { schema: BulkSchema } } } },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), applied: z.number() }) } },
+            description: 'Applied. `applied` counts the companies it was written for.',
+        },
+        400: { description: 'A company this agent is not bound to' },
+        401: { description: 'Unauthorized' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'bulkSaveAgentNotificationPreferences',
+    description:
+        'Applies one action to every cell in scope at one company, or at every company linked ' +
+        'to this agent. Channels a notification never uses are skipped, and always-sent ' +
+        'notifications are never touched.',
+}, { scopes: ['agent'], tier: 'extended' }));
 
 const getScreenRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -158,6 +189,29 @@ const agentNotificationPreferenceRoutes = createApiRouter()
                 tenantId: t.tenantId, subjectKind: 'contact', subjectId: t.contactId,
                 classId, channel, enabled,
             });
+        }
+        return c.json({ success: true as const, applied: targets.length }, 200);
+    })
+    .openapi(bulkRoute, async (c) => {
+        await requireRole('agent')(c, async () => {});
+        const agentUserId = c.get('user').sub;
+        const { action, channel, classId, companyId, scope } = c.req.valid('json');
+
+        const db = getDrizzle(c);
+        const companies = await listAgentCompanies(db, agentUserId);
+        const targets = scope === 'all'
+            ? companies
+            : companies.filter((x) => x.tenantId === companyId);
+        if (targets.length === 0) {
+            throw Errors.BadRequest('You are not currently linked to that company.');
+        }
+        for (const t of targets) {
+            await applyBulk(
+                db,
+                { tenantId: t.tenantId, subjectKind: 'contact', subjectId: t.contactId },
+                'agent',
+                { action, ...(channel ? { channel } : {}), ...(classId ? { classId } : {}) },
+            );
         }
         return c.json({ success: true as const, applied: targets.length }, 200);
     });

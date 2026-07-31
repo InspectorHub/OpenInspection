@@ -62,6 +62,15 @@ export type SendOneSmsArgs = {
     tenant: typeof tenants.$inferSelect;
     /** Already-resolved SMS body template (may contain `{{vars}}`). */
     bodyTemplate: string;
+    /**
+     * The notification class this rule sends, when it is a seeded one.
+     *
+     * Resolved by the CALLER because that is where the rule is — this function
+     * only ever sees the log. A tenant-written rule has no seeded class and so
+     * stays unclassified and unmutable, which is `isSuppressible` failing
+     * closed rather than an oversight.
+     */
+    classId?: string | undefined;
     sms: SmsProviderSeam;
     appName: string;
     appHost: string;
@@ -108,6 +117,7 @@ async function resolveRecipientRoleKind(
 }
 
 export async function sendOneSms(args: SendOneSmsArgs): Promise<void> {
+    const { classId } = args;
     const {
         db, log, inspection, tenant, bodyTemplate, sms,
         appName, appHost, env, quotaGuard, metering,
@@ -146,6 +156,9 @@ export async function sendOneSms(args: SendOneSmsArgs): Promise<void> {
         contactId,
         roleKind,
         env,
+        // Lets the gate consult this recipient's own preference. Without it the
+        // screen grows a text switch that writes a row nothing reads.
+        ...(classId ? { classId } : {}),
         ...(quotaGuard ? { quota: { guard: quotaGuard, tier: tenant.tier } } : {}),
     });
     if (!gate.allowed) return void (await skip(gate.reason));

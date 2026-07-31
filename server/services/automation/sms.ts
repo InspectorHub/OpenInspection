@@ -10,6 +10,7 @@
  */
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { automations, tenants } from '../../lib/db/schema';
+import { automationClassId } from '../../lib/notifications/automation-classes';
 import { automationLogs } from '../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import type { Constructor, FlushInspection } from './shared';
@@ -67,6 +68,8 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
                 inspection,
                 tenant,
                 bodyTemplate: tpl.body,
+                // The rule lives here, so the class is resolved here.
+                ...(automationClassId(automation) ? { classId: automationClassId(automation)! } : {}),
                 sms,
                 appName,
                 appHost,

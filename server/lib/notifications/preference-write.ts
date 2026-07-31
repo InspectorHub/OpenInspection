@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { notificationPreferences } from '../db/schema';
 import { defaultEnabled, isSuppressible, notificationClass, type Audience } from './classes';
+import { classesFor } from './screen-model';
 import { Errors } from '../errors';
 
 /**
@@ -101,4 +102,77 @@ export async function readChoices(
         )).all();
     return new Map(rows.map((r: { classId: string; channel: string; enabled: boolean }) =>
         [`${r.classId}:${r.channel}`, r.enabled]));
+}
+
+/**
+ * A bulk change, scoped the way the GRID is scoped.
+ *
+ * The screen is notifications x channels, so the useful bulk actions are the
+ * ones that match its shape: one row (every channel of one notification), one
+ * column (one channel across every notification), or the corner (everything).
+ * Three loose buttons above the table would have made the reader work out which
+ * cells each one touched; a control that sits ON the row or column says it.
+ */
+export interface BulkChange {
+    /** `reset` DELETES the rows in scope so each falls back to its default. */
+    action: 'enable' | 'disable' | 'reset';
+    /** Limit to one channel (a column). */
+    channel?: 'email' | 'sms' | 'in_app' | undefined;
+    /** Limit to one notification (a row). */
+    classId?: string | undefined;
+}
+
+/**
+ * Apply one bulk change to the cells this reader can actually choose.
+ *
+ * `reset` is NOT `enable`, and the difference is load-bearing: reset deletes
+ * rows so every class returns to its own default — and one class defaults to
+ * OFF (`agent-invoice-paid`, whose column defaulted to false). Treating them as
+ * synonyms would silently switch that one on.
+ *
+ * The cells it touches come from `classesFor(audience)` intersected with each
+ * class's own channel list, so a bulk change can never reach a class this
+ * reader is not addressed by, a class that is always sent, or a channel the
+ * class never uses — the three refusals `assertChoosable` makes one at a time,
+ * made structural instead. A row's `unavailable` cells are skipped rather than
+ * switched on, which is the whole reason the em dash is not a control.
+ */
+export async function applyBulk(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    db: any,
+    subject: { tenantId: string; subjectKind: 'user' | 'contact'; subjectId: string },
+    audience: Audience,
+    change: BulkChange,
+): Promise<number> {
+    const targets = classesFor(audience)
+        .filter((c) => !c.required)
+        .filter((c) => !change.classId || c.id === change.classId)
+        .flatMap((c) => c.channels
+            .filter((ch) => !change.channel || ch === change.channel)
+            .map((ch) => ({ cls: c, channel: ch })));
+
+    if (change.action === 'reset') {
+        // Delete only the cells in scope, so resetting one row leaves the rest
+        // of the reader's decisions alone.
+        for (const t of targets) {
+            await db.delete(notificationPreferences).where(and(
+                eq(notificationPreferences.tenantId, subject.tenantId),
+                eq(notificationPreferences.subjectKind, subject.subjectKind),
+                eq(notificationPreferences.subjectId, subject.subjectId),
+                eq(notificationPreferences.classId, t.cls.id),
+                eq(notificationPreferences.channel, t.channel),
+            )).run();
+        }
+        return 0;
+    }
+
+    const enabled = change.action === 'enable';
+    let written = 0;
+    for (const t of targets) {
+        await writeChoice(db, { ...subject, classId: t.cls.id, channel: t.channel, enabled });
+        // `writeChoice` stores only what differs from the default, so this
+        // counts the DECISIONS recorded, not the switches moved.
+        if (enabled !== defaultEnabled(t.cls.id)) written++;
+    }
+    return written;
 }

@@ -5,6 +5,7 @@ import {
   type ChannelId,
   type ChoiceRow,
 } from "~/components/notifications/NotificationPreferences";
+import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -26,14 +27,26 @@ export function PortalNotificationSection({
   error: string | null;
 }) {
   const fetcher = useFetcher<{ ok?: boolean; intent?: string; error?: string }>();
-  const result = fetcher.data?.intent === "notification-preference" ? fetcher.data : null;
+  const result = fetcher.data?.intent === "notification-preference" || fetcher.data?.intent === "notification-bulk"
+    ? fetcher.data : null;
   const saveError = result && result.ok === false ? result.error : null;
+  useNotificationSaveToast({ data: result, failed: !!saveError, error: saveError });
 
   // "saved" persists after the fetcher goes idle, so the confirmation is still
   // on screen when the reader looks up from the switch they just moved.
-  const status = fetcher.state !== "idle" ? "saving" as const
-    : saveError ? "idle" as const
-      : fetcher.data ? "saved" as const : "idle" as const;
+  const status = fetcher.state !== "idle" ? "saving" as const : "idle" as const;
+
+  function bulk(enabled: boolean, scope: { channel?: ChannelId; classId?: string }) {
+    fetcher.submit(
+      {
+        intent: "notification-bulk",
+        action: enabled ? "enable" : "disable",
+        ...(scope.channel ? { channel: scope.channel } : {}),
+        ...(scope.classId ? { classId: scope.classId } : {}),
+      },
+      { method: "post" },
+    );
+  }
 
   function save(classId: string, channel: ChannelId, enabled: boolean) {
     fetcher.submit(
@@ -48,15 +61,16 @@ export function PortalNotificationSection({
         <h1 className="text-lg font-bold text-ih-fg-1">{m.portal_notif_heading()}</h1>
         <p className="text-[13px] text-ih-fg-3 mt-1 max-w-prose">{m.portal_notif_desc()}</p>
       </div>
-      {(error || saveError) && (
-        <p className="text-[13px] text-ih-bad-fg">{error ?? saveError}</p>
-      )}
+      {/* Only the LOAD failure stays inline — it explains why the grid below
+          is missing, so it belongs where the grid would have been. */}
+      {error && <p className="text-[13px] text-ih-bad-fg">{error}</p>}
       <NotificationPreferences
         alwaysSent={alwaysSent}
         youChoose={youChoose}
         onChange={save}
         busy={fetcher.state !== "idle"}
         status={status}
+        onBulk={bulk}
       />
     </div>
   );

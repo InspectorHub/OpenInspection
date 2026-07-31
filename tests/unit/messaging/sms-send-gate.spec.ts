@@ -174,3 +174,56 @@ describe('smsSendGate — managed compliance', () => {
         });
     });
 });
+
+describe('smsSendGate — the recipient’s own preference', () => {
+    /**
+     * The screen renders a Text switch for `booking-confirmation` and
+     * `inspection-reminder`. Until this gate consulted preferences, ticking it
+     * off stored a row that NOTHING read and the text went out anyway — a
+     * screen that accepts a change and then ignores it, which is the exact
+     * defect the preference layer exists to remove.
+     */
+    async function mute(classId: string, contactId = 'c1') {
+        await db.insert(schema.notificationPreferences).values({
+            id: `np-${classId}-${contactId}`, tenantId: TENANT, subjectKind: 'contact',
+            subjectId: contactId, classId, channel: 'sms', enabled: false,
+            createdAt: new Date(), updatedAt: new Date(),
+        } as never);
+    }
+
+    it('withholds a class this recipient switched off', async () => {
+        await seedContact('c1', PHONE);
+        await seedConsent('sc1', 'c1', 'granted');
+        await mute('booking-confirmation');
+
+        const r = await gate({ contactId: 'c1', roleKind: 'client', classId: 'booking-confirmation' });
+        expect(r.allowed).toBe(false);
+    });
+
+    it('sends a DIFFERENT class the same recipient did not switch off', async () => {
+        await seedContact('c1', PHONE);
+        await seedConsent('sc1', 'c1', 'granted');
+        await mute('booking-confirmation');
+
+        const r = await gate({ contactId: 'c1', roleKind: 'client', classId: 'inspection-reminder' });
+        expect(r.allowed).toBe(true);
+    });
+
+    it('sends an UNCLASSIFIED message — an admin test send is not mutable', async () => {
+        await seedContact('c1', PHONE);
+        await seedConsent('sc1', 'c1', 'granted');
+        await mute('booking-confirmation');
+
+        const r = await gate({ contactId: 'c1', roleKind: 'client' });
+        expect(r.allowed).toBe(true);
+    });
+
+    it('a preference NARROWS consent, it never widens it', async () => {
+        // §3.3 — consent is the authority on this channel. A recipient who
+        // never granted consent stays unreachable no matter what the
+        // preference table says, so the order of the two checks is load-bearing.
+        await seedContact('c1', PHONE);
+        const r = await gate({ contactId: 'c1', roleKind: 'client', classId: 'inspection-reminder' });
+        expect(r).toEqual({ allowed: false, reason: 'no sms consent' });
+    });
+});

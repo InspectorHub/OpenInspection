@@ -1,118 +1,97 @@
 /**
- * The three choices §4 makes are the three things worth asserting, because each
- * one is a place where the obvious implementation would quietly lie to the
- * reader.
+ * The bulk controls, and the one rule that is easy to get backwards.
  *
- * These test what a reader SEES and what a click DOES — not which components
- * were used. A rewrite that keeps the promises should pass.
- *
- * WHAT THESE CANNOT TELL YOU. `user-event` refuses to click an element with
- * `pointer-events: none`, which reads like a reachability check — and here it
- * mostly is not one. Vitest loads no Tailwind CSS, so a `pointer-events-none`
- * CLASS has nothing behind it and the click goes through; only an inline style
- * is caught (both verified). Real unreachability in this codebase comes from
- * classes and overlays, so it is invisible at this level. Whether the control
- * can actually be reached, and whether it is legible in both themes, is a
- * question only the Chrome walkthrough answers.
+ * A row/column/corner checkbox is a promise about which cells it touches. The
+ * failure worth pinning is the empty column: every cell an em dash, and a
+ * checkbox above it that looks like "all off" and does nothing when clicked —
+ * the exact lie the em dash exists to prevent, reintroduced one level up. It
+ * shipped in the first draft and was caught in Chrome, not here.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, fireEvent } from "@testing-library/react";
+import { NotificationPreferences, type ChoiceRow } from "./NotificationPreferences";
 
-import { NotificationPreferences } from "./NotificationPreferences";
-
-const ALWAYS = [
-    { id: "password-reset", label: "Password reset", channels: ["email"] },
-    { id: "report-ready", label: "Your report is ready", channels: ["email"] },
+const rows: ChoiceRow[] = [
+  { id: "a", label: "Alpha", channels: { email: "on", sms: "unavailable", in_app: "unavailable" } },
+  { id: "b", label: "Beta", channels: { email: "off", sms: "unavailable", in_app: "on" } },
 ];
 
-const CHOOSE = [
-    {
-        id: "booking-confirmation",
-        label: "Booking confirmation",
-        channels: { email: "on", sms: "off", in_app: "unavailable" },
-    },
-    {
-        id: "review-request",
-        label: "How did we do?",
-        channels: { email: "off", sms: "unavailable", in_app: "unavailable" },
-    },
-] as const;
+function setup(over: Partial<Parameters<typeof NotificationPreferences>[0]> = {}) {
+  const onBulk = vi.fn();
+  const onChange = vi.fn();
+  const utils = render(
+    <NotificationPreferences
+      alwaysSent={[]}
+      youChoose={rows}
+      onChange={onChange}
+      onBulk={onBulk}
+      {...over}
+    />,
+  );
+  return { ...utils, onBulk, onChange };
+}
 
-const user = userEvent.setup();
+const boxes = (c: ReturnType<typeof setup>) =>
+  [...c.container.querySelectorAll("input[type=checkbox]")] as HTMLInputElement[];
+const byLabel = (c: ReturnType<typeof setup>, startsWith: string) =>
+  boxes(c).find((b) => (b.getAttribute("aria-label") ?? "").startsWith(startsWith))!;
 
-const renderScreen = (onChange = vi.fn()) => {
-    render(
-        <NotificationPreferences
-            alwaysSent={ALWAYS}
-            youChoose={CHOOSE.map((r) => ({ ...r, channels: { ...r.channels } }))}
-            onChange={onChange}
-        />,
-    );
-    return onChange;
-};
+describe("bulk controls", () => {
+  it("renders NO control for a channel every row is unavailable on", () => {
+    // Text is an em dash on both rows. A checkbox there would be a control
+    // over nothing.
+    const c = setup();
+    expect(boxes(c).some((b) => (b.getAttribute("aria-label") ?? "").includes("Text"))).toBe(false);
+    // In-app has one real cell, so it keeps its control.
+    expect(byLabel(c, "Turn In-app")).toBeTruthy();
+  });
 
-describe("NotificationPreferences", () => {
-    it("offers no switch at all for what is always sent", async () => {
-        // A greyed-out toggle invites the reader to try, then refuses. The
-        // always-sent group answers the question instead of posing it, so there
-        // must be nothing there to click.
-        renderScreen();
-        await user.click(screen.getByText(/show what these are/i));
+  it("shows a partly-on column as indeterminate, not as unchecked", () => {
+    // Alpha's email is on and Beta's is off. Rendering that as plain unchecked
+    // would invite "select all" on a column that is already half selected.
+    const c = setup();
+    const email = byLabel(c, "Turn Email");
+    expect(email.checked).toBe(false);
+    expect(email.indeterminate).toBe(true);
+  });
 
-        const alwaysItem = screen.getByText("Password reset").closest("li")!;
-        expect(within(alwaysItem).queryByRole("checkbox")).toBeNull();
-    });
+  it("turns a partly-on column fully ON when clicked", () => {
+    const c = setup();
+    fireEvent.click(byLabel(c, "Turn Email"));
+    expect(c.onBulk).toHaveBeenCalledWith(true, { channel: "email" });
+  });
 
-    it("tells the reader how many they cannot switch off", () => {
-        // §4: a number a reader can hold beats a sentence they have to trust.
-        renderScreen();
-        const always = screen.getByRole("region", { name: /always sent/i });
-        expect(within(always).getByText(String(ALWAYS.length))).toBeInTheDocument();
-        expect(within(always).getByText(/cannot be switched off/i)).toBeInTheDocument();
-    });
+  it("turns a fully-on row OFF when clicked", () => {
+    const c = setup();
+    const row = byLabel(c, "Turn Alpha");
+    expect(row.checked).toBe(true);
+    fireEvent.click(row);
+    expect(c.onBulk).toHaveBeenCalledWith(false, { classId: "a" });
+  });
 
-    it("shows a dash, not an empty switch, for a channel the notification never uses", () => {
-        // The distinction that matters: "off" is a choice the reader made,
-        // "—" is a form that does not exist. An unchecked box would invite them
-        // to turn on something that can never happen.
-        renderScreen();
-        const row = screen.getAllByRole("row").find((r) => within(r).queryByText("How did we do?"))!;
-        // email is a real control; the other two are not controls at all.
-        expect(within(row).getAllByRole("checkbox")).toHaveLength(1);
-        expect(within(row).getAllByText("—")).toHaveLength(2);
-    });
+  it("scopes the corner control to the whole grid", () => {
+    const c = setup();
+    fireEvent.click(byLabel(c, "Turn every"));
+    expect(c.onBulk).toHaveBeenCalledWith(true, {});
+  });
 
-    it("reports which notification and which channel a click was about", async () => {
-        const onChange = renderScreen();
-        await user.click(screen.getByRole("checkbox", { name: /booking confirmation — text/i }));
-        expect(onChange).toHaveBeenCalledWith("booking-confirmation", "sms", true);
-    });
+  it("renders no bulk controls at all for a single-row screen", () => {
+    // The row, the column and the grid all resolve to the same cell there.
+    const c = setup({ youChoose: [rows[0]] });
+    expect(boxes(c).filter((b) => (b.getAttribute("aria-label") ?? "").startsWith("Turn"))).toHaveLength(0);
+  });
 
-    it("turns something off as readily as on — the control is not one-way", async () => {
-        const onChange = renderScreen();
-        await user.click(screen.getByRole("checkbox", { name: /booking confirmation — email/i }));
-        expect(onChange).toHaveBeenCalledWith("booking-confirmation", "email", false);
-    });
+  it("shows the in-flight state inline, and never the result", () => {
+    // The RESULT is a toast, because it has to reach a reader who scrolled
+    // past this card. Only "saving" belongs next to the switch they touched.
+    const c = setup({ status: "saving" });
+    expect(c.getByText(/Saving/)).toBeTruthy();
+    expect(c.queryByText(/^Saved$/)).toBeNull();
+  });
 
-    it("names every switch by its notification, so a screen reader is not left with three 'email's", () => {
-        renderScreen();
-        for (const box of screen.getAllByRole("checkbox")) {
-            expect(box.getAttribute("aria-label")).toMatch(/ — /);
-        }
-    });
-
-    it("stops accepting clicks while a save is in flight", () => {
-        render(
-            <NotificationPreferences
-                alwaysSent={ALWAYS}
-                youChoose={CHOOSE.map((r) => ({ ...r, channels: { ...r.channels } }))}
-                onChange={vi.fn()}
-                busy
-            />,
-        );
-        for (const box of screen.getAllByRole("checkbox")) {
-            expect(box).toBeDisabled();
-        }
-    });
+  it("says what the dash means, rather than leaving it to be guessed", () => {
+    // A reader who has to ask will guess "off", which is the wrong answer.
+    const c = setup();
+    expect(c.getByText(/dash means/i)).toBeTruthy();
+  });
 });

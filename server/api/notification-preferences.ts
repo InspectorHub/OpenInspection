@@ -3,7 +3,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { getDrizzle } from '../lib/route-helpers';
 import { buildScreenModel } from '../lib/notifications/screen-model';
-import { assertChoosable, readChoices, writeChoice } from '../lib/notifications/preference-write';
+import { applyBulk, assertChoosable, readChoices, writeChoice } from '../lib/notifications/preference-write';
 
 /**
  * The signed-in reader's own notification preferences (spec §4).
@@ -41,6 +41,14 @@ const ScreenResponseSchema = z.object({
         })),
     }),
 }).openapi('NotificationPreferencesScreen');
+
+const BulkSchema = z.object({
+    action: z.enum(['enable', 'disable', 'reset'])
+        .describe('enable/disable every cell in scope; reset clears them back to defaults.'),
+    channel: z.enum(['email', 'sms', 'in_app']).optional()
+        .describe('Limit to one channel (a column). Omit with classId for everything.'),
+    classId: z.string().optional().describe('Limit to one notification (a row).'),
+});
 
 const SaveSchema = z.object({
     classId: z.string().describe('The notification class being changed, e.g. review-request.'),
@@ -85,6 +93,25 @@ const saveRoute = createRoute(withMcpMetadata({
         'storing a row that restates the default. A class that is always sent is refused.',
 }, { scopes: ['write'], tier: 'extended' }));
 
+const bulkRoute = createRoute(withMcpMetadata({
+    method: 'put',
+    path: '/notification-preferences/bulk',
+    tags: ['notifications'],
+    summary: 'Change a whole row, column or the entire grid',
+    request: { body: { content: { 'application/json': { schema: BulkSchema } } } },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), stored: z.number() }) } },
+            description: 'Applied. `stored` counts rows that differ from the default.',
+        },
+    },
+    operationId: 'bulkSaveNotificationPreferences',
+    description:
+        'Applies one action to every cell in scope: a row (one notification), a column (one ' +
+        'channel), or everything. Channels a notification never uses are skipped, and ' +
+        'always-sent notifications are never touched.',
+}, { scopes: ['write'], tier: 'extended' }));
+
 const notificationPreferenceRoutes = createApiRouter()
     .openapi(getScreenRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
@@ -111,6 +138,15 @@ const notificationPreferenceRoutes = createApiRouter()
             tenantId, subjectKind: 'user', subjectId: userId, classId, channel, enabled,
         });
         return c.json({ success: true as const }, 200);
+    })
+    .openapi(bulkRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const userId = c.get('user')?.sub as string;
+        const change = c.req.valid('json');
+        const stored = await applyBulk(
+            getDrizzle(c), { tenantId, subjectKind: 'user', subjectId: userId }, 'staff', change,
+        );
+        return c.json({ success: true as const, stored }, 200);
     });
 
 export default notificationPreferenceRoutes;

@@ -78,3 +78,28 @@ export async function saveNotificationChoice(
         ? { success: true, error: null }
         : { success: false, error: m.settings_notifications_error() };
 }
+
+/**
+ * A whole row, column or the entire grid.
+ *
+ * Separate from `saveNotificationChoice` because it is a different request, not
+ * a loop over the single-cell one: N round trips would leave the screen half
+ * changed if any of them failed, and the reader would have no way to tell which.
+ */
+export async function bulkNotificationChoice(
+    api: Api,
+    fd: FormData,
+): Promise<{ success: boolean; error: string | null }> {
+    const channel = String(fd.get("channel") ?? "");
+    const classId = String(fd.get("classId") ?? "");
+    const res = await api.notificationPrefs["notification-preferences"].bulk.$put({
+        json: {
+            action: String(fd.get("action") ?? "enable") as "enable" | "disable" | "reset",
+            ...(channel ? { channel: channel as "email" | "sms" | "in_app" } : {}),
+            ...(classId ? { classId } : {}),
+        },
+    });
+    return res.ok
+        ? { success: true, error: null }
+        : { success: false, error: m.settings_notifications_error() };
+}

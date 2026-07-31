@@ -29,6 +29,7 @@ import { normalizeE164 } from './phone';
 import type { RoleKind } from '../people/role-kinds';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 import { logger } from '../logger';
+import { isPreferenceMuted } from '../notifications/preference-port';
 
 /**
  * Why this message is being sent — and therefore which gates it is exempt from.
@@ -71,6 +72,19 @@ export interface SmsGateArgs {
     /** Consent basis for the recipient. Only consulted when `purpose` is `notification`. */
     roleKind?: RoleKind;
     env?: ManagedSendGateEnv | undefined;
+    /**
+     * WHAT is being sent — a `NOTIFICATION_CLASSES` id.
+     *
+     * Without it this gate cannot consult the recipient's own preference, and
+     * the screen grows a text switch that writes a row nothing reads. Absent ⇒
+     * the send is UNCLASSIFIED and therefore never muted (`isSuppressible`
+     * fails closed), which is the right answer for an admin test send.
+     *
+     * A preference can only ever NARROW what consent already allows (§3.3):
+     * it is checked AFTER consent, never instead of it, so muting a class can
+     * never turn an un-consented number into a sendable one.
+     */
+    classId?: string | undefined;
     /** Absent ⇒ no quota enforcement (standalone, BYO, or a non-quota deployment). */
     quota?: { guard: PlanQuotaGuard; tier: string } | undefined;
 }
@@ -110,7 +124,7 @@ async function contactIdsForPhone(
 }
 
 export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
-    const { db, tenantId, to, purpose, contactId, roleKind, env, quota } = args;
+    const { db, tenantId, to, purpose, contactId, roleKind, env, quota, classId } = args;
 
     // A tenant with no config row is 'platform' — the same default all three
     // chains already used. Wrapped rather than `.catch()`-chained because some
@@ -152,6 +166,19 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
         if (await latestConsent(db, tenantId, contactId) !== 'granted') {
             return { allowed: false, reason: 'no sms consent' };
         }
+    }
+
+    // ── The recipient's own preference, AFTER consent and BEFORE quota.
+    //
+    // After consent because a preference narrows what consent allows and must
+    // never widen it. Before quota because a text nobody wanted must not spend
+    // the tenant's allowance — the same ordering the email boundary uses.
+    if (classId && consultable.length > 0) {
+        const muted = await isPreferenceMuted(
+            db, tenantId, classId, 'sms',
+            consultable.map((id) => ({ kind: 'contact' as const, id })),
+        ).catch(() => false); // Fail OPEN: a failed lookup must not silence a send.
+        if (muted) return { allowed: false, reason: 'recipient switched this off' };
     }
 
     const gate = await managedSendAllowed(db, env ?? {}, tenantId, smsMode);

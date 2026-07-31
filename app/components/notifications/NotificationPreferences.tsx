@@ -59,6 +59,70 @@ export interface NotificationPreferencesProps {
      * a box that merely looks ticked. This is the reply.
      */
     status?: "idle" | "saving" | "saved";
+    /**
+     * Bulk change for one row, one column, or the whole grid.
+     *
+     * The controls sit ON the row and column rather than as loose buttons above
+     * the table, because the reader would otherwise have to work out which
+     * cells each button touched. A header checkbox says it by where it is.
+     *
+     * Omit to render no bulk controls at all — which is what a screen with a
+     * single choosable row should do, since there the one cell IS the control.
+     */
+    onBulk?: (enabled: boolean, scope: { channel?: ChannelId; classId?: string }) => void;
+}
+
+/** All | none | some of the cells in scope are on. `unavailable` never counts. */
+type BulkState = "all" | "none" | "some";
+
+/**
+ * @returns `null` when the scope contains NO selectable cell — a column whose
+ *          every row is an em dash, say. That must render no control at all:
+ *          an empty checkbox there reads as "all off" and does nothing when
+ *          clicked, which is precisely the lie the em dash exists to avoid.
+ */
+function bulkStateOf(
+    rows: ChoiceRow[],
+    scope: { channel?: ChannelId; classId?: string },
+): BulkState | null {
+    const cells: ChannelState[] = [];
+    for (const r of rows) {
+        if (scope.classId && r.id !== scope.classId) continue;
+        for (const c of CHANNELS) {
+            if (scope.channel && c.id !== scope.channel) continue;
+            const st = r.channels[c.id];
+            // An em dash is not a control, so it is not a vote either — a column
+            // whose only rows are unavailable must not read as "all off".
+            if (st !== "unavailable") cells.push(st);
+        }
+    }
+    if (cells.length === 0) return null;
+    if (cells.every((c) => c === "on")) return "all";
+    if (cells.every((c) => c === "off")) return "none";
+    return "some";
+}
+
+function BulkBox({
+    state, label, disabled, onToggle,
+}: {
+    state: BulkState;
+    label: string;
+    disabled: boolean;
+    onToggle: (enabled: boolean) => void;
+}) {
+    return (
+        <Checkbox
+            bare
+            aria-label={label}
+            checked={state === "all"}
+            disabled={disabled}
+            // `indeterminate` is a DOM property, not an attribute — a partially
+            // selected column that rendered as plain unchecked would invite the
+            // reader to "select all" when half of it already was.
+            ref={(el: HTMLInputElement | null) => { if (el) el.indeterminate = state === "some"; }}
+            onChange={() => onToggle(state !== "all")}
+        />
+    );
 }
 
 const CHANNELS: ReadonlyArray<{ id: ChannelId; label: () => string }> = [
@@ -104,8 +168,12 @@ function ChannelCell({
 }
 
 export function NotificationPreferences({
-    alwaysSent, youChoose, onChange, busy = false, status = "idle",
+    alwaysSent, youChoose, onChange, busy = false, status = "idle", onBulk,
 }: NotificationPreferencesProps) {
+    // With one row there is nothing to batch: the row, the column and the grid
+    // all resolve to the same single cell, and three extra controls saying so
+    // is noise.
+    const bulk = onBulk && youChoose.length > 1 ? onBulk : undefined;
     return (
         <div className="space-y-6">
             <section aria-labelledby="notif-always-h" className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
@@ -152,13 +220,11 @@ export function NotificationPreferences({
                     <h2 id="notif-choose-h" className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest">
                         {m.notif_prefs_choose_heading()}
                     </h2>
-                    {/* aria-live so the confirmation reaches a reader who cannot
-                        see the row they just changed. Same words either way —
-                        the switch already said WHAT changed. */}
+                    {/* Only the IN-FLIGHT state lives here. The result is a
+                        toast: it has to reach a reader who has scrolled past
+                        this card, which an inline line cannot. */}
                     <span aria-live="polite" className="text-[12px] text-ih-fg-3 ml-auto">
-                        {status === "saving" ? m.notif_prefs_saving()
-                            : status === "saved" ? m.notif_prefs_saved()
-                                : ""}
+                        {status === "saving" ? m.notif_prefs_saving() : ""}
                     </span>
                 </div>
 
@@ -171,10 +237,34 @@ export function NotificationPreferences({
                     // row is only a visual convenience for everyone else.
                     <div role="table" aria-labelledby="notif-choose-h" className="mt-4">
                         <div role="row" className="hidden sm:grid grid-cols-[1fr_repeat(3,5rem)] gap-2 pb-2 border-b border-ih-border">
-                            <span role="columnheader" />
+                            <span role="columnheader" className="flex items-center gap-2">
+                                {bulk && bulkStateOf(youChoose, {}) && (
+                                    <>
+                                        <BulkBox
+                                            state={bulkStateOf(youChoose, {})!}
+                                            label={m.notif_prefs_bulk_all()}
+                                            disabled={busy}
+                                            onToggle={(enabled) => bulk(enabled, {})}
+                                        />
+                                        <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-wider">
+                                            {m.notif_prefs_bulk_all_short()}
+                                        </span>
+                                    </>
+                                )}
+                            </span>
                             {CHANNELS.map((c) => (
-                                <span key={c.id} role="columnheader" className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-wider text-center">
-                                    {c.label()}
+                                <span key={c.id} role="columnheader" className="flex flex-col items-center gap-1">
+                                    <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-wider">
+                                        {c.label()}
+                                    </span>
+                                    {bulk && bulkStateOf(youChoose, { channel: c.id }) && (
+                                        <BulkBox
+                                            state={bulkStateOf(youChoose, { channel: c.id })!}
+                                            label={m.notif_prefs_bulk_column({ channel: c.label() })}
+                                            disabled={busy}
+                                            onToggle={(enabled) => bulk(enabled, { channel: c.id })}
+                                        />
+                                    )}
                                 </span>
                             ))}
                         </div>
@@ -185,7 +275,17 @@ export function NotificationPreferences({
                                     role="row"
                                     className="py-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_repeat(3,5rem)] sm:items-center"
                                 >
-                                    <span role="rowheader" className="text-[13px] text-ih-fg-1">{row.label}</span>
+                                    <span role="rowheader" className="text-[13px] text-ih-fg-1 flex items-center gap-2">
+                                        {bulk && bulkStateOf(youChoose, { classId: row.id }) && (
+                                            <BulkBox
+                                                state={bulkStateOf(youChoose, { classId: row.id })!}
+                                                label={m.notif_prefs_bulk_row({ notification: row.label })}
+                                                disabled={busy}
+                                                onToggle={(enabled) => bulk(enabled, { classId: row.id })}
+                                            />
+                                        )}
+                                        {row.label}
+                                    </span>
                                     {CHANNELS.map((c) => (
                                         <ChannelCell
                                             key={c.id}
@@ -199,6 +299,10 @@ export function NotificationPreferences({
                                 </div>
                             ))}
                         </div>
+                        {/* The em dash needs saying once. A reader who has to
+                            ask what a symbol means has been left to guess, and
+                            the guess here ("it's off") is the wrong one. */}
+                        <p className="text-[12px] text-ih-fg-4 mt-3">{m.notif_prefs_legend()}</p>
                     </div>
                 )}
             </section>

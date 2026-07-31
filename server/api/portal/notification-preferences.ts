@@ -6,7 +6,7 @@ import { portalSessionGuard } from '../../lib/middleware/portal-session-guard';
 import { getDrizzle } from '../../lib/route-helpers';
 import type { HonoConfig } from '../../types/hono';
 import { buildScreenModel } from '../../lib/notifications/screen-model';
-import { assertChoosable, readChoices, writeChoice } from '../../lib/notifications/preference-write';
+import { applyBulk, assertChoosable, readChoices, writeChoice } from '../../lib/notifications/preference-write';
 import { contactIdsForEmail } from '../../services/notice-inbox';
 import { Errors } from '../../lib/errors';
 
@@ -49,6 +49,13 @@ const SaveSchema = z.object({
     classId: z.string().describe('The notification class being changed, e.g. review-request.'),
     channel: z.enum(['email', 'sms', 'in_app']).describe('Which channel this choice applies to.'),
     enabled: z.boolean().describe('True to receive it again; false to switch it off.'),
+});
+
+const BulkSchema = z.object({
+    action: z.enum(['enable', 'disable', 'reset'])
+        .describe('enable/disable every cell in scope; reset clears them back to defaults.'),
+    channel: z.enum(['email', 'sms', 'in_app']).optional().describe('Limit to one channel (a column).'),
+    classId: z.string().optional().describe('Limit to one notification (a row).'),
 });
 
 function resolveTenantId(c: Context<HonoConfig>): string | null {
@@ -99,8 +106,32 @@ const saveRoute = createRoute(withMcpMetadata({
         'tenant. A choice that matches the class default deletes the row rather than storing it.',
 }, { scopes: [], tier: 'extended' }));
 
+const bulkRoute = createRoute(withMcpMetadata({
+    method: 'put',
+    path: '/{tenant}/notification-preferences/bulk',
+    tags: ['public'],
+    summary: 'Change a whole row, column or the entire grid',
+    request: {
+        params: TenantParam,
+        body: { content: { 'application/json': { schema: BulkSchema } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } },
+            description: 'Applied.',
+        },
+        401: { description: 'No valid portal session cookie' },
+    },
+    operationId: 'portalBulkSaveNotificationPreferences',
+    description:
+        'Applies one action to every cell in scope, against every contact row this session ' +
+        'resolves to. Channels a notification never uses are skipped, and always-sent ' +
+        'notifications are never touched.',
+}, { scopes: [], tier: 'extended' }));
+
 const router = createApiRouter();
 router.use('/:tenant/notification-preferences', portalSessionGuard);
+router.use('/:tenant/notification-preferences/bulk', portalSessionGuard);
 
 const portalNotificationPreferenceRoutes = router
     .openapi(getScreenRoute, async (c) => {
@@ -140,6 +171,19 @@ const portalNotificationPreferenceRoutes = router
             await writeChoice(db, {
                 tenantId, subjectKind: 'contact', subjectId, classId, channel, enabled,
             });
+        }
+        return c.json({ success: true as const }, 200);
+    })
+    .openapi(bulkRoute, async (c) => {
+        const tenantId = resolveTenantId(c);
+        if (!tenantId) throw Errors.NotFound('Company not found.');
+        const change = c.req.valid('json');
+
+        const db = getDrizzle(c);
+        const contactIds = await contactIdsForEmail(db, tenantId, c.get('portalEmail') as string);
+        if (contactIds.length === 0) throw Errors.BadRequest('There is nothing to change here.');
+        for (const subjectId of contactIds) {
+            await applyBulk(db, { tenantId, subjectKind: 'contact', subjectId }, 'client', change);
         }
         return c.json({ success: true as const }, 200);
     });

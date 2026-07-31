@@ -634,6 +634,108 @@
     "description": "Perform mass operations on multiple inspections. (PATCH /bulk, inspections domain)."
   },
   {
+    "operationId": "bulkSaveAgentNotificationPreferences",
+    "method": "PUT",
+    "pathTemplate": "/api/agent/notification-preferences/bulk",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "enable",
+              "disable",
+              "reset"
+            ],
+            "description": "enable/disable every cell in scope; reset clears them back to defaults."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms",
+              "in_app"
+            ],
+            "description": "Limit to one channel (a column)."
+          },
+          "classId": {
+            "type": "string",
+            "description": "Limit to one notification (a row)."
+          },
+          "companyId": {
+            "type": "string",
+            "description": "Tenant id to apply this to. Required unless scope is \"all\"."
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "company",
+              "all"
+            ],
+            "description": "\"all\" applies to every linked company."
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    },
+    "summary": "Change a whole row, column or grid at a company",
+    "description": "Applies one action to every cell in scope at one company, or at every company linked to this agent. Channels a notification never uses are skipped, and always-sent notifications are never touched."
+  },
+  {
+    "operationId": "bulkSaveNotificationPreferences",
+    "method": "PUT",
+    "pathTemplate": "/api/notification-preferences/bulk",
+    "scopes": [
+      "write"
+    ],
+    "tag": "notifications",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "enable",
+              "disable",
+              "reset"
+            ],
+            "description": "enable/disable every cell in scope; reset clears them back to defaults."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms",
+              "in_app"
+            ],
+            "description": "Limit to one channel (a column). Omit with classId for everything."
+          },
+          "classId": {
+            "type": "string",
+            "description": "Limit to one notification (a row)."
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    },
+    "summary": "Change a whole row, column or the entire grid",
+    "description": "Applies one action to every cell in scope: a row (one notification), a column (one channel), or everything. Channels a notification never uses are skipped, and always-sent notifications are never touched."
+  },
+  {
     "operationId": "cancelInspection",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/cancel",
@@ -14397,6 +14499,60 @@
     },
     "summary": "Dismiss (archive) a notice",
     "description": "Archives the notice for this recipient. Never a row deletion, and never a write to automation_logs: a recipient tidying their own inbox cannot edit the sending company's delivery record, which the inspector's Outbox keeps forever."
+  },
+  {
+    "operationId": "portalBulkSaveNotificationPreferences",
+    "method": "PUT",
+    "pathTemplate": "/api/portal/{tenant}/notification-preferences/bulk",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "enable",
+              "disable",
+              "reset"
+            ],
+            "description": "enable/disable every cell in scope; reset clears them back to defaults."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms",
+              "in_app"
+            ],
+            "description": "Limit to one channel (a column)."
+          },
+          "classId": {
+            "type": "string",
+            "description": "Limit to one notification (a row)."
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    },
+    "summary": "Change a whole row, column or the entire grid",
+    "description": "Applies one action to every cell in scope, against every contact row this session resolves to. Channels a notification never uses are skipped, and always-sent notifications are never touched."
   },
   {
     "operationId": "portalExchangeToken",

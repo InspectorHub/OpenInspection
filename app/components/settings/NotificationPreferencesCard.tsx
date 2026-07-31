@@ -5,6 +5,7 @@ import {
   type ChannelId,
   type ChoiceRow,
 } from "~/components/notifications/NotificationPreferences";
+import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -32,14 +33,26 @@ export function NotificationPreferencesCard({
   loadError: string | null;
 }) {
   const fetcher = useFetcher<{ success?: boolean; error?: string; intent?: string }>();
-  const result = fetcher.data?.intent === "save-notification" ? fetcher.data : null;
+  const result = fetcher.data?.intent === "save-notification" || fetcher.data?.intent === "bulk-notification"
+    ? fetcher.data : null;
   const error = result && result.success === false ? result.error : null;
+  useNotificationSaveToast({ data: result, failed: !!error, error });
 
   // "saved" persists after the fetcher goes idle, so the confirmation is still
   // on screen when the reader looks up from the switch they just moved.
-  const status = fetcher.state !== "idle" ? "saving" as const
-    : error ? "idle" as const
-      : fetcher.data ? "saved" as const : "idle" as const;
+  const status = fetcher.state !== "idle" ? "saving" as const : "idle" as const;
+
+  function bulk(enabled: boolean, scope: { channel?: ChannelId; classId?: string }) {
+    fetcher.submit(
+      {
+        intent: "bulk-notification",
+        action: enabled ? "enable" : "disable",
+        ...(scope.channel ? { channel: scope.channel } : {}),
+        ...(scope.classId ? { classId: scope.classId } : {}),
+      },
+      { method: "post" },
+    );
+  }
 
   function save(classId: string, channel: ChannelId, enabled: boolean) {
     fetcher.submit(
@@ -55,7 +68,6 @@ export function NotificationPreferencesCard({
       </p>
       <h2 className="text-sm font-bold text-ih-fg-1 mb-1">{m.settings_notifications_heading()}</h2>
       <p className="text-[13px] text-ih-fg-3 mb-4">{m.settings_notifications_desc()}</p>
-      {error && <p className="text-[12px] text-ih-bad-fg mb-3">{error}</p>}
       {loadError ? (
         // Never render the two counts when the read failed. "0 notifications
         // you cannot switch off" is a confident false answer, and the count is
@@ -68,6 +80,7 @@ export function NotificationPreferencesCard({
           onChange={save}
           busy={fetcher.state !== "idle"}
           status={status}
+          onBulk={bulk}
         />
       )}
     </section>
