@@ -159,7 +159,6 @@ const sendSmsRoutes = createApiRouter()
 
                 await sendOneSms({
                     db,
-                    rawDb,
                     log,
                     inspection: flushInspection,
                     tenant,

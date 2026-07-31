@@ -63,7 +63,6 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
 
             await sendOneSms({
                 db,
-                rawDb: this.db,
                 log,
                 inspection,
                 tenant,

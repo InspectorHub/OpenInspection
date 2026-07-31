@@ -126,6 +126,68 @@ describe('POST /api/message-templates/test-send (SMS) — managed-send gate (Fix
     });
 });
 
+describe('POST /api/message-templates/test-send (SMS) — STOP revocation', () => {
+    /**
+     * Honoring STOP is the one CTIA rule that binds universally — it does not
+     * depend on the basis the first message was sent under, and it does not
+     * care that this particular send is a "test". The real send path has
+     * checked it since `603bd7b6`; this path did not, because it is a second
+     * copy of the chain and the check simply was not there to receive it.
+     *
+     * A test send has no contact, so the check matches the NUMBER — the same
+     * match the inbound STOP webhook makes when it records the revocation.
+     */
+    async function seedRevoked(phone: string) {
+        await db.insert(schema.contacts).values({
+            id: 'c-stop', tenantId: TENANT, type: 'client', name: 'Stopped', phone, createdAt: new Date(),
+        } as never);
+        await db.insert(schema.smsConsentLog).values({
+            id: 'sc-1', tenantId: TENANT, contactId: 'c-stop', recipientType: 'client',
+            action: 'revoked', disclosureVersion: 1, capturedVia: 'admin', createdAt: new Date(),
+        } as never);
+    }
+
+    it('number that texted STOP → blocked, provider never called', async () => {
+        await seedRevoked('+15559991234');
+        const { sendMessage } = stubResolvedProvider();
+
+        const app = buildApp(db, SAAS_PROFILE);
+        const res = await sendReq(app, FAKE_ENV);
+        const body = await res.json() as { success: boolean; error?: string };
+
+        expect(body.success).toBe(false);
+        expect(body.error).toBe('sms opt-out');
+        expect(sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('same number after START → sends again', async () => {
+        await seedRevoked('+15559991234');
+        await db.insert(schema.smsConsentLog).values({
+            id: 'sc-2', tenantId: TENANT, contactId: 'c-stop', recipientType: 'client',
+            action: 'granted', disclosureVersion: 1, capturedVia: 'admin',
+            createdAt: new Date(Date.now() + 1000),
+        } as never);
+        const { sendMessage } = stubResolvedProvider();
+
+        const app = buildApp(db, SAAS_PROFILE);
+        const res = await sendReq(app, FAKE_ENV);
+
+        expect((await res.json() as { success: boolean }).success).toBe(true);
+        expect(sendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('a DIFFERENT number is unaffected when some other contact texted STOP', async () => {
+        await seedRevoked('+15550001111');
+        const { sendMessage } = stubResolvedProvider();
+
+        const app = buildApp(db, SAAS_PROFILE);
+        const res = await sendReq(app, FAKE_ENV);
+
+        expect((await res.json() as { success: boolean }).success).toBe(true);
+        expect(sendMessage).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('POST /api/message-templates/test-send (SMS) — free-tier pre-flight + metering (Fix 3)', () => {
     it('free tenant at 50/50 lifetime sms (platform mode) → 402 QUOTA_EXHAUSTED, provider never called', async () => {
         await new MeteringService(db as unknown as D1Database).record(TENANT, 'sms', '2026-06', 50);

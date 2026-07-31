@@ -1539,6 +1539,51 @@ describe('POST /sms/test — managed-send compliance gate (Task 8)', () => {
 
 // ─── Free-tier pre-flight + source tagging (Task 5) ──────────────────────────
 
+describe('POST /sms/test — STOP revocation', () => {
+    /**
+     * The settings "test connection" send was the third copy of the gate chain,
+     * and copies only carry the gates someone remembered to add. The
+     * STOP-revocation check landed in the real send path alone.
+     *
+     * A test send has no contact, so the check matches the NUMBER — the same
+     * match the inbound STOP webhook makes when recording the revocation.
+     */
+    function stubProvider() {
+        const sendMessage = vi.fn().mockResolvedValue({ ok: true, id: 'SM_stop' });
+        vi.spyOn(resolveTwilioModule, 'loadProviderForTenant').mockResolvedValue({
+            provider: { sendMessage, validateInboundSignature: vi.fn().mockResolvedValue(false) },
+            from: '+15550009999',
+        });
+        return sendMessage;
+    }
+
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('number that texted STOP → blocked, provider never called', async () => {
+        await db.insert(schema.contacts).values({
+            id: 'c-stop', tenantId: TENANT, type: 'client', name: 'Stopped',
+            phone: '+15559991234', createdAt: new Date(),
+        } as never);
+        await db.insert(schema.smsConsentLog).values({
+            id: 'sc-stop', tenantId: TENANT, contactId: 'c-stop', recipientType: 'client',
+            action: 'revoked', disclosureVersion: 1, capturedVia: 'admin', createdAt: new Date(),
+        } as never);
+        const sendMessage = stubProvider();
+
+        const app = buildApp(db, SAAS_PROFILE);
+        const res = await app.request('/api/admin/sms/test', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ to: '+15559991234' }),
+        }, FAKE_ENV, makeExecCtx());
+
+        const body = await res.json() as { success: boolean; error?: string };
+        expect(body.success).toBe(false);
+        expect(body.error).toBe('sms opt-out');
+        expect(sendMessage).not.toHaveBeenCalled();
+    });
+});
+
 describe('POST /sms/test — free-tier pre-flight + source tagging (Task 5)', () => {
     /**
      * Stub the provider-aware loader itself rather than real Twilio creds +
