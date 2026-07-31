@@ -203,6 +203,61 @@ describe('portal API', () => {
         expect(sendClientPortalLogin).not.toHaveBeenCalled();
     });
 
+    /**
+     * A reader who followed "manage your notifications" out of a privacy policy
+     * must come back to the notification settings, not to the inspections list
+     * — otherwise the link in a legal document lands one page short of the thing
+     * it promised, on a page that names no notification at all.
+     *
+     * The destination is an ENUM, never a path. The value is echoed into a link
+     * inside an outbound email, so a free-form field here would be an open
+     * redirect with a delivery mechanism attached.
+     */
+    it('POST /request-link carries destination=notifications into the emailed link', async () => {
+        await seedInspection('insp1');
+        await seedToken('insp1', 'a@x.com', 'client');
+        const app = buildApp();
+        const res = await app.request('/api/portal/acme/request-link', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ email: 'a@x.com', destination: 'notifications' }),
+        }, reqEnv());
+        expect(res.status).toBe(200);
+        expect(sendClientPortalLogin).toHaveBeenCalledWith(
+            'a@x.com',
+            expect.stringContaining('&to=notifications'),
+        );
+    });
+
+    it('POST /request-link defaults to the portal, and refuses a destination that is not one of the two', async () => {
+        await seedInspection('insp1');
+        await seedToken('insp1', 'a@x.com', 'client');
+        const app = buildApp();
+
+        // Omitted → the inspections list, unchanged from before this existed.
+        await app.request('/api/portal/acme/request-link', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ email: 'a@x.com' }),
+        }, reqEnv());
+        expect(sendClientPortalLogin).toHaveBeenCalledWith(
+            'a@x.com',
+            expect.not.stringContaining('&to='),
+        );
+
+        // A path, an absolute URL, a protocol-relative host: all rejected by the
+        // schema before any link is built, so none of them can reach an inbox.
+        for (const destination of ['//evil.example', 'https://evil.example', '/agent-dashboard', 'notifications ']) {
+            const res = await app.request('/api/portal/acme/request-link', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ email: 'a@x.com', destination }),
+            }, reqEnv());
+            expect(res.status, destination).toBe(400);
+        }
+        expect(sendClientPortalLogin).toHaveBeenCalledTimes(1);
+    });
+
     it('POST /request-link returns 404 when the tenant slug is unresolved', async () => {
         const app = buildApp(null);
         const res = await app.request('/api/portal/nope/request-link', {

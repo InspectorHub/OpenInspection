@@ -60,6 +60,11 @@ export default [
     route("portal/:tenant", "routes/public/portal.tsx"),
     route("portal/:tenant/auth", "routes/public/portal-auth.tsx"),
     route("portal/:tenant/i/:inspectionId", "routes/public/portal-inspection.tsx"),
+    // Notification settings as a page of its own, so the privacy policy and the
+    // terms have somewhere to link that names no inspection and assumes no
+    // session (spec §4.1). Signed out, it asks for an email and sends a
+    // one-time link back here — without saying whether the address is known.
+    route("portal/:tenant/notifications", "routes/public/portal-notifications.tsx"),
   ]),
   // Standalone pages (own chrome, no sidebar)
   route("setup", "routes/setup.tsx"),

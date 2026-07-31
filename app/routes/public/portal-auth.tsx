@@ -22,6 +22,29 @@ export function meta() {
   return [{ title: m.portal_auth_meta_title() }];
 }
 
+/**
+ * Where a redeemed link lands.
+ *
+ * A pure function, and separate from the loader, because one of its four
+ * answers is a SECURITY property rather than a routing preference: an
+ * agent-resolved redeem holds `__Host-inspector_token` and no
+ * `__Host-portal_session`, so it must never be handed a `/portal/` path — the
+ * client hub would answer it as an unauthenticated stranger at best, and the
+ * intent of the agent branch is that its report token can never unlock the
+ * client hub at all (server/api/portal.ts redeemRoute).
+ *
+ * `wantsNotifications` is a boolean by the time it arrives here, not a string
+ * and never a path: the caller matches `?to=` against one literal, so there is
+ * nothing for a crafted link to point at.
+ */
+export function redeemDestination(
+  { agent, wantsNotifications, tenant }:
+  { agent: boolean; wantsNotifications: boolean; tenant: string },
+): string {
+  if (agent) return wantsNotifications ? "/agent-settings/profile" : "/agent-dashboard";
+  return wantsNotifications ? `/portal/${tenant}/notifications` : `/portal/${tenant}`;
+}
+
 export async function loader({ params, request, context }: Route.LoaderArgs) {
   const tenant = params.tenant ?? "";
   const url = new URL(request.url);
@@ -29,6 +52,10 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   if (!link) {
     throw redirect(`/portal/${tenant}`);
   }
+  // `to` is matched against a fixed set and never used as a path. It arrives in
+  // a link inside an email, so treating it as one would be an open redirect the
+  // attacker gets to deliver. Anything unrecognised falls to the default.
+  const wantsNotifications = url.searchParams.get("to") === "notifications";
 
   const api = createApi(context);
   try {
@@ -39,10 +66,11 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     if (res.status === 200) {
       const cookie = res.headers.get("set-cookie");
       const body = (await res.json()) as { data?: { email: string; agent?: boolean } };
-      // SECURITY: an agent-resolved redeem set __Host-inspector_token (NOT
-      // __Host-portal_session) — route to the agent dashboard, never the
-      // client hub. See server/api/portal.ts redeemRoute.
-      const destination = body.data?.agent === true ? "/agent-dashboard" : `/portal/${tenant}`;
+      const destination = redeemDestination({
+        agent: body.data?.agent === true,
+        wantsNotifications,
+        tenant,
+      });
       return redirect(destination, {
         headers: cookie ? { "Set-Cookie": cookie } : undefined,
       });

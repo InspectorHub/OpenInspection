@@ -49,6 +49,15 @@ const TenantParam = z.object({
 
 const RequestLinkBody = z.object({
     email: z.string().email().describe('Recipient email address requesting a portal magic-link.'),
+    // An ENUM, deliberately, not a path or a URL. The value is echoed into a
+    // link inside an outbound email, so anything free-form here would be an
+    // open redirect with a delivery mechanism attached. Two named destinations
+    // cost nothing and cannot be pointed anywhere.
+    destination: z.enum(['portal', 'notifications']).optional().describe(
+        'Where the magic-link should land. `portal` (default) = the inspections list; ' +
+        '`notifications` = the notification settings page, for a reader arriving from ' +
+        'the privacy policy or terms.',
+    ),
 });
 
 const RecipientInspectionSchema = z.object({
@@ -300,7 +309,7 @@ const portalRoutes = portalRouter
         const tenantId = resolveTenantId(c);
         if (!tenantId) return c.json({ error: 'Tenant not found' }, 404);
 
-        const { email } = c.req.valid('json');
+        const { email, destination } = c.req.valid('json');
 
         // Look up whether this email has ANY live client/co_client grant in this
         // tenant. Same DB the PortalService reads (mocked to the test DB in unit
@@ -323,7 +332,8 @@ const portalRoutes = portalRouter
                     const token = await signMagicLink(c.env.JWT_SECRET, email);
                     const baseUrl = getBaseUrl(c).replace(/\/$/, '');
                     const slug = c.get('requestedTenantSlug') || '';
-                    const link = `${baseUrl}/portal/${slug}/auth?link=${encodeURIComponent(token)}`;
+                    const to = destination === 'notifications' ? '&to=notifications' : '';
+                    const link = `${baseUrl}/portal/${slug}/auth?link=${encodeURIComponent(token)}${to}`;
                     // The route mints the link; the email service renders the
                     // email. Built here, this was the one account-access mail
                     // with no tenant branding, no class and no editable copy.
