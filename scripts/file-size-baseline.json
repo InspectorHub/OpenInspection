@@ -17,7 +17,7 @@
   "app/routes/template-edit.tsx": 719,
   "server/api/admin/admin-settings.ts": 713,
   "app/components/media-studio/PhotoAnnotator.tsx": 692,
-  "server/index.ts": 688,
+  "server/index.ts": 690,
   "app/hooks/usePhotoOps.ts": 661,
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,
   "app/components/editor/ItemEditor.tsx": 637,

@@ -7435,6 +7435,20 @@
     "description": "Returns the authenticated user's editable profile fields (name, phone, license, slug, photo URL)."
   },
   {
+    "operationId": "getNotificationPreferences",
+    "method": "GET",
+    "pathTemplate": "/api/notification-preferences",
+    "scopes": [],
+    "tag": "notifications",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "What we send this reader, and what they can switch off",
+    "description": "Returns the notifications addressed to the signed-in reader, split into the ones that cannot be switched off and the ones they choose. Channels a class never uses are reported as \"unavailable\", which is not the same as \"off\"."
+  },
+  {
     "operationId": "getPublicBrand",
     "method": "GET",
     "pathTemplate": "/api/public/brand/{tenant}",
@@ -16058,6 +16072,48 @@
     },
     "summary": "Save email template override",
     "description": "Saves a tenant override for an editable email template. Required templates cannot be disabled. Only known block keys are accepted."
+  },
+  {
+    "operationId": "saveNotificationPreference",
+    "method": "PUT",
+    "pathTemplate": "/api/notification-preferences",
+    "scopes": [
+      "write"
+    ],
+    "tag": "notifications",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "classId": {
+            "type": "string",
+            "description": "The notification class being changed, e.g. review-request."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms",
+              "in_app"
+            ],
+            "description": "Which channel this choice applies to: email, sms or in_app."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "True to receive it again (clears the row); false to switch it off."
+          }
+        },
+        "required": [
+          "classId",
+          "channel",
+          "enabled"
+        ]
+      }
+    },
+    "summary": "Switch one notification on or off for one channel",
+    "description": "Records one explicit choice. Turning something back ON deletes the row rather than storing a row that restates the default. A class that is always sent is refused."
   },
   {
     "operationId": "saveUserDefaultSignature",

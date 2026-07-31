@@ -78,6 +78,7 @@ import userRoutes from './api/users';
 import messageRoutes, { inspectorMessageRoutes, clientMessageRoutes } from './api/messages';
 import widgetRoutes from './api/widget';
 import notificationsRoutes from './api/notifications';
+import notificationPreferenceRoutes from './api/notification-preferences';
 import inspectionSyncRoutes from './api/inspection-sync';
 import recommendationsRoutes from './api/recommendations';
 import contractorTypesRoutes from './api/contractor-types';
@@ -424,6 +425,7 @@ const routes = app
   // (inspector) or /api/public (client) now.
   .route('/api/messages', messageRoutes)
   .route('/api/notifications', notificationsRoutes)
+  .route('/api', notificationPreferenceRoutes)   // reader's own preferences (§4)
   .route('/settings/integrations/qbo', qboRoutes)
   .route('/api/integrations/qbo/webhook', qboWebhookRoutes)
   // Stripe webhook, tenant-scoped (SaaS): /api/integrations/stripe/webhook/:tenant
