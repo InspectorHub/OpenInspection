@@ -14,6 +14,7 @@
  * usable behind it).
  */
 import { useRef, useState } from "react";
+import { Link } from "react-router";
 import { Popover } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { NoticeList } from "./NoticeList";
@@ -26,6 +27,7 @@ export function NoticeBell({
   emailComposer,
   showCompany = false,
   emptyBody,
+  settingsHref,
   onOpen,
   onMarkAllRead,
   onDismiss,
@@ -40,6 +42,16 @@ export function NoticeBell({
   emailComposer: boolean;
   showCompany?: boolean;
   emptyBody: string;
+  /**
+   * Where "Notification settings" goes. Optional because not every audience
+   * has that screen yet — a footer link to nothing would be worse than none.
+   *
+   * The bell is the entry point the spec names (§4.1) rather than a nav tab,
+   * and the reason is that this is the one place a reader is already thinking
+   * about what they are being sent. A tab beside the inspection's own sections
+   * would file it as a fact about the inspection, which it is not.
+   */
+  settingsHref?: string;
   /** Fired once per open — reading a list is not always reading its contents,
    *  so the caller decides whether opening marks anything read. */
   onOpen?: () => void;
@@ -113,6 +125,20 @@ export function NoticeBell({
               onRemedy(remedy);
             }}
           />
+          {settingsHref && (
+            // Sticky to the bottom for the same reason the header is sticky to
+            // the top: a reader scrolling a long list must not have to reach
+            // the end of it to find the way out.
+            <div className="sticky bottom-0 border-t border-ih-border bg-ih-bg-card rounded-b-ih-card px-3 py-2">
+              <Link
+                to={settingsHref}
+                onClick={() => setOpen(false)}
+                className="text-[12px] font-semibold text-ih-fg-2 hover:text-ih-fg-1 transition-colors"
+              >
+                {m.notice_panel_settings()}
+              </Link>
+            </div>
+          )}
         </div>
       </Popover>
     </>

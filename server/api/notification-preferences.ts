@@ -1,13 +1,9 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, eq } from 'drizzle-orm';
-import { nanoid } from 'nanoid';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { getDrizzle } from '../lib/route-helpers';
-import { notificationPreferences } from '../lib/db/schema';
 import { buildScreenModel } from '../lib/notifications/screen-model';
-import { isSuppressible, notificationClass } from '../lib/notifications/classes';
-import { Errors } from '../lib/errors';
+import { assertChoosable, readChoices, writeChoice } from '../lib/notifications/preference-write';
 
 /**
  * The signed-in reader's own notification preferences (spec §4).
@@ -17,9 +13,15 @@ import { Errors } from '../lib/errors';
  * mute anyone. The route reads it from the JWT and the body carries only what
  * is being changed.
  *
- * This is the STAFF/AGENT surface — an account holder, so the subject is a
- * `users` row. The client portal has no account and authenticates by token;
- * that surface resolves a `contacts` subject and is its own route.
+ * This is the STAFF surface — an account holder inside one company, so the
+ * subject is a `users` row and the tenant comes from the same JWT.
+ *
+ * The other two audiences cannot share it, and the reason is the same both
+ * times: they have no tenant-scoped `users` row to be the subject. A partner
+ * agent is a GLOBAL account (`users.tenant_id IS NULL`) whose JWT deliberately
+ * carries no tenant, so their preferences are per-company and keyed on the
+ * `contacts` row each company holds — `api/agent/notification-preferences.ts`.
+ * A client has no account at all and authenticates by token.
  */
 
 const ChannelSchema = z.enum(['email', 'sms', 'in_app']);
@@ -89,64 +91,25 @@ const notificationPreferenceRoutes = createApiRouter()
         const userId = c.get('user')?.sub as string;
         const db = getDrizzle(c);
 
-        const rows = await db.select({
-            classId: notificationPreferences.classId,
-            channel: notificationPreferences.channel,
-        }).from(notificationPreferences)
-            .where(and(
-                eq(notificationPreferences.tenantId, tenantId),
-                eq(notificationPreferences.subjectKind, 'user'),
-                eq(notificationPreferences.subjectId, userId),
-                eq(notificationPreferences.enabled, false),
-            )).all();
-
-        // Only the MUTES are read. A row that restates the default would make
-        // the table grow with the user base instead of with the decisions (§3.2).
-        const muted = new Set(rows.map((r) => `${r.classId}:${r.channel}`));
-        const audience = c.get('userRole') === 'agent' ? 'agent' : 'staff';
-        return c.json({ success: true as const, data: buildScreenModel(audience, muted) }, 200);
+        // Only DIFFERENCES from the class default are stored, so this map stays
+        // small — a row that restates the default would make the table grow
+        // with the user base instead of with the decisions (§3.2).
+        const chosen = await readChoices(db, tenantId, 'user', userId);
+        return c.json({ success: true as const, data: buildScreenModel('staff', chosen) }, 200);
     })
     .openapi(saveRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const userId = c.get('user')?.sub as string;
         const { classId, channel, enabled } = c.req.valid('json');
 
-        const cls = notificationClass(classId);
-        if (!cls) throw Errors.BadRequest('Unknown notification.');
         // Refused at the edge as well as at the send boundary. The boundary is
         // what makes it true; this is what makes it HONEST — a screen that
         // accepts the change and then ignores it is worse than one that says no.
-        if (!isSuppressible(classId)) throw Errors.BadRequest('This notification is always sent.');
-        if (!cls.channels.includes(channel)) {
-            throw Errors.BadRequest('This notification is not sent on that channel.');
-        }
-        // Same argument as the two refusals above: a class this reader is never
-        // addressed by cannot take effect for them, and the row would be one
-        // they could never see or clear — the screen does not render it.
-        const audience = c.get('userRole') === 'agent' ? 'agent' : 'staff';
-        if (!cls.audience.includes(audience) || cls.recipientFacing === false) {
-            throw Errors.BadRequest('This notification is not addressed to you.');
-        }
+        assertChoosable(classId, channel, 'staff');
 
-        const db = getDrizzle(c);
-        const where = and(
-            eq(notificationPreferences.tenantId, tenantId),
-            eq(notificationPreferences.subjectKind, 'user'),
-            eq(notificationPreferences.subjectId, userId),
-            eq(notificationPreferences.classId, classId),
-            eq(notificationPreferences.channel, channel),
-        );
-
-        if (enabled) {
-            // Back to the default: delete rather than store `enabled = true`.
-            await db.delete(notificationPreferences).where(where).run();
-        } else {
-            const now = new Date();
-            await db.insert(notificationPreferences).values({
-                id: nanoid(), tenantId, subjectKind: 'user', subjectId: userId,
-                classId, channel, enabled: false, createdAt: now, updatedAt: now,
-            }).onConflictDoNothing().run();
-        }
+        await writeChoice(getDrizzle(c), {
+            tenantId, subjectKind: 'user', subjectId: userId, classId, channel, enabled,
+        });
         return c.json({ success: true as const }, 200);
     });
 

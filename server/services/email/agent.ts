@@ -1,4 +1,3 @@
-import { logger } from '../../lib/logger';
 import type { SignatureUser } from '../../lib/inspector-signature';
 import { escapeHtml, type Constructor } from './base';
 
@@ -114,17 +113,13 @@ export function AgentEmailMixin<TBase extends Constructor>(Base: TBase) {
 
         /**
          * Agent Accounts A2 — notify a partner agent that a new inspection has
-         * been booked under their referral. Gated on `agent.notifyOnReferral`;
+         * been booked under their referral. Muted by the recipient's own preference at the send boundary;
          * when the flag is false the call is a silent no-op (logged).
          */
         async sendNewReferral(
-            agent: { id: string; email: string; name: string | null; notifyOnReferral: boolean },
+            agent: { id: string; email: string; name: string | null },
             params: { propertyAddress: string; clientName: string | null; dashboardUrl: string },
         ): Promise<void> {
-            if (!agent.notifyOnReferral) {
-                logger.debug('email.sendNewReferral.skipped', { agentId: agent.id, reason: 'preference_off' });
-                return;
-            }
             const greet = agent.name ? `Hi ${agent.name},` : 'Hi,';
             const client = params.clientName ? ` for <strong>${params.clientName}</strong>` : '';
             const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
@@ -145,18 +140,14 @@ export function AgentEmailMixin<TBase extends Constructor>(Base: TBase) {
 
         /**
          * Agent Accounts A2 — agent-recipient variant of sendReportReady. Gated
-         * on `agent.notifyOnReport`. Distinct from the inspector-issued
+         * by the recipient's preference at the send boundary. Distinct from the inspector-issued
          * `sendReportReady` (client recipient) so the gating logic stays scoped
          * to the agent path.
          */
         async sendAgentReportReady(
-            agent: { id: string; email: string; name: string | null; notifyOnReport: boolean },
+            agent: { id: string; email: string; name: string | null },
             params: { propertyAddress: string; reportUrl: string },
         ): Promise<void> {
-            if (!agent.notifyOnReport) {
-                logger.debug('email.sendAgentReportReady.skipped', { agentId: agent.id, reason: 'preference_off' });
-                return;
-            }
             const greet = agent.name ? `Hi ${agent.name},` : 'Hi,';
             const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
             <h1 style="color: #4f46e5;">Report ready to read</h1>
@@ -176,17 +167,13 @@ export function AgentEmailMixin<TBase extends Constructor>(Base: TBase) {
 
         /**
          * Agent Accounts A2 — notify a partner agent that an invoice on one of
-         * their referrals has been paid. Gated on `agent.notifyOnPaid` (off by
+         * their referrals has been paid. Off by
          * default — high-noise signal that most agents won't want).
          */
         async sendInvoicePaid(
-            agent: { id: string; email: string; name: string | null; notifyOnPaid: boolean },
+            agent: { id: string; email: string; name: string | null },
             params: { propertyAddress: string; amountCents: number },
         ): Promise<void> {
-            if (!agent.notifyOnPaid) {
-                logger.debug('email.sendInvoicePaid.skipped', { agentId: agent.id, reason: 'preference_off' });
-                return;
-            }
             const dollars = (params.amountCents / 100).toFixed(2);
             const greet = agent.name ? `Hi ${agent.name},` : 'Hi,';
             const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">

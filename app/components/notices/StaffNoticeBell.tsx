@@ -44,6 +44,10 @@ export function StaffNoticeBell() {
 
   return (
     <NoticeBell
+      // A shortcut to the formal home on Settings -> Profile, not a second
+      // place the setting lives. The bell is where a reader is already asking
+      // "what are you all sending me".
+      settingsHref="/settings/profile#notifications"
       notices={data.notices}
       unread={data.unread}
       /* The bell lives in the sidebar, so the panel must open INTO the

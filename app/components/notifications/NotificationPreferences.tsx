@@ -49,6 +49,16 @@ export interface NotificationPreferencesProps {
     onChange: (classId: string, channel: ChannelId, enabled: boolean) => void;
     /** Disables every control while a save is in flight. */
     busy?: boolean;
+    /**
+     * Whether the last change is in flight, landed, or nothing has happened.
+     *
+     * There is no Save button, and that is deliberate: a single switch does not
+     * need one, and adding it would invent the question "did that save?" for an
+     * action that is already one click. But auto-save without a reply invents
+     * the SAME question silently — a reader cannot tell a persisted change from
+     * a box that merely looks ticked. This is the reply.
+     */
+    status?: "idle" | "saving" | "saved";
 }
 
 const CHANNELS: ReadonlyArray<{ id: ChannelId; label: () => string }> = [
@@ -94,7 +104,7 @@ function ChannelCell({
 }
 
 export function NotificationPreferences({
-    alwaysSent, youChoose, onChange, busy = false,
+    alwaysSent, youChoose, onChange, busy = false, status = "idle",
 }: NotificationPreferencesProps) {
     return (
         <div className="space-y-6">
@@ -142,6 +152,14 @@ export function NotificationPreferences({
                     <h2 id="notif-choose-h" className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest">
                         {m.notif_prefs_choose_heading()}
                     </h2>
+                    {/* aria-live so the confirmation reaches a reader who cannot
+                        see the row they just changed. Same words either way —
+                        the switch already said WHAT changed. */}
+                    <span aria-live="polite" className="text-[12px] text-ih-fg-3 ml-auto">
+                        {status === "saving" ? m.notif_prefs_saving()
+                            : status === "saved" ? m.notif_prefs_saved()
+                                : ""}
+                    </span>
                 </div>
 
                 {youChoose.length === 0 ? (

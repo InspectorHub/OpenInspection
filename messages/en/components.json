@@ -151,6 +151,8 @@
   "notif_prefs_always_reason": "We send these because you need them to get into your account, or because they are your record of something you signed or owe. They cannot be switched off.",
   "notif_prefs_always_show": "Show what these are",
   "notif_prefs_choose_heading": "You choose",
+  "notif_prefs_saving": "Saving…",
+  "notif_prefs_saved": "Saved",
   "notif_prefs_choose_empty": "Nothing here yet. When there is something you can switch off, it will appear here.",
   "notif_prefs_channel_email": "Email",
   "notif_prefs_channel_sms": "Text",

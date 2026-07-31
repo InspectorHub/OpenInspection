@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildScreenModel, classesFor } from '../../../server/lib/notifications/screen-model';
 
-const noMutes = new Set<string>();
+const noChoices = new Map<string, boolean>();
 
 describe('notifications screen model', () => {
     it('never shows a reader something they cannot receive', () => {
@@ -38,7 +38,7 @@ describe('notifications screen model', () => {
     });
 
     it('splits into what we always send and what you choose, with nothing in both', () => {
-        const m = buildScreenModel('client', noMutes);
+        const m = buildScreenModel('client', noChoices);
         const always = new Set(m.alwaysSent.map((r) => r.id));
         const choose = new Set(m.youChoose.map((r) => r.id));
         expect([...always].filter((id) => choose.has(id))).toEqual([]);
@@ -51,17 +51,29 @@ describe('notifications screen model', () => {
         // §4: `—` is distinct from "off". A review request has no in-app form;
         // an off-switch for it would be a lie about what exists, and a reader
         // who turned it on would be right to expect something.
-        const row = buildScreenModel('client', noMutes).youChoose.find((r) => r.id === 'review-request')!;
+        const row = buildScreenModel('client', noChoices).youChoose.find((r) => r.id === 'review-request')!;
         expect(row.channels.email).toBe('on');
         expect(row.channels.in_app).toBe('unavailable');
         expect(row.channels.sms).toBe('unavailable');
     });
 
-    it('reads absence as ON, and only an explicit row as off', () => {
-        const on = buildScreenModel('client', noMutes).youChoose.find((r) => r.id === 'booking-confirmation')!;
+    it('reads absence as the CLASS default, which is usually but not always on', () => {
+        // agent-invoice-paid was a column that defaulted to FALSE. The default
+        // moved with the data rather than being quietly dropped, so absence
+        // there means off — and turning it on is what gets stored.
+        const paid = buildScreenModel('agent', noChoices).youChoose.find((r) => r.id === 'agent-invoice-paid')!;
+        expect(paid.channels.email).toBe('off');
+
+        const on = buildScreenModel('agent', new Map([['agent-invoice-paid:email', true]]))
+            .youChoose.find((r) => r.id === 'agent-invoice-paid')!;
+        expect(on.channels.email).toBe('on');
+    });
+
+    it('reads absence as ON for everything else, and only an explicit row as off', () => {
+        const on = buildScreenModel('client', noChoices).youChoose.find((r) => r.id === 'booking-confirmation')!;
         expect(on.channels.email).toBe('on');
 
-        const off = buildScreenModel('client', new Set(['booking-confirmation:email']))
+        const off = buildScreenModel('client', new Map([['booking-confirmation:email', false]]))
             .youChoose.find((r) => r.id === 'booking-confirmation')!;
         expect(off.channels.email).toBe('off');
         // A mute is per CHANNEL — muting email must not silence the text.
@@ -71,7 +83,7 @@ describe('notifications screen model', () => {
     it('cannot be talked into switching off something required', () => {
         // Even with a mute row present. `alwaysSent` carries no state at all,
         // so there is nothing for a stale row to flip.
-        const m = buildScreenModel('client', new Set(['report-ready:email']));
+        const m = buildScreenModel('client', new Map([['report-ready:email', false]]));
         expect(m.alwaysSent.map((r) => r.id)).toContain('report-ready');
         expect(m.youChoose.map((r) => r.id)).not.toContain('report-ready');
     });

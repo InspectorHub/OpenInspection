@@ -43,9 +43,6 @@ export const LeaderboardResponseSchema = createApiResponseSchema(
 export const AgentProfilePatchSchema = z.object({
     slug:             z.string().min(3).max(32).regex(/^[a-z0-9][a-z0-9-]+[a-z0-9]$/).optional().describe('TODO describe slug field for the OpenInspection MCP integration'),
     name:             z.string().min(1).max(120).optional().describe('TODO describe name field for the OpenInspection MCP integration'),
-    notifyOnReferral: z.boolean().optional().describe('TODO describe notifyOnReferral field for the OpenInspection MCP integration'),
-    notifyOnReport:   z.boolean().optional().describe('TODO describe notifyOnReport field for the OpenInspection MCP integration'),
-    notifyOnPaid:     z.boolean().optional().describe('TODO describe notifyOnPaid field for the OpenInspection MCP integration'),
     // Personal display-timezone override (IANA id). Empty string clears it, so
     // referral dates fall back to each inspecting company's timezone. Validated
     // against the runtime Intl database in the service (isValidTimeZone).
@@ -66,9 +63,6 @@ export const AgentProfileResponseSchema = createApiResponseSchema(
         name:             z.string().nullable().describe('TODO describe name field for the OpenInspection MCP integration'),
         email:            z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
         slug:             z.string().nullable().describe('TODO describe slug field for the OpenInspection MCP integration'),
-        notifyOnReferral: z.boolean().describe('TODO describe notifyOnReferral field for the OpenInspection MCP integration'),
-        notifyOnReport:   z.boolean().describe('TODO describe notifyOnReport field for the OpenInspection MCP integration'),
-        notifyOnPaid:     z.boolean().describe('TODO describe notifyOnPaid field for the OpenInspection MCP integration'),
         timezone:         z.string().nullable().describe('Personal display timezone (IANA id), or null to use each company timezone.'),
     }),
 ).openapi('AgentProfileResponse');

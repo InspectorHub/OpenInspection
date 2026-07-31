@@ -65,6 +65,20 @@ export interface NotificationClass {
      */
     recipientFacing?: boolean;
     /**
+     * What "no row" means for this class. Default TRUE — we send unless told
+     * otherwise — and omitted everywhere it is.
+     *
+     * `false` exists because one notification was off by default before this
+     * table did: the agent invoice-paid mail. Without this field, migrating it
+     * had only bad answers — write a mute row for every user (the table then
+     * grows with the user base rather than with the decisions, §3.2), or drop
+     * the default and start sending mail nobody asked for.
+     *
+     * Absence still means "the class default"; this is what the class default
+     * IS.
+     */
+    defaultEnabled?: boolean;
+    /**
      * WHOSE screen this belongs on — §2's "Who" column, made executable.
      *
      * §2 has two columns the code has to honour. "Off?" became `required`;
@@ -134,11 +148,14 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     { id: 'message-notification', label: 'New message from your inspector', category: 'transactional', required: false, channels: ['email', 'in_app'], audience: ['client'] },
     { id: 'agent-share-link',     label: 'Shared report link',      category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
 
-    // ─── agent notifications (spec §2.3) — already recipient-controlled today
-    // via notifyOnReferral / notifyOnReport / notifyOnPaid.
+    // ─── agent notifications (spec §2.3). These were three booleans on `users`
+    // with their own gate in the email service; the columns are retired and the
+    // send boundary is now the only place the choice is read. `agent-invoice-paid`
+    // carries `defaultEnabled: false` because that column defaulted to false —
+    // the default moved with the data rather than being quietly dropped.
     { id: 'agent-new-referral',   label: 'A new referral is booked', category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
     { id: 'agent-report-ready',   label: 'A report is ready to read', category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
-    { id: 'agent-invoice-paid',   label: 'An invoice is paid',      category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
+    { id: 'agent-invoice-paid',   label: 'An invoice is paid',      category: 'transactional', required: false, channels: ['email'], audience: ['agent'], defaultEnabled: false },
 
     // ─── automation rules the tenant did not write (spec §2.2, §2.3, §2.5)
     //
@@ -212,6 +229,11 @@ export function notificationClass(id: string): NotificationClass | undefined {
  * The gate below makes "unknown" a build failure rather than a runtime one, but
  * the runtime default must still be the safe direction.
  */
+/** What "no preference row" means for this class. */
+export function defaultEnabled(id: string): boolean {
+    return BY_ID.get(id)?.defaultEnabled !== false;
+}
+
 export function isSuppressible(id: string): boolean {
     return BY_ID.get(id)?.required === false;
 }

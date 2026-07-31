@@ -26,6 +26,8 @@ import type {
   InvoiceLoaderResult,
   AgreementLoaderResult,
 } from "~/lib/section-loaders";
+import type { NotificationsLoaderResult } from "~/lib/portal-notification-preferences";
+import { PortalNotificationSection } from "~/components/portal/hub/PortalNotificationSection";
 import type { AgentReportContext } from "~/lib/agent-report-context";
 import type { ReportLoaderResult } from "~/components/portal/sections/ReportView";
 import type { LoaderResult as RepairLoaderResult } from "~/components/portal/sections/RepairBuilderSection";
@@ -53,6 +55,7 @@ interface HubSectionSlotProps {
     opts: { category: DocumentCategory; visibility: DocumentVisibility; label?: string },
   ) => void;
   onDelete: (docId: string) => void;
+  notifications: NotificationsLoaderResult | null;
 }
 
 export function HubSectionSlot({
@@ -74,11 +77,20 @@ export function HubSectionSlot({
   docError,
   onUpload,
   onDelete,
+  notifications,
 }: HubSectionSlotProps): React.ReactNode {
   // Build the active section's body (decision B/C). Overview renders the status
   // cards inside the Hub itself; this slot is only used on non-overview tabs.
   let sectionSlot: React.ReactNode = null;
-  if (section === "documents") {
+  if (section === "notifications" && notifications) {
+    sectionSlot = (
+      <PortalNotificationSection
+        alwaysSent={notifications.alwaysSent}
+        youChoose={notifications.youChoose}
+        error={notifications.error}
+      />
+    );
+  } else if (section === "documents") {
     sectionSlot = (
       <DocumentsSection
         items={documents ?? []}

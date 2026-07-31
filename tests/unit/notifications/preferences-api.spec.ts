@@ -24,6 +24,14 @@ import notificationPreferenceRoutes from '../../../server/api/notification-prefe
 const TENANT = 't-prefs-api';
 const ME = 'u-me';
 const SOMEONE_ELSE = 'u-other';
+/**
+ * The ONLY staff notification that is not required. That is a fact about the
+ * vocabulary, not about this test: everything else staff receive is either
+ * account access, a money record, or office dispatch that an individual is not
+ * allowed to silence for themselves (§2.5). If a second one ever appears, this
+ * constant is where a reader will look to find out.
+ */
+const MUTABLE = 'concierge-inspector-review';
 
 let db: BetterSQLite3Database<typeof schema>;
 let sqlite: { close: () => void };
@@ -69,8 +77,8 @@ describe('PUT /api/notification-preferences', () => {
     it('writes the mute against the SIGNED-IN reader, whatever the body says', async () => {
         // The body carries what changed, never who. Accepting a subject id here
         // would let anyone silence anyone.
-        const res = await put(buildApp('agent'), {
-            classId: 'agent-new-referral', channel: 'email', enabled: false,
+        const res = await put(buildApp(), {
+            classId: MUTABLE, channel: 'email', enabled: false,
             subjectId: SOMEONE_ELSE, userId: SOMEONE_ELSE,
         });
         expect(res.status).toBe(200);
@@ -112,18 +120,18 @@ describe('PUT /api/notification-preferences', () => {
     it('DELETES the row when switched back on, rather than storing the default', async () => {
         // §3.2 — never store a row that merely restates the default; it makes
         // the table grow with the user base instead of with the decisions.
-        const app = buildApp('agent');
-        await put(app, { classId: 'agent-new-referral', channel: 'email', enabled: false });
+        const app = buildApp();
+        await put(app, { classId: MUTABLE, channel: 'email', enabled: false });
         expect(await rows()).toHaveLength(1);
 
-        await put(app, { classId: 'agent-new-referral', channel: 'email', enabled: true });
+        await put(app, { classId: MUTABLE, channel: 'email', enabled: true });
         expect(await rows()).toHaveLength(0);
     });
 
     it('is idempotent — muting twice leaves one row, not two', async () => {
-        const app = buildApp('agent');
-        await put(app, { classId: 'agent-new-referral', channel: 'email', enabled: false });
-        await put(app, { classId: 'agent-new-referral', channel: 'email', enabled: false });
+        const app = buildApp();
+        await put(app, { classId: MUTABLE, channel: 'email', enabled: false });
+        await put(app, { classId: MUTABLE, channel: 'email', enabled: false });
         expect(await rows()).toHaveLength(1);
     });
 });
@@ -132,38 +140,39 @@ describe('GET /api/notification-preferences', () => {
     const get = (app: OpenAPIHono<HonoConfig>) =>
         app.request('/api/notification-preferences', {}, { DB: {} });
 
-    it('reports a mute this reader holds as off, and leaves the rest on', async () => {
-        const app = buildApp('agent');
-        await put(app, { classId: 'agent-new-referral', channel: 'email', enabled: false });
+    it('reports a mute this reader holds as off', async () => {
+        const app = buildApp();
+        await put(app, { classId: MUTABLE, channel: 'email', enabled: false });
 
         const body = await (await get(app)).json() as {
             data: { youChoose: Array<{ id: string; channels: Record<string, string> }> };
         };
-        const row = body.data.youChoose.find((r) => r.id === 'agent-new-referral')!;
-        expect(row.channels.email).toBe('off');
-        const other = body.data.youChoose.find((r) => r.id === 'agent-report-ready')!;
-        expect(other.channels.email).toBe('on');
+        expect(body.data.youChoose.find((r) => r.id === MUTABLE)!.channels.email).toBe('off');
     });
 
     it('does not show one reader another reader’s choices', async () => {
         await db.insert(schema.notificationPreferences).values({
             id: 'np-theirs', tenantId: TENANT, subjectKind: 'user', subjectId: SOMEONE_ELSE,
-            classId: 'agent-new-referral', channel: 'email', enabled: false,
+            classId: MUTABLE, channel: 'email', enabled: false,
             createdAt: new Date(), updatedAt: new Date(),
         } as never);
 
-        const body = await (await get(buildApp('agent'))).json() as {
+        const body = await (await get(buildApp())).json() as {
             data: { youChoose: Array<{ id: string; channels: Record<string, string> }> };
         };
-        expect(body.data.youChoose.find((r) => r.id === 'agent-new-referral')!.channels.email).toBe('on');
+        expect(body.data.youChoose.find((r) => r.id === MUTABLE)!.channels.email).toBe('on');
     });
 
-    it('shows an agent the agent list and staff the staff list', async () => {
-        const staff = await (await get(buildApp('owner'))).json() as { data: { alwaysSent: Array<{ id: string }> } };
-        const agent = await (await get(buildApp('agent'))).json() as { data: { youChoose: Array<{ id: string }> } };
-
-        expect(staff.data.alwaysSent.map((r) => r.id)).toContain('workspace-invitation');
-        expect(agent.data.youChoose.map((r) => r.id)).toContain('agent-new-referral');
-        expect(agent.data.youChoose.map((r) => r.id)).not.toContain('review-request');
+    it('shows the STAFF list, and never another audience’s', async () => {
+        // This route is the staff surface, full stop. An agent's JWT carries no
+        // tenant at all, so the old "read the role and pick an audience" line
+        // could only ever have been answering for a caller that cannot reach
+        // here — and would have written rows under an undefined tenant.
+        const body = await (await get(buildApp())).json() as {
+            data: { alwaysSent: Array<{ id: string }>; youChoose: Array<{ id: string }> };
+        };
+        expect(body.data.alwaysSent.map((r) => r.id)).toContain('workspace-invitation');
+        expect(body.data.youChoose.map((r) => r.id)).toEqual([MUTABLE]);
+        expect(body.data.youChoose.map((r) => r.id)).not.toContain('agent-new-referral');
     });
 });

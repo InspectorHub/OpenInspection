@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, inArray, or } from 'drizzle-orm';
 import { contacts, notificationPreferences, users } from '../db/schema';
-import { isSuppressible } from './classes';
+import { defaultEnabled, isSuppressible } from './classes';
 
 /**
  * The send-path preference port. `EmailService` asks it, per recipient, whether
@@ -46,7 +46,8 @@ export async function isPreferenceMuted(
     subjects: PreferenceSubject[],
 ): Promise<boolean> {
     if (!isSuppressible(classId)) return false;
-    if (subjects.length === 0) return false;
+    // No subject to consult: fall back to what the class itself defaults to.
+    if (subjects.length === 0) return !defaultEnabled(classId);
 
     const byKind = (kind: 'user' | 'contact') =>
         subjects.filter((s) => s.kind === kind).map((s) => s.id);
@@ -69,12 +70,13 @@ export async function isPreferenceMuted(
             eq(notificationPreferences.classId, classId),
             eq(notificationPreferences.channel, channel),
             match.length === 1 ? match[0] : or(...match),
-            eq(notificationPreferences.enabled, false),
         ))
         .get();
 
-    // Absence is not "off": no row means the class default applies.
-    return !!row;
+    // Absence means the CLASS default, which is usually "send" but is not
+    // always — see `defaultEnabled`. An explicit row always wins over it.
+    if (!row) return !defaultEnabled(classId);
+    return row.enabled === false;
 }
 
 /**

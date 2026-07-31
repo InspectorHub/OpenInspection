@@ -1,4 +1,4 @@
-import { NOTIFICATION_CLASSES, type Audience, type NotificationClass } from './classes';
+import { NOTIFICATION_CLASSES, defaultEnabled, type Audience, type NotificationClass } from './classes';
 
 /**
  * What one reader sees on the notifications screen (spec §4).
@@ -46,12 +46,13 @@ export function classesFor(audience: Audience): NotificationClass[] {
 }
 
 /**
- * @param muted  `${classId}:${channel}` for every explicit `enabled = false`
- *               row this subject holds. ABSENCE IS NOT "OFF" — a class with no
- *               row is on, which is why this takes the mutes rather than the
- *               full preference set.
+ * @param chosen  `${classId}:${channel}` → the explicit choice this subject
+ *                stored, for the rows they actually hold. A class with NO entry
+ *                falls back to its own default, which is usually "send" but is
+ *                not always — see `defaultEnabled`. Only differences from the
+ *                default are stored, so this map stays small (§3.2).
  */
-export function buildScreenModel(audience: Audience, muted: ReadonlySet<string>): ScreenModel {
+export function buildScreenModel(audience: Audience, chosen: ReadonlyMap<string, boolean>): ScreenModel {
     const visible = classesFor(audience);
     return {
         alwaysSent: visible
@@ -65,7 +66,7 @@ export function buildScreenModel(audience: Audience, muted: ReadonlySet<string>)
                 channels: Object.fromEntries(CHANNELS.map((ch) => [
                     ch,
                     !c.channels.includes(ch) ? 'unavailable'
-                        : muted.has(`${c.id}:${ch}`) ? 'off' : 'on',
+                        : (chosen.get(`${c.id}:${ch}`) ?? defaultEnabled(c.id)) ? 'on' : 'off',
                 ])) as ScreenRow['channels'],
             })),
     };

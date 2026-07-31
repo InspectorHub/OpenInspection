@@ -14,6 +14,8 @@ import { createRoutesStub } from "react-router";
 
 const profileGet = vi.fn();
 const profilePost = vi.fn();
+const prefsGet = vi.fn();
+const prefsPut = vi.fn();
 
 vi.mock("~/lib/session.server", () => ({
   requireToken: vi.fn(async () => "tok-test"),
@@ -23,6 +25,11 @@ vi.mock("~/lib/api-client.server", () => ({
   createApi: vi.fn(() => ({
     agent: {
       profile: { $get: profileGet, $post: profilePost },
+    },
+    // Its own per-module client: the preferences router mounts at /api/agent,
+    // a prefix `agent` already owns, so it cannot share that client.
+    agentNotificationPrefs: {
+      "notification-preferences": { $get: prefsGet, $put: prefsPut },
     },
   })),
 }));
@@ -37,9 +44,9 @@ function jsonRes(body: unknown, ok = true) {
   return { ok, json: async () => body } as unknown as Response;
 }
 
-function loaderArgs(): LoaderArgs {
+function loaderArgs(search = ""): LoaderArgs {
   return {
-    request: new Request("http://app.example.com/agent-settings/profile"),
+    request: new Request(`http://app.example.com/agent-settings/profile${search}`),
     context: {} as never,
     params: {},
   } as unknown as LoaderArgs;
@@ -62,15 +69,40 @@ const SAMPLE_AGENT = {
   name: "Jane",
   email: "jane@x.com",
   slug: "jane",
-  notifyOnReferral: true,
-  notifyOnReport: false,
-  notifyOnPaid: true,
   timezone: "America/New_York",
+};
+
+/**
+ * Two companies, because one is the case that hides the bug: with a single
+ * company the selector, the "apply to all" checkbox and the per-company write
+ * all look the same as a global setting.
+ */
+const SAMPLE_SCREEN = {
+  companies: [
+    { id: "t-acme", name: "Acme Inspections" },
+    { id: "t-bolt", name: "Bolt Home Services" },
+  ],
+  selected: "t-acme",
+  alwaysSent: [{ id: "agent-login-link", label: "Sign-in link", channels: ["email"] }],
+  youChoose: [
+    {
+      id: "agent-new-referral",
+      label: "A new referral is booked",
+      channels: { email: "on", sms: "unavailable", in_app: "unavailable" },
+    },
+    {
+      id: "agent-report-ready",
+      label: "A report is ready to read",
+      channels: { email: "off", sms: "unavailable", in_app: "unavailable" },
+    },
+  ],
 };
 
 beforeEach(() => {
   profileGet.mockReset().mockResolvedValue(jsonRes({ data: SAMPLE_AGENT }));
   profilePost.mockReset().mockResolvedValue(jsonRes({ data: { ok: true } }));
+  prefsGet.mockReset().mockResolvedValue(jsonRes({ data: SAMPLE_SCREEN }));
+  prefsPut.mockReset().mockResolvedValue(jsonRes({ success: true, applied: 1 }));
 });
 
 describe("agent settings-profile loader", () => {
@@ -83,11 +115,26 @@ describe("agent settings-profile loader", () => {
   it("degrades to safe defaults when the GET fails", async () => {
     profileGet.mockResolvedValue(jsonRes(null, false));
     const data = await loader(loaderArgs());
-    expect(data.agent).toEqual({
-      name: null, email: "", slug: null,
-      notifyOnReferral: true, notifyOnReport: true, notifyOnPaid: false,
-      timezone: null,
-    });
+    expect(data.agent).toEqual({ name: null, email: "", slug: null, timezone: null });
+  });
+
+  it("reads the notification screen for the company named in the URL", async () => {
+    await loader(loaderArgs("?company=t-bolt"));
+    expect(prefsGet).toHaveBeenCalledWith({ query: { companyId: "t-bolt" } });
+  });
+
+  it("lets the server pick the company when the URL names none", async () => {
+    await loader(loaderArgs());
+    expect(prefsGet).toHaveBeenCalledWith({ query: {} });
+  });
+
+  it("degrades to an empty screen rather than failing the page", async () => {
+    // A notification read that 500s must not take the slug and timezone cards
+    // down with it — they are a different subject entirely.
+    prefsGet.mockResolvedValue(jsonRes(null, false));
+    const data = await loader(loaderArgs());
+    expect(data.notifications.companies).toEqual([]);
+    expect(data.agent.slug).toBe("jane");
   });
 });
 
@@ -106,17 +153,37 @@ describe("agent settings-profile action", () => {
     expect(res).toMatchObject({ ok: false, intent: "save-slug", error: "Slug already taken" });
   });
 
-  it("intent=save-notifications posts all three toggles", async () => {
+  it("intent=save-notifications names the class, the channel and the company", async () => {
     const res = await action(actionArgs({
       intent: "save-notifications",
-      notifyOnReferral: "false",
-      notifyOnReport: "true",
-      notifyOnPaid: "true",
+      classId: "agent-new-referral",
+      channel: "email",
+      enabled: "false",
+      scope: "company",
+      companyId: "t-acme",
     }));
-    expect(profilePost).toHaveBeenCalledWith({
-      json: { notifyOnReferral: false, notifyOnReport: true, notifyOnPaid: true },
+    expect(prefsPut).toHaveBeenCalledWith({
+      json: {
+        classId: "agent-new-referral", channel: "email", enabled: false,
+        scope: "company", companyId: "t-acme",
+      },
     });
     expect(res).toMatchObject({ ok: true, intent: "save-notifications" });
+  });
+
+  it("intent=save-notifications with scope=all sends no company at all", async () => {
+    // Sending a companyId alongside scope=all would be two answers to one
+    // question, and the server would have to decide which one meant it.
+    await action(actionArgs({
+      intent: "save-notifications",
+      classId: "agent-new-referral", channel: "email", enabled: "false",
+      scope: "all", companyId: "t-acme",
+    }));
+    expect(prefsPut).toHaveBeenCalledWith({
+      json: {
+        classId: "agent-new-referral", channel: "email", enabled: false, scope: "all",
+      },
+    });
   });
 
   it("intent=save-timezone posts the chosen IANA zone", async () => {
@@ -139,36 +206,80 @@ describe("agent settings-profile action", () => {
  */
 describe("AgentSettingsProfilePage rendering", () => {
   function renderPage(opts: {
-    agent?: typeof SAMPLE_AGENT;
+    notifications?: typeof SAMPLE_SCREEN | { companies: []; selected: null; alwaysSent: []; youChoose: [] };
     action?: (args: { request: Request }) => unknown;
   } = {}) {
     const Stub = createRoutesStub([
       {
         path: "/agent-settings/profile",
         Component: AgentSettingsProfilePage,
-        loader: () => ({ agent: opts.agent ?? SAMPLE_AGENT }),
+        loader: () => ({
+          agent: SAMPLE_AGENT,
+          notifications: opts.notifications ?? SAMPLE_SCREEN,
+        }),
         action: opts.action ?? (async () => ({ ok: true, intent: "save-slug", error: undefined })),
       },
     ]);
     return render(<Stub initialEntries={["/agent-settings/profile"]} />);
   }
 
-  it("seeds the slug input and toggle states from loader data", async () => {
-    const { findByDisplayValue, getByText } = renderPage();
+  it("seeds the slug input from loader data", async () => {
+    const { findByDisplayValue } = renderPage();
     await findByDisplayValue("jane");
-    // notifyOnReferral: true, notifyOnReport: false, notifyOnPaid: true — just
-    // assert the section renders with the loader-seeded titles (state itself
-    // is covered by the switch aria-checked assertions below).
+  });
+
+  it("names the company whose settings are on screen", async () => {
+    // The whole card is one company's answer. A reader who cannot see which
+    // company they are editing is one click from silencing the wrong firm.
+    // A <select>'s display value is the option TEXT — which is also the only
+    // thing the reader can act on.
+    const { findByDisplayValue } = renderPage();
+    await findByDisplayValue("Acme Inspections");
+  });
+
+  it("shows a switched-off notification as unchecked, and an off-channel as neither", async () => {
+    const { findAllByRole, getByText } = renderPage();
+    const boxes = await findAllByRole("checkbox") as HTMLInputElement[];
+    // agent-new-referral email = on, agent-report-ready email = off. The two
+    // rows contribute one checkbox each; the sms/in_app cells are em dashes,
+    // which is what "unavailable" must look like — NOT an unchecked box.
+    const notifBoxes = boxes.filter((b) => (b.getAttribute("aria-label") ?? "").includes("—"));
+    expect(notifBoxes.map((b) => b.checked)).toEqual([true, false]);
     expect(getByText("A new referral is booked")).toBeTruthy();
   });
 
-  it("reflects notifyOnReport=false as an unchecked switch", async () => {
-    const { findAllByRole } = renderPage();
-    const switches = await findAllByRole("switch");
-    // Order: referral, report, paid.
-    expect(switches[0].getAttribute("aria-checked")).toBe("true");
-    expect(switches[1].getAttribute("aria-checked")).toBe("false");
-    expect(switches[2].getAttribute("aria-checked")).toBe("true");
+  it("submits the class, the channel and the flipped value on click", async () => {
+    const submitted: Record<string, FormDataEntryValue | null>[] = [];
+    const { findAllByRole } = renderPage({
+      action: async ({ request }) => {
+        const fd = await request.formData();
+        submitted.push({
+          intent: fd.get("intent"), classId: fd.get("classId"),
+          channel: fd.get("channel"), enabled: fd.get("enabled"),
+          scope: fd.get("scope"), companyId: fd.get("companyId"),
+        });
+        return { ok: true, intent: "save-notifications", error: undefined };
+      },
+    });
+
+    const boxes = await findAllByRole("checkbox") as HTMLInputElement[];
+    const referral = boxes.find((b) => (b.getAttribute("aria-label") ?? "").startsWith("A new referral"))!;
+    fireEvent.click(referral);
+
+    await waitFor(() => expect(submitted.length).toBeGreaterThan(0));
+    expect(submitted[0]).toEqual({
+      intent: "save-notifications", classId: "agent-new-referral",
+      channel: "email", enabled: "false", scope: "company", companyId: "t-acme",
+    });
+  });
+
+  it("says something useful when no company has added this agent yet", async () => {
+    // An empty screen is an invitation, not a blank card: it says who makes
+    // the next move, which is not the agent.
+    const { findByText } = renderPage({
+      notifications: { companies: [], selected: null, alwaysSent: [], youChoose: [] },
+    });
+    await findByText(/No companies yet/i);
   });
 
   it("clicking Save slug submits the fetcher with the typed slug", async () => {
@@ -198,34 +309,5 @@ describe("AgentSettingsProfilePage rendering", () => {
     fireEvent.click(getByText("Save slug"));
 
     await findByText("Slug already taken");
-  });
-
-  it("clicking a notification toggle submits save-notifications with the flipped value", async () => {
-    const submitted: Record<string, FormDataEntryValue | null>[] = [];
-    const { findAllByRole } = renderPage({
-      action: async ({ request }) => {
-        const fd = await request.formData();
-        submitted.push({
-          intent: fd.get("intent"),
-          notifyOnReferral: fd.get("notifyOnReferral"),
-          notifyOnReport: fd.get("notifyOnReport"),
-          notifyOnPaid: fd.get("notifyOnPaid"),
-        });
-        return { ok: true, intent: "save-notifications", error: undefined };
-      },
-    });
-
-    // Order: referral (true), report (false), paid (true). Flip the second
-    // switch (notifyOnReport: false -> true); the other two stay unchanged.
-    const switches = await findAllByRole("switch");
-    fireEvent.click(switches[1]);
-
-    await waitFor(() => expect(submitted.length).toBeGreaterThan(0));
-    expect(submitted[0]).toEqual({
-      intent: "save-notifications",
-      notifyOnReferral: "true",
-      notifyOnReport: "true",
-      notifyOnPaid: "true",
-    });
   });
 });

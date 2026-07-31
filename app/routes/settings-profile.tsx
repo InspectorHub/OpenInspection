@@ -17,6 +17,8 @@ import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
 import { LOCALE_OPTIONS } from "~/lib/locales";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { CredentialsEditor, type EditorCredential } from "~/components/settings/CredentialsEditor";
+import { NotificationPreferencesCard } from "~/components/settings/NotificationPreferencesCard";
+import { loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -43,13 +45,14 @@ interface Profile {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const [res, credRes] = await Promise.all([
+  const [res, credRes, notifications] = await Promise.all([
     api.profile.index.$get(),
     api.credentials.index.$get(),
+    loadNotificationScreen(api),
   ]);
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
   const credBody = credRes.ok ? ((await credRes.json()) as { data?: EditorCredential[] }) : { data: [] };
-  return { profile: (body.data ?? {}) as Profile, credentials: credBody.data ?? [] };
+  return { profile: (body.data ?? {}) as Profile, credentials: credBody.data ?? [], notifications };
 }
 
 /* ------------------------------------------------------------------ */
@@ -61,6 +64,10 @@ export async function action({ request, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
   const fd = await request.formData();
   const intent = fd.get("intent") as string | null;
+
+  if (intent === "save-notification") {
+    return { ...(await saveNotificationChoice(api, fd)), intent };
+  }
 
   // Handle save-signature intent from the SignaturePad fetcher
   if (intent === "save-signature") {
@@ -159,7 +166,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function SettingsProfilePage() {
-  const { profile, credentials } = useLoaderData<typeof loader>();
+  const { profile, credentials, notifications } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [avatarSource, setAvatarSource] = useState<string | null>(null);
   // DB-12 / IA-26 — useSessionContext / tenantSlug removed; slug section gone.
@@ -253,6 +260,7 @@ export default function SettingsProfilePage() {
     { id: "signature", label: m.settings_profile_signature_heading() },
     { id: "saved-signature", label: m.settings_profile_saved_signature_heading() },
     { id: "credentials", label: m.settings_profile_credentials_heading() },
+    { id: "notifications", label: m.settings_notifications_eyebrow() },
   ];
 
   return (
@@ -484,6 +492,14 @@ export default function SettingsProfilePage() {
         onDelete={onCredDelete}
         onUpload={onCredUpload}
       />
+
+      <div id="notifications">
+        <NotificationPreferencesCard
+          alwaysSent={notifications.alwaysSent}
+          youChoose={notifications.youChoose}
+          loadError={notifications.error}
+        />
+      </div>
 
       {avatarSource && (
         <AvatarCropper

@@ -91,6 +91,7 @@ import inspectionRequestsRoutes from './api/inspection-requests';
 import repairBuilderRoutes from './api/repair-builder';
 import portalRoutes from './api/portal';
 import portalNoticeRoutes from './api/portal/notices';
+import portalNotificationPreferenceRoutes from './api/portal/notification-preferences';
 import tagsRoutes, { inspectionTagRoutes } from './api/tags';
 import publicSlugRoutes from './api/public-slug';
 import publicShareRoutes from './api/public-share';
@@ -359,6 +360,8 @@ const routes = app
   .route('/api/portal', portalRoutes)
   // C3 — the client's Notices inbox, its own module under the same prefix.
   .route('/api/portal', portalNoticeRoutes)
+  // The client's own notification settings (§4.1) — same portal-session auth.
+  .route('/api/portal', portalNotificationPreferenceRoutes)
   .route('/api/admin', adminRoutes)
   // Branding sub-router — extracted to fix hono/client type-collapse (C-10)
   .route('/api/admin', adminBrandingRoutes)
