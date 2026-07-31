@@ -146,5 +146,14 @@
   "link_expiry_unit_months": "months",
   "link_expiry_unit_years": "years",
   "link_expiry_preview_never": "Report links keep working until you reset or remove them.",
-  "link_expiry_preview_date": "A link created today would stop working on {date}."
+  "link_expiry_preview_date": "A link created today would stop working on {date}.",
+  "notif_prefs_always_heading": "Always sent",
+  "notif_prefs_always_reason": "We send these because you need them to get into your account, or because they are your record of something you signed or owe. They cannot be switched off.",
+  "notif_prefs_always_show": "Show what these are",
+  "notif_prefs_choose_heading": "You choose",
+  "notif_prefs_choose_empty": "Nothing here yet. When there is something you can switch off, it will appear here.",
+  "notif_prefs_channel_email": "Email",
+  "notif_prefs_channel_sms": "Text",
+  "notif_prefs_channel_in_app": "In-app",
+  "notif_prefs_channel_unavailable": "Not sent by {channel}"
 }
