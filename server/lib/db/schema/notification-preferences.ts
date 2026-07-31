@@ -37,7 +37,10 @@ export const notificationPreferences = sqliteTable('notification_preferences', {
     /** A `NOTIFICATION_CLASSES` id. Not a template trigger — those are a subset. */
     classId:     text('class_id').notNull(),
     channel:     text('channel', { enum: ['email', 'sms', 'in_app'] }).notNull(),
-    enabled:     integer('enabled', { mode: 'boolean' }).notNull(),
+    // DB column is `is_enabled` per the naming rule; the drizzle property stays
+    // `enabled` so every call site and the API field keep reading as the plain
+    // English question they answer.
+    enabled:     integer('is_enabled', { mode: 'boolean' }).notNull(),
     createdAt:   integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt:   integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
