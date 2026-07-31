@@ -283,7 +283,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
             data-testid="pick-button"
             disabled={pickDisabled}
             onClick={() => inputRef.current?.click()}
-            className="min-h-[44px] w-full rounded-xl bg-ih-primary px-5 text-[14px] font-bold text-white hover:bg-ih-primary-600 disabled:opacity-50"
+            className="min-h-[44px] w-full rounded-xl bg-ih-primary px-5 text-[14px] font-bold text-ih-fg-inverse hover:bg-ih-primary-600 disabled:opacity-50"
           >
             {m.media_video_pick()}
           </button>

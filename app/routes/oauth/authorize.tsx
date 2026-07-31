@@ -371,7 +371,7 @@ export function ConsentForm({
               type="submit"
               data-testid="oauth-authorize-submit"
               disabled={submitting}
-              className="flex-1 py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 py-2.5 rounded-lg bg-ih-primary text-ih-fg-inverse font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {submitting ? m.oauth_authorize_submit_pending() : m.oauth_authorize_submit()}
             </button>

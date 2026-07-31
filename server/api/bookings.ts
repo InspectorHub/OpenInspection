@@ -16,7 +16,6 @@
 // `/api/public` unchanged.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, inArray } from 'drizzle-orm';
 import { users, services as servicesTable, tenants, availability, tenantConfigs } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
@@ -29,6 +28,7 @@ import {
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import createBookingRoutes from './bookings/create';
 import agreementRoutes from './bookings/agreement';
+import { getDrizzle } from '../lib/route-helpers';
 
 /**
  * GET /api/public/inspectors
@@ -223,7 +223,7 @@ export const bookingsRoutes = createApiRouter()
     .openapi(listPublicServicesRoute, async (c) => {
         const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
         if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const rows = await db.select({
             id:              servicesTable.id,
             name:            servicesTable.name,
@@ -261,7 +261,7 @@ export const bookingsRoutes = createApiRouter()
         // context fallback (tenantId || requestedTenantSlug) pointed at the fixed
         // tenant in standalone and at NOTHING in saas mode (this path is not
         // slug-routed), so it 403'd there. No context fallback.
-        const tenantRow = await drizzle(c.env.DB)
+        const tenantRow = await getDrizzle(c)
             .select({ id: tenants.id })
             .from(tenants).where(eq(tenants.slug, tenant)).get();
         if (!tenantRow) throw Errors.NotFound('Tenant not found.');
@@ -336,7 +336,7 @@ export const bookingsRoutes = createApiRouter()
     .openapi(getTenantSlotsRoute, async (c) => {
         await checkRateLimit(c, 'availability');
         const { tenant, date, serviceIds, inspectorId } = c.req.valid('query');
-        const tenantRow = await drizzle(c.env.DB).select({ id: tenants.id })
+        const tenantRow = await getDrizzle(c).select({ id: tenants.id })
             .from(tenants).where(eq(tenants.slug, tenant)).get();
         if (!tenantRow) throw Errors.NotFound('Tenant not found.');
         const ids = serviceIds ? serviceIds.split(',').filter(Boolean) : [];
@@ -369,7 +369,7 @@ export const bookingsRoutes = createApiRouter()
     .get('/book/:tenant', async (c) => {
         await checkRateLimit(c, 'availability');
         const { tenant } = c.req.param();
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         const tenantRow = await db.select({ id: tenants.id, name: tenants.name })
             .from(tenants).where(eq(tenants.slug, tenant)).get();
@@ -431,7 +431,7 @@ export const bookingsRoutes = createApiRouter()
     .get('/book/:tenant/:slug', async (c) => {
         await checkRateLimit(c, 'availability');
         const { tenant, slug } = c.req.param();
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         // Resolve tenant by slug
         const tenantRow = await db.select({ id: tenants.id, name: tenants.name })

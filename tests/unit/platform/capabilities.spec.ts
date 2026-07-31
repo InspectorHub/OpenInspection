@@ -19,3 +19,23 @@ describe('getCapabilities', () => {
     expect(getCapabilities('agent', null)).toMatchObject({ publish: false, scheduleOthers: false, financial: false, manageContacts: false });
   });
 });
+
+describe('viewCommunication', () => {
+    it('defaults on for owner, manager and inspector', () => {
+        expect(getCapabilities('owner', null).viewCommunication).toBe(true);
+        expect(getCapabilities('manager', null).viewCommunication).toBe(true);
+        expect(getCapabilities('inspector', null).viewCommunication).toBe(true);
+    });
+
+    it('is pinned off for agent even when an override tries to grant it', () => {
+        expect(getCapabilities('agent', { viewCommunication: true }).viewCommunication).toBe(false);
+    });
+
+    it('can be withdrawn from an inspector by override', () => {
+        expect(getCapabilities('inspector', { viewCommunication: false }).viewCommunication).toBe(false);
+    });
+
+    it('cannot be withdrawn from an owner', () => {
+        expect(getCapabilities('owner', { viewCommunication: false }).viewCommunication).toBe(true);
+    });
+});

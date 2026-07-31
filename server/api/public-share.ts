@@ -11,7 +11,6 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { inspections } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
@@ -20,6 +19,7 @@ import { isReportPublished } from '../lib/status/report-status';
 import { logger } from '../lib/logger';
 import { sendSuccess } from '../lib/response';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { getDrizzle } from '../lib/route-helpers';
 
 const shareTokenRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -67,7 +67,7 @@ const publicShareRoutes = createApiRouter()
         }
         if (!tenantId) throw Errors.NotFound('Inspection not found');
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const insp = await db.select({
             status: inspections.status,
             reportStatus: inspections.reportStatus,

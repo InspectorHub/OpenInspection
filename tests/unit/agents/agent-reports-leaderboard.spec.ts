@@ -114,14 +114,11 @@ describe('GET /api/agent/leaderboard — buyer_agent via inspection_people (Task
         ]);
     });
 
-    it('legacy referredByAgentId NULL, buyer_agent inspection_people rows present — counts + names the agent', async () => {
+    it('counts + names the referrer from referred_by_contact_id (Task 9: attribution reads the column)', async () => {
         await db.insert(schema.inspections).values([
-            { id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid', price: 0, referredByAgentId: null, inspectorId: null, createdAt: new Date() },
-            { id: INSP_2, tenantId: TENANT, propertyAddress: '2 Oak', date: '2026-06-02', status: 'confirmed', paymentStatus: 'paid', price: 0, referredByAgentId: null, inspectorId: null, createdAt: new Date() },
+            { id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid', price: 0, referredByContactId: AGENT_CONTACT, inspectorId: null, createdAt: new Date() },
+            { id: INSP_2, tenantId: TENANT, propertyAddress: '2 Oak', date: '2026-06-02', status: 'confirmed', paymentStatus: 'paid', price: 0, referredByContactId: AGENT_CONTACT, inspectorId: null, createdAt: new Date() },
         ]);
-        const people = new PeopleService({ DB: {} as D1Database });
-        await people.addPerson(TENANT, INSP_1, AGENT_CONTACT, roleProfileId('buyer_agent'));
-        await people.addPerson(TENANT, INSP_2, AGENT_CONTACT, roleProfileId('buyer_agent'));
 
         const res = await buildApp('manager').request('/api/agent/leaderboard', {}, ENV, CTX);
         expect(res.status).toBe(200);

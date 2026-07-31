@@ -68,7 +68,7 @@ export function FooterBar({ connected = false, status, roster = [] }: FooterBarP
           {roster.slice(0, 5).map((user) => (
             <div
               key={user.userId}
-              className="w-6 h-6 rounded-full bg-ih-primary text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-ih-bg-card"
+              className="w-6 h-6 rounded-full bg-ih-primary text-ih-fg-inverse text-[10px] font-bold flex items-center justify-center ring-2 ring-ih-bg-card"
               title={`${user.name}${user.focusItemId ? m.editor_footer_presence_editing({ id: user.focusItemId.slice(0, 8) }) : ''}`}
             >
               {user.name.charAt(0).toUpperCase()}

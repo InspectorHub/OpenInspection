@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { statusCardModels, reportLockNotice } from '../../../app/components/portal/InspectionStatusCards';
-import { hubSectionNavHref } from '../../../app/components/portal/InspectionHub';
+import { hubSectionNavHref } from '../../../app/components/portal/ClientPortalHub';
 describe('portal hub models', () => {
   it('statusCardModels renders 6 cards with correct states', () => {
     const cards = statusCardModels({ inspectionStatus:'completed', agreementSigned:true, paymentStatus:'paid', reportPublished:true, progress:{completed:8,total:10}, unreadMessages:2, address:'1 A St', date:'2026-06-16' });

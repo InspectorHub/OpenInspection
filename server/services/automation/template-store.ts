@@ -1,4 +1,4 @@
-import { MessageTemplateService } from '../message-template.service';
+import { MessageTemplateService, type TemplateChannel } from '../message-template.service';
 
 /**
  * SP2 — OI's adapter for the SP-ENG `TemplateStore` port. Resolves a
@@ -6,7 +6,10 @@ import { MessageTemplateService } from '../message-template.service';
  * Tenant-scoped (fail-closed): a wrong tenant or unknown id resolves to null.
  */
 interface ResolvedTemplate {
-    channel: 'email' | 'sms';
+    // Widened with the column (B1). The transport core stays email/sms-only on
+    // purpose — an in_app "delivery" never reaches it (delivery.ts settles the
+    // ledger row directly), so this type is the only one that has to know.
+    channel: TemplateChannel;
     subject?: string;
     body: string;
     variables: string[];

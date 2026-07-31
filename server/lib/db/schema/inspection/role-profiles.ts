@@ -18,6 +18,12 @@ export const contactRoleProfiles = sqliteTable('contact_role_profiles', {
     active:          integer('is_active', { mode: 'boolean' }).notNull().default(true),
     createdAt:       integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt:       integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    // Per-profile capability overrides, layered on the `kind` baseline by
+    // capabilitiesForProfile(). Mirrors users.permission_overrides. JSON,
+    // whitelisted on read against CONTACT_BITS — an unknown key or a value of
+    // the wrong shape is dropped rather than trusted.
+    // Appended at table end for D1 rebuild safety.
+    capabilityOverrides: text('capability_overrides', { mode: 'json' }).$type<Record<string, unknown>>(),
 }, (t) => [
     index('idx_crp_tenant').on(t.tenantId),
     uniqueIndex('uq_crp_tenant_key').on(t.tenantId, t.key).where(sql`is_active = 1`),

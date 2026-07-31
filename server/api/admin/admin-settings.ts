@@ -13,12 +13,12 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { userHasCalendarConnection, getCalendarConnection } from '../../lib/calendar/connection';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
-import { getBaseUrl } from '../../lib/url';
+import { getBaseUrl, resolveTenantSlug } from '../../lib/url';
 import { Errors } from '../../lib/errors';
+import { resolveTenantLegalUrls, type LegalMode } from '../../lib/legal-links';
 import {
     AttentionThresholdsSchema,
     AttentionThresholdsResponseSchema,
@@ -30,6 +30,7 @@ import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import { tenantConfigs } from '../../lib/db/schema';
 import { defaultPoliciesOnFirstEnable } from '../../lib/holidays/apply-holiday-policy';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
+import { getDrizzle } from '../../lib/route-helpers';
 
 
 // --- Attention Thresholds (handoff-decisions §1) ---
@@ -138,6 +139,15 @@ const TenantConfigGetResponseSchema = z.object({
         holidayRegion: z.string().nullable().describe('Holiday catalog region (US / US-{ST}) or null when catalog is off.'),
         holidayPublicPolicy: z.enum(['open', 'block', 'advisory']).describe('Public booking policy for catalog closed dates.'),
         holidayInternalPolicy: z.enum(['advisory', 'block']).describe('Internal scheduling policy for catalog closed dates.'),
+        legalMode: z.enum(['hosted', 'custom']).describe('Privacy/Terms source: OI /legal pages or custom URLs.'),
+        customPrivacyUrl: z.string().nullable().describe('Custom Privacy Policy URL when legalMode=custom.'),
+        customTermsUrl: z.string().nullable().describe('Custom Terms URL when legalMode=custom.'),
+        privacyBody: z.string().nullable().describe('Optional hosted Privacy page body override (plain text/markdown).'),
+        termsBody: z.string().nullable().describe('Optional hosted Terms page body override (plain text/markdown).'),
+        hostedPrivacyUrl: z.string().nullable().describe('Absolute hosted Privacy URL for copy/TFV (null without tenant slug).'),
+        hostedTermsUrl: z.string().nullable().describe('Absolute hosted Terms URL for copy/TFV (null without tenant slug).'),
+        effectivePrivacyUrl: z.string().nullable().describe('Effective Privacy URL (hosted or custom).'),
+        effectiveTermsUrl: z.string().nullable().describe('Effective Terms URL (hosted or custom).'),
     }).describe('Current tenant configuration flags'),
 }).openapi('TenantConfigGetResponse');
 
@@ -185,6 +195,11 @@ const TenantConfigPatchSchema = z.object({
     ]).optional().describe('Holiday catalog region. null disables the catalog.'),
     holidayPublicPolicy: z.enum(['open', 'block', 'advisory']).optional().describe('Public booking holiday policy.'),
     holidayInternalPolicy: z.enum(['advisory', 'block']).optional().describe('Internal scheduling holiday policy.'),
+    legalMode: z.enum(['hosted', 'custom']).optional().describe('Privacy/Terms source.'),
+    customPrivacyUrl: z.string().url().max(500).nullish().describe('Custom Privacy URL; required with customTermsUrl when legalMode=custom. null clears.'),
+    customTermsUrl: z.string().url().max(500).nullish().describe('Custom Terms URL; required with customPrivacyUrl when legalMode=custom. null clears.'),
+    privacyBody: z.string().max(50_000).nullish().describe('Hosted Privacy body override; null/empty clears to template.'),
+    termsBody: z.string().max(50_000).nullish().describe('Hosted Terms body override; null/empty clears to template.'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
@@ -372,7 +387,7 @@ const patchCommunicationRoute = createRoute(withMcpMetadata({
 const adminSettingsRoutes = createApiRouter()
     .openapi(getAttentionThresholdsRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const row = await db.select({ thresholds: tenantConfigs.attentionThresholds })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
@@ -383,7 +398,7 @@ const adminSettingsRoutes = createApiRouter()
     .openapi(updateAttentionThresholdsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         const existing = await db.select({ tenantId: tenantConfigs.tenantId })
             .from(tenantConfigs)
@@ -423,6 +438,21 @@ const adminSettingsRoutes = createApiRouter()
         // throwaway placeholders. Without this arg a brand-new tenant with no
         // tenant_configs row would TypeError on undefined defaults.
         const config = await c.var.services.branding.getBranding(tenantId, { companyName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown> | undefined;
+        // Best-effort slug for hosted legal URL preview; unit stubs often omit
+        // a real D1 tenants table — empty slug just omits the absolute URLs.
+        const slug = await resolveTenantSlug(c, tenantId).catch(() => '');
+        const legalMode = ((config?.legalMode as LegalMode | undefined) ?? 'hosted');
+        const customPrivacyUrl = (config?.customPrivacyUrl as string | null | undefined) ?? null;
+        const customTermsUrl = (config?.customTermsUrl as string | null | undefined) ?? null;
+        const privacyBody = (config?.privacyBody as string | null | undefined) ?? null;
+        const termsBody = (config?.termsBody as string | null | undefined) ?? null;
+        const baseUrl = getBaseUrl(c);
+        const hosted = slug
+            ? resolveTenantLegalUrls(slug, baseUrl, { legalMode: 'hosted' })
+            : { privacyUrl: null as string | null, termsUrl: null as string | null };
+        const effective = slug
+            ? resolveTenantLegalUrls(slug, baseUrl, { legalMode, customPrivacyUrl, customTermsUrl })
+            : { privacyUrl: null as string | null, termsUrl: null as string | null };
         return c.json({
             success: true as const,
             data: {
@@ -450,6 +480,15 @@ const adminSettingsRoutes = createApiRouter()
                     ? (config?.holidayPublicPolicy as 'open' | 'block' | 'advisory')
                     : 'open',
                 holidayInternalPolicy: config?.holidayInternalPolicy === 'block' ? 'block' : 'advisory',
+                legalMode,
+                customPrivacyUrl,
+                customTermsUrl,
+                privacyBody,
+                termsBody,
+                hostedPrivacyUrl: hosted.privacyUrl,
+                hostedTermsUrl: hosted.termsUrl,
+                effectivePrivacyUrl: effective.privacyUrl,
+                effectiveTermsUrl: effective.termsUrl,
             },
         }, 200);
     })
@@ -527,6 +566,47 @@ const adminSettingsRoutes = createApiRouter()
         if (body.holidayInternalPolicy !== undefined) {
             update.holidayInternalPolicy = body.holidayInternalPolicy;
         }
+        if (body.legalMode !== undefined) {
+            update.legalMode = body.legalMode;
+        }
+        if (body.customPrivacyUrl !== undefined) {
+            update.customPrivacyUrl = body.customPrivacyUrl || null;
+        }
+        if (body.customTermsUrl !== undefined) {
+            update.customTermsUrl = body.customTermsUrl || null;
+        }
+        if (body.privacyBody !== undefined) {
+            update.privacyBody = body.privacyBody?.trim() ? body.privacyBody : null;
+        }
+        if (body.termsBody !== undefined) {
+            update.termsBody = body.termsBody?.trim() ? body.termsBody : null;
+        }
+
+        const legalTouched =
+            body.legalMode !== undefined
+            || body.customPrivacyUrl !== undefined
+            || body.customTermsUrl !== undefined;
+        if (legalTouched) {
+            const previous = await c.var.services.branding.getBranding(tenantId, {
+                companyName: '', primaryColor: '', supportEmail: '',
+            }) as Record<string, unknown> | undefined;
+            const nextMode = (update.legalMode ?? previous?.legalMode ?? 'hosted') as LegalMode;
+            if (nextMode === 'custom') {
+                const privacy = (update.customPrivacyUrl !== undefined
+                    ? update.customPrivacyUrl
+                    : previous?.customPrivacyUrl) as string | null | undefined;
+                const terms = (update.customTermsUrl !== undefined
+                    ? update.customTermsUrl
+                    : previous?.customTermsUrl) as string | null | undefined;
+                if (!privacy?.trim() || !terms?.trim()) {
+                    throw Errors.BadRequest(
+                        'Custom Privacy and Terms URLs are both required when using your own website.',
+                        'legal_custom_urls_required',
+                    );
+                }
+            }
+        }
+
         if (Object.keys(update).length === 0) {
             return c.json({ success: true as const, data: { ok: true as const } }, 200);
         }

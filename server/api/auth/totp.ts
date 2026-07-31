@@ -10,7 +10,6 @@ import { createRoute } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { createApiRouter } from '../../lib/openapi-router';
 import type { HonoConfig } from '../../types/hono';
-import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, isNull } from 'drizzle-orm';
 import { users } from '../../lib/db/schema';
 import { setCookie } from 'hono/cookie';
@@ -29,6 +28,7 @@ import {
 import { SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { authCookieOptions, AUTH_COOKIE_NAME } from '../../lib/auth-helpers';
+import { getDrizzle } from '../../lib/route-helpers';
 
 // ─── Spec 4A — TOTP 2FA endpoints ──────────────────────────────────────────
 // All 5 endpoints below were added by Spec 4A. They are additive — no existing
@@ -40,7 +40,7 @@ const TOTP_ISSUER = 'OpenInspection';
 async function loadCurrentUser(c: Context<HonoConfig>) {
     const userPayload = c.get('user');
     if (!userPayload?.sub) throw Errors.Unauthorized();
-    const db = drizzle(c.env.DB);
+    const db = getDrizzle(c);
     const row = await db.select().from(users).where(eq(users.id, userPayload.sub)).get();
     if (!row) throw Errors.Unauthorized();
     return row;
@@ -132,7 +132,7 @@ const totpRoutes = createApiRouter()
         // Persist the secret + recovery hashes immediately, but keep totpEnabled=false until
         // the user proves they can produce a valid code via /2fa/verify. This way an abandoned
         // setup never locks anyone out.
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         await db.update(users).set({
             totpSecret: secret,
             totpRecoveryCodes: JSON.stringify(recoveryHashes),
@@ -153,7 +153,7 @@ const totpRoutes = createApiRouter()
         const ok = c.var.services.totp.verifyCode(me.totpSecret, code);
         if (!ok) throw Errors.BadRequest('Invalid verification code');
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         await db.update(users).set({
             totpEnabled: true,
             totpVerifiedAt: new Date(),
@@ -181,7 +181,7 @@ const totpRoutes = createApiRouter()
         }
         if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         await db.update(users).set({
             totpSecret: null,
             totpEnabled: false,
@@ -216,7 +216,7 @@ const totpRoutes = createApiRouter()
         const recoveryCodes = totpSvc.generateRecoveryCodes(8);
         const recoveryHashes = await Promise.all(recoveryCodes.map(rc => totpSvc.hashCode(rc)));
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         await db.update(users).set({
             totpRecoveryCodes: JSON.stringify(recoveryHashes),
         }).where(eq(users.id, me.id));
@@ -244,7 +244,7 @@ const totpRoutes = createApiRouter()
         }
         const userId = payload['sub'] as string;
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         // Excludes soft-deleted (removed member) rows — this is the second
         // half of the login flow, so it must honor the same active-user gate
         // as validateCredentials.

@@ -71,6 +71,62 @@
       "when": 1785246850634,
       "tag": "0009_wealthy_post",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1785338147556,
+      "tag": "0010_fluffy_rafael_vega",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1785354047420,
+      "tag": "0011_magenta_warbound",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1785354317907,
+      "tag": "0012_backfill_system_role_capabilities",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1785366771398,
+      "tag": "0013_hard_mysterio",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1785376765611,
+      "tag": "0014_curvy_quicksilver",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1785395739135,
+      "tag": "0015_tenant_legal_urls",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1785395795418,
+      "tag": "0016_empty_ultragirl",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1785421496479,
+      "tag": "0017_strange_multiple_man",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { availability, availabilityOverrides } from '../lib/db/schema';
 import { safeISODate } from '../lib/date';
@@ -16,6 +15,7 @@ import {
 } from '../lib/validations/booking.schema';
 import { SuccessResponseSchema, createApiResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { getDrizzle } from '../lib/route-helpers';
 
 /**
  * GET /api/availability
@@ -167,7 +167,7 @@ const deleteOverrideRoute = createRoute(withMcpMetadata({
 
 export const availabilityRoutes = createApiRouter()
     .openapi(listAvailabilityRoute, async (c) => {
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const tenantId = c.get('tenantId');
         const user = c.get('user');
         const userRole = c.get('userRole');
@@ -210,7 +210,7 @@ export const availabilityRoutes = createApiRouter()
         return c.json({ success: true, data: { count: body.slots.length } }, 200);
     })
     .openapi(listOverridesRoute, async (c) => {
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const tenantId = c.get('tenantId');
         const user = c.get('user');
         const userRole = c.get('userRole');

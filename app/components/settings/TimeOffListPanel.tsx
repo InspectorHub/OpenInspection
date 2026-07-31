@@ -58,7 +58,7 @@ export function TimeOffListPanel({
           <p className="text-[12px] text-ih-fg-4 italic">{m.settings_timeoff_none()}</p>
           <Link
             to="/calendar"
-            className="inline-flex h-8 px-3 items-center rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors"
+            className="inline-flex h-8 px-3 items-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors"
           >
             {m.settings_timeoff_block_time()}
           </Link>

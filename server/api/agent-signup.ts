@@ -6,7 +6,6 @@ import { verifyTurnstile } from '../lib/middleware/bot-protection';
 import { signJwt } from '../lib/jwt-keyring';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-import { getLegalLinks, buildTermsAcceptedBlob } from '../lib/legal-links';
 import { authCookieOptions, AUTH_COOKIE_NAME } from '../lib/auth-helpers';
 
 /**
@@ -23,9 +22,9 @@ const SignupBodySchema = z
         password: z.string().min(12).max(120).describe('TODO describe password field for the OpenInspection MCP integration'),
         name: z.string().min(2).max(120).describe('TODO describe name field for the OpenInspection MCP integration'),
         turnstileToken: z.string().optional().describe('TODO describe turnstileToken field for the OpenInspection MCP integration'),
-        // Legal-links feature — required (true) only when the operator configured
-        // TERMS_URL/PRIVACY_URL; enforced in the handler, optional on the wire.
-        termsAccepted: z.boolean().optional().describe('Acceptance of operator Terms of Service and Privacy Policy; required when the operator has configured TERMS_URL/PRIVACY_URL'),
+        // Legacy optional field — tenant Privacy/Terms are configured in Settings,
+        // not via Worker env. SaaS agents accept portal Terms at registration.
+        termsAccepted: z.boolean().optional().describe('Optional; unused for env-based legal (removed).'),
     })
     .openapi('AgentSignupBody');
 
@@ -82,19 +81,10 @@ const agentSignupRoutes = createApiRouter()
             if (!ok) throw Errors.BadRequest('Bot challenge failed');
         }
 
-        const links = getLegalLinks(c.env);
-        if (links && body.termsAccepted !== true) {
-            throw Errors.BadRequest('You must accept the terms to create an account.');
-        }
-
         const result = await c.var.services.agent.signup({
             email: body.email,
             password: body.password,
             name: body.name,
-            ...(links ? { termsAccepted: buildTermsAcceptedBlob(links, {
-                ip: c.req.header('CF-Connecting-IP'),
-                country: (c.req.raw.cf?.country as string | undefined),
-            }) } : {}),
         });
 
         const keyring = await c.var.keyringPromise!;

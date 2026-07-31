@@ -43,7 +43,7 @@
   "settings_hub_automations_title": "Automations",
   "settings_hub_automations_desc": "Email triggers and rules.",
   "settings_hub_compliance_title": "Compliance",
-  "settings_hub_compliance_desc": "GDPR retention window, erasure request records.",
+  "settings_hub_compliance_desc": "Privacy & Terms pages, GDPR retention, erasure records.",
   "settings_hub_usage_title": "Usage",
   "settings_hub_usage_desc": "SMS, email, and storage this account has used.",
   "settings_error_save_failed": "Save failed",

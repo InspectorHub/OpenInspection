@@ -3,7 +3,7 @@ import { useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { toActionResult } from "~/lib/inspection-hub-actions";
+import { toActionResult } from "~/lib/inspector-portal-actions";
 import { PageHeader, Input, Button, Select } from "@core/shared-ui";
 import { BrowserTimezoneHint } from "~/components/settings/BrowserTimezoneHint";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";

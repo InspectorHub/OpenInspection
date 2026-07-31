@@ -10,9 +10,9 @@ import { SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { expandFloorsStacks, parseUnitCsv } from '../../lib/unit-pattern';
 import { computeUnitProgress } from '../../lib/unit-progress';
-import { drizzle } from 'drizzle-orm/d1';
 import { inspectionResults } from '../../lib/db/schema';
 import { and, eq } from 'drizzle-orm';
+import { getDrizzle } from '../../lib/route-helpers';
 
 // -----------------------------------------------------------------------------
 // Design System 0520 subsystem D phase 1 task 1.3 — UnitTree CRUD routes.
@@ -286,7 +286,7 @@ const hierarchyRoutes = createApiRouter()
         const units = (await c.var.services.unit.list(tenantId, id)).filter((u: { kind: string }) => u.kind === 'unit');
         // One tenant-scoped results row read — computeUnitProgress does the rest
         // server-side; the full map never leaves the worker.
-        const db  = drizzle(c.env.DB);
+        const db  = getDrizzle(c);
         const row = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId)))
             .get();

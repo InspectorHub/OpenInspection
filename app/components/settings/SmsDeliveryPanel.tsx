@@ -187,7 +187,7 @@ export function SmsDeliveryPanel({
 
           <div className="flex justify-end pt-3 border-t border-ih-border">
             <button type="submit" disabled={savingSmsConfig}
-              className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
+              className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
               {savingSmsConfig ? m.common_saving() : m.settings_smsdelivery_save()}
             </button>
           </div>

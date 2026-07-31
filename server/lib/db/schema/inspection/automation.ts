@@ -18,6 +18,15 @@ export const automations = sqliteTable('automations', {
             'agreement.signer_signed',
             'agreement.viewed', 'agreement.declined', 'agreement.expired',
             'event.created', 'event.completed',
+            // B3 — two events that raised a hard-coded staff alert but had no
+            // trigger to hang a rule on. `booking.received` is NOT
+            // `inspection.created`: a booking is a stranger arriving through
+            // the public form, while an inspection can also be created by the
+            // office itself, and alerting someone about their own action is
+            // noise. `inspection.completed` is likewise not `report.published`
+            // — the completion route had been raising a notice TYPED
+            // report.published, which is a mislabel this migration retires.
+            'booking.received', 'inspection.completed',
             // Track J (D7) — the one time-relative trigger. Cron-fired by
             // AutomationService.enqueueReminders(); delayMinutes is the lead
             // time BEFORE inspections.date (not a post-event delay).
@@ -29,7 +38,12 @@ export const automations = sqliteTable('automations', {
     // are role-independent and always carry a null profile id. Invariant:
     // recipient_role_profile_id is set iff kind='role'; when set it holds a
     // contact_role_profiles.id (app-layer link, no FK per Schema Rules).
-    recipientKind: text('recipient_kind', { enum: ['role', 'inspector', 'all'] }).notNull(),
+    // B2 — `staff` addresses the workspace's OWNERS + MANAGERS (`users` rows,
+    // the set createForAllAdmins names), which is what the hard-coded internal
+    // alerts B3 migrates all target. It is the second kind whose recipients are
+    // users rather than contacts; `isStaffRecipient` (automation/shared.ts) is
+    // the one place that distinction is decided. Type-layer only — no DDL.
+    recipientKind: text('recipient_kind', { enum: ['role', 'inspector', 'all', 'staff'] }).notNull(),
     recipientRoleProfileId: text('recipient_role_profile_id'),
     delayMinutes: integer('delay_minutes').notNull().default(0),
     // -- DEAD (2026-06-26, SP2): embedded email subject/body retired. Automations
@@ -57,6 +71,18 @@ export const automations = sqliteTable('automations', {
     active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // B3 (IA-115) — references a message_templates(channel='in_app') row: the
+    // notice's TITLE (that template's `subject`) and body. Its own column
+    // rather than a reuse of email_template_id because a rule with
+    // `channels: ["email","in_app"]` has both, and one slot would make the two
+    // channels fight over it.
+    //
+    // Null = no in-app wording chosen; the trigger path falls back to the
+    // built-in `titleFor` literal. Fail-SOFT on purpose, unlike the email
+    // path's fail-closed skip: an email with no template has nothing to send,
+    // but a notice header already exists and hiding it would lose the event.
+    // Appended at table end for D1 rebuild safety.
+    inAppTemplateId: text('in_app_template_id'),
 }, (t) => [
     index('idx_automations_tenant').on(t.tenantId),
 ]);
@@ -64,7 +90,10 @@ export const automations = sqliteTable('automations', {
 export const automationLogs = sqliteTable('automation_logs', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
-    automationId: text('automation_id').notNull(),
+    // Nullable since Communication A2: `automation_id IS NULL` means a MANUAL
+    // send (an operator pressing Send report), logged into the same ledger so
+    // the Outbox answers "what left this office" regardless of who pressed it.
+    automationId: text('automation_id'),
     inspectionId: text('inspection_id').notNull(),
     // Track L — holds the email address for email logs, the E.164 phone for sms logs.
     recipient: text('recipient').notNull(),   // RENAMED from recipient_email (0025)
@@ -73,7 +102,13 @@ export const automationLogs = sqliteTable('automation_logs', {
     // recipient. Null for logs with no role context (legacy/reminder/inspector).
     recipientRoleKey: text('recipient_role_key'),
     // Track L — the log's own delivery channel (a multi-channel rule emits one log each).
-    channel: text('channel', { enum: ['email', 'sms'] }).notNull().default('email'),
+    //
+    // B1 — `in_app` joined email/sms. It is a delivery like the others in every
+    // way the ledger cares about (one row, a status, a send time), and unlike
+    // them in one: nothing leaves the building. The notice HEADER is what the
+    // recipient reads, and flush() only settles this row's status — see
+    // delivery.ts. Type-layer only; SQLite stores text either way, so no DDL.
+    channel: text('channel', { enum: ['email', 'sms', 'in_app'] }).notNull().default('email'),
     sendAt: integer('send_at', { mode: 'timestamp_ms' }).notNull(),
     deliveredAt: integer('delivered_at', { mode: 'timestamp_ms' }),
     status: text('status', { enum: ['pending', 'sent', 'failed', 'skipped'] }).notNull().default('pending'),
@@ -93,6 +128,15 @@ export const automationLogs = sqliteTable('automation_logs', {
     // the gate closed (see automation/sms.ts) rather than sending.
     // Appended at table end for D1 rebuild safety.
     recipientContactId: text('recipient_contact_id'),
+    // Communication C1 (design §3.13) — the NOTICE HEADER this channel-attempt
+    // belongs to (notifications.id). The header carries the recipient and read
+    // state; this row carries one channel's delivery outcome. App-layer soft
+    // reference, no .references() per Schema Rules. Nullable: legacy rows are
+    // stamped by scripts/backfill-notice-headers.mjs, and a row whose
+    // recipient resolves to neither a contact nor a user keeps NULL (the
+    // Outbox grouping falls back to the interim (automation_id, send_at) key).
+    // Appended at table end for D1 rebuild safety.
+    noticeId: text('notice_id'),
 }, (t) => [
     index('idx_automation_logs_pending').on(t.tenantId, t.status, t.sendAt),
     index('idx_automation_logs_insp').on(t.inspectionId),
@@ -101,6 +145,22 @@ export const automationLogs = sqliteTable('automation_logs', {
     // for multi-recipient/multi-channel rules, where each recipient/channel still
     // gets its own distinct row. Partial (event_id present) so legacy rows that
     // predate event-id stamping aren't forced unique on a NULL key.
+    //
+    // LIMIT, decided B1 (2026-07-30) and asserted by
+    // tests/unit/automations/in-app-channel.spec.ts: this index dedupes NOTHING
+    // when `automation_id IS NULL`, because SQLite treats NULLs in a unique
+    // index as distinct from each other. A ruleless row can therefore be
+    // inserted twice under one event_id, and `onConflictDoNothing` will not
+    // catch it.
+    //
+    // Left as-is rather than re-keyed on `coalesce(automation_id, '')`, because
+    // the exposure is empty by construction: manual sends write terminal rows
+    // one per press with no event_id, and B3 migrates the hard-coded call sites
+    // ONTO rules, so the rows it creates carry an automation_id and are covered.
+    // The rule to keep: **anything that relies on event_id idempotency must
+    // carry an automation_id.** If a path ever needs ruleless dedup, re-key the
+    // index — do not add an app-level pre-check, which has the read-then-write
+    // race this index exists to remove.
     uniqueIndex('uq_automation_logs_event')
         .on(t.automationId, t.inspectionId, t.eventId, t.channel, t.recipient)
         .where(sql`event_id IS NOT NULL`),

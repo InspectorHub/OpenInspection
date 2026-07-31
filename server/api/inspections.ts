@@ -27,6 +27,7 @@ import mediaRoutes from './inspections/media';
 import mediaStudioRoutes from './inspections/media-studio';
 import publishRoutes from './inspections/publish';
 import reportDeliveryRoutes from './inspections/report-delivery';
+import sendSmsRoutes from './inspections/send-sms';
 import agreementsRoutes from './inspections/agreements';
 import coreRoutes from './inspections/core';
 import resultsRoutes from './inspections/results';
@@ -35,6 +36,7 @@ import costExportRoutes from './inspections/cost-export';
 import costItemRoutes from './inspections/cost-items';
 import complianceRoutes from './inspections/compliance';
 import peopleRoutes from './inspections/people';
+import communicationRoutes from './inspections/communication';
 import inspectionServiceRoutes from './inspections/services';
 
 export const inspectionsRoutes = createApiRouter()
@@ -46,6 +48,10 @@ export const inspectionsRoutes = createApiRouter()
     .route('/', mediaStudioRoutes)
     .route('/', publishRoutes)
     .route('/', reportDeliveryRoutes)
+    // Communication A3.4 — manual SMS via the shared sendOneSms TCPA core.
+    .route('/', sendSmsRoutes)
+    // Communication design §2 — messages + platform notices, two arrays.
+    .route('/', communicationRoutes)
     .route('/', agreementsRoutes)
     .route('/', hierarchyRoutes)
     // Commercial PCA Phase C — cost line CSV export (Task 11).

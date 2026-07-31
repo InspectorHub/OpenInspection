@@ -237,16 +237,13 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         expect(workflowCreate).toHaveBeenCalledTimes(1);
         expect(workflowCreate).toHaveBeenCalledWith(expect.objectContaining({ id: requestId }));
 
-        // Completion notification carries the agreement DISPLAY NAME (regression
-        // guard: previously resolved via the signer token → NotFound → dropped).
-        expect(notificationCreate).toHaveBeenCalledTimes(1);
-        expect(notificationCreate).toHaveBeenCalledWith(
-            TENANT_ID,
-            expect.objectContaining({
-                type: 'agreement.signed',
-                title: 'Agreement signed — Standard Agreement',
-            }),
-        );
+        // B3 — the completion effect no longer writes a staff notification
+        // itself. It used to fetch the agreement's display name purely to build
+        // a hard-coded title; the office alert is now the seeded
+        // `Office alert — agreement signed` rule, raised by the
+        // `agreement.signed` trigger this same effect already fires. Asserted
+        // positively in tests/unit/automations/staff-alerts-via-rules.spec.ts.
+        expect(notificationCreate).not.toHaveBeenCalled();
         // IA-46 — three emails total across both signs: signer-1 receipt (jane),
         // the envelope-completion email (jane, the client), and signer-2's own
         // receipt (john). John is a remote co-signer who previously got NOTHING.
@@ -274,7 +271,9 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         await ec1.settle();
         expect(first.status).toBe(200);
         expect(workflowCreate).toHaveBeenCalledTimes(1);
-        expect(notificationCreate).toHaveBeenCalledTimes(1);
+        // B3 — the staff notification is a rule now; the single-fire gate this
+        // case guards is the WORKFLOW, which is still asserted above.
+        expect(notificationCreate).not.toHaveBeenCalled();
 
         const ec2 = makeExecCtx();
         const second = await app.request(`/agreements/${r.token}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec2.ctx);
@@ -282,7 +281,9 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         expect(second.status).toBe(200);
         // The single-fire completion gate must NOT re-trigger on a repeat sign.
         expect(workflowCreate).toHaveBeenCalledTimes(1);
-        expect(notificationCreate).toHaveBeenCalledTimes(1);
+        // B3 — the staff notification is a rule now; the single-fire gate this
+        // case guards is the WORKFLOW, which is still asserted above.
+        expect(notificationCreate).not.toHaveBeenCalled();
     });
 
     it('POST sign persists onBehalfOf / onBehalfDisclaimer on the signer row', async () => {

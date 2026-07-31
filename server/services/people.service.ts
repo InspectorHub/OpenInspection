@@ -1,19 +1,19 @@
-import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, sql } from 'drizzle-orm';
-import { contacts, contactRoleProfiles, inspectionPeople, messageTemplates } from '../lib/db/schema';
-import { capabilitiesForKind, type RoleCapabilities, type RoleKind } from '../lib/people/capabilities';
+import { contacts, contactRoleProfiles, inspectionPeople } from '../lib/db/schema';
+import { capabilitiesForProfile, type RoleCapabilities, type RoleKind } from '../lib/people/capabilities';
 import { PRIMARY_CLIENT_KEY, SECONDARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { Errors } from '../lib/errors';
+import { RoleProfileAdminService } from './role-profile-admin.service';
 
 export interface PersonRow {
     id: string; contactId: string; roleProfileId: string;
     roleKey: string; roleLabel: string; kind: RoleKind;
     name: string; email: string | null; phone: string | null; agency: string | null;
+    /** Raw per-profile overrides; resolve with capabilitiesForProfile(kind, this). */
+    capabilityOverrides: unknown;
 }
 
-export class PeopleService {
-    constructor(private env: { DB: D1Database }) {}
-    private get db() { return drizzle(this.env.DB); }
+export class PeopleService extends RoleProfileAdminService {
 
     private async profile(tenantId: string, roleProfileId: string) {
         const row = await this.db.select().from(contactRoleProfiles)
@@ -214,6 +214,7 @@ export class PeopleService {
         const rows = await this.db.select({
             id: inspectionPeople.id, contactId: contacts.id, roleProfileId: contactRoleProfiles.id,
             roleKey: contactRoleProfiles.key, roleLabel: contactRoleProfiles.label, kind: contactRoleProfiles.kind,
+            capabilityOverrides: contactRoleProfiles.capabilityOverrides,
             name: contacts.name, email: contacts.email, phone: contacts.phone, agency: contacts.agency,
         }).from(inspectionPeople)
             .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))
@@ -237,17 +238,23 @@ export class PeopleService {
     }
 
     async roleProfileIdsWithCapability(tenantId: string, cap: keyof RoleCapabilities): Promise<string[]> {
-        const rows = await this.db.select({ id: contactRoleProfiles.id, kind: contactRoleProfiles.kind })
+        const rows = await this.db.select({
+            id: contactRoleProfiles.id, kind: contactRoleProfiles.kind,
+            capabilityOverrides: contactRoleProfiles.capabilityOverrides,
+        })
             .from(contactRoleProfiles)
             .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
-        return rows.filter(r => capabilitiesForKind(r.kind as RoleKind)[cap]).map(r => r.id);
+        return rows.filter(r => Boolean(capabilitiesForProfile(r.kind as RoleKind, r.capabilityOverrides)[cap])).map(r => r.id);
     }
 
     async roleKeysWithCapability(tenantId: string, cap: keyof RoleCapabilities): Promise<string[]> {
-        const rows = await this.db.select({ key: contactRoleProfiles.key, kind: contactRoleProfiles.kind })
+        const rows = await this.db.select({
+            key: contactRoleProfiles.key, kind: contactRoleProfiles.kind,
+            capabilityOverrides: contactRoleProfiles.capabilityOverrides,
+        })
             .from(contactRoleProfiles)
             .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
-        return rows.filter(r => capabilitiesForKind(r.kind as RoleKind)[cap]).map(r => r.key);
+        return rows.filter(r => Boolean(capabilitiesForProfile(r.kind as RoleKind, r.capabilityOverrides)[cap])).map(r => r.key);
     }
 
     /**
@@ -307,80 +314,4 @@ export class PeopleService {
         return (row?.kind as RoleKind | undefined) ?? null;
     }
 
-    /** Lists all role profiles (active + inactive) for the tenant, in display order. */
-    async listProfiles(tenantId: string) {
-        return this.db.select().from(contactRoleProfiles)
-            .where(eq(contactRoleProfiles.tenantId, tenantId))
-            .orderBy(contactRoleProfiles.sortOrder);
-    }
-
-    /** Rejects any template id that is not an active row in THIS tenant's
-     *  message_templates — a role profile must never reference another tenant's
-     *  (or a bogus) template id. Null/undefined ids are allowed (no reference). */
-    private async assertTemplatesOwned(tenantId: string, emailTemplateId?: string | null, smsTemplateId?: string | null) {
-        for (const id of [emailTemplateId, smsTemplateId]) {
-            if (!id) continue;
-            const row = await this.db.select({ id: messageTemplates.id }).from(messageTemplates)
-                .where(and(eq(messageTemplates.tenantId, tenantId), eq(messageTemplates.id, id))).get();
-            if (!row) throw Errors.NotFound('Message template not found');
-        }
-    }
-
-    /** Creates a tenant-defined (non-system) role profile with a unique, slugified key. */
-    async createProfile(tenantId: string, input: { label: string; kind: RoleKind; emailTemplateId?: string; smsTemplateId?: string }) {
-        await this.assertTemplatesOwned(tenantId, input.emailTemplateId, input.smsTemplateId);
-        const key = await this.uniqueKey(tenantId, input.label);
-        const now = new Date();
-        const row = { id: crypto.randomUUID(), tenantId, key, label: input.label, kind: input.kind,
-            emailTemplateId: input.emailTemplateId ?? null, smsTemplateId: input.smsTemplateId ?? null,
-            isSystem: false, sortOrder: 1000, active: true, createdAt: now, updatedAt: now };
-        await this.db.insert(contactRoleProfiles).values(row);
-        return row;
-    }
-
-    /** Updates label/templates/active. System profiles cannot be deactivated (409). */
-    async updateProfile(tenantId: string, id: string, patch: { label?: string; emailTemplateId?: string | null; smsTemplateId?: string | null; active?: boolean }) {
-        const cur = await this.db.select().from(contactRoleProfiles)
-            .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.id, id))).get();
-        if (!cur) throw Errors.NotFound('Role profile not found');
-        if (cur.isSystem && patch.active === false) throw Errors.Conflict('System role profiles cannot be deactivated');
-        if (patch.emailTemplateId !== undefined || patch.smsTemplateId !== undefined) {
-            await this.assertTemplatesOwned(tenantId, patch.emailTemplateId, patch.smsTemplateId);
-        }
-        // Reactivating a profile whose key collides with an already-active profile
-        // would hit the partial unique index `uq_crp_tenant_key` (WHERE is_active=1)
-        // and surface a raw SQLite constraint error (500). Map it to a clean 409.
-        if (patch.active === true && !cur.active) {
-            const clash = await this.db.select({ id: contactRoleProfiles.id }).from(contactRoleProfiles)
-                .where(and(
-                    eq(contactRoleProfiles.tenantId, tenantId),
-                    eq(contactRoleProfiles.key, cur.key),
-                    eq(contactRoleProfiles.active, true),
-                )).get();
-            if (clash) throw Errors.Conflict('Another active role profile already uses this key');
-        }
-        await this.db.update(contactRoleProfiles).set({ ...patch, updatedAt: new Date() })
-            .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.id, id)));
-    }
-
-    /** Soft-deletes (deactivates) a role profile. System profiles cannot be deleted (409). */
-    async deactivateProfile(tenantId: string, id: string) {
-        const cur = await this.db.select().from(contactRoleProfiles)
-            .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.id, id))).get();
-        if (!cur) throw Errors.NotFound('Role profile not found');
-        if (cur.isSystem) throw Errors.Conflict('System role profiles cannot be deleted');
-        await this.db.update(contactRoleProfiles).set({ active: false, updatedAt: new Date() })
-            .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.id, id)));
-    }
-
-    /** Slugifies `label` into a stable machine key, disambiguating collisions with a numeric suffix. */
-    private async uniqueKey(tenantId: string, label: string): Promise<string> {
-        const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'role';
-        let key = base, n = 1;
-        while (await this.db.select({ id: contactRoleProfiles.id }).from(contactRoleProfiles)
-            .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.key, key))).get()) {
-            key = `${base}_${++n}`;
-        }
-        return key;
-    }
 }

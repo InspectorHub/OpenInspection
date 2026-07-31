@@ -1,10 +1,9 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { MessageTemplateService } from '../services/message-template.service';
+import { MessageTemplateService, type TemplateChannel } from '../services/message-template.service';
 import { smsSegmentInfo } from '../lib/sms/segments';
 import { interpolate } from '../services/automation/shared';
 import { buildTenantEmailService } from '../lib/email/build-email-service';
@@ -15,6 +14,7 @@ import { managedSendAllowed } from '../lib/sms/managed-send-gate';
 import { maybeMetering } from '../services/metering.service';
 import { currentPeriodKey } from '../lib/usage/period';
 import { tenantConfigs } from '../lib/db/schema';
+import { getDrizzle } from '../lib/route-helpers';
 import {
     CreateMessageTemplateSchema, UpdateMessageTemplateSchema, PreviewMessageTemplateSchema,
     TestSendMessageTemplateSchema, MessageTemplateSchema, MessageTemplateListResponseSchema,
@@ -100,7 +100,7 @@ const messageTemplateRoutes = createApiRouter()
     .openapi(createMtRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const body = c.req.valid('json');
-        const createPayload: { name: string; channel: 'email' | 'sms'; subject: string | null; body: string; variables?: string[] } = {
+        const createPayload: { name: string; channel: TemplateChannel; subject: string | null; body: string; variables?: string[] } = {
             name: body.name, channel: body.channel, subject: body.subject ?? null, body: body.body,
         };
         if (body.variables !== undefined) createPayload.variables = body.variables;
@@ -161,7 +161,7 @@ const messageTemplateRoutes = createApiRouter()
             // template test-send is a real send and must not bypass either the
             // compliance gate or the quota cap the standalone SMS test endpoint
             // already enforces.
-            const db = drizzle(c.env.DB);
+            const db = getDrizzle(c);
             let cfgRow: { smsMode: string; smsByoProvider: string | null } | null | undefined;
             try {
                 cfgRow = await db.select({ smsMode: tenantConfigs.smsMode, smsByoProvider: tenantConfigs.smsByoProvider })

@@ -41,16 +41,11 @@ const getRecentLogsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listAutomationLogsRecent (GET /logs/recent, automations domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-// GET /api/automations/logs/:inspectionId — BEFORE /:id to avoid shadowing
-const getLogsRoute = createRoute(withMcpMetadata({
-    method: 'get', path: '/logs/{inspectionId}', tags: ["automations"],
-    middleware: [requireRole('owner', 'manager', 'inspector')],
-    request: { params: z.object({ inspectionId: z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
-    responses: { 200: { content: { 'application/json': { schema: AutomationLogListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Logs' } },
-    operationId: "getAutomationLog",
-    summary: "Get automation log for current tenant",
-    description: "Auto-generated placeholder for getAutomationLog (GET /logs/{inspectionId}, automations domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['read'], tier: 'extended' }));
+// The per-inspection logs route (`GET /logs/{inspectionId}`) is RETIRED: it
+// never had a caller, and its query now serves the richer
+// `GET /api/inspections/:id/communication` payload. Two endpoints over one
+// query is how they drift. `/logs/recent` stays — Settings → Automations
+// renders it.
 
 // PATCH /api/automations/:id
 const updateRoute = createRoute(withMcpMetadata({
@@ -94,12 +89,6 @@ const automationsRoutes = createApiRouter()
         const tenantId = c.get('tenantId') as string;
         const { limit } = c.req.valid('query');
         const rows = await c.var.services.automation.listRecentLogs(tenantId, limit ?? 50);
-        return c.json({ success: true, data: rows });
-    })
-    .openapi(getLogsRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const { inspectionId } = c.req.valid('param');
-        const rows = await c.var.services.automation.getLogs(tenantId, inspectionId);
         return c.json({ success: true, data: rows });
     })
     .openapi(updateRoute, async (c) => {

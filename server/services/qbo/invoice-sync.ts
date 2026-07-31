@@ -16,19 +16,24 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
             return invoiceNumber.slice(0, 21);
         }
 
-        // Raw SQL because Drizzle does not type the cross-table join we need.
+        /** Invoice → contact → mapped QBO Customer id (same join the old raw SQL did). */
         protected async getQBOCustomerIdForInvoice(tenantId: string, invoiceId: string): Promise<string | null> {
-            const row = await this.db.prepare(
-                `SELECT qem_c.qbo_id AS qbo_customer_id
-                 FROM invoices inv
-                 JOIN qbo_entity_map qem_c
-                   ON qem_c.oi_id = inv.contact_id
-                  AND qem_c.tenant_id = inv.tenant_id
-                  AND qem_c.oi_type = 'contact'
-                 WHERE inv.id = ? AND inv.tenant_id = ?
-                 LIMIT 1`,
-            ).bind(invoiceId, tenantId).first<{ qbo_customer_id: string }>().catch(() => null);
-            return row?.qbo_customer_id ?? null;
+            const db = this.getDrizzle();
+            const row = await db
+                .select({ qboCustomerId: qboEntityMap.qboId })
+                .from(invoices)
+                .innerJoin(
+                    qboEntityMap,
+                    and(
+                        eq(qboEntityMap.oiId, invoices.contactId),
+                        eq(qboEntityMap.tenantId, invoices.tenantId),
+                        eq(qboEntityMap.oiType, 'contact'),
+                    ),
+                )
+                .where(and(eq(invoices.id, invoiceId), eq(invoices.tenantId, tenantId)))
+                .limit(1)
+                .get();
+            return row?.qboCustomerId ?? null;
         }
 
         protected async applyInvoiceStatusFromQBO(

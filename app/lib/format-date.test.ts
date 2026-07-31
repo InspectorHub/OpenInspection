@@ -34,7 +34,7 @@ describe('formatInspectionDateTime (en-US, C-14 part 1)', () => {
  * A zone is not optional information.
  *
  * The timezone argument used to be optional, and four of fourteen call sites left
- * it off — two of them on the inspection hub, whose other calls passed it. Omitting
+ * it off — two of them on the inspector portal, whose other calls passed it. Omitting
  * it falls through to Intl's default, which is the BROWSER's zone, so one page
  * rendered the same instant twice in two zones: an inspection booked for 09:00
  * read 09:00 in the schedule card and 5:00 PM in the page header for a viewer

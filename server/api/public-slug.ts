@@ -1,11 +1,11 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, isNull } from 'drizzle-orm';
 import { SlugAvailabilityResponseSchema } from '../lib/validations/profile.schema';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { users, slugReservations } from '../lib/db/schema/tenant';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { getDrizzle } from '../lib/route-helpers';
 
 /**
  * Booking #7 Sprint A — public slug-availability endpoint.
@@ -57,7 +57,7 @@ const publicSlugRoutes = createApiRouter()
             // Global agent-slug check: reserved blacklist OR another agent user
             // with this slug. tenant resolution irrelevant.
             const slug = value.trim().toLowerCase();
-            const db = drizzle(c.env.DB);
+            const db = getDrizzle(c);
             const reserved = await db.select({ slug: slugReservations.slug })
                 .from(slugReservations)
                 .where(eq(slugReservations.slug, slug))

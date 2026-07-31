@@ -16,11 +16,11 @@ import { buildRenderReportUrl } from '../../lib/public-urls';
 import { logger } from '../../lib/logger';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { PublishInspectionSchema, CreateReinspectionSchema, CancelInspectionSchema } from '../../lib/validations/inspection.schema';
-import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
+import { fireAutomation } from '../../services/inspection/shared';
 import { eq, and } from 'drizzle-orm';
-import { getTenantId } from '../../lib/route-helpers';
+import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 
 /**
@@ -144,7 +144,7 @@ const returnReportRoute = createRoute(withMcpMetadata({
     },
     operationId: 'returnReport',
     description: 'Transitions reportStatus from submitted → in_progress. Requires publish capability.',
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
  * POST /api/inspections/:id/unpublish
@@ -170,7 +170,7 @@ const unpublishReportRoute = createRoute(withMcpMetadata({
     },
     operationId: 'unpublishReport',
     description: 'Transitions reportStatus from published → in_progress. Requires publish capability.',
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
  * POST /api/inspections/:id/publish
@@ -206,7 +206,7 @@ const publishRoute = createRoute(withMcpMetadata({
     },
     operationId: "publishInspection",
     description: "Auto-generated placeholder for publishInspection (POST /{id}/publish, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
  * Issue #119 (Re-inspections) Task 4 — POST /api/inspections/:id/reinspect
@@ -293,27 +293,23 @@ const publishRoutes = createApiRouter()
             return c.json({ success: true }, 200);
         }
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         await db.update(inspectionTable).set({ status: INSPECTION_STATUS.COMPLETED }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
-        // Task 9a (people-role-profiles) — resolve the recipient via the
-        // inspection_people join (PeopleService) instead of the legacy
-        // inspection.clientEmail/.clientName column, which is being dropped.
-        // Used for the admin notification's metadata below. Report delivery is
-        // NOT fired here: report.published is a report event, produced solely by
-        // the publish path. Firing it on order completion would deliver a report
-        // that may never have been published (see IA-30).
-        const primaryClient = await c.var.services.people.getPrimaryClient(tenantId, id);
+        // Report DELIVERY is still not fired here: `report.published` is a
+        // report event, produced solely by the publish path, and firing it on
+        // completion would deliver a report that may never have been published
+        // (IA-30). The primary-client lookup that used to sit here fed the
+        // removed notification's metadata and had no other reader.
 
-        // B3: in-app notification for report ready
+        // B3 — was a direct staff notification TYPED `report.published`, on the
+        // route that COMPLETES an inspection. Completing is not publishing (the
+        // comment above says so itself), so the mislabel went with the
+        // migration: this fires the real `inspection.completed` trigger and the
+        // seeded `Office alert — inspection completed` rule raises the notice,
+        // through the same path every other recipient uses.
         c.executionCtx.waitUntil(
-            c.var.services.notification.createForAllAdmins(tenantId, {
-                type: 'report.published',
-                title: `Report ready — ${inspection.propertyAddress ?? 'inspection'}`,
-                entityType: 'inspection',
-                entityId: inspection.id,
-                metadata: { clientEmail: primaryClient?.email ?? null },
-            })
+            fireAutomation(c.env.DB, tenantId, id, 'inspection.completed'),
         );
 
         auditFromContext(c, 'inspection.complete', 'inspection', {

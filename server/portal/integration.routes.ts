@@ -9,7 +9,7 @@ import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
 import { SsoHandoffSchema } from '../lib/validations/sso-handoff.schema';
 import { logger } from '../lib/logger';
 import { tenantConfigs, inspectionAccessTokens, tenants, contactRoleProfiles } from '../lib/db/schema';
-import { capabilitiesForKind, type RoleKind } from '../lib/people/capabilities';
+import { capabilitiesForProfile, type RoleKind } from '../lib/people/capabilities';
 import { reencryptAllTenantSecrets } from '../lib/secrets-reencrypt';
 import { secretsCacheKey } from '../lib/secrets-cache';
 import { OutboxService } from './outbox.service';
@@ -436,7 +436,7 @@ api.get('/tenants/by-email', requireServiceBinding, async (c) => {
         // no active profile row for its tenant (deleted/renamed) is dropped by
         // the inner join — fails closed, never matches.
         const grants = await d
-            .select({ tenantId: inspectionAccessTokens.tenantId, kind: contactRoleProfiles.kind })
+            .select({ tenantId: inspectionAccessTokens.tenantId, kind: contactRoleProfiles.kind, capabilityOverrides: contactRoleProfiles.capabilityOverrides })
             .from(inspectionAccessTokens)
             .innerJoin(contactRoleProfiles, and(
                 eq(contactRoleProfiles.tenantId, inspectionAccessTokens.tenantId),
@@ -451,7 +451,7 @@ api.get('/tenants/by-email', requireServiceBinding, async (c) => {
 
         const tenantIds = [...new Set(
             grants
-                .filter((g) => capabilitiesForKind(g.kind as RoleKind).selfRetrieveReport)
+                .filter((g) => capabilitiesForProfile(g.kind as RoleKind, g.capabilityOverrides).selfRetrieveReport)
                 .map((g) => g.tenantId as string),
         )];
         if (tenantIds.length === 0) return c.json({ success: true, data: { slugs: [] } });

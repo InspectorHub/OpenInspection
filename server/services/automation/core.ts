@@ -4,7 +4,7 @@ import { AUTOMATION_SEEDS } from '../../data/automation-seeds';
 import { nanoid } from 'nanoid';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
-import { SMS_DISCLOSURE_V1, type Constructor } from './shared';
+import { SMS_DISCLOSURE_V1, AUTOMATION_CHANNELS, type AutomationChannel, type RecipientKind, type Constructor } from './shared';
 import type { AutomationBase } from './shared';
 
 /**
@@ -35,8 +35,14 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
                     // so this map is normally fully populated; a seed whose key is still
                     // missing is skipped below (not inserted with a null profile id) and
                     // picked up on the next ensureSeeds call once the profile exists.
-                    const neededKeys = [...new Set(
-                        toInsert.map(s => s.recipientRoleKey).filter((k): k is NonNullable<typeof k> => !!k)
+                    // Not every seed targets a role — B3's staff alerts address
+                    // `users` and carry no role key at all.
+                    const neededKeys: string[] = [...new Set(
+                        toInsert.flatMap(s =>
+                            'recipientRoleKey' in s && typeof s.recipientRoleKey === 'string'
+                                ? [s.recipientRoleKey as string]
+                                : [],
+                        ),
                     )];
                     const profileRows = neededKeys.length
                         ? await db.select({ key: contactRoleProfiles.key, id: contactRoleProfiles.id })
@@ -55,12 +61,13 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
                     const CHUNK_SIZE = 7;
                     const rows: (typeof automations.$inferInsert)[] = [];
                     for (const seed of toInsert) {
+                        const seedRoleKey = 'recipientRoleKey' in seed ? seed.recipientRoleKey : null;
                         let recipientRoleProfileId: string | null = null;
-                        if (seed.recipientRoleKey) {
-                            recipientRoleProfileId = profileIdByKey.get(seed.recipientRoleKey) ?? null;
+                        if (seedRoleKey) {
+                            recipientRoleProfileId = profileIdByKey.get(seedRoleKey) ?? null;
                             if (!recipientRoleProfileId) {
                                 logger.warn('AutomationService.ensureSeeds: role profile not yet seeded, skipping rule (will retry)',
-                                    { tenantId, name: seed.name, recipientRoleKey: seed.recipientRoleKey });
+                                    { tenantId, name: seed.name, recipientRoleKey: seedRoleKey });
                                 continue;
                             }
                         }
@@ -124,14 +131,14 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
          * JSON `channels` column to a `string[]`. Keeps the typed response honest
          * (AutomationSchema.channels is `string[]`) without changing the DB column.
          */
-        protected serializeRow<T extends { channels: string | null }>(row: T): Omit<T, 'channels'> & { channels: ('email' | 'sms')[] } {
+        protected serializeRow<T extends { channels: string | null }>(row: T): Omit<T, 'channels'> & { channels: AutomationChannel[] } {
             const { channels, ...rest } = row;
             return { ...rest, channels: this.parseChannels(channels) };
         }
 
         async create(tenantId: string, data: {
             name: string; trigger: string;
-            recipientKind: 'role' | 'inspector' | 'all'; recipientRoleProfileId?: string | null;
+            recipientKind: RecipientKind; recipientRoleProfileId?: string | null;
             delayMinutes: number;
             conditions?: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
             channels?: ('email' | 'sms')[];
@@ -163,7 +170,7 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
 
         async update(tenantId: string, id: string, data: Partial<{
             name: string; trigger: string;
-            recipientKind: 'role' | 'inspector' | 'all'; recipientRoleProfileId: string | null;
+            recipientKind: RecipientKind; recipientRoleProfileId: string | null;
             delayMinutes: number; active: boolean;
             conditions: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
             channels: ('email' | 'sms')[];
@@ -205,11 +212,16 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
          */
         // Public (was `private` on the monolith) so later mixins in the chain can
         // call it through a typed cross-mixin contract; no runtime behavior change.
-        parseChannels(raw: string | null): ('email' | 'sms')[] {
+        parseChannels(raw: string | null): AutomationChannel[] {
             if (!raw) return ['email'];
             try {
                 const arr = JSON.parse(raw);
-                const valid = Array.isArray(arr) ? arr.filter((c) => c === 'email' || c === 'sms') : [];
+                // Filtering against the known set (rather than trusting the
+                // JSON) is what keeps a typo in the column from fanning out a
+                // log row on a channel no delivery path handles.
+                const valid = Array.isArray(arr)
+                    ? arr.filter((c): c is AutomationChannel => AUTOMATION_CHANNELS.includes(c))
+                    : [];
                 return valid.length ? valid : ['email'];
             } catch { return ['email']; }
         }

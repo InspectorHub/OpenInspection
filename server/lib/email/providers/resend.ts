@@ -79,6 +79,46 @@ export class ResendProvider implements EmailProvider {
   }
 
   /**
+   * Auth-only key probe used by Settings "save" / "test connection".
+   * POSTs an EMPTY send body: bad key → 401/403; valid key (incl. sending-only
+   * restricted keys that 401 on GET /domains) → 422. No email is ever sent.
+   * Lives on the provider so route handlers never hand-roll Resend URLs
+   * (`lint:provider-helpers`).
+   */
+  async probeApiKey(): Promise<{ valid: boolean; status: number | null }> {
+    let res: Response | null;
+    try {
+      res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.creds.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      });
+    } catch {
+      return { valid: true, status: null }; // network/5xx → don't block save on Resend uptime
+    }
+    if (res.status === 401 || res.status === 403) return { valid: false, status: res.status };
+    return { valid: true, status: res.status };
+  }
+
+  /** Count of verified domains visible to this key (0 when the key cannot list). */
+  async countVerifiedDomains(): Promise<number> {
+    let res: Response;
+    try {
+      res = await fetch('https://api.resend.com/domains', {
+        headers: { 'Authorization': `Bearer ${this.creds.apiKey}` },
+      });
+    } catch {
+      return 0;
+    }
+    if (!res.ok) return 0;
+    const body = (await res.json().catch(() => null)) as { data?: unknown[] } | null;
+    return Array.isArray(body?.data) ? body.data.length : 0;
+  }
+
+  /**
    * Verify a Resend (Svix) webhook signature.
    *
    * Svix signs `${svix-id}.${svix-timestamp}.${rawBody}` with HMAC-SHA256 using

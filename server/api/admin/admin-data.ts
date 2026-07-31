@@ -7,7 +7,6 @@
 // Mounted at `/` by the admin aggregator, preserving the original paths.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq, desc as descDz } from 'drizzle-orm';
 import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
@@ -26,6 +25,7 @@ import {
 import { SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { erasureLog } from '../../lib/db/schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
+import { getDrizzle } from '../../lib/route-helpers';
 
 
 /**
@@ -349,7 +349,7 @@ const adminDataRoutes = createApiRouter()
     })
     .openapi(erasureLogRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         const rows = await db
             .select({

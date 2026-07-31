@@ -8,7 +8,7 @@
  * state, and passes them in.
  */
 import type React from "react";
-import type { HubSection } from "~/components/portal/InspectionHub";
+import type { HubSection } from "~/components/portal/ClientPortalHub";
 import DocumentsSection, {
   type DocumentItem,
   type DocumentCategory,

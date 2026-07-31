@@ -165,7 +165,7 @@ export function CalendarConnectPanel({
               type="button"
               disabled={syncing}
               onClick={() => syncFetcher.submit({ intent: "calendar-sync" }, { method: "post" })}
-              className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
+              className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
             >
               {syncing ? m.settings_calconnect_syncing() : m.settings_calconnect_sync_now()}
             </button>

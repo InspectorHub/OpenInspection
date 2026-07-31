@@ -7,15 +7,19 @@ const AUTOMATION_TRIGGERS = [
     'agreement.signer_signed',
     'agreement.viewed', 'agreement.declined', 'agreement.expired',
     'event.created', 'event.completed',
+    // B3 — see the schema comment: a booking is not any inspection creation,
+    // and completing an inspection is not publishing its report.
+    'booking.received', 'inspection.completed',
     'inspection.reminder',
 ] as const;
 
 // Recipient discriminator (replaces the old fixed `recipient` enum). 'role'
 // targets the contact_role_profiles row named by recipientRoleProfileId;
 // 'inspector' and 'all' are role-independent.
-const RECIPIENT_KINDS = ['role', 'inspector', 'all'] as const;
+// B2 — 'staff' targets the workspace's owners + managers (users, not contacts).
+const RECIPIENT_KINDS = ['role', 'inspector', 'all', 'staff'] as const;
 
-const AUTOMATION_CHANNELS = ['email', 'sms'] as const;
+const AUTOMATION_CHANNELS = ['email', 'sms', 'in_app'] as const;
 
 // Track J (D2) — send-time gates. All optional; absent = no gate.
 const ConditionsSchema = z.object({
@@ -29,7 +33,7 @@ export const AutomationSchema = z.object({
     tenantId:        z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
     name:            z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
     trigger:         z.enum(AUTOMATION_TRIGGERS).describe('TODO describe trigger field for the OpenInspection MCP integration'),
-    recipientKind:   z.enum(RECIPIENT_KINDS).describe("Who this rule sends to: 'role' (see recipientRoleProfileId), 'inspector', or 'all'."),
+    recipientKind:   z.enum(RECIPIENT_KINDS).describe("Who this rule sends to: 'role' (see recipientRoleProfileId), 'inspector', 'all', or 'staff' (the workspace's owners + managers)."),
     recipientRoleProfileId: z.string().nullable().describe("The contact_role_profiles.id targeted when recipientKind is 'role'; null otherwise."),
     delayMinutes:    z.number().int().describe('TODO describe delayMinutes field for the OpenInspection MCP integration'),
     conditions:      z.string().nullable().describe('JSON-encoded send-time gates, or null. Editor parses it.'),
@@ -46,7 +50,7 @@ export const AutomationSchema = z.object({
 const CreateAutomationBase = z.object({
     name:            z.string().min(1).max(200).describe('TODO describe name field for the OpenInspection MCP integration'),
     trigger:         z.enum(AUTOMATION_TRIGGERS).describe('TODO describe trigger field for the OpenInspection MCP integration'),
-    recipientKind:   z.enum(RECIPIENT_KINDS).describe("Who this rule sends to: 'role' (see recipientRoleProfileId), 'inspector', or 'all'."),
+    recipientKind:   z.enum(RECIPIENT_KINDS).describe("Who this rule sends to: 'role' (see recipientRoleProfileId), 'inspector', 'all', or 'staff' (the workspace's owners + managers)."),
     recipientRoleProfileId: z.string().nullish().describe("The contact_role_profiles.id targeted when recipientKind is 'role'; omit/null otherwise."),
     // No `.default(0)` on the base — same `.partial()` injection hazard as `channels`: it would
     // reset a tenant's configured delay to 0 on every partial PATCH that omits it (the service

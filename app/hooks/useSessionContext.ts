@@ -17,8 +17,10 @@ export interface SessionContext {
     tenantStatus: string;
     currentUserSlug: string | null;
     bookingHost: string | null;
-    /** PRIVACY_URL env value (operator-configured), or null when unset. */
+    /** Effective Privacy URL for this tenant (hosted /legal/… or custom). */
     privacyUrl: string | null;
+    /** Effective Terms URL for this tenant. */
+    termsUrl: string | null;
     /** Tenant default display timezone (IANA name; 'UTC' when unset). */
     defaultTimezone: string;
     /** Tenant default display locale (BCP-47; 'en-US' when unset). */
@@ -49,6 +51,12 @@ export interface SessionContext {
  * Access the session context from any child route of auth-layout.
  * Returns null when context is unavailable (e.g. fetch failed).
  */
+/** Unread counterparty messages across the tenant (sidebar badge). */
+export function useUnreadMessages(): number {
+  const ctx = useSessionContext();
+  return (ctx as (SessionContext & { unreadMessages?: number }) | null)?.unreadMessages ?? 0;
+}
+
 export function useSessionContext(): SessionContext | null {
   const data = useRouteLoaderData("routes/auth-layout") as
     | { context: SessionContext | null }

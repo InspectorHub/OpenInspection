@@ -1,12 +1,13 @@
 import { useState, useRef } from "react";
 import { NavLink, useRouteLoaderData } from "react-router";
-import { useSessionContext } from "~/hooks/useSessionContext";
+import { useSessionContext, useUnreadMessages } from "~/hooks/useSessionContext";
 import { writeSidebarCookie, type UiPrefs } from "~/lib/ui-prefs";
 import { IC, WORKSPACE_ITEMS } from "~/components/sidebar/nav-items";
 import { SidebarGroup } from "~/components/sidebar/SidebarGroup";
 import { UserMenuPopover } from "~/components/sidebar/UserMenuPopover";
 import { MobileHeader } from "~/components/sidebar/MobileHeader";
 import { useCommandPalette } from "~/components/CommandPalette";
+import { StaffNoticeBell } from "~/components/notices/StaffNoticeBell";
 import { Avatar } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
@@ -23,6 +24,7 @@ export function Sidebar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const ctx = useSessionContext();
+  const unreadMessages = useUnreadMessages();
   const { openPalette } = useCommandPalette();
 
   const companyName = ctx?.branding?.companyName || "OpenInspection";
@@ -65,9 +67,12 @@ export function Sidebar() {
         {!collapsed && (
           <>
             <span className="text-[14px] font-bold text-ih-fg-1 tracking-tight leading-tight truncate">{companyName}</span>
-            <NavLink to="/notifications" className="ml-auto relative flex items-center justify-center w-7 h-7 rounded-ih-button text-ih-fg-4 hover:bg-ih-bg-muted hover:text-ih-primary transition-all" aria-label={m.nav_action_notifications()}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-            </NavLink>
+            {/* Notices — the same bell + panel the client and agent portals
+                use (design §3.15). It was a link to /notifications; "sent to
+                me" is a glance, and the page stays for the full history. */}
+            <span className="ml-auto shrink-0">
+              <StaffNoticeBell />
+            </span>
           </>
         )}
       </div>
@@ -93,7 +98,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-1 overflow-y-auto">
-        <SidebarGroup label={m.nav_section_workspace()} items={WORKSPACE_ITEMS} collapsed={collapsed} />
+        <SidebarGroup label={m.nav_section_workspace()} items={WORKSPACE_ITEMS.map((i) => (i.to === "/messages" ? { ...i, badge: unreadMessages } : i))} collapsed={collapsed} />
         {/* ds-allow: compact sidebar nav rhythm (10/7/14px), no semantic spacing token */}
         <div className="mb-[14px]">
           <NavLink

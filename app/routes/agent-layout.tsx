@@ -3,6 +3,8 @@ import type { Route } from "./+types/agent-layout";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
+import { AgentNoticeBell } from "~/components/agent/AgentNoticeBell";
+import type { NoticeRowData } from "~/lib/notice-view";
 import { m } from "~/paraglide/messages";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -12,8 +14,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // timezone here so every agent page can resolve dates the same way. null =
   // no personal override (dates then follow each inspecting company's tz).
   let timezone: string | null = null;
+  const api = createApi(context, { token });
   try {
-    const api = createApi(context, { token });
     const res = await api.agent.profile.$get();
     if (res.ok) {
       const body = (await res.json()) as { data?: { timezone?: string | null } };
@@ -22,7 +24,22 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   } catch {
     /* non-fatal: fall back to per-company / UTC resolution */
   }
-  return { agentTimezone: timezone };
+
+  // C3 — the Notices bell rides this loader, which every agent page already
+  // runs, so the unread badge is right before the panel is ever opened. Ambient
+  // by nature: a failed read shows an empty bell rather than failing the page.
+  let notices: { notices: NoticeRowData[]; unread: number } = { notices: [], unread: 0 };
+  try {
+    const res = await api.agentNotices.notices.$get({}, { headers: { "x-token-relay": "1" } });
+    if (res.ok) {
+      const body = (await res.json()) as { data?: { notices: NoticeRowData[]; unread: number } };
+      if (body.data) notices = body.data;
+    }
+  } catch {
+    /* non-fatal: an empty bell */
+  }
+
+  return { agentTimezone: timezone, notices };
 }
 
 /**
@@ -47,7 +64,8 @@ const NAV_ITEMS: { to: string; label: () => string }[] = [
   { to: "/agent-settings/profile", label: () => m.agent_portal_settings_title() },
 ];
 
-export default function AgentLayout() {
+export default function AgentLayout({ loaderData }: Route.ComponentProps) {
+  const { notices } = loaderData;
   return (
     <div className="min-h-screen bg-ih-bg-app">
       {/* Top bar */}
@@ -83,6 +101,12 @@ export default function AgentLayout() {
                 reachable and consistent here too. Hidden on the smallest widths
                 where the top bar has no room; the field variant + cookie still
                 apply. */}
+            {/* Notices — a bell in the header is always "sent to me"
+                (design §3.15). Sits before the theme control so the two
+                header affordances read left-to-right as inbox then settings. */}
+            <span className="ml-2">
+              <AgentNoticeBell notices={notices.notices} unread={notices.unread} />
+            </span>
             <ThemeSegmentControl className="hidden md:flex ml-2" />
             <a
               href="/logout"

@@ -63,7 +63,7 @@ describe('deleteInspectionCascade', () => {
             role: 'client', token: crypto.randomUUID(), createdAt: new Date(),
         } as never);
         await testDb.insert(schema.inspectionMessages).values({
-            id: 'msg-1', tenantId: TENANT, inspectionId: INSP, fromRole: 'client',
+            id: 'msg-1', tenantId: TENANT, inspectionId: INSP, contactId: 'c-cascade', fromRole: 'client',
             body: 'hi', createdAt: new Date(),
         } as never);
 

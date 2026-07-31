@@ -38,6 +38,22 @@ export interface ListResult {
 }
 
 /**
+ * The ONE place a `notifications` row is written (enforced by
+ * `lint:provider-helpers`, which allows the insert in this file only).
+ *
+ * C1's notice-header writer needs to insert against a db handle it was
+ * ALREADY given — the trigger path writes headers inside the same drizzle
+ * instance that just inserted the logs, and the unit tests run it against
+ * better-sqlite3. So the write lives here, with its table, while the header's
+ * meaning (the user_id XOR contact_id invariant, the id, the defaults) stays
+ * in automation/notice-headers.ts where a reader looks for it.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function insertNotificationRow(db: any, values: typeof notifications.$inferInsert): Promise<void> {
+    await db.insert(notifications).values(values);
+}
+
+/**
  * In-app notifications inbox. Companion to email automation:
  * the same triggers that send email also write a row here so users
  * have a durable feed they can review later without searching their inbox.

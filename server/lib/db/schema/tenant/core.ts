@@ -237,6 +237,15 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // states the live-link count, so nobody is deciding blind.
     // Appended at table end for D1 rebuild safety.
     archiveRevokesAccess: integer('is_archive_revoking_access', { mode: 'boolean' }).notNull().default(false),
+    // Tenant Privacy / Terms for public footers + SMS/TFV filings.
+    // `hosted` = OI pages at /legal/:slug/privacy|terms (optional body overrides).
+    // `custom` = tenant's own website URLs (both required when custom).
+    legalMode: text('legal_mode', { enum: ['hosted', 'custom'] }).notNull().default('hosted'),
+    customPrivacyUrl: text('custom_privacy_url'),
+    customTermsUrl: text('custom_terms_url'),
+    // Optional full-page body for hosted mode; null = built-in template.
+    privacyBody: text('privacy_body'),
+    termsBody: text('terms_body'),
 });
 
 /**

@@ -109,7 +109,7 @@ export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
           )}
           <button
             type="button"
-            className="text-sm font-semibold bg-ih-primary text-white px-3 py-1 rounded"
+            className="text-sm font-semibold bg-ih-primary text-ih-fg-inverse px-3 py-1 rounded"
             onClick={submit}
             disabled={busy}
           >

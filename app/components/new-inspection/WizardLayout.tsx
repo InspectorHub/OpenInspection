@@ -60,7 +60,7 @@ export function WizardLayout({
                             <div key={s} className="flex items-center gap-1 flex-1">
                                 <div
                                     className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                                        i <= stepIdx ? "bg-ih-primary text-white" : "bg-ih-bg-muted text-ih-fg-4"
+                                        i <= stepIdx ? "bg-ih-primary text-ih-fg-inverse" : "bg-ih-bg-muted text-ih-fg-4"
                                     }`}
                                 >
                                     {i + 1}
@@ -104,7 +104,7 @@ export function WizardLayout({
                                 disabled={blockedReason !== null}
                                 aria-describedby={blockedReason ? "newinsp-blocked-reason" : undefined}
                                 onClick={onNext}
-                                className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 {isLastStep ? m.new_inspection_create() : m.common_next()}
                             </button>

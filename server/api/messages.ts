@@ -35,6 +35,8 @@ import { buildPortalUrl } from '../lib/portal-urls';
 import { getBaseUrl, resolveTenantSlug } from '../lib/url';
 import type { HonoConfig } from '../types/hono';
 import { r2Keys } from '../lib/r2-keys';
+import { messageThreadRoutes } from './messages-threads';
+import { r2Get } from '../lib/r2/objects';
 
 const AttachmentSchema = z.object({
     id: z.string().describe('Stable attachment identifier within the message.'),
@@ -77,6 +79,7 @@ const sendRoute = createRoute(withMcpMetadata({
         body: { content: { 'application/json': { schema: z.object({
             body: z.string().min(1).max(5000).describe('Message body text.'),
             attachments: z.array(AttachmentSchema).max(5).optional().describe('Up to 5 previously-uploaded attachments.'),
+            contactId: z.string().optional().describe('Which contact\'s thread to post into (compose picker). Omitted: the primary client\'s thread. 404 when the contact is not on this inspection.'),
         }).describe('Message payload.') } } },
     },
     responses: {
@@ -190,35 +193,62 @@ export const inspectorMessageRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const svc = c.var.services.message;
         const messages = await svc.listForInspection(inspectionId, tenantId);
-        // Mark all client messages read on inspector view.
-        await svc.markAllReadForRole(inspectionId, tenantId, 'client');
+        // The inspector opened the merged view: mark every counterparty-authored
+        // message on the inspection read (all threads — this is the one surface
+        // that shows them all).
+        await svc.markInspectionReadForStaff(inspectionId, tenantId);
         return c.json({ success: true, data: messages }, 200);
     })
     .openapi(sendRoute, async (c) => {
         const { inspectionId } = c.req.valid('param');
         const tenantId = c.get('tenantId');
-        const { body, attachments } = c.req.valid('json');
+        const { body, attachments, contactId } = c.req.valid('json');
         const jwtUser = c.get('user');
         const svc = c.var.services.message;
+        // Which thread this reply belongs to: the named contact's (compose
+        // picker), else the primary client's. A contactId not seated on this
+        // inspection is a 404, not a silent fallback — falling back would post
+        // the reply into a stranger's thread.
+        const thread = contactId
+            ? await svc.contactOnInspection(tenantId, inspectionId, contactId)
+            : await svc.primaryClientThread(tenantId, inspectionId);
+        if (contactId && !thread) throw Errors.NotFound('Contact is not on this inspection');
+        if (!thread) throw Errors.BadRequest('Inspection has no client to message');
+        // The JWT carries `sub`, not `id`, and no display name (looked up from
+        // the DB when needed) — resolve the author's name so the client's
+        // portal shows who replied instead of a bare role label.
+        const authorId = (jwtUser as { sub?: string } | undefined)?.sub ?? null;
+        let authorName: string | null = (jwtUser as { name?: string } | undefined)?.name ?? null;
+        if (!authorName && authorId) {
+            const { drizzle } = await import('drizzle-orm/d1');
+            const { users } = await import('../lib/db/schema');
+            const { and, eq } = await import('drizzle-orm');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const u = await drizzle(c.env.DB as any).select({ name: users.name }).from(users)
+                .where(and(eq(users.id, authorId), eq(users.tenantId, tenantId))).get();
+            authorName = u?.name ?? null;
+        }
         const row = await svc.createMessage({
             tenantId,
             inspectionId,
+            contactId: thread.contactId,
             fromRole: 'inspector',
-            fromName: (jwtUser as { name?: string } | undefined)?.name ?? null,
+            fromUserId: authorId,
+            fromName: authorName,
             body,
             attachments: attachments ?? [],
         });
-        // T22: notify client. Build a unified-portal Messages deep-link the same
-        // way the report-ready email does (per-recipient portal token + slug), so
-        // the no-login client lands in the Hub messages tab already authorized.
+        // T22: notify the THREAD's contact — not unconditionally the primary
+        // client. Build a unified-portal Messages deep-link the same way the
+        // report-ready email does (per-recipient portal token + slug), so the
+        // no-login recipient lands in the Hub messages tab already authorized.
         try {
             let clientViewUrl: string | undefined;
             try {
-                const clientEmail = await svc.clientEmailForInspection(inspectionId, tenantId);
-                if (clientEmail) {
+                if (thread.email) {
                     const slug = await resolveTenantSlug(c, tenantId);
                     const portalToken = await c.var.services.portalAccess.issueToken({
-                        tenantId, inspectionId, recipientEmail: clientEmail, role: 'client',
+                        tenantId, inspectionId, recipientEmail: thread.email, role: 'client',
                     });
                     clientViewUrl = buildPortalUrl(getBaseUrl(c), slug, inspectionId, portalToken, 'messages');
                 }
@@ -226,6 +256,7 @@ export const inspectorMessageRoutes = createApiRouter()
             await c.var.services.email.sendMessageNotification('client', inspectionId, row, {
                 db: c.env.DB, kv: c.env.TENANT_CACHE, baseUrl: c.env.APP_BASE_URL || `https://${c.req.header('host') ?? ''}`,
                 clientViewUrl,
+                contactEmail: thread.email ?? undefined,
             });
         } catch { /* silent */ }
         return c.json({ success: true, data: row }, 201);
@@ -242,21 +273,24 @@ export const inspectorMessageRoutes = createApiRouter()
         const att = await c.var.services.message.resolveAttachmentForInspection(inspectionId, tenantId, attachmentId);
         if (!att) throw Errors.NotFound('Attachment not found');
         if (!c.env.PHOTOS) throw Errors.NotFound('Storage not available');
-        const obj = await c.env.PHOTOS.get(att.key);
+        const obj = await r2Get(c.env.PHOTOS, att.key);
         if (!obj) throw Errors.NotFound('Attachment not found');
         return streamAttachment(obj, att);
     });
 
-// ── Cross-cutting summary router (mounted at /api/messages) ───────────────────
+// Company inbox thread routes live in ./messages-threads (Track D); they
+// compose onto this same /api/messages mount below.
 
 const messageRoutes = createApiRouter()
     .openapi(unreadRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const count = await c.var.services.message.unreadCountForTenant(tenantId);
         return c.json({ success: true, data: { count } }, 200);
-    });
+    })
+    .route('/', messageThreadRoutes);
 
 export type MessagesApi = typeof messageRoutes;
+export type InspectorMessagesApi = typeof inspectorMessageRoutes;
 
 // ── Client router (resolveClientActor-gated; mounted at /api/public) ──────────
 
@@ -275,9 +309,13 @@ clientMessageRoutes.get('/inspections/:id/messages', async (c) => {
     const actor = await resolveClientActor(c, inspectionId);
     if (!actor) return c.json({ error: 'Unauthorized' }, 401);
     const svc = c.var.services.message;
-    const messages = await svc.listForInspection(inspectionId, actor.tenantId);
-    // Mark all inspector messages read on client view.
-    await svc.markAllReadForRole(inspectionId, actor.tenantId, 'inspector');
+    // The portal viewer sees THEIR thread, and marking read is scoped to it —
+    // an inspection-wide mark would clear unread state on every participant's
+    // thread the moment one of them looked (per-contact threading, design §3.9).
+    const thread = await svc.resolveThreadContact(actor.tenantId, inspectionId, actor.ref);
+    const all = await svc.listForInspection(inspectionId, actor.tenantId);
+    const messages = thread ? all.filter((mrow) => mrow.contactId === thread.contactId) : all;
+    if (thread) await svc.markThreadReadForContact(actor.tenantId, thread.contactId, inspectionId);
     return c.json({ success: true, data: messages }, 200);
 });
 
@@ -289,13 +327,17 @@ clientMessageRoutes.post('/inspections/:id/messages', async (c) => {
     const parsed = sendBodySchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: 'Invalid message payload.' }, 400);
     const svc = c.var.services.message;
+    // Attribution goes through the actor's OWN seat (matched by their verified
+    // email), not unconditionally through the primary client — the old path is
+    // why a co-client's messages were signed with the primary client's name.
+    const thread = await svc.resolveThreadContact(actor.tenantId, inspectionId, actor.ref);
+    if (!thread) return c.json({ error: 'No client seat on this inspection.' }, 403);
     const row = await svc.createMessage({
         tenantId: actor.tenantId,
         inspectionId,
+        contactId: thread.contactId,
         fromRole: 'client',
-        // Attribution: prefer the inspection's stored client name; fall back to
-        // the actor's verified email so the inspector sees who replied.
-        fromName: (await svc.clientNameForInspection(inspectionId, actor.tenantId)) ?? actor.ref,
+        fromName: thread.name ?? actor.ref,
         body: parsed.data.body,
         attachments: parsed.data.attachments ?? [],
     });
@@ -332,7 +374,7 @@ clientMessageRoutes.get('/inspections/:id/messages/attachments/:attachmentId', a
     const att = await c.var.services.message.resolveAttachmentForInspection(inspectionId, actor.tenantId, attachmentId);
     if (!att) return c.json({ error: 'Not found' }, 404);
     if (!c.env.PHOTOS) return c.json({ error: 'Not found' }, 404);
-    const obj = await c.env.PHOTOS.get(att.key);
+    const obj = await r2Get(c.env.PHOTOS, att.key);
     if (!obj) return c.json({ error: 'Not found' }, 404);
     return streamAttachment(obj, att);
 });

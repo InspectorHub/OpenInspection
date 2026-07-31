@@ -296,7 +296,7 @@ export default function TemplatesPage() {
               <Icon name="download" size={16} strokeWidth={1.75} />
               {m.templates_action_import_spectora()}
             </button>
-            <button onClick={() => setCreateOpen(true)} className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2">
+            <button onClick={() => setCreateOpen(true)} className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2">
               {m.templates_action_new_template()}
             </button>
           </>

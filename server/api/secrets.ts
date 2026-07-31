@@ -9,7 +9,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { createApiRouter } from '../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
@@ -18,6 +17,7 @@ import { sealSecrets, openSecrets, maskSecret, isMasked } from '../lib/config-cr
 import { secretsCacheKey } from '../lib/secrets-cache';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import type { HonoConfig } from '../types/hono';
+import { getDrizzle } from '../lib/route-helpers';
 
 /**
  * Canonical list of all integration secrets configurable via UI.
@@ -207,7 +207,7 @@ const CAMEL_TO_ENV: Record<string, IntegrationSecretKey> = {
  */
 async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, string | undefined>) {
     const tenantId = c.get('tenantId');
-    const db = drizzle(c.env.DB);
+    const db = getDrizzle(c);
     const allowedKeys = new Set<string>(INTEGRATION_SECRET_KEYS);
 
     // Normalize incoming body to canonical ENV-name keys (drop unknowns).
@@ -284,16 +284,11 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
 
     const newResend = body.RESEND_API_KEY;
     if (newResend && !isMasked(newResend) && newResend.trim() !== '') {
-        // Auth-only probe: an EMPTY send — bad key → 401/403, valid key
-        // (incl. sending-only restricted keys) → 422. No email is sent.
-        const probe = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${newResend.trim()}`, 'Content-Type': 'application/json' },
-            body: '{}',
-        }).catch(() => null);
-        // 401/403 = bad key. Other failures (network, 5xx) are NOT the key's
-        // fault — let the save proceed rather than blocking on Resend uptime.
-        if (probe && (probe.status === 401 || probe.status === 403)) {
+        // Auth-only probe via the Resend provider — no hand-rolled vendor URL.
+        const { ResendProvider } = await import('../lib/email/providers/resend');
+        const probe = await new ResendProvider({ apiKey: newResend.trim() }).probeApiKey();
+        // Network/null status: not the key's fault — let the save proceed.
+        if (!probe.valid) {
             return c.json({
                 success: false as const,
                 error: {
@@ -364,7 +359,7 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
 const secretsRoutes = createApiRouter()
     .openapi(getSecretsRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         const row = await db
             .select({ secretsEnc: tenantConfigs.secretsEnc, dekEnc: tenantConfigs.dekEnc })

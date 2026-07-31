@@ -10,7 +10,7 @@
  *
  * Uses setExtraHTTPHeaders for auth (HTTP env, __Host- cookies can't be set from
  * the browser over plain HTTP — the raw header replay is the same trick used by
- * inspection-hub.spec.ts).
+ * inspector-portal.spec.ts).
  */
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';

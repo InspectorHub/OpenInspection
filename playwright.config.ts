@@ -70,8 +70,8 @@ export default defineConfig({
             testMatch: 'route-auth-boundary.spec.ts',
         },
         {
-            name: 'inspection-hub',
-            testMatch: 'inspection-hub.spec.ts',
+            name: 'inspector-portal',
+            testMatch: 'inspector-portal.spec.ts',
         },
         {
             // IA-29 / IA-30 — publishing is decoupled from order completion.

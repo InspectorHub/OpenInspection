@@ -153,7 +153,7 @@ export function QualificationWidget({ service, initialUserIds, members }: Qualif
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="h-7 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+              className="h-7 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
             >
               {saving ? m.common_saving() : m.common_save()}
             </button>

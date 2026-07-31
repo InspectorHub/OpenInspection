@@ -4,6 +4,7 @@ import { tenantConfigs } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import type { EmailIdentityConfig } from '../lib/email/sender-identity';
 import { r2Keys } from '../lib/r2-keys';
+import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
 
 export interface IntegrationConfig {
     appBaseUrl?: string;
@@ -82,8 +83,21 @@ export class BrandingService {
      * A-10 — the canonical tenant brand projection every tenant-facing surface
      * (profile / booking / report / invoice / email) paints with.
      * Returns nulls when no config row exists; callers apply platform fallbacks.
+     * Pass `slug` + `baseUrl` to include effective Privacy / Terms URLs.
      */
-    async getBrand(tenantId: string): Promise<{ companyName: string | null; logoUrl: string | null; primaryColor: string | null; defaultTimezone: string; supportEmail: string | null; companyPhone: string | null }> {
+    async getBrand(
+        tenantId: string,
+        opts?: { slug?: string | null; baseUrl?: string | null },
+    ): Promise<{
+        companyName: string | null;
+        logoUrl: string | null;
+        primaryColor: string | null;
+        defaultTimezone: string;
+        supportEmail: string | null;
+        companyPhone: string | null;
+        privacyUrl: string | null;
+        termsUrl: string | null;
+    }> {
         const db = this.getDrizzle();
         const row = await db
             .select({
@@ -93,10 +107,28 @@ export class BrandingService {
                 defaultTimezone: tenantConfigs.defaultTimezone,
                 supportEmail: tenantConfigs.supportEmail,
                 companyPhone: tenantConfigs.companyPhone,
+                legalMode: tenantConfigs.legalMode,
+                customPrivacyUrl: tenantConfigs.customPrivacyUrl,
+                customTermsUrl: tenantConfigs.customTermsUrl,
             })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
             .get();
+
+        let privacyUrl: string | null = null;
+        let termsUrl: string | null = null;
+        const slug = opts?.slug?.trim();
+        const baseUrl = opts?.baseUrl?.trim();
+        if (slug && baseUrl) {
+            const links = resolveTenantLegalUrls(slug, baseUrl, {
+                legalMode: (row?.legalMode as LegalMode | undefined) ?? 'hosted',
+                customPrivacyUrl: row?.customPrivacyUrl ?? null,
+                customTermsUrl: row?.customTermsUrl ?? null,
+            });
+            privacyUrl = links.privacyUrl;
+            termsUrl = links.termsUrl;
+        }
+
         return {
             companyName: row?.companyName ?? null,
             logoUrl: row?.logoUrl ?? null,
@@ -107,6 +139,8 @@ export class BrandingService {
             // IA-36 ⑨ — recovery channel for a reader whose link no longer works.
             supportEmail: row?.supportEmail ?? null,
             companyPhone: row?.companyPhone ?? null,
+            privacyUrl,
+            termsUrl,
         };
     }
 

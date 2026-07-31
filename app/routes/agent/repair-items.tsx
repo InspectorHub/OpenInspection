@@ -278,7 +278,7 @@ export default function AgentRepairItemsPage() {
         actions={
           <button
             onClick={() => window.print()}
-            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors shrink-0"
+            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors shrink-0"
           >
             {m.agent_portal_recommendations_print()}
           </button>

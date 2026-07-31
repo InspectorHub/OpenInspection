@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 
-const ChannelSchema = z.enum(['email', 'sms']);
+// B1 — `in_app` templates hold a notice's title (`subject`) and body.
+const ChannelSchema = z.enum(['email', 'sms', 'in_app']);
 
 // tenantId is NEVER accepted from input (multi-tenant rule); .strip() drops extras.
 export const CreateMessageTemplateSchema = z.object({

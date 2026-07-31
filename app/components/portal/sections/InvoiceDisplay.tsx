@@ -31,20 +31,38 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, portalToken, just
   const total = invoice.total;
   const isPaid = invoice.status === "paid";
   const isVoid = invoice.status === "void";
-  const amountPaid = isPaid ? total : 0;
   const balanceDue = isPaid ? 0 : total;
   const payable = !isPaid && !isVoid && balanceDue > 0;
+  // IA-89 — Stripe has redirected back but the webhook has not settled the
+  // invoice yet. This is a PRESENTATION state only: nothing is written, the
+  // webhook stays the settlement authority.
+  const processing = payable && justPaid;
+  // Everything below keys off `settled` rather than `isPaid`, so the optimistic
+  // state renders the PAID layout (stamp, "Amount paid", zero balance) with its
+  // wording swapped — not the unpaid layout with a reassurance box bolted on.
+  // It used to render the latter: a client who had just paid $450 saw
+  // "BALANCE DUE $450" in the largest type on the page, a `SENT` badge, and a
+  // small green note claiming payment was received. The three signals
+  // contradicted each other at the most trust-sensitive moment in the journey,
+  // and the largest one was the wrong one.
+  const settled = isPaid || processing;
+  const amountPaid = settled ? total : 0;
   // Phase B — every amount on this document renders in the invoice's snapshot
   // currency, not the tenant's live setting. `money()` defaults to USD when absent.
   const cur = { currency: invoice.currency };
 
   return (
     <div className="relative bg-ih-bg-card border border-ih-border rounded-2xl shadow-ih-card overflow-hidden print:shadow-none print:border-0">
-      {/* PAID stamp */}
-      {isPaid && (
+      {/* PAID stamp — "PROCESSING" until the webhook settles, so the client
+          watches one element change wording rather than the page change shape. */}
+      {settled && (
         <div className="pointer-events-none absolute top-16 right-6 -rotate-12 select-none">
-          <span className="inline-block px-4 py-1.5 rounded-md border-[3px] border-ih-ok-fg text-ih-ok-fg font-extrabold tracking-[0.25em] text-2xl uppercase opacity-90">
-            {m.portal_invoice_paid_stamp()}
+          <span
+            className={`inline-block px-4 py-1.5 rounded-md border-[3px] border-ih-ok-fg text-ih-ok-fg font-extrabold tracking-[0.25em] uppercase opacity-90 ${
+              processing ? "text-base" : "text-2xl"
+            }`}
+          >
+            {processing ? m.portal_invoice_processing_stamp() : m.portal_invoice_paid_stamp()}
           </span>
         </div>
       )}
@@ -58,8 +76,8 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, portalToken, just
               {invoice.number}
             </h1>
           </div>
-          <Pill tone={STATUS_TONE[invoice.status] ?? "neutral"} className="shrink-0 uppercase tracking-wide">
-            {invoice.status}
+          <Pill tone={processing ? "sat" : STATUS_TONE[invoice.status] ?? "neutral"} className="shrink-0 uppercase tracking-wide">
+            {processing ? m.portal_invoice_status_processing() : invoice.status}
           </Pill>
         </div>
 
@@ -92,39 +110,41 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, portalToken, just
           <Row label={m.portal_invoice_subtotal()} value={money(subtotal, cur)} muted />
           {discountTotal < 0 && <Row label={m.portal_invoice_discount()} value={`−${money(Math.abs(discountTotal), cur)}`} muted tone="ok" />}
           <Row label={m.portal_invoice_total()} value={money(total, cur)} strong />
-          {isPaid && <Row label={m.portal_invoice_amount_paid()} value={`−${money(amountPaid, cur)}`} muted tone="ok" />}
+          {settled && <Row label={m.portal_invoice_amount_paid()} value={`−${money(amountPaid, cur)}`} muted tone="ok" />}
           <div className="flex items-baseline justify-between pt-2 mt-1 border-t border-ih-border">
-            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4">{isPaid ? m.portal_invoice_balance() : m.portal_invoice_balance_due()}</span>
-            <span className={`font-serif text-[24px] font-semibold tracking-tight ${balanceDue > 0 ? "text-ih-fg-1" : "text-ih-ok-fg"}`}>
-              {money(balanceDue, cur)}
-            </span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4">{settled ? m.portal_invoice_balance() : m.portal_invoice_balance_due()}</span>
+            {processing ? (
+              // The amount is deliberately absent: the balance is not zero until
+              // the webhook says so, and restating "$450" here is exactly the
+              // contradiction this state exists to remove.
+              <span className="font-serif text-[18px] font-semibold tracking-tight text-ih-ok-fg">
+                {m.portal_invoice_finalizing_short()}
+              </span>
+            ) : (
+              <span className={`font-serif text-[24px] font-semibold tracking-tight ${balanceDue > 0 ? "text-ih-fg-1" : "text-ih-ok-fg"}`}>
+                {money(balanceDue, cur)}
+              </span>
+            )}
           </div>
         </div>
       </div>
 
       {/* Pay panel — Stripe Payment Element (bring-your-own-keys) */}
-      {payable && !justPaid && (
+      {payable && !processing && (
         <div className="px-7 pb-7 print:hidden">
           <StripePayPanel id={inspectionId} portalToken={portalToken} balanceDue={balanceDue} inspectorName={invoice.inspectorName} brandColor={brand.primaryColor} currency={invoice.currency} />
         </div>
       )}
 
-      {/* Optimistic post-redirect state — webhook settles the invoice async */}
-      {payable && justPaid && (
+      {/* Confirmation — one block for both settled states; only the second line
+          differs (what happens next vs. what to do with the receipt). */}
+      {settled && (
         <div className="px-7 pb-7 print:hidden">
           <div className="rounded-xl border border-ih-ok bg-ih-ok-bg p-4 text-center">
             <p className="text-[13px] font-semibold text-ih-ok-fg">{m.portal_invoice_payment_received()}</p>
-            <p className="text-[12px] text-ih-fg-3 mt-1">{m.portal_invoice_finalizing()}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Paid confirmation */}
-      {isPaid && (
-        <div className="px-7 pb-7 print:hidden">
-          <div className="rounded-xl border border-ih-ok bg-ih-ok-bg p-4 text-center">
-            <p className="text-[13px] font-semibold text-ih-ok-fg">{m.portal_invoice_payment_received()}</p>
-            <p className="text-[12px] text-ih-fg-3 mt-1">{m.portal_invoice_keep_receipt()}</p>
+            <p className="text-[12px] text-ih-fg-3 mt-1">
+              {processing ? m.portal_invoice_finalizing() : m.portal_invoice_keep_receipt()}
+            </p>
           </div>
         </div>
       )}

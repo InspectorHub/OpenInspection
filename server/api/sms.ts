@@ -23,7 +23,6 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { contacts, inspections, tenants, tenantConfigs, messagingCompliance } from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
@@ -34,7 +33,7 @@ import { SmsConsentService } from '../services/sms-consent.service';
 import { MessagingComplianceService } from '../services/messaging-compliance.service';
 import { PeopleService } from '../services/people.service';
 import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
-import { TwilioClient } from '../lib/messaging/twilio';
+import { createTwilioClient } from '../lib/messaging/twilio';
 import { ensureClientContact } from '../lib/sms/ensure-client-contact';
 import { resolveOptinToken } from '../lib/sms/optin-token';
 import { normalizeE164 } from '../lib/sms/phone';
@@ -45,6 +44,7 @@ import { managedSendAllowed } from '../lib/sms/managed-send-gate';
 import { PlanQuotaGuard, readTenantTier } from '../features/plan-quota/guard';
 import { complianceWebhookUrl } from '../lib/sms/compliance-webhook';
 import { getBaseUrl } from '../lib/url';
+import { resolveTenantLegalUrls } from '../lib/legal-links';
 import { loadTenantSecrets } from '../lib/secrets-cache';
 import { maybeMetering } from '../services/metering.service';
 import {
@@ -57,6 +57,7 @@ import { registerEmailEventsRoute } from '../lib/email/email-events';
 import { logger } from '../lib/logger';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
+import { getDrizzle, type AppDrizzle } from '../lib/route-helpers';
 
 // Re-export for the existing send-site import path (server/api/sms#recordSentStatus).
 export { recordSentStatus };
@@ -81,7 +82,7 @@ function escapeXml(s: string): string {
  */
 async function helpReplyBrand(c: Context<HonoConfig>, scopeTenantId: string | null): Promise<string> {
     if (scopeTenantId) {
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const t = await db.select({ name: tenants.name }).from(tenants)
             .where(eq(tenants.id, scopeTenantId)).get().catch(() => null);
         if (t?.name) return t.name;
@@ -134,7 +135,7 @@ export const smsPublicRoutes = createApiRouter()
         const resolved = await resolveOptinToken(token, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS);
         if (!resolved) throw Errors.NotFound('This opt-in link is invalid or has expired.');
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const tenant = await db.select({ name: tenants.name }).from(tenants)
             .where(eq(tenants.id, resolved.tenantId)).get();
         if (!tenant) throw Errors.NotFound('This opt-in link is invalid or has expired.');
@@ -142,9 +143,27 @@ export const smsPublicRoutes = createApiRouter()
         const disc = await new SmsConsentService(c.env.DB).currentDisclosure();
         const disclosureText = (disc?.text ?? 'By confirming, you agree to receive appointment and report text messages. Message frequency varies by your inspection activity. Message and data rates may apply. Reply STOP to opt out, HELP for help.')
             .replace(/\{\{\s*company_name\s*\}\}/g, tenant.name);
-        const env = c.env as { PRIVACY_URL?: string; TERMS_URL?: string };
-        const privacyUrl = env.PRIVACY_URL?.trim() || null;
-        const termsUrl = env.TERMS_URL?.trim() || null;
+
+        const tenantRow = await db.select({
+            slug: tenants.slug,
+        }).from(tenants).where(eq(tenants.id, resolved.tenantId)).get();
+        const cfg = await db.select({
+            legalMode: tenantConfigs.legalMode,
+            customPrivacyUrl: tenantConfigs.customPrivacyUrl,
+            customTermsUrl: tenantConfigs.customTermsUrl,
+        }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, resolved.tenantId)).get();
+
+        let privacyUrl: string | null = null;
+        let termsUrl: string | null = null;
+        if (tenantRow?.slug) {
+            const links = resolveTenantLegalUrls(tenantRow.slug, getBaseUrl(c), {
+                legalMode: (cfg?.legalMode as 'hosted' | 'custom' | undefined) ?? 'hosted',
+                customPrivacyUrl: cfg?.customPrivacyUrl ?? null,
+                customTermsUrl: cfg?.customTermsUrl ?? null,
+            });
+            privacyUrl = links.privacyUrl;
+            termsUrl = links.termsUrl;
+        }
         return c.json({ success: true as const, data: { companyName: tenant.name, disclosureText, privacyUrl, termsUrl } }, 200);
     })
     .openapi(optinConfirmRoute, async (c) => {
@@ -167,7 +186,7 @@ smsPublicRoutes.post('/sms/inbound', (c) =>
 
 smsPublicRoutes.post('/sms/inbound/:tenant', async (c) => {
     const slug = c.req.param('tenant');
-    const db = drizzle(c.env.DB);
+    const db = getDrizzle(c);
     const tenant = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).get();
     if (!tenant) return c.text('', 404);
 
@@ -272,7 +291,7 @@ async function handleInbound(
 
     if (!from) return c.text('<Response/>', 200, { 'Content-Type': 'text/xml' });
 
-    const db = drizzle(c.env.DB);
+    const db = getDrizzle(c);
     // Pull candidate contacts (filtered to a tenant, or all platform-mode tenants),
     // then match on the NORMALIZED phone (stored phones may be unnormalized).
     const candidateRows = await db
@@ -427,7 +446,7 @@ const complianceResubmitRoute = createRoute(withMcpMetadata({
  * Fetch the managed sub-status columns for a tenant from messaging_compliance.
  * Returns undefined if no row exists or the query fails.
  */
-async function getManagedSubRow(db: ReturnType<typeof drizzle>, tenantId: string): Promise<{
+async function getManagedSubRow(db: AppDrizzle, tenantId: string): Promise<{
     customerProfileStatus: string | null;
     brandStatus: string | null;
     campaignStatus: string | null;
@@ -451,7 +470,7 @@ export const smsAdminRoutes = createApiRouter()
     .openapi(attestRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const { inspectionId } = c.req.valid('json');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const insp = await db.select().from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId))).get();
         if (!insp) throw Errors.NotFound('Inspection not found.');
@@ -475,7 +494,7 @@ export const smsAdminRoutes = createApiRouter()
         // Managed-send compliance gate — fail-closed for managed tenants until approved.
         // Must run BEFORE the provider call so a blocked managed send makes NO Twilio call.
         // own/platform tenants are always allowed (gate returns immediately).
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const testedByUserId = c.get('user')?.sub ?? null;
         let cfgRow: { smsMode: string; smsByoProvider: string | null } | null | undefined;
         try {
@@ -525,7 +544,7 @@ export const smsAdminRoutes = createApiRouter()
         if (res.ok) {
             // WH-2 — seed a 'sent' delivery-status row for the returned message id
             // (non-fatal; absent id is skipped). The status callback advances it.
-            await recordSentStatus(drizzle(c.env.DB), tenantId, res.id, Date.now());
+            await recordSentStatus(getDrizzle(c), tenantId, res.id, Date.now());
             const metering = maybeMetering(c.env);
             if (metering) {
                 const { currentPeriodKey } = await import('../lib/usage/period');
@@ -545,7 +564,7 @@ export const smsAdminRoutes = createApiRouter()
     .openapi(consentStatusRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const { inspectionId } = c.req.valid('query');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const insp = await db.select({ id: inspections.id }).from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId))).get();
         if (!insp) throw Errors.NotFound('Inspection not found.');
@@ -560,7 +579,7 @@ export const smsAdminRoutes = createApiRouter()
     })
     .openapi(smsConfigRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const cfg = await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId)).get().catch(() => null);
         const mode = (cfg?.smsMode as 'platform' | 'own') ?? 'platform';
@@ -583,7 +602,7 @@ export const smsAdminRoutes = createApiRouter()
     })
     .openapi(complianceRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         let cfg: { smsMode: string | null } | undefined;
         try { cfg = await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get(); }
         catch { cfg = undefined; }
@@ -600,7 +619,7 @@ export const smsAdminRoutes = createApiRouter()
             const sid = dec['TWILIO_ACCOUNT_SID'];
             const token = dec['TWILIO_AUTH_TOKEN'];
             if (sid && token) {
-                const client = new TwilioClient({ sid, token });
+                const client = createTwilioClient({ sid, token });
                 tollfree = await client.tollfree.list().catch(() => []);
                 // Persist the snapshot so getStatus reflects the latest read.
                 await complianceSvc.syncOwnStatus(tenantId, { sid, token }, client).catch(() => {});
@@ -636,7 +655,7 @@ export const smsAdminRoutes = createApiRouter()
         // managedEligible is set by portal billing sync or a platform admin.
         // Fail-closed: missing row or false → 403 (not eligible).
         const tenantId = c.get('tenantId') as string;
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         let cfgEligibility: { managedEligible: boolean | null; managedProvider: 'twilio' | 'telnyx' | null } | null | undefined;
         try {
             cfgEligibility = await db
@@ -730,7 +749,7 @@ export const smsAdminRoutes = createApiRouter()
         // Managed-eligibility gate: tenant_configs.managed_eligible must be set.
         // Fail-closed: missing row or false → 403 (not eligible).
         const tenantId = c.get('tenantId') as string;
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         let cfgEligibility: { managedEligible: boolean | null; managedProvider: 'twilio' | 'telnyx' | null } | null | undefined;
         try {
             cfgEligibility = await db

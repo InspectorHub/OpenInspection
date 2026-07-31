@@ -85,6 +85,10 @@ export default [
   route("resources/publish-readiness", "routes/resources/publish-readiness.tsx"),
   route("resources/recent-inspections", "routes/resources/recent-inspections.tsx"),
   route("resources/entity-audit", "routes/resources/entity-audit.tsx"),
+  // C3 — the agent bell's writes (its reads ride the agent-layout loader).
+  route("resources/agent-notices", "routes/resources/agent-notices.tsx"),
+  route("resources/staff-notices", "routes/resources/staff-notices.tsx"),
+  route("resources/inspection-communication", "routes/resources/inspection-communication.tsx"),
   route("resources/agreement-signers", "routes/resources/agreement-signers.tsx"),
   route("resources/team-members", "routes/resources/team-members.tsx"),
   route("resources/contact-access", "routes/resources/contact-access.tsx"),
@@ -107,13 +111,13 @@ export default [
     // from /inspections). Static `new` outranks the dynamic `inspections/:id`
     // hub route, so this resolves first.
     route("inspections/new", "routes/inspections.new.tsx"),
-    // Issue #111 — the inspection hub ("where does this job stand?"). Inside the
+    // Issue #111 — the inspector portal ("where does this job stand?"). Inside the
     // auth layout: it is a management page, and sitting outside it meant walking
     // from the list into the hub dropped the entire workspace nav, leaving the
     // breadcrumb as the only way back. (The EDITOR is deliberately outside — it
     // is a full-screen work surface with its own chrome.) The hub had been
     // reproducing this layout's container by hand, which is now removed.
-    route("inspections/:id", "routes/inspection-hub.tsx"),
+    route("inspections/:id", "routes/inspector-portal.tsx"),
     route("calendar", "routes/calendar.tsx"),
     route("contacts", "routes/contacts.tsx"),
     // IA-18 (#111) — contact detail (record + inspection history + stats).
@@ -122,6 +126,7 @@ export default [
     route("notifications", "routes/notifications.tsx"),
     route("team", "routes/team.tsx"),
     route("metrics", "routes/metrics.tsx"),
+    route("messages", "routes/messages.tsx"),
     route("reports", "routes/reports-redirect.tsx"),
     layout("routes/settings-layout.tsx", [
       route("settings", "routes/settings-hub.tsx"),

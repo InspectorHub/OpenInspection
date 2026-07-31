@@ -11,7 +11,7 @@ import type { useFetcher } from "react-router";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
 import type { PersonRow } from "~/components/inspection/PeopleEditor";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
-import type { action } from "~/routes/inspection-hub";
+import type { action } from "~/routes/inspector-portal";
 
 afterEach(cleanup);
 

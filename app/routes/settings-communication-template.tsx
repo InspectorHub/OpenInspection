@@ -180,7 +180,7 @@ function TemplateEditor({ detail }: { detail: Detail }) {
           </div>
 
           <div className="flex justify-end pt-2">
-            <button type="submit" disabled={saving} className="h-9 px-5 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
+            <button type="submit" disabled={saving} className="h-9 px-5 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
               {saving ? m.common_saving() : m.settings_comms_template_save_changes()}
             </button>
           </div>

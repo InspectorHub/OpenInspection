@@ -9,7 +9,6 @@
 // aggregator, preserving the original paths.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { auditFromContext } from '../../lib/audit';
 import { requireRole } from '../../lib/middleware/rbac';
@@ -21,6 +20,7 @@ import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { syncInspectionAssignmentsBatch } from '../../lib/db/assignment-links';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { getDrizzle } from '../../lib/route-helpers';
 
 /**
  * Task 7c (people-role-profiles fix) — resolves an active role profile's id
@@ -124,7 +124,7 @@ const adminDataImportRoutes = createApiRouter()
         if (total === 0) throw Errors.BadRequest('No importable records found.');
         if (total > 5000) throw Errors.BadRequest('Payload too large.');
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         const counts = { templates: 0, agreements: 0, inspections: 0, results: 0 };
 
         interface TemplateImport { id: string; name: string; version?: number; schema: unknown; createdAt?: string }
@@ -260,7 +260,7 @@ const adminDataImportRoutes = createApiRouter()
     })
     .openapi(migrateFindingKeysRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         let processed = 0;
         let migrated = 0;

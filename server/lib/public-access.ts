@@ -206,7 +206,7 @@ export async function resolveAgentSession(
 /**
  * Owner-session preview fallback for the public report endpoints.
  *
- * The owner's "View report" link (dashboard / inspection hub) deep-links into
+ * The owner's "View report" link (dashboard / inspector portal) deep-links into
  * the public report tokenlessly so the inspector/admin can preview exactly what
  * a client sees. Those routes are otherwise gated by a per-recipient portal
  * token, which the owner does not hold. The global JWT middleware skips

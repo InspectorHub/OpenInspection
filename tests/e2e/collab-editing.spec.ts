@@ -19,7 +19,7 @@
  * Auth: POST /api/auth/login with a self-issued CSRF double-submit pair (the
  * middleware only checks header === cookie), capturing __Host-inspector_token
  * from Set-Cookie. That raw JWT is a Bearer token for API seeding AND replayable
- * as the cookie for browser navigation (same trick as inspection-hub.spec.ts).
+ * as the cookie for browser navigation (same trick as inspector-portal.spec.ts).
  * The __Host- cookie can't be set from the browser over plain HTTP, so we replay
  * it via context.setExtraHTTPHeaders.
  *

@@ -1,1 +1,4 @@
-[]
+[
+  "exports:server/lib/compliance/erasure-manifest.ts:ERASURE_OUT_OF_SCOPE",
+  "types:server/lib/compliance/erasure-manifest.ts:ErasureOutOfScopeEntry"
+]

@@ -15,7 +15,7 @@ import { m } from "~/paraglide/messages";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { formatDate } from "~/lib/format";
 import { EMPTY_BRAND } from "~/lib/brand";
-import type { HubSection } from "~/components/portal/InspectionHub";
+import type { HubSection } from "~/components/portal/ClientPortalHub";
 import type {
   ReportLoaderResult,
   FilterKey,
@@ -84,7 +84,7 @@ export async function loadReportSection(
         param: { tenant, id: inspectionId },
         query: { token: token || undefined },
       }),
-      resolveTenantBrand(context, tenant),
+      resolveTenantBrand(context, tenant, request),
     ]);
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as unknown as ReportLoaderResult | undefined;

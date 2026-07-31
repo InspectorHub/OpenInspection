@@ -17,7 +17,7 @@
  *      POST /{id}/people, alongside the inspection's own primary client.
  *   3. POST /{id}/complete then /{id}/publish to reach reportStatus=published
  *      (required before the hub's "Send report" button renders — see
- *      inspection-hub.tsx's reportPublished branch).
+ *      inspector-portal.tsx's reportPublished branch).
  *   4. Open the hub, click "Send report", select ONLY the listing agent,
  *      submit.
  *   5. Assert the E2E email sink recorded an email addressed to the listing

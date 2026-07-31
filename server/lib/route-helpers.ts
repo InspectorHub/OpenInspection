@@ -8,6 +8,9 @@ import { drizzle } from 'drizzle-orm/d1';
  * These wrap the two boilerplate accessors every authenticated handler needs:
  * the verified tenant id (read exclusively from the JWT-set context variable,
  * never from user input) and a Drizzle instance bound to the request's D1.
+ *
+ * `lint:provider-helpers` bans hand-rolled `drizzle(c.env.DB)` / `drizzle(env.DB)`
+ * in server/api — call one of these instead.
  */
 
 /**
@@ -22,9 +25,28 @@ export function getTenantId(c: Context<HonoConfig>): string {
 }
 
 /**
- * Returns a Drizzle ORM instance bound to the request's D1 database. Mirrors the
- * `drizzle(c.env.DB)` construction used across the API route handlers.
+ * Returns a Drizzle ORM instance bound to the request's D1 database.
+ *
+ * Return type is intentionally loose (`any` schema map): handlers pass the
+ * handle into helpers typed as `ReturnType<typeof drizzle>` / service methods
+ * with their own schema maps. Pinning `Record<string, never>` here made every
+ * call site a TS2345 after the provider-helpers migration.
  */
-export function getDrizzle(c: Context<HonoConfig>): ReturnType<typeof drizzle> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getDrizzle(c: Context<HonoConfig>): ReturnType<typeof drizzle<any>> {
     return drizzle(c.env.DB);
 }
+
+/**
+ * Drizzle from a bare D1 binding — for helpers that only have `env` (e.g.
+ * integration test loggers, non-request callbacks). Prefer `getDrizzle(c)` in
+ * route handlers.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function createDrizzle(db: D1Database): ReturnType<typeof drizzle<any>> {
+    return drizzle(db);
+}
+
+/** Shared alias for helpers that take a drizzle handle without a schema map. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AppDrizzle = ReturnType<typeof drizzle<any>>;

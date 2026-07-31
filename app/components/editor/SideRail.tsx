@@ -250,7 +250,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
             title={tab.label()}
           >
             {tab.id === "photos" && (photoCount ?? 0) > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-ih-primary text-white text-[9px] font-bold leading-none">
+              <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-ih-primary text-ih-fg-inverse text-[9px] font-bold leading-none">
                 {photoCount}
               </span>
             )}

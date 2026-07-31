@@ -156,7 +156,11 @@ describe('in-app on-site signing rides the envelope (Track I-a Task 5)', () => {
         expect(body2.data.signed).toBe(true);
         expect(body2.data.alreadySigned).toBe(true);
         expect(workflowCreate).toHaveBeenCalledTimes(1); // not 2
-        expect(notificationCreate).toHaveBeenCalledTimes(1); // not 2
+        // B3 — the staff notification moved to a rule (`Office alert —
+        // agreement signed`). The double-fire this case guards is the
+        // WORKFLOW, asserted above; the notice's own once-per-firing property
+        // is covered in tests/unit/automations/staff-alerts-via-rules.spec.ts.
+        expect(notificationCreate).not.toHaveBeenCalled();
     });
 
     // 6b — legacy envelope (pre-envelope-v2, no signer rows) → findOrCreate

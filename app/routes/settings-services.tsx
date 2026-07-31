@@ -274,7 +274,7 @@ export default function SettingsServices() {
         </p>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
+          className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
         >
           {m.settings_services_add_button()}
         </button>
@@ -300,7 +300,7 @@ export default function SettingsServices() {
             <button type="button" onClick={() => setShowForm(false)} className="h-8 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
               {m.common_cancel()}
             </button>
-            <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
+            <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
               {m.common_save()}
             </button>
           </div>

@@ -38,7 +38,7 @@ export function ServicesStep({
                 onClick={() => toggleService(s.id)}
                 className={`flex-1 text-left text-[12px] font-medium flex items-center gap-1.5 ${selected ? "text-ih-primary" : "text-ih-fg-3"}`}
               >
-                <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${selected ? "border-ih-primary bg-ih-primary text-white" : "border-ih-border"}`}>
+                <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${selected ? "border-ih-primary bg-ih-primary text-ih-fg-inverse" : "border-ih-border"}`}>
                   {selected ? "✓" : ""}
                 </span>
                 {s.name}

@@ -26,6 +26,7 @@ export interface EmbedData {
   brand: TenantBrand | null;
   bookingOpen: boolean;
   privacyUrl: string | null;
+  termsUrl?: string | null;
 }
 
 export function EmbedWizard({
@@ -79,9 +80,26 @@ export function EmbedWizard({
           </>
         ) : (
           // B-16 — no working hours configured: honest not-open state.
-          <p className="text-[13px] text-ih-fg-3">
-            {m.booking_embed_not_open({ name: data.inspectorName })}
-          </p>
+          <div>
+            <p className="text-[13px] text-ih-fg-3">
+              {m.booking_embed_not_open({ name: data.inspectorName })}
+            </p>
+            {(data.privacyUrl || data.termsUrl) && (
+              <p className="mt-4 text-center text-[11px] text-ih-fg-4">
+                {data.privacyUrl && (
+                  <a href={data.privacyUrl} target="_blank" rel="noreferrer" className="hover:underline">
+                    {m.booking_link_privacy_policy()}
+                  </a>
+                )}
+                {data.privacyUrl && data.termsUrl && <span className="mx-1.5">·</span>}
+                {data.termsUrl && (
+                  <a href={data.termsUrl} target="_blank" rel="noreferrer" className="hover:underline">
+                    {m.legal_checkbox_terms()}
+                  </a>
+                )}
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>

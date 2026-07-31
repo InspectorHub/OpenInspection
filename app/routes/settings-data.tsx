@@ -33,7 +33,7 @@ export default function SettingsData() {
         <div className="flex gap-3 flex-wrap">
           <a
             href="/api/admin/export?format=csv&type=inspections"
-            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors inline-flex items-center gap-2"
+            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors inline-flex items-center gap-2"
           >
             <DownloadIcon />
             {m.settings_data_export_inspections_csv()}

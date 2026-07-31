@@ -1,25 +1,14 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/legal";
-import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { createApi } from "~/lib/api-client.server";
 import { m } from "~/paraglide/messages";
 
 export function meta({ loaderData }: Route.MetaArgs) {
-  // This route's loader throws a 404 Response for an unknown doc type or an
-  // unresolvable tenant, and meta still runs on that path with nothing loaded.
-  // The generated MetaArgs types loaderData as always-present, so the guard
-  // below reads as unnecessary to the linter — widen it back to what actually
-  // arrives rather than dropping a live check.
   const data = loaderData as typeof loaderData | undefined;
   if (!data) return [{ title: m.public_legal_meta_default() }];
-  // companyName is non-null on the success path: the loader 404s when brand
-  // resolution yields null, so no fallback is reachable here.
   const docTitle = data.doc === "privacy" ? m.public_legal_doc_privacy() : m.public_legal_doc_terms();
   return [{ title: m.public_legal_title({ doc: docTitle, company: data.companyName }) }];
 }
-
-// ---------------------------------------------------------------------------
-// Allowed document types
-// ---------------------------------------------------------------------------
 
 const ALLOWED_DOCS = ["privacy", "terms"] as const;
 type LegalDoc = (typeof ALLOWED_DOCS)[number];
@@ -28,15 +17,6 @@ function isAllowedDoc(v: string): v is LegalDoc {
   return (ALLOWED_DOCS as readonly string[]).includes(v);
 }
 
-// ---------------------------------------------------------------------------
-// Pure content builders — testable without a Hono context or DOM.
-// ---------------------------------------------------------------------------
-
-/**
- * Returns the SMS/messaging clause text that must appear verbatim in the
- * privacy page to satisfy Twilio TFV/A2P review requirements.
- * Exported for use in tests to assert the clause is present.
- */
 export const SMS_CLAUSE_HEADING = "SMS & Text Messaging";
 export const SMS_CLAUSE_TEXT =
   "If you provide a mobile number and opt in, {{company}} may send you appointment reminders, " +
@@ -47,48 +27,39 @@ export const SMS_CLAUSE_TEXT =
   "We do not sell or share mobile opt-in information or your phone number with third parties " +
   "or affiliates for their marketing. SMS is delivered through our provider, Twilio, Inc.";
 
-/**
- * Resolves a template token `{{company}}` in the given text with the actual
- * company name, falling back to "[Your Company]" if the name is not available.
- */
 export function mergeCompany(template: string, company: string | null): string {
   return template.replace(/\{\{company\}\}/g, company ?? "[Your Company]");
 }
 
-// ---------------------------------------------------------------------------
-// Loader
-// ---------------------------------------------------------------------------
-
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { tenant, doc } = params;
 
-  // Unknown doc type → 404
-  if (!doc || !isAllowedDoc(doc)) {
+  if (!doc || !isAllowedDoc(doc) || !tenant) {
     throw new Response(null, { status: 404 });
   }
 
-  // Resolve tenant brand (company name) — unknown slug degrades to null.
-  // We treat a null companyName after slug resolution as a 404 because
-  // the brand endpoint returns a non-ok response for unknown slugs.
-  const brand = await resolveTenantBrand(context, tenant);
-
-  // `resolveTenantBrand` returns EMPTY_BRAND (companyName: null) for an unknown
-  // slug (the brand endpoint returns ok:false), so a null company name is our
-  // single "tenant not found" signal → 404.
-  if (brand.companyName === null) {
+  const api = createApi(context);
+  const res = await api.publicReport.legal[":tenant"][":doc"].$get({
+    param: { tenant, doc },
+  });
+  if (!res.ok) {
+    throw new Response(null, { status: 404 });
+  }
+  const body = (await res.json()) as {
+    data?: { companyName?: string; body?: string | null };
+  };
+  const companyName = body.data?.companyName?.trim();
+  if (!companyName) {
     throw new Response(null, { status: 404 });
   }
 
   return {
     doc,
-    companyName: brand.companyName,
+    companyName,
+    customBody: body.data?.body?.trim() || null,
     tenantSlug: tenant,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Privacy page content
-// ---------------------------------------------------------------------------
 
 function PrivacyContent({ company }: { company: string }) {
   const smsText = mergeCompany(SMS_CLAUSE_TEXT, company);
@@ -163,10 +134,6 @@ function PrivacyContent({ company }: { company: string }) {
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Terms page content
-// ---------------------------------------------------------------------------
 
 function TermsContent({ company }: { company: string }) {
   return (
@@ -261,12 +228,8 @@ function TermsContent({ company }: { company: string }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
-
 export default function LegalPage() {
-  const { doc, companyName } = useLoaderData<typeof loader>();
+  const { doc, companyName, customBody } = useLoaderData<typeof loader>();
 
   const isPrivacy = doc === "privacy";
   const docTitle = isPrivacy ? m.public_legal_doc_privacy() : m.public_legal_doc_terms();
@@ -287,7 +250,11 @@ export default function LegalPage() {
         </header>
 
         <div className="space-y-6 border-t border-ih-border pt-6">
-          {isPrivacy ? (
+          {customBody ? (
+            <div className="text-[15px] text-ih-fg-2 leading-relaxed whitespace-pre-wrap">
+              {customBody}
+            </div>
+          ) : isPrivacy ? (
             <PrivacyContent company={companyName} />
           ) : (
             <TermsContent company={companyName} />

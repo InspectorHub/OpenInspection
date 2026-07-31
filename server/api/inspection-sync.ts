@@ -1,6 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
 import { Errors } from '../lib/errors';
@@ -10,6 +9,8 @@ import {
 } from '../lib/validations/sync.schema';
 import { inspections, inspectionResults, templates } from '../lib/db/schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { getDrizzle } from '../lib/route-helpers';
+import { r2Delete } from '../lib/r2/objects';
 
 const syncRoutes = createApiRouter()
 /* ── DELETE /api/inspections/:id/items/:itemId/photos/:photoIndex ─────────── */
@@ -44,7 +45,7 @@ const syncRoutes = createApiRouter()
 }, { scopes: ['write'], tier: 'extended' })), async (c) => {
     const { id, itemId, photoIndex } = c.req.valid('param');
     const tenantId = c.get('tenantId') as string;
-    const db = drizzle(c.env.DB);
+    const db = getDrizzle(c);
 
     const insp = await db.select().from(inspections)
         .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId))).get();
@@ -66,7 +67,7 @@ const syncRoutes = createApiRouter()
         .where(eq(inspectionResults.id, row.id));
 
     if (deletedKey && c.env.PHOTOS) {
-        await c.env.PHOTOS.delete(deletedKey).catch(() => {});
+        await r2Delete(c.env.PHOTOS, deletedKey).catch(() => {});
     }
 
     return c.json({ success: true as const, data: { deletedKey } }, 200);
@@ -101,7 +102,7 @@ const syncRoutes = createApiRouter()
     const { id } = c.req.valid('param');
     const { signatureBase64, signedAt } = c.req.valid('json');
     const tenantId = c.get('tenantId') as string;
-    const db = drizzle(c.env.DB);
+    const db = getDrizzle(c);
 
     const insp = await db.select().from(inspections)
         .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId))).get();
@@ -142,7 +143,7 @@ const syncRoutes = createApiRouter()
 }, { scopes: ['write'], tier: 'extended' })), async (c) => {
     const { id } = c.req.valid('param');
     const tenantId = c.get('tenantId') as string;
-    const db = drizzle(c.env.DB);
+    const db = getDrizzle(c);
 
     const insp = await db.select().from(inspections)
         .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId))).get();

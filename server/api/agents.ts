@@ -1,12 +1,12 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq, isNotNull } from 'drizzle-orm';
 import { Errors } from '../lib/errors';
 import { requireRole } from '../lib/middleware/rbac';
 import { users } from '../lib/db/schema/tenant';
 import { contacts } from '../lib/db/schema/contact';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { getDrizzle } from '../lib/route-helpers';
 
 /**
  * Inspector-side partner-agent links. The (existing) /api/agent routes
@@ -99,7 +99,7 @@ const agentsRoutes = createApiRouter()
         await requireRole('owner', 'manager', 'inspector')(c, async () => {});
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized();
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
         // IA-104 — the "links" are contact rows carrying an account binding.
         // `id` is the contact id, which is what POST /{linkId}/revoke now
         // takes. Only bound rows are listed: an ordinary agent contact with no

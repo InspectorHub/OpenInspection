@@ -75,6 +75,15 @@ const RULES = [
   { name: "arbitrary px spacing", re: new RegExp(`\\b(${SPACING_PREFIXES})-\\[\\d+px\\]`, "g") },
   { name: "backdrop-blur", re: /\bbackdrop-blur/g },
   { name: "rgba scrim", re: /\bbg-\[rgba\(/g },
+  // `text-white` on a brand-primary fill bypasses the theme flip: dark mode
+  // brightens --ih-primary to #818cf8 and flips --ih-fg-inverse to #0f172a
+  // (dark-on-light ≈5.8:1; white would be ≈2.9:1 and fail AA). 95 sites had
+  // hand-written white before this rule existed — hence a rule, not a review
+  // note. Matches either order on the line; use text-ih-fg-inverse.
+  {
+    name: "text-white on bg-ih-primary (use text-ih-fg-inverse)",
+    re: /\btext-white\b[^\n]*\bbg-ih-primary\b|\bbg-ih-primary\b[^\n]*\btext-white\b/g,
+  },
 ];
 
 function* walk(dir) {

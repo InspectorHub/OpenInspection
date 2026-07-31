@@ -5,7 +5,6 @@
 // POST /agreements/:token/sign, POST /agreements/:token/decline.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc } from 'drizzle-orm';
 import { agreements, tenantConfigs, invoices, inspections } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
@@ -13,6 +12,7 @@ import { logger } from '../../lib/logger';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { PublicAgreementBodySchema } from '../../lib/validations/agreement-public.schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
+import { getDrizzle } from '../../lib/route-helpers';
 
 // Local aliases for the literal unions the DB columns are narrowed to in the
 // JSON responses below. Kept file-local (not exported) so the public router
@@ -198,7 +198,7 @@ const agreementRoutes = createApiRouter()
         const snapshot = await svc.getSnapshotForRequest(envelope);
 
         // Agreement name comes from the template row (display only, not content).
-        const agreementRow = await drizzle(c.env.DB).select({ name: agreements.name })
+        const agreementRow = await getDrizzle(c).select({ name: agreements.name })
             .from(agreements).where(eq(agreements.id, envelope.agreementId)).get();
 
         // Signature progress across the whole envelope.
@@ -244,7 +244,7 @@ const agreementRoutes = createApiRouter()
         // IS viewing the agreement.
         await svc.markViewedBySigner(token);
 
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         // Pinned snapshot — never the live template.
         const snapshot = await svc.getSnapshotForRequest(envelope);

@@ -39,11 +39,14 @@ import type {
     McpGrantsApi,
     MessageTemplatesApi,
     MessagesApi,
+    InspectorMessagesApi,
     MetricsApi,
     AuditApi,
     NotificationsApi,
     PlacesApi,
     PortalApi,
+    PortalNoticesApi,
+    AgentNoticesApi,
     ProfileApi,
     PublicShareApi,
     PublicReportApi,
@@ -160,11 +163,17 @@ export interface Api {
     mcpGrants:          ReturnType<typeof hc<McpGrantsApi>>;
     messageTemplates:   ReturnType<typeof hc<MessageTemplatesApi>>;
     messages:           ReturnType<typeof hc<MessagesApi>>;
+    inspectorMessages:  ReturnType<typeof hc<InspectorMessagesApi>>;
     metrics:            ReturnType<typeof hc<MetricsApi>>;
     audit:              ReturnType<typeof hc<AuditApi>>;
     notifications:      ReturnType<typeof hc<NotificationsApi>>;
     places:             ReturnType<typeof hc<PlacesApi>>;
     portal:             ReturnType<typeof hc<PortalApi>>;
+    // C3 — the Notices inboxes live in their own router files mounted at the
+    // same prefixes, typed independently for the same structural-depth reason
+    // as agentMagicLogin above.
+    portalNotices:      ReturnType<typeof hc<PortalNoticesApi>>;
+    agentNotices:       ReturnType<typeof hc<AgentNoticesApi>>;
     profile:            ReturnType<typeof hc<ProfileApi>>;
     publicShare:        ReturnType<typeof hc<PublicShareApi>>;
     publicReport:       ReturnType<typeof hc<PublicReportApi>>;
@@ -234,11 +243,14 @@ const MOUNT: Record<keyof Api, string> = {
     mcpGrants:          "/api/mcp",
     messageTemplates:   "/api/message-templates",
     messages:           "/api/messages",
+    inspectorMessages:  "/api/inspections",
     metrics:            "/api/metrics",
     audit:              "/api/audit",
     notifications:      "/api/notifications",
     places:             "/api/places",
     portal:             "/api/portal",
+    portalNotices:      "/api/portal",
+    agentNotices:       "/api/agent",
     profile:            "/api/profile",
     publicShare:        "/api/public",
     publicReport:       "/api/public",
@@ -326,11 +338,14 @@ export function createApi(context: LoadContext, opts: CreateApiOptions = {}): Ap
         mcpGrants:          mk<McpGrantsApi>(MOUNT.mcpGrants),
         messageTemplates:   mk<MessageTemplatesApi>(MOUNT.messageTemplates),
         messages:           mk<MessagesApi>(MOUNT.messages),
+        inspectorMessages:  mk<InspectorMessagesApi>(MOUNT.inspectorMessages),
         metrics:            mk<MetricsApi>(MOUNT.metrics),
         audit:              mk<AuditApi>(MOUNT.audit),
         notifications:      mk<NotificationsApi>(MOUNT.notifications),
         places:             mk<PlacesApi>(MOUNT.places),
         portal:             mk<PortalApi>(MOUNT.portal),
+        portalNotices:      mk<PortalNoticesApi>(MOUNT.portalNotices),
+        agentNotices:       mk<AgentNoticesApi>(MOUNT.agentNotices),
         profile:            mk<ProfileApi>(MOUNT.profile),
         publicShare:        mk<PublicShareApi>(MOUNT.publicShare),
         publicReport:       mk<PublicReportApi>(MOUNT.publicReport),

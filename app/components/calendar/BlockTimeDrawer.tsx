@@ -132,7 +132,7 @@ export function BlockTimeDrawer({
               type="submit"
               form="block-time-form"
               disabled={submitting}
-              className="h-9 px-4 rounded-md bg-ih-primary text-[13px] font-bold text-white hover:bg-ih-primary-600 disabled:opacity-50"
+              className="h-9 px-4 rounded-md bg-ih-primary text-[13px] font-bold text-ih-fg-inverse hover:bg-ih-primary-600 disabled:opacity-50"
             >
               {submitting ? m.calendar_block_saving() : block ? m.calendar_block_save_changes() : m.calendar_block_time()}
             </button>

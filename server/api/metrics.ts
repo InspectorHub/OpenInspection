@@ -2,31 +2,32 @@ import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { MetricsQuerySchema, MetricsApiResponseSchema } from '../lib/validations/metrics.schema';
-import { drizzle } from 'drizzle-orm/d1';
-import { inspections, inspectionServices, contacts, inspectionPeople, contactRoleProfiles, users, reportVersions } from '../lib/db/schema';
-import { eq, and, gte, sql } from 'drizzle-orm';
+import { inspections, inspectionServices, contacts, users, reportVersions } from '../lib/db/schema';
+import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { sumEffectivePriceCentsSql } from '../lib/effective-price.sql';
+import { inclusiveUpperBound, resolveMetricsWindow } from '../lib/metrics-window';
+import { getDrizzle } from '../lib/route-helpers';
 
 const metricsRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["metrics"],
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { query: MetricsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
-    responses: { 200: { content: { 'application/json': { schema: MetricsApiResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Metrics' } },
+    request: { query: MetricsQuerySchema.describe('Inclusive civil-date window the figures cover.') },
+    responses: { 200: { content: { 'application/json': { schema: MetricsApiResponseSchema.describe('Revenue, volume, agent, inspector and service aggregates for the window.') } }, description: 'Metrics' } },
     operationId: "listMetrics",
     summary: "List metrics for current tenant",
-    description: "Auto-generated placeholder for listMetrics (GET /, metrics domain). TODO: replace with a real description sourced from the handler."
+    description: "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, top referring agents, per-inspector productivity, service mix, and paid/unpaid split. Omitting both bounds returns the trailing three months."
 }, { scopes: ['read'], tier: 'extended' })), async (c) => {
     const tenantId = c.get('tenantId');
-    const { period } = c.req.valid('query');
-    const db = drizzle(c.env.DB);
+    const { from, to } = resolveMetricsWindow(c.req.valid('query'));
+    const db = getDrizzle(c);
 
-    const months = period === '3m' ? 3 : period === '6m' ? 6 : 12;
-    const fromDate = new Date();
-    fromDate.setMonth(fromDate.getMonth() - months);
-    const fromStr = fromDate.toISOString().slice(0, 10);
+    // Both bounds are inclusive. `inspections.date` may hold a bare civil date
+    // or a full ISO instant, so the upper bound carries a sentinel that sorts
+    // after every time-of-day on that day — see inclusiveUpperBound.
+    const inWindow = and(gte(inspections.date, from), lte(inspections.date, inclusiveUpperBound(to)));
 
     // Monthly revenue + count
     const monthly = await db.select({
@@ -35,7 +36,7 @@ const metricsRoutes = createApiRouter()
         count:   sql<number>`count(*)`,
     })
         .from(inspections)
-        .where(and(eq(inspections.tenantId, tenantId), gte(inspections.date, fromStr)))
+        .where(and(eq(inspections.tenantId, tenantId), inWindow))
         .groupBy(sql`strftime('%Y-%m', ${inspections.date})`)
         .orderBy(sql`strftime('%Y-%m', ${inspections.date})`);
 
@@ -43,40 +44,27 @@ const metricsRoutes = createApiRouter()
     const totalInspections = monthly.reduce((s, r) => s + Number(r.count || 0), 0);
     const avgOrderValue    = totalInspections > 0 ? Math.round(totalRevenue / totalInspections) : 0;
 
-    // Top agents — single JOIN query instead of N+1. Buyer's-agent
-    // attribution via inspection_people (role buyer_agent) — contact_role_profiles
-    // is joined before inspection_people so the join stays scoped to
-    // buyer_agent only (joining inspection_people first would fan out over
-    // every role on the inspection). The old "referredByAgentId is not null"
-    // filter is now implicit: an inspection with no buyer_agent
-    // inspection_people row simply has no matching row to group on.
+    // Top referrers — attribution reads the explicit referred_by_contact_id
+    // column (Task 9, two-layer role model), not the buyer_agent seat. Any
+    // contact can be the referrer, so "agent" here means "referrer" and a
+    // past client shows up under their own name.
     const topAgents = await db.select({
-        agentId:   inspectionPeople.contactId,
+        agentId:   inspections.referredByContactId,
         agentName: contacts.name,
         count:     sql<number>`count(*)`,
         revenue:   sumEffectivePriceCentsSql,
     })
         .from(inspections)
-        .leftJoin(contactRoleProfiles, and(
-            eq(contactRoleProfiles.tenantId, inspections.tenantId),
-            eq(contactRoleProfiles.key, 'buyer_agent'),
-            eq(contactRoleProfiles.active, true),
-        ))
-        .leftJoin(inspectionPeople, and(
-            eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
-            eq(inspectionPeople.inspectionId, inspections.id),
-            eq(inspectionPeople.tenantId, inspections.tenantId),
-        ))
         .leftJoin(contacts, and(
-            eq(contacts.id, inspectionPeople.contactId),
+            eq(contacts.id, inspections.referredByContactId),
             eq(contacts.tenantId, inspections.tenantId),
         ))
         .where(and(
             eq(inspections.tenantId, tenantId),
-            gte(inspections.date, fromStr),
-            sql`${inspectionPeople.contactId} is not null`,
+            inWindow,
+            sql`${inspections.referredByContactId} is not null`,
         ))
-        .groupBy(inspectionPeople.contactId)
+        .groupBy(inspections.referredByContactId)
         .orderBy(sql`count(*) desc`)
         .limit(10)
         .then(rows => rows.map(r => ({
@@ -86,14 +74,21 @@ const metricsRoutes = createApiRouter()
             revenue:   Number(r.revenue || 0),
         })));
 
-    // Service breakdown
+    // Service breakdown. Joined to inspections so it obeys the same window as
+    // every other figure here — it used to filter on tenant alone, which was
+    // invisible while nothing rendered it (IA-82) and would now read as an
+    // all-time card sitting inside a page about a chosen date range.
     const serviceBreakdown = await db.select({
         serviceName: inspectionServices.nameSnapshot,
         count:       sql<number>`count(*)`,
         revenue:     sql<number>`sum(coalesce(${inspectionServices.priceOverride}, ${inspectionServices.priceSnapshot}))`,
     })
         .from(inspectionServices)
-        .where(eq(inspectionServices.tenantId, tenantId))
+        .innerJoin(inspections, and(
+            eq(inspections.id, inspectionServices.inspectionId),
+            eq(inspections.tenantId, inspectionServices.tenantId),
+        ))
+        .where(and(eq(inspectionServices.tenantId, tenantId), inWindow))
         .groupBy(inspectionServices.nameSnapshot)
         .orderBy(sql`count(*) desc`)
         .limit(10);
@@ -104,7 +99,7 @@ const metricsRoutes = createApiRouter()
         revenue: sumEffectivePriceCentsSql,
     })
         .from(inspections)
-        .where(and(eq(inspections.tenantId, tenantId), gte(inspections.date, fromStr)))
+        .where(and(eq(inspections.tenantId, tenantId), inWindow))
         .groupBy(inspections.paymentStatus);
 
     const paidAmt   = Number(paymentSummary.find(r => r.status === 'paid')?.revenue ?? 0);
@@ -135,7 +130,7 @@ const metricsRoutes = createApiRouter()
         .leftJoin(users, eq(users.id, inspectorKey))
         .where(and(
             eq(inspections.tenantId, tenantId),
-            gte(inspections.date, fromStr),
+            inWindow,
             sql`${inspectorKey} is not null`,
         ))
         .groupBy(inspectorKey)
@@ -152,7 +147,8 @@ const metricsRoutes = createApiRouter()
     return c.json({
         success: true,
         data: {
-            period,
+            from,
+            to,
             totalRevenue,
             totalInspections,
             avgOrderValue,

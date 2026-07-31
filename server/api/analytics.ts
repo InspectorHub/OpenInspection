@@ -11,6 +11,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { resolveMetricsWindow } from '../lib/metrics-window';
 
 const growthRoute = createRoute(withMcpMetadata({
     method:  'get',
@@ -27,10 +28,14 @@ const heatmapRoute = createRoute(withMcpMetadata({
     method:  'get',
     path:    '/findings-heatmap',
     tags: ["metrics"],
-    summary: 'Section × rating bucket counts across this tenant\'s inspections',
+    summary: 'Section × rating-level counts across this tenant\'s inspections',
+    request: { query: z.object({
+        from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('First day of the window (inclusive), YYYY-MM-DD.'),
+        to:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Last day of the window (inclusive), YYYY-MM-DD.'),
+    }).describe('The same inclusive civil-date window GET /api/metrics takes.') },
     responses: { 200: { description: 'ok' } },
     operationId: "listAnalyticFindingsHeatmap",
-    description: "Auto-generated placeholder for listAnalyticFindingsHeatmap (GET /findings-heatmap, metrics domain). TODO: replace with a real description sourced from the handler."
+    description: "Counts rated items by template section and rating level over an inclusive `from`..`to` window. Columns are the tenant's own rating levels minus Not Inspected / Not Present; rows are template sections ordered by volume, with unresolvable sections collected in a flagged catch-all row."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const analyticsRoutes = createApiRouter()
@@ -44,7 +49,8 @@ const analyticsRoutes = createApiRouter()
     .openapi(heatmapRoute, async (c) => {
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-        const out = await c.var.services.analytics.findingsHeatmap(tenantId);
+        const window = resolveMetricsWindow(c.req.valid('query'));
+        const out = await c.var.services.analytics.findingsHeatmap(tenantId, window);
         return c.json({ success: true as const, data: out }, 200);
     });
 
