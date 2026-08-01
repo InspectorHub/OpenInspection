@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0023-notification-pref-enabled-rename",
-  "prevId": "057c147b-6909-5a38-80d2-d42f542a82da",
+  "id": "f4a25042-4ded-529b-8ffc-ae3883d3ac0b",
+  "prevId": "0023-notification-pref-enabled-rename",
   "tables": {
     "agreement_requests": {
       "name": "agreement_requests",
@@ -9065,13 +9065,6 @@
         },
         "phone": {
           "name": "phone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "license_number": {
-          "name": "license_number",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
