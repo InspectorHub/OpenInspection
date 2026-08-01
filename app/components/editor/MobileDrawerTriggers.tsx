@@ -17,7 +17,7 @@ export function MobileDrawerTriggers({ onOpen }: MobileDrawerTriggersProps) {
             {([
                 { id: 'sections', label: m.editor_mobile_drawer_sections(), icon: '☰' },
                 { id: 'items',    label: m.editor_mobile_drawer_items(),    icon: '≣' },
-                { id: 'preview',  label: m.editor_header_preview(),  icon: '👁' },
+                { id: 'preview',  label: m.editor_route_drawer_preview(),  icon: '👁' },
                 { id: 'theme',    label: m.nav_theme_label(),        icon: '◐' },
             ] as const).map(t => (
                 <button
