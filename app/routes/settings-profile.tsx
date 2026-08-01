@@ -33,6 +33,7 @@ interface Profile {
   photoUrl?: string | null;
   signatureEnabled?: boolean;
   signaturePreviewHtml?: string;
+  savedSignature?: string | null;
   timezone?: string | null;
   locale?: string | null;
 }
@@ -77,6 +78,22 @@ export function signatureEnabledFromForm(fd: FormData): boolean | undefined {
   if (!fd.has("signatureEnabled")) return undefined;
   const vals = fd.getAll("signatureEnabled");
   return vals[vals.length - 1] === "true";
+}
+
+/**
+ * The reason the API refused, or a generic fallback.
+ *
+ * The envelope is `{ success: false, error: { code, message } }` — the message
+ * is NESTED. Reading `err.message` off the top level (which several call sites
+ * did) always misses, so every refusal collapsed to "Save failed": a 3 MB badge
+ * upload told the reader nothing about the 2 MB limit it had just broken, which
+ * is indistinguishable from the button doing nothing at all.
+ */
+async function apiErrorMessage(res: { json: () => Promise<unknown> }): Promise<string> {
+  const body = await res.json().catch(() => ({}));
+  const nested = (body as { error?: { message?: string } })?.error?.message;
+  const flat = (body as { message?: string })?.message;
+  return nested || flat || m.settings_error_save_failed();
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -125,8 +142,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     // hono/client form: keys must match the API schema field names
     const res = await api.profile.photo.$post({ form: { photo } } as Parameters<typeof api.profile.photo.$post>[0]);
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return { success: false, error: (err as Record<string, string>)?.message || m.settings_profile_error_upload_failed(), intent };
+      return { success: false, error: await apiErrorMessage(res), intent };
     }
     return { success: true, error: null, intent };
   }
@@ -143,8 +159,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   // `webSocket` field. Only `ok` and `json()` are read here.
   const credentialResult = async (res: { ok: boolean; json: () => Promise<unknown> }, i: string) => {
     if (res.ok) return { success: true, error: null, intent: i };
-    const err = await res.json().catch(() => ({}));
-    return { success: false, error: (err as Record<string, string>)?.message || m.settings_error_save_failed(), intent: i };
+    return { success: false, error: await apiErrorMessage(res), intent: i };
   };
   if (intent === "credential-add") {
     return credentialResult(await api.credentials.index.$post({ json: { label: "" } }), intent);
@@ -279,6 +294,11 @@ export default function SettingsProfilePage() {
     error: credImageFetcher.data?.error ?? null,
   });
   const [uploadingCredId, setUploadingCredId] = useState<string | null>(null);
+  // The row the last upload was for, kept so a refusal can be shown ON it.
+  const [lastUploadCredId, setLastUploadCredId] = useState<string | null>(null);
+  const credUploadError = lastUploadCredId && credImageFetcher.data?.success === false
+    ? { id: lastUploadCredId, message: credImageFetcher.data.error ?? m.settings_error_save_failed() }
+    : null;
   useEffect(() => {
     if (credImageFetcher.state === "idle") setUploadingCredId(null);
   }, [credImageFetcher.state]);
@@ -296,6 +316,7 @@ export default function SettingsProfilePage() {
   const onCredDelete = (id: string) => credFetcher.submit({ intent: "credential-delete", id }, { method: "post" });
   const onCredUpload = (id: string, file: File) => {
     setUploadingCredId(id);
+    setLastUploadCredId(id);
     const f = new FormData();
     f.append("intent", "credential-image");
     f.append("id", id);
@@ -492,11 +513,12 @@ export default function SettingsProfilePage() {
         previewHtml={profile.signaturePreviewHtml ?? null}
       />
 
-      <SavedSignatureCard />
+      <SavedSignatureCard savedSignature={profile.savedSignature ?? null} />
 
       <CredentialsEditor
         credentials={credentials}
         uploadingId={uploadingCredId}
+        uploadError={credUploadError}
         onAdd={onCredAdd}
         onUpdate={onCredUpdate}
         onDelete={onCredDelete}

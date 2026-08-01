@@ -88,10 +88,10 @@
   "settings_profile_signature_preview_label": "Preview",
   "settings_profile_signature_empty": "Add your name (and phone/license) above to build a signature.",
   "settings_profile_save_button": "Save Profile",
-  "settings_profile_saved_signature_heading": "Saved Signature",
-  "settings_profile_saved_signature_subtitle": "Your signature is applied to agreements you send and can be used for auto-sign on report publish.",
+  "settings_profile_saved_signature_heading": "Signature",
+  "settings_profile_saved_signature_subtitle": "The mark applied to agreements you send and to reports you publish.",
   "settings_profile_signature_saved_flash": "Signature saved.",
-  "settings_profile_signature_pad_save": "Save Signature",
+  "settings_profile_signature_pad_save": "Save signature",
   "settings_profile_signature_update": "Update signature",
   "settings_profile_signature_add": "Add signature",
   "settings_profile_error_no_signature": "No signature data provided",
@@ -229,5 +229,12 @@
   "settings_team_cancel_invite_title": "Cancel this invite?",
   "settings_team_cancel_invite_confirm": "The invite to {email} will be revoked. They will no longer be able to join with the emailed link.",
   "settings_team_load_failed": "The team list could not be loaded, so it may be incomplete. Reload before assuming someone has been removed.",
-  "settings_apps_load_failed": "Connected apps could not be loaded. This is not a confirmation that nothing has access — reload before acting on it."
+  "settings_apps_load_failed": "Connected apps could not be loaded. This is not a confirmation that nothing has access — reload before acting on it.",
+  "settings_profile_saved_signature_alt": "Your saved signature",
+  "settings_profile_signature_draw": "Draw signature",
+  "settings_profile_signature_upload": "Upload image",
+  "settings_profile_signature_empty_hint": "Nothing signed yet. Draw one, or upload an image of your signature.",
+  "settings_profile_signature_upload_too_big": "That image is over 2 MB. Try a smaller one.",
+  "settings_profile_signature_upload_bad_type": "Use a PNG, JPEG, WebP or SVG image.",
+  "settings_profile_signature_upload_unreadable": "That file could not be read as an image."
 }

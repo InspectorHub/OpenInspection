@@ -84,19 +84,55 @@ export function EmailSignatureCard({
 }
 
 /**
- * The drawn signature used on reports and agreements.
+ * THE signature — the mark applied to agreements and published reports.
  *
- * Its feedback stays INLINE rather than becoming a toast: the pad is a modal
- * act the reader is looking straight at when it resolves, so the confirmation
- * belongs where their attention already is. (The toast exists for the saves
- * that happen without ceremony — a blurred field, a flipped checkbox.)
+ * One signature, two equal ways to produce it. Drawing and uploading are
+ * siblings, not a primary and a fallback: an inspector with a scanned signature
+ * on file has no reason to redraw it with a mouse, and one without a scanner has
+ * no way to upload. So the two actions carry the same weight and sit together
+ * under the mark they replace.
+ *
+ * The swatch is a signature LINE, not an image frame: a white field with a
+ * hairline baseline, the way a printed form presents the space you sign. Empty,
+ * it is the same line — an invitation to sign rather than a grey box announcing
+ * that there is nothing there.
+ *
+ * Everything is left-aligned, including the actions. The card's content is
+ * left-aligned, and a centred control under left-aligned content reads as an
+ * accident rather than a decision.
  */
-export function SavedSignatureCard() {
+export function SavedSignatureCard({ savedSignature }: { savedSignature: string | null }) {
   const fetcher = useFetcher<SaveResult>();
   const [showPad, setShowPad] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const isOurs = fetcher.data?.intent === "save-signature";
-  const saved = isOurs && fetcher.data?.success === true;
-  const error = isOurs && typeof fetcher.data?.error === "string" ? fetcher.data.error : null;
+
+  /**
+   * WHERE THE ANSWER GOES, and why it is two different places.
+   *
+   * The SAVE result is a toast. A full-width banner between the heading and the
+   * mark pushed the card open, stayed after the moment had passed, and said
+   * "Signature saved." directly above a signature that was visibly already
+   * there — a receipt for something the reader could see. The mark changing IS
+   * the confirmation; the toast is only there for the case where the new one
+   * looks like the old one.
+   *
+   * A FILE the reader just chose and we refused is different: no request was
+   * made, the fault is in their hand, and the message has to sit next to the
+   * control they will use again. That one stays inline.
+   */
+  useNotificationSaveToast({
+    data: isOurs ? fetcher.data : null,
+    failed: isOurs && fetcher.data?.success === false,
+    error: isOurs && typeof fetcher.data?.error === "string" ? fetcher.data.error : null,
+  });
+
+  const submit = (dataUri: string) => {
+    const fd = new FormData();
+    fd.append("intent", "save-signature");
+    fd.append("signatureBase64", dataUri);
+    fetcher.submit(fd, { method: "post" });
+  };
 
   return (
     <section id="saved-signature" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
@@ -105,38 +141,124 @@ export function SavedSignatureCard() {
         <p className="text-[12px] text-ih-fg-3">{m.settings_profile_saved_signature_subtitle()}</p>
       </header>
 
-      {saved && (
-        <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-          {m.settings_profile_signature_saved_flash()}
-        </div>
-      )}
-      {error && (
-        <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
-          {error}
-        </div>
-      )}
 
       {showPad ? (
         <SignaturePad
           label={m.settings_profile_signature_pad_save()}
           onCancel={() => setShowPad(false)}
-          onSubmit={(dataUri) => {
-            const fd = new FormData();
-            fd.append("intent", "save-signature");
-            fd.append("signatureBase64", dataUri);
-            fetcher.submit(fd, { method: "post" });
-            setShowPad(false);
-          }}
+          onSubmit={(dataUri) => { submit(dataUri); setShowPad(false); }}
         />
       ) : (
-        <button
-          type="button"
-          onClick={() => setShowPad(true)}
-          className="px-4 py-2 bg-ih-bg-muted border border-ih-border text-ih-fg-1 rounded-md font-semibold text-[13px] hover:bg-ih-bg-card hover:border-ih-primary transition-all"
-        >
-          {saved ? m.settings_profile_signature_update() : m.settings_profile_signature_add()}
-        </button>
+        <div className="space-y-3">
+          {/* The signing line. White in both themes because that is the paper
+              the mark is applied to — a signature previewed on a dark card is
+              not the signature anyone receives. */}
+          <div
+            // ds-allow: documents this mark is applied to are rendered on white
+            className="w-full max-w-sm h-28 rounded border border-ih-border bg-white px-5 pb-5 flex items-end"
+          >
+            {/* The rule is a literal slate hairline, not a token: it lives on a
+                fixed-white field, so a theme-aware border would be invisible in
+                one of the two themes — which is exactly what it was. */}
+            <div
+              // ds-allow: fixed-white signing field
+              className="w-full border-b border-[#cbd5e1] flex items-end justify-start pb-1.5"
+            >
+              {savedSignature && (
+                <img src={savedSignature} alt={m.settings_profile_saved_signature_alt()} className="max-h-16 w-auto" />
+              )}
+            </div>
+          </div>
+
+          {!savedSignature && (
+            <p className="text-[12px] text-ih-fg-3">{m.settings_profile_signature_empty_hint()}</p>
+          )}
+
+          {/* Two ways to the same thing, so neither outranks the other. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setUploadError(null); setShowPad(true); }}
+              className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-muted text-ih-fg-1 text-[13px] font-semibold hover:border-ih-primary hover:text-ih-primary transition-colors"
+            >
+              {m.settings_profile_signature_draw()}
+            </button>
+            <label className="h-9 px-3 inline-flex items-center rounded-md border border-ih-border bg-ih-bg-muted text-ih-fg-1 text-[13px] font-semibold cursor-pointer hover:border-ih-primary hover:text-ih-primary focus-within:border-ih-primary focus-within:shadow-ih-focus transition-colors">
+              {/* A label wrapping the input, so the picker opens NATIVELY. The
+                  button-plus-`input.click()` pattern depends on a hidden input
+                  being clickable, and when it is not there is nothing on screen
+                  to say so — the control simply does not respond. */}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                className="sr-only"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!file) return;
+                  setUploadError(await readSignatureFile(file, submit));
+                }}
+              />
+              {m.settings_profile_signature_upload()}
+            </label>
+          </div>
+
+          {uploadError && (
+            <p role="alert" className="text-[12px] text-ih-bad-fg">{uploadError}</p>
+          )}
+        </div>
       )}
     </section>
   );
+}
+
+/**
+ * Read an uploaded signature into a data URI, DOWNSCALED.
+ *
+ * The column is TEXT and its value is read on every report render and every
+ * agreement, so a phone photo pasted in whole would be carried around forever
+ * for a mark drawn at a couple of hundred pixels. Raster images are redrawn
+ * through a canvas at signature scale; SVG passes through untouched, being
+ * resolution-independent already.
+ *
+ * Returns an error message, or null on success.
+ */
+async function readSignatureFile(
+  file: File,
+  onReady: (dataUri: string) => void,
+): Promise<string | null> {
+  const ALLOWED = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+  if (!ALLOWED.includes(file.type)) return m.settings_profile_signature_upload_bad_type();
+  if (file.size > 2_000_000) return m.settings_profile_signature_upload_too_big();
+
+  const dataUri = await new Promise<string | null>((resolve) => {
+    const r = new FileReader();
+    r.onload = () => resolve(typeof r.result === "string" ? r.result : null);
+    r.onerror = () => resolve(null);
+    r.readAsDataURL(file);
+  });
+  if (!dataUri) return m.settings_profile_signature_upload_unreadable();
+
+  if (file.type === "image/svg+xml") { onReady(dataUri); return null; }
+
+  const scaled = await new Promise<string | null>((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX_H = 200, MAX_W = 600;
+      const ratio = Math.min(MAX_W / img.width, MAX_H / img.height, 1);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * ratio));
+      canvas.height = Math.max(1, Math.round(img.height * ratio));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(null); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      // PNG, so a signature on transparency stays on transparency.
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUri;
+  });
+  if (!scaled) return m.settings_profile_signature_upload_unreadable();
+  onReady(scaled);
+  return null;
 }

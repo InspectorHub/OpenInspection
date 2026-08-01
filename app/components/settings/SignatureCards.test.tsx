@@ -64,20 +64,72 @@ describe("EmailSignatureCard", () => {
 });
 
 describe("SavedSignatureCard", () => {
-  it("offers to add a signature, and nothing that looks like a form submit", () => {
-    const { container } = renderInRouter(<SavedSignatureCard />);
-    const buttons = container.querySelectorAll("button");
-    expect(buttons).toHaveLength(1);
-    // `type="button"` — it opens the pad. Signing is what saves.
-    expect(buttons[0].getAttribute("type")).toBe("button");
+  it("offers BOTH ways to sign, as siblings", () => {
+    // Drawing and uploading are two routes to one mark, not a primary and a
+    // fallback: an inspector with a scanned signature has no reason to redraw
+    // it with a mouse, and one without a scanner cannot upload.
+    renderInRouter(<SavedSignatureCard savedSignature={null} />);
+    expect(screen.getByRole("button", { name: /draw signature/i })).toBeTruthy();
+    expect(screen.getByText(/upload image/i)).toBeTruthy();
+  });
+
+  it("opens the picker through a LABEL, never a scripted click", () => {
+    // `button` + `inputRef.click()` on a `display:none` input is the pattern
+    // that silently does nothing when the browser declines it — and a control
+    // that does not respond is indistinguishable from a broken one.
+    const { container } = renderInRouter(<SavedSignatureCard savedSignature={null} />);
+    const input = container.querySelector('input[type="file"]');
+    expect(input).toBeTruthy();
+    expect(input!.closest("label")).toBeTruthy();
+    // sr-only, not hidden: still a rendered, focusable control.
+    expect(input!.className).toContain("sr-only");
+  });
+
+  it("has no form submit — signing is what saves", () => {
+    const { container } = renderInRouter(<SavedSignatureCard savedSignature={null} />);
     expect(container.querySelectorAll("button[type=submit]")).toHaveLength(0);
   });
 
-  it("opens the signature pad on click", () => {
-    renderInRouter(<SavedSignatureCard />);
-    fireEvent.click(screen.getByRole("button"));
-    // The pad replaces the button: there is no state where both are offered,
-    // which is what would let someone sign and then hit "add" expecting a save.
-    expect(screen.queryByRole("button", { name: /add|update/i })).toBeNull();
+  it("opens the signature pad on Draw", () => {
+    renderInRouter(<SavedSignatureCard savedSignature={null} />);
+    fireEvent.click(screen.getByRole("button", { name: /draw signature/i }));
+    // The pad replaces the two actions: there is no state offering both the pad
+    // and the controls that opened it.
+    expect(screen.queryByRole("button", { name: /draw signature/i })).toBeNull();
+  });
+});
+
+/**
+ * A saved signature has to be VISIBLE.
+ *
+ * The card said "Signature saved." and showed nothing — so the one thing a
+ * reader might want to check, that the mark captured is the one they meant, was
+ * the one thing the page would not tell them. Short of sending themselves an
+ * agreement there was no way to find out.
+ */
+describe("SavedSignatureCard — showing what was saved", () => {
+  it("renders the saved signature", () => {
+    renderInRouter(<SavedSignatureCard savedSignature="data:image/png;base64,AAAA" />);
+    const img = screen.getByRole("img");
+    expect(img.getAttribute("src")).toBe("data:image/png;base64,AAAA");
+  });
+
+  it("shows the signing line even when empty, and no image", () => {
+    // The empty state is the same ruled line, an invitation to sign — not a
+    // grey box announcing an absence.
+    const { container } = renderInRouter(<SavedSignatureCard savedSignature={null} />);
+    expect(container.querySelectorAll("img")).toHaveLength(0);
+    expect(screen.getByText(/Nothing signed yet/i)).toBeTruthy();
+  });
+
+  it("drops the empty hint once a signature exists", () => {
+    renderInRouter(<SavedSignatureCard savedSignature="data:image/png;base64,AAAA" />);
+    expect(screen.queryByText(/Nothing signed yet/i)).toBeNull();
+  });
+
+  it("hides the saved image while the pad is open, so the two never overlap", () => {
+    renderInRouter(<SavedSignatureCard savedSignature="data:image/png;base64,AAAA" />);
+    fireEvent.click(screen.getByRole("button", { name: /draw signature/i }));
+    expect(screen.queryByRole("img")).toBeNull();
   });
 });

@@ -37,12 +37,30 @@ export function LogoUploader({ currentUrl, uploading, onSelect, size = "default"
         )}
       </div>
       <div className={compact ? "space-y-1.5 text-center" : "space-y-2 flex-1 text-center sm:text-left"}>
-        <input ref={inputRef} type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp" className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onSelect(f); e.target.value = ""; }} />
-        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
-          className="h-9 px-3 rounded-md border border-ih-border text-ih-fg-2 text-[12px] font-bold hover:border-ih-primary hover:text-ih-primary transition-colors disabled:opacity-50">
+        {/* A LABEL, not a button calling `input.click()`.
+            The picker used to be opened programmatically from a `display:none`
+            input, which is the fragile half of that pattern: a non-rendered
+            input is not reliably clickable, and when it silently refuses there
+            is nothing on screen to say so — the control just does not respond.
+            A label wrapping the input opens the picker NATIVELY, with no
+            JavaScript in the path at all. The input stays visually hidden
+            rather than `display:none` so it is still a rendered, focusable
+            control for keyboard and assistive tech. */}
+        <label className={`inline-flex items-center justify-center h-9 px-3 rounded-md border border-ih-border text-ih-fg-2 text-[12px] font-bold transition-colors ${
+          uploading
+            ? "opacity-50 cursor-default"
+            : "cursor-pointer hover:border-ih-primary hover:text-ih-primary focus-within:border-ih-primary focus-within:shadow-ih-focus"
+        }`}>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/svg+xml,image/jpeg,image/webp"
+            disabled={uploading}
+            className="sr-only"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onSelect(f); e.target.value = ""; }}
+          />
           {uploading ? m.media_logo_uploading() : m.media_logo_upload()}
-        </button>
+        </label>
         {/* The caption is a whole-line hint at full size; in the narrow cell it
             would wrap to four lines and read as broken layout, so it drops the
             letter-spacing and the shouting. */}

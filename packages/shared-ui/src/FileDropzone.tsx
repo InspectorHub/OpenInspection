@@ -219,7 +219,11 @@ export function FileDropzone({
           type="file"
           accept={accept}
           disabled={!interactive}
-          className="hidden"
+          // sr-only, NOT hidden. A `display:none` input is not reliably
+          // clickable — `inputRef.click()` can be declined with nothing on
+          // screen to say so, and the zone then simply does not respond.
+          // Visually hidden keeps it a rendered, focusable control.
+          className="sr-only"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) onFile(file);

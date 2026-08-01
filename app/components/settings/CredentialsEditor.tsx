@@ -16,6 +16,7 @@ export interface EditorCredential {
 export function CredentialsEditor({
   credentials,
   uploadingId,
+  uploadError,
   onUpload,
   onAdd,
   onUpdate,
@@ -23,6 +24,15 @@ export function CredentialsEditor({
 }: {
   credentials: EditorCredential[];
   uploadingId: string | null;
+  /**
+   * Why the last upload was refused, shown on the row it belongs to.
+   *
+   * A per-row failure needs a per-row message. A toast cannot say WHICH of
+   * three uploaders rejected the file, and a rejected upload otherwise looks
+   * exactly like a button that does nothing — which is how a 3 MB badge hitting
+   * the 2 MB limit reads to the person who chose it.
+   */
+  uploadError: { id: string; message: string } | null;
   onUpload: (id: string, file: File) => void;
   onAdd: () => void;
   onUpdate: (id: string, patch: { label?: string; memberNumber?: string }) => void;
@@ -44,8 +54,11 @@ export function CredentialsEditor({
           {/* The uploader's COMPACT size — its default is a wide row that needs
               more than this column has, and squeezing it collapsed the preview
               to a sliver with the button floating off-centre beside it. */}
-          <div className="w-32 shrink-0">
+          <div className="w-32 shrink-0 space-y-1.5">
             <LogoUploader size="compact" currentUrl={c.imageUrl} uploading={uploadingId === c.id} onSelect={(f) => onUpload(c.id, f)} />
+            {uploadError?.id === c.id && (
+              <p role="alert" className="text-[11px] text-ih-bad-fg leading-tight">{uploadError.message}</p>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             {/* OPEN by default. `onAdd` creates a blank row, so a collapsed

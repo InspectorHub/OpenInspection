@@ -39,6 +39,7 @@ const getProfileRoute = createRoute(withMcpMetadata({
                         slug: z.string().nullable(),
                         photoUrl: z.string().nullable(),
                         signatureEnabled: z.boolean(),
+                        savedSignature: z.string().nullable().describe('The inspector drawn signature as a data URI, or null when none is saved.'),
                         signaturePreviewHtml: z.string(),
                         timezone: z.string().nullable(),
                         locale: z.string().nullable(),
@@ -135,6 +136,11 @@ const profileRoutes = createApiRouter()
             signatureEnabled: users.signatureEnabled,
             timezone: users.timezone,
             locale: users.locale,
+            // The drawn signature itself. Settings said "Signature saved" and
+            // showed the reader nothing — so the one thing they might want to
+            // check, that the right mark was captured, was the one thing the
+            // page would not tell them.
+            savedSignature: users.defaultSignatureBase64,
         }).from(users)
           .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
           .get();
