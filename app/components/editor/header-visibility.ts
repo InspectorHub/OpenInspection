@@ -28,8 +28,6 @@ export const HEADER_OVERFLOW = {
   theme: { inline: 'hidden xl:flex', row: 'xl:hidden' },
 } as const;
 
-export type HeaderOverflowKey = keyof typeof HEADER_OVERFLOW;
-
 /**
  * The breakpoint a class pair pivots on, or null when the pair is malformed
  * (no breakpoint, or the two sides name different ones). Exported for the
