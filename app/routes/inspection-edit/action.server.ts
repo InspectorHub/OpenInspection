@@ -30,6 +30,20 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  // "Mark complete and publish": fire complete first — idempotent and
  // non-blocking, so a failure there never stops the publish that follows.
  if (formData.get("markComplete") === "true") await completeEndpoint().catch(() => undefined);
+ // AUTO-SIGN IS SET HERE, AND AWAITED, because the publish handler decides
+ // whether to sign by re-reading the inspection row. The checkbox used to
+ // fire its own fetcher alongside this request, so the two raced: when the
+ // toggle lost, publish read the old value and the report went out UNSIGNED
+ // while the flag still landed — so the NEXT publish signed and the reader
+ // concluded they had mis-clicked. Ordering it here is what makes the
+ // checkbox mean what it says on the publish it was ticked for.
+ const autoSign = formData.get("autoSignOnPublish");
+ if (autoSign !== null) {
+  await api.inspections[":id"].$patch({
+   param: { id: params.id },
+   json: { autoSignOnPublish: autoSign === "true" },
+  });
+ }
  const res = await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: {} });
  // Publish has meaningful precondition failures (e.g. "Inspection must be
  // completed before publishing the report.") that the inspector MUST see —
@@ -335,16 +349,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   return { ok: res.ok, intent: "save-structure-template" };
  }
 
- if (intent === "toggle-auto-sign") {
- const autoSignOnPublish = formData.get("autoSignOnPublish") === "true";
- const res = await api.inspections[":id"].$patch({
- param: { id: params.id },
- json: { autoSignOnPublish },
- });
- ok = res.ok;
- }
-
- if (intent === "sign-inspector") {
+if (intent === "sign-inspector") {
  const signatureBase64 = String(formData.get("signatureBase64") ?? "");
  if (signatureBase64) {
  const res = await api.inspectionSync[":id"]["inspector-signature"].$post({

@@ -629,16 +629,11 @@ export default function InspectionEditPage() {
   setAutoSign(!!(state.inspection as Record<string, unknown>).autoSignOnPublish);
  }, [state.inspection]);
 
- const handleAutoSignToggle = useCallback(
-  (checked: boolean) => {
-   setAutoSign(checked);
-   signFetcher.submit(
-    { intent: "toggle-auto-sign", autoSignOnPublish: String(checked) },
-    { method: "post" },
-   );
-  },
-  [signFetcher],
- );
+ // Ticking the box only moves LOCAL state now; the publish request carries
+ // the value and the server writes it before publishing. Submitting here as
+ // well would restore the race this replaced, and persisting a choice the
+ // reader can still cancel out of was never the intent either.
+ const handleAutoSignToggle = useCallback((checked: boolean) => setAutoSign(checked), []);
 
  const handleSignSubmit = useCallback(
   async (dataUri: string) => {
@@ -2060,8 +2055,20 @@ export default function InspectionEditPage() {
  if (markComplete) {
  state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED }));
  }
+ // The auto-sign choice rides ALONG WITH the publish, never beside it.
+ // It used to be a separate fetcher fired by the checkbox, racing this
+ // request: the publish handler re-reads the inspection row to decide
+ // whether to sign, and if the toggle had not landed yet it read the OLD
+ // value and published UNSIGNED. The flag still persisted, so the next
+ // publish signed — the worst shape for a bug like this, because the
+ // reader concludes they mis-clicked rather than that a report went out
+ // unsigned.
  publishFetcher.submit(
- markComplete ? { intent: "publish", markComplete: "true" } : { intent: "publish" },
+ {
+ intent: "publish",
+ autoSignOnPublish: String(autoSign),
+ ...(markComplete ? { markComplete: "true" } : {}),
+ },
  { method: "post" },
  );
  }}
