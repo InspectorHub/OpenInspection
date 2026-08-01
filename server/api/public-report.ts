@@ -18,7 +18,7 @@ import { InvoiceNotPayableError } from '../lib/stripe-helpers';
 import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
 import { getBookingHost, getBaseUrl } from '../lib/url';
-import { publicReportAccessAllowed } from '../lib/report-access';
+import { publicReportAccessAllowed, shouldPinLatestPublished } from '../lib/report-access';
 import publicVerifyRoutes from './public/verify';
 import publicInspectorProfileRoutes from './public/inspector-profile';
 import { PublicInvoiceBodySchema } from '../lib/validations/invoice.schema';
@@ -288,6 +288,32 @@ const publicReportRoutes = createApiRouter()
         // THIS inspection is enforced by getReportData's tenant-scoped query.
         let ownerPreview = false;
         if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
+
+        // OPTION A — a delivered report renders what it FROZE.
+        //
+        // A recipient reading their link gets the latest PUBLISHED version's
+        // snapshot, not live tables. Without this the everyday web read tracked
+        // current state, so an inspector who renewed a licence or left an
+        // association silently retro-edited every report they had ever issued —
+        // on a document that carries a signature and an integrity hash claiming
+        // it had not changed.
+        //
+        // Three deliberate exclusions:
+        //  - RENDER TOKEN already names its own version (above); it must keep
+        //    it, because the verify page materialises one specific version.
+        //  - OWNER PREVIEW stays LIVE. The owner is the author: preview exists
+        //    to show work in progress, and pinning it would hide every edit made
+        //    after the last publish. This is the plan's own split — "publish →
+        //    snapshot; live/draft preview → read current state".
+        //  - AN UNPUBLISHED report has no version row, so it resolves live by
+        //    falling through with `pinnedVersion` still undefined.
+        //
+        // Server-derived, like the render token's: nothing here reads a version
+        // from the query string, so a link holder still cannot ask for one.
+        if (tenantId && shouldPinLatestPublished({ renderMode, ownerPreview, tokenPinnedVersion: pinnedVersion })) {
+            const latest = await c.var.services.reportVersion.getLatestPublished(tenantId, id);
+            if (latest) pinnedVersion = latest.versionNumber;
+        }
         if (!tenantId) {
             // IA-36 ⑨ — distinguish "this link was taken offline" from "this link
             // never existed". The recipient was invited by us and the link died by

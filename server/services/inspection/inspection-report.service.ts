@@ -119,10 +119,20 @@ export class InspectionReportService extends InspectionSubService {
         const db = this.getDrizzle();
 
         // Spec B §1 — a published version renders what it FROZE. Loaded up front
-        // so the live resolutions below can be overlaid rather than duplicated:
-        // everything the snapshot does not carry still comes from live tables,
-        // which is the honest scope of this change and is stated on the payload
-        // itself via `snapshotSchemaVersion`.
+        // so the live resolutions below can be overlaid rather than duplicated.
+        //
+        // WHAT THE OVERLAY COVERS, precisely, because the gap matters: inspector
+        // identity + credentials, and the resolved style profile. Everything the
+        // snapshot does not carry still resolves live. That is less alarming than
+        // it sounds — the report's STRUCTURE is already frozen elsewhere, at
+        // creation, by `inspections.template_snapshot` and
+        // `inspection_results.rating_system_snapshot` — but it is not "the whole
+        // report is immutable", and anything added to the snapshot later has to
+        // be overlaid here too or it silently keeps tracking live state.
+        //
+        // (An earlier version of this comment claimed the payload advertises
+        // `snapshotSchemaVersion`. It does not — nothing emits that field. Said
+        // here instead of promising a field that does not exist.)
         const pinned = typeof versionNumber === 'number'
             ? await loadPinnedSnapshot(this.getDrizzle(), tenantId, inspectionId, versionNumber)
             : null;

@@ -27,6 +27,9 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
         resolveToken: ReturnType<typeof vi.fn>,
         getReportData = vi.fn().mockResolvedValue({ inspectionId: 'insp1' }),
         resolveAgentViewToken = vi.fn().mockResolvedValue(null),
+        // Option A — a recipient read resolves the latest PUBLISHED version and
+        // renders its snapshot. `null` is the draft case: no version row yet.
+        getLatestPublished = vi.fn().mockResolvedValue({ versionNumber: 7 }),
     ) {
         // The publish gate added to reportRoute runs drizzle(c.env.DB).select()...get()
         // on the resolved (client/legacy) path. These cases all use published
@@ -37,11 +40,15 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
             (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
-            c.set('services', { portalAccess: { resolveToken }, inspection: { getReportData, resolveAgentViewToken } } as unknown as HonoConfig['Variables']['services']);
+            c.set('services', {
+                portalAccess: { resolveToken },
+                inspection: { getReportData, resolveAgentViewToken },
+                reportVersion: { getLatestPublished },
+            } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
         app.route('/api/public', publicReportRoutes);
-        return { app, getReportData };
+        return { app, getReportData, getLatestPublished };
     }
 
     it('404 when no token', async () => {
@@ -63,12 +70,53 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
         const res = await app.request('/api/public/report/t/insp1?token=kvtok');
         expect(res.status).toBe(200);
         // Third arg: the makePhotoUrl factory added by A-9 (photo serve routes).
-        expect(getReportData).toHaveBeenCalledWith('insp1', 't9', expect.any(Function), expect.any(Object),
-            // 5th arg: the pinned version. `undefined` on every path that is not
-            // materialising a specific published version — asserted rather than
-            // omitted, because a NUMBER leaking in here would mean an ordinary
-            // client read was being served a frozen snapshot.
-            undefined);
+        // 5th arg: the pinned version. A recipient read is EXACTLY the read that
+        // must be served a frozen snapshot — this assertion used to require
+        // `undefined` here, which is the behaviour option A was chosen to
+        // replace: the delivered report tracked live state and silently changed
+        // under the client after it was signed.
+        expect(getReportData).toHaveBeenCalledWith('insp1', 't9', expect.any(Function), expect.any(Object), 7);
+    });
+
+    /**
+     * OPTION A — the assertion the plan named and said nobody writes.
+     *
+     * "publish a report, change the credential, re-read the published report —
+     * the badge must be the old one." That is a snapshot READ, and the everyday
+     * web link was the one path still resolving live. These pin the routing
+     * decision; the overlay itself is covered where the snapshot is applied.
+     */
+    it('falls back to LIVE when the report has no published version yet', async () => {
+        // A draft has no version row. Pinning `undefined` here is what lets an
+        // unpublished report render at all.
+        const { app, getReportData } = buildApp(
+            vi.fn().mockResolvedValue(tokenRow()),
+            undefined, undefined,
+            vi.fn().mockResolvedValue(null),
+        );
+        const res = await app.request('/api/public/report/t/insp1?token=tok');
+        expect(res.status).toBe(200);
+        expect(getReportData).toHaveBeenCalledWith('insp1', 't1', expect.any(Function), expect.any(Object), undefined);
+    });
+
+    it('pins whatever version is latest, not a hard-coded one', async () => {
+        // Guards the obvious wrong fix: pinning v1 forever, so every amendment
+        // after the first publish would be invisible to the client.
+        const { app, getReportData } = buildApp(
+            vi.fn().mockResolvedValue(tokenRow()),
+            undefined, undefined,
+            vi.fn().mockResolvedValue({ versionNumber: 3 }),
+        );
+        await app.request('/api/public/report/t/insp1?token=tok');
+        expect(getReportData).toHaveBeenCalledWith('insp1', 't1', expect.any(Function), expect.any(Object), 3);
+    });
+
+    it('resolves the version against the TOKEN tenant, never the URL tenant', async () => {
+        // Same rule the read itself follows. A URL-supplied tenant reaching this
+        // lookup would be a cross-tenant read of another company's versions.
+        const { app, getLatestPublished } = buildApp(vi.fn().mockResolvedValue(tokenRow()));
+        await app.request('/api/public/report/WRONG-TENANT/insp1?token=tok');
+        expect(getLatestPublished).toHaveBeenCalledWith('t1', 'insp1');
     });
 
     it('200 with report data + queries by the token tenantId (not the URL)', async () => {
@@ -78,12 +126,8 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
         const body = await res.json() as { success: boolean; data: unknown };
         expect(body.success).toBe(true);
         // Third arg: the makePhotoUrl factory added by A-9 (photo serve routes).
-        expect(getReportData).toHaveBeenCalledWith('insp1', 't1', expect.any(Function), expect.any(Object),
-            // 5th arg: the pinned version. `undefined` on every path that is not
-            // materialising a specific published version — asserted rather than
-            // omitted, because a NUMBER leaking in here would mean an ordinary
-            // client read was being served a frozen snapshot.
-            undefined);
+        // 5th arg: the recipient's read is pinned to the latest published version.
+        expect(getReportData).toHaveBeenCalledWith('insp1', 't1', expect.any(Function), expect.any(Object), 7);
     });
 });
 
