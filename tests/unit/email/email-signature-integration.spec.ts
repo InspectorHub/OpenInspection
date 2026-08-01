@@ -150,6 +150,21 @@ describe('EmailService — credential badges reach the recipient', () => {
         expect(html).not.toMatch(/<img[^>]+src="\/api\/public/);
     });
 
+    it('asks for the EMAIL badge variant, not the stored original', async () => {
+        await svc.sendReportReady('client@example.com', '1 Main St', 'https://r.example/abc', WITH_CREDENTIALS, HOST);
+        const html = sent[0]?.html ?? '';
+        // Badges are stored at whatever was uploaded — up to 2 MB — and drawn
+        // here at 28px. Without the variant the recipient downloads the whole
+        // thing to render a chip the height of a line of text, on every open.
+        // `&amp;`, not `&` — the whole src goes through escapeHtml, which is the
+        // correct encoding for an attribute and what every mail client decodes.
+        // Asserting the raw ampersand here would fail against correct output.
+        expect(html).toContain('&amp;v=email');
+        // PNG, because Outlook draws with Word's engine and shows a broken-image
+        // box for WebP. The variant name is what carries that decision.
+        expect(html).toMatch(/<img[^>]+src="https:\/\/app\.inspectorhub\.io\/api\/public\/brand-asset[^"]*&amp;v=email"/);
+    });
+
     it('renders a text-only credential too, so a blocked image never loses it', async () => {
         await svc.sendReportReady('client@example.com', '1 Main St', 'https://r.example/abc', WITH_CREDENTIALS, HOST);
         const html = sent[0]?.html ?? '';

@@ -16,6 +16,8 @@
  * retired. SignatureUser.slug is still accepted but is no longer read.
  */
 
+import { badgeUrl } from './media/badge-variant';
+
 export interface SignatureUser {
     name?: string | null;
     email?: string | null;
@@ -91,7 +93,12 @@ export function inspectorSignature(user: SignatureUser, host: string): Signature
         const imgs = creds
             .filter((c) => c.imageUrl)
             .map((c) => {
-                const abs = c.imageUrl!.startsWith('/') ? `https://${host}${c.imageUrl}` : c.imageUrl!;
+                // The EMAIL variant: PNG (Outlook cannot draw WebP) at twice the
+                // 28px it is about to be scaled to. Without this the recipient
+                // downloads whatever was uploaded — up to 2 MB — to render a
+                // chip the height of a line of text.
+                const sized = badgeUrl(c.imageUrl, 'email') ?? c.imageUrl!;
+                const abs = sized.startsWith('/') ? `https://${host}${sized}` : sized;
                 return `<img src="${escapeHtml(abs)}" alt="${escapeHtml(c.label || 'Credential')}" style="height:28px;width:auto;vertical-align:middle;margin-right:6px">`;
             })
             .join('');

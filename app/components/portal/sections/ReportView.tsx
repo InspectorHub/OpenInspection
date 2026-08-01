@@ -27,6 +27,7 @@ import { ErrorState } from "~/components/ErrorState";
 import { getSectionIcon, itemDrivesSummary } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
 import { CredentialBadges } from "./report/CredentialBadges";
+import { badgeUrl } from "../../../../server/lib/media/badge-variant";
 import { ReportDefectCard } from "./report/ReportDefectCard";
 import { PhotoAppendix } from "./report/PhotoAppendix";
 import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
@@ -772,7 +773,7 @@ export function ReportView(props: ReportViewProps) {
       )}
 
       {/* ── Signature block ──────────────────────────────────────────── */}
-      <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} timeZone={data.reportTimeZone} credentialBadgeUrl={data.inspectorCredentials?.find((c) => c.imageUrl)?.imageUrl ?? null} />
+      <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} timeZone={data.reportTimeZone} credentialBadgeUrl={badgeUrl(data.inspectorCredentials?.find((c) => c.imageUrl)?.imageUrl ?? null, "reportSignature")} />
 
       {/* ── Verification block ───────────────────────────────────────── */}
       <ReportVerificationBlock verification={data.verification} baseUrl={data.baseUrl} timeZone={data.reportTimeZone} />

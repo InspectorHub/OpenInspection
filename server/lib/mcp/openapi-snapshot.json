@@ -7620,6 +7620,16 @@
             "type": "string",
             "description": "R2 object key under the branding/ prefix."
           }
+        },
+        {
+          "name": "v",
+          "in": "query",
+          "required": false,
+          "description": "Render variant: email | reportSignature | reportCover. Badges are drawn at 28-40px but stored at whatever was uploaded, so this serves a size the surface can use. Omitted or unrecognised serves the original, never an error.",
+          "schema": {
+            "type": "string",
+            "description": "Render variant: email | reportSignature | reportCover. Badges are drawn at 28-40px but stored at whatever was uploaded, so this serves a size the surface can use. Omitted or unrecognised serves the original, never an error."
+          }
         }
       ],
       "body": null
