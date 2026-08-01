@@ -60,7 +60,21 @@ export function EmailSignatureCard({
       {previewHtml ? (
         <div className="rounded-md border border-ih-border bg-ih-bg-muted p-4">
           <div className="text-[11px] text-ih-fg-3 mb-2 uppercase tracking-[0.2em]">{m.settings_profile_signature_preview_label()}</div>
-          <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          {/* THE PREVIEW IS DELIBERATELY LIGHT IN BOTH THEMES.
+              `inspectorSignature()` bakes literal colours into the HTML
+              (`#0f172a` text, `#e2e8f0` rule) and has to — a mail client has
+              none of our tokens, and the footer must read correctly in an inbox.
+              Dropped straight onto a themed card that HTML was near-black on
+              near-black in dark mode: the one surface whose whole job is showing
+              what the recipient sees, showing nothing. So the swatch carries the
+              medium's background rather than the app's. */}
+          <div
+            // ds-allow: email body — the swatch renders mail-client HTML whose
+            // colours are literal by necessity, so it carries the inbox's
+            // background, not the app's theme.
+            className="rounded bg-white px-3 py-2 overflow-x-auto"
+            dangerouslySetInnerHTML={{ __html: previewHtml }}
+          />
         </div>
       ) : (
         <p className="text-[12px] text-ih-fg-3">{m.settings_profile_signature_empty()}</p>

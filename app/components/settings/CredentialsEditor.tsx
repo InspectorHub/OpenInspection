@@ -41,10 +41,11 @@ export function CredentialsEditor({
 
       {credentials.map((c) => (
         <div key={c.id} className="rounded-md border border-ih-border bg-ih-bg-muted/40 p-3 flex items-start gap-4">
-          {/* Wide enough for the uploader's own caption. At w-24 it wrapped to
-              three lines and read as a broken layout. */}
-          <div className="w-36 shrink-0">
-            <LogoUploader currentUrl={c.imageUrl} uploading={uploadingId === c.id} onSelect={(f) => onUpload(c.id, f)} />
+          {/* The uploader's COMPACT size — its default is a wide row that needs
+              more than this column has, and squeezing it collapsed the preview
+              to a sliver with the button floating off-centre beside it. */}
+          <div className="w-32 shrink-0">
+            <LogoUploader size="compact" currentUrl={c.imageUrl} uploading={uploadingId === c.id} onSelect={(f) => onUpload(c.id, f)} />
           </div>
           <div className="flex-1 min-w-0">
             {/* OPEN by default. `onAdd` creates a blank row, so a collapsed
