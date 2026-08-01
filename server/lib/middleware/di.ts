@@ -11,6 +11,8 @@ import { OutboxService } from '../../portal/outbox.service';
 import { publishRow } from '../../portal/outbox.service';
 import { BookingService } from '../../services/booking.service';
 import { BrandingService } from '../../services/branding.service';
+import { LegalVersionService } from '../../services/legal-version.service';
+import { drizzle } from 'drizzle-orm/d1';
 import { assembleTenantEmailService, loadTenantEmailConfig, type LoadedEmailConfig } from '../email/build-email-service';
 import { InspectionService } from '../../services/inspection.service';
 import type { ImagesBinding } from '../media/strip-exif';
@@ -191,6 +193,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'branding':
                     target.branding = new BrandingService(c.env.DB, c.env.TENANT_CACHE);
+                    break;
+                case 'legalVersion':
+                    target.legalVersion = new LegalVersionService(drizzle(c.env.DB));
                     break;
                 case 'email':
                     target.email = buildEmailService();

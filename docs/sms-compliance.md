@@ -27,7 +27,17 @@ Those effective URLs appear in booking footers, the client portal, invoices, and
 |---|---|---|
 | Clients / consumers | Express — recorded opt-in before send | Recorded opt-in; retain proof |
 | Agents / other parties on the job | Implied — phone on file for the transaction | Established business relationship; STOP still applies |
-| Staff | Account / employment terms | Internal; not the consumer consent ledger |
+| Staff | Account / employment terms | Internal; no recorded opt-in — STOP still applies |
+
+**STOP works for everyone; opt-in EVIDENCE is consumers only.** Agents and staff
+are never shown a disclosure and never asked to agree to one — they are reachable
+under an existing relationship. They can stop, and they can start again, and both
+acts are recorded against their own `recipient_type` (`agent` / `staff`).
+
+When a carrier asks to see your opt-in proof, the answer filters on
+`recipient_type = 'client'`. That is what keeps the layers separable inside one
+ledger: a staff member turning texts back on never appears as a consumer who
+opted in, and nobody who says stop keeps getting texts.
 
 ---
 

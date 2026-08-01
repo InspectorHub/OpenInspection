@@ -208,7 +208,7 @@ export function makeShareDb(inspResult: unknown) {
 export function makeShareServices(overrides: {
     getByShareToken?: ReturnType<typeof vi.fn>;
     creditTotal?: ReturnType<typeof vi.fn>;
-    sendEmail?: ReturnType<typeof vi.fn>;
+    sendRepairRequestShare?: ReturnType<typeof vi.fn>;
 } = {}) {
     return {
         portalAccess: { resolveToken: vi.fn().mockResolvedValue(null) },
@@ -227,7 +227,7 @@ export function makeShareServices(overrides: {
             assertCanEdit: vi.fn().mockResolvedValue(undefined),
         },
         email: {
-            sendEmail: overrides.sendEmail ?? vi.fn().mockResolvedValue({ delivered: true }),
+            sendRepairRequestShare: overrides.sendRepairRequestShare ?? vi.fn().mockResolvedValue(undefined),
         },
     };
 }
@@ -251,20 +251,20 @@ export function buildShareApp(opts: {
     rrResult?: { request: typeof SHARE_RR; items: typeof SHARE_ITEMS } | null;
     inspResult?: typeof SHARE_INSP_PUBLISHED | typeof SHARE_INSP_UNPUBLISHED | null;
     creditTotalResult?: number;
-    sendEmail?: ReturnType<typeof vi.fn>;
+    sendRepairRequestShare?: ReturnType<typeof vi.fn>;
     browserBinding?: unknown;
 }) {
     const {
         rrResult = { request: SHARE_RR, items: SHARE_ITEMS },
         inspResult = SHARE_INSP_PUBLISHED,
         creditTotalResult = 5000,
-        sendEmail,
+        sendRepairRequestShare,
         browserBinding,
     } = opts;
 
     const getByShareToken = vi.fn().mockResolvedValue(rrResult);
     const creditTotal = vi.fn().mockResolvedValue(creditTotalResult);
-    const svc = makeShareServices({ getByShareToken, creditTotal, sendEmail });
+    const svc = makeShareServices({ getByShareToken, creditTotal, sendRepairRequestShare });
 
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
         makeShareDb(inspResult),

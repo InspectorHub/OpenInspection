@@ -11,6 +11,12 @@ export default [
   route("forgot-password", "routes/forgot-password.tsx"),
   route("reset-password", "routes/reset-password.tsx"),
   route("logout", "routes/logout.tsx"),
+  // The agent portal's own teardown path. Same module — the difference is
+  // entirely in the path, which is what `loginPathFor` reads to decide which
+  // sign-in page the session ends on. `/logout` would send an agent to the
+  // STAFF login (and, in SaaS, on to the portal's), which is not a door they
+  // have a key to. See app/lib/session.server.ts.
+  route("agent-logout", "routes/logout.tsx", { id: "agent-logout" }),
   // Remote MCP OAuth consent screen (B3). Bare route (own chrome, own auth
   // handling); the OAuthProvider wrapper routes /oauth/authorize here via the
   // defaultHandler, injecting env.OAUTH_PROVIDER for the loader/action.
@@ -54,6 +60,11 @@ export default [
     route("portal/:tenant", "routes/public/portal.tsx"),
     route("portal/:tenant/auth", "routes/public/portal-auth.tsx"),
     route("portal/:tenant/i/:inspectionId", "routes/public/portal-inspection.tsx"),
+    // Notification settings as a page of its own, so the privacy policy and the
+    // terms have somewhere to link that names no inspection and assumes no
+    // session (spec §4.1). Signed out, it asks for an email and sends a
+    // one-time link back here — without saying whether the address is known.
+    route("portal/:tenant/notifications", "routes/public/portal-notifications.tsx"),
   ]),
   // Standalone pages (own chrome, no sidebar)
   route("setup", "routes/setup.tsx"),

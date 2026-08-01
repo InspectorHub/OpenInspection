@@ -33,10 +33,9 @@ export function InspectionEmailMixin<TBase extends Constructor>(Base: TBase) {
                 host,
             );
             if (!rendered.enabled) return false;
-            const { delivered } = await this.sendEmail(
+            const { delivered } = await this.sendRendered(
+                rendered,
                 [to],
-                rendered.subject,
-                rendered.html,
                 undefined,
                 { inspector },
             );
@@ -78,14 +77,43 @@ export function InspectionEmailMixin<TBase extends Constructor>(Base: TBase) {
                 host,
             );
             if (!rendered.enabled) return false;
-            const { delivered } = await this.sendEmail(
+            const { delivered } = await this.sendRendered(
+                rendered,
                 [to],
-                rendered.subject,
-                rendered.html,
                 [{ filename: `${safeAddress}-report.pdf`, content: pdfBytes }],
                 { inspector },
             );
             return delivered;
+        }
+
+        /**
+         * Shares a repair request with an address the sender typed — usually a
+         * contractor, an agent, or the other side of the transaction.
+         *
+         * The route built this HTML itself, hardcoding a slate button that
+         * ignored the company's colour and logo. Everything a recipient sees of
+         * the inspector's brand was missing from the one email an inspector's
+         * client sends on their behalf.
+         *
+         * `message` is the sender's optional note; when they wrote none, the
+         * template's block resolves to nothing and the layout drops it.
+         */
+        async sendRepairRequestShare(
+            to: string,
+            args: { propertyAddress: string; shareUrl: string; message?: string | undefined },
+        ): Promise<void> {
+            const address = args.propertyAddress || 'your property';
+            const rendered = this.renderOr('repair-request-share', {
+                propertyAddress: address,
+                shareUrl: args.shareUrl,
+                message: args.message ?? '',
+            }, {
+                subject: `Repair request — ${address}`,
+                html: `<p>A repair request list for ${address} has been shared with you.</p>
+                 <p><a href="${args.shareUrl}">View repair request</a></p>`,
+            });
+            if (!rendered.enabled) return;
+            await this.sendRendered(rendered, [to]);
         }
 
         /**
@@ -143,10 +171,13 @@ export function InspectionEmailMixin<TBase extends Constructor>(Base: TBase) {
                     Prefer text updates? <a href="${smsOptinUrl}" style="color:#4f46e5; font-weight:600;">Also text me appointment &amp; report updates</a>. Message &amp; data rates may apply; reply STOP to opt out.
                </p>`
                 : '';
-            await this.sendEmail(
+            // The opt-in block is appended to the BODY, so the rendered result is
+            // spread rather than replaced — the trigger it carries is what makes
+            // this a `booking-confirmation` at the send boundary, and rebuilding
+            // the object from scratch would drop it.
+            await this.sendRendered(
+                { ...rendered, html: optinBlock ? `${rendered.html}${optinBlock}` : rendered.html },
                 [to],
-                rendered.subject,
-                optinBlock ? `${rendered.html}${optinBlock}` : rendered.html,
                 attachments,
                 { inspector },
             );

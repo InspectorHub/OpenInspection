@@ -40,7 +40,7 @@ import { normalizeE164 } from '../lib/sms/phone';
 import { loadProviderForTenant, resolveTwilioSource } from '../lib/sms/resolve-twilio';
 import { resolveComplianceProvider } from '../lib/sms/resolve-compliance-provider';
 import { recordIntegrationTest } from '../lib/integration-test-results';
-import { managedSendAllowed } from '../lib/sms/managed-send-gate';
+import { smsSendGate } from '../lib/sms/send-gate';
 import { PlanQuotaGuard, readTenantTier } from '../features/plan-quota/guard';
 import { complianceWebhookUrl } from '../lib/sms/compliance-webhook';
 import { getBaseUrl } from '../lib/url';
@@ -502,27 +502,27 @@ export const smsAdminRoutes = createApiRouter()
                 .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
         } catch { cfgRow = null; }
         const smsProvider = cfgRow?.smsByoProvider ?? 'twilio';
-        const smsMode = cfgRow?.smsMode ?? 'platform';
-        const gate = await managedSendAllowed(db, c.env, tenantId, smsMode);
-        if (!gate.allowed) {
-            logger.info('sms.test_send: blocked by managed compliance gate', { tenantId, reason: gate.reason });
-            await recordIntegrationTest(db, { tenantId, target: 'sms', provider: smsProvider, ok: false, detail: gate.reason ?? 'managed_not_approved', testedByUserId }).catch(() => {});
-            return c.json({ success: false, error: gate.reason ?? 'managed_not_approved' }, 200);
-        }
 
-        // Free-tier pre-flight (2026-07) — a free tenant's platform-mode sends
-        // (any mode except 'own', which is BYO and uncapped) count against the
-        // lifetime sms cap. Runs alongside (not replacing) the managed-compliance
-        // gate above, and BEFORE any provider call — a quota block never spends
-        // a provider request or a meter record. `tenantTier` is not populated by
-        // session-context on this JWT-authenticated route (only the public/
-        // fixed-tenant tenant-routing resolvers set it), so fall back to a
-        // one-shot tier lookup.
-        if (c.var.profile.hasUsageQuota && smsMode !== 'own') {
-            const quotaGuard = new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl });
-            const tier = c.get('tenantTier') ?? await readTenantTier(c.env.DB, tenantId);
-            await quotaGuard.checkMessagingQuota(tenantId, tier, 'sms');
+        // ONE gate chain, shared with the real send path and the template
+        // test-send (`lib/sms/send-gate.ts` — the reasoning lives there). This
+        // route carried its own copy, which is how it came to be the only one
+        // of the three with no STOP-revocation check. `tenantTier` is unset by
+        // session-context here, so fall back to a one-shot lookup.
+        const quotaGuard = c.var.profile.hasUsageQuota
+            ? new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl })
+            : undefined;
+        const gate = await smsSendGate({
+            db, tenantId, to: normalized, purpose: 'test', env: c.env,
+            ...(quotaGuard
+                ? { quota: { guard: quotaGuard, tier: c.get('tenantTier') ?? await readTenantTier(c.env.DB, tenantId) } }
+                : {}),
+        });
+        if (!gate.allowed) {
+            logger.info('sms.test_send: blocked', { tenantId, reason: gate.reason });
+            await recordIntegrationTest(db, { tenantId, target: 'sms', provider: smsProvider, ok: false, detail: gate.reason, testedByUserId }).catch(() => {});
+            return c.json({ success: false, error: gate.reason }, 200);
         }
+        const smsMode = gate.smsMode;
 
         // Use the provider-aware loader so BYO Telnyx tenants route to TelnyxProvider.
         // Twilio tenants: same logic as before (loadProviderForTenant → resolveTwilio).

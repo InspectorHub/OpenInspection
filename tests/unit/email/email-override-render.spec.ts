@@ -25,8 +25,11 @@ describe('renderer override-merge', () => {
     expect(out.html).toContain('View Interactive Report');
   });
   it('enabled:false short-circuits for a non-required trigger', () => {
-    const r = withOverrides([{ trigger: 'report-ready', subject: null, blocks: null, enabled: false }]);
-    const out = r.render('report-ready', { address: 'A', reportUrl: 'u' });
+    // `report-ready` used to be the example here; it is `required` now — the
+    // report IS the delivery, so an operator must not be able to switch it off
+    // (spec §2.1 #15). Booking confirmation is a genuine operator choice.
+    const r = withOverrides([{ trigger: 'booking-confirmation', subject: null, blocks: null, enabled: false }]);
+    const out = r.render('booking-confirmation', { clientName: 'Jo', address: 'A', date: 'D', time: 'T' });
     expect(out.enabled).toBe(false);
   });
   it('ignores enabled:false for a required trigger (still enabled)', () => {

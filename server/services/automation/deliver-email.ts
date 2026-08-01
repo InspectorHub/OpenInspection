@@ -7,6 +7,7 @@ import { logger } from '../../lib/logger';
 import { deliverAction } from '../../lib/automation-core';
 import { buildBaseTemplateVars } from './template-vars';
 import { createOiTemplateStore } from './template-store';
+import { automationClassId } from '../../lib/notifications/automation-classes';
 import { oiClock } from './shared';
 import type { FlushInspection } from './shared';
 import type { EmailService } from '../email.service';
@@ -163,7 +164,17 @@ export async function deliverTemplatedEmail(
     };
     const transport = {
         sendEmail: async (a: { to: string; subject: string; html: string }) => {
-            const { delivered } = await emailSvc.sendEmail([a.to], a.subject, a.html);
+            // The rules layer names what it is sending, like every other
+            // dispatch path. A tenant-written rule has no code-owned identity
+            // and resolves to undefined — unclassified, so it still goes out,
+            // it just cannot be muted by a recipient.
+            // Conditional spread, not `classId: maybeUndefined` —
+            // exactOptionalPropertyTypes distinguishes "absent" from "present
+            // and undefined", and absent is what an unclassified send means.
+            const classId = automationClassId(automation);
+            const { delivered } = await emailSvc.sendEmail(
+                [a.to], a.subject, a.html, undefined, classId ? { classId } : {},
+            );
             // OI maps "not delivered" (e.g. email not configured) to a
             // SKIPPED log, not a failure. Encode that as a sentinel the
             // logger adapter below translates.

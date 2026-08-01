@@ -13,6 +13,17 @@ describe('EmailLayout', () => {
     expect(html.startsWith('<!DOCTYPE html>')).toBe(true);
   });
 
+  it('drops a paragraph that resolved to nothing, rather than leaving a blank one', () => {
+    // A template block can be conditional in practice — `repair-request-share`
+    // carries the sender's optional note. Rendering `<p></p>` for the empty case
+    // leaves a visible gap, so the caller would have to build the block list
+    // dynamically and no template could ever declare an optional paragraph.
+    const withGap = EmailLayout({ brand, heading: 'H', paragraphs: ['Before.', '', '   ', 'After.'] });
+    expect(withGap).toContain('Before.');
+    expect(withGap).toContain('After.');
+    expect(withGap).not.toMatch(/<p[^>]*>\s*<\/p>/);
+  });
+
   it('renders the CTA button with the primary color and url', () => {
     const html = EmailLayout({ brand, heading: 'H', paragraphs: [], cta: { label: 'View Report', url: 'https://x/y' } });
     expect(html).toContain('https://x/y');

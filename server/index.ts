@@ -78,6 +78,7 @@ import userRoutes from './api/users';
 import messageRoutes, { inspectorMessageRoutes, clientMessageRoutes } from './api/messages';
 import widgetRoutes from './api/widget';
 import notificationsRoutes from './api/notifications';
+import notificationPreferenceRoutes from './api/notification-preferences';
 import inspectionSyncRoutes from './api/inspection-sync';
 import recommendationsRoutes from './api/recommendations';
 import contractorTypesRoutes from './api/contractor-types';
@@ -90,6 +91,7 @@ import inspectionRequestsRoutes from './api/inspection-requests';
 import repairBuilderRoutes from './api/repair-builder';
 import portalRoutes from './api/portal';
 import portalNoticeRoutes from './api/portal/notices';
+import portalNotificationPreferenceRoutes from './api/portal/notification-preferences';
 import tagsRoutes, { inspectionTagRoutes } from './api/tags';
 import publicSlugRoutes from './api/public-slug';
 import publicShareRoutes from './api/public-share';
@@ -358,6 +360,8 @@ const routes = app
   .route('/api/portal', portalRoutes)
   // C3 — the client's Notices inbox, its own module under the same prefix.
   .route('/api/portal', portalNoticeRoutes)
+  // The client's own notification settings (§4.1) — same portal-session auth.
+  .route('/api/portal', portalNotificationPreferenceRoutes)
   .route('/api/admin', adminRoutes)
   // Branding sub-router — extracted to fix hono/client type-collapse (C-10)
   .route('/api/admin', adminBrandingRoutes)
@@ -424,6 +428,7 @@ const routes = app
   // (inspector) or /api/public (client) now.
   .route('/api/messages', messageRoutes)
   .route('/api/notifications', notificationsRoutes)
+  .route('/api', notificationPreferenceRoutes)   // reader's own preferences (§4)
   .route('/settings/integrations/qbo', qboRoutes)
   .route('/api/integrations/qbo/webhook', qboWebhookRoutes)
   // Stripe webhook, tenant-scoped (SaaS): /api/integrations/stripe/webhook/:tenant

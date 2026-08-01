@@ -1,3 +1,4 @@
+import { badgeUrl } from "../../../../../server/lib/media/badge-variant";
 // Renders 0-N inspector credentials (Spec B). Image credentials -> <img> (equal
 // height); text-only credentials -> "label #member". layout comes from the
 // resolved profile's badgeLayout (Plan 1a): 'strip' = its own wrapping row,
@@ -24,7 +25,7 @@ export function CredentialBadges({
   return (
     <div className={layout === "strip" ? "flex flex-wrap items-center gap-2 mt-2" : "flex items-center gap-2"}>
       {images.map((c, i) => (
-        <img key={i} src={c.imageUrl!} alt={c.label || "Inspector credential"} className="h-10 w-auto" />
+        <img key={i} src={badgeUrl(c.imageUrl, "reportCover") ?? c.imageUrl!} alt={c.label || "Inspector credential"} className="h-10 w-auto" />
       ))}
       {texts.length > 0 && (
         <span className="text-[11px] text-ih-fg-3">

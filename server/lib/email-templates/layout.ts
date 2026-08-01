@@ -25,6 +25,12 @@ export function EmailLayout(input: LayoutInput): string {
   const SIG_TOKEN = /\{\{\s*signature\s*\}\}/;
   let signaturePlaced = false;
   const paras = paragraphs
+    // A block that resolved to nothing contributes nothing. Without this, any
+    // template with an optional block (the sender's note on a repair-request
+    // share) renders a blank paragraph and its margin — so "optional" would
+    // have to be expressed by the caller assembling the list, not by the
+    // template declaring it.
+    .filter(p => p.trim() !== '')
     .map(p => {
       if (signatureHtml && SIG_TOKEN.test(p)) {
         signaturePlaced = true;

@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, expect } from 'vitest';
+// jest-dom matchers. The reason is failure MESSAGES, not brevity:
+// `expect(el.disabled).toBe(true)` fails with "expected false to be true",
+// which names neither the element nor the reason. `toBeDisabled()` prints the
+// element it was handed.
+import '@testing-library/jest-dom/vitest';
 
 /**
  * Hermeticity guard for the web-unit suite (happy-dom).

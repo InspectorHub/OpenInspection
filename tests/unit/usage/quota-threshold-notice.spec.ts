@@ -90,6 +90,10 @@ describe('sendQuotaThresholdNotice', () => {
     expect(body.to).toEqual(['owner4@example.com']);
     expect(body.subject).toBe('One free inspection left');
     expect(body.html).toContain('one free inspection left');
+    // It goes through the shared branded layout now, not a bare `<p>` —
+    // the whole point of moving it onto a registry template.
+    expect(body.html).toContain('<!DOCTYPE html>');
+    expect(body.html).toContain('https://billing.example.com');
   });
 
   it('emails the tenant owner with the 5/5 "cap reached" copy', async () => {

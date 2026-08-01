@@ -1,5 +1,4 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
@@ -10,10 +9,9 @@ import { buildTenantEmailService } from '../lib/email/build-email-service';
 import { PlanQuotaGuard, readTenantTier } from '../features/plan-quota/guard';
 import { loadProviderForTenant } from '../lib/sms/resolve-twilio';
 import { normalizeE164 } from '../lib/sms/phone';
-import { managedSendAllowed } from '../lib/sms/managed-send-gate';
+import { smsSendGate } from '../lib/sms/send-gate';
 import { maybeMetering } from '../services/metering.service';
 import { currentPeriodKey } from '../lib/usage/period';
-import { tenantConfigs } from '../lib/db/schema';
 import { getDrizzle } from '../lib/route-helpers';
 import {
     CreateMessageTemplateSchema, UpdateMessageTemplateSchema, PreviewMessageTemplateSchema,
@@ -156,33 +154,26 @@ const messageTemplateRoutes = createApiRouter()
             const normalized = normalizeE164(to);
             if (!normalized) return c.json({ success: false, error: 'That phone number could not be parsed.' }, 200);
 
-            // Mirrors server/api/sms.ts POST /sms/test exactly: managed-compliance
-            // gate, then free-tier pre-flight, both BEFORE any provider call — a
-            // template test-send is a real send and must not bypass either the
-            // compliance gate or the quota cap the standalone SMS test endpoint
-            // already enforces.
+            // ONE gate chain, shared with the real send path and the settings
+            // test-connection (`lib/sms/send-gate.ts`). This route used to carry
+            // its own copy, which is why it never received the STOP-revocation
+            // check: `purpose: 'test'` now states the single exemption it has
+            // (express consent — there is no contact to hold any) instead of
+            // being exempt from whatever nobody remembered to copy across.
             const db = getDrizzle(c);
-            let cfgRow: { smsMode: string; smsByoProvider: string | null } | null | undefined;
-            try {
-                cfgRow = await db.select({ smsMode: tenantConfigs.smsMode, smsByoProvider: tenantConfigs.smsByoProvider })
-                    .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
-            } catch { cfgRow = null; }
-            const smsMode = cfgRow?.smsMode ?? 'platform';
-
-            const gate = await managedSendAllowed(db, c.env, tenantId, smsMode);
-            if (!gate.allowed) {
-                return c.json({ success: false, error: gate.reason ?? 'managed_not_approved' }, 200);
-            }
-
-            // Free-tier pre-flight (2026-07) — platform-mode sends count against
-            // the lifetime sms cap; 'own' is BYO and uncapped. `tenantTier` is not
-            // populated by session-context on this JWT-authenticated route, so
-            // fall back to a one-shot tier lookup (mirrors sms.ts / di.ts).
-            if (c.var.profile.hasUsageQuota && smsMode !== 'own') {
-                const quotaGuard = new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl });
-                const tier = c.get('tenantTier') ?? await readTenantTier(c.env.DB, tenantId);
-                await quotaGuard.checkMessagingQuota(tenantId, tier, 'sms');
-            }
+            const quotaGuard = c.var.profile.hasUsageQuota
+                ? new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl })
+                : undefined;
+            const gate = await smsSendGate({
+                db, tenantId, to: normalized, purpose: 'test', env: c.env,
+                // `tenantTier` is not populated by session-context on this
+                // JWT-authenticated route, so fall back to a one-shot lookup.
+                ...(quotaGuard
+                    ? { quota: { guard: quotaGuard, tier: c.get('tenantTier') ?? await readTenantTier(c.env.DB, tenantId) } }
+                    : {}),
+            });
+            if (!gate.allowed) return c.json({ success: false, error: gate.reason }, 200);
+            const smsMode = gate.smsMode;
 
             const resolved = await loadProviderForTenant(c.env, tenantId);
             if (!resolved) return c.json({ success: false, error: 'SMS is not configured.' }, 200);
@@ -217,7 +208,13 @@ const messageTemplateRoutes = createApiRouter()
             ? (c.get('tenantTier') ?? await readTenantTier(c.env.DB, tenantId))
             : undefined;
         const emailSvc = await buildTenantEmailService(c.env, tenantId, quotaGuard, tenantTier);
-        const { delivered } = await emailSvc.sendEmail([to], interpolate(subject ?? '', vars), interpolate(body, vars));
+        // `diagnostic`: this only ever reaches whoever pressed the button, so
+        // there is no recipient who could hold a preference about it — but the
+        // boundary still has to be able to say what it is sending.
+        const { delivered } = await emailSvc.sendEmail(
+            [to], interpolate(subject ?? '', vars), interpolate(body, vars),
+            undefined, { classId: 'admin-test-send' },
+        );
         return delivered ? c.json({ success: true }, 200) : c.json({ success: false, error: 'Email is not configured.' }, 200);
     });
 

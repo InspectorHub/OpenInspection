@@ -1,7 +1,7 @@
 /**
  * Email-template CRUD + preview API — GET/PUT/POST /api/admin/email-templates
  *
- * Tenant-scoped overrides for the 17 editable registry templates.
+ * Tenant-scoped overrides for the editable registry templates.
  * Phase 3 of the email-templates feature.
  */
 import { createRoute, z } from '@hono/zod-openapi';
@@ -84,11 +84,11 @@ const listRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: { 'application/json': { schema: TemplateListResponseSchema } },
-            description: 'List of 17 editable templates merged with tenant overrides',
+            description: 'List of editable templates merged with tenant overrides',
         },
     },
     operationId: 'listEmailTemplates',
-    description: 'Returns all 17 editable email templates merged with the tenant\'s saved overrides. The password-reset template (non-editable) is excluded.',
+    description: 'Returns the editable email templates merged with the tenant\'s saved overrides. Non-editable, platform-owned templates (password reset, usage-quota notices) are excluded.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
 // ─── GET /email-templates/{trigger} ───────────────────────────────────────

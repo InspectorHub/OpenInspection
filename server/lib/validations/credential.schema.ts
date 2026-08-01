@@ -6,7 +6,22 @@ export const CreateCredentialSchema = z.object({
   memberNumber: z.string().max(60).nullable().optional().describe('Optional membership or license number displayed alongside the credential label.'),
   sortOrder: z.number().int().optional().describe('Display order for this credential within the inspector list (ascending).'),
 });
-export const UpdateCredentialSchema = CreateCredentialSchema.partial();
+/**
+ * Spelled out rather than `CreateCredentialSchema.partial()`.
+ *
+ * `.partial()` does NOT remove a field's `.default()` — it wraps it — so
+ * `parse({ sortOrder: 0 })` came back as `{ label: '', sortOrder: 0 }` and the
+ * service, which writes any key that is not `undefined`, cleared the label.
+ * Every PATCH that named one field silently blanked another: renaming a
+ * credential's member number erased its label, and so did reordering the list.
+ *
+ * A PATCH must carry exactly the fields the caller sent. No defaults here.
+ */
+export const UpdateCredentialSchema = z.object({
+  label: z.string().max(120).optional().describe('Human-readable credential label shown on reports, e.g. "InterNACHI Certified Professional Inspector".'),
+  memberNumber: z.string().max(60).nullable().optional().describe('Optional membership or license number displayed alongside the credential label.'),
+  sortOrder: z.number().int().optional().describe('Display order for this credential within the inspector list (ascending).'),
+});
 export const CredentialSchema = z.object({
   id: z.string(),
   label: z.string(),

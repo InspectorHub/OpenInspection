@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Form, useLoaderData, useActionData, useFetcher } from "react-router";
+import { Form, useLoaderData, useActionData, useFetcher, useNavigation } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { BrowserTimezoneHint } from "~/components/settings/BrowserTimezoneHint";
 import { useSessionContext } from "~/hooks/useSessionContext";
@@ -8,15 +8,17 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { SignaturePad } from "~/components/SignaturePad";
-import { AvatarCropper } from "~/components/media-studio/AvatarCropper";
-import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
 import { makeProfileSchema } from "~/lib/forms/settings.schema";
 import { Select } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
 import { LOCALE_OPTIONS } from "~/lib/locales";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { CredentialsEditor, type EditorCredential } from "~/components/settings/CredentialsEditor";
+import { NotificationPreferencesCard } from "~/components/settings/NotificationPreferencesCard";
+import { ProfilePhotoCard } from "~/components/settings/ProfilePhotoCard";
+import { EmailSignatureCard, SavedSignatureCard } from "~/components/settings/SignatureCards";
+import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
+import { bulkNotificationChoice, grantNotificationSms, loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -27,11 +29,11 @@ interface Profile {
   name?: string | null;
   email?: string | null;
   phone?: string | null;
-  licenseNumber?: string | null;
   // DB-12 / IA-26 — slug omitted; inspector booking slugs are frozen.
   photoUrl?: string | null;
   signatureEnabled?: boolean;
   signaturePreviewHtml?: string;
+  savedSignature?: string | null;
   timezone?: string | null;
   locale?: string | null;
 }
@@ -43,24 +45,74 @@ interface Profile {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const [res, credRes] = await Promise.all([
+  const [res, credRes, notifications] = await Promise.all([
     api.profile.index.$get(),
     api.credentials.index.$get(),
+    loadNotificationScreen(api),
   ]);
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
   const credBody = credRes.ok ? ((await credRes.json()) as { data?: EditorCredential[] }) : { data: [] };
-  return { profile: (body.data ?? {}) as Profile, credentials: credBody.data ?? [] };
+  return { profile: (body.data ?? {}) as Profile, credentials: credBody.data ?? [], notifications };
 }
 
 /* ------------------------------------------------------------------ */
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The email-signature flag carried by a form, or `undefined` when the form does
+ * not carry one.
+ *
+ * ABSENCE IS NOT `false`, and that distinction is the whole function. The
+ * toggle used to live inside the profile form; it now saves itself, so the
+ * profile form no longer submits it. The obvious read —
+ * `fd.getAll(...).at(-1) === "true"` — evaluates `undefined === "true"` on a
+ * form that omits the field, quietly switching every inspector's signature OFF
+ * the next time they save an unrelated profile field. Nothing on screen would
+ * say so; they would find out from a recipient.
+ *
+ * When the field IS present it arrives twice (a hidden `false` plus a checked
+ * `true`), so the last value wins.
+ */
+export function signatureEnabledFromForm(fd: FormData): boolean | undefined {
+  if (!fd.has("signatureEnabled")) return undefined;
+  const vals = fd.getAll("signatureEnabled");
+  return vals[vals.length - 1] === "true";
+}
+
+/**
+ * The reason the API refused, or a generic fallback.
+ *
+ * The envelope is `{ success: false, error: { code, message } }` — the message
+ * is NESTED. Reading `err.message` off the top level (which several call sites
+ * did) always misses, so every refusal collapsed to "Save failed": a 3 MB badge
+ * upload told the reader nothing about the 2 MB limit it had just broken, which
+ * is indistinguishable from the button doing nothing at all.
+ */
+async function apiErrorMessage(res: { json: () => Promise<unknown> }): Promise<string> {
+  const body = await res.json().catch(() => ({}));
+  const nested = (body as { error?: { message?: string } })?.error?.message;
+  const flat = (body as { message?: string })?.message;
+  return nested || flat || m.settings_error_save_failed();
+}
+
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
   const fd = await request.formData();
   const intent = fd.get("intent") as string | null;
+
+  if (intent === "save-notification") {
+    return { ...(await saveNotificationChoice(api, fd)), intent };
+  }
+
+  if (intent === "bulk-notification") {
+    return { ...(await bulkNotificationChoice(api, fd)), intent };
+  }
+
+  if (intent === "grant-notification-sms") {
+    return { ...(await grantNotificationSms(api, request)), intent };
+  }
 
   // Handle save-signature intent from the SignaturePad fetcher
   if (intent === "save-signature") {
@@ -90,30 +142,57 @@ export async function action({ request, context }: Route.ActionArgs) {
     // hono/client form: keys must match the API schema field names
     const res = await api.profile.photo.$post({ form: { photo } } as Parameters<typeof api.profile.photo.$post>[0]);
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return { success: false, error: (err as Record<string, string>)?.message || m.settings_profile_error_upload_failed(), intent };
+      return { success: false, error: await apiErrorMessage(res), intent };
     }
     return { success: true, error: null, intent };
   }
 
   // Inspector credentials (Spec B) — each mutation revalidates the loader so the
   // editor re-renders with fresh rows. '' member number clears to null.
+  // Each of these four used to `await` the call and return `success: true`
+  // whatever came back, so a rejected write reported as a save. That was
+  // survivable while nothing rendered the result; it is not survivable now that
+  // the page's rule is "no button means it saved" and these are the sections
+  // with no button.
+  // Typed structurally rather than as `Response`: hono/client returns a
+  // `ClientResponse`, which carries the response contract but not Workers'
+  // `webSocket` field. Only `ok` and `json()` are read here.
+  const credentialResult = async (res: { ok: boolean; json: () => Promise<unknown> }, i: string) => {
+    if (res.ok) return { success: true, error: null, intent: i };
+    return { success: false, error: await apiErrorMessage(res), intent: i };
+  };
   if (intent === "credential-add") {
-    await api.credentials.index.$post({ json: { label: "" } });
-    return { success: true, error: null, intent };
+    return credentialResult(await api.credentials.index.$post({ json: { label: "" } }), intent);
   }
   if (intent === "credential-update") {
     const id = fd.get("id") as string;
     const patch: Record<string, unknown> = {};
     if (fd.has("label")) patch.label = fd.get("label") as string;
     if (fd.has("memberNumber")) patch.memberNumber = (fd.get("memberNumber") as string) || null;
-    await api.credentials[":id"].$patch({ param: { id }, json: patch });
-    return { success: true, error: null, intent };
+    return credentialResult(await api.credentials[":id"].$patch({ param: { id }, json: patch }), intent);
+  }
+  /**
+   * Reorder = choose. The list order decides the licence line AND the badge
+   * beside the signature (`primaryLicenseOf` / `primaryBadgeOf`), so this is
+   * not a cosmetic sort — it is how the inspector says which credential is
+   * theirs to lead with.
+   *
+   * Reindexes the WHOLE list rather than swapping two rows: every credential
+   * created before this control shipped sits at `sortOrder = 0`, and swapping
+   * two zeroes is a no-op that looks exactly like a broken button.
+   */
+  if (intent === "credential-reorder") {
+    const ids = String(fd.get("ids") ?? "").split(",").filter(Boolean);
+    if (!ids.length) return { success: false, error: m.settings_profile_error_reorder_failed(), intent };
+    const results = await Promise.all(
+      ids.map((id, i) => api.credentials[":id"].$patch({ param: { id }, json: { sortOrder: i } })),
+    );
+    const failed = results.find((r) => !r.ok);
+    return failed ? credentialResult(failed, intent) : { success: true, error: null, intent };
   }
   if (intent === "credential-delete") {
     const id = fd.get("id") as string;
-    await api.credentials[":id"].$delete({ param: { id } });
-    return { success: true, error: null, intent };
+    return credentialResult(await api.credentials[":id"].$delete({ param: { id } }), intent);
   }
   if (intent === "credential-image") {
     const id = fd.get("id") as string;
@@ -121,7 +200,22 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!(image instanceof File) || image.size === 0) {
       return { success: false, error: m.settings_profile_error_no_photo(), intent };
     }
-    await api.credentials[":id"].image.$post({ param: { id }, form: { image } } as Parameters<typeof api.credentials[":id"]["image"]["$post"]>[0]);
+    return credentialResult(
+      await api.credentials[":id"].image.$post({ param: { id }, form: { image } } as Parameters<typeof api.credentials[":id"]["image"]["$post"]>[0]),
+      intent,
+    );
+  }
+
+  // The email-signature toggle saves itself (it is no longer inside the profile
+  // form), so it needs its own intent rather than riding the default branch.
+  if (intent === "signature-toggle") {
+    const res = await api.profile.index.$patch({
+      json: { signatureEnabled: fd.get("signatureEnabled") === "true" },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: (err as Record<string, string>)?.message || m.settings_error_save_failed(), intent };
+    }
     return { success: true, error: null, intent };
   }
 
@@ -133,7 +227,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const v = submission.value;
   const body: Record<string, unknown> = {};
   // DB-12 / IA-26 — "slug" intentionally removed; inspector booking slugs frozen.
-  for (const key of ["name", "phone", "licenseNumber"] as const) {
+  for (const key of ["name", "phone"] as const) {
     if (v[key] !== undefined) body[key] = v[key];
   }
   // Per-user timezone override. The <select> always submits a value; an empty
@@ -141,9 +235,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (v.timezone !== undefined) body.timezone = v.timezone;
   // Per-user locale override. Same contract as timezone: '' clears (inherit tenant).
   if (v.locale !== undefined) body.locale = v.locale;
-  // Email signature toggle: hidden "false" + optional checkbox "true" — last value wins.
-  const sigVals = fd.getAll("signatureEnabled");
-  body.signatureEnabled = sigVals[sigVals.length - 1] === "true";
+  const sigEnabled = signatureEnabledFromForm(fd);
+  if (sigEnabled !== undefined) body.signatureEnabled = sigEnabled;
   const res = await api.profile.index.$patch({ json: body });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -159,9 +252,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function SettingsProfilePage() {
-  const { profile, credentials } = useLoaderData<typeof loader>();
+  const { profile, credentials, notifications } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  const [avatarSource, setAvatarSource] = useState<string | null>(null);
   // DB-12 / IA-26 — useSessionContext / tenantSlug removed; slug section gone.
 
   // Conform owns the main profile form (default intent). The save-signature
@@ -176,23 +268,37 @@ export default function SettingsProfilePage() {
     shouldRevalidate: "onInput",
   });
 
+  // The profile form is the only thing left on this page that SUBMITS, so it is
+  // the only thing that reads route navigation state.
+  const savingProfile = useNavigation().state === "submitting";
+
   // Conform narrowing helpers (cat-7): actionData may be SubmissionResult or {success,error,...}
   const flashSuccess = actionData && "success" in actionData && actionData.success;
   const flashError = actionData && "error" in actionData && typeof actionData.error === "string" ? actionData.error : null;
 
-  // Photo upload fetcher — replaces the raw fetch() in the file input onChange
-  const photoFetcher = useFetcher<{ success?: boolean; error?: string; intent?: string }>();
-  useEffect(() => {
-    if (photoFetcher.state === "idle" && photoFetcher.data?.success && photoFetcher.data?.intent === "photo-upload") {
-      window.location.reload();
-    }
-  }, [photoFetcher.state, photoFetcher.data]);
-
   // Inspector credentials (Spec B) — mutations route through the action (BFF);
   // RR revalidates the loader afterward, so the editor re-renders with fresh rows.
-  const credFetcher = useFetcher();
-  const credImageFetcher = useFetcher<{ intent?: string }>();
+  const credFetcher = useFetcher<{ success?: boolean; error?: string; intent?: string }>();
+  const credImageFetcher = useFetcher<{ success?: boolean; error?: string; intent?: string }>();
+  // Credentials save on BLUR — the most invisible save on the page, because
+  // nothing moves when it works and nothing moves when it does not. Both
+  // fetchers report, so leaving a field is a confirmable act.
+  useNotificationSaveToast({
+    data: credFetcher.data ?? null,
+    failed: credFetcher.data?.success === false,
+    error: credFetcher.data?.error ?? null,
+  });
+  useNotificationSaveToast({
+    data: credImageFetcher.data ?? null,
+    failed: credImageFetcher.data?.success === false,
+    error: credImageFetcher.data?.error ?? null,
+  });
   const [uploadingCredId, setUploadingCredId] = useState<string | null>(null);
+  // The row the last upload was for, kept so a refusal can be shown ON it.
+  const [lastUploadCredId, setLastUploadCredId] = useState<string | null>(null);
+  const credUploadError = lastUploadCredId && credImageFetcher.data?.success === false
+    ? { id: lastUploadCredId, message: credImageFetcher.data.error ?? m.settings_error_save_failed() }
+    : null;
   useEffect(() => {
     if (credImageFetcher.state === "idle") setUploadingCredId(null);
   }, [credImageFetcher.state]);
@@ -208,8 +314,11 @@ export default function SettingsProfilePage() {
       { method: "post" },
     );
   const onCredDelete = (id: string) => credFetcher.submit({ intent: "credential-delete", id }, { method: "post" });
+  const onCredReorder = (orderedIds: string[]) =>
+    credFetcher.submit({ intent: "credential-reorder", ids: orderedIds.join(",") }, { method: "post" });
   const onCredUpload = (id: string, file: File) => {
     setUploadingCredId(id);
+    setLastUploadCredId(id);
     const f = new FormData();
     f.append("intent", "credential-image");
     f.append("id", id);
@@ -237,22 +346,13 @@ export default function SettingsProfilePage() {
     setSelectedTz(zone);
   }
 
-  // Signature pad state
-  const sigFetcher = useFetcher<typeof action>();
-  const [showSigPad, setShowSigPad] = useState(false);
-  const sigSaved = sigFetcher.data && "success" in sigFetcher.data && sigFetcher.data.success
-    && "intent" in sigFetcher.data && sigFetcher.data.intent === "save-signature";
-  const sigError = sigFetcher.data && "error" in sigFetcher.data
-    && typeof sigFetcher.data.error === "string" && sigFetcher.data.error
-    && "intent" in sigFetcher.data && sigFetcher.data.intent === "save-signature"
-    ? (sigFetcher.data.error as string) : null;
-
   const navSections = [
     { id: "profile-details", label: m.settings_profile_crumb() },
     { id: "photo", label: m.settings_profile_photo_heading() },
     { id: "signature", label: m.settings_profile_signature_heading() },
     { id: "saved-signature", label: m.settings_profile_saved_signature_heading() },
     { id: "credentials", label: m.settings_profile_credentials_heading() },
+    { id: "notifications", label: m.settings_notifications_eyebrow() },
   ];
 
   return (
@@ -307,18 +407,6 @@ export default function SettingsProfilePage() {
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.phone.errors[0]}</p>
               )}
             </div>
-            <div className="space-y-2">
-              <label htmlFor={fields.licenseNumber.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_license_label()}</label>
-              <input type="text" id={fields.licenseNumber.id} name={fields.licenseNumber.name} defaultValue={profile.licenseNumber ?? ""}
-                placeholder={m.settings_profile_license_placeholder()}
-                aria-invalid={fields.licenseNumber.errors ? true : undefined}
-                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
-              {fields.licenseNumber.errors ? (
-                <p className="mt-1 text-xs text-ih-bad-fg">{fields.licenseNumber.errors[0]}</p>
-              ) : (
-                <p className="text-[11px] text-ih-fg-3">{m.settings_profile_license_hint()}</p>
-              )}
-            </div>
           </div>
 
           <div className="max-w-md">
@@ -357,148 +445,64 @@ export default function SettingsProfilePage() {
               ]}
             />
           </div>
-        </section>
 
-        {/* DB-12 / IA-26 — Booking slug section removed; the company booking link
-            now lives in Settings → Booking ("Your links"). */}
-
-        {/* Photo placeholder */}
-        <section id="photo" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
-          <header className="space-y-1">
-            <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_photo_heading()}</h3>
-            <p className="text-[12px] text-ih-fg-3">{m.settings_profile_photo_subtitle()}</p>
-          </header>
-
-          {/* Photo */}
-          <div className="space-y-2">
-            <label className="block text-[13px] font-semibold text-ih-fg-1">{m.settings_profile_photo_heading()}</label>
-            <div className="flex items-center gap-4">
-              <div className="w-24 h-24 rounded-full bg-ih-bg-muted border border-ih-border overflow-hidden flex items-center justify-center text-ih-fg-4 text-[11px]">
-                {profile.photoUrl ? (
-                  <img src={profile.photoUrl} alt={m.settings_profile_photo_alt()} className="w-full h-full object-cover" />
-                ) : (
-                  <span>{m.settings_profile_photo_none()}</span>
-                )}
-              </div>
-              <div className="space-y-2">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="block text-[11px] text-ih-fg-3"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) setAvatarSource(URL.createObjectURL(file));
-                    e.target.value = "";
-                  }}
-                />
-                <p className="text-[11px] text-ih-fg-3">{m.settings_profile_photo_hint()}</p>
-              </div>
+          {form.errors && (
+            <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
+              {form.errors[0]}
             </div>
-          </div>
-
-        </section>
-
-        {/* Email signature (business-card footer) — independent of Point of Contact */}
-        <section id="signature" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4 scroll-mt-12">
-          <header className="space-y-1">
-            <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_signature_heading()}</h3>
-            <p className="text-[12px] text-ih-fg-3">
-              {m.settings_profile_signature_subtitle()}
-            </p>
-          </header>
-
-          <input type="hidden" name="signatureEnabled" value="false" />
-          <label className="flex items-center gap-2 text-[13px] text-ih-fg-1">
-            <input type="checkbox" name="signatureEnabled" value="true" defaultChecked={profile.signatureEnabled ?? true} />
-            {m.settings_profile_signature_toggle()}
-          </label>
-
-          {profile.signaturePreviewHtml ? (
-            <div className="rounded-md border border-ih-border bg-ih-bg-muted p-4">
-              <div className="text-[11px] text-ih-fg-3 mb-2 uppercase tracking-[0.2em]">{m.settings_profile_signature_preview_label()}</div>
-              <div dangerouslySetInnerHTML={{ __html: profile.signaturePreviewHtml }} />
-            </div>
-          ) : (
-            <p className="text-[12px] text-ih-fg-3">{m.settings_profile_signature_empty()}</p>
           )}
-        </section>
 
-        {form.errors && (
-          <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
-            {form.errors[0]}
+          {/* Save lives INSIDE the card it owns, and nowhere else on the page.
+              It used to be a sticky bar spanning all six sections while owning
+              one, which taught the wrong rule in both directions: a reader who
+              edited a credential saw it and assumed nothing was saved yet (it
+              was), and a reader who edited these fields watched it follow them
+              down the page with no sign of what it belonged to. */}
+          <div className="flex justify-end pt-2 border-t border-ih-border">
+            <button
+              type="submit"
+              disabled={savingProfile}
+              className="px-4 py-2 bg-ih-primary text-ih-fg-inverse rounded-md font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:pointer-events-none"
+            >
+              {savingProfile ? m.common_saving() : m.settings_profile_save_button()}
+            </button>
           </div>
-        )}
-
-        {/* Save — sticky bar pinned to the bottom of the settings scroll area */}
-        <SettingsSaveBar label={m.settings_profile_save_button()} />
+        </section>
       </Form>
 
-      {/* Saved signature */}
-      <section id="saved-signature" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
-        <header className="space-y-1">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_saved_signature_heading()}</h3>
-          <p className="text-[12px] text-ih-fg-3">
-            {m.settings_profile_saved_signature_subtitle()}
-          </p>
-        </header>
+      {/* DB-12 / IA-26 — Booking slug section removed; the company booking link
+          now lives in Settings → Booking ("Your links"). */}
 
-        {sigSaved && (
-          <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-            {m.settings_profile_signature_saved_flash()}
-          </div>
-        )}
-        {sigError && (
-          <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
-            {sigError}
-          </div>
-        )}
+      <ProfilePhotoCard photoUrl={profile.photoUrl ?? null} />
 
-        {showSigPad ? (
-          <SignaturePad
-            label={m.settings_profile_signature_pad_save()}
-            onCancel={() => setShowSigPad(false)}
-            onSubmit={async (dataUri) => {
-              const fd = new FormData();
-              fd.append("intent", "save-signature");
-              fd.append("signatureBase64", dataUri);
-              sigFetcher.submit(fd, { method: "post" });
-              setShowSigPad(false);
-            }}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowSigPad(true)}
-            className="px-4 py-2 bg-ih-bg-muted border border-ih-border text-ih-fg-1 rounded-md font-semibold text-[13px] hover:bg-ih-bg-card hover:border-ih-primary transition-all"
-          >
-            {sigSaved ? m.settings_profile_signature_update() : m.settings_profile_signature_add()}
-          </button>
-        )}
-      </section>
+      {/* Email signature (business-card footer) — independent of Point of Contact */}
+      <EmailSignatureCard
+        enabled={profile.signatureEnabled ?? true}
+        previewHtml={profile.signaturePreviewHtml ?? null}
+      />
+
+      <SavedSignatureCard savedSignature={profile.savedSignature ?? null} />
 
       <CredentialsEditor
         credentials={credentials}
         uploadingId={uploadingCredId}
+        uploadError={credUploadError}
         onAdd={onCredAdd}
         onUpdate={onCredUpdate}
         onDelete={onCredDelete}
+        onReorder={onCredReorder}
         onUpload={onCredUpload}
       />
 
-      {avatarSource && (
-        <AvatarCropper
-          sourceUrl={avatarSource}
-          onCancel={() => { URL.revokeObjectURL(avatarSource); setAvatarSource(null); }}
-          onSave={(blob) => {
-            const fd = new FormData();
-            fd.append("intent", "photo-upload");
-            fd.append("photo", new File([blob], "avatar.jpg", { type: "image/jpeg" }));
-            photoFetcher.submit(fd, { method: "POST", encType: "multipart/form-data" });
-            URL.revokeObjectURL(avatarSource);
-            setAvatarSource(null);
-          }}
+      <div id="notifications">
+        <NotificationPreferencesCard
+          alwaysSent={notifications.alwaysSent}
+          youChoose={notifications.youChoose}
+          loadError={notifications.error}
+          smsConsent={notifications.smsConsent}
         />
-      )}
+      </div>
+
     </div>
   );
 }

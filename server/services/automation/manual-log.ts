@@ -41,7 +41,9 @@ export function makeManualSendLogger(
                         type: 'manual.send', title: noticeTitle,
                         inspectionId, entityType: 'inspection', entityId: inspectionId,
                     });
-                    headerByContact.set(row.contactId, noticeId);
+                    // A manual send names no class, so the header is always
+                    // written — the guard is for the type, not a real branch.
+                    if (noticeId) headerByContact.set(row.contactId, noticeId);
                 }
             }
             await db.insert(automationLogs).values({

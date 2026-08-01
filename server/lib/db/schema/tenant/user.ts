@@ -18,7 +18,6 @@ export const users = sqliteTable('users', {
     passwordHash: text('password_hash').notNull(),
     name: text('name'),
     phone: text('phone'),
-    licenseNumber: text('license_number'),
     // Inspector avatar shown on the public company booking page (/book/:tenant).
     photoUrl: text('photo_url'),
     // Spec 5H D2 — saved signature used for auto-sign on publish + Settings prefill.
@@ -52,9 +51,6 @@ export const users = sqliteTable('users', {
     // inspector forwards the receipt manually if the agent wants visibility).
     // Read by EmailService.sendNewReferral / sendReportReady / sendInvoicePaid
     // before delivery; written from /agent-settings/profile (agent-side toggles).
-    notifyOnReferral: integer('is_referral_notification_enabled', { mode: 'boolean' }).notNull().default(true),
-    notifyOnReport:   integer('is_report_notification_enabled',   { mode: 'boolean' }).notNull().default(true),
-    notifyOnPaid:     integer('is_paid_notification_enabled',     { mode: 'boolean' }).notNull().default(false),
     // Design System 0520 subsystem B phase 1 — debounced "user last active"
     // timestamp updated by touch-last-active middleware (30s debounce window
     // per worker isolate). Powers TeamStrip "last active Nm ago" pill and the

@@ -8,9 +8,6 @@ import { logger } from '../../lib/logger';
 
 export interface AgentProfilePatch {
     slug?: string;
-    notifyOnReferral?: boolean;
-    notifyOnReport?: boolean;
-    notifyOnPaid?: boolean;
     name?: string;
     /** Personal display-timezone override (IANA id). '' clears it (referral
      *  dates then follow each inspecting company's timezone). */
@@ -49,9 +46,6 @@ export async function updateProfile(
 
     const set: Record<string, unknown> = {};
     if (patch.slug !== undefined) set.slug = patch.slug.trim().toLowerCase();
-    if (patch.notifyOnReferral !== undefined) set.notifyOnReferral = patch.notifyOnReferral;
-    if (patch.notifyOnReport !== undefined) set.notifyOnReport = patch.notifyOnReport;
-    if (patch.notifyOnPaid !== undefined) set.notifyOnPaid = patch.notifyOnPaid;
     if (patch.name !== undefined) set.name = patch.name;
     if (patch.timezone !== undefined) {
         // Empty string clears the override (NULL = follow each company's tz).
@@ -77,13 +71,11 @@ export async function getProfile(rawDb: D1Database, userId: string) {
     const db = drizzle(rawDb);
     const row = await db.select({
         name: users.name, email: users.email, slug: users.slug,
-        notifyOnReferral: users.notifyOnReferral, notifyOnReport: users.notifyOnReport, notifyOnPaid: users.notifyOnPaid,
         timezone: users.timezone,
     }).from(users).where(eq(users.id, userId)).get();
     if (!row) throw Errors.NotFound('Agent profile not found');
     return {
         name: row.name ?? null, email: row.email ?? '', slug: row.slug ?? null,
-        notifyOnReferral: !!row.notifyOnReferral, notifyOnReport: !!row.notifyOnReport, notifyOnPaid: !!row.notifyOnPaid,
         timezone: row.timezone ?? null,
     };
 }

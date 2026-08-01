@@ -4,8 +4,24 @@ import type { InferSelectModel } from 'drizzle-orm';
 import { inspectorCredentials } from '../lib/db/schema';
 import { r2Keys } from '../lib/r2-keys';
 import { Errors } from '../lib/errors';
+import { primaryLicenseOf } from '../lib/credentials/primary';
 
 export type InspectorCredential = InferSelectModel<typeof inspectorCredentials>;
+
+/**
+ * A credential as every RENDERER wants it (Spec B): the booking footer, the
+ * email signature, the report cover strip and the report signature block.
+ *
+ * `imageUrl` is the public brand-asset path, ROOT-RELATIVE. Callers that embed
+ * it in outbound HTML email must absolutise against the deployment host —
+ * `inspectorSignature()` does — because a relative path in an email resolves
+ * against the recipient's mail client, which is nowhere.
+ */
+export interface RenderableCredential {
+  label: string;
+  memberNumber: string | null;
+  imageUrl: string | null;
+}
 
 // Inspector Credentials & Association Badges (Spec B). Self-asserted per-inspector
 // credentials with an optional uploaded badge image (one R2 object per credential;
@@ -19,6 +35,52 @@ export class CredentialService {
     return this.getDrizzle().select().from(inspectorCredentials)
       .where(and(eq(inspectorCredentials.tenantId, tenantId), eq(inspectorCredentials.userId, userId)))
       .orderBy(asc(inspectorCredentials.sortOrder), asc(inspectorCredentials.createdAt)).all();
+  }
+
+  /**
+   * The inspector's ACTIVE credentials, shaped for rendering.
+   *
+   * One function rather than a mapping copied per surface. There were three
+   * copies of these six lines when this was written — booking's footer, the
+   * Profile preview, and about to be the send path and the report payload — and
+   * three copies is exactly how the URL form comes to differ between the email
+   * a client receives and the page they land on.
+   *
+   * Filters to `active`, drops rows that are neither a badge nor a label
+   * (a credential row is created blank and filled in, so an abandoned one would
+   * otherwise render as an empty chip), and orders by the inspector's own
+   * `sortOrder`.
+   */
+  async listRenderable(tenantId: string, userId: string): Promise<RenderableCredential[]> {
+    const rows = await this.listByUser(tenantId, userId);
+    return rows
+      .filter((cr) => cr.active)
+      .filter((cr) => cr.imageR2Key || (cr.label ?? '').trim())
+      .map((cr) => ({
+        label: cr.label,
+        memberNumber: cr.memberNumber,
+        imageUrl: cr.imageR2Key
+          ? `/api/public/brand-asset?key=${encodeURIComponent(cr.imageR2Key)}`
+          : null,
+      }));
+  }
+
+  /**
+   * The inspector's LICENCE NUMBER, for the surfaces that render one string.
+   *
+   * The PDF footer prints `· Lic. <n>` and the report signature block carries a
+   * single licence — neither can show a list. A dedicated `users` column used
+   * to answer this; it has been dropped, and the licence now lives as a
+   * credential row seeded at `sort_order = -1` by the backfill, which is
+   * exactly why that sort order was chosen rather than 0. So "first active
+   * credential carrying a member number, in the inspector's own order" IS the
+   * licence.
+   *
+   * Null when they have none, and the callers omit the line rather than
+   * printing an empty one.
+   */
+  async primaryLicenseNumber(tenantId: string, userId: string): Promise<string | null> {
+    return primaryLicenseOf(await this.listRenderable(tenantId, userId));
   }
 
   async create(

@@ -54,3 +54,4 @@ scripts/backfill-zod-descriptions.report.md
 
 # SDD scratch (briefs, reports, diffs, progress ledger)
 .superpowers/
+.gate-cache/

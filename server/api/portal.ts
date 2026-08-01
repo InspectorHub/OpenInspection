@@ -49,6 +49,15 @@ const TenantParam = z.object({
 
 const RequestLinkBody = z.object({
     email: z.string().email().describe('Recipient email address requesting a portal magic-link.'),
+    // An ENUM, deliberately, not a path or a URL. The value is echoed into a
+    // link inside an outbound email, so anything free-form here would be an
+    // open redirect with a delivery mechanism attached. Two named destinations
+    // cost nothing and cannot be pointed anywhere.
+    destination: z.enum(['portal', 'notifications']).optional().describe(
+        'Where the magic-link should land. `portal` (default) = the inspections list; ' +
+        '`notifications` = the notification settings page, for a reader arriving from ' +
+        'the privacy policy or terms.',
+    ),
 });
 
 const RecipientInspectionSchema = z.object({
@@ -300,7 +309,7 @@ const portalRoutes = portalRouter
         const tenantId = resolveTenantId(c);
         if (!tenantId) return c.json({ error: 'Tenant not found' }, 404);
 
-        const { email } = c.req.valid('json');
+        const { email, destination } = c.req.valid('json');
 
         // Look up whether this email has ANY live client/co_client grant in this
         // tenant. Same DB the PortalService reads (mocked to the test DB in unit
@@ -323,22 +332,12 @@ const portalRoutes = portalRouter
                     const token = await signMagicLink(c.env.JWT_SECRET, email);
                     const baseUrl = getBaseUrl(c).replace(/\/$/, '');
                     const slug = c.get('requestedTenantSlug') || '';
-                    const link = `${baseUrl}/portal/${slug}/auth?link=${encodeURIComponent(token)}`;
-                    const safeLink = link.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-                    const html = `
-                    <div style="font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #0f172a;">
-                        <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #64748b; margin: 0 0 4px;">Client Portal</p>
-                        <h1 style="font-size: 22px; line-height: 1.25; font-weight: 600; margin: 0 0 16px;">Sign in to your portal</h1>
-                        <p style="font-size: 14px; line-height: 1.5; color: #475569;">
-                            Click the button below to access your inspections. This link expires in 15 minutes.
-                        </p>
-                        <p style="margin-top: 24px;">
-                            <a href="${safeLink}" style="display: inline-block; padding: 10px 16px; background: #0f172a; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700;">Open my portal</a>
-                        </p>
-                        <p style="font-size: 12px; color: #94a3b8; margin-top: 24px;">If you didn't request this, you can safely ignore this email.</p>
-                    </div>
-                `;
-                    await c.var.services.email.sendEmail([email], 'Sign in to your client portal', html);
+                    const to = destination === 'notifications' ? '&to=notifications' : '';
+                    const link = `${baseUrl}/portal/${slug}/auth?link=${encodeURIComponent(token)}${to}`;
+                    // The route mints the link; the email service renders the
+                    // email. Built here, this was the one account-access mail
+                    // with no tenant branding, no class and no editable copy.
+                    await c.var.services.email.sendClientPortalLogin(email, link);
                 } catch (err) {
                     // Swallow send failures — never leak whether the email was known.
                     logger.error('[portal] magic-link send failed', {}, err instanceof Error ? err : undefined);

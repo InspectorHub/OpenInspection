@@ -54,7 +54,7 @@ export function ConciergeEmailMixin<TBase extends Constructor>(Base: TBase) {
                 html: fallbackBody,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([to], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [to]);
         }
 
         /**
@@ -100,7 +100,7 @@ export function ConciergeEmailMixin<TBase extends Constructor>(Base: TBase) {
                 html: fallbackBody,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([to], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [to]);
         }
 
         /**
@@ -131,7 +131,7 @@ export function ConciergeEmailMixin<TBase extends Constructor>(Base: TBase) {
                 html: fallbackBody,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([to], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [to]);
         }
 
         /**
@@ -162,7 +162,7 @@ export function ConciergeEmailMixin<TBase extends Constructor>(Base: TBase) {
                 html: fallbackBody,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail([to], rendered.subject, rendered.html);
+            await this.sendRendered(rendered, [to]);
         }
     };
 }

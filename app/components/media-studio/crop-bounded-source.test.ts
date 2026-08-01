@@ -11,6 +11,26 @@ describe('boundedSourceUrl', () => {
   it('preserves other query params and appends &w=', () => {
     expect(boundedSourceUrl('/p/orig.jpg?v=2', 4096)).toBe('/p/orig.jpg?v=2&w=4096');
   });
+
+  /**
+   * A LOCAL source is left alone.
+   *
+   * `?w=` asks our photo route for a smaller variant. A blob URL has no route
+   * behind it, and a query appended to one does not weaken the request — it
+   * makes the URL resolve to nothing. Every image picked off disk on Settings →
+   * Profile is a blob URL, so this is the difference between Save working and
+   * Save doing nothing at all: the cropper renders the raw URL, so the file
+   * looks fine right up to the moment it fails to bake.
+   */
+  it('leaves a blob: URL untouched — appending a query would unresolve it', () => {
+    const blob = 'blob:http://localhost:5174/6b1f-4e2a';
+    expect(boundedSourceUrl(blob, 4096)).toBe(blob);
+  });
+
+  it('leaves a data: URL untouched', () => {
+    const data = 'data:image/png;base64,AAAA';
+    expect(boundedSourceUrl(data, 4096)).toBe(data);
+  });
 });
 
 describe('scaleCropToDecoded', () => {

@@ -28,19 +28,20 @@ describe('getProfile', () => {
 
         await f.db.insert(schema.users).values({
             id: 'ag1', tenantId: null, email: 'jane@x.com', role: 'agent', name: 'Jane',
-            slug: 'jane', notifyOnReferral: true, notifyOnReport: true, notifyOnPaid: false,
-            passwordHash: 'H', createdAt: new Date(),
+            slug: 'jane', passwordHash: 'H', createdAt: new Date(),
         } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     });
 
     afterEach(() => f.sqlite.close());
 
     it('returns the agent profile shape', async () => {
+        // The three notifyOn* fields left this payload when preferences moved to
+        // `notification_preferences`. A profile that still carried them would be
+        // a second place to answer the same question — which is how the agent
+        // screen and the send path came apart in the first place.
         const p = await getProfile(rawDb, 'ag1');
         expect(p).toEqual({
-            name: 'Jane', email: 'jane@x.com', slug: 'jane',
-            notifyOnReferral: true, notifyOnReport: true, notifyOnPaid: false,
-            timezone: null,
+            name: 'Jane', email: 'jane@x.com', slug: 'jane', timezone: null,
         });
     });
 

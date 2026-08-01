@@ -26,6 +26,25 @@ describe('EmailTemplateRenderer', () => {
     expect(r.html).not.toContain('<script>x</script>');
     expect(r.html).toContain('&lt;script&gt;');
   });
+  it('keeps line breaks a sender or template author typed', () => {
+    // Every `multiline: true` block invites newlines, and until now they were
+    // collapsed into one run-on paragraph. The break is inserted AFTER escaping,
+    // so it is layout chrome — an author still cannot smuggle HTML through.
+    const r = mk().render('repair-request-share', {
+      propertyAddress: '12 Elm',
+      message: 'Line one.\nLine two.',
+      shareUrl: 'https://x/s',
+    });
+    expect(r.html).toContain('Line one.<br />Line two.');
+    expect(r.html).not.toContain('<b>');
+  });
+
+  it('leaves no empty paragraph when an optional block resolves to nothing', () => {
+    const r = mk().render('repair-request-share', { propertyAddress: '12 Elm', shareUrl: 'https://x/s' });
+    expect(r.html).toContain('12 Elm');
+    expect(r.html).not.toMatch(/<p[^>]*>\s*<\/p>/);
+  });
+
   it('throws for an unknown trigger', () => {
     expect(() => mk().render('nope', {})).toThrow();
   });

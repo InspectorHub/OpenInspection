@@ -127,6 +127,55 @@
       "when": 1785421496479,
       "tag": "0017_strange_multiple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1785470983411,
+      "tag": "0018_charming_wild_pack",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1785479812967,
+      "tag": "0019_motionless_dark_phoenix",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1785502662839,
+      "tag": "0020_fancy_toxin",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1785515513924,
+      "tag": "0021_gigantic_bruce_banner",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1785515514924,
+      "tag": "0022_license_number_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1785515515924,
+      "tag": "0023_notification_pref_enabled_rename",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1785515515925,
+      "tag": "0024_drop_users_license_number",
+      "breakpoints": true
     }
   ]
 }

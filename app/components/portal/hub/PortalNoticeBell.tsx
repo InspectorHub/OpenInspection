@@ -23,10 +23,14 @@ export function PortalNoticeBell({
   notices,
   unread,
   ctx,
+  settingsHref,
 }: {
   notices: NoticeRowData[];
   unread: number;
   ctx: { tenant: string; inspectionId: string; token: string };
+  /** The Hub's own `?section=notifications` — the client's only "about me"
+   *  surface, since the Hub itself is organised per inspection. */
+  settingsHref?: string;
 }) {
   const fetcher = useFetcher<{ ok?: boolean; intent?: string; url?: string }>();
   const revalidator = useRevalidator();
@@ -75,6 +79,7 @@ export function PortalNoticeBell({
 
   return (
     <NoticeBell
+      settingsHref={settingsHref}
       notices={notices}
       unread={unread}
       emailComposer

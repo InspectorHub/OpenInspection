@@ -144,7 +144,6 @@ const updateProfileRoute = createRoute(withMcpMetadata({
                     schema: z.object({
                         name: z.string().max(100).optional().describe('Display name shown on dashboards, reports, and booking pages.'),
                         phone: z.string().max(30).optional().describe('Contact phone number; included on reports if set.'),
-                        licenseNumber: z.string().max(50).optional().describe('Inspector license number; printed on reports as a credential.'),
                     }).describe('TODO describe schema field for the OpenInspection MCP integration')
                 }
             }
@@ -228,7 +227,6 @@ const profileRoutes = createApiRouter()
             email: users.email,
             name: users.name,
             phone: users.phone,
-            licenseNumber: users.licenseNumber,
             onboardingState: users.onboardingState,
             totpEnabled: users.totpEnabled,
             totpRecoveryCodes: users.totpRecoveryCodes,
@@ -248,7 +246,6 @@ const profileRoutes = createApiRouter()
                     email: row?.email,
                     name: row?.name || null,
                     phone: row?.phone || null,
-                    licenseNumber: row?.licenseNumber || null,
                     onboardingState: row?.onboardingState ?? null,
                     tenantId: c.get('tenantId'),
                     role: c.get('userRole'),
@@ -270,7 +267,6 @@ const profileRoutes = createApiRouter()
         const updates: Record<string, string | null> = {};
         if (body.name !== undefined) updates.name = body.name || null;
         if (body.phone !== undefined) updates.phone = body.phone || null;
-        if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber || null;
 
         if (Object.keys(updates).length > 0) {
             const db = getDrizzle(c);

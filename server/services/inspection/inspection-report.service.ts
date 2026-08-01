@@ -1,6 +1,10 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, asc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits, inspectorCredentials } from '../../lib/db/schema';
+import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits } from '../../lib/db/schema';
+import { CredentialService, type RenderableCredential } from '../credential.service';
+import { primaryLicenseOf } from '../../lib/credentials/primary';
+import { pinnedLead } from '../../lib/version-diff';
+import { loadPinnedSnapshot } from '../../lib/report-snapshot';
 import { buildUnitConditionMatrix, defectCountsByUnit } from '../../lib/unit-scope';
 import { Errors } from '../../lib/errors';
 import { resolveTenantTimeZone } from '../../lib/tz';
@@ -105,8 +109,34 @@ export class InspectionReportService extends InspectionSubService {
         // report + PDF render chain can branch. Absent (legacy callers) ⇒ photos
         // resolve exactly as before (image only).
         videoCtx?: ReportMediaContext,
+        /**
+         * When set, this read is serving a SPECIFIC published version, and the
+         * fields the snapshot captured are taken from it rather than resolved
+         * live. Only a signed render token can name one (render-token.ts), so a
+         * link holder cannot ask for a version they were never sent.
+         */
+        versionNumber?: number,
     ) {
         const db = this.getDrizzle();
+
+        // Spec B §1 — a published version renders what it FROZE. Loaded up front
+        // so the live resolutions below can be overlaid rather than duplicated.
+        //
+        // WHAT THE OVERLAY COVERS, precisely, because the gap matters: inspector
+        // identity + credentials, and the resolved style profile. Everything the
+        // snapshot does not carry still resolves live. That is less alarming than
+        // it sounds — the report's STRUCTURE is already frozen elsewhere, at
+        // creation, by `inspections.template_snapshot` and
+        // `inspection_results.rating_system_snapshot` — but it is not "the whole
+        // report is immutable", and anything added to the snapshot later has to
+        // be overlaid here too or it silently keeps tracking live state.
+        //
+        // (An earlier version of this comment claimed the payload advertises
+        // `snapshotSchemaVersion`. It does not — nothing emits that field. Said
+        // here instead of promising a field that does not exist.)
+        const pinned = typeof versionNumber === 'number'
+            ? await loadPinnedSnapshot(this.getDrizzle(), tenantId, inspectionId, versionNumber)
+            : null;
 
         const inspection = await db.select().from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
@@ -457,26 +487,29 @@ export class InspectionReportService extends InspectionSubService {
         const numberedSections = photoNumbering.sections as typeof sections;
         const photoAppendix: AppendixPhoto[] = photoNumbering.appendix;
 
+        // THE INSPECTOR, RESOLVED ONCE. Name, licence and badges are three facts
+        // about one person on one document, so they come from one source or the
+        // report contradicts itself: pinning the badges alone gave a renewed
+        // inspector the old number in the cover strip and the new one on the
+        // signature block.
+        //
+        // The licence is a credential row, seeded ahead of the voluntary badges
+        // by the backfill; `users` carries no licence column.
+        const lead = pinnedLead(pinned);
         let inspectorName: string | null = null;
         let inspectorLicense: string | null = null;
-        if (inspection.inspectorId) {
-            const inspector = await db.select({ name: users.name, email: users.email, licenseNumber: users.licenseNumber })
+        let credentialSnapshot: RenderableCredential[] = [];
+        if (lead) {
+            inspectorName = lead.name;
+            inspectorLicense = primaryLicenseOf(lead.credentials);
+            credentialSnapshot = lead.credentials;
+        } else if (inspection.inspectorId) {
+            const inspector = await db.select({ name: users.name, email: users.email })
                 .from(users).where(eq(users.id, inspection.inspectorId)).get();
             inspectorName = inspector?.name || (inspector?.email?.split('@')[0] ?? null);
-            inspectorLicense = inspector?.licenseNumber ?? null;
-        }
-
-        // Inspector Credentials & Association Badges (Spec B) — the inspector's
-        // active credentials, resolved to public asset URLs and snapshotted into
-        // the report payload. Empty rows (no image, blank label) are dropped.
-        let credentialSnapshot: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }> = [];
-        if (inspection.inspectorId) {
-            const credRows = await db.select().from(inspectorCredentials)
-                .where(and(eq(inspectorCredentials.tenantId, tenantId), eq(inspectorCredentials.userId, inspection.inspectorId), eq(inspectorCredentials.active, true)))
-                .orderBy(asc(inspectorCredentials.sortOrder), asc(inspectorCredentials.createdAt)).all();
-            credentialSnapshot = credRows
-                .filter((c) => c.imageR2Key || (c.label ?? '').trim())
-                .map((c) => ({ label: c.label, memberNumber: c.memberNumber, imageUrl: c.imageR2Key ? `/api/public/brand-asset?key=${encodeURIComponent(c.imageR2Key)}` : null }));
+            credentialSnapshot = await new CredentialService(this.db)
+                .listRenderable(tenantId, inspection.inspectorId);
+            inspectorLicense = primaryLicenseOf(credentialSnapshot);
         }
 
         // Sprint 2 S2-4 — per-tenant flag controls whether the published
@@ -526,7 +559,10 @@ export class InspectionReportService extends InspectionSubService {
         }
         // Report Style Presets (Plan 1a) — three-tier resolution + field-level tweaks.
         const insp = inspection as { profileOverride?: string | null; badgeLayoutOverride?: string | null; reportPhotoColumns?: number | null };
-        const styleProfile = resolveProfile(
+        // Same rule as the badges: a pinned version keeps the appearance it was
+        // published under, so a tenant switching their house style cannot
+        // restyle documents that were already delivered.
+        const styleProfile = (pinned?.styleProfile as ReturnType<typeof resolveProfile> | undefined) ?? resolveProfile(
             { profileOverride: insp.profileOverride ?? null, badgeLayoutOverride: insp.badgeLayoutOverride ?? null, reportPhotoColumns: insp.reportPhotoColumns ?? null },
             template ? { defaultProfileId: (template as { defaultProfileId?: string | null }).defaultProfileId ?? null } : null,
             { defaultProfileId: tenantDefaultProfileId },
@@ -871,7 +907,7 @@ export class InspectionReportService extends InspectionSubService {
      *    showLicense + companyAddress) from tenant_configs (default ON).
      *  - address: the inspection's property address (footer fallback when the
      *    tenant has no companyAddress configured).
-     *  - license: the assigned inspector's users.licenseNumber (or null when no
+     *  - license: the assigned inspector's licence credential row (or null when no
      *    inspector is assigned / the user row carries no license).
      *
      * All reads are filtered by tenantId so a footer can never leak a foreign
@@ -900,15 +936,11 @@ export class InspectionReportService extends InspectionSubService {
             .where(eq(tenantConfigs.tenantId, tenantId))
             .get();
 
-        let license: string | null = null;
-        if (insp?.inspectorId) {
-            const owner = await db
-                .select({ licenseNumber: users.licenseNumber })
-                .from(users)
-                .where(and(eq(users.id, insp.inspectorId), eq(users.tenantId, tenantId)))
-                .get();
-            license = owner?.licenseNumber ?? null;
-        }
+        // PDF footer licence — same source as the report payload's, so the two
+        // can never print different numbers for the same inspector.
+        const license: string | null = insp?.inspectorId
+            ? await new CredentialService(this.db).primaryLicenseNumber(tenantId, insp.inspectorId)
+            : null;
 
         return {
             settings: resolvePdfSettings(cfg),

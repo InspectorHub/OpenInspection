@@ -87,5 +87,10 @@
   "media_strip_select": "Select",
   "media_strip_uploading": "Uploading",
   "media_strip_cover": "Cover",
-  "media_strip_add_photo_aria": "Add photo"
+  "media_strip_add_photo_aria": "Add photo",
+  "media_cropper_rotate_left": "Rotate left",
+  "media_cropper_rotate_right": "Rotate right",
+  "media_badge_crop_aria": "Crop badge",
+  "media_badge_save": "Save badge",
+  "media_cropper_bake_failed": "That image could not be processed. Try another file."
 }

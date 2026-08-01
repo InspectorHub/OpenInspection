@@ -31,9 +31,18 @@ async function seedBase(testDb: BetterSQLite3Database<typeof schema>) {
         email:        'inspector@example.com',
         passwordHash: 'x',
         name:         'Alice Inspector',
-        licenseNumber: 'LIC-9999',
         role:         'inspector',
         createdAt:    new Date(),
+    });
+    // The licence is a credential row now — `users` carries no licence column.
+    // Seeded at sort_order -1, which is where the backfill puts it and why the
+    // "first credential carrying a member number" rule finds the licence rather
+    // than a voluntary badge.
+    await testDb.insert(schema.inspectorCredentials).values({
+        id: 'cred-license', tenantId: TENANT, userId: INSPECTOR,
+        label: 'Licensed home inspector', memberNumber: 'LIC-9999',
+        imageR2Key: null, sortOrder: -1, active: true,
+        createdAt: new Date(), updatedAt: new Date(),
     });
     await testDb.insert(schema.inspections).values({
         id:              INSPECTION,

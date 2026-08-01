@@ -46,6 +46,9 @@ import type {
     PlacesApi,
     PortalApi,
     PortalNoticesApi,
+    NotificationPreferencesApi,
+    AgentNotificationPreferencesApi,
+    PortalNotificationPreferencesApi,
     AgentNoticesApi,
     ProfileApi,
     PublicShareApi,
@@ -173,6 +176,12 @@ export interface Api {
     // same prefixes, typed independently for the same structural-depth reason
     // as agentMagicLogin above.
     portalNotices:      ReturnType<typeof hc<PortalNoticesApi>>;
+    // Notification preferences (§4) — one client per audience. Each mounts at
+    // a prefix another module already owns, so they need their own keys for
+    // the same reason portalNotices does (hono/client type-collapse, C-10).
+    notificationPrefs:      ReturnType<typeof hc<NotificationPreferencesApi>>;
+    agentNotificationPrefs: ReturnType<typeof hc<AgentNotificationPreferencesApi>>;
+    portalNotificationPrefs: ReturnType<typeof hc<PortalNotificationPreferencesApi>>;
     agentNotices:       ReturnType<typeof hc<AgentNoticesApi>>;
     profile:            ReturnType<typeof hc<ProfileApi>>;
     publicShare:        ReturnType<typeof hc<PublicShareApi>>;
@@ -250,6 +259,9 @@ const MOUNT: Record<keyof Api, string> = {
     places:             "/api/places",
     portal:             "/api/portal",
     portalNotices:      "/api/portal",
+    notificationPrefs:      "/api",
+    agentNotificationPrefs: "/api/agent",
+    portalNotificationPrefs: "/api/portal",
     agentNotices:       "/api/agent",
     profile:            "/api/profile",
     publicShare:        "/api/public",
@@ -345,6 +357,9 @@ export function createApi(context: LoadContext, opts: CreateApiOptions = {}): Ap
         places:             mk<PlacesApi>(MOUNT.places),
         portal:             mk<PortalApi>(MOUNT.portal),
         portalNotices:      mk<PortalNoticesApi>(MOUNT.portalNotices),
+        notificationPrefs:      mk<NotificationPreferencesApi>(MOUNT.notificationPrefs),
+        agentNotificationPrefs: mk<AgentNotificationPreferencesApi>(MOUNT.agentNotificationPrefs),
+        portalNotificationPrefs: mk<PortalNotificationPreferencesApi>(MOUNT.portalNotificationPrefs),
         agentNotices:       mk<AgentNoticesApi>(MOUNT.agentNotices),
         profile:            mk<ProfileApi>(MOUNT.profile),
         publicShare:        mk<PublicShareApi>(MOUNT.publicShare),

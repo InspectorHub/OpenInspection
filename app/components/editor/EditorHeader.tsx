@@ -5,6 +5,9 @@ import { usePdfExport, pdfActionLabel } from "~/hooks/usePdfExport";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { ProgressStripText } from "~/components/editor/ProgressStripText";
 import { TemplateMenu } from "~/components/editor/TemplateMenu";
+import { PreviewMenu } from "~/components/editor/PreviewMenu";
+import { HEADER_OVERFLOW } from "~/components/editor/header-visibility";
+import { HeaderOverflowMenu } from "~/components/editor/HeaderOverflowMenu";
 import { m } from "~/paraglide/messages";
 
 type EditorState = ReturnType<typeof useInspectionState>;
@@ -178,8 +181,11 @@ export function EditorHeader({
  </div>
  )}
 
- {/* Center zone: report search + version history [tools] */}
- <div className="hidden xl:flex items-center gap-2">
+ {/* Center zone: report search + version history [tools]. Both hide together
+     at the same breakpoint; only version history reappears in the More menu.
+     Search does not: typing into a popover is worse than not offering it, and
+     an inspector on a tablet navigates by section rail, not by search. */}
+ <div className={`${HEADER_OVERFLOW.versionHistory.inline} items-center gap-2`}>
  {/* Search */}
  <input
   type="text"
@@ -212,7 +218,7 @@ export function EditorHeader({
  {/* Theme — the shared 4-segment control (auto/light/dark/field), same as the
      tenant sidebar. Shown from xl up where the header has room; narrower
      widths reach it through the mobile Theme drawer. */}
- <ThemeSegmentControl className="hidden xl:flex" />
+ <ThemeSegmentControl className={HEADER_OVERFLOW.theme.inline} />
 
  {/* Report settings — a labelled button, not a bare gear.
      IA-87 ③ / IA-88 ⑤: this was the only unlabelled icon in a row of text
@@ -262,51 +268,33 @@ export function EditorHeader({
   canUpdateSource={canUpdateSourceTemplate}
  />
 
- {/* Preview full report — opens the whole report (all sections) in a new tab.
-     Owner preview works on drafts (tokenless via the report-view loader). */}
- {tenantSlug && (
-  <Button
-  variant="secondary"
-  size="md"
-  onClick={() => window.open(`/report-view/${tenantSlug}/${state.inspection.id}`, "_blank", "noopener")}
-  className="hidden 2xl:inline-flex"
-  title={m.editor_header_preview_full_title()}
-  icon={
-   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-   </svg>
+ {/* Preview [CHECK tier] — the report's two fidelities behind one control.
+     Never hides: it is the rehearsal for Publish, and Publish never hides.
+     The web report is the owner preview (works on drafts, tokenless via the
+     report-view loader); the PDF is the real server-rendered deliverable
+     (owner on-demand pre-publish via the JWT-authed endpoint). */}
+ <PreviewMenu
+  onPreviewReport={
+   tenantSlug
+    ? () => window.open(`/report-view/${tenantSlug}/${state.inspection.id}`, "_blank", "noopener")
+    : null
   }
-  >
-  {m.editor_header_preview()}
-  </Button>
- )}
-
- {/* Preview PDF — opens the real server-rendered PDF deliverable (the exact
-     client deliverable) in a new tab. Owner on-demand render works pre-publish
-     on drafts via the owner/JWT-authed /api/inspections/:id/pdf endpoint. */}
- <Button
-  variant="secondary"
-  size="md"
-  onClick={() => pdf.exportPdf(`/api/inspections/${state.inspection.id}/pdf?type=full`, { mode: "view", filename: `report-${state.inspection.id}.pdf` })}
-  disabled={pdf.busy}
-  className="hidden xl:inline-flex"
-  title={pdf.error ?? m.editor_header_preview_pdf_title()}
-  icon={
-   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-   </svg>
-  }
- >
-  {pdfActionLabel(pdf, m.editor_header_preview_pdf())}
- </Button>
+  onPreviewPdf={() => pdf.exportPdf(`/api/inspections/${state.inspection.id}/pdf?type=full`, { mode: "view", filename: `report-${state.inspection.id}.pdf` })}
+  pdfBusy={pdf.busy}
+  pdfError={pdf.error}
+  /* Inside a menu already labelled "Preview", the rows name destinations,
+     not actions — "Web report" / "PDF", not "Web report" / "Preview PDF".
+     The busy and cooldown states replace the label outright, so the short
+     form loses nothing. */
+  pdfLabel={pdfActionLabel(pdf, m.editor_header_preview_pdf_short())}
+ />
 
  {/* Sign now button */}
  <Button
   variant="secondary"
   size="md"
   onClick={() => setSignModalOpen(true)}
-  className="hidden xl:inline-flex"
+  className={HEADER_OVERFLOW.sign.inline}
   title={m.editor_header_sign_title()}
   icon={<Icon name="edit" className="w-3.5 h-3.5" />}
  >
@@ -322,12 +310,29 @@ export function EditorHeader({
   size="md"
   onClick={handleFinishFieldwork}
   disabled={finishingFieldwork}
-  className="hidden lg:inline-flex"
+  className={HEADER_OVERFLOW.finishFieldwork.inline}
   icon={<Icon name="check" className="w-3.5 h-3.5" />}
  >
   {finishingFieldwork ? m.editor_finish_fieldwork_pending() : m.editor_finish_fieldwork()}
  </Button>
  )}
+
+ {/* More [COMPOSE tier overflow] — holds exactly what this width dropped.
+     Sits immediately left of Publish so the controls that vanished from the
+     row are one tap from where they used to be. Hides itself at xl, where
+     everything it holds is inline again. */}
+ <HeaderOverflowMenu
+  onSign={() => setSignModalOpen(true)}
+  onFinishFieldwork={
+   (state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null
+  }
+  finishingFieldwork={finishingFieldwork}
+  onOpenVersionHistory={collabEditing && onOpenVersionHistory ? onOpenVersionHistory : null}
+  /* Full width in the menu: at its intrinsic size the four segments sit in
+     a short pill against a much wider panel, reading as a stray chip rather
+     than a control. */
+  themeControl={<ThemeSegmentControl className="w-full" />}
+ />
 
  {/* Publish button */}
  <Button

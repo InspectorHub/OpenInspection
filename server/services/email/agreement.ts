@@ -38,10 +38,9 @@ export function AgreementEmailMixin<TBase extends Constructor>(Base: TBase) {
                 host,
             );
             if (!rendered.enabled) return;
-            await this.sendEmail(
+            await this.sendRendered(
+                rendered,
                 [to],
-                rendered.subject,
-                rendered.html,
                 undefined,
                 { inspector },
             );
@@ -130,10 +129,9 @@ export function AgreementEmailMixin<TBase extends Constructor>(Base: TBase) {
             );
             if (!rendered.enabled) return;
             const recipients = [to, ...ccs.filter(Boolean).filter(e => e && e !== to)];
-            await this.sendEmail(
+            await this.sendRendered(
+                rendered,
                 recipients,
-                rendered.subject,
-                rendered.html,
                 undefined,
                 { inspector },
             );
@@ -212,10 +210,9 @@ export function AgreementEmailMixin<TBase extends Constructor>(Base: TBase) {
                 html: fallbackHtml,
             });
             if (!rendered.enabled) return;
-            await this.sendEmail(
+            await this.sendRendered(
+                rendered,
                 [to],
-                rendered.subject,
-                rendered.html,
                 [
                     { filename: 'signed-agreement.pdf', content: signedPdfBytes.buffer as ArrayBuffer, contentType: 'application/pdf' },
                     { filename: 'evidence-pack.zip',    content: evidenceZipBytes.buffer as ArrayBuffer, contentType: 'application/zip' },

@@ -1,6 +1,6 @@
 // tests/unit/report-access-gate.spec.ts
 import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from 'vitest';
-import { publicReportAccessAllowed } from '../../../server/lib/report-access';
+import { publicReportAccessAllowed, shouldPinLatestPublished } from '../../../server/lib/report-access';
 
 describe('publicReportAccessAllowed', () => {
   it('client token: allowed only when published', () => {
@@ -98,6 +98,10 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
             c.set('services', {
                 portalAccess: { resolveToken },
                 inspection: { getReportData, resolveAgentViewToken },
+                // Option A resolves the latest published version on the recipient
+                // track. `null` = no version row, which keeps these cases about
+                // the PUBLISH GATE rather than about snapshot selection.
+                reportVersion: { getLatestPublished: vi.fn().mockResolvedValue(null) },
             } as unknown as HonoConfig['Variables']['services']);
             if (opts.withKeyring) c.set('keyringPromise', Promise.resolve(keyring));
             await next();
@@ -131,7 +135,11 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
         const { app, getReportData } = buildApp();
         const res = await app.request(`/api/public/report/acme/${INSP_ID}?token=tok`);
         expect(res.status).toBe(200);
-        expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function), expect.any(Object));
+        // 5th arg: `undefined` HERE because this harness seeds no version row —
+        // not because a recipient read is meant to be live. Option A pins that
+        // read to the latest published version; public-report-endpoint.spec.ts
+        // owns that assertion.
+        expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function), expect.any(Object), undefined);
     });
 
     it('owner-preview bypasses the gate (200 even when report_status=in_progress)', async () => {
@@ -146,7 +154,12 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
             headers: { Authorization: `Bearer ${ownerJwt}` },
         });
         expect(res.status).toBe(200);
-        expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function), expect.any(Object));
+        expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function), expect.any(Object),
+            // 5th arg: the pinned version. `undefined` on every path that is not
+            // materialising a specific published version — asserted rather than
+            // omitted, because a NUMBER leaking in here would mean an ordinary
+            // client read was being served a frozen snapshot.
+            undefined);
     });
 });
 
@@ -315,5 +328,37 @@ describe('GET /api/public/verify/report/:token — reflects current publish stat
         const res = await app.request('/api/public/verify/report/vtok/pdf');
         expect([403, 404]).toContain(res.status);
         expect(res.status).toBe(403);
+    });
+});
+
+/**
+ * Which reads get the FROZEN snapshot (option A).
+ *
+ * The routing decision, isolated from the endpoint. It is deliberately not the
+ * same shape as the access gate above: that one lets render-token and owner
+ * traffic THROUGH, this one keeps both on live data, for two different reasons.
+ */
+describe('shouldPinLatestPublished', () => {
+    it('pins the recipient track — the read that must not change after delivery', () => {
+        expect(shouldPinLatestPublished({ renderMode: false, ownerPreview: false, tokenPinnedVersion: undefined })).toBe(true);
+    });
+
+    it('leaves OWNER PREVIEW live, so the author can see unpublished edits', () => {
+        // Pinning here would make the preview show the last published state and
+        // silently hide everything typed since — on the surface whose only job
+        // is showing work in progress.
+        expect(shouldPinLatestPublished({ renderMode: false, ownerPreview: true, tokenPinnedVersion: undefined })).toBe(false);
+    });
+
+    it('never overrides a version the render token already named', () => {
+        // The verify page materialises ONE specific version. Replacing it with
+        // "the latest" would hand back a different document than the hash the
+        // verifier is checking against.
+        expect(shouldPinLatestPublished({ renderMode: true, ownerPreview: false, tokenPinnedVersion: 2 })).toBe(false);
+        expect(shouldPinLatestPublished({ renderMode: true, ownerPreview: false, tokenPinnedVersion: undefined })).toBe(false);
+    });
+
+    it('a token version wins even if the caller looks like a recipient', () => {
+        expect(shouldPinLatestPublished({ renderMode: false, ownerPreview: false, tokenPinnedVersion: 1 })).toBe(false);
     });
 });

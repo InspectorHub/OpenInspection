@@ -42,14 +42,15 @@ function jwt(payload: Record<string, unknown>): string {
  * Cookie is a forbidden header name in fetch — so the header is built directly.
  * requireToken only ever reads `request.headers.get("Cookie")`.
  */
-function requestWithCookie(cookie: string | null): Request {
+function requestWithCookie(cookie: string | null, path = "/inspections"): Request {
   return {
+    url: `https://example.test${path}`,
     headers: new Headers(cookie ? { Cookie: cookie } : {}),
   } as unknown as Request;
 }
 
-function requestWithToken(token: string): Request {
-  return requestWithCookie(`__Host-inspector_token=${token}`);
+function requestWithToken(token: string, path?: string): Request {
+  return requestWithCookie(`__Host-inspector_token=${token}`, path);
 }
 
 const HOUR = 3600;
@@ -98,6 +99,66 @@ describe("requireToken", () => {
     for (const bad of ["not-a-jwt", "a.b", "a.!!!.c", jwt({ sub: "u1" })]) {
       const res = await captureThrown(() => requireToken(CONTEXT, requestWithToken(bad)));
       expect(res.headers.get("Location")).toBe("/login");
+    }
+  });
+});
+
+/**
+ * A session ends at the door it was opened at.
+ *
+ * `/login` is the STAFF front door: an agent has no account there, and in SaaS
+ * mode `routes/login.tsx` 302s again to `${PORTAL_API_URL}/login` — out of this
+ * product entirely, onto a portal sign-in an agent cannot use. Sending an agent
+ * there on logout or on expiry is a dead end, not a login page.
+ *
+ * The door is derived from the path rather than passed in by each caller, so an
+ * agent route added later cannot forget to ask for it.
+ */
+describe("which login page a session ends on", () => {
+  const AGENT_PAGES = [
+    "/agent-dashboard",
+    "/agent-settings/profile",
+    "/agent-inspectors",
+    "/agent-repair-items",
+    "/agent-logout",
+  ];
+  const STAFF_PAGES = ["/inspections", "/settings/profile", "/logout", "/calendar"];
+
+  it("sends an agent with no session to the agent login", async () => {
+    for (const path of AGENT_PAGES) {
+      const res = await captureThrown(() =>
+        requireToken(CONTEXT, requestWithCookie(null, path)),
+      );
+      expect(res.headers.get("Location"), path).toBe("/agent-login");
+    }
+  });
+
+  it("sends an agent whose session EXPIRED to the agent login", async () => {
+    for (const path of AGENT_PAGES) {
+      const res = await captureThrown(() =>
+        requireToken(CONTEXT, requestWithToken(jwt({ sub: "a1", exp: nowSec() - HOUR }), path)),
+      );
+      expect(res.headers.get("Location"), path).toBe("/agent-login");
+    }
+  });
+
+  it("leaves every staff surface on the staff login", async () => {
+    for (const path of STAFF_PAGES) {
+      const res = await captureThrown(() =>
+        requireToken(CONTEXT, requestWithCookie(null, path)),
+      );
+      expect(res.headers.get("Location"), path).toBe("/login");
+    }
+  });
+
+  it("does not treat a staff path that merely CONTAINS 'agent' as an agent surface", async () => {
+    // `/contacts?type=agent` and `/inspections/agent-notes` are staff pages
+    // about agents, not agent pages. The prefix is the whole rule.
+    for (const path of ["/contacts", "/inspections/agent-notes", "/reports/agentx"]) {
+      const res = await captureThrown(() =>
+        requireToken(CONTEXT, requestWithCookie(null, path)),
+      );
+      expect(res.headers.get("Location"), path).toBe("/login");
     }
   });
 });
