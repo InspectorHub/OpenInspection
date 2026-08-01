@@ -27,33 +27,23 @@ import { PortalAccessService } from '../../server/services/portal-access.service
 import { seedRoleProfiles } from '../../server/services/seed/seed-role-profiles';
 import publicReportRoutes from '../../server/api/public-report';
 import type { HonoConfig } from '../../server/types/hono';
+import { applyMigrations as replayMigrations } from './migration-replay';
 
 const b = env as unknown as { DB: D1Database };
 const KEY_SECRET = 'test-key-encryption-secret-0123456789';
 
 // Replay every migration .sql exactly as production applies them. Vite (the
 // pool's bundler) inlines the file bodies via import.meta.glob ?raw.
+// The pool's bundler inlines the migration bodies via import.meta.glob ?raw;
+// the glob must be literal HERE for that to happen, so the replay helper takes
+// the map rather than doing the glob itself.
 const migrationSql = import.meta.glob('../../migrations/*.sql', {
     query: '?raw',
     import: 'default',
     eager: true,
 }) as Record<string, string>;
 
-async function applyMigrations(): Promise<void> {
-    const files = Object.keys(migrationSql).sort();
-    for (const file of files) {
-        const sql = migrationSql[file]!;
-        for (const stmt of sql.split('--> statement-breakpoint')) {
-            const cleaned = stmt
-                .split('\n')
-                .filter((line) => !line.trim().startsWith('--'))
-                .join(' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-            if (cleaned) await b.DB.exec(cleaned);
-        }
-    }
-}
+const applyMigrations = () => replayMigrations(b.DB, migrationSql);
 
 function reportVersionService(): ReportVersionService {
     return new ReportVersionService(b.DB, KEY_SECRET);
@@ -72,6 +62,12 @@ function reportApp() {
         c.set('services', {
             inspection: inspectionService(),
             portalAccess: portalAccessService(),
+            // The recipient read resolves the latest published version and
+            // renders ITS snapshot, so the route needs this service. Registered
+            // here rather than guarded with `?.` in the route: a missing service
+            // is a DI misconfiguration, and optional-chaining it would turn a
+            // loud 500 into a report silently served from live tables.
+            reportVersion: reportVersionService(),
         } as unknown as HonoConfig['Variables']['services']);
         await next();
     });

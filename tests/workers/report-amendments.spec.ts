@@ -32,6 +32,7 @@ import { ReportPdfService } from '../../server/services/report-pdf.service';
 import { SigningKeyService } from '../../server/services/signing-key.service';
 import publicReportRoutes from '../../server/api/public-report';
 import type { HonoConfig } from '../../server/types/hono';
+import { applyMigrations as replayMigrations } from './migration-replay';
 
 const b = env as unknown as { DB: D1Database };
 const KEY_SECRET = 'test-key-encryption-secret-0123456789';
@@ -44,33 +45,16 @@ const PUBLISHER = 'user-a1';
 // Replay every migration .sql exactly as production applies them. Vite (the
 // pool's bundler) inlines the file bodies via import.meta.glob ?raw, so this
 // works inside workerd where node:fs is unavailable.
+// The pool's bundler inlines the migration bodies via import.meta.glob ?raw;
+// the glob must be literal HERE for that to happen, so the replay helper takes
+// the map rather than doing the glob itself.
 const migrationSql = import.meta.glob('../../migrations/*.sql', {
     query: '?raw',
     import: 'default',
     eager: true,
 }) as Record<string, string>;
 
-async function applyMigrations(): Promise<void> {
-    const files = Object.keys(migrationSql).sort();
-    for (const file of files) {
-        const sql = migrationSql[file]!;
-        for (const stmt of sql.split('--> statement-breakpoint')) {
-            // Strip whole-line `--` comments: D1.exec rejects a statement whose
-            // text reduces to a comment, and a leading comment line preceding
-            // the DDL would otherwise swallow the statement.
-            // D1.exec is line-oriented (it splits on newlines), so strip
-            // whole-line `--` comments AND collapse the remaining DDL onto a
-            // single line before exec.
-            const cleaned = stmt
-                .split('\n')
-                .filter((line) => !line.trim().startsWith('--'))
-                .join(' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-            if (cleaned) await b.DB.exec(cleaned);
-        }
-    }
-}
+const applyMigrations = () => replayMigrations(b.DB, migrationSql);
 
 function reportVersionService(): ReportVersionService {
     return new ReportVersionService(b.DB, KEY_SECRET);
