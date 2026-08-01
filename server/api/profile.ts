@@ -160,7 +160,13 @@ const profileRoutes = createApiRouter()
           ? inspectorSignature({
               name: row.name, email: row.email, phone: row.phone,
               tenantSlug, credentials,
-            }, host).html
+              // RELATIVE badge URLs. `host` here is the in-process API
+              // request's, which in local dev is a different port than the
+              // browser is on, so absolutizing against it pointed every badge
+              // at a port with nothing behind it. The preview is drawn on this
+              // app's own origin; letting the browser resolve them is both
+              // simpler and immune to that whole class of mismatch.
+            }, host, { assetOrigin: '' }).html
           : '';
 
         return c.json({
@@ -218,9 +224,15 @@ const profileRoutes = createApiRouter()
         const buf = new Uint8Array(await file.arrayBuffer());
         await r2Put(c.env.PHOTOS, key, buf, { httpMetadata: { contentType: file.type } });
 
-        const host = (c.env.APP_BASE_URL?.replace(/^https?:\/\//, '').replace(/\/$/, '')) || c.req.header('host') || '';
-        const proto = c.env.APP_BASE_URL?.startsWith('http://') ? 'http' : 'https';
-        const photoUrl = `${proto}://${host}/photos/${key}`;
+        // A RELATIVE path, stored. Every consumer of `users.photo_url` is a
+        // browser surface — this page, the public booking page, concierge,
+        // presence — so each already has the right origin and nothing needs one
+        // baked in. The absolute form was built from the request's host, which
+        // for an in-process API call is not the host the browser is on: the
+        // photo saved fine and then rendered as a broken image, pointing at a
+        // port nobody was serving. An absolute URL is also a hostage to the
+        // deploy origin never changing, for no benefit here.
+        const photoUrl = `/photos/${key}`;
         await getDrizzle(c).update(users)
             .set({ photoUrl })
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));

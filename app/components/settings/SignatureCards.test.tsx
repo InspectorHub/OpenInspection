@@ -16,6 +16,17 @@ import { createRoutesStub } from "react-router";
 import { EmailSignatureCard, SavedSignatureCard } from "./SignatureCards";
 
 /**
+ * The cropper is stubbed. These specs are about WHETHER it opens and with what
+ * settings; react-easy-crop's own behaviour is not this card's contract, and
+ * the crop geometry is covered by crop-rotation.
+ */
+vi.mock("~/components/media-studio/PhotoCropper", () => ({
+  PhotoCropper: (p: { outputFormat?: string; maxLongEdge?: number }) => (
+    <div data-testid="cropper" data-format={p.outputFormat} data-max={String(p.maxLongEdge)} />
+  ),
+}));
+
+/**
  * Both cards submit through `useFetcher`, which needs a router. The stub is
  * used for RENDERING only — never for an auth assertion, which it cannot make
  * (it does not run middleware).
@@ -131,5 +142,46 @@ describe("SavedSignatureCard — showing what was saved", () => {
     renderInRouter(<SavedSignatureCard savedSignature="data:image/png;base64,AAAA" />);
     fireEvent.click(screen.getByRole("button", { name: /draw signature/i }));
     expect(screen.queryByRole("img")).toBeNull();
+  });
+});
+
+/**
+ * An uploaded signature goes through the CROPPER.
+ *
+ * A photographed signature arrives with the rest of the page around it, and
+ * often a quarter-turn off — the two things a cropper exists to fix. What it
+ * used to get instead was an invisible canvas downscale, so a crooked mark on a
+ * sheet of A4 was what every agreement recipient saw.
+ */
+describe("SavedSignatureCard — cropping an uploaded signature", () => {
+  function pick(container: HTMLElement, file: File) {
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    fireEvent.change(input);
+  }
+
+  it("opens the cropper rather than saving the file as-is", async () => {
+    const { container, action } = renderInRouter(<SavedSignatureCard savedSignature={null} />);
+    pick(container, new File(["x"], "sig.png", { type: "image/png" }));
+    expect(await screen.findByTestId("cropper")).toBeTruthy();
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("bakes PNG — a signature is composited onto a document", async () => {
+    // As a JPEG the transparency it is cut out against becomes white, and the
+    // mark lands on the report as a white rectangle.
+    const { container } = renderInRouter(<SavedSignatureCard savedSignature={null} />);
+    pick(container, new File(["x"], "sig.png", { type: "image/png" }));
+    expect((await screen.findByTestId("cropper")).getAttribute("data-format")).toBe("image/png");
+  });
+
+  it("refuses an oversized image inline, before any request", async () => {
+    const { container, action } = renderInRouter(<SavedSignatureCard savedSignature={null} />);
+    const big = new File(["x"], "sig.png", { type: "image/png" });
+    Object.defineProperty(big, "size", { value: 3_000_000 });
+    pick(container, big);
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.queryByTestId("cropper")).toBeNull();
+    expect(action).not.toHaveBeenCalled();
   });
 });

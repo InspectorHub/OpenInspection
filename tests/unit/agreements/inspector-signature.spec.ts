@@ -57,6 +57,36 @@ describe('inspectorSignature — Sprint B-4 / DB-12', () => {
         expect(sig.text).not.toContain('<img');
     });
 
+    /**
+     * The settings PREVIEW asks for relative badge URLs, and gets them.
+     *
+     * `host` at that call site comes from the in-process API request, which in
+     * local dev reports a different port than the browser is on — so every
+     * badge resolved to a port with nothing behind it and rendered as a broken
+     * image, on the one surface whose job is showing what the recipient sees.
+     * A relative URL resolves against whatever origin is serving the page, in
+     * dev and in production alike.
+     */
+    it('leaves badge URLs relative when assetOrigin is empty', () => {
+        const sig = inspectorSignature({
+            ...FULL_USER,
+            credentials: [{ label: 'InterNACHI CPI', memberNumber: '12345', imageUrl: '/api/public/brand-asset?key=k.png' }],
+        }, HOST, { assetOrigin: '' });
+        expect(sig.html).toContain('<img src="/api/public/brand-asset');
+        expect(sig.html).not.toContain(`<img src="https://${HOST}`);
+        // The LINK stays absolute even so: it is displayed text, and what it
+        // has to show is the URL the recipient will actually be given.
+        expect(sig.html).toContain(`href="https://${HOST}/book/acme"`);
+    });
+
+    it('absolutizes badges by default — a mail client resolves nothing for us', () => {
+        const sig = inspectorSignature({
+            ...FULL_USER,
+            credentials: [{ label: 'InterNACHI CPI', memberNumber: '12345', imageUrl: '/api/public/brand-asset?key=k.png' }],
+        }, HOST);
+        expect(sig.html).toContain(`<img src="https://${HOST}/api/public/brand-asset`);
+    });
+
     it('omits the credential block entirely when there are no credentials', () => {
         const sig = inspectorSignature(FULL_USER, HOST);
         expect(sig.html).not.toContain('brand-asset');

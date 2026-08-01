@@ -8,7 +8,6 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { AvatarCropper } from "~/components/media-studio/AvatarCropper";
 import { makeProfileSchema } from "~/lib/forms/settings.schema";
 import { Select } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
@@ -16,6 +15,7 @@ import { LOCALE_OPTIONS } from "~/lib/locales";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { CredentialsEditor, type EditorCredential } from "~/components/settings/CredentialsEditor";
 import { NotificationPreferencesCard } from "~/components/settings/NotificationPreferencesCard";
+import { ProfilePhotoCard } from "~/components/settings/ProfilePhotoCard";
 import { EmailSignatureCard, SavedSignatureCard } from "~/components/settings/SignatureCards";
 import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { bulkNotificationChoice, grantNotificationSms, loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
@@ -235,7 +235,6 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function SettingsProfilePage() {
   const { profile, credentials, notifications } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  const [avatarSource, setAvatarSource] = useState<string | null>(null);
   // DB-12 / IA-26 — useSessionContext / tenantSlug removed; slug section gone.
 
   // Conform owns the main profile form (default intent). The save-signature
@@ -257,24 +256,6 @@ export default function SettingsProfilePage() {
   // Conform narrowing helpers (cat-7): actionData may be SubmissionResult or {success,error,...}
   const flashSuccess = actionData && "success" in actionData && actionData.success;
   const flashError = actionData && "error" in actionData && typeof actionData.error === "string" ? actionData.error : null;
-
-  // Photo upload fetcher — replaces the raw fetch() in the file input onChange
-  const photoFetcher = useFetcher<{ success?: boolean; error?: string; intent?: string }>();
-  useEffect(() => {
-    if (photoFetcher.state === "idle" && photoFetcher.data?.success && photoFetcher.data?.intent === "photo-upload") {
-      window.location.reload();
-    }
-  }, [photoFetcher.state, photoFetcher.data]);
-  // A FAILED upload used to say nothing at all: success reloads the page, and
-  // failure left the old photo sitting there looking like nothing had been
-  // attempted. On a page whose rule is now "no button means it saved", a
-  // silent failure is the one thing that breaks the rule.
-  useNotificationSaveToast({
-    data: photoFetcher.data?.intent === "photo-upload" && !photoFetcher.data?.success
-      ? photoFetcher.data : null,
-    failed: true,
-    error: photoFetcher.data?.error ?? null,
-  });
 
   // Inspector credentials (Spec B) — mutations route through the action (BFF);
   // RR revalidates the loader afterward, so the editor re-renders with fresh rows.
@@ -471,41 +452,7 @@ export default function SettingsProfilePage() {
       {/* DB-12 / IA-26 — Booking slug section removed; the company booking link
           now lives in Settings → Booking ("Your links"). */}
 
-      {/* Photo placeholder */}
-      <section id="photo" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
-        <header className="space-y-1">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_photo_heading()}</h3>
-          <p className="text-[12px] text-ih-fg-3">{m.settings_profile_photo_subtitle()}</p>
-        </header>
-
-        {/* Photo */}
-        <div className="space-y-2">
-          <label className="block text-[13px] font-semibold text-ih-fg-1">{m.settings_profile_photo_heading()}</label>
-          <div className="flex items-center gap-4">
-            <div className="w-24 h-24 rounded-full bg-ih-bg-muted border border-ih-border overflow-hidden flex items-center justify-center text-ih-fg-4 text-[11px]">
-              {profile.photoUrl ? (
-                <img src={profile.photoUrl} alt={m.settings_profile_photo_alt()} className="w-full h-full object-cover" />
-              ) : (
-                <span>{m.settings_profile_photo_none()}</span>
-              )}
-            </div>
-            <div className="space-y-2">
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="block text-[11px] text-ih-fg-3"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) setAvatarSource(URL.createObjectURL(file));
-                  e.target.value = "";
-                }}
-              />
-              <p className="text-[11px] text-ih-fg-3">{m.settings_profile_photo_hint()}</p>
-            </div>
-          </div>
-        </div>
-
-      </section>
+      <ProfilePhotoCard photoUrl={profile.photoUrl ?? null} />
 
       {/* Email signature (business-card footer) — independent of Point of Contact */}
       <EmailSignatureCard
@@ -534,20 +481,6 @@ export default function SettingsProfilePage() {
         />
       </div>
 
-      {avatarSource && (
-        <AvatarCropper
-          sourceUrl={avatarSource}
-          onCancel={() => { URL.revokeObjectURL(avatarSource); setAvatarSource(null); }}
-          onSave={(blob) => {
-            const fd = new FormData();
-            fd.append("intent", "photo-upload");
-            fd.append("photo", new File([blob], "avatar.jpg", { type: "image/jpeg" }));
-            photoFetcher.submit(fd, { method: "POST", encType: "multipart/form-data" });
-            URL.revokeObjectURL(avatarSource);
-            setAvatarSource(null);
-          }}
-        />
-      )}
     </div>
   );
 }

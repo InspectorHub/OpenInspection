@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useFetcher } from "react-router";
 import { SignaturePad } from "~/components/SignaturePad";
+import { PhotoCropper } from "~/components/media-studio/PhotoCropper";
+import { blobToDataUri, readAsDataUri, validateImageFile, isVectorImage, SIGNATURE_MAX_LONG_EDGE } from "~/lib/image-upload";
 import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { m } from "~/paraglide/messages";
 
@@ -105,6 +107,8 @@ export function SavedSignatureCard({ savedSignature }: { savedSignature: string 
   const fetcher = useFetcher<SaveResult>();
   const [showPad, setShowPad] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  /** The object URL of an uploaded image waiting to be cropped. */
+  const [cropSource, setCropSource] = useState<string | null>(null);
   const isOurs = fetcher.data?.intent === "save-signature";
 
   /**
@@ -132,6 +136,32 @@ export function SavedSignatureCard({ savedSignature }: { savedSignature: string 
     fd.append("intent", "save-signature");
     fd.append("signatureBase64", dataUri);
     fetcher.submit(fd, { method: "post" });
+  };
+
+  const closeCropper = () => {
+    if (cropSource) URL.revokeObjectURL(cropSource);
+    setCropSource(null);
+  };
+
+  /**
+   * A chosen file goes to the CROPPER, not straight to the server.
+   *
+   * A photographed signature arrives with the rest of the page around it and
+   * often a quarter-turn off — the two things the cropper exists to fix. It was
+   * previously downscaled by a canvas nobody could see and stored as-is, so a
+   * crooked mark on a sheet of A4 was what every agreement recipient got.
+   */
+  const onFileChosen = async (file: File) => {
+    const invalid = validateImageFile(file);
+    if (invalid) { setUploadError(invalid); return; }
+    setUploadError(null);
+    if (isVectorImage(file)) {
+      const dataUri = await readAsDataUri(file);
+      if (!dataUri) { setUploadError(m.settings_profile_signature_upload_unreadable()); return; }
+      submit(dataUri);
+      return;
+    }
+    setCropSource(URL.createObjectURL(file));
   };
 
   return (
@@ -192,11 +222,10 @@ export function SavedSignatureCard({ savedSignature }: { savedSignature: string 
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/svg+xml"
                 className="sr-only"
-                onChange={async (e) => {
+                onChange={(e) => {
                   const file = e.target.files?.[0];
                   e.target.value = "";
-                  if (!file) return;
-                  setUploadError(await readSignatureFile(file, submit));
+                  if (file) void onFileChosen(file);
                 }}
               />
               {m.settings_profile_signature_upload()}
@@ -208,57 +237,30 @@ export function SavedSignatureCard({ savedSignature }: { savedSignature: string 
           )}
         </div>
       )}
+
+      {cropSource && (
+        <PhotoCropper
+          sourceUrl={cropSource}
+          // A signature is a wide, thin mark, so 3:1 is offered as the shape
+          // that matches the line it will sit on — but free stays the default,
+          // because the mark's own proportions are whatever they are.
+          presets={["3:1"]}
+          initialAspect="free"
+          // PNG: a signature is composited onto a document, and JPEG would fill
+          // the transparency it is cut out against with white.
+          outputFormat="image/png"
+          maxLongEdge={SIGNATURE_MAX_LONG_EDGE}
+          title={m.settings_profile_signature_crop_aria()}
+          saveLabel={m.settings_profile_signature_crop_save()}
+          onCancel={closeCropper}
+          onSave={async (blob) => {
+            const dataUri = await blobToDataUri(blob);
+            closeCropper();
+            if (!dataUri) { setUploadError(m.settings_profile_signature_upload_unreadable()); return; }
+            submit(dataUri);
+          }}
+        />
+      )}
     </section>
   );
-}
-
-/**
- * Read an uploaded signature into a data URI, DOWNSCALED.
- *
- * The column is TEXT and its value is read on every report render and every
- * agreement, so a phone photo pasted in whole would be carried around forever
- * for a mark drawn at a couple of hundred pixels. Raster images are redrawn
- * through a canvas at signature scale; SVG passes through untouched, being
- * resolution-independent already.
- *
- * Returns an error message, or null on success.
- */
-async function readSignatureFile(
-  file: File,
-  onReady: (dataUri: string) => void,
-): Promise<string | null> {
-  const ALLOWED = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
-  if (!ALLOWED.includes(file.type)) return m.settings_profile_signature_upload_bad_type();
-  if (file.size > 2_000_000) return m.settings_profile_signature_upload_too_big();
-
-  const dataUri = await new Promise<string | null>((resolve) => {
-    const r = new FileReader();
-    r.onload = () => resolve(typeof r.result === "string" ? r.result : null);
-    r.onerror = () => resolve(null);
-    r.readAsDataURL(file);
-  });
-  if (!dataUri) return m.settings_profile_signature_upload_unreadable();
-
-  if (file.type === "image/svg+xml") { onReady(dataUri); return null; }
-
-  const scaled = await new Promise<string | null>((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const MAX_H = 200, MAX_W = 600;
-      const ratio = Math.min(MAX_W / img.width, MAX_H / img.height, 1);
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(img.width * ratio));
-      canvas.height = Math.max(1, Math.round(img.height * ratio));
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { resolve(null); return; }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      // PNG, so a signature on transparency stays on transparency.
-      resolve(canvas.toDataURL("image/png"));
-    };
-    img.onerror = () => resolve(null);
-    img.src = dataUri;
-  });
-  if (!scaled) return m.settings_profile_signature_upload_unreadable();
-  onReady(scaled);
-  return null;
 }

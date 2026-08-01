@@ -3,7 +3,10 @@
 // upload control + a Remove button, and label / member number live behind a
 // collapsed <details>. A solo inspector pasting one pre-composed badge strip
 // never touches a text field. No expiry input (Spec B §5).
+import { useState } from "react";
 import { LogoUploader } from "~/components/media-studio/LogoUploader";
+import { PhotoCropper } from "~/components/media-studio/PhotoCropper";
+import { BADGE_MAX_LONG_EDGE, isVectorImage, validateImageFile } from "~/lib/image-upload";
 import { m } from "~/paraglide/messages";
 
 export interface EditorCredential {
@@ -38,6 +41,41 @@ export function CredentialsEditor({
   onUpdate: (id: string, patch: { label?: string; memberNumber?: string }) => void;
   onDelete: (id: string) => void;
 }) {
+  /** The row whose badge is being cropped, and the object URL it came from. */
+  const [cropTarget, setCropTarget] = useState<{ id: string; url: string } | null>(null);
+  /**
+   * A file this page refused, before any request was made.
+   *
+   * Kept separately from `uploadError` (which is the SERVER's answer) because
+   * the two arrive at different moments and one does not supersede the other:
+   * a local refusal has to survive on screen while nothing at all is in flight.
+   */
+  const [localError, setLocalError] = useState<{ id: string; message: string } | null>(null);
+
+  const closeCropper = () => {
+    if (cropTarget) URL.revokeObjectURL(cropTarget.url);
+    setCropTarget(null);
+  };
+
+  /**
+   * A badge gets cropped like every other image on this page.
+   *
+   * It used to go to the server byte-for-byte, which made it the one image here
+   * with no way to straighten a photographed certificate or trim the margin
+   * around a seal — on the surface whose whole purpose is appearing on a
+   * published report. Vector badges still pass straight through: rasterizing an
+   * SVG to crop it would throw away the reason it was uploaded as an SVG.
+   */
+  const onSelect = (id: string, file: File) => {
+    const invalid = validateImageFile(file);
+    if (invalid) { setLocalError({ id, message: invalid }); return; }
+    setLocalError(null);
+    if (isVectorImage(file)) { onUpload(id, file); return; }
+    setCropTarget({ id, url: URL.createObjectURL(file) });
+  };
+
+  const shownError = localError ?? uploadError;
+
   return (
     <section id="credentials" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4 scroll-mt-12">
       <div>
@@ -55,9 +93,9 @@ export function CredentialsEditor({
               more than this column has, and squeezing it collapsed the preview
               to a sliver with the button floating off-centre beside it. */}
           <div className="w-32 shrink-0 space-y-1.5">
-            <LogoUploader size="compact" currentUrl={c.imageUrl} uploading={uploadingId === c.id} onSelect={(f) => onUpload(c.id, f)} />
-            {uploadError?.id === c.id && (
-              <p role="alert" className="text-[11px] text-ih-bad-fg leading-tight">{uploadError.message}</p>
+            <LogoUploader size="compact" currentUrl={c.imageUrl} uploading={uploadingId === c.id} onSelect={(f) => onSelect(c.id, f)} />
+            {shownError?.id === c.id && (
+              <p role="alert" className="text-[11px] text-ih-bad-fg leading-tight">{shownError.message}</p>
             )}
           </div>
           <div className="flex-1 min-w-0">
@@ -93,6 +131,28 @@ export function CredentialsEditor({
       <button type="button" onClick={onAdd} className="text-[13px] font-bold text-ih-primary hover:underline">
         {m.settings_profile_credentials_add()}
       </button>
+
+      {cropTarget && (
+        <PhotoCropper
+          sourceUrl={cropTarget.url}
+          // Square first: most association seals are round or square. Free stays
+          // available for the wide certificate strips some inspectors upload.
+          presets={["1:1", "3:2"]}
+          initialAspect="1:1"
+          // PNG, so a badge cut out against transparency still is one. As a JPEG
+          // it lands on the report cover as a white rectangle.
+          outputFormat="image/png"
+          maxLongEdge={BADGE_MAX_LONG_EDGE}
+          title={m.media_badge_crop_aria()}
+          saveLabel={m.media_badge_save()}
+          onCancel={closeCropper}
+          onSave={(blob) => {
+            const { id } = cropTarget;
+            closeCropper();
+            onUpload(id, new File([blob], "badge.png", { type: "image/png" }));
+          }}
+        />
+      )}
     </section>
   );
 }

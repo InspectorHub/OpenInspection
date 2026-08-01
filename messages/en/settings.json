@@ -236,5 +236,8 @@
   "settings_profile_signature_empty_hint": "Nothing signed yet. Draw one, or upload an image of your signature.",
   "settings_profile_signature_upload_too_big": "That image is over 2 MB. Try a smaller one.",
   "settings_profile_signature_upload_bad_type": "Use a PNG, JPEG, WebP or SVG image.",
-  "settings_profile_signature_upload_unreadable": "That file could not be read as an image."
+  "settings_profile_signature_upload_unreadable": "That file could not be read as an image.",
+  "settings_profile_signature_crop_aria": "Crop signature",
+  "settings_profile_signature_crop_save": "Save signature",
+  "settings_profile_photo_choose": "Choose photo"
 }

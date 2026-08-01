@@ -70,7 +70,33 @@ const phoneTel = (raw: string | null | undefined): string | null => {
     return `+1${digits.slice(-10)}`;
 };
 
-export function inspectorSignature(user: SignatureUser, host: string): SignatureOutput {
+export interface SignatureRenderOptions {
+    /**
+     * Where badge `<img>` URLs point, when that is not where the LINKS point.
+     *
+     * The two have different requirements and only one caller notices. An EMAIL
+     * needs both absolute — a mail client renders the footer wherever the
+     * recipient happens to be, and resolves nothing against an origin of ours.
+     * The SETTINGS PREVIEW is drawn by a browser already sitting on this app's
+     * origin, so it passes `''` and its badges become relative: they then load
+     * from whatever origin is actually serving the page.
+     *
+     * Absolutizing them was what broke the preview. `host` there comes from the
+     * in-process API request, which in local dev reports a different port than
+     * the browser is on, so every badge resolved to a port with nothing behind
+     * it — broken-image icons on the one surface whose entire job is showing
+     * what the recipient will see. Relative cannot have that class of bug,
+     * in dev or in production.
+     */
+    assetOrigin?: string;
+}
+
+export function inspectorSignature(
+    user: SignatureUser,
+    host: string,
+    { assetOrigin = `https://${host}` }: SignatureRenderOptions = {},
+): SignatureOutput {
+    const origin = `https://${host}`;
     const name      = user.name          ? escapeHtml(user.name)          : null;
     const email     = user.email         ? escapeHtml(user.email)         : null;
     const phoneRaw  = user.phone         ? escapeHtml(user.phone)         : null;
@@ -78,7 +104,7 @@ export function inspectorSignature(user: SignatureUser, host: string): Signature
     // DB-12 / IA-26 — the per-inspector URL is retired; link to the company
     // booking page instead. tenantSlug alone is sufficient now.
     const link      = user.tenantSlug
-        ? `https://${host}/book/${escapeHtml(user.tenantSlug)}`
+        ? `${origin}/book/${escapeHtml(user.tenantSlug)}`
         : null;
 
     const htmlLines: string[] = [];
@@ -98,7 +124,7 @@ export function inspectorSignature(user: SignatureUser, host: string): Signature
                 // downloads whatever was uploaded — up to 2 MB — to render a
                 // chip the height of a line of text.
                 const sized = badgeUrl(c.imageUrl, 'email') ?? c.imageUrl!;
-                const abs = sized.startsWith('/') ? `https://${host}${sized}` : sized;
+                const abs = sized.startsWith('/') ? `${assetOrigin}${sized}` : sized;
                 return `<img src="${escapeHtml(abs)}" alt="${escapeHtml(c.label || 'Credential')}" style="height:28px;width:auto;vertical-align:middle;margin-right:6px">`;
             })
             .join('');
@@ -128,7 +154,7 @@ export function inspectorSignature(user: SignatureUser, host: string): Signature
     }
     // DB-12 / IA-26 — company-level URL only; per-inspector slug retired.
     if (user.tenantSlug) {
-        textLines.push(`Book again: https://${host}/book/${user.tenantSlug}`);
+        textLines.push(`Book again: ${origin}/book/${user.tenantSlug}`);
     }
     const text = textLines.join('\n');
 
