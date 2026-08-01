@@ -47,6 +47,25 @@ function konvaSsrStub(): Plugin {
 }
 
 export default defineConfig({
+  /**
+   * MINIFY THE WORKER. Vite turns minification off for SSR builds by default,
+   * on the reasonable assumption that server output runs in Node where bytes do
+   * not matter. Here the "SSR" build IS the deployed artifact, and Workers Free
+   * caps the script at 3 MiB gzipped — so the default shipped the worker as
+   * 177k lines of unminified source, averaging 37 bytes a line.
+   *
+   * That is why the bundle sat at the ceiling while every diet attempt went
+   * looking for whole dependencies to remove: the largest single saving was not
+   * a dependency at all, it was a build flag nobody had set.
+   *
+   * `esbuild` (not terser) because the build already runs it and the difference
+   * between the two is a couple of percent against a saving measured in tens.
+   * Exported names — the `fetch`/`queue`/`scheduled` handlers and the
+   * `InspectionDocDO` class that `wrangler.jsonc` binds BY NAME — are preserved
+   * by esbuild's minifier; `check:bundle` and the DO binding both fail loudly if
+   * that ever stops being true.
+   */
+  build: { minify: "esbuild" },
   resolve: {
     alias: {
       "~": path.resolve(__dirname, "app"),
