@@ -419,7 +419,10 @@ const reportDeliveryRoutes = createApiRouter()
                         interpolate(roleTemplate.subject, vars),
                         interpolate(roleTemplate.body, vars),
                         pdf ? [{ filename: `${address.replace(/[^a-z0-9]+/gi, '-')}-report.pdf`, content: pdf }] : undefined,
-                        { inspector: sigInspector },
+                        // Same class as the two branches below: only the WORDING
+                        // differs, chosen by role. A different template is not a
+                        // different thing to have a preference about.
+                        { inspector: sigInspector, classId: pdf ? 'report-ready-pdf' : 'report-ready' },
                     );
                 } else if (pdf) {
                     await c.var.services.email.sendInspectionReportPdf(recipientEmail, address, linkUrl, pdf, sigInspector, sigHost);

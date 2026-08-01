@@ -27,6 +27,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 // Import admin routes AFTER the mock is set up.
 // eslint-disable-next-line import/order
 import adminRoutes from '../../../server/api/admin';
+import { LegalVersionService } from '../../../server/services/legal-version.service';
 
 const TENANT_ID = 'aaaaaaaa-0000-0000-0000-000000000001';
 const OTHER_TENANT = 'bbbbbbbb-0000-0000-0000-000000000002';
@@ -54,6 +55,12 @@ function buildApp(
             branding: {
                 updateBranding: brandingStubs.updateBranding ?? vi.fn().mockResolvedValue(undefined),
             },
+            // Real service over the test DB, not a stub. The PATCH handler
+            // swallows a failure here on purpose (the version row is evidence
+            // about a save, not part of it), so a stub that silently did
+            // nothing would let a broken wiring pass as a green test — which is
+            // exactly what happened the first time this spec was run.
+            legalVersion: new LegalVersionService(db as never),
         } as unknown as HonoConfig['Variables']['services']);
         await next();
     });
@@ -209,5 +216,90 @@ describe('GET /api/admin/compliance/erasure-log (G4)', () => {
         expect(res.status).toBe(200);
         const body = await res.json() as { data: unknown[] };
         expect(body.data).toEqual([]);
+    });
+});
+
+/**
+ * Publishing a legal document records a version (design §6A.3).
+ *
+ * The read side is easy to build and easy to believe. The WRITE side is where
+ * this feature is silently wrong or silently noisy, and both failure modes look
+ * identical from the settings page:
+ *
+ *   - recording nothing, because the PATCH handler never called the historian —
+ *     the version table stays empty and "Last updated" never appears;
+ *   - recording a version on EVERY PATCH, so a tenant who changes their booking
+ *     hours mints a new revision of their privacy policy.
+ */
+describe('PATCH /api/admin/tenant-config — legal document versions', () => {
+    let db: BetterSQLite3Database<typeof schema>;
+
+    beforeEach(async () => {
+        const fixture = createTestDb();
+        db = fixture.db;
+        await setupSchema(fixture.sqlite);
+        await db.insert(schema.tenants).values({
+            id: TENANT_ID, name: 'Acme', slug: 'acme', status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        });
+        await db.insert(schema.tenantConfigs).values({
+            tenantId: TENANT_ID, defaultTimezone: 'UTC', updatedAt: new Date(),
+        });
+    });
+
+    const patch = (app: OpenAPIHono<HonoConfig>, body: Record<string, unknown>) =>
+        request(app, '/api/admin/tenant-config', {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+    const versions = () => db.select().from(schema.tenantLegalVersions).all();
+
+    it('records a version, WITH the body, when a legal document is saved', async () => {
+        const app = buildApp(db);
+        const res = await patch(app, { privacyBody: 'We collect only what an inspection needs.' });
+        expect(res.status).toBe(200);
+
+        const rows = await versions();
+        expect(rows).toHaveLength(1);
+        expect(rows[0].doc).toBe('privacy');
+        // The body, not just a hash — the source column is mutable with nothing
+        // behind it, so a row that cannot reproduce the text is worthless.
+        expect(rows[0].bodySnapshot).toBe('We collect only what an inspection needs.');
+        expect(rows[0].contentHash).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it('records NOTHING when the PATCH did not touch a legal document', async () => {
+        const app = buildApp(db);
+        const res = await patch(app, { agreementRetentionYears: 7 });
+        expect(res.status).toBe(200);
+        expect(await versions()).toHaveLength(0);
+    });
+
+    it('records nothing on a re-save of identical text', async () => {
+        const app = buildApp(db);
+        await patch(app, { privacyBody: 'Same words.' });
+        await patch(app, { privacyBody: 'Same words.' });
+        expect(await versions()).toHaveLength(1);
+    });
+
+    it('versions the two documents independently', async () => {
+        const app = buildApp(db);
+        await patch(app, { privacyBody: 'P text.', termsBody: 'T text.' });
+        const rows = await versions();
+        expect(rows.map((r) => r.doc).sort()).toEqual(['privacy', 'terms']);
+    });
+
+    it('does not fail the settings save when recording the version throws', async () => {
+        // The version row is evidence ABOUT a save, not part of it. Failing the
+        // tenant's actual change because the historian fell over would lose the
+        // thing they asked for in order to protect the record of it.
+        const app = buildApp(db);
+        const boom = vi.spyOn(LegalVersionService.prototype, 'recordPublish')
+            .mockRejectedValue(new Error('registry down'));
+        const res = await patch(app, { privacyBody: 'Still saves.' });
+        expect(res.status).toBe(200);
+        boom.mockRestore();
     });
 });

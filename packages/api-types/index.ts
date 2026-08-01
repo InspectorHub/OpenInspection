@@ -49,6 +49,12 @@ export type { NotificationsApi }      from '../../server/api/notifications';
 export type { PlacesApi }             from '../../server/api/places';
 export type { PortalApi }             from '../../server/api/portal';
 export type { PortalNoticesApi }      from '../../server/api/portal/notices';
+// Notification preferences (§4) — three sibling routers, one per audience.
+// Each needs its own per-module client for the same reason portalNotices does:
+// they mount at a prefix another module already owns.
+export type { NotificationPreferencesApi }       from '../../server/api/notification-preferences';
+export type { AgentNotificationPreferencesApi }  from '../../server/api/agent/notification-preferences';
+export type { PortalNotificationPreferencesApi } from '../../server/api/portal/notification-preferences';
 export type { AgentNoticesApi }       from '../../server/api/agent/notices';
 export type { ProfileApi }            from '../../server/api/profile';
 export type { PublicShareApi }        from '../../server/api/public-share';

@@ -18,7 +18,7 @@ import { InvoiceNotPayableError } from '../lib/stripe-helpers';
 import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
 import { getBookingHost, getBaseUrl } from '../lib/url';
-import { publicReportAccessAllowed } from '../lib/report-access';
+import { publicReportAccessAllowed, shouldPinLatestPublished } from '../lib/report-access';
 import publicVerifyRoutes from './public/verify';
 import publicInspectorProfileRoutes from './public/inspector-profile';
 import { PublicInvoiceBodySchema } from '../lib/validations/invoice.schema';
@@ -34,7 +34,7 @@ import { getDrizzle } from '../lib/route-helpers';
  */
 export async function resolveRenderAccess(
     render: string | undefined, requestedId: string, secret: string,
-): Promise<{ inspectionId: string } | null> {
+): Promise<{ inspectionId: string; versionNumber?: number } | null> {
     if (!render) return null;
     const v = await verifyRenderToken(render, secret);
     if (!v || v.inspectionId !== requestedId) return null;
@@ -269,13 +269,18 @@ const publicReportRoutes = createApiRouter()
         // and pass it as `?render=`. Resolve tenantId from the inspection row so the
         // headless browser can load the full report without any user credential.
         let renderMode = false;
+        // A version named INSIDE the signed render token, when the caller is
+        // materialising a specific published version (the verify page's frozen
+        // PDF). Never read from the query string: a link holder who could append
+        // `&v=1` would be asking the renderer for a version they were never sent.
+        let pinnedVersion: number | undefined;
         if (!tenantId && render) {
             const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
             if (r) {
                 const db = getDrizzle(c);
                 const row = await db.select({ tenantId: inspections.tenantId })
                     .from(inspections).where(eq(inspections.id, id)).get();
-                if (row) { tenantId = row.tenantId; renderMode = true; }
+                if (row) { tenantId = row.tenantId; renderMode = true; pinnedVersion = r.versionNumber; }
             }
         }
         // Owner-session preview: an authenticated tenant user (inspector/admin)
@@ -283,6 +288,32 @@ const publicReportRoutes = createApiRouter()
         // THIS inspection is enforced by getReportData's tenant-scoped query.
         let ownerPreview = false;
         if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
+
+        // OPTION A — a delivered report renders what it FROZE.
+        //
+        // A recipient reading their link gets the latest PUBLISHED version's
+        // snapshot, not live tables. Without this the everyday web read tracked
+        // current state, so an inspector who renewed a licence or left an
+        // association silently retro-edited every report they had ever issued —
+        // on a document that carries a signature and an integrity hash claiming
+        // it had not changed.
+        //
+        // Three deliberate exclusions:
+        //  - RENDER TOKEN already names its own version (above); it must keep
+        //    it, because the verify page materialises one specific version.
+        //  - OWNER PREVIEW stays LIVE. The owner is the author: preview exists
+        //    to show work in progress, and pinning it would hide every edit made
+        //    after the last publish. This is the plan's own split — "publish →
+        //    snapshot; live/draft preview → read current state".
+        //  - AN UNPUBLISHED report has no version row, so it resolves live by
+        //    falling through with `pinnedVersion` still undefined.
+        //
+        // Server-derived, like the render token's: nothing here reads a version
+        // from the query string, so a link holder still cannot ask for one.
+        if (tenantId && shouldPinLatestPublished({ renderMode, ownerPreview, tokenPinnedVersion: pinnedVersion })) {
+            const latest = await c.var.services.reportVersion.getLatestPublished(tenantId, id);
+            if (latest) pinnedVersion = latest.versionNumber;
+        }
         if (!tenantId) {
             // IA-36 ⑨ — distinguish "this link was taken offline" from "this link
             // never existed". The recipient was invited by us and the link died by
@@ -337,7 +368,7 @@ const publicReportRoutes = createApiRouter()
             streamCustomerSubdomain,
             appBaseUrl,
             r2BaseUrl: `/api/inspections/${id}/media/video`,
-        });
+        }, pinnedVersion);
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(reportPhotoRoute, async (c) => {

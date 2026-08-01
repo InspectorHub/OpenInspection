@@ -31,6 +31,29 @@ export function mergeCompany(template: string, company: string | null): string {
   return template.replace(/\{\{company\}\}/g, company ?? "[Your Company]");
 }
 
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/**
+ * `2026-08-01` -> `August 1, 2026`.
+ *
+ * Deliberately string arithmetic and no `Date` anywhere. The input is already a
+ * civil date computed in the TENANT's timezone; handing it to `new Date()` here
+ * would re-interpret it as a UTC instant and then read local parts back off it,
+ * which is how a date renders as the day before for every reader west of
+ * Greenwich. There is no instant in this value to lose.
+ */
+export function formatLegalVersion(version: string | null): string | null {
+  if (!version) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(version);
+  if (!m) return version;
+  const month = MONTHS[Number(m[2]) - 1];
+  if (!month) return version;
+  return `${month} ${Number(m[3])}, ${m[1]}`;
+}
+
 export async function loader({ params, context }: Route.LoaderArgs) {
   const { tenant, doc } = params;
 
@@ -46,7 +69,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     throw new Response(null, { status: 404 });
   }
   const body = (await res.json()) as {
-    data?: { companyName?: string; body?: string | null };
+    data?: { companyName?: string; body?: string | null; lastUpdated?: string | null };
   };
   const companyName = body.data?.companyName?.trim();
   if (!companyName) {
@@ -57,6 +80,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     doc,
     companyName,
     customBody: body.data?.body?.trim() || null,
+    lastUpdated: body.data?.lastUpdated ?? null,
     tenantSlug: tenant,
   };
 }
@@ -229,12 +253,18 @@ function TermsContent({ company }: { company: string }) {
 }
 
 export default function LegalPage() {
-  const { doc, companyName, customBody } = useLoaderData<typeof loader>();
+  const { doc, companyName, customBody, lastUpdated } = useLoaderData<typeof loader>();
 
   const isPrivacy = doc === "privacy";
   const docTitle = isPrivacy ? m.public_legal_doc_privacy() : m.public_legal_doc_terms();
   const heading = m.public_legal_title({ doc: docTitle, company: companyName });
-  const effectiveDate = m.public_legal_effective();
+  // Was a hardcoded literal — one date, baked into the message catalogue, shown
+  // on EVERY tenant's page whatever their document said or when they last
+  // touched it, and stale the moment the release shipped. It now comes from the
+  // version registry, which is the only thing that knows a save changed the
+  // TEXT rather than some neighbouring setting. Null until a tenant has
+  // published once, and then the line is omitted rather than invented.
+  const effectiveDate = formatLegalVersion(lastUpdated);
 
   return (
     <div className="min-h-screen bg-ih-bg-card text-ih-fg-1 py-12 px-4">
@@ -246,7 +276,11 @@ export default function LegalPage() {
           <h1 className="font-serif text-3xl font-bold text-ih-fg-1 leading-tight mb-2">
             {heading}
           </h1>
-          <p className="text-sm text-ih-fg-3">{effectiveDate}</p>
+          {effectiveDate && (
+            <p className="text-sm text-ih-fg-3">
+              {m.public_legal_last_updated({ date: effectiveDate })}
+            </p>
+          )}
         </header>
 
         <div className="space-y-6 border-t border-ih-border pt-6">

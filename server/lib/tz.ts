@@ -75,6 +75,17 @@ export function epochMsToWallClockHm(ms: number, ianaTz: string): string {
   return epochMsToRfc3339(ms, ianaTz).slice(11, 16);
 }
 
+/**
+ * Wall-clock `YYYY-MM-DD` of instant `ms` in `ianaTz`.
+ *
+ * Not `new Date(ms).toISOString().slice(0, 10)`: that is the UTC date, which is
+ * the wrong day for roughly a third of every day west of Greenwich. Anything a
+ * reader is shown as "the date this happened" has to be their date.
+ */
+export function epochMsToWallClockYmd(ms: number, ianaTz: string): string {
+  return epochMsToRfc3339(ms, ianaTz).slice(0, 10);
+}
+
 /** `YYYY-MM-DD` + `HH:MM` interpreted as local wall-clock in `ianaTz` -> UTC epoch ms. */
 export function wallClockToEpochMs(dateYmd: string, timeHm: string, ianaTz: string): number {
   const [y, mo, d] = dateYmd.split('-').map(Number);

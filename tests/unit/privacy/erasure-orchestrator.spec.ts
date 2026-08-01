@@ -499,6 +499,31 @@ describe('runErasure — the residences the original manifest missed (#88)', () 
         expect(other?.clientName).toBe('John Other');
     });
 
+    it('notification_preferences: the subject rows go, because a contact id can be reused', async () => {
+        // A preference row is keyed on the contact id, not on a person. Ids are
+        // reused after an erasure, so leaving these behind hands the NEXT person
+        // at that id the erased subject's mute settings — silently, and in the
+        // direction that suppresses mail they never asked to suppress.
+        await db.insert(schema.notificationPreferences).values([
+            { id: 'np-subject', tenantId: TENANT_A, subjectKind: 'contact', subjectId: 'contact-88',
+              classId: 'booking-confirmation', channel: 'email', enabled: false,
+              createdAt: new Date(), updatedAt: new Date() },
+            { id: 'np-other', tenantId: TENANT_A, subjectKind: 'contact', subjectId: 'contact-other',
+              classId: 'booking-confirmation', channel: 'email', enabled: false,
+              createdAt: new Date(), updatedAt: new Date() },
+            // A STAFF preference at the same id string in the other id space —
+            // proof the subject kind is part of the key, not decoration.
+            { id: 'np-user', tenantId: TENANT_A, subjectKind: 'user', subjectId: 'contact-88',
+              classId: 'booking-confirmation', channel: 'email', enabled: false,
+              createdAt: new Date(), updatedAt: new Date() },
+        ]);
+
+        await run();
+
+        const left = await db.select().from(schema.notificationPreferences).all();
+        expect(left.map((r) => r.id).sort()).toEqual(['np-other', 'np-user']);
+    });
+
     it('email_suppressions: the opt-out row is RETAINED — deleting it would resume sending to someone who objected', async () => {
         await db.insert(schema.emailSuppressions).values({
             id: 'sup-subject', tenantId: TENANT_A, email: SUBJECT_EMAIL, reason: 'complaint', sourceProvider: 'resend', createdAt: new Date(),

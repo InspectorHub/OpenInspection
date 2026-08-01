@@ -64,3 +64,67 @@ describe('EmailService rendered path', () => {
     expect(body.html).not.toContain('inspection.ics');
   });
 });
+
+/**
+ * The two sends the ROUTES used to build by hand.
+ *
+ * Each one shipped a hardcoded slate button (`#0f172a`) that ignored the
+ * company's colour and logo, could not be edited or translated, and reached the
+ * send boundary with no notification class. Being a template is what fixes all
+ * four at once, so these assert all four.
+ */
+describe('sends converted off hand-built HTML', () => {
+  /** Captures what reached the boundary, including the class the routes lacked. */
+  class Probe extends EmailService {
+    captured: Array<{ to: string[]; subject: string; html: string; classId?: string }> = [];
+    override async sendEmail(
+      to: string[], subject: string, html: string,
+      _attachments?: Array<{ filename: string; content: ArrayBuffer | string; contentType?: string }>,
+      opts?: { classId?: string },
+    ): Promise<{ delivered: boolean }> {
+      this.captured.push({ to, subject, html, classId: opts?.classId });
+      return { delivered: true };
+    }
+  }
+  const probe = () => new Probe('re_test', 'reports@acme.com', 'Acme', undefined, renderer);
+
+  it('client portal sign-in: tenant-branded, carries the link and its class', async () => {
+    const p = probe();
+    await p.sendClientPortalLogin('a@x.com', 'https://x/portal/acme/auth?link=tok');
+    expect(p.captured[0].classId).toBe('client-portal-login');
+    expect(p.captured[0].subject).toBe('Sign in to your client portal');
+    expect(p.captured[0].html).toContain('https://x/portal/acme/auth?link=tok');
+    // Tenant brand, not the platform's — a client's portal belongs to one company.
+    expect(p.captured[0].html).toContain('Acme');
+    expect(p.captured[0].html).not.toContain('#0f172a;">Open my portal');
+  });
+
+  it('repair-request share: subject carries the address, body the note and the link', async () => {
+    const p = probe();
+    await p.sendRepairRequestShare('contractor@x.com', {
+      propertyAddress: '12 Elm St',
+      shareUrl: 'https://x/repair-request/tok',
+      message: 'Please quote items 2 and 3.\nThanks.',
+    });
+    expect(p.captured[0].classId).toBe('repair-request-share');
+    expect(p.captured[0].subject).toBe('Repair request — 12 Elm St');
+    expect(p.captured[0].html).toContain('https://x/repair-request/tok');
+    // The sender's newline survives — they typed it into a textarea.
+    expect(p.captured[0].html).toContain('Please quote items 2 and 3.<br />Thanks.');
+  });
+
+  it('repair-request share with no note leaves no empty block behind', async () => {
+    const p = probe();
+    await p.sendRepairRequestShare('contractor@x.com', {
+      propertyAddress: '12 Elm St',
+      shareUrl: 'https://x/repair-request/tok',
+    });
+    expect(p.captured[0].html).not.toMatch(/<p[^>]*>\s*<\/p>/);
+  });
+
+  it('falls back to "your property" rather than a subject ending in a dash', async () => {
+    const p = probe();
+    await p.sendRepairRequestShare('contractor@x.com', { propertyAddress: '', shareUrl: 'https://x/s' });
+    expect(p.captured[0].subject).toBe('Repair request — your property');
+  });
+});

@@ -432,8 +432,10 @@ export class InspectionService {
         makePhotoUrl: (key: string) => string =
             (key) => `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`,
         videoCtx?: ReportMediaContext,
+        /** Renders the named published version's snapshot instead of live state. */
+        versionNumber?: number,
     ) {
-        return this.report.getReportData(inspectionId, tenantId, makePhotoUrl, videoCtx);
+        return this.report.getReportData(inspectionId, tenantId, makePhotoUrl, videoCtx, versionNumber);
     }
 
     /**

@@ -78,7 +78,7 @@ export type ChangePasswordInput = z.infer<ReturnType<typeof makeChangePasswordSc
 
 /**
  * Profile fields — mirrors the API's inline `PatchProfileSchema` in
- * `server/api/profile.ts` (name max 100, phone max 30, licenseNumber max 50).
+ * `server/api/profile.ts` (name max 100, phone max 30).
  * All fields optional so a partial save leaves untouched fields unchanged.
  *
  * DB-12 / IA-26 (2026-06-06) — slug removed. Inspector booking slugs are
@@ -89,7 +89,6 @@ export function makeProfileSchema() {
   return z.object({
     name: z.string().max(100, m.validation_profile_name_too_long()).optional(),
     phone: z.string().max(30, m.validation_profile_phone_too_long()).optional(),
-    licenseNumber: z.string().max(50, m.validation_profile_license_too_long()).optional(),
     signatureEnabled: z.boolean().optional(),
     // Per-user display-timezone override (IANA name). Empty string = inherit the
     // tenant default. Constrained to a <select> in the UI.

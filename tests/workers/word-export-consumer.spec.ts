@@ -10,6 +10,7 @@ import * as schema from '../../server/lib/db/schema';
 import { handleWordExportBatch } from '../../server/services/report-export-consumer';
 import { ReportExportService } from '../../server/services/report-export.service';
 import type { WordExportJob } from '../../server/lib/sync-events/word-export-job';
+import { applyMigrations as replayMigrations } from './migration-replay';
 
 const b = env as unknown as { DB: D1Database; PHOTOS: R2Bucket };
 
@@ -65,27 +66,16 @@ function distinctLargeBytes(index: number, byteSize: number): Uint8Array {
 
 // Replay every migration .sql exactly as production applies them (mirrors
 // tests/workers/report-amendments.spec.ts).
+// The pool's bundler inlines the migration bodies via import.meta.glob ?raw;
+// the glob must be literal HERE for that to happen, so the replay helper takes
+// the map rather than doing the glob itself.
 const migrationSql = import.meta.glob('../../migrations/*.sql', {
     query: '?raw',
     import: 'default',
     eager: true,
 }) as Record<string, string>;
 
-async function applyMigrations(): Promise<void> {
-    const files = Object.keys(migrationSql).sort();
-    for (const file of files) {
-        const sql = migrationSql[file]!;
-        for (const stmt of sql.split('--> statement-breakpoint')) {
-            const cleaned = stmt
-                .split('\n')
-                .filter((line) => !line.trim().startsWith('--'))
-                .join(' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-            if (cleaned) await b.DB.exec(cleaned);
-        }
-    }
-}
+const applyMigrations = () => replayMigrations(b.DB, migrationSql);
 
 async function seedCommercialInspection(): Promise<void> {
     const db = drizzle(b.DB);

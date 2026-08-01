@@ -28,6 +28,7 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
+import { gateStamp, collectInputs } from "./lib/gate-stamp.mjs";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const KNIP_BIN = join(ROOT, "node_modules", "knip", "bin", "knip.js");
@@ -102,6 +103,21 @@ function collectKeys(report) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+// knip is the one gate here whose cost is real work rather than node startup
+// (~8.7s against ~0.6s for the conformance gates). Its verdict is a pure
+// function of the source tree, knip.json and the baseline, so a run whose
+// inputs are unchanged can only reach the same verdict. `--update` bypasses
+// the cache: that run has a side effect.
+const stamp = gateStamp(
+  "deadcode",
+  new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
+  collectInputs(
+    ["server", "app", "workers", "packages", "scripts", "tests"].map((d) => join(ROOT, d)),
+    [join(ROOT, "knip.json"), join(ROOT, "package.json"), join(ROOT, "tsconfig.json"), BASELINE],
+  ),
+);
+if (stamp.hit) process.exit(0);
+
 const report = runKnip();
 const current = collectKeys(report);
 
@@ -133,6 +149,7 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
+stamp.save();
 console.log(
   `Dead-code gate: OK (${baseline.size} baselined, 0 new findings).`,
 );

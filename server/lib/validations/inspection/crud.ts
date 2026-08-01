@@ -180,7 +180,7 @@ export const UpdateInspectionSchema = z.object({
     requireDefectFieldsOverride: z.enum(['none', 'location', 'trade', 'both']).nullable().optional().describe('Per-inspection override of which defect fields the publish gate requires; null inherits the tenant default.'),
     // Per-inspection override of the tenant's auto-sign-on-publish default
     // (maps to inspections.auto_sign_on_publish). Toggled from the editor's
-    // "toggle-auto-sign" action via PATCH /{id}.
+    // publish request via PATCH /{id}, ordered before the publish itself.
     autoSignOnPublish: z.boolean().optional().openapi({ example: true }).describe('Whether the inspector signature is auto-applied when the report is published.'),
     // The settings sheet's "Template" selector reassigns the inspection's
     // template (inspections.template_id). The column is a free-text id

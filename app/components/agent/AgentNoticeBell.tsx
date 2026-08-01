@@ -47,6 +47,9 @@ export function AgentNoticeBell({ notices, unread }: { notices: NoticeRowData[];
 
   return (
     <NoticeBell
+      // Shortcut only; the agent screen is per-company and needs the company
+      // selector, so it stays a page rather than moving into this panel.
+      settingsHref="/agent-settings/profile"
       notices={notices}
       unread={unread}
       emailComposer={false}

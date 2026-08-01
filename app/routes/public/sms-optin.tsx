@@ -1,6 +1,7 @@
 import { useLoaderData, useActionData, useNavigation, Form } from "react-router";
 import type { Route } from "./+types/sms-optin";
 import { createApi } from "~/lib/api-client.server";
+import { SmsDisclosure } from "~/components/notifications/SmsDisclosure";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -95,19 +96,12 @@ export default function SmsOptinPage() {
                     {m.sms_optin_intro_1()}{" "}
                     <strong>{data.companyName}</strong>{m.sms_optin_intro_2()}
                 </p>
-                <div className="bg-ih-bg-muted border border-ih-border rounded-xl p-4 mb-5">
-                    <p className="text-xs text-ih-fg-3 leading-relaxed">{data.disclosureText}</p>
-                    {(data.privacyUrl || data.termsUrl) && (
-                        <p className="text-xs text-ih-fg-3 leading-relaxed mt-2">
-                            {data.privacyUrl && (
-                                <a href={data.privacyUrl} target="_blank" rel="noreferrer" className="underline">{m.sms_optin_privacy_link()}</a>
-                            )}
-                            {data.privacyUrl && data.termsUrl && <span> · </span>}
-                            {data.termsUrl && (
-                                <a href={data.termsUrl} target="_blank" rel="noreferrer" className="underline">{m.sms_optin_terms_link()}</a>
-                            )}
-                        </p>
-                    )}
+                <div className="mb-5">
+                    <SmsDisclosure
+                        text={data.disclosureText}
+                        privacyUrl={data.privacyUrl}
+                        termsUrl={data.termsUrl}
+                    />
                 </div>
                 {actionData?.error && (
                     <p className="text-sm text-ih-bad-fg mb-3" role="alert">

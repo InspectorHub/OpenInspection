@@ -18,6 +18,7 @@ import {
 } from './shared';
 import { communicationCounts } from '../../lib/communication-counts';
 import { InspectionSubService } from './base';
+import { CredentialService } from '../credential.service';
 import type { InspectionService } from '../inspection.service';
 
 /** Normalise a possibly-JSON-encoded D1 column: parse when it's a string,
@@ -135,13 +136,17 @@ export class InspectionPublishService extends InspectionSubService {
         const branding = await db.select({ companyName: tenantConfigs.companyName, primaryColor: tenantConfigs.primaryColor, defaultLocale: tenantConfigs.defaultLocale })
             .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
 
-        let inspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null } | undefined;
+        let inspector: { name: string | null; email: string | null; phone: string | null } | undefined;
+        let licenseNumber: string | null = null;
         if (insp.inspectorId) {
             inspector = await db.select({
-                name: users.name, email: users.email, phone: users.phone, licenseNumber: users.licenseNumber,
+                name: users.name, email: users.email, phone: users.phone,
             }).from(users)
                 .where(and(eq(users.id, insp.inspectorId), eq(users.tenantId, tenantId)))
                 .get();
+            // The licence is a credential row — `users` carries no licence column.
+            licenseNumber = await new CredentialService(this.db)
+                .primaryLicenseNumber(tenantId, insp.inspectorId);
         }
 
         // Surface the invoice amount whenever payment is part of the gate (the
@@ -207,7 +212,7 @@ export class InspectionPublishService extends InspectionSubService {
             inspectorName: inspector?.name ?? null,
             inspectorEmail: inspector?.email ?? null,
             inspectorPhone: inspector?.phone ?? null,
-            inspectorLicense: inspector?.licenseNumber ?? null,
+            inspectorLicense: licenseNumber,
             scheduledDate: insp.date ?? null,
             amountCents,
             // Snapshot currency from the invoice (Phase B); fall back to USD only

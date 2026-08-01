@@ -11,8 +11,10 @@
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, desc } from 'drizzle-orm';
-import { reportVersions, inspections, inspectionResults, inspectionUnits } from '../lib/db/schema';
-import { computeDiff, type Snapshot, type DiffPayload } from '../lib/version-diff';
+import { reportVersions, inspections, inspectionResults, inspectionUnits, users, inspectionInspectors, templates, tenantConfigs } from '../lib/db/schema';
+import { computeDiff, SNAPSHOT_SCHEMA_VERSION, type Snapshot, type SnapshotInspector, type DiffPayload } from '../lib/version-diff';
+import { CredentialService } from './credential.service';
+import { resolveProfile } from '../lib/report-style/resolve';
 import { SigningKeyService, sha256Hex, base64UrlEncode, base64UrlDecode } from './signing-key.service';
 
 const MAX_SNAPSHOT_BYTES = 1024 * 1024;  // 1 MB
@@ -71,9 +73,18 @@ export class ReportVersionService {
             .all();
 
         const snapshot: Snapshot = {
+            schemaVersion: SNAPSHOT_SCHEMA_VERSION,
             inspection: ins as unknown as Record<string, unknown>,
             data,
             units,
+            // Spec B §1: report surfaces snapshot credentials + resolved layout
+            // at publish; live surfaces read current state. Before this, the
+            // report resolved credentials LIVE on every read — so an inspector
+            // who left an association silently rewrote the cover of every report
+            // they had ever delivered, including ones a client downloaded months
+            // earlier and may be relying on.
+            inspectors: await this.resolveInspectors(tenantId, inspectionId, ins),
+            styleProfile: await this.resolveStyleProfile(tenantId, ins),
         };
         const snapshotJson = JSON.stringify(snapshot);
         if (snapshotJson.length > MAX_SNAPSHOT_BYTES) {
@@ -110,6 +121,94 @@ export class ReportVersionService {
         });
 
         return { versionNumber: nextVersion, ...(summary ? { summary } : {}) };
+    }
+
+    /**
+     * Everyone the report credits, and the credentials they held right now.
+     *
+     * OPTION A ON THE COVER, A LIST IN THE PAYLOAD. Only the lead's badges are
+     * rendered today, matching the report's single inspector name and single
+     * signer — a helper holding the certification gets no credit, which is
+     * acceptable only while the line reads "Lead inspector". Both are captured
+     * here regardless, because deciding otherwise later must not mean migrating
+     * every snapshot that already exists.
+     *
+     * `inspection_inspectors` is the query face over `leadInspectorId` +
+     * `helperInspectorIds`; when it holds nothing (older inspections that never
+     * synced) the inspection's own `inspectorId` is the lead.
+     */
+    private async resolveInspectors(
+        tenantId: string,
+        inspectionId: string,
+        ins: Record<string, unknown>,
+    ): Promise<SnapshotInspector[]> {
+        const db = this.getDrizzle();
+        const links = await db.select({ userId: inspectionInspectors.userId, role: inspectionInspectors.role })
+            .from(inspectionInspectors)
+            .where(and(
+                eq(inspectionInspectors.tenantId, tenantId),
+                eq(inspectionInspectors.inspectionId, inspectionId),
+            )).all();
+
+        const assignments: Array<{ userId: string; role: 'lead' | 'helper' }> = links.length
+            ? links.map((l) => ({ userId: l.userId, role: l.role }))
+            : (typeof ins.inspectorId === 'string' && ins.inspectorId
+                ? [{ userId: ins.inspectorId, role: 'lead' as const }]
+                : []);
+        if (!assignments.length) return [];
+
+        // Lead first, so a reader of the raw snapshot sees the same order the
+        // cover does rather than whatever the link table happened to return.
+        assignments.sort((a, b) => (a.role === 'lead' ? -1 : 1) - (b.role === 'lead' ? -1 : 1));
+
+        const credentials = new CredentialService(this.db);
+        const out: SnapshotInspector[] = [];
+        for (const a of assignments) {
+            const u = await db.select({ name: users.name, email: users.email })
+                .from(users).where(and(eq(users.id, a.userId), eq(users.tenantId, tenantId))).get();
+            out.push({
+                userId: a.userId,
+                name: u?.name || (u?.email?.split('@')[0] ?? null),
+                role: a.role,
+                // The shared mapper, so the badge URL in a snapshot and the badge
+                // URL on the live page cannot disagree about their form.
+                credentials: await credentials.listRenderable(tenantId, a.userId),
+            });
+        }
+        return out;
+    }
+
+    /**
+     * The appearance profile as resolved on publish day.
+     *
+     * Same three-tier resolution the report read path runs
+     * (inspection override -> template default -> tenant default), captured so a
+     * tenant switching their house style later does not restyle documents that
+     * were already delivered.
+     */
+    private async resolveStyleProfile(
+        tenantId: string,
+        ins: Record<string, unknown>,
+    ): Promise<Record<string, unknown> | null> {
+        const db = this.getDrizzle();
+        let templateDefault: string | null = null;
+        if (typeof ins.templateId === 'string' && ins.templateId) {
+            const t = await db.select({ defaultProfileId: templates.defaultProfileId })
+                .from(templates).where(and(eq(templates.id, ins.templateId), eq(templates.tenantId, tenantId))).get();
+            templateDefault = t?.defaultProfileId ?? null;
+        }
+        const cfg = await db.select({ defaultProfileId: tenantConfigs.defaultProfileId })
+            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+
+        return resolveProfile(
+            {
+                profileOverride: (ins.profileOverride as string | null) ?? null,
+                badgeLayoutOverride: (ins.badgeLayoutOverride as string | null) ?? null,
+                reportPhotoColumns: (ins.reportPhotoColumns as number | null) ?? null,
+            },
+            { defaultProfileId: templateDefault },
+            { defaultProfileId: cfg?.defaultProfileId ?? null },
+        ) as unknown as Record<string, unknown>;
     }
 
     async verifyByToken(token: string) {

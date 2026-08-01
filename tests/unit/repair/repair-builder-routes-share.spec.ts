@@ -156,9 +156,13 @@ describe('POST /api/public/repair-request/share/:shareToken/email', () => {
         expect(res.status).toBe(400);
     });
 
-    it('200 on published report with valid email — calls sendEmail', async () => {
-        const sendEmail = vi.fn().mockResolvedValue({ delivered: true });
-        const { app, svc } = buildShareApp({ sendEmail });
+    it('200 on published report with valid email — hands the address, link and note to the email service', async () => {
+        // The route no longer builds HTML: it owns the share LINK and passes the
+        // facts. What the recipient actually sees is the email service's job
+        // (`sendRepairRequestShare` → the branded `repair-request-share`
+        // template), tested where that decision lives.
+        const sendRepairRequestShare = vi.fn().mockResolvedValue(undefined);
+        const { app, svc } = buildShareApp({ sendRepairRequestShare });
 
         const res = await app.request('/api/public/repair-request/share/share-tok-abc/email', {
             method: 'POST',
@@ -169,16 +173,19 @@ describe('POST /api/public/repair-request/share/:shareToken/email', () => {
         const body = await res.json() as { success: boolean };
         expect(body.success).toBe(true);
 
-        expect(svc.email.sendEmail).toHaveBeenCalledWith(
-            ['contractor@example.com'],
-            expect.stringContaining('123 Main St'),
-            expect.any(String),
+        expect(svc.email.sendRepairRequestShare).toHaveBeenCalledWith(
+            'contractor@example.com',
+            expect.objectContaining({
+                propertyAddress: '123 Main St',
+                shareUrl: expect.stringContaining('/repair-request/share-tok-abc'),
+                message: 'Please review.',
+            }),
         );
     });
 
     it('200 on published report with no optional message', async () => {
-        const sendEmail = vi.fn().mockResolvedValue({ delivered: true });
-        const { app } = buildShareApp({ sendEmail });
+        const sendRepairRequestShare = vi.fn().mockResolvedValue(undefined);
+        const { app, svc } = buildShareApp({ sendRepairRequestShare });
 
         const res = await app.request('/api/public/repair-request/share/share-tok-abc/email', {
             method: 'POST',
@@ -186,5 +193,9 @@ describe('POST /api/public/repair-request/share/:shareToken/email', () => {
             body: JSON.stringify({ to: 'contractor@example.com' }),
         });
         expect(res.status).toBe(200);
+        expect(svc.email.sendRepairRequestShare).toHaveBeenCalledWith(
+            'contractor@example.com',
+            expect.objectContaining({ message: undefined }),
+        );
     });
 });

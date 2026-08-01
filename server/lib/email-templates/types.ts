@@ -38,6 +38,15 @@ export interface TemplateBrand {
 }
 
 export interface RenderResult {
+  /**
+   * The template trigger that produced this result — and therefore the
+   * notification class the send boundary will record.
+   *
+   * It lives IN the result rather than being passed alongside it so a caller
+   * cannot render one template and declare another: there is only one place
+   * the value can come from.
+   */
+  trigger: string;
   subject: string;
   html: string;
   enabled: boolean;

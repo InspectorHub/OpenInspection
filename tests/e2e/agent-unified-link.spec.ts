@@ -453,9 +453,16 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
       await expect(freshPage.getByTestId('agent-report-actions')).toBeVisible({ timeout: 10000 });
 
       await freshPage.goto(`${BASE_URL}/agent-dashboard`, { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
-      // requireToken() (app/lib/session.server.ts) finds no session/cookie —
-      // the report token was never exchanged for one — and bounces to /login.
-      expect(freshPage.url()).toContain('/login');
+      // requireToken() (app/lib/session.server.ts) finds no session/cookie — the
+      // report token was never exchanged for one — and bounces to a login door.
+      //
+      // Specifically the AGENT one: `loginPathFor` sends anything under
+      // `/agent-` to `/agent-login`, so a session ends at the door it was opened
+      // at. This assertion used to read `toContain('/login')`, which passed only
+      // while agents were bounced to the staff login — and note that
+      // `/agent-login` does NOT contain `/login`, so the old spelling would keep
+      // failing here rather than accidentally passing.
+      expect(freshPage.url()).toContain('/agent-login');
       await expect(freshPage.getByRole('heading', { name: 'Agent Dashboard' })).toHaveCount(0);
     } finally {
       await close();

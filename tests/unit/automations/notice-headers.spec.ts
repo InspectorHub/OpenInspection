@@ -131,6 +131,57 @@ describe('insertNoticeHeader — the XOR invariant the DB cannot express', () =>
     });
 });
 
+describe('insertNoticeHeader honours the recipient preference', () => {
+    /**
+     * The notice IS the in-app delivery, so withholding it means not writing
+     * the row. The decision is shared with the email boundary rather than
+     * restated here — particularly the required check, which is what keeps the
+     * screen's promise and the send path's behaviour in agreement.
+     */
+    async function mute(classId: string, subjectId: string, kind: 'user' | 'contact' = 'contact') {
+        await db.insert(schema.notificationPreferences).values({
+            id: `np-${classId}-${subjectId}`, tenantId: TENANT, subjectKind: kind, subjectId,
+            classId, channel: 'in_app', enabled: false, createdAt: new Date(), updatedAt: new Date(),
+        } as never);
+    }
+
+    it('writes nothing and returns null when the recipient switched it off', async () => {
+        await mute('message-notification', 'c-muted');
+        const id = await insertNoticeHeader(db, {
+            tenantId: TENANT, userId: null, contactId: 'c-muted',
+            type: 'message.received', title: 'New message', classId: 'message-notification',
+        });
+        expect(id).toBeNull();
+        const rows = await db.select().from(schema.notifications).all();
+        expect(rows).toHaveLength(0);
+    });
+
+    it('still writes a REQUIRED notice — an individual cannot mute their dispatch', async () => {
+        // `notifications.user_id` carries a legacy FK, so the staff row has to
+        // exist before a header can point at it.
+        await db.insert(schema.users).values({
+            id: 'u-staff', tenantId: TENANT, email: 'staff@example.com',
+            passwordHash: 'x', role: 'owner', createdAt: new Date(),
+        } as never);
+        await mute('office-alert-new-booking', 'u-staff', 'user');
+        const id = await insertNoticeHeader(db, {
+            tenantId: TENANT, userId: 'u-staff', contactId: null,
+            type: 'booking.received', title: 'New booking', classId: 'office-alert-new-booking',
+        });
+        expect(id).not.toBeNull();
+        expect(await db.select().from(schema.notifications).all()).toHaveLength(1);
+    });
+
+    it('writes an UNCLASSIFIED notice — a header that cannot say what it is is never silenced', async () => {
+        await mute('message-notification', 'c-muted');
+        const id = await insertNoticeHeader(db, {
+            tenantId: TENANT, userId: null, contactId: 'c-muted',
+            type: 'message.received', title: 'New message',
+        });
+        expect(id).not.toBeNull();
+    });
+});
+
 describe('manual send logger creates headers (C1)', () => {
     it('one header per contact per batch; rows without a contact keep notice_id NULL', async () => {
         const insp = 'insp-c1-manual';

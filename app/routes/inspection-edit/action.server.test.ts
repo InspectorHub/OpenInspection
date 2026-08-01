@@ -6,6 +6,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // branching — which endpoints it calls, in what order, for a given intent.
 const completePost = vi.fn();
 const publishPost = vi.fn();
+const inspectionPatch = vi.fn();
+/** Call order across endpoints — the whole point of the auto-sign specs. */
+const calls: string[] = [];
 
 vi.mock('~/lib/session.server', () => ({
     requireToken: vi.fn().mockResolvedValue('tok'),
@@ -16,6 +19,7 @@ vi.mock('~/lib/api-client.server', () => ({
             ':id': {
                 complete: { $post: completePost },
                 publish: { $post: publishPost },
+                $patch: inspectionPatch,
             },
         },
     })),
@@ -70,5 +74,59 @@ describe('editor action — order-lifecycle intents (IA-30 Task 4)', () => {
         const res = await post({ intent: 'publish', markComplete: 'true' });
         expect(publishPost).toHaveBeenCalledTimes(1);
         expect(res).toMatchObject({ ok: true, intent: 'publish' });
+    });
+});
+
+
+/**
+ * Auto-sign must be WRITTEN BEFORE the publish it was ticked for.
+ *
+ * The publish handler decides whether to sign by re-reading the inspection
+ * row. The checkbox used to fire its own fetcher alongside the publish
+ * request, so the two raced; when the toggle lost, publish read the old value
+ * and the report went out UNSIGNED — while the flag still landed, so the NEXT
+ * publish signed and the reader concluded they had mis-clicked. Verified
+ * against a real local publish before this was written: first publish left
+ * `_inspector_signature` absent, second one injected it.
+ */
+describe('editor action — auto-sign on publish', () => {
+    beforeEach(() => {
+        calls.length = 0;
+        completePost.mockReset().mockImplementation(async () => { calls.push('complete'); return new Response(null, { status: 200 }); });
+        publishPost.mockReset().mockImplementation(async () => { calls.push('publish'); return new Response(null, { status: 200 }); });
+        inspectionPatch.mockReset().mockImplementation(async () => { calls.push('patch'); return new Response(null, { status: 200 }); });
+    });
+
+    it('writes the flag BEFORE publishing', async () => {
+        await post({ intent: 'publish', autoSignOnPublish: 'true' });
+        expect(inspectionPatch).toHaveBeenCalledWith({
+            param: { id: 'insp-1' },
+            json: { autoSignOnPublish: true },
+        });
+        // Order is the assertion. Both being called proves nothing on its own —
+        // that was true of the racing version too.
+        expect(calls).toEqual(['patch', 'publish']);
+    });
+
+    it('carries an explicit false, so unticking takes effect on this publish', async () => {
+        // `false` must be written, not omitted: a previously-persisted `true`
+        // would otherwise sign a report the reader had just opted out of.
+        await post({ intent: 'publish', autoSignOnPublish: 'false' });
+        expect(inspectionPatch).toHaveBeenCalledWith({
+            param: { id: 'insp-1' },
+            json: { autoSignOnPublish: false },
+        });
+        expect(calls).toEqual(['patch', 'publish']);
+    });
+
+    it('still orders complete -> flag -> publish when marking complete too', async () => {
+        await post({ intent: 'publish', markComplete: 'true', autoSignOnPublish: 'true' });
+        expect(calls).toEqual(['complete', 'patch', 'publish']);
+    });
+
+    it('touches nothing when the field is absent — a caller that never asked', async () => {
+        await post({ intent: 'publish' });
+        expect(inspectionPatch).not.toHaveBeenCalled();
+        expect(calls).toEqual(['publish']);
     });
 });

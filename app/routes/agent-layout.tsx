@@ -109,7 +109,7 @@ export default function AgentLayout({ loaderData }: Route.ComponentProps) {
             </span>
             <ThemeSegmentControl className="hidden md:flex ml-2" />
             <a
-              href="/logout"
+              href="/agent-logout"
               className="px-3 py-1.5 rounded-md text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bad-bg hover:text-ih-bad-fg transition-colors ml-2"
             >
               {m.agent_portal_layout_logout()}

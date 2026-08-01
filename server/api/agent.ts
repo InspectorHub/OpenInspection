@@ -25,6 +25,7 @@ import {
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import agentPhotoRoutes from './agent/photo';
+import agentNotificationPreferenceRoutes from './agent/notification-preferences';
 import { getDrizzle } from '../lib/route-helpers';
 
 /**
@@ -237,6 +238,9 @@ const inspectorsRoute = createRoute(withMcpMetadata({
 const agentRoutes = createApiRouter()
     // Byte-serving lives in its own module (file-size ratchet on this one).
     .route('/', agentPhotoRoutes)
+    // Per-company notification preferences (§4) — see that module for why the
+    // agent cannot share the staff route.
+    .route('/', agentNotificationPreferenceRoutes)
     .openapi(getReportsRoute, async (c) => {
         // Move RBAC check inside to fix OpenAPIHono type inference issues with context
         await requireRole('manager')(c, async () => {});
@@ -345,9 +349,6 @@ const agentRoutes = createApiRouter()
         const patch: Parameters<typeof c.var.services.agent.updateProfile>[1] = {};
         if (body.slug !== undefined)             patch.slug             = body.slug;
         if (body.name !== undefined)             patch.name             = body.name;
-        if (body.notifyOnReferral !== undefined) patch.notifyOnReferral = body.notifyOnReferral;
-        if (body.notifyOnReport !== undefined)   patch.notifyOnReport   = body.notifyOnReport;
-        if (body.notifyOnPaid !== undefined)     patch.notifyOnPaid     = body.notifyOnPaid;
         if (body.timezone !== undefined)         patch.timezone         = body.timezone;
 
         await c.var.services.agent.updateProfile(user.sub, patch);

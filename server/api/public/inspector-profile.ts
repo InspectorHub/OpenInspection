@@ -9,6 +9,9 @@ import { isServableBrandAsset } from '../../lib/report-style/brand-asset-key';
 import { getDrizzle } from '../../lib/route-helpers';
 import { r2Get } from '../../lib/r2/objects';
 import { getBaseUrl } from '../../lib/url';
+import { imagesBinding } from '../../lib/media/serve-photo';
+import { resolveBadgeVariant, isVectorBadge } from '../../lib/media/badge-variant';
+import { logger } from '../../lib/logger';
 
 const brandRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -42,6 +45,7 @@ const legalDocRoute = createRoute(withMcpMetadata({
                     schema: createApiResponseSchema(z.object({
                         companyName: z.string(),
                         body: z.string().nullable().describe('Custom body when set; null = use built-in template'),
+                        lastUpdated: z.string().nullable().describe('Version of the document currently in force (YYYY-MM-DD in the tenant timezone), or null when nothing has been published yet.'),
                     })),
                 },
             },
@@ -62,7 +66,20 @@ const brandAssetRoute = createRoute(withMcpMetadata({
     path: '/brand-asset',
     tags: ['public'],
     summary: 'Public brand asset (tenant logo) bytes',
-    request: { query: z.object({ key: z.string().describe('R2 object key under the branding/ prefix.') }) },
+    request: { query: z.object({
+        key: z.string().describe('R2 object key under the branding/ prefix.'),
+        // A STRING, not an enum, and that is deliberate. An enum 400s on an
+        // unrecognised value, which during a rolling deploy means a client
+        // holding older or newer JS asks for a variant this worker does not
+        // know and gets a BROKEN IMAGE. Unknown degrades to the original
+        // instead: bigger than it needed to be, which is a cost, rather than
+        // absent, which is a defect. `resolveBadgeVariant` owns the allowlist.
+        v: z.string().optional().describe(
+            'Render variant: email | reportSignature | reportCover. Badges are drawn at 28-40px ' +
+            'but stored at whatever was uploaded, so this serves a size the surface can use. ' +
+            'Omitted or unrecognised serves the original, never an error.',
+        ),
+    }) },
     responses: {
         200: { content: { 'image/*': { schema: z.any() } }, description: 'Asset bytes' },
         404: { description: 'Key outside branding/ or object missing' },
@@ -70,6 +87,16 @@ const brandAssetRoute = createRoute(withMcpMetadata({
     operationId: 'getPublicBrandAsset',
     description: 'Streams a tenant brand asset (logo) from R2. Only keys under the public `branding/` prefix are servable; everything else in the bucket stays scoped to its own routes.',
 }, { scopes: [], tier: 'extended' }));
+
+/** The stored bytes, unchanged — the answer whenever a transform is not wanted
+ *  or not possible. */
+function brandAssetResponse(obj: R2ObjectBody): Response {
+    const headers = new Headers();
+    headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
+    headers.set('Cache-Control', 'public, max-age=3600');
+    if (obj.httpEtag) headers.set('etag', obj.httpEtag);
+    return new Response(obj.body, { status: 200, headers });
+}
 
 const publicInspectorProfileRoutes = createApiRouter()
     .openapi(brandRoute, async (c) => {
@@ -100,10 +127,18 @@ const publicInspectorProfileRoutes = createApiRouter()
         const body = doc === 'privacy'
             ? (cfg?.privacyBody?.trim() || null)
             : (cfg?.termsBody?.trim() || null);
-        return c.json({ success: true as const, data: { companyName, body } }, 200);
+        // "Last updated" comes from the version REGISTRY, never from the config
+        // row's own timestamp: the registry is the only thing that knows a save
+        // changed the text rather than some neighbouring setting. Null until the
+        // tenant has published once, and the page then says nothing rather than
+        // inventing a date.
+        const latest = await c.var.services.legalVersion.latest(row.id, doc);
+        return c.json({ success: true as const, data: {
+            companyName, body, lastUpdated: latest?.version ?? null,
+        } }, 200);
     })
     .openapi(brandAssetRoute, async (c) => {
-        const { key } = c.req.valid('query');
+        const { key, v } = c.req.valid('query');
         if (!c.env.PHOTOS) return c.notFound();
         // Public brand-asset endpoint may ONLY serve branding logos (never arbitrary
         // R2 objects). New layout: {tenantId}/branding/logo-{uuid}.{ext}; legacy:
@@ -112,11 +147,39 @@ const publicInspectorProfileRoutes = createApiRouter()
         if (!isServableBrandAsset(key)) return c.notFound();
         const obj = await r2Get(c.env.PHOTOS, key);
         if (!obj) return c.notFound();
-        const headers = new Headers();
-        headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
-        headers.set('Cache-Control', 'public, max-age=3600');
-        if (obj.httpEtag) headers.set('etag', obj.httpEtag);
-        return new Response(obj.body, { status: 200, headers });
+
+        // Serve-time downscale. This is what reaches the badges ALREADY in R2 —
+        // an upload-time rule only ever helps the next upload, and the 2 MB
+        // photograph somebody has already saved is the one costing every
+        // recipient of every email.
+        //
+        // FAILS OPEN IN EVERY DIRECTION: no variant asked for, no IMAGES
+        // binding, a vector, or a transform that throws — all serve the
+        // original. A badge that is larger than it needed to be is a cost; a
+        // badge that does not render is a broken document.
+        const variant = resolveBadgeVariant(v);
+        const images = imagesBinding(c.env);
+        if (variant && images && !isVectorBadge(obj.httpMetadata?.contentType)) {
+            try {
+                const out = await images.input(obj.body)
+                    .transform({ width: variant.width })
+                    .output({ format: variant.format });
+                const r = out.response();
+                const h = new Headers(r.headers);
+                // Immutable: the key carries a uuid, so a replaced badge is a
+                // new key. Longer than the original's hour for that reason.
+                h.set('Cache-Control', 'public, max-age=31536000, immutable');
+                return new Response(r.body, { status: 200, headers: h });
+            } catch (err) {
+                logger.warn('[brand-asset] badge transform failed — serving original', {
+                    key, variant: v, error: String(err),
+                });
+                const orig = await r2Get(c.env.PHOTOS, key);
+                if (!orig) return c.notFound();
+                return brandAssetResponse(orig);
+            }
+        }
+        return brandAssetResponse(obj);
     });
 
 export default publicInspectorProfileRoutes;

@@ -18,6 +18,7 @@ import { automationLogs } from '../../lib/db/schema';
 import { insertNotificationRow } from '../notification.service';
 import { nanoid } from 'nanoid';
 import { isStaffRecipient } from './shared';
+import { isPreferenceMuted, type PreferenceSubject } from '../../lib/notifications/preference-port';
 
 export interface NoticeHeaderInput {
     tenantId: string;
@@ -32,12 +33,22 @@ export interface NoticeHeaderInput {
     entityType?: string | null;
     entityId?: string | null;
     metadata?: Record<string, unknown> | null;
+    /**
+     * A `NOTIFICATION_CLASSES` id. When given, the recipient's in-app
+     * preference is consulted before the header is written — the notice IS the
+     * in-app delivery, so withholding it means not writing the row.
+     *
+     * Absent ⇒ unclassified ⇒ always written, matching the email boundary's
+     * posture: a send that cannot say what it is must never be silenced by
+     * guesswork.
+     */
+    classId?: string | undefined;
 }
 
 // Accept the D1 drizzle instance or the better-sqlite3 test db — same builder surface.
 type AnyDb = { insert: (...args: never[]) => unknown };
 
-export async function insertNoticeHeader(rawDb: AnyDb, input: NoticeHeaderInput): Promise<string> {
+export async function insertNoticeHeader(rawDb: AnyDb, input: NoticeHeaderInput): Promise<string | null> {
     const userId = input.userId ?? null;
     const contactId = input.contactId ?? null;
     if ((userId === null) === (contactId === null)) {
@@ -47,6 +58,22 @@ export async function insertNoticeHeader(rawDb: AnyDb, input: NoticeHeaderInput)
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = rawDb as any;
+
+    // The recipient's own kill switch, sharing the decision with the email
+    // boundary rather than restating it — the required check in particular
+    // must not exist in two places, or the screen's promise and the send
+    // path's behaviour can drift apart. FAIL-OPEN on a lookup error: a failed
+    // query must never be the reason a notice was not written.
+    if (input.classId) {
+        const subject: PreferenceSubject = userId
+            ? { kind: 'user', id: userId }
+            : { kind: 'contact', id: contactId! };
+        let muted = false;
+        try {
+            muted = await isPreferenceMuted(db, input.tenantId, input.classId, 'in_app', [subject]);
+        } catch { muted = false; }
+        if (muted) return null;
+    }
     const id = nanoid();
     // The row write itself belongs to NotificationService — one owner for this
     // table (lint:provider-helpers). What stays here is what a header MEANS:
@@ -97,6 +124,12 @@ export async function createHeadersForInsertedLogs(
      * single title for the whole firing would silently pick one of them.
      */
     wordingFor: (automationId: string | null) => NoticeWording,
+    /**
+     * The notification class for one rule's notice — per-RULE for the same
+     * reason `wordingFor` is: two rules on one event are two different things
+     * to have a preference about.
+     */
+    classFor: (automationId: string | null) => string | undefined,
     inserted: Array<{ id: string; automationId: string | null; sendAt: Date | number;
         recipientContactId: string | null; recipientRoleKey: string | null }>,
 ): Promise<void> {
@@ -116,6 +149,7 @@ export async function createHeadersForInsertedLogs(
     }
     for (const g of groups.values()) {
         const wording = wordingFor(g.automationId);
+        const classId = classFor(g.automationId);
         const noticeId = await insertNoticeHeader(db, {
             tenantId: ctx.tenantId,
             userId: g.userId,
@@ -127,7 +161,16 @@ export async function createHeadersForInsertedLogs(
             entityType: 'inspection',
             entityId: ctx.inspectionId,
             metadata: g.automationId ? { automationId: g.automationId } : null,
+            ...(classId ? { classId } : {}),
         });
+        if (noticeId === null) {
+            // The recipient switched this off. The notice IS the in-app
+            // delivery, so there is nothing to link — record WHY rather than
+            // leaving a pending row that never resolves.
+            await db.update(automationLogs).set({ status: 'skipped', error: 'muted by recipient' })
+                .where(inArray(automationLogs.id, g.ids));
+            continue;
+        }
         await db.update(automationLogs).set({ noticeId })
             .where(inArray(automationLogs.id, g.ids));
     }

@@ -9,6 +9,7 @@ import type { EmailIdentityConfig } from './sender-identity';
 import type { TemplateOverride } from '../email-templates/types';
 import { resolveEmailProvider, coerceEmailByoProvider, type EmailByoProvider } from './resolve-provider';
 import { buildEmailSuppression } from './suppression';
+import { buildNotificationPreferences } from '../notifications/preference-port';
 import { logger } from '../logger';
 import { ResendProvider } from './providers/resend';
 import { RecordingEmailProvider } from './providers/recording';
@@ -185,6 +186,13 @@ export function assembleTenantEmailService(
     const suppression = meterTenantId
         ? buildEmailSuppression(env.DB, meterTenantId)
         : undefined;
+    // The recipient's own kill switch, under the SAME guard: it needs a tenant
+    // to scope the subject lookup, and without one it could only ever match the
+    // wrong person. A send with no tenant context is therefore ungated, which
+    // is the safe direction — it goes out.
+    const preferences = meterTenantId
+        ? buildNotificationPreferences(env.DB, meterTenantId)
+        : undefined;
 
     // TEST-ONLY email sink (E2E). Capture every message to KV instead of
     // sending, so E2E can read back links it cannot see from the browser (the
@@ -203,7 +211,7 @@ export function assembleTenantEmailService(
         );
     }
 
-    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider, suppression, quota);
+    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider, suppression, quota, preferences);
 }
 
 /**

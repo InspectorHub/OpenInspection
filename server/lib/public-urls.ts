@@ -41,9 +41,13 @@ export function reportUrl(host: string, tenantSlug: string, inspectionId: string
  */
 export async function buildRenderReportUrl(
     host: string, tenantSlug: string, inspectionId: string, secret: string,
+    versionNumber?: number,
 ): Promise<string> {
     const base = reportUrl(host, tenantSlug, inspectionId); // no query
-    const token = await signRenderToken(inspectionId, secret);
+    // `versionNumber` names a PUBLISHED version, and the page then renders that
+    // version's snapshot instead of live tables. It travels inside the signed
+    // render token, never as a query param — see render-token.ts.
+    const token = await signRenderToken(inspectionId, secret, undefined, versionNumber);
     return `${base}?render=${encodeURIComponent(token)}`;
 }
 

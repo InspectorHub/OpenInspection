@@ -89,6 +89,16 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // the subject's rows (via contacts.email), not a column to null.
     { table: 'inspection_people', column: 'contact_id', category: 'user.contact.email', action: 'delete' },
 
+    // ── notification_preferences (orphan cleanup) ─────────────────────────────
+    // No PII of its own — an answer to "send me this or don't", keyed on the
+    // contact id. Ids are REUSED after an erasure, so a surviving row hands the
+    // next person at that id the erased subject's mute settings: silently, and
+    // in the direction that withholds mail nobody asked to withhold. Deleted
+    // BEFORE the contacts delete, via the same contact-id resolution.
+    // Staff rows (`subject_kind = 'user'`) are untouched — employees are not
+    // consumer data subjects (see ERASURE_OUT_OF_SCOPE below).
+    { table: 'notification_preferences', column: 'subject_id', category: 'user.contact.email', action: 'delete' },
+
     // ── invoices (#88) ────────────────────────────────────────────────────────
     // The money record is the tenant's ledger (P-4 authority chain) and stays;
     // the denormalized client identity is nulled in place. Rows are located by
@@ -185,4 +195,12 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'contact_role_profiles', column: 'email_template_id',        reason: 'template reference, not personal data' },
     { table: 'sms_consent_log',       column: 'recipient_type',           reason: 'role-kind enum, not personal data' },
     { table: 'report_versions',       column: 'signature',                reason: 'report-content integrity seal, not personal data' },
+    // The tenant's own published Privacy / Terms. `body_snapshot` is the
+    // company's prose, not a data subject's data, and the row's whole purpose is
+    // to be immutable — erasing it would destroy the record of what a document
+    // said at a date, which is the one thing it exists to answer. Listed rather
+    // than left silent because the PII heuristic does not flag any column here,
+    // and silence is not the same as a decision.
+    { table: 'tenant_legal_versions', column: 'body_snapshot',            reason: 'company-authored policy text, not personal data of any data subject' },
+    { table: 'tenant_legal_versions', column: 'published_by_user_id',     reason: 'staff author reference — not consumer-DSAR scope' },
 ];

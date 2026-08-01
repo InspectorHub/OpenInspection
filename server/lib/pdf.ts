@@ -35,7 +35,10 @@ import { logger } from './logger';
  * so previously content-hashed PDFs (rendered under the old gated path)
  * re-render under the new mechanism.
  */
-export const RENDER_VERSION = 'r10';
+// r11 — the footer licence now comes from the inspector's credential row.
+// Bumped so cached PDFs are re-rendered instead of serving a footer built from
+// a column that no longer exists.
+export const RENDER_VERSION = 'r11';
 
 /**
  * Backoff before the single pass-2 retry when Browser Rendering rate-limits the

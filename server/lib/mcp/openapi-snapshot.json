@@ -634,6 +634,108 @@
     "description": "Perform mass operations on multiple inspections. (PATCH /bulk, inspections domain)."
   },
   {
+    "operationId": "bulkSaveAgentNotificationPreferences",
+    "method": "PUT",
+    "pathTemplate": "/api/agent/notification-preferences/bulk",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "enable",
+              "disable",
+              "reset"
+            ],
+            "description": "enable/disable every cell in scope; reset clears them back to defaults."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms",
+              "in_app"
+            ],
+            "description": "Limit to one channel (a column)."
+          },
+          "classId": {
+            "type": "string",
+            "description": "Limit to one notification (a row)."
+          },
+          "companyId": {
+            "type": "string",
+            "description": "Tenant id to apply this to. Required unless scope is \"all\"."
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "company",
+              "all"
+            ],
+            "description": "\"all\" applies to every linked company."
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    },
+    "summary": "Change a whole row, column or grid at a company",
+    "description": "Applies one action to every cell in scope at one company, or at every company linked to this agent. Channels a notification never uses are skipped, and always-sent notifications are never touched."
+  },
+  {
+    "operationId": "bulkSaveNotificationPreferences",
+    "method": "PUT",
+    "pathTemplate": "/api/notification-preferences/bulk",
+    "scopes": [
+      "write"
+    ],
+    "tag": "notifications",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "enable",
+              "disable",
+              "reset"
+            ],
+            "description": "enable/disable every cell in scope; reset clears them back to defaults."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms",
+              "in_app"
+            ],
+            "description": "Limit to one channel (a column). Omit with classId for everything."
+          },
+          "classId": {
+            "type": "string",
+            "description": "Limit to one notification (a row)."
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    },
+    "summary": "Change a whole row, column or the entire grid",
+    "description": "Applies one action to every cell in scope: a row (one notification), a column (one channel), or everything. Channels a notification never uses are skipped, and always-sent notifications are never touched."
+  },
+  {
     "operationId": "cancelInspection",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/cancel",
@@ -6731,6 +6833,33 @@
     "description": "Auto-generated placeholder for geocodeBooking (GET /geocode, bookings domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "getAgentNotificationPreferences",
+    "method": "GET",
+    "pathTemplate": "/api/agent/notification-preferences",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "companyId",
+          "in": "query",
+          "required": false,
+          "description": "Which company to read. Defaults to the first.",
+          "schema": {
+            "type": "string",
+            "description": "Which company to read. Defaults to the first."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "What each company sends this agent, and what they can switch off",
+    "description": "Lists the companies this agent is currently bound to and returns the notification screen for one of them. Channels a class never uses are reported as \"unavailable\", which is not the same as \"off\"."
+  },
+  {
     "operationId": "getAgentProfile",
     "method": "GET",
     "pathTemplate": "/api/agent/profile",
@@ -7435,6 +7564,20 @@
     "description": "Returns the authenticated user's editable profile fields (name, phone, license, slug, photo URL)."
   },
   {
+    "operationId": "getNotificationPreferences",
+    "method": "GET",
+    "pathTemplate": "/api/notification-preferences",
+    "scopes": [],
+    "tag": "notifications",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "What we send this reader, and what they can switch off",
+    "description": "Returns the notifications addressed to the signed-in reader, split into the ones that cannot be switched off and the ones they choose. Channels a class never uses are reported as \"unavailable\", which is not the same as \"off\"."
+  },
+  {
     "operationId": "getPublicBrand",
     "method": "GET",
     "pathTemplate": "/api/public/brand/{tenant}",
@@ -7476,6 +7619,16 @@
           "schema": {
             "type": "string",
             "description": "R2 object key under the branding/ prefix."
+          }
+        },
+        {
+          "name": "v",
+          "in": "query",
+          "required": false,
+          "description": "Render variant: email | reportSignature | reportCover. Badges are drawn at 28-40px but stored at whatever was uploaded, so this serves a size the surface can use. Omitted or unrecognised serves the original, never an error.",
+          "schema": {
+            "type": "string",
+            "description": "Render variant: email | reportSignature | reportCover. Badges are drawn at 28-40px but stored at whatever was uploaded, so this serves a size the surface can use. Omitted or unrecognised serves the original, never an error."
           }
         }
       ],
@@ -8500,6 +8653,66 @@
     "description": "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against."
   },
   {
+    "operationId": "grantAgentSmsConsent",
+    "method": "PUT",
+    "pathTemplate": "/api/agent/notification-preferences/sms-consent",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "type": "string",
+            "description": "Tenant id to resume at. Required unless scope is \"all\"."
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "company",
+              "all"
+            ],
+            "description": "\"all\" resumes at every company currently linked to this agent."
+          },
+          "disclosureVersion": {
+            "type": "integer",
+            "description": "Ignored for an agent: implied consent has nothing to disclose."
+          }
+        }
+      }
+    },
+    "summary": "Turn text messages back on at one company",
+    "description": "Withdraws an earlier stop at one company, or at every linked company. Agents are implied, so this records a resume under recipient_type agent — never consumer opt-in evidence."
+  },
+  {
+    "operationId": "grantStaffSmsConsent",
+    "method": "PUT",
+    "pathTemplate": "/api/notification-preferences/sms-consent",
+    "scopes": [
+      "write"
+    ],
+    "tag": "notifications",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "disclosureVersion": {
+            "type": "integer",
+            "description": "Required for an express grant; ignored for an implied resume."
+          }
+        }
+      }
+    },
+    "summary": "Turn text messages back on for this reader",
+    "description": "Appends a granted row for the signed-in staff member. Staff are implied, so this withdraws an earlier stop rather than capturing consent — recorded under recipient_type staff so it never counts as consumer opt-in evidence."
+  },
+  {
     "operationId": "importContacts",
     "method": "POST",
     "pathTemplate": "/api/contacts/import",
@@ -9502,7 +9715,7 @@
       "body": null
     },
     "summary": "List editable email templates",
-    "description": "Returns all 17 editable email templates merged with the tenant's saved overrides. The password-reset template (non-editable) is excluded."
+    "description": "Returns the editable email templates merged with the tenant's saved overrides. Non-editable, platform-owned templates (password reset, usage-quota notices) are excluded."
   },
   {
     "operationId": "listEventTypes",
@@ -14237,11 +14450,6 @@
             "maxLength": 30,
             "description": "Contact phone number for the inspector profile"
           },
-          "licenseNumber": {
-            "type": "string",
-            "maxLength": 50,
-            "description": "Professional inspector license or certification number"
-          },
           "signatureEnabled": {
             "type": "boolean",
             "description": "Whether the inspector business-card footer is added to outbound emails"
@@ -14258,7 +14466,7 @@
       }
     },
     "summary": "Update current user profile",
-    "description": "Partially updates the authenticated user's profile (name, phone, licenseNumber). DB-12: slug is frozen for inspectors — the field is silently stripped if sent. Agent slugs use POST /api/agent/profile."
+    "description": "Partially updates the authenticated user's profile (name, phone). DB-12: slug is frozen for inspectors — the field is silently stripped if sent. Agent slugs use POST /api/agent/profile."
   },
   {
     "operationId": "patchTenantAttentionThreshold",
@@ -14358,6 +14566,60 @@
     "description": "Archives the notice for this recipient. Never a row deletion, and never a write to automation_logs: a recipient tidying their own inbox cannot edit the sending company's delivery record, which the inspector's Outbox keeps forever."
   },
   {
+    "operationId": "portalBulkSaveNotificationPreferences",
+    "method": "PUT",
+    "pathTemplate": "/api/portal/{tenant}/notification-preferences/bulk",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "enable",
+              "disable",
+              "reset"
+            ],
+            "description": "enable/disable every cell in scope; reset clears them back to defaults."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms",
+              "in_app"
+            ],
+            "description": "Limit to one channel (a column)."
+          },
+          "classId": {
+            "type": "string",
+            "description": "Limit to one notification (a row)."
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    },
+    "summary": "Change a whole row, column or the entire grid",
+    "description": "Applies one action to every cell in scope, against every contact row this session resolves to. Channels a notification never uses are skipped, and always-sent notifications are never touched."
+  },
+  {
     "operationId": "portalExchangeToken",
     "method": "GET",
     "pathTemplate": "/api/portal/{tenant}/exchange",
@@ -14401,6 +14663,67 @@
     },
     "summary": "Upgrade a per-inspection access token into a portal session",
     "description": "Exchanges a persistent per-(recipient, inspection) access token (the same family used by the public report links) for a __Host-portal_session cookie, so a client arriving from an email CTA lands in the portal already authenticated. Asserts the resolved grant tenant matches the path tenant AND the role currently grants selfRetrieveReport (client/co_client by default, and agent). SECURITY: an agent-kind role NEVER receives the session cookie — it gets `agent: true` and no Set-Cookie, so its report token can never unlock the client hub."
+  },
+  {
+    "operationId": "portalGetNotificationPreferences",
+    "method": "GET",
+    "pathTemplate": "/api/portal/{tenant}/notification-preferences",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "What this company sends you, and what you can switch off",
+    "description": "Returns the notifications addressed to the signed-in recipient in this tenant, split into the ones that cannot be switched off and the ones they choose. Channels a class never uses are reported as \"unavailable\", which is not the same as \"off\"."
+  },
+  {
+    "operationId": "portalGrantSmsConsent",
+    "method": "PUT",
+    "pathTemplate": "/api/portal/{tenant}/notification-preferences/sms-consent",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "disclosureVersion": {
+            "type": "integer",
+            "description": "The version of the disclosure that was on screen when they agreed."
+          }
+        },
+        "required": [
+          "disclosureVersion"
+        ]
+      }
+    },
+    "summary": "Record that this reader agreed to receive texts",
+    "description": "Appends a granted row to the SMS consent ledger, stamped with the disclosure the reader saw, their ip and their user agent. A separate route from the preference writes because it is a legal record, not a setting."
   },
   {
     "operationId": "portalInspectionObserve",
@@ -14683,6 +15006,14 @@
             "type": "string",
             "format": "email",
             "description": "Recipient email address requesting a portal magic-link."
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "portal",
+              "notifications"
+            ],
+            "description": "Where the magic-link should land. `portal` (default) = the inspections list; `notifications` = the notification settings page, for a reader arriving from the privacy policy or terms."
           }
         },
         "required": [
@@ -14692,6 +15023,57 @@
     },
     "summary": "Request a portal magic-link by email",
     "description": "Requests a no-password magic-link for the unified client portal. ALWAYS returns 200 with { sent: true } regardless of whether the email has any access grant, to prevent account enumeration. When the email owns a live client/co_client access token in this tenant, an email containing a signed magic-link is sent."
+  },
+  {
+    "operationId": "portalSaveNotificationPreference",
+    "method": "PUT",
+    "pathTemplate": "/api/portal/{tenant}/notification-preferences",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (resolves the tenant from the URL path).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (resolves the tenant from the URL path)."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "classId": {
+            "type": "string",
+            "description": "The notification class being changed, e.g. review-request."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms",
+              "in_app"
+            ],
+            "description": "Which channel this choice applies to."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "True to receive it again; false to switch it off."
+          }
+        },
+        "required": [
+          "classId",
+          "channel",
+          "enabled"
+        ]
+      }
+    },
+    "summary": "Switch one notification on or off for one channel",
+    "description": "Records one explicit choice against every contact row this session resolves to in this tenant. A choice that matches the class default deletes the row rather than storing it."
   },
   {
     "operationId": "postIntegrationSecrets",
@@ -16031,6 +16413,60 @@
     "description": "Revokes an OAuth grant. Self-path revokes the caller's own grant; admin path (?admin=1) allows owner or manager to revoke any tenant member's grant with full audit logging."
   },
   {
+    "operationId": "saveAgentNotificationPreference",
+    "method": "PUT",
+    "pathTemplate": "/api/agent/notification-preferences",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "classId": {
+            "type": "string",
+            "description": "The notification class being changed, e.g. agent-new-referral."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms",
+              "in_app"
+            ],
+            "description": "Which channel this choice applies to."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "True to receive it; false to switch it off."
+          },
+          "companyId": {
+            "type": "string",
+            "description": "Tenant id to apply this to. Required unless scope is \"all\"."
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "company",
+              "all"
+            ],
+            "description": "\"all\" applies the choice to every company currently linked to this agent."
+          }
+        },
+        "required": [
+          "classId",
+          "channel",
+          "enabled"
+        ]
+      }
+    },
+    "summary": "Switch a notification on or off at one company",
+    "description": "Records one explicit choice against the agent's contact row at one company, or at every company currently linked to them when scope is \"all\". A choice that matches the class default deletes the row rather than storing it."
+  },
+  {
     "operationId": "saveEmailTemplate",
     "method": "PUT",
     "pathTemplate": "/api/admin/email-templates/{trigger}",
@@ -16058,6 +16494,48 @@
     },
     "summary": "Save email template override",
     "description": "Saves a tenant override for an editable email template. Required templates cannot be disabled. Only known block keys are accepted."
+  },
+  {
+    "operationId": "saveNotificationPreference",
+    "method": "PUT",
+    "pathTemplate": "/api/notification-preferences",
+    "scopes": [
+      "write"
+    ],
+    "tag": "notifications",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "classId": {
+            "type": "string",
+            "description": "The notification class being changed, e.g. review-request."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms",
+              "in_app"
+            ],
+            "description": "Which channel this choice applies to: email, sms or in_app."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "True to receive it again (clears the row); false to switch it off."
+          }
+        },
+        "required": [
+          "classId",
+          "channel",
+          "enabled"
+        ]
+      }
+    },
+    "summary": "Switch one notification on or off for one channel",
+    "description": "Records one explicit choice. Turning something back ON deletes the row rather than storing a row that restates the default. A class that is always sent is refused."
   },
   {
     "operationId": "saveUserDefaultSignature",
@@ -19678,7 +20156,6 @@
           "label": {
             "type": "string",
             "maxLength": 120,
-            "default": "",
             "description": "Human-readable credential label shown on reports, e.g. \"InterNACHI Certified Professional Inspector\"."
           },
           "memberNumber": {
@@ -19775,11 +20252,6 @@
             "type": "string",
             "maxLength": 30,
             "description": "Contact phone number; included on reports if set."
-          },
-          "licenseNumber": {
-            "type": "string",
-            "maxLength": 50,
-            "description": "Inspector license number; printed on reports as a credential."
           }
         },
         "description": "TODO describe schema field for the OpenInspection MCP integration"

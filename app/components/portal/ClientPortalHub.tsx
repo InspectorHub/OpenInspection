@@ -17,7 +17,10 @@ export type HubSection =
   | "progress"
   | "messages"
   | "repair"
-  | "documents";
+  | "documents"
+  // Reached from the BELL, never from navItems() below: the eight tabs are
+  // facts about this inspection and this is a fact about the reader.
+  | "notifications";
 
 export interface HubLinkCtx {
   tenant: string;

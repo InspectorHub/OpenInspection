@@ -324,19 +324,16 @@ describe('AgentService.updateProfile — A2', () => {
         svc = new AgentService({} as D1Database);
     });
 
-    it('persists slug + notification prefs', async () => {
-        await svc.updateProfile(AGENT_USER, {
-            slug: 'jane',
-            notifyOnReferral: true,
-            notifyOnReport: false,
-            notifyOnPaid: true,
-        });
+    it('persists the profile fields it is given', async () => {
+        // Notification preferences used to be part of this patch, as three
+        // booleans on `users`. They now live in `notification_preferences` and
+        // are written by their own route — see
+        // `tests/unit/notifications/preferences-api.spec.ts`.
+        await svc.updateProfile(AGENT_USER, { slug: 'jane', name: 'Jane R.' });
         const row = await testDb.select().from(schema.users)
             .where(eq(schema.users.id, AGENT_USER)).get();
         expect(row?.slug).toBe('jane');
-        expect(row?.notifyOnReferral).toBe(true);
-        expect(row?.notifyOnReport).toBe(false);
-        expect(row?.notifyOnPaid).toBe(true);
+        expect(row?.name).toBe('Jane R.');
     });
 
     it('rejects slug taken by another global agent user', async () => {
@@ -347,11 +344,14 @@ describe('AgentService.updateProfile — A2', () => {
     });
 
     it('does not write fields that were not provided', async () => {
+        // A patch names what changed. A later call that names something else
+        // must leave the first alone — otherwise editing a display name would
+        // silently drop the referral link the slug backs.
         await svc.updateProfile(AGENT_USER, { slug: 'jane' });
-        await svc.updateProfile(AGENT_USER, { notifyOnPaid: true });
+        await svc.updateProfile(AGENT_USER, { name: 'Jane R.' });
         const row = await testDb.select().from(schema.users)
             .where(eq(schema.users.id, AGENT_USER)).get();
         expect(row?.slug).toBe('jane');
-        expect(row?.notifyOnPaid).toBe(true);
+        expect(row?.name).toBe('Jane R.');
     });
 });

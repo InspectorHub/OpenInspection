@@ -224,6 +224,7 @@ import type { AuthService } from '../services/auth.service';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
 import type { BookingService, AvailabilityService } from '../services/booking.service';
 import type { BrandingService } from '../services/branding.service';
+import type { LegalVersionService } from '../services/legal-version.service';
 import type { EmailService } from '../services/email.service';
 import type { InspectionService } from '../services/inspection.service';
 import type { TeamService } from '../services/team.service';
@@ -273,6 +274,8 @@ export interface AppServices {
     outbox?: UserSyncOutbox | undefined;
     booking: BookingService;
     branding: BrandingService;
+    /** Immutable version rows for the tenant's own Privacy / Terms (design 6A.3). */
+    legalVersion: LegalVersionService;
     email: EmailService;
     inspection: InspectionService;
     team: TeamService;

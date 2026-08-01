@@ -5,7 +5,6 @@ const STUB_INSPECTOR = {
     name: 'Mike Reynolds',
     email: 'mike@acme.test',
     phone: '(303) 555-0142',
-    licenseNumber: 'TX-INSP-9001',
     slug: 'mike',
     tenantSlug: 'acme',
 };
@@ -106,5 +105,79 @@ describe('EmailService — signature footer (Sprint B-4a + B-4c)', () => {
         await svc.sendReportReady('client@example.com', '1 Main St', 'https://r.example/abc');
         expect(sent[0]?.html).not.toContain('Mike Reynolds');
         expect(sent[0]?.html).not.toContain('/book/');
+    });
+});
+
+/**
+ * Credentials on the SEND path, not just in the preview.
+ *
+ * `inspectorSignature()` has rendered credential badges since Spec B and no
+ * caller ever supplied any, so the feature was wired and dead: every recipient
+ * got the legacy license line while Settings → Profile promised badges "shown on
+ * your reports, emails, and booking page". The resolvers now populate them.
+ *
+ * THE ASSERTION THAT MATTERS IS THE ABSOLUTE URL. A spec that only checked
+ * "credentials were passed" would pass while every recipient saw a broken
+ * image: the stored `imageUrl` is root-relative (`/api/public/brand-asset?…`),
+ * and a relative src inside an email resolves against the recipient's mail
+ * client, which is nowhere.
+ */
+describe('EmailService — credential badges reach the recipient', () => {
+    let svc: EmailService;
+    let sent: SentCall[];
+
+    const WITH_CREDENTIALS = {
+        ...STUB_INSPECTOR,
+        credentials: [
+            { label: 'InterNACHI Certified', memberNumber: 'NACHI-22', imageUrl: '/api/public/brand-asset?key=t1%2Fcred%2Flogo.png' },
+            { label: 'Licensed home inspector', memberNumber: 'TX-9001', imageUrl: null },
+        ],
+    };
+
+    beforeEach(() => {
+        const fixture = makeService();
+        svc = fixture.svc;
+        sent = fixture.sent;
+    });
+
+    it('renders the badge image as an ABSOLUTE url against the deployment host', async () => {
+        await svc.sendReportReady('client@example.com', '1 Main St', 'https://r.example/abc', WITH_CREDENTIALS, HOST);
+        const html = sent[0]?.html ?? '';
+        expect(html).toMatch(/<img[^>]+src="https:\/\/app\.inspectorhub\.io\/api\/public\/brand-asset/);
+        // The negative half: no `src="/…"` anywhere in the signature, which is
+        // what shipping the stored value verbatim would produce.
+        expect(html).not.toMatch(/<img[^>]+src="\/api\/public/);
+    });
+
+    it('asks for the EMAIL badge variant, not the stored original', async () => {
+        await svc.sendReportReady('client@example.com', '1 Main St', 'https://r.example/abc', WITH_CREDENTIALS, HOST);
+        const html = sent[0]?.html ?? '';
+        // Badges are stored at whatever was uploaded — up to 2 MB — and drawn
+        // here at 28px. Without the variant the recipient downloads the whole
+        // thing to render a chip the height of a line of text, on every open.
+        // `&amp;`, not `&` — the whole src goes through escapeHtml, which is the
+        // correct encoding for an attribute and what every mail client decodes.
+        // Asserting the raw ampersand here would fail against correct output.
+        expect(html).toContain('&amp;v=email');
+        // PNG, because Outlook draws with Word's engine and shows a broken-image
+        // box for WebP. The variant name is what carries that decision.
+        expect(html).toMatch(/<img[^>]+src="https:\/\/app\.inspectorhub\.io\/api\/public\/brand-asset[^"]*&amp;v=email"/);
+    });
+
+    it('renders a text-only credential too, so a blocked image never loses it', async () => {
+        await svc.sendReportReady('client@example.com', '1 Main St', 'https://r.example/abc', WITH_CREDENTIALS, HOST);
+        const html = sent[0]?.html ?? '';
+        // Mail clients block remote images by default. A credential that exists
+        // only as an <img> is a credential most recipients never see.
+        expect(html).toContain('InterNACHI Certified #NACHI-22');
+        expect(html).toContain('Licensed home inspector #TX-9001');
+    });
+
+    it('still sends a clean signature for an inspector with no credentials', async () => {
+        await svc.sendReportReady('client@example.com', '1 Main St', 'https://r.example/abc',
+            { ...STUB_INSPECTOR, credentials: [] }, HOST);
+        const html = sent[0]?.html ?? '';
+        expect(html).toContain('Mike Reynolds');
+        expect(html).not.toContain('<img');
     });
 });

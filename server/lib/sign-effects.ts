@@ -162,7 +162,7 @@ async function buildSignedConfirmation(
     inspectorEmail: string | null;
     sigInspector: {
         name: string | null; email: string | null; phone: string | null;
-        licenseNumber: string | null; slug: string | null;
+        slug: string | null;
     } | undefined;
 }> {
     const baseUrl = (c.env.APP_BASE_URL || '').replace(/\/$/, '') || (() => {
@@ -192,7 +192,6 @@ async function buildSignedConfirmation(
         name: inspectorRow.name ?? null,
         email: inspectorRow.email ?? null,
         phone: inspectorRow.phone ?? null,
-        licenseNumber: inspectorRow.licenseNumber ?? null,
         slug: inspectorRow.slug ?? null,
     } : undefined;
 

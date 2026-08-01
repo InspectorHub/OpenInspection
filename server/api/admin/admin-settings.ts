@@ -18,6 +18,7 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { getBaseUrl, resolveTenantSlug } from '../../lib/url';
 import { Errors } from '../../lib/errors';
+import { logger } from '../../lib/logger';
 import { resolveTenantLegalUrls, type LegalMode } from '../../lib/legal-links';
 import {
     AttentionThresholdsSchema,
@@ -611,6 +612,34 @@ const adminSettingsRoutes = createApiRouter()
             return c.json({ success: true as const, data: { ok: true as const } }, 200);
         }
         await c.var.services.branding.updateBranding(tenantId, update);
+
+        // A publish is recorded AFTER the write succeeds, and only for a body
+        // that actually changed (the service compares the content hash and
+        // no-ops on a match). Recording before the write would register a
+        // version of text that may never have gone live; recording on every
+        // PATCH would mint a version each time a tenant saved an unrelated
+        // setting, and a registry that grows a row per form submission stops
+        // meaning "the document changed" almost immediately.
+        //
+        // Non-fatal by design: the version row is evidence about a save, not
+        // part of it. Failing the settings save because the historian fell over
+        // would lose the change the tenant actually asked for.
+        for (const doc of ['privacy', 'terms'] as const) {
+            const key = doc === 'privacy' ? 'privacyBody' : 'termsBody';
+            if (update[key] === undefined) continue;
+            try {
+                await c.var.services.legalVersion.recordPublish({
+                    tenantId,
+                    doc,
+                    body: (update[key] as string | null) ?? null,
+                    userId: c.get('user')?.sub ?? null,
+                });
+            } catch (err) {
+                logger.error('[legal] failed to record a published version', { doc },
+                    err instanceof Error ? err : undefined);
+            }
+        }
+
         auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
             metadata: update,
         });

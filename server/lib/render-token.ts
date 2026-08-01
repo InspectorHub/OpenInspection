@@ -34,14 +34,24 @@ async function hmacB64(secret: string, msg: string): Promise<string> {
   return base64Url(new Uint8Array(sig));
 }
 
-interface RenderPayload { i: string; e: number; } // inspectionId, exp epoch ms
+// inspectionId, exp epoch ms, and — when the caller is rendering a SPECIFIC
+// published version — that version number. `v` rides inside the HMAC body
+// rather than as a query param precisely because it changes what the page
+// renders: a client who could append `&v=1` to a report link could ask the
+// renderer for a version they were never sent.
+interface RenderPayload { i: string; e: number; v?: number; }
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
 
 export async function signRenderToken(
   inspectionId: string, secret: string, ttlMs: number = DEFAULT_TTL_MS,
+  versionNumber?: number,
 ): Promise<string> {
-  const payload: RenderPayload = { i: inspectionId, e: Date.now() + ttlMs };
+  const payload: RenderPayload = {
+    i: inspectionId,
+    e: Date.now() + ttlMs,
+    ...(typeof versionNumber === 'number' ? { v: versionNumber } : {}),
+  };
   const body64 = base64Url(encoder.encode(JSON.stringify(payload)));
   const sig = await hmacB64(secret, body64);
   return `${body64}.${sig}`;
@@ -49,7 +59,7 @@ export async function signRenderToken(
 
 export async function verifyRenderToken(
   token: string, secret: string,
-): Promise<{ inspectionId: string } | null> {
+): Promise<{ inspectionId: string; versionNumber?: number } | null> {
   if (!token || typeof token !== 'string') return null;
   const parts = token.split('.');
   if (parts.length !== 2) return null;
@@ -62,5 +72,8 @@ export async function verifyRenderToken(
   try { payload = JSON.parse(base64UrlDecode(body64)) as RenderPayload; } catch { return null; }
   if (!payload || typeof payload.i !== 'string' || typeof payload.e !== 'number') return null;
   if (payload.e < Date.now()) return null;
-  return { inspectionId: payload.i };
+  return {
+    inspectionId: payload.i,
+    ...(typeof payload.v === 'number' ? { versionNumber: payload.v } : {}),
+  };
 }

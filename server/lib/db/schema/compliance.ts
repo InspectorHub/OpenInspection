@@ -63,16 +63,47 @@ export const smsDisclosureVersions = sqliteTable('sms_disclosure_versions', {
 export const smsConsentLog = sqliteTable('sms_consent_log', {
     id:                text('id').primaryKey(),
     tenantId:          text('tenant_id').notNull(),
-    contactId:         text('contact_id').notNull(),   // the contact the consent attaches to
-    recipientType:     text('recipient_type', { enum: ['client', 'agent', 'other'] }).notNull(),
+    /**
+     * The contact this consent attaches to — NULL when the subject is a staff
+     * `users` row (see `subjectKind` below). Kept alongside the subject pair
+     * rather than retired because `idx_sms_consent_contact` and every existing
+     * reader use it, and a consent ledger is the wrong place to do a rename.
+     */
+    contactId:         text('contact_id'),
+    /**
+     * The BASIS the recipient was reachable under, for a carrier audit.
+     *
+     * `staff` is internal-operational: an employee under account/employment
+     * terms, never consumer consent. It is a separate value precisely so a
+     * staff STOP can be recorded without polluting the consumer evidence the
+     * ISV filing rests on — see docs/superpowers/specs/2026-07-30-sms-consent-isv-strategy.md.
+     */
+    recipientType:     text('recipient_type', { enum: ['client', 'agent', 'other', 'staff'] }).notNull(),
     action:            text('action', { enum: ['granted', 'revoked'] }).notNull(),
     disclosureVersion: integer('disclosure_version').notNull(),
-    capturedVia:       text('captured_via', { enum: ['booking_form', 'optin_link', 'admin'] }).notNull(),
+    // `settings_page` is a grant made inline on the notifications screen, with
+    // the disclosure rendered there. Type-layer only — the DDL is plain text,
+    // so widening this costs no migration.
+    capturedVia:       text('captured_via', { enum: ['booking_form', 'optin_link', 'admin', 'settings_page'] }).notNull(),
     ip:                text('ip'),
     userAgent:         text('user_agent'),
     createdAt:         integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    /**
+     * WHO the consent is about, generalised beyond `contacts`.
+     *
+     * Staff are `users` rows and have no contact, so a ledger keyed only on
+     * `contact_id` could not record their STOP at all. Mirrors the
+     * `notification_preferences` subject pair deliberately: one shape for "a
+     * person, of either kind", rather than a second XOR of nullable columns.
+     *
+     * Appended at the END — a column inserted mid-table makes drizzle-kit
+     * rebuild the whole thing, and this one holds legal evidence.
+     */
+    subjectKind:       text('subject_kind', { enum: ['contact', 'user'] }).notNull().default('contact'),
+    subjectId:         text('subject_id').notNull().default(''),
 }, (t) => [
     index('idx_sms_consent_contact').on(t.tenantId, t.contactId, t.createdAt),
+    index('idx_sms_consent_subject').on(t.tenantId, t.subjectKind, t.subjectId, t.createdAt),
 ]);
 
 // SMS provider compliance state — one row per tenant, tracks Twilio (or

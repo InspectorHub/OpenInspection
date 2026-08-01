@@ -6,6 +6,7 @@ import { createHeadersForInsertedLogs, type NoticeWording } from './notice-heade
 import { logger } from '../../lib/logger';
 import { createOiTemplateStore } from './template-store';
 import { resolveRuleRecipients, type ResolvedRecipient } from './recipients';
+import { automationClassId } from '../../lib/notifications/automation-classes';
 import { interpolate } from './shared';
 import type { AutomationChannel, RecipientKind, Constructor, TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
@@ -181,9 +182,19 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                         });
                     }
                     const fallback: NoticeWording = { title: this.titleFor(ctx.triggerEvent, insp), body: null };
+                    // The class comes from the RULE, like the wording — two rules
+                    // on one event are two different things to have a preference
+                    // about, so a per-firing class would be wrong for the same
+                    // reason a per-firing title was.
+                    const classByRule = new Map<string, string>();
+                    for (const rule of filteredRules) {
+                        const cls = automationClassId(rule);
+                        if (cls) classByRule.set(rule.id, cls);
+                    }
                     await createHeadersForInsertedLogs(
                         db, ctx,
                         (automationId) => (automationId && wordingByRule.get(automationId)) || fallback,
+                        (automationId) => (automationId ? classByRule.get(automationId) : undefined),
                         inserted,
                     );
                 } catch (err) {

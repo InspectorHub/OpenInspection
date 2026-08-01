@@ -84,3 +84,6 @@ export { reportSignoff, psqResponses, documentReviewItems } from './pca-complian
 // Commercial PCA Phase W — async .docx export status row (R2 key + lifecycle).
 export { reportExports } from './report-export';
 export type { ReportExport, NewReportExport } from './report-export';
+// Recipient notification preferences — one answer per (subject, class, channel).
+export { notificationPreferences } from './notification-preferences';
+export type { NotificationPreference, NewNotificationPreference } from './notification-preferences';

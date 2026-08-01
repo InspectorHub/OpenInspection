@@ -52,6 +52,13 @@ import {
   type InvoiceLoaderResult,
   type AgreementLoaderResult,
 } from "~/lib/section-loaders";
+import {
+  bulkPortalNotificationChoice,
+  grantPortalSmsConsent,
+  loadNotificationsSection,
+  savePortalNotificationChoice,
+  type NotificationsLoaderResult,
+} from "~/lib/portal-notification-preferences";
 import { loadAgentReportContext, type AgentReportContext } from "~/lib/agent-report-context";
 import { resolvePortalSession } from "~/lib/portal-exchange";
 import {
@@ -132,8 +139,13 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   let repair: RepairLoaderResult | null = null;
   let invoice: InvoiceLoaderResult | null = null;
   let agreement: AgreementLoaderResult | null = null;
+  let notifications: NotificationsLoaderResult | null = null;
 
-  if (section === "documents") {
+  if (section === "notifications") {
+    // Not about the inspection at all — the reader arrived from the bell, and
+    // the setting covers everything this company sends them.
+    notifications = await loadNotificationsSection(context, tenant, cookieForApi);
+  } else if (section === "documents") {
     // Client documents (unified portal section ⑦) — fetch using the SAME cookie
     // value used for the overview call. Best-effort: a non-OK response → empty.
     documents = [];
@@ -213,7 +225,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 
   // Step 5 — render the hub.
   return new Response(
-    JSON.stringify({ overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement, agentReport, notices: noticesPayload }),
+    JSON.stringify({ overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement, agentReport, notices: noticesPayload, notifications }),
     {
       headers: {
         "Content-Type": "application/json",
@@ -241,6 +253,25 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 
   // C3 — the Notices bell's writes. The session cookie travels explicitly
   // because the typed client does not forward the browser's.
+  if (intent === "notification-sms-grant") {
+    const r = await grantPortalSmsConsent(context, tenant, request, formData);
+    return { ...r, intent };
+  }
+
+  if (intent === "notification-bulk") {
+    const r = await bulkPortalNotificationChoice(
+      context, tenant, request.headers.get("cookie") ?? "", formData,
+    );
+    return { ...r, intent };
+  }
+
+  if (intent === "notification-preference") {
+    const r = await savePortalNotificationChoice(
+      context, tenant, request.headers.get("cookie") ?? "", formData,
+    );
+    return { ...r, intent };
+  }
+
   const noticeResult = await handlePortalNoticeIntent(
     api, tenant, request.headers.get("cookie") ?? "", intent,
     String(formData.get("noticeId") ?? ""),
@@ -259,7 +290,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function PortalInspection() {
-  const { overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement, agentReport, notices } = useLoaderData<typeof loader>() as {
+  const { overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement, agentReport, notices, notifications } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
     ctx: { tenant: string; inspectionId: string; token: string; signerToken: string | null };
     section: HubSection;
@@ -272,6 +303,7 @@ export default function PortalInspection() {
     agreement: AgreementLoaderResult | null;
     agentReport: AgentReportContext | null;
     notices: PortalNoticesPayload;
+    notifications: NotificationsLoaderResult | null;
   };
   const revalidator = useRevalidator();
   const [searchParams] = useSearchParams();
@@ -369,6 +401,7 @@ export default function PortalInspection() {
       docError={docError}
       onUpload={onUpload}
       onDelete={onDelete}
+      notifications={notifications}
     />
   );
 
@@ -383,7 +416,12 @@ export default function PortalInspection() {
       onSignOut={isAgent ? undefined : () => void signOut(tenant)}
       bellSlot={
         isAgent ? undefined : (
-          <PortalNoticeBell notices={notices.notices} unread={notices.unread} ctx={ctx} />
+          <PortalNoticeBell
+            notices={notices.notices}
+            unread={notices.unread}
+            ctx={ctx}
+            settingsHref={hubSectionNavHref("notifications", ctx)}
+          />
         )
       }
     />

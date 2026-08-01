@@ -141,6 +141,8 @@ describe('staff recipients (B2)', () => {
             db,
             { tenantId: T, inspectionId: INSP, triggerEvent: 'report.published' },
             () => ({ title: 'Report published', body: null }),
+            // No class: this fixture exercises the XOR, not the preference gate.
+            () => undefined,
             [{ id: 'log-staff-1', automationId: null, sendAt: new Date(0), recipientContactId: 'u-owner', recipientRoleKey: STAFF_ROLE_KEY }],
         );
 

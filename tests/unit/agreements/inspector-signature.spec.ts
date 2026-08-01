@@ -5,9 +5,13 @@ const FULL_USER = {
     name: 'Mike Reynolds',
     email: 'mike@acme.test',
     phone: '(303) 555-0142',
-    licenseNumber: 'TX-INSP-9001',
     slug: 'mike',        // retained for API stability (DB-12); no longer used for URL
     tenantSlug: 'acme',
+    // The licence is a CREDENTIAL now, sorted ahead of voluntary badges by the
+    // backfill. `users` carries no licence column.
+    credentials: [
+        { label: 'Licensed home inspector', memberNumber: 'TX-INSP-9001', imageUrl: null },
+    ],
 } as const;
 
 const HOST = 'app.inspectorhub.io';
@@ -53,6 +57,36 @@ describe('inspectorSignature — Sprint B-4 / DB-12', () => {
         expect(sig.text).not.toContain('<img');
     });
 
+    /**
+     * The settings PREVIEW asks for relative badge URLs, and gets them.
+     *
+     * `host` at that call site comes from the in-process API request, which in
+     * local dev reports a different port than the browser is on — so every
+     * badge resolved to a port with nothing behind it and rendered as a broken
+     * image, on the one surface whose job is showing what the recipient sees.
+     * A relative URL resolves against whatever origin is serving the page, in
+     * dev and in production alike.
+     */
+    it('leaves badge URLs relative when assetOrigin is empty', () => {
+        const sig = inspectorSignature({
+            ...FULL_USER,
+            credentials: [{ label: 'InterNACHI CPI', memberNumber: '12345', imageUrl: '/api/public/brand-asset?key=k.png' }],
+        }, HOST, { assetOrigin: '' });
+        expect(sig.html).toContain('<img src="/api/public/brand-asset');
+        expect(sig.html).not.toContain(`<img src="https://${HOST}`);
+        // The LINK stays absolute even so: it is displayed text, and what it
+        // has to show is the URL the recipient will actually be given.
+        expect(sig.html).toContain(`href="https://${HOST}/book/acme"`);
+    });
+
+    it('absolutizes badges by default — a mail client resolves nothing for us', () => {
+        const sig = inspectorSignature({
+            ...FULL_USER,
+            credentials: [{ label: 'InterNACHI CPI', memberNumber: '12345', imageUrl: '/api/public/brand-asset?key=k.png' }],
+        }, HOST);
+        expect(sig.html).toContain(`<img src="https://${HOST}/api/public/brand-asset`);
+    });
+
     it('omits the credential block entirely when there are no credentials', () => {
         const sig = inspectorSignature(FULL_USER, HOST);
         expect(sig.html).not.toContain('brand-asset');
@@ -72,8 +106,8 @@ describe('inspectorSignature — Sprint B-4 / DB-12', () => {
         expect(sig.text).not.toContain('Book again');
     });
 
-    it('omits license line when licenseNumber is null', () => {
-        const sig = inspectorSignature({ ...FULL_USER, licenseNumber: null }, HOST);
+    it('omits the licence line when there is no licence credential', () => {
+        const sig = inspectorSignature({ ...FULL_USER, credentials: [] }, HOST);
         expect(sig.html).not.toContain('Licensed home inspector');
         expect(sig.text).not.toContain('Licensed home inspector');
     });
@@ -89,10 +123,10 @@ describe('inspectorSignature — Sprint B-4 / DB-12', () => {
         const sig = inspectorSignature(FULL_USER, HOST);
         expect(sig).toMatchInlineSnapshot(`
           {
-            "html": "<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-family:-apple-system,Segoe UI,sans-serif;font-size:13px;line-height:1.5;color:#0f172a"><strong>— Mike Reynolds</strong><br><span style="color:#475569">Licensed home inspector · TX-INSP-9001</span><br>📞 <a href="tel:+13035550142">(303) 555-0142</a> ✉️ <a href="mailto:mike@acme.test">mike@acme.test</a><br>Book again: <a href="https://app.inspectorhub.io/book/acme">https://app.inspectorhub.io/book/acme</a></div>",
+            "html": "<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-family:-apple-system,Segoe UI,sans-serif;font-size:13px;line-height:1.5;color:#0f172a"><strong>— Mike Reynolds</strong><br><span style="color:#475569">Licensed home inspector #TX-INSP-9001</span><br>📞 <a href="tel:+13035550142">(303) 555-0142</a> ✉️ <a href="mailto:mike@acme.test">mike@acme.test</a><br>Book again: <a href="https://app.inspectorhub.io/book/acme">https://app.inspectorhub.io/book/acme</a></div>",
             "text": "--
           — Mike Reynolds
-          Licensed home inspector · TX-INSP-9001
+          Licensed home inspector #TX-INSP-9001
           (303) 555-0142 · mike@acme.test
           Book again: https://app.inspectorhub.io/book/acme",
           }
