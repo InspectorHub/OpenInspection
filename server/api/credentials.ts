@@ -83,7 +83,7 @@ const uploadRouteDef = createRoute(withMcpMetadata({
   middleware: [OWN] as const,
   request: {
     params: z.object({ id: z.string().min(1).describe('The credential id whose badge image is being uploaded or replaced.') }),
-    body: { content: { 'multipart/form-data': { schema: z.object({ image: z.any().openapi({ type: 'string', format: 'binary' }).describe('The badge image file (png, svg, jpeg, or webp; up to 2MB).') }) } } },
+    body: { content: { 'multipart/form-data': { schema: z.object({ image: z.any().openapi({ type: 'string', format: 'binary' }).describe('The badge image file (png, svg, or webp — formats that carry transparency; up to 2MB).') }) } } },
   },
   responses: { 200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ imageUrl: z.string() }) }) } }, description: 'Uploaded' } },
   operationId: 'uploadInspectorCredentialImage',
@@ -91,7 +91,17 @@ const uploadRouteDef = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 
 const MAX_BADGE_BYTES = 2_000_000;
-const ALLOWED = ['image/png', 'image/svg+xml', 'image/jpeg', 'image/webp'];
+/**
+ * Badge formats that can carry an ALPHA CHANNEL. JPEG is deliberately absent.
+ *
+ * A badge is composited over the report cover strip and beside the signature,
+ * both of which sit on the report's own surface — so a format with no
+ * transparency renders the association logo inside a white rectangle, and in
+ * dark mode that rectangle is the most prominent thing on the page. The
+ * cropper already bakes PNG on the way out, so this is the guard for anything
+ * reaching the endpoint directly (API tokens, `extended` tier).
+ */
+const ALLOWED = ['image/png', 'image/svg+xml', 'image/webp'];
 
 const credentialsRoutes = createApiRouter()
   .openapi(listRoute, async (c) => {
@@ -133,7 +143,7 @@ const credentialsRoutes = createApiRouter()
     const file = formData.get('image');
     if (!file || !(file instanceof File)) throw Errors.BadRequest('No image file provided.');
     if (file.size > MAX_BADGE_BYTES) throw Errors.BadRequest('image > 2MB');
-    if (!ALLOWED.includes(file.type)) throw Errors.BadRequest('image must be png, svg, jpeg, or webp');
+    if (!ALLOWED.includes(file.type)) throw Errors.BadRequest('image must be png, svg, or webp — a badge needs a transparent background');
     const imageUrl = await c.var.services.credentials.uploadImage(tenantId, userId, id, file);
     auditFromContext(c, 'credential.image_uploaded', 'credential', { entityId: id });
     return c.json({ success: true as const, data: { imageUrl } }, 200);

@@ -30,6 +30,13 @@ const MIGRATION_FILE = readdirSync(MIGRATION_DIR)
 if (!MIGRATION_FILE) throw new Error('license_number backfill migration not found in migrations/');
 const MIGRATION = readFileSync(join(MIGRATION_DIR, MIGRATION_FILE), 'utf8');
 
+const DROP_FILE = readdirSync(MIGRATION_DIR)
+    .filter((f) => f.endsWith('_drop_users_license_number.sql'))
+    .sort()
+    .at(-1);
+if (!DROP_FILE) throw new Error('license_number drop migration not found in migrations/');
+const DROP = readFileSync(join(MIGRATION_DIR, DROP_FILE), 'utf8');
+
 const T = '00000000-0000-0000-0000-0000000000a1';
 const T2 = '00000000-0000-0000-0000-0000000000a2';
 
@@ -38,15 +45,28 @@ describe('license_number backfill migration', () => {
     let sqlite: BetterSqlite3.Database;
 
     const run = () => sqlite.exec(MIGRATION);
+    const drop = () => sqlite.exec(DROP);
     const creds = () => db.select().from(schema.inspectorCredentials).all();
+    const licenseColumnExists = () =>
+        (sqlite.prepare(
+            "SELECT count(*) AS n FROM pragma_table_info('users') WHERE name = 'license_number'",
+        ).get() as { n: number }).n > 0;
 
+    /**
+     * `users.license_number` is GONE from the drizzle schema — the drop migration
+     * below is what removed it. So the fixture re-creates it by hand and inserts
+     * through raw SQL: this pair of migrations still runs, in this order, on every
+     * fresh database, and a spec that could only describe the world after the drop
+     * could not test the backfill at all.
+     */
     async function user(id: string, licenseNumber: string | null, opts: { tenantId?: string; deletedAt?: Date } = {}) {
         await db.insert(schema.users).values({
             id, tenantId: opts.tenantId ?? T, email: id + '@acme.test', name: id,
-            passwordHash: 'x', role: 'inspector', licenseNumber,
+            passwordHash: 'x', role: 'inspector',
             ...(opts.deletedAt ? { deletedAt: opts.deletedAt } : {}),
             createdAt: new Date(),
         });
+        sqlite.prepare('UPDATE users SET license_number = ? WHERE id = ?').run(licenseNumber, id);
     }
 
     beforeEach(async () => {
@@ -54,6 +74,7 @@ describe('license_number backfill migration', () => {
         db = fix.db;
         sqlite = fix.sqlite;
         await setupSchema(fix.sqlite);
+        sqlite.exec('ALTER TABLE users ADD COLUMN license_number text');
         for (const id of [T, T2]) {
             await db.insert(schema.tenants).values({
                 id, name: 'Co ' + id, slug: 'co-' + id.slice(-2), status: 'active',
@@ -152,13 +173,37 @@ describe('license_number backfill migration', () => {
         expect(ids.every((id) => /^[0-9a-f-]{36}$/.test(id))).toBe(true);
     });
 
-    it('leaves users.license_number in place', async () => {
-        // Deliberately NOT dropped in the same migration: the column is still
-        // the only source of the license line on the email signature and the PDF
-        // footer, and D1 cannot drop a column on an FK-referenced table anyway.
+    it('drops the column only AFTER the credential row exists', async () => {
+        // The order is the whole safety property. Backfill first, drop second:
+        // reverse them and every licensed inspector loses their licence with no
+        // way back, because the column was the only place it lived.
         await user('u1', 'TX-9001');
         run();
-        const u = await db.select().from(schema.users).where(eq(schema.users.id, 'u1')).get();
-        expect(u!.licenseNumber).toBe('TX-9001');
+        expect(creds()[0].memberNumber).toBe('TX-9001');
+
+        drop();
+        expect(licenseColumnExists()).toBe(false);
+        // The credential must survive the drop — it is the licence now.
+        expect(creds()[0].memberNumber).toBe('TX-9001');
+    });
+
+    it('drops the column in place, without rebuilding the FK-referenced table', async () => {
+        // A generated migration would have emitted the 12-step rebuild
+        // (CREATE __new_users / INSERT / DROP TABLE users / RENAME), and that
+        // `DROP TABLE` on a table six others reference is what loses rows on
+        // remote D1. SQLite's native DROP COLUMN keeps the table's identity, so
+        // the assertion that matters is that the other rows are still here.
+        await user('u1', 'TX-9001');
+        await user('u2', null);
+        run();
+        drop();
+
+        const rows = await db.select().from(schema.users).all();
+        expect(rows.map((r) => r.id).sort()).toEqual(['u1', 'u2']);
+        // Statements only — the migration's own comment NAMES the rebuild it is
+        // avoiding, so matching the raw file would match the explanation.
+        const statements = DROP.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n');
+        expect(/DROP TABLE/i.test(statements)).toBe(false);
+        expect(/ALTER TABLE `?users`? DROP COLUMN/i.test(statements)).toBe(true);
     });
 });

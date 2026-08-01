@@ -1,7 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, asc } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits } from '../../lib/db/schema';
-import { CredentialService, primaryLicenseOf, type RenderableCredential } from '../credential.service';
+import { CredentialService, type RenderableCredential } from '../credential.service';
+import { primaryLicenseOf } from '../../lib/credentials/primary';
 import { pinnedLead } from '../../lib/version-diff';
 import { loadPinnedSnapshot } from '../../lib/report-snapshot';
 import { buildUnitConditionMatrix, defectCountsByUnit } from '../../lib/unit-scope';
@@ -492,8 +493,8 @@ export class InspectionReportService extends InspectionSubService {
         // inspector the old number in the cover strip and the new one on the
         // signature block.
         //
-        // `users.license_number` is frozen; the licence is a credential row now,
-        // seeded ahead of the voluntary badges by the backfill.
+        // The licence is a credential row, seeded ahead of the voluntary badges
+        // by the backfill; `users` carries no licence column.
         const lead = pinnedLead(pinned);
         let inspectorName: string | null = null;
         let inspectorLicense: string | null = null;

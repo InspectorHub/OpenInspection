@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import { signRenderToken, verifyRenderToken } from '../../../server/lib/render-token';
 import { buildRenderReportUrl } from '../../../server/lib/public-urls';
 import { pinnedLead, type Snapshot } from '../../../server/lib/version-diff';
-import { primaryLicenseOf } from '../../../server/services/credential.service';
+import { primaryLicenseOf } from '../../../server/lib/credentials/primary';
 
 const SECRET = 'test-secret';
 const INSPECTION = 'insp-1';

@@ -4,6 +4,7 @@ import type { InferSelectModel } from 'drizzle-orm';
 import { inspectorCredentials } from '../lib/db/schema';
 import { r2Keys } from '../lib/r2-keys';
 import { Errors } from '../lib/errors';
+import { primaryLicenseOf } from '../lib/credentials/primary';
 
 export type InspectorCredential = InferSelectModel<typeof inspectorCredentials>;
 
@@ -16,25 +17,6 @@ export type InspectorCredential = InferSelectModel<typeof inspectorCredentials>;
  * `inspectorSignature()` does — because a relative path in an email resolves
  * against the recipient's mail client, which is nowhere.
  */
-/**
- * The LICENCE among a set of credentials, or null.
- *
- * A free function over the list rather than a method that queries, because two
- * callers need the same answer from two different SOURCES: the live report reads
- * current rows, and a pinned published version reads the ones its snapshot
- * froze. When the rule lived inside the DB method, the pinned path could not
- * reach it — so it called the live one, and a report ended up showing a frozen
- * badge strip beside a licence line resolved from today. Same document, two
- * numbers, for an inspector who had renewed.
- *
- * "First entry carrying a member number, in the inspector's own order" works
- * because the backfill seeds the licence at `sort_order = -1`; that sort order
- * was chosen for exactly this.
- */
-export function primaryLicenseOf(credentials: RenderableCredential[]): string | null {
-  return credentials.find((c) => (c.memberNumber ?? '').trim())?.memberNumber?.trim() || null;
-}
-
 export interface RenderableCredential {
   label: string;
   memberNumber: string | null;
@@ -87,11 +69,12 @@ export class CredentialService {
    * The inspector's LICENCE NUMBER, for the surfaces that render one string.
    *
    * The PDF footer prints `· Lic. <n>` and the report signature block carries a
-   * single licence — neither can show a list. `users.license_number` used to
-   * answer this; it is frozen, and the licence now lives as a credential row
-   * seeded at `sort_order = -1` by the backfill, which is exactly why that sort
-   * order was chosen rather than 0. So "first active credential carrying a
-   * member number, in the inspector's own order" IS the licence.
+   * single licence — neither can show a list. A dedicated `users` column used
+   * to answer this; it has been dropped, and the licence now lives as a
+   * credential row seeded at `sort_order = -1` by the backfill, which is
+   * exactly why that sort order was chosen rather than 0. So "first active
+   * credential carrying a member number, in the inspector's own order" IS the
+   * licence.
    *
    * Null when they have none, and the callers omit the line rather than
    * printing an empty one.

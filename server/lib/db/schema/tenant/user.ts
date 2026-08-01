@@ -18,14 +18,6 @@ export const users = sqliteTable('users', {
     passwordHash: text('password_hash').notNull(),
     name: text('name'),
     phone: text('phone'),
-    // -- DEAD (2026-08-01, retired in favour of inspector_credentials).
-    // The licence is a credential row now: the backfill seeded one per licensed
-    // user at sort_order -1, and every renderer reads
-    // `CredentialService.primaryLicenseNumber`. No live path reads or writes
-    // this column. Frozen rather than dropped per the Schema Rules — D1 cannot
-    // drop a column on an FK-referenced table, and the name must never be
-    // reused.
-    licenseNumber: text('license_number'),
     // Inspector avatar shown on the public company booking page (/book/:tenant).
     photoUrl: text('photo_url'),
     // Spec 5H D2 — saved signature used for auto-sign on publish + Settings prefill.

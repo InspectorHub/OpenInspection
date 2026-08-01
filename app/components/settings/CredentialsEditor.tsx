@@ -4,6 +4,7 @@
 // collapsed <details>. A solo inspector pasting one pre-composed badge strip
 // never touches a text field. No expiry input (Spec B §5).
 import { useState } from "react";
+import { IconButton } from "@core/shared-ui";
 import { LogoUploader } from "~/components/media-studio/LogoUploader";
 import { PhotoCropper } from "~/components/media-studio/PhotoCropper";
 import { BADGE_MAX_LONG_EDGE, isVectorImage, validateImageFile } from "~/lib/image-upload";
@@ -24,6 +25,7 @@ export function CredentialsEditor({
   onAdd,
   onUpdate,
   onDelete,
+  onReorder,
 }: {
   credentials: EditorCredential[];
   uploadingId: string | null;
@@ -40,6 +42,13 @@ export function CredentialsEditor({
   onAdd: () => void;
   onUpdate: (id: string, patch: { label?: string; memberNumber?: string }) => void;
   onDelete: (id: string) => void;
+  /**
+   * The full list in its new order. Emitting the whole order rather than a
+   * (id, direction) pair keeps the rule for turning positions into `sortOrder`
+   * in ONE place — the route — instead of splitting it across a component that
+   * knows the order and a handler that has to reconstruct it.
+   */
+  onReorder: (orderedIds: string[]) => void;
 }) {
   /** The row whose badge is being cropped, and the object URL it came from. */
   const [cropTarget, setCropTarget] = useState<{ id: string; url: string } | null>(null);
@@ -76,6 +85,21 @@ export function CredentialsEditor({
 
   const shownError = localError ?? uploadError;
 
+  /**
+   * ORDER IS THE CHOICE. The first credential carrying a badge is the one that
+   * stands beside the signature on every report (`primaryBadgeOf`), so moving a
+   * row is how an inspector picks it — there is no separate "primary" toggle to
+   * fall out of step with the list.
+   */
+  const primaryBadgeId = credentials.find((c) => c.imageUrl)?.id ?? null;
+
+  const move = (index: number, delta: number) => {
+    const next = [...credentials];
+    const [row] = next.splice(index, 1);
+    next.splice(index + delta, 0, row);
+    onReorder(next.map((c) => c.id));
+  };
+
   return (
     <section id="credentials" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4 scroll-mt-12">
       <div>
@@ -87,13 +111,49 @@ export function CredentialsEditor({
         <p className="text-[12px] text-ih-fg-4">{m.settings_profile_credentials_empty()}</p>
       )}
 
-      {credentials.map((c) => (
-        <div key={c.id} className="rounded-md border border-ih-border bg-ih-bg-muted/40 p-3 flex items-start gap-4">
+      {credentials.map((c, i) => (
+        <div key={c.id} className="rounded-md border border-ih-border bg-ih-bg-muted/40 p-3 flex items-start gap-3">
+          {/* Up/down rather than drag: this list is two to five rows, and
+              buttons work with a keyboard and with a gloved finger on the iPad
+              that the drag handle would not. Hidden entirely at one row, where
+              there is no order to express. */}
+          {credentials.length > 1 && (
+            <div className="flex flex-col gap-0.5 shrink-0 pt-0.5">
+              <IconButton
+                aria-label={m.settings_profile_credentials_move_up()}
+                title={m.settings_profile_credentials_move_up()}
+                disabled={i === 0}
+                onClick={() => move(i, -1)}
+                className="w-7 h-7"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+              </IconButton>
+              <IconButton
+                aria-label={m.settings_profile_credentials_move_down()}
+                title={m.settings_profile_credentials_move_down()}
+                disabled={i === credentials.length - 1}
+                onClick={() => move(i, 1)}
+                className="w-7 h-7"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </IconButton>
+            </div>
+          )}
           {/* The uploader's COMPACT size — its default is a wide row that needs
               more than this column has, and squeezing it collapsed the preview
               to a sliver with the button floating off-centre beside it. */}
           <div className="w-32 shrink-0 space-y-1.5">
             <LogoUploader size="compact" currentUrl={c.imageUrl} uploading={uploadingId === c.id} onSelect={(f) => onSelect(c.id, f)} />
+            {/* Says what the order DID, on the row it happened to. A paragraph
+                above the list would explain the same rule without ever showing
+                which credential it currently picked. */}
+            {c.id === primaryBadgeId && (
+              <p className="text-[11px] text-ih-fg-3 leading-tight">{m.settings_profile_credentials_primary_badge()}</p>
+            )}
             {shownError?.id === c.id && (
               <p role="alert" className="text-[11px] text-ih-bad-fg leading-tight">{shownError.message}</p>
             )}

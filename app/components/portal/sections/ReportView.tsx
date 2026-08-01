@@ -28,6 +28,7 @@ import { getSectionIcon, itemDrivesSummary } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
 import { CredentialBadges } from "./report/CredentialBadges";
 import { badgeUrl } from "../../../../server/lib/media/badge-variant";
+import { primaryBadgeOf } from "../../../../server/lib/credentials/primary";
 import { ReportDefectCard } from "./report/ReportDefectCard";
 import { PhotoAppendix } from "./report/PhotoAppendix";
 import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
@@ -772,8 +773,13 @@ export function ReportView(props: ReportViewProps) {
         </div>
       )}
 
-      {/* ── Signature block ──────────────────────────────────────────── */}
-      <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} timeZone={data.reportTimeZone} credentialBadgeUrl={badgeUrl(data.inspectorCredentials?.find((c) => c.imageUrl)?.imageUrl ?? null, "reportSignature")} />
+      {/* ── Signature block ──────────────────────────────────────────────
+          The cover strip above shows EVERY badge; this has room for one, and
+          `primaryBadgeOf` is where that choice is stated — first badge in the
+          inspector's own order, the same list they reorder in Licenses &
+          affiliations. It used to be an inline `.find()` here, which made the
+          answer an accident of sort order that nobody could aim at. */}
+      <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} timeZone={data.reportTimeZone} credentialBadgeUrl={badgeUrl(primaryBadgeOf(data.inspectorCredentials ?? []), "reportSignature")} />
 
       {/* ── Verification block ───────────────────────────────────────── */}
       <ReportVerificationBlock verification={data.verification} baseUrl={data.baseUrl} timeZone={data.reportTimeZone} />

@@ -20156,7 +20156,6 @@
           "label": {
             "type": "string",
             "maxLength": 120,
-            "default": "",
             "description": "Human-readable credential label shown on reports, e.g. \"InterNACHI Certified Professional Inspector\"."
           },
           "memberNumber": {

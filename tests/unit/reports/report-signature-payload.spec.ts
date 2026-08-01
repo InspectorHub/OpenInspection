@@ -34,7 +34,7 @@ async function seedBase(testDb: BetterSQLite3Database<typeof schema>) {
         role:         'inspector',
         createdAt:    new Date(),
     });
-    // The licence is a credential row now — `users.license_number` is frozen.
+    // The licence is a credential row now — `users` carries no licence column.
     // Seeded at sort_order -1, which is where the backfill puts it and why the
     // "first credential carrying a member number" rule finds the licence rather
     // than a voluntary badge.

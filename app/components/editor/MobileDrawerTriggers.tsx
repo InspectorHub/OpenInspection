@@ -1,6 +1,12 @@
 import { m } from "~/paraglide/messages";
 
-export type MobileDrawerId = 'sections' | 'items' | 'preview' | 'theme';
+/**
+ * `actions` has no trigger in this nav — it opens from the app bar's own
+ * "More actions" button, which is where a phone user already looks for the
+ * things that end a job (publish, sign, preview). Adding a fifth tab here
+ * would put the terminal action in the same row as the navigation.
+ */
+export type MobileDrawerId = 'sections' | 'items' | 'preview' | 'theme' | 'actions';
 
 export interface MobileDrawerTriggersProps {
     onOpen: (id: MobileDrawerId) => void;

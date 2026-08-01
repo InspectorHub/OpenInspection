@@ -35,9 +35,9 @@ import { logger } from './logger';
  * so previously content-hashed PDFs (rendered under the old gated path)
  * re-render under the new mechanism.
  */
-// r11 — the footer licence now comes from the inspector's credential row
-// rather than the retired `users.license_number`. Bumped so cached PDFs are
-// re-rendered instead of serving a footer built from a column nothing reads.
+// r11 — the footer licence now comes from the inspector's credential row.
+// Bumped so cached PDFs are re-rendered instead of serving a footer built from
+// a column that no longer exists.
 export const RENDER_VERSION = 'r11';
 
 /**

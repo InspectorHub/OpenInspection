@@ -8,7 +8,7 @@ const FULL_USER = {
     slug: 'mike',        // retained for API stability (DB-12); no longer used for URL
     tenantSlug: 'acme',
     // The licence is a CREDENTIAL now, sorted ahead of voluntary badges by the
-    // backfill. `users.license_number` is frozen and no longer rendered.
+    // backfill. `users` carries no licence column.
     credentials: [
         { label: 'Licensed home inspector', memberNumber: 'TX-INSP-9001', imageUrl: null },
     ],
@@ -110,19 +110,6 @@ describe('inspectorSignature — Sprint B-4 / DB-12', () => {
         const sig = inspectorSignature({ ...FULL_USER, credentials: [] }, HOST);
         expect(sig.html).not.toContain('Licensed home inspector');
         expect(sig.text).not.toContain('Licensed home inspector');
-    });
-
-    it('IGNORES the retired users.license_number entirely', () => {
-        // The stronger claim, and the one that matters during the transition: a
-        // caller that still passes the frozen column must not put a second
-        // licence line on the signature beside the credential one. Two sources
-        // for one line is how a recipient reads the licence twice.
-        const sig = inspectorSignature(
-            { ...FULL_USER, credentials: [], licenseNumber: 'TX-STALE-1' },
-            HOST,
-        );
-        expect(sig.html).not.toContain('TX-STALE-1');
-        expect(sig.text).not.toContain('TX-STALE-1');
     });
 
     it('omits everything when user has no fields at all', () => {

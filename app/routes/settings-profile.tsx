@@ -171,6 +171,25 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (fd.has("memberNumber")) patch.memberNumber = (fd.get("memberNumber") as string) || null;
     return credentialResult(await api.credentials[":id"].$patch({ param: { id }, json: patch }), intent);
   }
+  /**
+   * Reorder = choose. The list order decides the licence line AND the badge
+   * beside the signature (`primaryLicenseOf` / `primaryBadgeOf`), so this is
+   * not a cosmetic sort — it is how the inspector says which credential is
+   * theirs to lead with.
+   *
+   * Reindexes the WHOLE list rather than swapping two rows: every credential
+   * created before this control shipped sits at `sortOrder = 0`, and swapping
+   * two zeroes is a no-op that looks exactly like a broken button.
+   */
+  if (intent === "credential-reorder") {
+    const ids = String(fd.get("ids") ?? "").split(",").filter(Boolean);
+    if (!ids.length) return { success: false, error: m.settings_profile_error_reorder_failed(), intent };
+    const results = await Promise.all(
+      ids.map((id, i) => api.credentials[":id"].$patch({ param: { id }, json: { sortOrder: i } })),
+    );
+    const failed = results.find((r) => !r.ok);
+    return failed ? credentialResult(failed, intent) : { success: true, error: null, intent };
+  }
   if (intent === "credential-delete") {
     const id = fd.get("id") as string;
     return credentialResult(await api.credentials[":id"].$delete({ param: { id } }), intent);
@@ -295,6 +314,8 @@ export default function SettingsProfilePage() {
       { method: "post" },
     );
   const onCredDelete = (id: string) => credFetcher.submit({ intent: "credential-delete", id }, { method: "post" });
+  const onCredReorder = (orderedIds: string[]) =>
+    credFetcher.submit({ intent: "credential-reorder", ids: orderedIds.join(",") }, { method: "post" });
   const onCredUpload = (id: string, file: File) => {
     setUploadingCredId(id);
     setLastUploadCredId(id);
@@ -469,6 +490,7 @@ export default function SettingsProfilePage() {
         onAdd={onCredAdd}
         onUpdate={onCredUpdate}
         onDelete={onCredDelete}
+        onReorder={onCredReorder}
         onUpload={onCredUpload}
       />
 

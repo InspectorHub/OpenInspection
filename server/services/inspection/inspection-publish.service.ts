@@ -144,7 +144,7 @@ export class InspectionPublishService extends InspectionSubService {
             }).from(users)
                 .where(and(eq(users.id, insp.inspectorId), eq(users.tenantId, tenantId)))
                 .get();
-            // `users.license_number` is frozen; the licence is a credential row.
+            // The licence is a credential row — `users` carries no licence column.
             licenseNumber = await new CredentialService(this.db)
                 .primaryLicenseNumber(tenantId, insp.inspectorId);
         }

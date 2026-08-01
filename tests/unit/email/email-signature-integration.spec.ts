@@ -5,7 +5,6 @@ const STUB_INSPECTOR = {
     name: 'Mike Reynolds',
     email: 'mike@acme.test',
     phone: '(303) 555-0142',
-    licenseNumber: 'TX-INSP-9001',
     slug: 'mike',
     tenantSlug: 'acme',
 };

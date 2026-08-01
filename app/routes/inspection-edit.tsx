@@ -70,6 +70,7 @@ import { TagPickerModal } from "~/components/editor/TagPickerModal";
 import { useIsMobile } from "~/hooks/useBreakpoint";
 import { MobileAppBar } from "~/components/editor/MobileAppBar";
 import { MobileDrawerTriggers, type MobileDrawerId } from "~/components/editor/MobileDrawerTriggers";
+import { MobileFinishDrawer } from "~/components/editor/MobileFinishDrawer";
 import { MobileBottomDrawer } from "~/components/MobileBottomDrawer";
 import { BreadcrumbDropdown, type UnitScopeRow } from "~/components/editor/BreadcrumbDropdown";
 import { UnitsManager } from "~/components/editor/UnitsManager";
@@ -1756,6 +1757,98 @@ export default function InspectionEditPage() {
  /* Render */
  /* ---------------------------------------------------------------- */
 
+ /**
+  * The four dialogs that END a job: report settings, sign, the publish
+  * readiness gate, and publish itself.
+  *
+  * Held in a fragment rendered by BOTH the mobile and the desktop tree. They
+  * used to live only in the desktop one, below the `isMobile` early return —
+  * so on a phone there was no Publish, no Sign, and no way to reach them: the
+  * mobile app bar's own "More actions" button was a comment reading
+  * `future: open more menu`. An inspector could complete the entire
+  * walkthrough on the device they carry and then not finish it.
+  */
+ const finishActionsEl = (
+ <>
+ {/* Inspection settings sheet */}
+ <InspectionSettingsSheet
+ open={state.settingsOpen}
+ onClose={() => state.setSettingsOpen(false)}
+ inspectionId={String(state.inspection.id)}
+ // Template schema drives the whole editor state (frozen at mount in useInspection),
+ // so a template change requires a full route reload — this also fixes the same
+ // staleness for mid-inspection template switches, not just the empty case.
+ onTemplateApplied={() => window.location.reload()}
+ />
+ {/* Publish confirmation modal */}
+ <PublishModal
+ open={state.showPublishModal}
+ progress={{ rated: state.progress.rated, total: state.progress.total, pct: state.progress.pct }}
+ status={state.inspection.status as string}
+ publishError={publishError}
+ isSubmitting={publishFetcher.state !== "idle"}
+ onClose={() => { setPublishError(null); state.setShowPublishModal(false); }}
+ onPublish={(markComplete: boolean) => {
+ // Keep the modal open: the publish-result effect closes it on success
+ // and shows the real server reason inline on failure. `markComplete`
+ // also closes the order axis first (advisory — never blocks publish);
+ // patch status locally so the badge reflects it without a reload.
+ setPublishError(null);
+ if (markComplete) {
+ state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED }));
+ }
+ // The auto-sign choice rides ALONG WITH the publish, never beside it.
+ // It used to be a separate fetcher fired by the checkbox, racing this
+ // request: the publish handler re-reads the inspection row to decide
+ // whether to sign, and if the toggle had not landed yet it read the OLD
+ // value and published UNSIGNED. The flag still persisted, so the next
+ // publish signed — the worst shape for a bug like this, because the
+ // reader concludes they mis-clicked rather than that a report went out
+ // unsigned.
+ publishFetcher.submit(
+ {
+ intent: "publish",
+ autoSignOnPublish: String(autoSign),
+ ...(markComplete ? { markComplete: "true" } : {}),
+ },
+ { method: "post" },
+ );
+ }}
+ autoSign={autoSign}
+ onAutoSignToggle={handleAutoSignToggle}
+ />
+ {/* Inspector sign modal */}
+ <SignModal
+ open={signModalOpen}
+ onSubmit={handleSignSubmit}
+ onCancel={() => setSignModalOpen(false)}
+ failed={Boolean(signFetcher.data && !(signFetcher.data as { ok: boolean }).ok)}
+ />
+ {/* Publish gate modal */}
+ <PublishGateModal
+  open={showPublishGate}
+  readiness={publishReadiness}
+  onClose={() => setShowPublishGate(false)}
+  onProceed={() => {
+   // IA-7 warning mode — user acknowledged the soft gaps.
+   setPublishError(null);
+   setShowPublishGate(false);
+   state.setShowPublishModal(true);
+  }}
+  onJump={(b: PublishBlockingDefect) => {
+   state.selectSectionById(b.sectionId);
+   state.setActiveItemId(b.itemId);
+   setShowPublishGate(false);
+   setTimeout(() => {
+    const sel = b.missing[0] === 'trade' ? 'select' : 'input[type="text"]';
+    const el = document.querySelector<HTMLElement>(`[data-defect-id="${b.cannedId}"] ${sel}`);
+    if (el) el.focus();
+   }, 100);
+  }}
+ />
+ </>
+ );
+
  if (isMobile) {
  return (
  <div className="min-h-screen pb-14">
@@ -1769,7 +1862,7 @@ export default function InspectionEditPage() {
   if (state.activeItemId) { state.setActiveItemId(null); return; }
   navigate('/inspections');
  }}
- onMore={() => { /* future: open more menu */ }}
+ onMore={() => setMobileDrawer('actions')}
  />
  <main className="p-4">
  {emptyTemplateEl ?? (state.activeItemId ? (
@@ -1800,6 +1893,20 @@ export default function InspectionEditPage() {
  >
  {sideRailEl}
  </MobileBottomDrawer>
+ <MobileFinishDrawer
+ open={mobileDrawer === 'actions'}
+ onClose={() => setMobileDrawer(null)}
+ onPublish={() => void handlePublishClick()}
+ onSign={() => setSignModalOpen(true)}
+ onOpenSettings={() => state.setSettingsOpen(true)}
+ onFinishFieldwork={(state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null}
+ finishingFieldwork={completeFetcher.state !== "idle"}
+ onPreviewReport={
+  loaderData.tenantSlug
+  ? () => window.open(`/report-view/${loaderData.tenantSlug}/${state.inspection.id}`, "_blank", "noopener")
+  : null
+ }
+ />
  {/* Theme — narrow-screen home for the theme control the xl+ header shows
      inline, so the auto/light/dark/field preference is reachable on tablet
      and phone too. */}
@@ -1812,6 +1919,7 @@ export default function InspectionEditPage() {
   <ThemeSegmentControl />
  </div>
  </MobileBottomDrawer>
+ {finishActionsEl}
  </div>
  );
  }
@@ -2002,16 +2110,6 @@ export default function InspectionEditPage() {
   onCancel={structure.closeSaveTemplate}
  />
 
- {/* Inspection settings sheet */}
- <InspectionSettingsSheet
- open={state.settingsOpen}
- onClose={() => state.setSettingsOpen(false)}
- inspectionId={String(state.inspection.id)}
- // Template schema drives the whole editor state (frozen at mount in useInspection),
- // so a template change requires a full route reload — this also fixes the same
- // staleness for mid-inspection template switches, not just the empty case.
- onTemplateApplied={() => window.location.reload()}
- />
 
  {/* Media Studio — gallery "Set as cover" crop overlay */}
  {galleryCropSource && (
@@ -2038,43 +2136,6 @@ export default function InspectionEditPage() {
  onLeave={confirmLeave}
  />
 
- {/* Publish confirmation modal */}
- <PublishModal
- open={state.showPublishModal}
- progress={{ rated: state.progress.rated, total: state.progress.total, pct: state.progress.pct }}
- status={state.inspection.status as string}
- publishError={publishError}
- isSubmitting={publishFetcher.state !== "idle"}
- onClose={() => { setPublishError(null); state.setShowPublishModal(false); }}
- onPublish={(markComplete: boolean) => {
- // Keep the modal open: the publish-result effect closes it on success
- // and shows the real server reason inline on failure. `markComplete`
- // also closes the order axis first (advisory — never blocks publish);
- // patch status locally so the badge reflects it without a reload.
- setPublishError(null);
- if (markComplete) {
- state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED }));
- }
- // The auto-sign choice rides ALONG WITH the publish, never beside it.
- // It used to be a separate fetcher fired by the checkbox, racing this
- // request: the publish handler re-reads the inspection row to decide
- // whether to sign, and if the toggle had not landed yet it read the OLD
- // value and published UNSIGNED. The flag still persisted, so the next
- // publish signed — the worst shape for a bug like this, because the
- // reader concludes they mis-clicked rather than that a report went out
- // unsigned.
- publishFetcher.submit(
- {
- intent: "publish",
- autoSignOnPublish: String(autoSign),
- ...(markComplete ? { markComplete: "true" } : {}),
- },
- { method: "post" },
- );
- }}
- autoSign={autoSign}
- onAutoSignToggle={handleAutoSignToggle}
- />
 
  {/* #181 — Version history panel (collab Phase 4). Only reachable when the
      collabEditing flag is on (the trigger button is gated in EditorHeader).
@@ -2091,13 +2152,8 @@ export default function InspectionEditPage() {
  currentResults={state.results as unknown as ResultsProjection}
  />
 
- {/* Inspector sign modal */}
- <SignModal
- open={signModalOpen}
- onSubmit={handleSignSubmit}
- onCancel={() => setSignModalOpen(false)}
- failed={Boolean(signFetcher.data && !(signFetcher.data as { ok: boolean }).ok)}
- />
+
+ {finishActionsEl}
 
  {/* Comment library drawer */}
  <CommentLibraryDrawer
@@ -2149,28 +2205,6 @@ export default function InspectionEditPage() {
   onClose={() => setTagPickerOpen(false)}
  />
 
- {/* Publish gate modal */}
- <PublishGateModal
-  open={showPublishGate}
-  readiness={publishReadiness}
-  onClose={() => setShowPublishGate(false)}
-  onProceed={() => {
-   // IA-7 warning mode — user acknowledged the soft gaps.
-   setPublishError(null);
-   setShowPublishGate(false);
-   state.setShowPublishModal(true);
-  }}
-  onJump={(b: PublishBlockingDefect) => {
-   state.selectSectionById(b.sectionId);
-   state.setActiveItemId(b.itemId);
-   setShowPublishGate(false);
-   setTimeout(() => {
-    const sel = b.missing[0] === 'trade' ? 'select' : 'input[type="text"]';
-    const el = document.querySelector<HTMLElement>(`[data-defect-id="${b.cannedId}"] ${sel}`);
-    if (el) el.focus();
-   }, 100);
-  }}
- />
 
  {/* ------------------------------------------------------------ */}
  {/* Fixed top header with progress bar */}

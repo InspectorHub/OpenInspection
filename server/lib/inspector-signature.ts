@@ -23,13 +23,6 @@ export interface SignatureUser {
     email?: string | null;
     phone?: string | null;
     /**
-     * @deprecated FROZEN. `users.license_number` is retired — the licence is a
-     * credential row now and arrives in `credentials`. The field stays on the
-     * type only so a caller that still passes it does not fail to compile; it
-     * is not rendered. Remove once no caller sets it.
-     */
-    licenseNumber?: string | null;
-    /**
      * DB-12 / IA-26 — inspector booking slugs are retired. This field is
      * retained so existing callers do not need to change their call sites, but
      * the signature helper no longer uses it for the booking URL.

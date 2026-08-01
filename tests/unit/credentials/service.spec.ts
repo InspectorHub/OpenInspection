@@ -122,7 +122,7 @@ describe('CredentialService.listRenderable', () => {
  * are allowed to print.
  *
  * The PDF footer prints `· Lic. <n>` and the report signature block carries a
- * single licence. `users.license_number` used to answer this and is now frozen,
+ * single licence. A dedicated `users` column used to answer this and is gone,
  * so the answer comes from the credential the backfill seeded at
  * `sort_order = -1` — which is precisely why that sort order was chosen instead
  * of 0, and why this rule can be stated as "first active credential carrying a
