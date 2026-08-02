@@ -11,6 +11,7 @@ import { interpolate } from './shared';
 import type { AutomationChannel, RecipientKind, Constructor, TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
+import { m } from '../../lib/i18n/messages';
 
 /**
  * Trigger mixin: fan out pending automation_log rows when a domain event fires,
@@ -351,16 +352,32 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             return resolveRuleRecipients(this.db, rule, inspection, channel);
         }
 
+        /**
+         * The title STORED on a notice when a rule's template has no subject,
+         * or resolves to no template at all. Staff/ledger voice with the address
+         * — distinct from the recipient-voiced `notice_title_*` family that
+         * `app/lib/notice-view.ts` renders for types it recognises, which is why
+         * these carry the `comm_` prefix (same split as
+         * `comm_reason_sms_opt_out` vs `notice_reason_sms_opt_out`).
+         *
+         * Reading these through the catalogue does not yet make them render in
+         * the RECIPIENT's language — nothing resolves a recipient locale, and in
+         * a cron or queue context there is no request locale at all. It makes
+         * them reachable by a translator, which they were not before.
+         */
         protected titleFor(event: string, insp: typeof inspections.$inferSelect): string {
-            const addr = insp.propertyAddress || 'inspection';
+            const address = insp.propertyAddress || 'inspection';
             switch (event) {
-                case 'inspection.created':   return `New inspection scheduled — ${addr}`;
-                case 'inspection.confirmed': return `Inspection confirmed — ${addr}`;
-                case 'inspection.cancelled': return `Inspection cancelled — ${addr}`;
-                case 'report.published':     return `Report published — ${addr}`;
-                case 'invoice.created':      return `Invoice created — ${addr}`;
-                case 'payment.received':     return `Payment received — ${addr}`;
-                default:                     return `${event} — ${addr}`;
+                case 'inspection.created':   return m.comm_notice_title_inspection_created({ address });
+                case 'inspection.confirmed': return m.comm_notice_title_inspection_confirmed({ address });
+                case 'inspection.cancelled': return m.comm_notice_title_inspection_cancelled({ address });
+                case 'report.published':     return m.comm_notice_title_report_published({ address });
+                case 'invoice.created':      return m.comm_notice_title_invoice_created({ address });
+                case 'payment.received':     return m.comm_notice_title_payment_received({ address });
+                // Deliberately kept: a trigger can be added to the enum before a
+                // template exists for it, and a readable "<event> — <address>"
+                // beats an empty notice title. It is now translatable too.
+                default:                     return m.comm_notice_title_generic({ event, address });
             }
         }
 

@@ -93,6 +93,13 @@
   "notice_title_inspection_reminder": "Your inspection is coming up",
   "notice_title_agreement_signed": "Your inspection agreement is signed",
   "notice_title_manual_send": "A message from your inspector",
+  "comm_notice_title_inspection_created": "New inspection scheduled — {address}",
+  "comm_notice_title_inspection_confirmed": "Inspection confirmed — {address}",
+  "comm_notice_title_inspection_cancelled": "Inspection cancelled — {address}",
+  "comm_notice_title_report_published": "Report published — {address}",
+  "comm_notice_title_invoice_created": "Invoice created — {address}",
+  "comm_notice_title_payment_received": "Payment received — {address}",
+  "comm_notice_title_generic": "{event} — {address}",
   "notice_empty_body_staff": "When a booking comes in, an agreement is signed, or a payment lands, it shows up here.",
   "comm_reason_sms_opt_out": "Skipped — this person replied STOP. They can text START to opt back in.",
   "notice_reason_sms_opt_out": "You asked us to stop texting you. Text START to any of our messages to turn texts back on."
