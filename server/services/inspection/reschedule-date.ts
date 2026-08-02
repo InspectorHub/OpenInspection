@@ -6,8 +6,9 @@
  * forever — every downstream reader saw a timestamp diverging from the row's
  * own date.
  *
- * The one-time cleanup for rows that diverged before this shipped is
- * `scripts/backfill-scheduled-start.mjs` (same shift rule, dry-run first).
+ * A row that never had an instant at all — anything created outside the booking
+ * path — derives one from the time suffix on `date`, so the column stops
+ * depending solely on `fulfillBooking` being the writer.
  */
 import { and, eq } from 'drizzle-orm';
 import { inspections, tenantConfigs } from '../../lib/db/schema';
@@ -52,17 +53,35 @@ export async function datePatchValues(
         : body.date;
     const values: Record<string, unknown> = { ...body, date: dateValue };
 
-    const oldStart = toMs(row?.scheduledStartMs);
-    if (oldStart != null) {
+    let tzCache: string | undefined;
+    const tenantTz = async (): Promise<string> => {
+        if (tzCache) return tzCache;
         const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
             .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
-        const tz = resolveTenantTimeZone(tzRow?.defaultTimezone);
-        const newStartMs = wallClockToEpochMs(newCivil, epochMsToWallClockHm(oldStart, tz), tz);
+        tzCache = resolveTenantTimeZone(tzRow?.defaultTimezone);
+        return tzCache;
+    };
+
+    const oldStart = toMs(row?.scheduledStartMs);
+    // Two sources for the wall-clock to preserve: the existing instant when the
+    // row has one, otherwise the time suffix on `date`. Rows created outside the
+    // booking path only ever have the latter, and without this they stay NULL
+    // forever, permanently degrading conflict detection to the hour bucket.
+    const oldHm = oldStart != null
+        ? epochMsToWallClockHm(oldStart, await tenantTz())
+        : (oldDate.length > 10 ? oldDate.slice(11, 16) : null);
+
+    if (oldHm) {
+        const tz = await tenantTz();
+        const newStartMs = wallClockToEpochMs(newCivil, oldHm, tz);
         values.scheduledStartMs = new Date(newStartMs);
         const oldEnd = toMs(row?.scheduledEndMs);
         // End shifts by the same delta, so the booked duration survives even
-        // across a DST boundary.
-        if (oldEnd != null) values.scheduledEndMs = new Date(oldEnd + (newStartMs - oldStart));
+        // across a DST boundary. A row with no prior instant has no prior end
+        // either; leave it null rather than inventing a duration.
+        if (oldEnd != null && oldStart != null) {
+            values.scheduledEndMs = new Date(oldEnd + (newStartMs - oldStart));
+        }
     }
     return values;
 }
