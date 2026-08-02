@@ -469,6 +469,8 @@
   "settings_mcw_submitting": "Submitting…",
   "settings_mcw_start_provisioning": "Start provisioning",
   "settings_services_template_consequence": "Without a template, a customer who picks this service cannot book online.",
+  "settings_services_template_shared_one": "{name} also uses this template — an inspection with both generates two identical reports.",
+  "settings_services_template_shared_many": "{name} and {count} more use this template too — an inspection with several generates duplicate reports.",
   "settings_services_template_none_available": "No templates yet.",
   "settings_services_template_create_link": "Create a template",
   "settings_services_edit_heading": "Edit {name}",
