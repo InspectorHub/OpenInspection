@@ -18,6 +18,13 @@ export default defineConfig({
       // Workers-runtime tests (tests/workers/mcp/*) and production.
       '@cloudflare/workers-oauth-provider': path.resolve(__dirname, 'tests/unit/stubs/workers-oauth-provider.ts'),
       'agents/mcp': path.resolve(__dirname, 'tests/unit/stubs/agents-mcp.ts'),
+      // `server/lib/i18n/messages.ts` re-exports the compiled Paraglide
+      // catalogue, which lives under `app/`. The worker build resolves this
+      // through vite.config.ts's own `~` alias and the api tsc pass through
+      // tsconfig.api.json's `paths`; this is the third resolver that has to
+      // agree, and without it every api spec that reaches a server-side
+      // message fails to import rather than to assert.
+      '~': path.resolve(__dirname, 'app'),
     },
   },
   test: {
