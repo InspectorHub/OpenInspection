@@ -12,7 +12,7 @@
  *   4. Load the inspection via `services.inspection.getInspection(id, tenantId)`
  *      (tenant-scoped service call) — 404 if not found.
  *   5. Check that the caller is on the inspection (inspectorId /
- *      leadInspectorId / helperInspectorIds) — 403 otherwise.
+ *      the inspection's roster) — 403 otherwise.
  *
  * The WS upgrade route adds the `Upgrade: websocket` (426) check on top. All
  * routes forward to the INSPECTION_DOC DO keyed by `${tenantId}:${id}`,
@@ -30,6 +30,8 @@ import { logger } from '../../lib/logger';
 import { CollabRestoreRequestSchema, CollabSnapshotParamSchema } from '../../lib/validations/collab.schema';
 import type { HonoConfig } from '../../types/hono';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
+import { getInspectionRoster } from '../../lib/inspection/roster';
+import { getDrizzle } from '../../lib/route-helpers';
 
 /**
  * Result of the shared fail-closed auth: either an early `Response` (the caller
@@ -63,15 +65,11 @@ async function authorizeCollab(c: Context<HonoConfig>): Promise<AuthResult> {
     }
 
     // ── (4) Inspection lookup — tenant-scoped ─────────────────────────────────
-    let inspection: {
-        id:                 string;
-        inspectorId:        string | null;
-        leadInspectorId:    string | null;
-        helperInspectorIds: string;
-    };
+    // Called for the guard, not the row: it throws when the inspection does not
+    // exist OR belongs to another tenant, which is the 404 below. Who may edit
+    // comes from the roster in step 5.
     try {
-        const out = await c.var.services.inspection.getInspection(id, tenantId);
-        inspection = out.inspection;
+        await c.var.services.inspection.getInspection(id, tenantId);
     } catch (err) {
         logger.error(
             'collab: inspection lookup failed',
@@ -83,7 +81,8 @@ async function authorizeCollab(c: Context<HonoConfig>): Promise<AuthResult> {
 
     // ── (5) Edit-permission check (mirrors presence route) ────────────────────
     const userRole = c.get('userRole') as string | undefined;
-    const allowed = canAccessInspectionCollab(inspection, { id: userId, role: userRole ?? '' });
+    const roster = await getInspectionRoster(getDrizzle(c), tenantId, id);
+    const allowed = canAccessInspectionCollab(roster, { id: userId, role: userRole ?? '' });
 
     if (!allowed) {
         return { ok: false, response: new Response('forbidden', { status: 403 }) };

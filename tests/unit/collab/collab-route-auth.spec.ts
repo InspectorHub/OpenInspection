@@ -34,6 +34,21 @@ function makeMockDoNamespace(doFetchResponse?: Response) {
 
 // ── App builder ───────────────────────────────────────────────────────────────
 
+// The route now resolves who may edit from the ROSTER rather than from the
+// inspection row's lead/helper columns. Mock that one module: this spec's
+// subject is the route's 403/200 behaviour, not the SQL that fetches a roster
+// (which tests/unit/inspections/roster.spec.ts pins, including on the SQL).
+const getInspectionRoster = vi.fn();
+vi.mock('../../../server/lib/inspection/roster', () => ({
+    getInspectionRoster: (...args: unknown[]) => getInspectionRoster(...args),
+}));
+
+const member = (id: string) => ({ id, name: id, email: `${id}@example.com` });
+const rosterOf = (lead: string | null, helpers: string[] = []) => ({
+    lead: lead ? member(lead) : null,
+    helpers: helpers.map(member),
+});
+
 interface BuildAppOptions {
     /** If null, simulate no JWT (middleware never ran). */
     tenantId?: string | null;
@@ -47,6 +62,8 @@ interface BuildAppOptions {
         tenantId?: string;
     } | 'not_found';
     doNamespace?: ReturnType<typeof makeMockDoNamespace>;
+    /** Who the roster says works this inspection. */
+    roster?: { lead: string | null; helpers?: string[] };
 }
 
 function buildApp(opts: BuildAppOptions = {}) {
@@ -61,9 +78,26 @@ function buildApp(opts: BuildAppOptions = {}) {
             tenantId: 't1',
         },
         doNamespace,
+        roster,
     } = opts;
 
     const mockDo = doNamespace ?? makeMockDoNamespace();
+
+    // Default the roster from the legacy lead/helper override so each existing
+    // case keeps asserting the same thing it always did.
+    const legacyHelpers: string[] = (() => {
+        if (inspectionOverride === 'not_found') return [];
+        try { return JSON.parse(inspectionOverride.helperInspectorIds ?? '[]') as string[]; }
+        catch { return []; }
+    })();
+    const effectiveRoster = roster ?? {
+        lead: inspectionOverride === 'not_found'
+            ? null
+            : (inspectionOverride.leadInspectorId ?? inspectionOverride.inspectorId ?? null),
+        helpers: legacyHelpers,
+    };
+    getInspectionRoster.mockReset();
+    getInspectionRoster.mockResolvedValue(rosterOf(effectiveRoster.lead, effectiveRoster.helpers ?? []));
 
     // Build a fake inspection object from the override.
     const fakeInspection =
@@ -93,7 +127,7 @@ function buildApp(opts: BuildAppOptions = {}) {
     // Simulate what the global JWT middleware + DI middleware set.
     app.use('*', async (c, next) => {
         // Set env bindings before any handler sees it (mirrors repair-builder harness).
-        c.env = { INSPECTION_DOC: mockDo } as unknown as HonoConfig['Bindings'];
+        c.env = { INSPECTION_DOC: mockDo, DB: {} } as unknown as HonoConfig['Bindings'];
         if (tenantId !== null)  c.set('tenantId', tenantId);
         if (userId   !== null)  c.set('user', { sub: userId } as never);
         if (userRole)           c.set('userRole', userRole as never);
