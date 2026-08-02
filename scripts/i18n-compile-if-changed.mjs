@@ -21,16 +21,25 @@
  */
 import { createHash } from 'node:crypto';
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 const OUT_DIR = 'app/paraglide';
-// The stamp lives INSIDE the output directory on purpose: anything that caches
-// or restores `app/paraglide` (CI does) carries the record of which inputs
-// produced it, so a restored directory is trusted only for the exact inputs
-// that built it. Keeping the stamp elsewhere would make every fresh checkout
-// recompile even with the output already in hand.
-const STAMP = 'app/paraglide/.inputs-hash';
+// The stamp is written to TWO places, and either one is enough to skip.
+//
+//   app/paraglide/.inputs-hash  — inside the output, so anything that caches or
+//     restores `app/paraglide` (CI does) carries the record of which inputs
+//     produced it. A restored directory is then trusted for exactly those inputs
+//     instead of recompiling on every fresh checkout.
+//
+//   node_modules/.cache/…       — outside it, because the compiler CLEANS its
+//     outdir, and `paraglideVitePlugin` in vite.config.ts writes to the same
+//     `./app/paraglide` with the same options. So every `npm run dev` and every
+//     `npm run build` silently deleted the in-output stamp, and the next commit
+//     that staged `messages/**` paid the full 66s for inputs that had not moved.
+//     Vite's output is byte-equivalent (same project, outdir, strategy,
+//     outputStructure and emitTsDeclarations), so trusting this copy is sound.
+const STAMPS = ['app/paraglide/.inputs-hash', 'node_modules/.cache/i18n-inputs-hash'];
 const INPUT_DIRS = ['messages', 'project.inlang'];
 const force = process.argv.includes('--force');
 
@@ -58,6 +67,24 @@ function compile() {
     execSync('npm run i18n:compile', { stdio: 'inherit' });
 }
 
+/**
+ * Called after a successful compile AND after a skip. The skip case matters:
+ * when only one of the two locations still holds the hash, this is what
+ * restores the other — otherwise a wiped in-output stamp would never come back
+ * and every fresh clone would be one full compile away from a warm cache.
+ */
+function writeStamps(value) {
+    for (const p of STAMPS) {
+        try {
+            mkdirSync(dirname(p), { recursive: true });
+            writeFileSync(p, value);
+        } catch {
+            // A missing stamp only costs a redundant compile next time — and the
+            // other copy still votes, so one unwritable location is not fatal.
+        }
+    }
+}
+
 const hash = inputHash();
 
 if (force) {
@@ -67,25 +94,22 @@ if (force) {
     console.log(`[i18n] ${OUT_DIR} missing — compiling.`);
     compile();
 } else {
-    let previous = null;
-    try {
-        previous = readFileSync(STAMP, 'utf8').trim();
-    } catch {
-        // No stamp yet, or unreadable — fall through and compile.
-    }
-    if (previous === hash) {
+    const seen = STAMPS.map((p) => {
+        try {
+            return readFileSync(p, 'utf8').trim();
+        } catch {
+            return null; // No stamp yet, or unreadable — that one does not vote.
+        }
+    });
+    if (seen.includes(hash)) {
         console.log('[i18n] inputs unchanged — skipped.');
+        writeStamps(hash);
         process.exit(0);
     }
-    console.log(previous ? '[i18n] inputs changed — compiling.' : '[i18n] no stamp — compiling.');
+    console.log(seen.some(Boolean) ? '[i18n] inputs changed — compiling.' : '[i18n] no stamp — compiling.');
     compile();
 }
 
 // Stamp only AFTER a compile that did not throw: recording the hash for a failed
 // run would make the next one skip and leave app/paraglide half-written.
-try {
-    execSync('node -e "require(\'node:fs\').mkdirSync(\'node_modules/.cache\',{recursive:true})"');
-    writeFileSync(STAMP, hash);
-} catch {
-    // A missing stamp only costs a redundant compile next time.
-}
+writeStamps(hash);
