@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, sql, like } from 'drizzle-orm';
-import { templates, inspections } from '../lib/db/schema';
+import { templates, inspections, services } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { TemplateSchemaV2Schema } from '../lib/validations/template.schema';
 
@@ -270,6 +270,25 @@ export class TemplateService {
 
         if (usedBy) {
             throw Errors.Conflict('Cannot delete a template that is referenced by existing inspections');
+        }
+
+        // `services.template_id` is the SECOND foreign key to this table, and it
+        // was unchecked. Latent only while the services catalogue was empty —
+        // seeding it ends that, and without this the delete fails at the FK with
+        // a message naming neither the table nor the row.
+        //
+        // Name the service. "Conflict" with no subject sends a tenant hunting
+        // through their inspections for a reference that is in their catalogue.
+        const usedByService = await db.select({ name: services.name })
+            .from(services)
+            .where(and(eq(services.templateId, id), eq(services.tenantId, tenantId)))
+            .limit(1)
+            .get();
+
+        if (usedByService) {
+            throw Errors.Conflict(
+                `Cannot delete a template that is the default for the service "${usedByService.name}"`,
+            );
         }
 
         await db.delete(templates).where(eq(templates.id, id));

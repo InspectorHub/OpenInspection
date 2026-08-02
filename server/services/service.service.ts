@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, asc, isNull, ne, inArray, sql } from 'drizzle-orm';
-import { services, inspectionServices, discountCodes, serviceInspectors, users, inspections } from '../lib/db/schema';
+import { services, inspectionServices, discountCodes, serviceInspectors, users, inspections, eventTypes } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { nanoid } from 'nanoid';
 import type { z } from 'zod';
@@ -20,6 +20,34 @@ export class ServiceService {
         return db.select().from(services)
             .where(and(eq(services.tenantId, tenantId), eq(services.active, true)))
             .orderBy(asc(services.sortOrder), asc(services.name));
+    }
+
+    /**
+     * The visits a service implies, resolved from its stored event-type slugs
+     * and returned in the order the fixture declares them — for radon that is
+     * drop-off before pickup, which is the whole point.
+     *
+     * A slug with no matching event type is SKIPPED rather than erroring. That
+     * is the deliberate consequence of storing slugs instead of a hard
+     * reference: a tenant who tidies up their event types gets a shorter
+     * proposal, not a 500 on the order screen. Returning [] for a service with
+     * no defaults is the same rule with an empty list.
+     */
+    async proposeEventsForService(tenantId: string, serviceId: string) {
+        const db = this.getDrizzle();
+        const svc = await db.select({ slugs: services.defaultEventTypeSlugs }).from(services)
+            .where(and(eq(services.id, serviceId), eq(services.tenantId, tenantId)))
+            .get();
+        const slugs = svc?.slugs ?? [];
+        if (slugs.length === 0) return [];
+
+        const rows = await db.select().from(eventTypes)
+            .where(and(eq(eventTypes.tenantId, tenantId), inArray(eventTypes.slug, slugs)))
+            .all();
+        const bySlug = new Map(rows.map(r => [r.slug as string, r]));
+        // Order comes from the service's own list, not from the query — a
+        // pickup proposed before its drop-off is a nonsense visit sequence.
+        return slugs.map(s => bySlug.get(s)).filter((r): r is NonNullable<typeof r> => r != null);
     }
 
     async createService(tenantId: string, data: CreateServiceData) {

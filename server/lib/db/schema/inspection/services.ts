@@ -17,6 +17,19 @@ export const services = sqliteTable('services', {
     active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // The visits this service implies. Radon needs two — a drop-off and a
+    // pickup at least 48h later — while a sewer scope needs none beyond the
+    // main visit.
+    //
+    // Stored as event_type SLUGS, not ids, and that is the load-bearing choice:
+    // slugs are stable identifiers that survive a tenant deleting and
+    // re-creating a type, they do not depend on seed ordering (services and
+    // event types are seeded in the same run), and an unmatched slug degrades
+    // to "propose nothing" instead of dangling. A hard FK would additionally
+    // block deleting an event type, which is not a trade worth making for a
+    // proposal.
+    // Appended at table end for D1 rebuild safety.
+    defaultEventTypeSlugs: text('default_event_type_slugs', { mode: 'json' }).$type<string[]>(),
 }, (t) => [
     index('idx_services_tenant').on(t.tenantId),
 ]);
