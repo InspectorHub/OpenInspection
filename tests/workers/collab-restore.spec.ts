@@ -15,6 +15,7 @@
  */
 
 import { env, runInDurableObject } from 'cloudflare:test';
+import { INSPECTION_RESULTS_TEST_DDL } from '../helpers/inline-ddl';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import * as Y from 'yjs';
 import {
@@ -38,7 +39,7 @@ const b = env as unknown as TestBindings;
 // ─── Schema seeding (mirrors collab-multiclient.spec.ts) ───────────────────────
 
 async function seedSchema(): Promise<void> {
-    await b.DB.exec('CREATE TABLE IF NOT EXISTS inspection_results (id TEXT PRIMARY KEY NOT NULL, tenant_id TEXT NOT NULL, inspection_id TEXT NOT NULL, data TEXT NOT NULL, ydoc_state BLOB, last_synced_at INTEGER NOT NULL, rating_system_id TEXT, rating_system_snapshot TEXT);');
+    await b.DB.exec(INSPECTION_RESULTS_TEST_DDL);
     await b.DB.exec('CREATE TABLE IF NOT EXISTS inspections (id TEXT PRIMARY KEY NOT NULL, tenant_id TEXT NOT NULL, template_snapshot TEXT);');
 }
 

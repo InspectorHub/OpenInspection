@@ -19,6 +19,7 @@
  */
 
 import { env, runInDurableObject } from 'cloudflare:test';
+import { INSPECTION_RESULTS_TEST_DDL } from '../helpers/inline-ddl';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';
@@ -54,7 +55,7 @@ const b = env as unknown as TestBindings;
 async function seedSchema(): Promise<void> {
     // Minimal inline DDL — FK references omitted (miniflare D1 does not enforce
     // FK constraints, so parent tenant/inspection rows need not be present).
-    await b.DB.exec('CREATE TABLE IF NOT EXISTS inspection_results (id TEXT PRIMARY KEY NOT NULL, tenant_id TEXT NOT NULL, inspection_id TEXT NOT NULL, data TEXT NOT NULL, ydoc_state BLOB, last_synced_at INTEGER NOT NULL, rating_system_id TEXT, rating_system_snapshot TEXT);');
+    await b.DB.exec(INSPECTION_RESULTS_TEST_DDL);
     // Minimal FK-free inspections table — only the columns the DO hydration reads
     // (id, tenant_id, template_snapshot). Mirrors the existing FK-free pattern.
     await b.DB.exec('CREATE TABLE IF NOT EXISTS inspections (id TEXT PRIMARY KEY NOT NULL, tenant_id TEXT NOT NULL, template_snapshot TEXT);');
