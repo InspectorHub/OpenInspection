@@ -141,6 +141,7 @@ const collabRoutes = createApiRouter()
                 'Upgrade':         'websocket',
                 'x-tenant-id':     auth.tenantId,
                 'x-inspection-id': auth.inspectionId,
+                'x-report-id':     auth.reportId,
                 'x-user-id':       auth.userId,
             },
         });
@@ -157,6 +158,7 @@ const collabRoutes = createApiRouter()
             headers: {
                 'x-tenant-id':     auth.tenantId,
                 'x-inspection-id': auth.inspectionId,
+                'x-report-id':     auth.reportId,
                 'x-user-id':       auth.userId,
             },
         });
@@ -182,6 +184,7 @@ const collabRoutes = createApiRouter()
             headers: {
                 'x-tenant-id':     auth.tenantId,
                 'x-inspection-id': auth.inspectionId,
+                'x-report-id':     auth.reportId,
                 'x-user-id':       auth.userId,
             },
         });
@@ -198,6 +201,7 @@ const collabRoutes = createApiRouter()
             headers: {
                 'x-tenant-id':     auth.tenantId,
                 'x-inspection-id': auth.inspectionId,
+                'x-report-id':     auth.reportId,
                 'x-user-id':       auth.userId,
             },
         });
@@ -227,6 +231,7 @@ const collabRoutes = createApiRouter()
                 'Content-Type':    'application/json',
                 'x-tenant-id':     auth.tenantId,
                 'x-inspection-id': auth.inspectionId,
+                'x-report-id':     auth.reportId,
                 'x-user-id':       auth.userId,
             },
             body: JSON.stringify({ seq: parsed.data.seq }),
@@ -249,6 +254,7 @@ const collabRoutes = createApiRouter()
             headers: {
                 'x-tenant-id':     auth.tenantId,
                 'x-inspection-id': auth.inspectionId,
+                'x-report-id':     auth.reportId,
                 'x-user-id':       auth.userId,
             },
         });
