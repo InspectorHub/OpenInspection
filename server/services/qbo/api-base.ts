@@ -29,7 +29,13 @@ export type QBOToken = {
 export type InvoiceSummary = { Id: string; SyncToken: string; Balance: number; TotalAmt: number };
 
 export type MarkPaidFn = (invoiceId: string, tenantId: string) => Promise<void>;
-export type MarkPartialFn = (invoiceId: string, balance: number, tenantId: string) => Promise<void>;
+/**
+ * Second argument is the amount already RECEIVED, in integer cents — not the
+ * remaining balance and not dollars. QuickBooks reports a remainder in dollars;
+ * `applyInvoiceStatusFromQBO` converts it once, so no adapter has to know the
+ * QBO shape or repeat the arithmetic. See #273.
+ */
+export type MarkPartialFn = (invoiceId: string, amountPaidCents: number, tenantId: string) => Promise<void>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Constructor<T = object> = new (...args: any[]) => T;

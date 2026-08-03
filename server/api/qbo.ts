@@ -129,7 +129,7 @@ api.post('/sync', async (c) => {
         svc.runCDCSync(
             tenantId,
             (invoiceId, tid) => invoiceSvc.markPaid(invoiceId, tid, 'qbo'),
-            (invoiceId, _balance, tid) => invoiceSvc.markPartial(invoiceId, tid, 'qbo'),
+            (invoiceId, amountPaidCents, tid) => invoiceSvc.markPartial(invoiceId, tid, 'qbo', amountPaidCents),
         ),
     );
     return c.json({ success: true, data: { message: 'Sync started' } });

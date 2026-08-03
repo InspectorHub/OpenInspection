@@ -24,7 +24,7 @@ api.post('/', async (c) => {
             rawBody,
             headerSig,
             (invoiceId, tenantId) => invoiceSvc.markPaid(invoiceId, tenantId, 'qbo'),
-            (invoiceId, _balance, tenantId) => invoiceSvc.markPartial(invoiceId, tenantId, 'qbo'),
+            (invoiceId, amountPaidCents, tenantId) => invoiceSvc.markPartial(invoiceId, tenantId, 'qbo', amountPaidCents),
         ).then(({ valid }) => {
             if (!valid) logger.info('QBO webhook: signature mismatch — discarded');
         }).catch(e => {

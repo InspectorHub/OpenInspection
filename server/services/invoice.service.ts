@@ -146,16 +146,32 @@ export class InvoiceService {
         await db.update(invoices).set({
             paidAt: new Date(),
             partialPaidAt: null,
+            // Paid in full leaves no residual partial amount; a stale value here
+            // would let a paid invoice report an outstanding balance.
+            amountPaidCents: null,
             // Record how it was paid; keep any existing value if the caller omits one.
             paymentMethod: method ?? existing.paymentMethod ?? null,
         }).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
         void source; // consumed by route handler to decide QBO sync
     }
 
-    async markPartial(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi'): Promise<void> {
+    /**
+     * Record that an invoice is partially paid. `amountPaidCents` is what has
+     * actually been RECEIVED, in integer cents; remaining is derived by the
+     * caller as `amountCents - amountPaidCents` because the invoice total is
+     * the money authority, not any external system's view of it.
+     *
+     * Omitting the amount means "partial, amount unknown" and clears any
+     * previously captured figure — a number left over from an earlier sync is
+     * not evidence of what is owed now.
+     */
+    async markPartial(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi', amountPaidCents?: number): Promise<void> {
         const db = this.getDrizzle();
-        await db.update(invoices).set({ partialPaidAt: new Date(), paidAt: null })
-            .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
+        await db.update(invoices).set({
+            partialPaidAt: new Date(),
+            paidAt: null,
+            amountPaidCents: amountPaidCents ?? null,
+        }).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
         void source;
     }
 
@@ -163,7 +179,7 @@ export class InvoiceService {
         const db = this.getDrizzle();
         const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Invoice not found');
-        await db.update(invoices).set({ paidAt: null, partialPaidAt: null })
+        await db.update(invoices).set({ paidAt: null, partialPaidAt: null, amountPaidCents: null })
             .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
         await this.syncInspectionPaymentGate(existing.inspectionId, tenantId);
     }

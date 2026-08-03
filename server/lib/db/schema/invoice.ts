@@ -36,6 +36,18 @@ export const invoices = sqliteTable('invoices', {
     // the metadata that keeps a historical record self-describing, so a later tenant
     // currency change never re-labels a paid invoice. Appended at table end.
     currency: text('currency').notNull().default('USD'),
+    // How much has actually been received on a partially-paid invoice. NULL on
+    // draft/sent/paid/void — only a 'partial' invoice carries one, and it is
+    // cleared whenever the invoice reaches paid or is refunded so the amount can
+    // never contradict the status derived from paidAt/partialPaidAt.
+    //
+    // Stores the amount PAID, not a remaining balance: amountCents above is the
+    // authoritative total (money authority chain, tier 1), so remaining is
+    // derived as amountCents - amountPaidCents. Persisting an external system's
+    // remaining balance would state a remainder computed against THAT system's
+    // total, which drifts from ours the first time either side edits the
+    // invoice. Appended at table end. See #273.
+    amountPaidCents: integer('amount_paid_cents'),
 }, (t) => [
     index('idx_invoices_tenant').on(t.tenantId),
     index('idx_invoices_inspection').on(t.inspectionId),

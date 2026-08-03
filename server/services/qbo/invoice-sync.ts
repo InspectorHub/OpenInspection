@@ -60,7 +60,14 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
             if (inv.Balance === 0) {
                 await markPaid(mapped.oiId, tenantId);
             } else if (inv.Balance < inv.TotalAmt) {
-                await markPartial(mapped.oiId, inv.Balance, tenantId);
+                // QuickBooks amounts are dollars (see the reverse mapping in
+                // upsertInvoice, `Amount: amountCents / 100`). Round each side to
+                // its own exact cent value before subtracting: a bare float
+                // multiply on the difference produces off-by-one-cent amounts
+                // that are impossible to explain to a customer. This is the ONLY
+                // place the conversion happens — adapters receive cents.
+                const amountPaidCents = Math.round(inv.TotalAmt * 100) - Math.round(inv.Balance * 100);
+                await markPartial(mapped.oiId, amountPaidCents, tenantId);
             }
             return true;
         }

@@ -82,7 +82,7 @@ async function runQBOCDC(env: ScheduledEnv): Promise<void> {
             const { processed } = await svc.runCDCSync(
                 conn.tenantId,
                 (invoiceId, tid) => invoiceSvc.markPaid(invoiceId, tid, 'qbo'),
-                (invoiceId, _bal, tid) => invoiceSvc.markPartial(invoiceId, tid, 'qbo'),
+                (invoiceId, amountPaidCents, tid) => invoiceSvc.markPartial(invoiceId, tid, 'qbo', amountPaidCents),
             );
             if (processed > 0) logger.info('[cron:qbo] CDC processed invoices', { tenantId: conn.tenantId, processed });
         } catch (e) {
