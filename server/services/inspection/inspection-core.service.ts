@@ -10,6 +10,7 @@ import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
 import { escapeLikePattern } from '../../lib/db/like-escape';
 import { safeISODate, safeTimestamp } from '../../lib/date';
 import { logger } from '../../lib/logger';
+import { createPrimaryReport } from '../../lib/inspection/reports';
 import { computePreflightFromData } from '../../lib/preflight';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { findingKey, DEFAULT_UNIT } from '../../lib/finding-key';
@@ -558,6 +559,11 @@ export class InspectionCoreService extends InspectionSubService {
             }
         }
 
+        // Every order gets its primary report. Without it the collab route —
+        // which resolves an inspection to its primary and fails closed — cannot
+        // open the editor at all for anything created from here on.
+        await createPrimaryReport(db, tenantId, id, data.templateId ?? null);
+
         return {
             ...newInspection,
             clientName: clientNameInput,
@@ -689,6 +695,9 @@ export class InspectionCoreService extends InspectionSubService {
         } catch (err) {
             logger.error('inspection-people copy from reinspection create failed', { inspectionId: id }, err instanceof Error ? err : undefined);
         }
+
+        // A re-inspection is its own ORDER, so it gets its own primary report.
+        await createPrimaryReport(db, tenantId, id, null);
 
         const created = await db.select().from(inspections).where(eq(inspections.id, id)).get();
         return created as unknown as Inspection;

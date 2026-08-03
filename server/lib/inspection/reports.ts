@@ -9,6 +9,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { reports } from '../db/schema';
+import { logger } from '../logger';
 
 /**
  * The primary report of an inspection, or null when it has none.
@@ -31,4 +32,43 @@ export async function resolvePrimaryReportId(
         ))
         .get();
     return row?.id ?? null;
+}
+
+/**
+ * Give an inspection its PRIMARY report.
+ *
+ * The minimum slice of report generation, not the whole of it: one report per
+ * SOLD SERVICE is separate work. What has to hold now is that a primary report
+ * always exists, because the collab route resolves an inspection to its primary
+ * and fails CLOSED when there is none — correct, since the alternative is
+ * falling back to an inspection-keyed document, which is the shared-Y.Doc bug,
+ * but it means an inspection without one cannot be edited at all.
+ *
+ * Non-fatal by design. Both callers have already written the canonical
+ * `inspections` row, and throwing here would lose it over a row that a backfill
+ * can add later.
+ */
+export async function createPrimaryReport(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    db: any,
+    tenantId: string,
+    inspectionId: string,
+    templateId: string | null,
+): Promise<void> {
+    try {
+        await db.insert(reports).values({
+            id: crypto.randomUUID(),
+            tenantId,
+            inspectionId,
+            kind: 'primary',
+            inspectionServiceId: null,
+            templateId,
+            title: 'Inspection Report',
+            status: 'in_progress',
+            createdAt: new Date(),
+        });
+    } catch (err) {
+        logger.error('primary report create failed', { inspectionId },
+            err instanceof Error ? err : undefined);
+    }
 }

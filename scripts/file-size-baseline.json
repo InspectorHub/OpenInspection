@@ -1,7 +1,7 @@
 {
   "app/routes/inspection-edit.tsx": 2530,
   "app/routes/inspector-portal.tsx": 1202,
-  "server/services/inspection/inspection-core.service.ts": 1117,
+  "server/services/inspection/inspection-core.service.ts": 1126,
   "server/services/booking.service.ts": 966,
   "server/services/inspection/inspection-report.service.ts": 952,
   "server/durable-objects/inspection-doc.ts": 928,
