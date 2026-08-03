@@ -7,6 +7,7 @@ import { logger } from '../../lib/logger';
 import { createOiTemplateStore } from './template-store';
 import { resolveRuleRecipients, type ResolvedRecipient } from './recipients';
 import { automationClassId } from '../../lib/notifications/automation-classes';
+import { getInspectionRoster } from '../../lib/inspection/roster';
 import { interpolate } from './shared';
 import type { AutomationChannel, RecipientKind, Constructor, TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
@@ -323,14 +324,16 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 const roleKey = await roleKeyFor(recipientRoleProfileId);
                 if (roleKey) raw = (await contactForRole(roleKey))?.phone ?? null;
             } else if (recipientKind === 'inspector') {
-                // Verified against server/lib/db/schema/inspection.ts: the assigned
-                // inspector is `inspections.inspector_id` (text FK → users.id, line 46).
-                // `lead_inspector_id` (team mode) is the primary when set and falls back
-                // to inspector_id per its schema comment, so prefer lead then inspector.
-                // (The inspection_inspectors join table from DB-8 is a query face only;
-                // inspectorId/leadInspectorId remain canonical for single-value reads.)
+                // The lead comes from `inspection_inspectors`, which is where
+                // assignment lives. This is the same value the old
+                // `leadInspectorId ?? inspectorId` expression produced — that is
+                // literally how the lead row is resolved when it is written (see
+                // buildSyncStatements in lib/db/assignment-links.ts) — so the
+                // inspector_id fallback is kept only for inspections created
+                // before the link table existed and never re-assigned since.
                 // Unchanged by Task 11a — inspector is not an inspection_people role.
-                const inspectorId = insp.leadInspectorId ?? insp.inspectorId ?? null;
+                const roster = await getInspectionRoster(db, insp.tenantId, insp.id);
+                const inspectorId = roster.lead?.id ?? insp.inspectorId ?? null;
                 if (inspectorId) {
                     const u = await db.select({ phone: users.phone }).from(users)
                         .where(eq(users.id, inspectorId)).get().catch(() => null);

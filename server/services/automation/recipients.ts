@@ -4,6 +4,7 @@ import type { inspections } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
 import { PeopleService } from '../people.service';
 import { capabilitiesForProfile } from '../../lib/people/capabilities';
+import { getInspectionRoster } from '../../lib/inspection/roster';
 import { STAFF_ROLE_KEY } from './shared';
 import type { AutomationChannel, RecipientKind } from './shared';
 
@@ -92,10 +93,14 @@ export async function resolveRuleRecipients(
     }
 
     if (rule.recipientKind === 'inspector') {
-        const inspectorId = inspection.leadInspectorId ?? inspection.inspectorId ?? null;
+        // Assignment lives in `inspection_inspectors`. The inspector_id fallback
+        // covers inspections created before that table existed and never
+        // re-assigned since; it is not a second source of truth.
+        const db = drizzle(rawDb);
+        const roster = await getInspectionRoster(db, inspection.tenantId, inspection.id);
+        const inspectorId = roster.lead?.id ?? inspection.inspectorId ?? null;
         if (!inspectorId) return [];
         const { users } = await import('../../lib/db/schema');
-        const db = drizzle(rawDb);
         // Try/catch (not `.get().catch()`) — the latter only behaves as a
         // Promise against the real async D1 driver, not the synchronous
         // better-sqlite3 test driver (same posture as resolveAddress's

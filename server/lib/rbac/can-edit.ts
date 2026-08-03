@@ -3,14 +3,20 @@ import { ROLE, isAdminRole } from '../auth/roles';
 /**
  * Design System 0520 subsystem C phase 4 — canEdit permission matrix.
  *
- * Pure decision function consumed by every write-bearing route to
- * answer "is this user allowed to mutate this inspection (and
- * optionally this section)?" before the service-layer write fires.
+ * Pure decision function answering "is this user allowed to mutate this
+ * inspection?".
+ *
+ * ⚠️ NOTHING IN PRODUCTION CALLS THIS. Write-bearing routes authorize with
+ * `requireRole` + `requireCapability` only — a role/capability test, with no
+ * per-inspection membership check. So the policy below ("an inspector may edit
+ * an inspection they are on") is NOT currently enforced: within a tenant, any
+ * inspector with the capability may edit any inspection. That may well be the
+ * intended product behaviour; it is recorded here because the docstring used to
+ * claim this function guarded every write, and it does not.
  *
  * Role outcomes:
  *   - owner / admin  → always true
  *   - inspector      → true when caller is on the inspection
- *                       (inspectorId / leadInspectorId / helperInspectorIds)
  *   - agent          → false (buyer-agent view is read-only)
  */
 
@@ -24,20 +30,18 @@ export interface CanEditUser {
 }
 
 export interface CanEditInspection {
-    id:                 string;
-    inspectorId:        string | null;
-    leadInspectorId:    string | null;
-    helperInspectorIds: string;   // JSON-encoded string array
-    teamMode:           boolean;
-}
-
-function safeJsonArray(raw: string): string[] {
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter(s => typeof s === 'string') : [];
-    } catch {
-        return [];
-    }
+    id:              string;
+    /**
+     * Everyone on the inspection, by user id — the roster's lead and helpers
+     * (`getInspectionRoster`), plus `inspections.inspector_id` for rows created
+     * before that table existed and never re-assigned since.
+     *
+     * Membership is passed in rather than read from `inspections` because the
+     * lead and helper columns are no longer written; reading them would make
+     * this function deny every non-admin.
+     */
+    assignedUserIds: string[];
+    teamMode:        boolean;
 }
 
 export function canEdit(
@@ -52,12 +56,7 @@ export function canEdit(
     if (isAdminRole(role)) return true;
     if (role === ROLE.AGENT)  return false;
 
-    const helpers = safeJsonArray(inspection.helperInspectorIds);
-    const onInspection =
-        inspection.inspectorId === user.id ||
-        inspection.leadInspectorId === user.id ||
-        helpers.includes(user.id);
-    if (!onInspection) return false;
+    if (!inspection.assignedUserIds.includes(user.id)) return false;
 
     if (role === ROLE.INSPECTOR) return true;
 

@@ -8,12 +8,14 @@
  * a version that falls back to the column would reintroduce the ability for two
  * callers to get two different answers.
  *
- * On the current design (see the schema comment on `inspectionInspectors`),
- * `inspections.inspector_id` is canonical and this table is its mirror, kept in
- * step by `syncInspectionAssignments` from every assignment write. Reading the
- * mirror is still the right call here: it carries a ROLE per person and it can
- * express more than one of them, which the column cannot, and anything that
- * attributes work or money to a named person needs both.
+ * `inspection_inspectors` is where assignment lives, written by
+ * `syncInspectionAssignments` from every assignment write. It carries a ROLE per
+ * person and can express more than one of them, which a single column cannot,
+ * and anything that attributes work or money to a named person needs both.
+ *
+ * `inspections.inspector_id` survives only as a fallback for inspections created
+ * before this table existed and never re-assigned since. It is not a second
+ * authority, and nothing writes it as one.
  *
  * `inspection_events.inspector_id` is NOT part of this. It answers a narrower
  * question — who performed THAT visit — and a radon pickup may legitimately be

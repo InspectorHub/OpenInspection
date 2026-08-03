@@ -13,6 +13,7 @@ import { logger } from '../../lib/logger';
 import { createPrimaryReport } from '../../lib/inspection/reports';
 import { computePreflightFromData } from '../../lib/preflight';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
+import { getInspectionRoster } from '../../lib/inspection/roster';
 import { findingKey, DEFAULT_UNIT } from '../../lib/finding-key';
 import { parseReinspectionStatuses, isOpenStatus } from '../../lib/reinspection-status';
 import { INSPECTION_STATUS, type InspectionStatus } from '../../lib/status/inspection-status';
@@ -888,11 +889,12 @@ export class InspectionCoreService extends InspectionSubService {
             let effectiveLead: string | null = null;
             let effectiveHelpers: string[] = [];
             if (input.teamMode || input.leadInspectorId || (input.helperInspectorIds?.length ?? 0) > 0) {
-                patch.teamMode           = input.teamMode;
-                patch.leadInspectorId    = input.teamMode ? (input.leadInspectorId ?? creatorUserId) : null;
-                patch.helperInspectorIds = JSON.stringify(input.teamMode ? (input.helperInspectorIds ?? []) : []);
+                // teamMode is live (it drives the team UI). Lead + helpers are
+                // NOT written back to `inspections` — they live in
+                // inspection_inspectors, written from the intent computed below.
+                patch.teamMode = input.teamMode;
                 teamFieldsPatched = true;
-                effectiveLead    = patch.leadInspectorId as string | null;
+                effectiveLead    = input.teamMode ? (input.leadInspectorId ?? creatorUserId) : null;
                 effectiveHelpers = input.teamMode ? (input.helperInspectorIds ?? []) : [];
             }
             if (Object.keys(patch).length > 0) {
@@ -900,17 +902,18 @@ export class InspectionCoreService extends InspectionSubService {
                     .set(patch)
                     .where(and(eq(inspections.id, created.id), eq(inspections.tenantId, tenantId)));
             }
-            // DB-8: re-sync with effective post-patch assignment values when team
-            // fields were written. Always pass creatorUserId as the inspectorId
-            // fallback so that when teamMode=false but a stale leadInspectorId was
-            // present in the request (effectiveLead=null, effectiveHelpers=[]),
-            // syncInspectionAssignments still writes a lead row for the creator
-            // rather than clearing all link rows while inspections.inspectorId
-            // still holds creatorUserId (which would diverge the two sources of truth).
+            // Write who is assigned. Always pass creatorUserId as the inspectorId
+            // fallback so that when teamMode=false but a lead was still present in
+            // the request (effectiveLead=null, effectiveHelpers=[]),
+            // syncInspectionAssignments writes a lead row for the creator rather
+            // than leaving the inspection with nobody on it.
             if (teamFieldsPatched) {
-                // Non-fatal — the link table is a denormalized mirror; a sync
-                // failure must not surface to the caller after the canonical row
-                // has already been written.
+                // Non-fatal, but no longer cosmetic: this table is the only
+                // record of who is assigned, so a failure here leaves the
+                // inspection UNASSIGNED, not merely un-mirrored. Still non-fatal
+                // because the inspection row is already committed and throwing
+                // would lose it; assignment can be redone, a lost inspection
+                // cannot. The error log is the signal.
                 try {
                     await syncInspectionAssignments(db, tenantId, created.id, {
                         inspectorId:        creatorUserId,
@@ -976,14 +979,16 @@ export class InspectionCoreService extends InspectionSubService {
         } catch (err) {
             logger.error('inspection-people copy from clone create failed', { inspectionId: clone.id }, err instanceof Error ? err : undefined);
         }
-        // DB-8: mirror the cloned inspection's assignment into inspection_inspectors.
-        // Non-fatal — the link table is a denormalized mirror; a sync failure must
-        // not abort a clone whose canonical inspection row already committed.
+        // Give the clone the SOURCE's people, read from the source's roster —
+        // not from columns copied onto the clone row, which are no longer
+        // written and would leave any recently-assigned clone empty. Non-fatal
+        // for the same reason as the create path above.
         try {
+            const sourceRoster = await getInspectionRoster(this.getDrizzle(), tenantId, id);
             await syncInspectionAssignments(this.getDrizzle(), tenantId, clone.id, {
                 inspectorId:        (clone as { inspectorId?: string | null }).inspectorId ?? null,
-                leadInspectorId:    (clone as { leadInspectorId?: string | null }).leadInspectorId ?? null,
-                helperInspectorIds: JSON.parse((clone as { helperInspectorIds?: string }).helperInspectorIds ?? '[]') as string[],
+                leadInspectorId:    sourceRoster.lead?.id ?? null,
+                helperInspectorIds: sourceRoster.helpers.map(h => h.id),
             });
         } catch (e) {
             logger.error('inspection.clone-sync.failed', { inspectionId: clone.id }, e instanceof Error ? e : undefined);
