@@ -517,6 +517,15 @@ export default tseslint.config(
         // and the sole hono/jwt import (server/lib/jwt-keyring.ts) is a
         // verify-only import carrying an inline disable with a reason (the
         // keyring IS the sanctioned wrapper).
+        //
+        // There is now a second sanctioned wrapper on the same pattern:
+        // server/lib/i18n/messages.ts re-exports the compiled Paraglide
+        // catalogue, which lives at app/paraglide/ because that is where the
+        // outdir points — generated data, not app code. Its disable is inline
+        // for the same reason the keyring's is: scoped to one file, so every
+        // other server module still fails the rule and has to go through the
+        // wrapper. Keep new exceptions inline; an entry here would apply to all
+        // of server/ and is how this list would start growing.
         files: ['server/**/*.ts'],
         rules: {
             'no-restricted-imports': ['error', {

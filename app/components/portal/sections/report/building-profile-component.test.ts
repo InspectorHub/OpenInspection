@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // tests/web/unit/building-profile-component.spec.ts
 //
 // TDD for <BuildingProfile> — the Commercial PCA Phase F fact list rendered at

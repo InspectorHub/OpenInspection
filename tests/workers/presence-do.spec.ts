@@ -53,7 +53,29 @@ function captureRosters(ws: WebSocket): RosterMsg[] {
     return frames;
 }
 
-const flush = () => new Promise((r) => setTimeout(r, 50));
+/**
+ * Wait for an assertion to hold instead of sleeping a fixed interval.
+ *
+ * Whether the DO has processed a close yet is a question about the runtime's
+ * schedule, not about elapsed time, and a fixed sleep answers it correctly only
+ * on a machine fast enough. That is exactly how this suite behaved: green on a
+ * developer machine, and intermittently red on a loaded CI runner with the
+ * departed user still in the roster. Polling is both faster when the event has
+ * already landed and correct when it has not.
+ */
+async function waitFor(assertion: () => void, timeoutMs = 2000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+        try {
+            assertion();
+            return;
+        } catch (err) {
+            if (Date.now() >= deadline) throw err;
+            await new Promise((r) => setTimeout(r, 10));
+        }
+    }
+}
+
 const ids = (m: RosterMsg | undefined) => (m?.users ?? []).map((u) => u.userId).sort();
 
 describe('InspectionPresenceDO — roster broadcast (workerd)', () => {
@@ -73,11 +95,11 @@ describe('InspectionPresenceDO — roster broadcast (workerd)', () => {
         expect(respB.status).toBe(101);
         respB.webSocket!.accept();
 
-        await flush();
-
         // A received a roster broadcast naming both users.
-        expect(aFrames.length).toBeGreaterThan(0);
-        expect(ids(aFrames[aFrames.length - 1])).toEqual(['uA', 'uB']);
+        await waitFor(() => {
+            expect(aFrames.length).toBeGreaterThan(0);
+            expect(ids(aFrames[aFrames.length - 1])).toEqual(['uA', 'uB']);
+        });
 
         // The DO's own roster state lists both live connections.
         await runInDurableObject(stub, async (instance: InspectionPresenceDO) => {
@@ -97,14 +119,11 @@ describe('InspectionPresenceDO — roster broadcast (workerd)', () => {
         const respB = await stub.fetch(wsUpgrade('uB', 'Bob'));
         const bWs = respB.webSocket!;
         bWs.accept();
-        await flush();
-        expect(ids(aFrames[aFrames.length - 1])).toEqual(['uA', 'uB']);
+        await waitFor(() => expect(ids(aFrames[aFrames.length - 1])).toEqual(['uA', 'uB']));
 
         // B leaves → webSocketClose fires → broadcastRoster to remaining (A).
         bWs.close(1000, 'bye');
-        await flush();
-
-        expect(ids(aFrames[aFrames.length - 1])).toEqual(['uA']);
+        await waitFor(() => expect(ids(aFrames[aFrames.length - 1])).toEqual(['uA']));
 
         await runInDurableObject(stub, async (instance: InspectionPresenceDO) => {
             const roster = (instance as unknown as PresenceInternals).snapshotRoster();

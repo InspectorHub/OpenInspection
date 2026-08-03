@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The sentence that keeps "this did not load" apart from "there is nothing
  * here" (IA-118).

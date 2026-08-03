@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Commercial PCA Phase U (Batch C2a) — usePhotoOps per-unit scoping regression.
  *

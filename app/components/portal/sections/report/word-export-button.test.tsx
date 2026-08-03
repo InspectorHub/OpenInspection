@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // Commercial PCA Phase W Task 6 — "Export to Word" owner control.
 //
 // WordExportButton calls useFetcher(), which requires a data-router context

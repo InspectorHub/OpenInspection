@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-36 ⑦ — one control, two places (Settings → Inspection, and the People
  * card). It expresses a DURATION, never a date: the value therefore cannot land

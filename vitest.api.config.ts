@@ -18,11 +18,46 @@ export default defineConfig({
       // Workers-runtime tests (tests/workers/mcp/*) and production.
       '@cloudflare/workers-oauth-provider': path.resolve(__dirname, 'tests/unit/stubs/workers-oauth-provider.ts'),
       'agents/mcp': path.resolve(__dirname, 'tests/unit/stubs/agents-mcp.ts'),
+      // `server/lib/i18n/messages.ts` re-exports the compiled Paraglide
+      // catalogue, which lives under `app/`. The worker build resolves this
+      // through vite.config.ts's own `~` alias and the api tsc pass through
+      // tsconfig.api.json's `paths`; this is the third resolver that has to
+      // agree, and without it every api spec that reaches a server-side
+      // message fails to import rather than to assert.
+      '~': path.resolve(__dirname, 'app'),
     },
   },
   test: {
     globals: true,
     environment: 'node',
+    // The suite is IMPORT-bound, not assertion-bound. A full run reported
+    // `import 1977s` against `tests 1246s`: with the default forks pool and
+    // isolation, each of the 600+ spec files gets a fresh process that rebuilds
+    // the whole module graph from scratch.
+    //
+    // Pre-bundling node_modules with esbuild attacks that directly, and the
+    // result is cached in node_modules/.vite keyed on the dependency set — so
+    // the cost is paid once, not once per file per run. Left OFF for the
+    // stubbed Workers packages: they are aliased above to local stubs, and
+    // pre-bundling would resolve the real ones.
+    deps: {
+      optimizer: {
+        ssr: {
+          enabled: true,
+          exclude: ['@cloudflare/workers-oauth-provider', 'agents/mcp'],
+        },
+      },
+    },
+    // Do NOT set pool: 'threads' here. It was tried and the run dies with a
+    // SIGSEGV (exit 139): 312 specs drive an in-memory better-sqlite3, and that
+    // native addon does not survive being loaded into worker_threads even
+    // though each worker builds its own Database. The default forks pool is a
+    // requirement, not an oversight.
+    //
+    // maxWorkers is deliberately NOT capped either. Capping it to 4 on an
+    // 8-core machine was measured at 694s against 611s uncapped — a 13% loss —
+    // while the forks only held ~300MB each, so memory was never the
+    // constraint. Leave the pool sized to the machine.
     // Load `scripts/*.mjs` (e.g. the tenant-scoping gate) via native Node import
     // instead of vitest's transform pipeline, which throws "Invalid or unexpected
     // token" on these standalone build scripts. Tests import their exported pure

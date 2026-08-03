@@ -150,6 +150,14 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     { table: 'agreement_signers',  column: 'signature_base64', category: 'user.biometric.signature', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
     { table: 'agreement_requests', column: 'signature_base64', category: 'user.biometric.signature', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
     { table: 'esign_audit_logs',   column: 'signature',        category: 'system.integrity',         action: 'retain', legalBasis: 'art_17_3_e' },
+
+    // ── reports ───────────────────────────────────────────────────────────────
+    // A report is findings about a named person's property, and `title` is the
+    // one free-text column a human writes — it routinely carries the address
+    // ("123 Oak St — Radon"). Anonymised rather than deleted: the row is the
+    // spine of a signed, delivered document, and removing it would strand the
+    // version chain that proves what was delivered.
+    { table: 'reports', column: 'title', category: 'user.address', action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y' },
 ];
 
 /**
@@ -195,6 +203,19 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'contact_role_profiles', column: 'email_template_id',        reason: 'template reference, not personal data' },
     { table: 'sms_consent_log',       column: 'recipient_type',           reason: 'role-kind enum, not personal data' },
     { table: 'report_versions',       column: 'signature',                reason: 'report-content integrity seal, not personal data' },
+    // ── reports ───────────────────────────────────────────────────────────────
+    // A report is findings about a named person's property. Only `title` is
+    // free text a human writes, and it routinely carries the address ("123 Oak
+    // St — Radon"). The rest of the row is ids, enums and a timestamp, declared
+    // out of scope below.
+    { table: 'reports',               column: 'inspection_id',            reason: 'opaque id; the inspection row carries its own rules' },
+    { table: 'reports',               column: 'tenant_id',                reason: 'tenant scope key, not personal data' },
+    { table: 'reports',               column: 'id',                       reason: 'opaque primary key' },
+    { table: 'reports',               column: 'kind',                     reason: 'primary/ancillary enum, not personal data' },
+    { table: 'reports',               column: 'inspection_service_id',    reason: 'billing-line reference, not personal data' },
+    { table: 'reports',               column: 'template_id',              reason: 'template reference, not personal data' },
+    { table: 'reports',               column: 'status',                   reason: 'workflow enum, not personal data' },
+    { table: 'reports',               column: 'created_at',               reason: 'record timestamp, not personal data' },
     // The tenant's own published Privacy / Terms. `body_snapshot` is the
     // company's prose, not a data subject's data, and the row's whole purpose is
     // to be immutable — erasing it would destroy the record of what a document

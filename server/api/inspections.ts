@@ -26,6 +26,7 @@ import bulkRoutes from './inspections/bulk';
 import mediaRoutes from './inspections/media';
 import mediaStudioRoutes from './inspections/media-studio';
 import publishRoutes from './inspections/publish';
+import reportGateRoutes from './inspections/report-gate';
 import reportDeliveryRoutes from './inspections/report-delivery';
 import sendSmsRoutes from './inspections/send-sms';
 import agreementsRoutes from './inspections/agreements';
@@ -47,6 +48,7 @@ export const inspectionsRoutes = createApiRouter()
     .route('/', mediaRoutes)
     .route('/', mediaStudioRoutes)
     .route('/', publishRoutes)
+    .route('/', reportGateRoutes)
     .route('/', reportDeliveryRoutes)
     // Communication A3.4 — manual SMS via the shared sendOneSms TCPA core.
     .route('/', sendSmsRoutes)

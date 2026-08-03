@@ -213,6 +213,12 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      */
     private tenantId:          string | null = null;
     private inspectionId:      string | null = null;
+    // Which DOCUMENT this Y.Doc is. The DO is addressed per report, and the D1
+    // projection must be written per report too — an inspection now has one
+    // results row PER report, so writing by inspection id would overwrite every
+    // sibling document with this one. Fixing the DO address alone leaves that
+    // second path open.
+    private reportId:          string | null = null;
     /** True once identity has been written to DO storage (avoids redundant puts). */
     private identityPersisted: boolean       = false;
     /**
@@ -287,8 +293,10 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             // authorized route is the trust boundary).
             const headerTenantId     = req.headers.get('x-tenant-id');
             const headerInspectionId = req.headers.get('x-inspection-id');
+            const headerReportId     = req.headers.get('x-report-id');
             if (headerTenantId)     this.tenantId     = headerTenantId;
             if (headerInspectionId) this.inspectionId = headerInspectionId;
+            if (headerReportId) this.reportId = headerReportId;
 
             // M3: fail-closed — reject the upgrade if identity is unknown from
             // both headers and stored state (hydrate() would have loaded it).
@@ -398,8 +406,10 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             // mirroring the /ws path identity acquisition (the DO trusts the route).
             const headerTenantId     = req.headers.get('x-tenant-id');
             const headerInspectionId = req.headers.get('x-inspection-id');
+            const headerReportId     = req.headers.get('x-report-id');
             if (headerTenantId)     this.tenantId     = headerTenantId;
             if (headerInspectionId) this.inspectionId = headerInspectionId;
+            if (headerReportId) this.reportId = headerReportId;
 
             await this.restructure();
             return Response.json({ ok: true });
@@ -504,8 +514,13 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             })
             .where(
                 and(
-                    eq(inspectionResults.tenantId,     tenantId),
-                    eq(inspectionResults.inspectionId, inspectionId),
+                    eq(inspectionResults.tenantId, tenantId),
+                    // Per REPORT when we know which one. An inspection can now
+                    // carry several results rows, and matching on inspection id
+                    // alone updates all of them with this document.
+                    this.reportId
+                        ? eq(inspectionResults.reportId, this.reportId)
+                        : eq(inspectionResults.inspectionId, inspectionId),
                 ),
             );
 
@@ -519,6 +534,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                 id:           crypto.randomUUID(),
                 tenantId,
                 inspectionId,
+                ...(this.reportId ? { reportId: this.reportId } : {}),
                 ydocState:    stateUpdate,
                 data:         projection,
                 lastSyncedAt: new Date(),

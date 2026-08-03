@@ -11,6 +11,7 @@
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
 import { makeCsrfToken } from './helpers/csrf';
+import { COMPANY_NAME } from './helpers/tenant-identity';
 
 const BASE_URL = 'http://127.0.0.1:8789';
 const NAV_TIMEOUT = 15000;
@@ -54,7 +55,7 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
         // the api project's SETUP test).
         const csrf = await getCsrfToken(request);
         await request.post(`${BASE_URL}/api/auth/setup`, {
-            data: { companyName: 'Mobile Test Corp', adminName: 'Test Admin', email: ADMIN_EMAIL, password: ADMIN_PASSWORD, verificationCode: '000000' },
+            data: { companyName: COMPANY_NAME, adminName: 'Test Admin', email: ADMIN_EMAIL, password: ADMIN_PASSWORD, verificationCode: '000000' },
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, 'Cookie': `__Host-csrf_token=${csrf}` },
         });
         adminToken = await loginApi(request, ADMIN_EMAIL, ADMIN_PASSWORD);

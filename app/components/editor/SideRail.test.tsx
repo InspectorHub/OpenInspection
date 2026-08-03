@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { render, screen } from '@testing-library/react';
 import { SideRail } from '~/components/editor/SideRail';
 

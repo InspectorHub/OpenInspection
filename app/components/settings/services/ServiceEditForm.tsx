@@ -31,10 +31,13 @@ interface EditableService {
 export function ServiceEditForm({
   service,
   templates,
+  otherServices = [],
   onCancel,
 }: {
   service: EditableService;
   templates: Array<{ id: string; name: string }>;
+  /** The rest of the catalogue, so the template picker can warn about sharing. */
+  otherServices?: Array<{ id: string; name: string; templateId: string | null }>;
   onCancel: () => void;
 }) {
   const [form, fields] = useForm({
@@ -70,6 +73,7 @@ export function ServiceEditForm({
         templates={templates}
         initialPriceCents={service.price}
         initialTemplateId={service.templateId ?? ""}
+        otherServices={otherServices.filter((s) => s.id !== service.id)}
       />
       {form.errors && (
         <div className="px-3 py-2 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg">

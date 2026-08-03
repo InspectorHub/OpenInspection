@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-89 — what a client sees in the seconds between paying and the webhook
  * settling the invoice.

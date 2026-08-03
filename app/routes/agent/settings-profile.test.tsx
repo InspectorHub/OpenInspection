@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Spec 3 Task 4b — agent profile round-trip (GET /api/agent/profile wiring +
  * slug/notification save on /agent-settings/profile).

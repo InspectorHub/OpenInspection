@@ -1,7 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, asc, isNull, ne, inArray, sql } from 'drizzle-orm';
-import { services, inspectionServices, discountCodes, serviceInspectors, users, inspections } from '../lib/db/schema';
+import { eq, and, asc, inArray, sql } from 'drizzle-orm';
+import { services, inspectionServices, discountCodes, inspections, eventTypes } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { getServiceInspectors, setServiceInspectors } from './service/qualification';
 import { nanoid } from 'nanoid';
 import type { z } from 'zod';
 import type { CreateServiceSchema, UpdateServiceSchema, CreateDiscountCodeSchema } from '../lib/validations/service.schema';
@@ -20,6 +21,34 @@ export class ServiceService {
         return db.select().from(services)
             .where(and(eq(services.tenantId, tenantId), eq(services.active, true)))
             .orderBy(asc(services.sortOrder), asc(services.name));
+    }
+
+    /**
+     * The visits a service implies, resolved from its stored event-type slugs
+     * and returned in the order the fixture declares them — for radon that is
+     * drop-off before pickup, which is the whole point.
+     *
+     * A slug with no matching event type is SKIPPED rather than erroring. That
+     * is the deliberate consequence of storing slugs instead of a hard
+     * reference: a tenant who tidies up their event types gets a shorter
+     * proposal, not a 500 on the order screen. Returning [] for a service with
+     * no defaults is the same rule with an empty list.
+     */
+    async proposeEventsForService(tenantId: string, serviceId: string) {
+        const db = this.getDrizzle();
+        const svc = await db.select({ slugs: services.defaultEventTypeSlugs }).from(services)
+            .where(and(eq(services.id, serviceId), eq(services.tenantId, tenantId)))
+            .get();
+        const slugs = svc?.slugs ?? [];
+        if (slugs.length === 0) return [];
+
+        const rows = await db.select().from(eventTypes)
+            .where(and(eq(eventTypes.tenantId, tenantId), inArray(eventTypes.slug, slugs)))
+            .all();
+        const bySlug = new Map(rows.map(r => [r.slug as string, r]));
+        // Order comes from the service's own list, not from the query — a
+        // pickup proposed before its drop-off is a nonsense visit sequence.
+        return slugs.map(s => bySlug.get(s)).filter((r): r is NonNullable<typeof r> => r != null);
     }
 
     async createService(tenantId: string, data: CreateServiceData) {
@@ -66,12 +95,17 @@ export class ServiceService {
         await db.update(services).set({ active: false }).where(and(eq(services.id, id), eq(services.tenantId, tenantId)));
     }
 
+    /**
+     * The live lines on an inspection. Excludes soft-deleted ones: a line the
+     * client declined at the door is history, not something still billed.
+     */
     async getInspectionServices(tenantId: string, inspectionId: string) {
         const db = this.getDrizzle();
         return db.select().from(inspectionServices)
             .where(and(
                 eq(inspectionServices.inspectionId, inspectionId),
-                eq(inspectionServices.tenantId, tenantId)
+                eq(inspectionServices.tenantId, tenantId),
+                eq(inspectionServices.active, true),
             ));
     }
 
@@ -121,7 +155,19 @@ export class ServiceService {
                 eq(inspectionServices.serviceId, serviceId),
             ))
             .limit(1).get();
-        if (existing) return existing;
+        if (existing?.active) return existing;
+        if (existing) {
+            // Declined at the door, then wanted after all. REACTIVATE the row
+            // rather than inserting a second one: a `reports` row or a pay split
+            // may already point at this id, and a fresh row would strand them
+            // while the client is billed for the line they can see.
+            await db.update(inspectionServices).set({ active: true })
+                .where(and(
+                    eq(inspectionServices.id, existing.id),
+                    eq(inspectionServices.tenantId, tenantId),
+                ));
+            return { ...existing, active: true };
+        }
 
         const id = nanoid();
         await db.insert(inspectionServices).values({
@@ -161,17 +207,39 @@ export class ServiceService {
         return updated[0];
     }
 
-    /** IA-87 — drop a service line from an inspection. */
+    /**
+     * IA-87 — drop a service line from an inspection.
+     *
+     * Soft delete, so the history of what was sold survives a scope change at
+     * the door — and so a `reports` row or a pay split that points at this line
+     * still finds it.
+     *
+     * The REFUSAL half of this guard is deliberately not stubbed here. Neither
+     * `reports` nor `inspection_service_pay_splits` exists yet, so a check
+     * against them would be a function that always returns "nothing blocks
+     * this" — a gate that passes vacuously, which this repo has shipped before.
+     * Each of those tasks adds its own clause, with a test, when it creates the
+     * table. What lands now is the column and the soft delete, which is what
+     * has to exist BEFORE the first row points here.
+     */
     async removeInspectionService(tenantId: string, inspectionId: string, lineId: string) {
         const db = this.getDrizzle();
-        const removed = await db.delete(inspectionServices)
+        const line = await db.select({ id: inspectionServices.id, active: inspectionServices.active })
+            .from(inspectionServices)
             .where(and(
                 eq(inspectionServices.id, lineId),
                 eq(inspectionServices.tenantId, tenantId),
                 eq(inspectionServices.inspectionId, inspectionId),
             ))
-            .returning({ id: inspectionServices.id });
-        if (removed.length === 0) throw Errors.NotFound('Service line not found');
+            .get();
+        if (!line || !line.active) throw Errors.NotFound('Service line not found');
+
+        await db.update(inspectionServices).set({ active: false })
+            .where(and(
+                eq(inspectionServices.id, lineId),
+                eq(inspectionServices.tenantId, tenantId),
+                eq(inspectionServices.inspectionId, inspectionId),
+            ));
     }
 
     async listDiscountCodes(tenantId: string) {
@@ -224,84 +292,14 @@ export class ServiceService {
         return rows[0];
     }
 
-    // IA-26 — per-service inspector qualification write face
-
-    /**
-     * Returns the current list of restricted inspector userIds for a service.
-     * An empty list means all staff are qualified (no rows = open).
-     * Throws 404 if the service does not belong to the given tenant.
-     */
+    // IA-26 — per-service inspector qualification. The implementation lives in
+    // service/qualification.ts; these delegates keep every caller unchanged.
     async getServiceInspectors(tenantId: string, serviceId: string): Promise<string[]> {
-        const db = this.getDrizzle();
-        const svc = await db.select({ id: services.id }).from(services)
-            .where(and(eq(services.id, serviceId), eq(services.tenantId, tenantId)))
-            .limit(1).get();
-        if (!svc) throw Errors.NotFound('Service not found');
-
-        const rows = await db.select({ userId: serviceInspectors.userId }).from(serviceInspectors)
-            .where(and(eq(serviceInspectors.serviceId, serviceId), eq(serviceInspectors.tenantId, tenantId)))
-            .all();
-        return rows.map(r => r.userId);
+        return getServiceInspectors(this.getDrizzle(), tenantId, serviceId);
     }
 
-    /**
-     * Full-replace the inspector restriction list for a service.
-     * Empty userIds = clear all rows (back to "all staff qualified").
-     * Validates that every provided userId is a non-deleted, non-agent tenant member.
-     * Throws 404 if the service is not found in the tenant; 400 on invalid userIds.
-     */
     async setServiceInspectors(tenantId: string, serviceId: string, userIds: string[]): Promise<number> {
-        const db = this.getDrizzle();
-
-        // 404 guard
-        const svc = await db.select({ id: services.id }).from(services)
-            .where(and(eq(services.id, serviceId), eq(services.tenantId, tenantId)))
-            .limit(1).get();
-        if (!svc) throw Errors.NotFound('Service not found');
-
-        if (userIds.length > 0) {
-            // Validate: every userId must be a non-deleted, non-agent member of the tenant.
-            const validMembers = await db.select({ id: users.id }).from(users)
-                .where(and(
-                    eq(users.tenantId, tenantId),
-                    isNull(users.deletedAt),
-                    ne(users.role, 'agent'),
-                    inArray(users.id, userIds),
-                ))
-                .all();
-            const validSet = new Set(validMembers.map(m => m.id));
-            const invalid = userIds.filter(id => !validSet.has(id));
-            if (invalid.length > 0) {
-                throw Errors.BadRequest(`Invalid or ineligible user IDs: ${invalid.join(', ')}`);
-            }
-        }
-
-        // Full-replace atomically: delete existing rows then insert new ones in one
-        // db.batch() so a failed insert can never leave zero rows (fail-open).
-        // Drivers without batch support (e.g. the better-sqlite3 unit-test mock)
-        // fall back to sequential statements, matching the pattern in
-        // starter-content.service.ts:batchInsert.
-        const deleteStmt = db.delete(serviceInspectors)
-            .where(and(eq(serviceInspectors.serviceId, serviceId), eq(serviceInspectors.tenantId, tenantId)));
-
-        if (userIds.length > 0) {
-            const now = new Date();
-            const insertStmt = db.insert(serviceInspectors).values(
-                userIds.map(userId => ({ serviceId, userId, tenantId, createdAt: now })),
-            );
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if (typeof (db as any).batch === 'function') {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                await (db as any).batch([deleteStmt, insertStmt]);
-            } else {
-                await deleteStmt;
-                await insertStmt;
-            }
-        } else {
-            await deleteStmt;
-        }
-
-        return userIds.length;
+        return setServiceInspectors(this.getDrizzle(), tenantId, serviceId, userIds);
     }
 
     async validateDiscountCode(tenantId: string, code: string, subtotal: number): Promise<{

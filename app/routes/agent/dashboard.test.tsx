@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Spec 3 Task 4c — dashboard welcome banner + highlight for the
  * just-converted inspection.

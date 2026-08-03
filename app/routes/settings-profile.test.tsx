@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The Profile page's Save button now owns exactly one card, and the email
  * signature toggle saves itself. That move created a trap on the way out.

@@ -5,6 +5,7 @@ export * from './media';
 export * from './comments';
 export * from './assignment';
 export * from './services';
+export * from './reports';
 export * from './automation';
 export * from './message-template';
 export * from './concierge';

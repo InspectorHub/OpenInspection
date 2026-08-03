@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // Renders MediaViewerToolbar under happy-dom via react-dom/client (no RTL dep in
 // this repo). JSX avoided so the file stays a .spec.ts and matches the vitest
 // glob; assertions query buttons by accessible name (text content).

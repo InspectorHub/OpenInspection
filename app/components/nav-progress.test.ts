@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * NavProgress render tests (issue #202, Tier 1).
  *

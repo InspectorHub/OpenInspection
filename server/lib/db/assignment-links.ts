@@ -10,9 +10,13 @@ export interface AssignmentOpts {
 
 /**
  * Shared statement builder — one inspection's full-replace resync as a list
- * of UNEXECUTED drizzle statements (delete + optional insert). Lead
- * resolution mirrors canEdit(): leadInspectorId ?? inspectorId. An
- * unassigned inspection simply yields the bare delete (zero rows after).
+ * of UNEXECUTED drizzle statements (delete + optional insert). An unassigned
+ * inspection simply yields the bare delete (zero rows after).
+ *
+ * `leadInspectorId ?? inspectorId` is the lead RESOLUTION RULE, applied once
+ * here, at the write. Readers do not repeat it — they read the lead row. That
+ * is the whole point of resolving it in one place: a rule applied at every
+ * read is a rule that eventually gets applied differently at one of them.
  */
 function buildSyncStatements(
     db: DrizzleD1Database,
@@ -38,11 +42,11 @@ function buildSyncStatements(
 }
 
 /**
- * DB-8 dual-write — replaces the inspection_inspectors rows for one
- * inspection so the link table mirrors the canonical columns on
- * `inspections` (inspectorId / leadInspectorId / helperInspectorIds JSON).
+ * Records who is assigned to one inspection. `inspection_inspectors` is where
+ * that fact lives — this is not a mirror of anything, and the opts below are
+ * the caller's INTENT, not a copy of columns read back off `inspections`.
  *
- * Call this AFTER any write that changes who is assigned. Full-replace
+ * Call this from any write that changes who is assigned. Full-replace
  * semantics: rows not re-supplied are removed. The helper never throws on
  * an unassigned inspection — it simply leaves zero rows.
  */

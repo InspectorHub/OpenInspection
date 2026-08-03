@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Task 11 (two-layer role model) — the `?` capability matrix on the Roles page.
  * Five booleans with no explanation is how email_template_id became IA-93:

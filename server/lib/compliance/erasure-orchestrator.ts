@@ -48,6 +48,7 @@ import {
     conciergeConfirmTokens,
     inspectionAccessTokens,
     inspectionRequests,
+    reports,
     erasureLog,
 } from '../db/schema';
 import {
@@ -55,6 +56,13 @@ import {
     ANONYMIZE_REQUEST_PII,
     ANONYMIZE_BOOKING_REQUEST_PII,
 } from './anonymize-pii';
+
+/**
+ * What a report title becomes. Not blank: a reader of the version chain needs
+ * to see that a document existed and was deliberately cleared, not wonder
+ * whether the field was never filled in.
+ */
+const ANONYMIZED_TITLE = 'Inspection Report (details removed)';
 
 /** A single recorded erasure decision (serialized into `decisions_json`). */
 interface ErasureDecision {
@@ -332,6 +340,38 @@ export async function runErasure(
         const res = await db.update(inspectionRequests)
             .set(ANONYMIZE_BOOKING_REQUEST_PII)
             .where(and(eq(inspectionRequests.tenantId, tenantId), eq(inspectionRequests.clientEmail, subjectEmail)))
+            .run();
+        const c = changeCount(res);
+        retainedCount += c; // rows retained with identity cleared under Art. 17(3)(e)
+        return c;
+    });
+
+    // A report TITLE is written by a human and routinely carries the property
+    // address ("123 Oak St — Radon"). The row itself survives: it is the spine
+    // of a signed, delivered document, and deleting it would strand the version
+    // chain that proves what was delivered. Only the title is cleared.
+    //
+    // Scoped through the subject's inspections rather than by matching the
+    // title text — an address can be spelled several ways, and a title that
+    // happens to mention someone else's street is not this subject's data.
+    await step('reports', 'anonymize', { legalBasis: 'art_17_3_e' }, async () => {
+        if (subjectContactIds.length === 0) return 0;
+        // Through inspection_people, NOT a column on `inspections`: the
+        // denormalized clientContactId was dropped when people became rows, and
+        // the schema comment says not to reintroduce it.
+        const inspRows = await db.select({ id: inspectionPeople.inspectionId })
+            .from(inspectionPeople)
+            .where(and(
+                eq(inspectionPeople.tenantId, tenantId),
+                inArray(inspectionPeople.contactId, subjectContactIds),
+            ))
+            .all();
+        const inspIds = [...new Set((inspRows as Array<{ id: string }>).map((i) => i.id))];
+        if (inspIds.length === 0) return 0;
+
+        const res = await db.update(reports)
+            .set({ title: ANONYMIZED_TITLE })
+            .where(and(eq(reports.tenantId, tenantId), inArray(reports.inspectionId, inspIds)))
             .run();
         const c = changeCount(res);
         retainedCount += c; // rows retained with identity cleared under Art. 17(3)(e)

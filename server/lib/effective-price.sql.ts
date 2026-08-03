@@ -35,6 +35,9 @@ const SVC_TENANT = qualified(inspectionServices, inspectionServices.tenantId);
 const SVC_INSPECTION = qualified(inspectionServices, inspectionServices.inspectionId);
 const SVC_OVERRIDE = qualified(inspectionServices, inspectionServices.priceOverride);
 const SVC_SNAPSHOT = qualified(inspectionServices, inspectionServices.priceSnapshot);
+// Soft-deleted lines are history, not money. Without this the sum keeps
+// charging for a service the client declined at the door.
+const SVC_ACTIVE = qualified(inspectionServices, inspectionServices.active);
 
 const INSP_ID = qualified(inspections, inspections.id);
 const INSP_TENANT = qualified(inspections, inspections.tenantId);
@@ -86,7 +89,8 @@ export const effectivePriceCentsSql: SQL<number> = sql<number>`coalesce(
     (select sum(coalesce(${SVC_OVERRIDE}, ${SVC_SNAPSHOT}))
        from ${inspectionServices}
       where ${SVC_TENANT} = ${INSP_TENANT}
-        and ${SVC_INSPECTION} = ${INSP_ID}),
+        and ${SVC_INSPECTION} = ${INSP_ID}
+        and ${SVC_ACTIVE} = 1),
     ${INSP_PRICE},
     0
 )`;

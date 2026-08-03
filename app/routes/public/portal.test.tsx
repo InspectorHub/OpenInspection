@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Spec 3 Task 7b — portal request-link success state cold-trail recovery
  * guidance.

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The /metrics page reads the server's aggregation response. The monthly
  * series is the server's source of truth: the endpoint returns

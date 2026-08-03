@@ -65,6 +65,16 @@ describe('GET /api/metrics — byInspector (IA-63)', () => {
             // Bob — attributed via lead_inspector_id, which must win over inspector_id.
             { id: 'i-b1', tenantId: TENANT, propertyAddress: '3 Oak', date: today, status: 'completed', paymentStatus: 'paid', price: 20000, inspectorId: U1, leadInspectorId: U2, createdAt: new Date() },
             { id: 'i-b2', tenantId: TENANT, propertyAddress: '4 Oak', date: today, status: 'completed', paymentStatus: 'paid', price: 5000, inspectorId: U1, leadInspectorId: U2, createdAt: new Date() },
+        ]);
+        // Attribution now comes from the roster's lead row, not from
+        // coalesce(lead_inspector_id, inspector_id). Same intent as the columns
+        // above: a1/a2 are Alice's, b1/b2 are Bob's even though Alice is the
+        // inspector_id on them.
+        await db.insert(schema.inspectionInspectors).values([
+            { inspectionId: 'i-a1', userId: U1, tenantId: TENANT, role: 'lead', createdAt: new Date() },
+            { inspectionId: 'i-a2', userId: U1, tenantId: TENANT, role: 'lead', createdAt: new Date() },
+            { inspectionId: 'i-b1', userId: U2, tenantId: TENANT, role: 'lead', createdAt: new Date() },
+            { inspectionId: 'i-b2', userId: U2, tenantId: TENANT, role: 'lead', createdAt: new Date() },
         ] as never);
 
         const res = await buildApp().request('/api/metrics?from=2024-01-01&to=2028-12-31', {}, ENV, CTX);
@@ -88,6 +98,10 @@ describe('GET /api/metrics — byInspector (IA-63)', () => {
         await db.insert(schema.inspections).values([
             { id: 'pub', tenantId: TENANT, propertyAddress: '1 Main', date, status: 'delivered', paymentStatus: 'paid', price: 10000, inspectorId: U1, createdAt: new Date() },
             { id: 'unpub', tenantId: TENANT, propertyAddress: '2 Oak', date, status: 'completed', paymentStatus: 'unpaid', price: 10000, inspectorId: U2, createdAt: new Date() },
+        ]);
+        await db.insert(schema.inspectionInspectors).values([
+            { inspectionId: 'pub', userId: U1, tenantId: TENANT, role: 'lead', createdAt: new Date() },
+            { inspectionId: 'unpub', userId: U2, tenantId: TENANT, role: 'lead', createdAt: new Date() },
         ] as never);
         // Alice's inspection published 3 days after the inspection date.
         await db.insert(schema.reportVersions).values({

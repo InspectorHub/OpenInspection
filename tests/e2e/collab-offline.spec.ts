@@ -30,8 +30,6 @@
  *
  * Run: npm run test:e2e -- collab-offline
  */
-import { execFileSync } from 'node:child_process';
-import { writeFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
@@ -47,46 +45,11 @@ const ADMIN_EMAIL = process.env.TEST_EMAIL || 'admin@autotest.com';
 const ADMIN_PASSWORD = process.env.TEST_PASSWORD || 'Password123!';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP_DIR = path.resolve(__dirname, '..', '..');
 
 // ─── Helpers (mirror collab-editing.spec.ts) ─────────────────────────────────
 
-/** PBKDF2-SHA256 (100k iters, 16-byte salt) — matches server/lib/password.ts. */
-async function hashPassword(password: string): Promise<string> {
-  const toHex = (b: Uint8Array) =>
-    Array.from(b).map((x) => x.toString(16).padStart(2, '0')).join('');
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveBits'],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' },
-    key,
-    256,
-  );
-  return `pbkdf2:${toHex(salt)}:${toHex(new Uint8Array(bits))}`;
-}
 
 /** Reset the known admin's password in LOCAL D1 so the login below is deterministic. */
-async function seedAdminPassword(): Promise<void> {
-  const hash = await hashPassword(ADMIN_PASSWORD);
-  const sql = `UPDATE users SET password_hash='${hash}' WHERE email='${ADMIN_EMAIL.replace(/'/g, "''")}';`;
-  const sqlFile = path.join(APP_DIR, '.collab-offline-e2e-seed.tmp.sql');
-  writeFileSync(sqlFile, sql, 'utf8');
-  try {
-    execFileSync(
-      process.execPath,
-      [path.join(APP_DIR, 'scripts', 'wrangler.mjs'), 'd1', 'execute', 'DB', '--local', '--file', sqlFile],
-      { cwd: APP_DIR, stdio: ['ignore', 'ignore', 'inherit'] },
-    );
-  } finally {
-    rmSync(sqlFile, { force: true });
-  }
-}
 
 async function loginApi(
   request: APIRequestContext,
@@ -196,7 +159,12 @@ let inspectionId = '';
 
 test.describe.serial('Collab offline + auto-reconnect — 2-client browser E2E (#181 PR-G)', () => {
   test.beforeAll(async ({ request }) => {
-    await seedAdminPassword();
+    // The admin password is already what POST /api/auth/setup wrote (both
+    // sides use ADMIN_PASSWORD), so the local seedAdminPassword() that used to
+    // run here re-hashed the same value onto the same row — at the cost of a
+    // `wrangler d1 execute --local` that held the SQLite file lock and forced
+    // workers:1 on the whole suite. The `api` project dependency guarantees
+    // the row exists.
     adminToken = await loginApi(request, ADMIN_EMAIL, ADMIN_PASSWORD);
 
     const tplRes = await apiPost(request, '/api/inspections/templates', adminToken, {

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-57 — the public repair-request page must show the recommended trade.
  *

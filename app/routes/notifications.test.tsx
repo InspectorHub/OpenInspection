@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The staff alert centre has to actually say what happened (IA-112).
  *

@@ -34,6 +34,29 @@ function makeMockDoNamespace(doFetchResponse?: Response) {
 
 // ── App builder ───────────────────────────────────────────────────────────────
 
+// The route now resolves who may edit from the ROSTER rather than from the
+// inspection row's lead/helper columns. Mock that one module: this spec's
+// subject is the route's 403/200 behaviour, not the SQL that fetches a roster
+// (which tests/unit/inspections/roster.spec.ts pins, including on the SQL).
+const getInspectionRoster = vi.fn();
+vi.mock('../../../server/lib/inspection/roster', () => ({
+    getInspectionRoster: (...args: unknown[]) => getInspectionRoster(...args),
+}));
+
+// The collab document is keyed per REPORT now, so the route resolves which one
+// before it can address a Durable Object. Mocked for the same reason as the
+// roster: this spec is about the route's auth and DO wiring, not about SQL.
+const resolvePrimaryReportId = vi.fn();
+vi.mock('../../../server/lib/inspection/reports', () => ({
+    resolvePrimaryReportId: (...args: unknown[]) => resolvePrimaryReportId(...args),
+}));
+
+const member = (id: string) => ({ id, name: id, email: `${id}@example.com` });
+const rosterOf = (lead: string | null, helpers: string[] = []) => ({
+    lead: lead ? member(lead) : null,
+    helpers: helpers.map(member),
+});
+
 interface BuildAppOptions {
     /** If null, simulate no JWT (middleware never ran). */
     tenantId?: string | null;
@@ -47,6 +70,8 @@ interface BuildAppOptions {
         tenantId?: string;
     } | 'not_found';
     doNamespace?: ReturnType<typeof makeMockDoNamespace>;
+    /** Who the roster says works this inspection. */
+    roster?: { lead: string | null; helpers?: string[] };
 }
 
 function buildApp(opts: BuildAppOptions = {}) {
@@ -61,9 +86,28 @@ function buildApp(opts: BuildAppOptions = {}) {
             tenantId: 't1',
         },
         doNamespace,
+        roster,
     } = opts;
 
     const mockDo = doNamespace ?? makeMockDoNamespace();
+
+    // Default the roster from the legacy lead/helper override so each existing
+    // case keeps asserting the same thing it always did.
+    const legacyHelpers: string[] = (() => {
+        if (inspectionOverride === 'not_found') return [];
+        try { return JSON.parse(inspectionOverride.helperInspectorIds ?? '[]') as string[]; }
+        catch { return []; }
+    })();
+    const effectiveRoster = roster ?? {
+        lead: inspectionOverride === 'not_found'
+            ? null
+            : (inspectionOverride.leadInspectorId ?? inspectionOverride.inspectorId ?? null),
+        helpers: legacyHelpers,
+    };
+    resolvePrimaryReportId.mockReset();
+    resolvePrimaryReportId.mockResolvedValue('rpt-insp1');
+    getInspectionRoster.mockReset();
+    getInspectionRoster.mockResolvedValue(rosterOf(effectiveRoster.lead, effectiveRoster.helpers ?? []));
 
     // Build a fake inspection object from the override.
     const fakeInspection =
@@ -93,7 +137,7 @@ function buildApp(opts: BuildAppOptions = {}) {
     // Simulate what the global JWT middleware + DI middleware set.
     app.use('*', async (c, next) => {
         // Set env bindings before any handler sees it (mirrors repair-builder harness).
-        c.env = { INSPECTION_DOC: mockDo } as unknown as HonoConfig['Bindings'];
+        c.env = { INSPECTION_DOC: mockDo, DB: {} } as unknown as HonoConfig['Bindings'];
         if (tenantId !== null)  c.set('tenantId', tenantId);
         if (userId   !== null)  c.set('user', { sub: userId } as never);
         if (userRole)           c.set('userRole', userRole as never);
@@ -184,7 +228,7 @@ describe('collab WS route — auth gate', () => {
 
     // ── (c) Authorized — DO is contacted with correct identity headers ────────
 
-    it('(c1) authorized primary inspector — DO idFromName called with tenantId:inspectionId', async () => {
+    it('(c1) authorized primary inspector — DO idFromName called with tenantId:reportId', async () => {
         const mockDo = makeMockDoNamespace();
         const { app } = buildApp({
             tenantId:  't1',
@@ -202,7 +246,7 @@ describe('collab WS route — auth gate', () => {
             '/api/inspections/insp1/collab/ws',
             { headers: { Upgrade: 'websocket' } },
         );
-        expect(mockDo.idFromName).toHaveBeenCalledWith('t1:insp1');
+        expect(mockDo.idFromName).toHaveBeenCalledWith('t1:rpt-insp1');
         expect(mockDo.get).toHaveBeenCalled();
         const fetchCall = mockDo.stubFetch.mock.calls[0][0] as Request;
         expect(fetchCall.headers.get('x-tenant-id')).toBe('t1');
@@ -227,7 +271,7 @@ describe('collab WS route — auth gate', () => {
             '/api/inspections/insp1/collab/ws',
             { headers: { Upgrade: 'websocket' } },
         );
-        expect(mockDo.idFromName).toHaveBeenCalledWith('t1:insp1');
+        expect(mockDo.idFromName).toHaveBeenCalledWith('t1:rpt-insp1');
     });
 
     // ── (d) Role-based access — admin/manager bypass assignment check ────────
@@ -252,7 +296,7 @@ describe('collab WS route — auth gate', () => {
         );
         // Must NOT be 403 — admin bypasses assignment check.
         expect(res.status).not.toBe(403);
-        expect(mockDo.idFromName).toHaveBeenCalledWith('t1:insp1');
+        expect(mockDo.idFromName).toHaveBeenCalledWith('t1:rpt-insp1');
     });
 
     it('(d2) manager user who is NOT assigned to the inspection is authorized', async () => {
@@ -274,7 +318,7 @@ describe('collab WS route — auth gate', () => {
             { headers: { Upgrade: 'websocket' } },
         );
         expect(res.status).not.toBe(403);
-        expect(mockDo.idFromName).toHaveBeenCalledWith('t1:insp1');
+        expect(mockDo.idFromName).toHaveBeenCalledWith('t1:rpt-insp1');
     });
 
     it('(d3) inspector user who is NOT assigned is still denied 403', async () => {

@@ -48,6 +48,23 @@ export class InvoiceService {
     }
 
     /**
+     * One invoice by id, tenant-scoped. Exists because both QuickBooks push
+     * sites need the amount and nothing else: the manual route was reading it
+     * out of a full `listInvoices` scan, and the Stripe webhook — which runs on
+     * every card settlement — must not do that.
+     *
+     * Returns `null` rather than throwing: a caller that cannot find the
+     * invoice has nothing to push, which is not an error.
+     */
+    async findById(tenantId: string, id: string) {
+        const db = this.getDrizzle();
+        const row = await db.select().from(invoices)
+            .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)))
+            .get();
+        return row ?? null;
+    }
+
+    /**
      * iter-2 production bug #10 — given an inspection id, return its most
      * recent invoice (if any) within the given tenant. Used by the public
      * `/invoice/:id` payment page that the report-gate "Pay invoice" CTA

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // "Times shown in {zone}" affordance for public pages that anchor dates to the
 // viewer's own browser zone. Names the zone in effect and lets the viewer switch.
 import { describe, it, expect, vi, afterEach } from "vitest";

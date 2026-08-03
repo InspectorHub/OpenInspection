@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Two rules for the hub's cards, because it is a column of siblings a reader
  * scans rather than reads — so position has to carry meaning on its own:

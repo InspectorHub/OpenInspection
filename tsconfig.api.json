@@ -23,7 +23,8 @@
     "incremental": true,
     "tsBuildInfoFile": "./.tsbuildinfo.api",
     "paths": {
-      "@core/api-types": ["./packages/api-types/index.ts"]
+      "@core/api-types": ["./packages/api-types/index.ts"],
+      "~/*": ["./app/*"]
     }
   },
   "include": ["server/**/*.ts", "server/**/*.tsx", "worker-configuration.d.ts"],

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-97 — the invoices list was a dead end. Three defects, one page:
  *

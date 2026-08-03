@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // #181 Task 12a — VersionHistoryPanel UI behaviour.
 //
 // Renders the panel under happy-dom via react-dom/client (no RTL dep in this

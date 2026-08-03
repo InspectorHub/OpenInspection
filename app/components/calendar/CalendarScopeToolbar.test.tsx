@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { CalendarScopeToolbar } from "./CalendarScopeToolbar";

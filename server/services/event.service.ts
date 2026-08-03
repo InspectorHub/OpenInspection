@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lte, asc } from 'drizzle-orm';
 import { eventTypes, inspectionEvents, automations, automationLogs } from '../lib/db/schema';
-import { EVENT_TYPE_SEEDS } from '../data/event-type-seeds';
+import { EVENT_TYPES } from './starter-content/fixtures/event-types';
 import { logger } from '../lib/logger';
 import { PeopleService } from './people.service';
 
@@ -59,7 +59,10 @@ export class EventService {
             .where(eq(eventTypes.tenantId, tenantId)).all();
         const existingSlugs = new Set(existing.map(e => e.slug as string));
         let seeded = 0, skipped = 0;
-        for (const seed of EVENT_TYPE_SEEDS) {
+        // Same list provisioning uses. This endpoint is now a repair tool —
+        // idempotent on slug, so it fills gaps for a tenant provisioned before a
+        // type existed and does nothing for anyone else.
+        for (const seed of EVENT_TYPES) {
             if (existingSlugs.has(seed.slug)) { skipped++; continue; }
             await d.insert(eventTypes).values({
                 id:        crypto.randomUUID(),

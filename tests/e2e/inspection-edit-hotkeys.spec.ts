@@ -17,6 +17,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { readEditorSeed } from './helpers/editor-seed';
+import { awaitEditorShortcutsReady } from './helpers/editor-ready';
 
 test.describe('Inspection Edit hotkeys (Sprint 1 A-1..A-9)', () => {
     test.beforeEach(async ({ page }) => {
@@ -30,8 +31,7 @@ test.describe('Inspection Edit hotkeys (Sprint 1 A-1..A-9)', () => {
         await page.click('button[type=submit]');
         await page.waitForURL('**/inspections');
         await page.goto(`/inspections/${seed!.inspectionId}/edit`);
-        // The RR v7 editor shell renders a single <main>; wait for it to hydrate.
-        await page.getByRole('main').waitFor({ state: 'visible' });
+        await awaitEditorShortcutsReady(page);
     });
 
     test('? opens keyboard HUD with all 5 rating rows', async ({ page }) => {

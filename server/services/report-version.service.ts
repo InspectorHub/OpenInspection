@@ -11,7 +11,7 @@
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, desc } from 'drizzle-orm';
-import { reportVersions, inspections, inspectionResults, inspectionUnits, users, inspectionInspectors, templates, tenantConfigs } from '../lib/db/schema';
+import { reports, reportVersions, inspections, inspectionResults, inspectionUnits, users, inspectionInspectors, templates, tenantConfigs } from '../lib/db/schema';
 import { computeDiff, SNAPSHOT_SCHEMA_VERSION, type Snapshot, type SnapshotInspector, type DiffPayload } from '../lib/version-diff';
 import { CredentialService } from './credential.service';
 import { resolveProfile } from '../lib/report-style/resolve';
@@ -41,17 +41,50 @@ export class ReportVersionService {
         return drizzle(this.db);
     }
 
+    /**
+     * Resolve which report a publish belongs to.
+     *
+     * Callers that predate multi-report publishing pass only an inspection, and
+     * for them the answer is its primary report. Callers that know which
+     * deliverable they are publishing pass `reportId` and skip this.
+     */
+    private async resolveReportId(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        db: any, tenantId: string, inspectionId: string, reportId?: string,
+    ): Promise<string | null> {
+        if (reportId) return reportId;
+        const primary = await db.select({ id: reports.id }).from(reports)
+            .where(and(
+                eq(reports.tenantId, tenantId),
+                eq(reports.inspectionId, inspectionId),
+                eq(reports.kind, 'primary'),
+            ))
+            .get();
+        return primary?.id ?? null;
+    }
+
     async snapshotOnPublish(
         tenantId: string,
         inspectionId: string,
         publishedBy: string,
         summary?: string,
+        reportId?: string,
     ): Promise<SnapshotResult> {
         const db = this.getDrizzle();
+        const targetReportId = await this.resolveReportId(db, tenantId, inspectionId, reportId);
 
-        // Compute next version number.
+        // Version numbers and the prevHash chain are per REPORT, not per
+        // inspection. Two reports on one order publish independently — the
+        // standard report on Tuesday, radon on Thursday — and interleaving them
+        // into one chain fails verification for BOTH, including for versions
+        // published before the second report existed.
         const prev = await db.select().from(reportVersions)
-            .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, inspectionId)))
+            .where(and(
+                eq(reportVersions.tenantId, tenantId),
+                targetReportId
+                    ? eq(reportVersions.reportId, targetReportId)
+                    : eq(reportVersions.inspectionId, inspectionId),
+            ))
             .orderBy(desc(reportVersions.versionNumber))
             .limit(1)
             .get();
@@ -106,6 +139,7 @@ export class ReportVersionService {
             id:             crypto.randomUUID(),
             tenantId,
             inspectionId,
+            reportId:       targetReportId,
             versionNumber:  nextVersion,
             snapshotJson,
             summary:        summary ?? null,
@@ -236,9 +270,15 @@ export class ReportVersionService {
 
         let chainValid: boolean;
         if (row.versionNumber > 1) {
+            // Walk the chain within this REPORT. Reading by inspection would
+            // pick up the other report's version and report a valid chain as
+            // broken (or worse, a broken one as valid) the moment an order
+            // delivers more than one document.
             const prev = await db.select().from(reportVersions).where(and(
                 eq(reportVersions.tenantId, row.tenantId),
-                eq(reportVersions.inspectionId, row.inspectionId),
+                row.reportId
+                    ? eq(reportVersions.reportId, row.reportId)
+                    : eq(reportVersions.inspectionId, row.inspectionId),
                 eq(reportVersions.versionNumber, row.versionNumber - 1),
             )).get();
             chainValid = !!prev && prev.contentHash === row.prevHash;

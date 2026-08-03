@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // tests/web/unit/report-card-stack.buttons.spec.ts
 //
 // Task 9 — Verifies that:

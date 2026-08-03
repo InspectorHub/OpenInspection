@@ -52,7 +52,10 @@ describe('seedStarterContent', () => {
         expect(result.inspectionTemplatesSeeded).toBe(7);
         expect(result.agreementTemplatesSeeded).toBe(1);
         expect(result.cannedCommentsSeeded).toBe(254);
-        expect(result.eventTypesSeeded).toBe(3);
+        // 7 since the two event-type seed lists were merged: the three main
+        // visits plus the radon pair, mold and water tests that the seeded
+        // service catalogue references.
+        expect(result.eventTypesSeeded).toBe(7);
         expect(result.tagsSeeded).toBe(4);
         expect(result.recommendationsSeeded).toBeGreaterThan(0);
         expect(result.ratingSystemsSeeded).toBeGreaterThan(0);

@@ -7,10 +7,12 @@ import { logger } from '../../lib/logger';
 import { createOiTemplateStore } from './template-store';
 import { resolveRuleRecipients, type ResolvedRecipient } from './recipients';
 import { automationClassId } from '../../lib/notifications/automation-classes';
+import { getInspectionRoster } from '../../lib/inspection/roster';
 import { interpolate } from './shared';
 import type { AutomationChannel, RecipientKind, Constructor, TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
+import { m } from '../../lib/i18n/messages';
 
 /**
  * Trigger mixin: fan out pending automation_log rows when a domain event fires,
@@ -322,14 +324,16 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 const roleKey = await roleKeyFor(recipientRoleProfileId);
                 if (roleKey) raw = (await contactForRole(roleKey))?.phone ?? null;
             } else if (recipientKind === 'inspector') {
-                // Verified against server/lib/db/schema/inspection.ts: the assigned
-                // inspector is `inspections.inspector_id` (text FK → users.id, line 46).
-                // `lead_inspector_id` (team mode) is the primary when set and falls back
-                // to inspector_id per its schema comment, so prefer lead then inspector.
-                // (The inspection_inspectors join table from DB-8 is a query face only;
-                // inspectorId/leadInspectorId remain canonical for single-value reads.)
+                // The lead comes from `inspection_inspectors`, which is where
+                // assignment lives. This is the same value the old
+                // `leadInspectorId ?? inspectorId` expression produced — that is
+                // literally how the lead row is resolved when it is written (see
+                // buildSyncStatements in lib/db/assignment-links.ts) — so the
+                // inspector_id fallback is kept only for inspections created
+                // before the link table existed and never re-assigned since.
                 // Unchanged by Task 11a — inspector is not an inspection_people role.
-                const inspectorId = insp.leadInspectorId ?? insp.inspectorId ?? null;
+                const roster = await getInspectionRoster(db, insp.tenantId, insp.id);
+                const inspectorId = roster.lead?.id ?? insp.inspectorId ?? null;
                 if (inspectorId) {
                     const u = await db.select({ phone: users.phone }).from(users)
                         .where(eq(users.id, inspectorId)).get().catch(() => null);
@@ -351,16 +355,32 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             return resolveRuleRecipients(this.db, rule, inspection, channel);
         }
 
+        /**
+         * The title STORED on a notice when a rule's template has no subject,
+         * or resolves to no template at all. Staff/ledger voice with the address
+         * — distinct from the recipient-voiced `notice_title_*` family that
+         * `app/lib/notice-view.ts` renders for types it recognises, which is why
+         * these carry the `comm_` prefix (same split as
+         * `comm_reason_sms_opt_out` vs `notice_reason_sms_opt_out`).
+         *
+         * Reading these through the catalogue does not yet make them render in
+         * the RECIPIENT's language — nothing resolves a recipient locale, and in
+         * a cron or queue context there is no request locale at all. It makes
+         * them reachable by a translator, which they were not before.
+         */
         protected titleFor(event: string, insp: typeof inspections.$inferSelect): string {
-            const addr = insp.propertyAddress || 'inspection';
+            const address = insp.propertyAddress || 'inspection';
             switch (event) {
-                case 'inspection.created':   return `New inspection scheduled — ${addr}`;
-                case 'inspection.confirmed': return `Inspection confirmed — ${addr}`;
-                case 'inspection.cancelled': return `Inspection cancelled — ${addr}`;
-                case 'report.published':     return `Report published — ${addr}`;
-                case 'invoice.created':      return `Invoice created — ${addr}`;
-                case 'payment.received':     return `Payment received — ${addr}`;
-                default:                     return `${event} — ${addr}`;
+                case 'inspection.created':   return m.comm_notice_title_inspection_created({ address });
+                case 'inspection.confirmed': return m.comm_notice_title_inspection_confirmed({ address });
+                case 'inspection.cancelled': return m.comm_notice_title_inspection_cancelled({ address });
+                case 'report.published':     return m.comm_notice_title_report_published({ address });
+                case 'invoice.created':      return m.comm_notice_title_invoice_created({ address });
+                case 'payment.received':     return m.comm_notice_title_payment_received({ address });
+                // Deliberately kept: a trigger can be added to the enum before a
+                // template exists for it, and a readable "<event> — <address>"
+                // beats an empty notice title. It is now translatable too.
+                default:                     return m.comm_notice_title_generic({ event, address });
             }
         }
 

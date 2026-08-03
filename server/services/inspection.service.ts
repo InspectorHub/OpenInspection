@@ -670,6 +670,16 @@ export class InspectionService {
         return this.status.markPaymentReceived(tenantId, inspectionId);
     }
 
+    async unlockReportGate(
+        tenantId: string, inspectionId: string, userId: string, reason: string,
+    ): Promise<{ alreadyUnlocked: boolean }> {
+        return this.status.unlockReportGate(tenantId, inspectionId, userId, reason);
+    }
+
+    async relockReportGate(tenantId: string, inspectionId: string): Promise<void> {
+        return this.status.relockReportGate(tenantId, inspectionId);
+    }
+
     /**
      * Spec 5B P2B — Compute defect category counts for a single inspection.
      *

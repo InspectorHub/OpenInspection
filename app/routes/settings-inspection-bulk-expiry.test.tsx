@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-36 ⑥ — the tenant-wide bulk-expiry control.
  *

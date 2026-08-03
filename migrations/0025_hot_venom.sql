@@ -1,0 +1,1 @@
+ALTER TABLE `services` ADD `default_event_type_slugs` text;

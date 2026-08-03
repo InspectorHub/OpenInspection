@@ -129,7 +129,15 @@ describe('ServiceService — service lines on an inspection (IA-87)', () => {
         const added = await svc.addInspectionService(TENANT, INSP_ID, SVC_ID);
         await svc.removeInspectionService(TENANT, INSP_ID, added.id);
 
-        expect(await linesOf(INSP_ID)).toHaveLength(0);
+        // Removal is now a SOFT delete — the row survives so a reports row or a
+        // pay split pointing at it still resolves, and so the history of what
+        // was sold outlives a scope change at the door. It is gone from the live
+        // list, which is what every reader consumes.
+        expect(await svc.getInspectionServices(TENANT, INSP_ID)).toHaveLength(0);
+        const raw = await linesOf(INSP_ID);
+        expect(raw).toHaveLength(1);
+        expect(raw[0].active).toBe(false);
+
         const catalog = await db.select().from(schema.services).where(eq(schema.services.id, SVC_ID)).get();
         expect(catalog?.active).toBe(true);
     });

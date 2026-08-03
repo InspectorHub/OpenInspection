@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Free-tier "at cap" gate — the New Inspection wizard should show the
  * upgrade panel IMMEDIATELY when it opens for a tenant already at the free

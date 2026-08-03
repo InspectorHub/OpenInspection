@@ -15374,6 +15374,33 @@
     "description": "Invalidates all existing 2FA recovery codes and returns a fresh set of eight. Requires the current password plus a valid TOTP or recovery code."
   },
   {
+    "operationId": "relockInspectionReport",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/relock-report",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Restore the report gate for this inspection",
+    "description": "Restores the agreement/payment gate for this inspection and clears the recorded unlock reason."
+  },
+  {
     "operationId": "remindTenantAgreementsRequestSigner",
     "method": "POST",
     "pathTemplate": "/api/admin/agreements/requests/{requestId}/signers/{signerId}/remind",
@@ -17477,6 +17504,46 @@
     },
     "summary": "Record an inspector's use of a snippet (per-user counter)",
     "description": "Increment per-user usage counter for a comment library entry."
+  },
+  {
+    "operationId": "unlockInspectionReport",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/unlock-report",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Why this report is being released before the agreement or payment gate is satisfied."
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      }
+    },
+    "summary": "Unlock the report gate for this inspection",
+    "description": "Releases the agreement/payment gate for every report on this inspection. The gate is order-wide, so this is the way to hand over a finished report that is held back by paperwork attached to something else on the same job. Records who unlocked it and why."
   },
   {
     "operationId": "unpublishReport",

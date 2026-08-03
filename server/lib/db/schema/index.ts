@@ -30,6 +30,7 @@ export {
     commentUsage,
     defectCategories,
     costItems,
+    reports,
 } from './inspection';
 export { inspectorCredentials } from './inspection/inspector-credentials';
 export { commercialSubtypes } from './commercial-subtypes';

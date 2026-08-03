@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The two signature cards, and the rule they exist to keep.
  *

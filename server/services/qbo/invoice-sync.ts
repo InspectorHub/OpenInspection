@@ -191,7 +191,23 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
             }
         }
 
-        async recordPayment(tenantId: string, invoiceId: string, amountPaid: number): Promise<void> {
+        /**
+         * QuickBooks is the tenant's book of record, so a duplicate Payment
+         * overstates their revenue and their tax position. `idempotencyKey`
+         * becomes QBO's `requestid`: Intuit's contract is that a repeated key
+         * returns the ORIGINAL response instead of performing the operation
+         * again, which is what stops a Stripe webhook redelivery — or the
+         * manual route and the webhook both firing for one invoice — becoming a
+         * second Payment.
+         *
+         * It must identify the FACT, not the attempt. A per-attempt uuid is
+         * unique every time and therefore protects nothing. Keys are unique per
+         * company forever, so derive them from a row id and never from a
+         * counter.
+         */
+        async recordPayment(
+            tenantId: string, invoiceId: string, amountPaid: number, idempotencyKey: string,
+        ): Promise<void> {
             const db = this.getDrizzle();
             const invoiceMap = await db.select().from(qboEntityMap).where(
                 and(eq(qboEntityMap.tenantId, tenantId), eq(qboEntityMap.oiType, 'invoice'), eq(qboEntityMap.oiId, invoiceId)),
@@ -205,7 +221,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
             }
 
             try {
-                await this.apiCall(tenantId, 'POST', 'payment', {
+                await this.apiCall(tenantId, 'POST', `payment?requestid=${encodeURIComponent(idempotencyKey)}`, {
                     CustomerRef: { value: qboCustomerId },
                     TotalAmt:    amountPaid,
                     TxnDate:     new Date().toISOString().slice(0, 10),

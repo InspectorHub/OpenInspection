@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The consent block, and the one control it deliberately does NOT have.
  *

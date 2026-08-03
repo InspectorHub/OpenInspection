@@ -195,12 +195,18 @@ async function seedDefaultAgreement(db: D1Database, tenantId: string): Promise<v
 // inspection products that customers pick from on /book; without them the
 // public booking page has no items to add to cart. Idempotent on
 // (tenant_id, name).
+//
+// The column list was `price` and `active`; the actual columns are `price_cents`
+// and `is_active`, so every run of this threw and was swallowed by the catch
+// below — a standalone tenant has never had a seeded catalogue, and the warning
+// said so in a log nobody reads. Found because the E2E run surfaced it while
+// failing for an unrelated reason.
 async function seedDefaultServices(db: D1Database, tenantId: string): Promise<void> {
     try {
         await db.prepare(`
             INSERT INTO services (
-                id, tenant_id, name, description, price, duration_minutes,
-                template_id, agreement_id, active, sort_order, created_at
+                id, tenant_id, name, description, price_cents, duration_minutes,
+                template_id, agreement_id, is_active, sort_order, created_at
             )
             SELECT
                 ${SQL_UUID_V4}, ?, x.name, x.description, x.price, x.duration_minutes,

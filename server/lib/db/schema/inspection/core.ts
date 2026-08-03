@@ -115,13 +115,27 @@ export const inspections = sqliteTable('inspections', {
     conciergeStatus:     text('concierge_status'),
     // Design System 0520 M3 — TeamMode + multi-inspector (subsystem B, phase 1).
     //   teamMode             = boolean flag enabling team UI (TeamBanner / RosterPopover).
-    //   leadInspectorId      = primary inspector. NULL ⇒ falls back to inspectorId above.
-    //   helperInspectorIds   = JSON array of additional inspectors with edit access.
+    //   leadInspectorId      = -- DEAD (2026-08-03): replaced by inspection_inspectors.
+    //   helperInspectorIds   = -- DEAD (2026-08-03): replaced by inspection_inspectors.
     //   dataVersion          = monotonic counter; bumped on every successful field write
     //                          (see InspectionService.patchItem) for offline-queue staleness checks.
     //                          Superseded by the Yjs state vector under collab editing (#181);
     //                          column frozen — stop writes once the DO is the authority.
     teamMode:            integer('is_team_mode', { mode: 'boolean' }).notNull().default(false),
+    // -- DEAD (2026-08-03): replaced by inspection_inspectors.
+    //
+    // Zero production rows ever carried either: lead_inspector_id was NULL on all
+    // 19 inspections and helper_inspector_ids was '[]' on all of them. They were
+    // still READ — metrics attributed work via coalesce(lead_inspector_id,
+    // inspector_id) and collab access granted editing to the lead and the helpers
+    // JSON — so the two agreed with the rest of the app only by being empty. The
+    // first write of either would have made "who worked this" and, worse, "who may
+    // EDIT this" answer differently from everywhere else.
+    //
+    // A JSON array of ids cannot be indexed, joined, or carry a role beyond its
+    // position, which is what the link table exists to fix. No reads, no writes.
+    // Columns frozen — D1 cannot rebuild an FK-referenced table — and neither name
+    // is ever reused. Same treatment as `comments.rating_bucket`.
     leadInspectorId:     text('lead_inspector_id'),
     helperInspectorIds:  text('helper_inspector_ids').notNull().default('[]'),
     dataVersion:         integer('data_version').notNull().default(0),
@@ -131,6 +145,11 @@ export const inspections = sqliteTable('inspections', {
     // creation order among re-inspections sharing root. All NULL on originals.
     sourceInspectionId: text('source_inspection_id'),
     rootInspectionId:   text('root_inspection_id'),
+    // A re-inspection is its own ORDER, not a second report on the original.
+    // It is created as a new `inspections` row carrying this round number, and
+    // that is correct: it is a separate fee-bearing visit with its own
+    // agreement and its own invoice. Folding it into the original order as an
+    // ancillary report would put two of each behind one order id.
     reinspectionRound:  integer('reinspection_round'),
     // Commercial PCA Phase F — multi-unit inspection mode. 'tagged' (default,
     // Spectora-parity): the section/item checklist stays fixed and each defect
@@ -187,6 +206,26 @@ export const inspections = sqliteTable('inspections', {
     // App-layer soft reference to contacts.id; no FK per Schema Rules.
     // Appended at table end for D1 rebuild safety.
     referredByContactId: text('referred_by_contact_id'),
+    // Manual release of the report gate for THIS inspection.
+    //
+    // The gate is order-wide by design: any required agreement left unsigned, or
+    // payment outstanding, blocks every report on the inspection. That rule is
+    // simple to explain and matches what a client thinks they bought — one job,
+    // one set of paperwork — but it means an add-on's unsigned addendum can hold
+    // back a report that is finished and that someone is waiting for.
+    //
+    // The release for that is a deliberate human action, not a finer-grained
+    // gate: an owner or manager opens this one inspection and says why. Making
+    // the gate itself per-report would put a service dimension on
+    // `agreement_requests`, which is signed evidence with a retention rule, to
+    // solve a problem a one-line override solves.
+    //
+    // NULL = still gated. The reason is required at the API, not by the column,
+    // so existing rows do not need one.
+    // Appended at table end for D1 rebuild safety.
+    unlockedAt:          integer('unlocked_at', { mode: 'timestamp_ms' }),
+    unlockedBy:          text('unlocked_by'),
+    unlockReason:        text('unlock_reason'),
 }, (t) => [
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),
@@ -243,8 +282,16 @@ export const inspectionResults = sqliteTable('inspection_results', {
     // source rating system afterwards never mutates an existing inspection.
     ratingSystemId:       text('rating_system_id'),
     ratingSystemSnapshot: text('rating_system_snapshot', { mode: 'json' }),
+    // The report this document belongs to. One order can now deliver several —
+    // a standard report and a radon report — so the uniqueness that used to be
+    // per INSPECTION is per REPORT. Nullable only so the backfill can run in
+    // order; every row carries one afterwards.
+    // Appended at table end for D1 rebuild safety.
+    reportId:             text('report_id'),
 }, (t) => [
     index('idx_results_tenant').on(t.tenantId),
     index('idx_results_inspection').on(t.inspectionId),
-    uniqueIndex('uq_results_inspection').on(t.inspectionId),
+    // Was uq_results_inspection. A second report on one order is the whole
+    // point of the reports entity; the old index made it impossible.
+    uniqueIndex('uq_results_report').on(t.reportId),
 ]);

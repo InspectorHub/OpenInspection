@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * One source for the <Elements> options both pay surfaces mount with.
  *

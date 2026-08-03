@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The agent repair-items page groups by PROPERTY / transaction, not by defect
  * category — the same first-level structure the agent dashboard uses. An agent's

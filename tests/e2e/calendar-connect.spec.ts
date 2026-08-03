@@ -1,15 +1,13 @@
 /**
  * Calendar multiprovider connect — API-level E2E (no real Google calls).
  *
- * Seeds encrypted calendar_connections rows directly, then exercises
- * capability gating + disconnect against the running worker.
+ * Seeds encrypted calendar_connections rows through a fail-closed test hook
+ * on the running worker, then exercises capability gating + disconnect.
  */
 import { test, expect } from '@playwright/test';
-import { execSync } from 'node:child_process';
-import { existsSync, writeFileSync, rmSync } from 'node:fs';
+import type { APIRequestContext } from '@playwright/test';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import os from 'node:os';
 import { loadDevVars } from '../helpers/dev-vars';
 import { sealCredentials } from '../../server/lib/calendar/credentials';
 import { csrfHeaders } from './helpers/csrf';
@@ -23,11 +21,6 @@ const ADMIN_PASSWORD = 'Password123!';
 
 const env = loadDevVars(APP_DIR);
 const JWT_SECRET = env.JWT_SECRET || 'dev-jwt-secret-change-me-in-production';
-
-function wranglerCfg(): string {
-    return process.env.WRANGLER_CONFIG ||
-        (existsSync(resolve(APP_DIR, 'wrangler.local.jsonc')) ? 'wrangler.local.jsonc' : 'wrangler.jsonc');
-}
 
 function decodeJwtPayload(token: string): { sub: string; 'custom:tenantId'?: string } {
     const payload = token.split('.')[1] ?? '';
@@ -74,21 +67,8 @@ async function loginSession(request: import('@playwright/test').APIRequestContex
     };
 }
 
-function d1ExecuteSql(sql: string) {
-    const file = resolve(os.tmpdir(), `cal-e2e-${Date.now()}.sql`);
-    writeFileSync(file, sql, 'utf8');
-    const cfg = wranglerCfg();
-    try {
-        execSync(`npx wrangler d1 execute DB --local -c ${cfg} --file "${file}" --yes`, {
-            cwd: APP_DIR,
-            stdio: 'pipe',
-        });
-    } finally {
-        rmSync(file, { force: true });
-    }
-}
-
 async function seedConnection(
+    request: APIRequestContext,
     tenantId: string,
     userId: string,
     capability: 'availability_read' | 'events_read_write',
@@ -98,23 +78,21 @@ async function seedConnection(
         tenantId,
         JWT_SECRET,
     );
-    const now = Date.now();
-    const id = crypto.randomUUID();
-    // Escape single quotes in base64 blobs for SQL literal safety.
-    const enc = sealed.credentialsEnc.replace(/'/g, "''");
-    const dek = sealed.credentialsDekEnc.replace(/'/g, "''");
-    d1ExecuteSql(`
-DELETE FROM calendar_connections WHERE user_id = '${userId}';
-INSERT INTO calendar_connections (
-  id, tenant_id, user_id, provider, auth_type,
-  credentials_enc, credentials_dek_enc, capabilities, calendar_id,
-  connected_at, updated_at
-) VALUES (
-  '${id}', '${tenantId}', '${userId}', 'google', 'oauth',
-  '${enc}', '${dek}', '${capability}', 'primary',
-  ${now}, ${now}
-);
-`);
+    // Through the worker, not `wrangler d1 execute --local`. The CLI takes an
+    // exclusive lock on the SQLite file the dev worker is serving from, which is
+    // why this suite used to be pinned to workers:1 — under any real
+    // concurrency the other workers' requests died with ECONNRESET.
+    const res = await request.post(`${BASE_URL}/api/__test__/calendar-connection`, {
+        data: {
+            id: crypto.randomUUID(),
+            tenantId,
+            userId,
+            capability,
+            credentialsEnc: sealed.credentialsEnc,
+            credentialsDekEnc: sealed.credentialsDekEnc,
+        },
+    });
+    expect(res.status(), 'calendar-connection seed hook must be enabled (E2E_EMAIL_SINK=1)').toBe(200);
 }
 
 test.describe('Calendar connect — capability gating', () => {
@@ -135,7 +113,7 @@ test.describe('Calendar connect — capability gating', () => {
 
     test('POST /api/calendar/sync-events returns 403 for availability_read connection', async ({ request }) => {
         const session = await loginSession(request);
-        await seedConnection(session.tenantId, session.userId, 'availability_read');
+        await seedConnection(request, session.tenantId, session.userId, 'availability_read');
         const res = await request.post(`${BASE_URL}/api/calendar/sync-events`, {
             headers: authedHeaders(session.cookie),
         });
@@ -144,7 +122,7 @@ test.describe('Calendar connect — capability gating', () => {
 
     test('DELETE /api/calendar/disconnect removes calendar_connections row', async ({ request }) => {
         const session = await loginSession(request);
-        await seedConnection(session.tenantId, session.userId, 'events_read_write');
+        await seedConnection(request, session.tenantId, session.userId, 'events_read_write');
         const del = await request.delete(`${BASE_URL}/api/calendar/disconnect`, {
             headers: authedHeaders(session.cookie),
         });

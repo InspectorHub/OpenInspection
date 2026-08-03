@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // Viewer timezone for public, unauthenticated surfaces (no tenant, no session).
 // SSR-safe: "UTC" until mount, then a remembered choice or the browser zone.
 import { describe, it, expect, vi, afterEach } from "vitest";

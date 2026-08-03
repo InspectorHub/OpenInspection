@@ -290,7 +290,7 @@ export default function SettingsServices() {
           className="bg-ih-bg-card border border-ih-border rounded-lg p-4 space-y-3"
         >
           <input type="hidden" name="intent" value="create-service" />
-          <ServiceFields fields={fields} templates={templates} />
+          <ServiceFields fields={fields} templates={templates} otherServices={services} />
           {form.errors && (
             <div className="px-3 py-2 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg">
               {form.errors[0]}
@@ -314,6 +314,7 @@ export default function SettingsServices() {
         <ServiceEditForm
           service={editingService}
           templates={templates}
+          otherServices={services}
           onCancel={() => setEditingId(null)}
         />
       )}
