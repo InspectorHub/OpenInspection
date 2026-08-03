@@ -61,25 +61,10 @@ applies the same config resolution to direct wrangler commands (db:migrate).
 
 ## Key Files & Directories
 
-| File/Dir | Purpose |
-|---|---|
-| `workers/app.ts` | Single-worker entry — Hono mounts the full API in-process + delegates page routes to React Router SSR |
-| `server/index.ts` | Hono API entry point and route configuration |
-| `server/api/` | API route handlers (Auth, Inspections, Bookings, etc.) |
-| `server/lib/db/` | Drizzle ORM schema (`server/lib/db/schema`) and database utilities |
-| `server/lib/middleware/` | Hono middleware (Authentication, RBAC, etc.) |
-| `server/lib/validations/` | Zod schemas per module |
-| `server/services/` | Business logic, DB queries (Drizzle) |
-| `migrations/` | D1 migration SQL (drizzle-kit schema-first: `0000_baseline.sql` + forward) |
-| `tests/` | See "Test Layout" below |
-| `app/routes/` | React Router v8 route files |
-| `app/components/` | React components |
-| `app/hooks/` | React hooks (useInspection, useFindings, useKeyboard, etc.) |
-| `app/lib/` | API client (hono/client over the in-process binding), session management, helpers |
-| `app/styles/tailwind.css` | Design System 0523 token layer (Tailwind v4) |
-| `public/` | Static assets (fonts, logo, service worker, widget) |
-| `packages/shared-ui/src/` | shared React components (Button, Pill, Card, etc.) |
-| `packages/api-types/` | CoreApiType re-export for hono/client |
+The layout is conventional and discoverable — `server/` (api, lib/db, lib/middleware,
+lib/validations, services), `app/` (routes, components, hooks, lib), `packages/`
+(shared-ui, api-types), `migrations/`, `public/`. `workers/app.ts` is the single
+worker entry; see Core Architecture below for what it does and why.
 
 ### Test Layout
 
