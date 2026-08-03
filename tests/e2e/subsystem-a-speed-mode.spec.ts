@@ -7,6 +7,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { readEditorSeed } from './helpers/editor-seed';
+import { awaitEditorShortcutsReady } from './helpers/editor-ready';
 
 test.describe('SpeedMode (subsystem A M10)', () => {
     test.beforeEach(async ({ page }) => {
@@ -20,9 +21,7 @@ test.describe('SpeedMode (subsystem A M10)', () => {
         await page.click('button[type=submit]');
         await page.waitForURL('**/inspections');
         await page.goto(`/inspections/${seed!.inspectionId}/edit`);
-        // The RR v7 editor shell renders a single <main>; wait for it to hydrate
-        // before driving keyboard flows.
-        await page.getByRole('main').waitFor({ state: 'visible' });
+        await awaitEditorShortcutsReady(page);
     });
 
     test('Z opens overlay; 1 rates first unrated + advances; Z exits', async ({ page }) => {

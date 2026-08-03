@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * OI #291 — `/library/comments` could create, edit and touch a canned comment
  * but never delete one, so 2,774 rows had no delete path at any surface. The

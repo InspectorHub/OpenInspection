@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { swKillSwitchActive, bootstrapServiceWorker } from '~/lib/sw-bootstrap';
 import type { SWRegistrarLike } from '~/lib/sw-bootstrap';

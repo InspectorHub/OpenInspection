@@ -15,14 +15,13 @@
  */
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { makeCsrfToken } from './helpers/csrf';
+import { TENANT_SLUG } from './helpers/tenant-identity';
 
 const BASE_URL = 'http://127.0.0.1:8789';
 
 const ADMIN_EMAIL = 'admin@autotest.com';
 const ADMIN_PASSWORD = 'Password123!';
-// PR 2 — path-tenant URL shape: /report/<tenantSlug>/<id>. Matches the slug
-// the setup wizard derives from the standalone-browser COMPANY_NAME.
-const TENANT_SLUG = 'automation-test-corp';
+// PR 2 — path-tenant URL shape: /report/<tenantSlug>/<id>.
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

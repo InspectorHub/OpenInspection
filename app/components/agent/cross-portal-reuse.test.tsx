@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The same entity must read the same in both portals.
  *

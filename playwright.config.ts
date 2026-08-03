@@ -5,11 +5,31 @@ export default defineConfig({
     testDir: './tests/e2e',
     testIgnore: ['**/*.integration.spec.ts'],
     timeout: 30000,
-    // Every project shares ONE wrangler-dev worker + ONE local D1 (globalSetup
-    // seeds it once). Cross-project parallelism therefore races on shared state:
-    // multiple SETUP tests init the same admin (409s), and concurrent
-    // `wrangler d1 execute --local` calls lock the SQLite file. Serialize.
-    workers: 1,
+    // Every project still shares ONE wrangler-dev worker + ONE local D1
+    // (globalSetup seeds it once), so this cannot go wide. It no longer has to
+    // be 1, though: the three reasons it was are gone.
+    //
+    //   1. Several specs raced POST /api/auth/setup with DIFFERENT company
+    //      names, so whichever won named the tenant. They now all send the one
+    //      COMPANY_NAME from helpers/tenant-identity and depend on `api`, so a
+    //      late setup 409s harmlessly instead of renaming the workspace.
+    //   2. Four specs shelled out to `wrangler d1 execute --local` mid-test to
+    //      re-hash an admin password that already had that exact value, and
+    //      those calls locked the SQLite file. They are deleted. The one
+    //      remaining CLI user is calendar-connect, which genuinely needs D1 and
+    //      cannot contend with itself.
+    //   3. Ten projects were handed the SAME seeded inspection, which only ever
+    //      worked because they ran one at a time. The first run at 3 workers
+    //      duly failed: SpeedMode found nothing left to rate after a concurrent
+    //      spec had rated it. helpers/editor-seed.ts now seeds one inspection
+    //      per editing project. (This reason was missed when 1 and 2 were fixed
+    //      — the list above was written from what made the CLI and setup race,
+    //      not from an audit of what else the projects share.)
+    //
+    // Kept deliberately low rather than left to the CPU-count default: the
+    // shared worker and single D1 are the real ceiling, and every spec in a
+    // parallel slot is another client of them. Raise further only with evidence.
+    workers: 3,
     // The browser projects drive real WebSocket + Durable Object collab flows
     // against one shared wrangler-dev worker; transient socket resets
     // (ECONNRESET on a concurrent login) and WS reconnect timing occasionally
@@ -31,12 +51,29 @@ export default defineConfig({
         //   SETUP_CODE=000000  — matches the api project's setup fixture in BOTH
         //                        CI and local (local .dev.vars may differ).
         //   DISABLE_RATE_LIMIT=1 — the seeded suite drives many logins from one IP.
-        command: 'npm run build && npx wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state --port 8789 --var E2E_EMAIL_SINK:1 --var SETUP_CODE:000000 --var DISABLE_RATE_LIMIT:1',
+        //   APP_BASE_URL=…:8789 — the origin the SERVER stamps into emailed links.
+        //                        CI's generated .dev.vars omits it entirely, so CI
+        //                        passed; a real local .dev.vars sets 8787 for
+        //                        `npm run dev`, and the agent-unified-link spec then
+        //                        followed an emailed link to a port nothing served
+        //                        (ERR_CONNECTION_REFUSED). Pin it to the port this
+        //                        worker actually listens on.
+        command: 'npm run build && npx wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state --port 8789 --var E2E_EMAIL_SINK:1 --var SETUP_CODE:000000 --var DISABLE_RATE_LIMIT:1 --var APP_BASE_URL:http://127.0.0.1:8789',
         url: 'http://127.0.0.1:8789/status',
         reuseExistingServer: true,
         stdout: 'pipe',
         stderr: 'pipe',
-        timeout: 60000,
+        // The command above contains a FULL build, so this budget has to cover
+        // one. 60s did not: `npm run build` is vendor:copy + gen-version +
+        // `react-router build`, and typegen alone is ~64s. It survived because
+        // the Linux CI runner happens to finish inside a minute; on Windows the
+        // same build measures 2m02s warm, so `npm run test:e2e` could not reach
+        // a single test locally — it timed out in webServer three runs running,
+        // which reads exactly like a broken suite rather than a short timer.
+        //
+        // A timeout is an upper bound, not a wait: raising it costs CI nothing
+        // and makes the command runnable on the machines people actually use.
+        timeout: 300000,
     },
     projects: [
         // api runs FIRST: it is the single-tenant workspace initializer. Its
@@ -61,6 +98,7 @@ export default defineConfig({
         {
             name: 'frontend-browser',
             testMatch: 'frontend-browser.spec.ts',
+            dependencies: ['api'],
         },
         {
             // Anonymous requests only — asserts the guard boundary between the
@@ -98,8 +136,15 @@ export default defineConfig({
         {
             name: 'mobile',
             testMatch: 'standalone-mobile.spec.ts',
-            // No dependency — the SETUP test in this spec is idempotent and
-            // will create test data if not already present.
+            // The old comment here claimed the SETUP test was idempotent and
+            // would create the workspace if absent. It is not: POST
+            // /api/auth/setup returns 409 once any user has a tenant_id, so
+            // this spec either lost the race and 409'd, or WON it and named the
+            // tenant "Mobile Test Corp" — which broke every spec asserting the
+            // automation-test-corp slug. It now sends the shared COMPANY_NAME,
+            // so a 409 is harmless, and depends on `api` to guarantee the
+            // workspace exists rather than hoping to build it.
+            dependencies: ['api'],
         },
         {
             // Sprint 1 C-9 — public-page responsive smoke (5 viewports × 3
@@ -199,8 +244,11 @@ export default defineConfig({
         // so depend on `api` (which seeds admin@autotest.com). The reset token is
         // read back from the E2E email sink (E2E_EMAIL_SINK, wired on the worker).
         { name: 'auth-password-reset', testMatch: 'auth-password-reset.spec.ts', dependencies: ['api'] },
-        { name: 'branding', testMatch: 'branding.spec.ts' },
-        { name: 'timezone-settings', testMatch: 'timezone-settings.spec.ts' },
+        // Both run the setup wizard. They used to send their own company names
+        // ("Branding Corp", "Timezone Corp"), which meant whichever reached
+        // /api/auth/setup first named the tenant for the whole run.
+        { name: 'branding', testMatch: 'branding.spec.ts', dependencies: ['api'] },
+        { name: 'timezone-settings', testMatch: 'timezone-settings.spec.ts', dependencies: ['api'] },
         // Calendar multiprovider (#199) — API-level capability gating; depends on
         // `api` so admin@autotest.com exists in the shared D1 seed.
         { name: 'calendar-connect', testMatch: 'calendar-connect.spec.ts', dependencies: ['api'] },

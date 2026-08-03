@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-57 — the two string-keyed seams between the builder and the API.
  *

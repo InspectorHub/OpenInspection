@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Two services defaulting to the same template is the single most common way a
  * tenant ends up with duplicate reports — the competitor keeps an FAQ entry

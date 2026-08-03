@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-96 — /contacts carried three tabs that did not belong together:
  *

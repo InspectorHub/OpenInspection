@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * A refused badge upload has to say so, ON the row it was refused for.
  *

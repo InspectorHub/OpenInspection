@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The modal auto-closes itself when a save succeeds, and the value it reads to
  * decide that — `fetcher.data` — outlives the submission that produced it.

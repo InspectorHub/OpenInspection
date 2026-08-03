@@ -14,13 +14,14 @@
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
 import { makeCsrfToken } from './helpers/csrf';
+import { COMPANY_NAME } from './helpers/tenant-identity';
 
 const BASE_URL = process.env.FRONTEND_URL || 'http://127.0.0.1:8789';
 const NAV_TIMEOUT = 30000;
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@autotest.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Password123!';
-const COMPANY_NAME = process.env.COMPANY_NAME || 'Automation Test Corp';
+
 
 // --- Helpers ----------------------------------------------------------------
 

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * <Input> — the two behaviours the auth pages depend on, and which are the
  * reason those pages could stop hand-rolling their own field markup.

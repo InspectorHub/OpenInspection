@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { render, screen, waitFor } from "@testing-library/react";
 import { vi, beforeEach, afterEach } from "vitest";
 import { CostItemsHost } from "./CostItemsHost";

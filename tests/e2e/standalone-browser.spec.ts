@@ -15,13 +15,14 @@
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
 import { makeCsrfToken } from './helpers/csrf';
+import { COMPANY_NAME, TENANT_SLUG } from './helpers/tenant-identity';
 
 const BASE_URL = 'http://127.0.0.1:8789';
 const NAV_TIMEOUT = 15000;
 
 const ADMIN_EMAIL = 'admin@autotest.com';
 const ADMIN_PASSWORD = 'Password123!';
-const COMPANY_NAME = 'Automation Test Corp';
+
 const INSPECTOR_EMAIL = 'inspector@autotest.com';
 const INSPECTOR_PASSWORD = 'Inspector123!';
 
@@ -164,7 +165,7 @@ test.describe.serial('Standalone Browser Tests', () => {
         // the company's branded shell (profile.company via BookingShell /
         // BookingNotOpenState), so assert the deterministic invariant: the real
         // tenant RESOLVES (company name present) and it is NOT the error state.
-        const tenantSlug = COMPANY_NAME.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const tenantSlug = TENANT_SLUG;
         await page.goto(`${BASE_URL}/book/${tenantSlug}`, { timeout: NAV_TIMEOUT, waitUntil: 'networkidle' });
         const pageText = (await page.textContent('body')) ?? '';
         expect(pageText, 'booking page must resolve the real tenant').toContain(COMPANY_NAME);
@@ -216,7 +217,7 @@ test.describe.serial('Standalone Browser Tests', () => {
         // then-unpublished report) and ReportView renders its branded error state
         // ("Report not found" / "This report is not published"). Complements
         // API-22 (request-level 302) with the render layer it can't see.
-        const tenantSlug = COMPANY_NAME.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const tenantSlug = TENANT_SLUG;
         await page.goto(`${BASE_URL}/report/${tenantSlug}/${createdInspectionId}`, { timeout: NAV_TIMEOUT, waitUntil: 'networkidle' });
         // Followed the permalink shim onto the report-view target (not bounced to
         // /login, not a bare 404).

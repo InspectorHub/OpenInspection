@@ -10,13 +10,14 @@
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
 import { makeCsrfToken } from './helpers/csrf';
+import { COMPANY_NAME, TENANT_SLUG } from './helpers/tenant-identity';
 
 const BASE_URL = 'http://127.0.0.1:8789';
 
 const ADMIN_EMAIL = 'admin@autotest.com';
 const ADMIN_PASSWORD = 'Password123!';
 const ADMIN_NAME    = 'Automation Test Admin';
-const COMPANY_NAME = 'Automation Test Corp';
+
 const INSPECTOR_EMAIL = 'inspector@autotest.com';
 const INSPECTOR_PASSWORD = 'Inspector123!';
 
@@ -343,7 +344,7 @@ test.describe.serial('Standalone API Tests', () => {
         // Spectora-style bookmark still works). The actual report RENDER lives at
         // /report-view and is covered by the report-viewer project; the existence
         // check moved into the data layer (see API-23).
-        const tenantSlug = COMPANY_NAME.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const tenantSlug = TENANT_SLUG;
         const res = await request.get(`${BASE_URL}/report/${tenantSlug}/${createdInspectionId}`, {
             maxRedirects: 0,
         });
@@ -356,7 +357,7 @@ test.describe.serial('Standalone API Tests', () => {
         // (server/api/public-report.ts, mounted at /api/public) 404s when the
         // inspection/token does not resolve. A nonexistent id therefore has no
         // public report data → 404.
-        const tenantSlug = COMPANY_NAME.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const tenantSlug = TENANT_SLUG;
         const res = await request.get(
             `${BASE_URL}/api/public/report/${tenantSlug}/00000000-0000-0000-0000-000000000000`,
         );

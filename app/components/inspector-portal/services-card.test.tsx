@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-87 — the Services card used to be a dead end: it displayed what was sold
  * and offered nothing, so an inspection created without services showed "No

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Spec 2 Task 7 — "Send report" modal. `SendReportModal` receives its
  * fetcher as a prop (independent per-mutation fetcher, B-17), so tests build

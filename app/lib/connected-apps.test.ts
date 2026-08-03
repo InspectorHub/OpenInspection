@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * D3 — Settings → Connected applications route (BFF loader/action + render).
  *

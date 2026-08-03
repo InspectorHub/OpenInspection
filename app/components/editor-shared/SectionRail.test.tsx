@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
 import { SectionRail } from '~/components/editor-shared/SectionRail';

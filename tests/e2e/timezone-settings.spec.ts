@@ -12,13 +12,14 @@
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
 import { makeCsrfToken } from './helpers/csrf';
+import { COMPANY_NAME } from './helpers/tenant-identity';
 
 const BASE_URL = 'http://127.0.0.1:8789';
 const NAV_TIMEOUT = 20000;
 
 const ADMIN_EMAIL = 'admin@autotest.com';
 const ADMIN_PASSWORD = 'Password123!';
-const COMPANY_NAME = 'Timezone Corp';
+
 
 const getCsrfToken = (_request?: APIRequestContext): string => makeCsrfToken();
 

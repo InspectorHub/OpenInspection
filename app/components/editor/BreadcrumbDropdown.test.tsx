@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { render, screen, fireEvent } from "@testing-library/react";
 import { vi } from "vitest";
 import { BreadcrumbDropdown, type UnitScopeRow } from "~/components/editor/BreadcrumbDropdown";

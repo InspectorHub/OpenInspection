@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Final-review Fix 4 — Settings → Usage must not show a permanently-0
  * Inspections meter for standalone deploys. `usage.inspections` is only ever

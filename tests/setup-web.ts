@@ -1,9 +1,19 @@
-import { afterEach, beforeEach, expect } from 'vitest';
+import { afterEach, beforeEach } from 'vitest';
+
 // jest-dom matchers. The reason is failure MESSAGES, not brevity:
 // `expect(el.disabled).toBe(true)` fails with "expected false to be true",
 // which names neither the element nor the reason. `toBeDisabled()` prints the
 // element it was handed.
-import '@testing-library/jest-dom/vitest';
+//
+// Loaded only where there is a DOM to match against. This file runs for every
+// spec in the suite, and since the suite defaults to the node environment (see
+// vitest.config.ts) most of them have no element to assert on — importing the
+// matchers there would pull the package and its dependencies into 136 specs
+// that cannot use them. A spec that opts into happy-dom gets them; one that did
+// not ask for a browser was never going to call toBeDisabled().
+if (typeof document !== 'undefined') {
+  await import('@testing-library/jest-dom/vitest');
+}
 
 /**
  * Hermeticity guard for the web-unit suite (happy-dom).

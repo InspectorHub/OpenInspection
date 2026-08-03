@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * What a tenant running more than one rating system sees.
  *

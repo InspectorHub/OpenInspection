@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { vi, beforeEach } from "vitest";
 import { loader } from "./cost-export";
 import { getToken } from "~/lib/session.server";

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Where a redeemed magic-link lands — and, for an agent, where it must NOT.
  *

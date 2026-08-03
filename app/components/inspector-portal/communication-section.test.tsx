@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * <CommunicationSection> invariants (plan A1.5).
  *

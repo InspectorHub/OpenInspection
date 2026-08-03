@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The Report Access panel makes a claim about access control, so its three
  * states have to stay distinguishable.

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Booking on behalf of a client is the same booking page, not a third form.
  * A signed-in agent gets one page with a different destination: the company's

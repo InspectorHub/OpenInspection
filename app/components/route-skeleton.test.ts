@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * RouteSkeleton matching tests (issue #202, Tier 2).
  *

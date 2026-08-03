@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The order-wide gate's release control.
  *

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup, act } from "@testing-library/react";
 import { useScrollSpy } from "./useScrollSpy";

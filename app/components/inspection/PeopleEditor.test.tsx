@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Plan 1B Task 5 — editable People section on the inspection detail page.
  * Covers what the review checks for: renders people grouped by role kind

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-39 — the marketplace-install resource route action forwards to the
  * import endpoint via the token-relay API client and surfaces the new local

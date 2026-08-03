@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // Spec 3 — <ClientPortalHub> agent-mode chrome gating.
 //
 // When an agent opens their report link (token-only, no client session; the

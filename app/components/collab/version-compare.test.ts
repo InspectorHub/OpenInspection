@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // #181 PR-H (Task H2) — VersionCompare modal + VersionHistoryPanel compare flow.
 //
 // happy-dom + react-dom/client (no RTL in this repo). JSX avoided so the file

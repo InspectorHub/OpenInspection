@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The bulk controls, and the one rule that is easy to get backwards.
  *
