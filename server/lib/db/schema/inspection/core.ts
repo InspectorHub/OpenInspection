@@ -145,6 +145,11 @@ export const inspections = sqliteTable('inspections', {
     // creation order among re-inspections sharing root. All NULL on originals.
     sourceInspectionId: text('source_inspection_id'),
     rootInspectionId:   text('root_inspection_id'),
+    // A re-inspection is its own ORDER, not a second report on the original.
+    // It is created as a new `inspections` row carrying this round number, and
+    // that is correct: it is a separate fee-bearing visit with its own
+    // agreement and its own invoice. Folding it into the original order as an
+    // ancillary report would put two of each behind one order id.
     reinspectionRound:  integer('reinspection_round'),
     // Commercial PCA Phase F — multi-unit inspection mode. 'tagged' (default,
     // Spectora-parity): the section/item checklist stays fixed and each defect

@@ -24,7 +24,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspectionInspectors } from '../db/schema';
 import { users } from '../db/schema';
 
-export interface RosterMember {
+interface RosterMember {
     id: string;
     name: string | null;
     email: string;
@@ -45,8 +45,9 @@ const EMPTY: InspectionRoster = { lead: null, helpers: [] };
  * round: the calendar and the inspections list render many rows at a time, and
  * a per-row accessor would turn one query into N.
  *
- * Returns a Map keyed by inspection id. Ids with no roster are simply absent —
- * callers use `rosterOf` below, which supplies the empty roster.
+ * Returns a Map keyed by inspection id. Ids with no roster are simply absent;
+ * `getInspectionRoster` below turns that into the empty roster for the
+ * single-inspection case.
  */
 export async function getInspectionRosters(
     db: DrizzleD1Database,
@@ -91,10 +92,5 @@ export async function getInspectionRoster(
     inspectionId: string,
 ): Promise<InspectionRoster> {
     const map = await getInspectionRosters(db, tenantId, [inspectionId]);
-    return map.get(inspectionId) ?? EMPTY;
-}
-
-/** Reading helper for batch callers — never returns undefined. */
-export function rosterOf(map: Map<string, InspectionRoster>, inspectionId: string): InspectionRoster {
     return map.get(inspectionId) ?? EMPTY;
 }

@@ -97,6 +97,12 @@ export class InspectionPublishService extends InspectionSubService {
             .get();
         if (!insp) return null;
 
+        // THE PAY GATE IS THE INVOICE'S, AND THE INVOICE IS THE ORDER'S. One
+        // order, one invoice, one payment — paying it unlocks whatever has been
+        // published, and a client who has paid is not asked again because a
+        // second report arrived later. Per-report payment would need per-report
+        // invoicing, which is a different product.
+        //
         // A manual unlock releases the gate for this whole inspection, which is
         // the same scope the gate itself has.
         //

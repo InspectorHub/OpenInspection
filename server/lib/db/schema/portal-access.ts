@@ -12,6 +12,15 @@ import { tenants } from './tenant';
  * Lifecycle: issued on order-create / recipient-add; `expiresAt` set ~30–60d
  * after report delivery; `revokedAt` set by the inspector "Reset access link".
  * Timestamps are plain epoch-ms integers (numeric comparison in the guard).
+ * ONE TOKEN OPENS EVERY REPORT ON THE ORDER, deliberately. An order can now
+ * deliver several documents — a standard report and a radon report — and the
+ * token stays keyed on the INSPECTION, not on a report. One order, one client,
+ * one link: a per-report token would mean three links in three emails for one
+ * job, and a client who mislaid the middle one.
+ *
+ * The report dimension still exists where it is useful: a view counter keys on
+ * (report, token) — the report says WHAT was opened, the token says WHO.
+ *
  * See memory project_client_portal_token_model.
  */
 export const inspectionAccessTokens = sqliteTable('inspection_access_tokens', {

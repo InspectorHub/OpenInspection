@@ -11,6 +11,13 @@
  *
  * Mounted in index.ts. All CRUD routes are scoped to (tenantId, inspectionId)
  * to prevent cross-inspection reads within the same tenant.
+ *
+ * SCOPED TO THE ORDER, ACROSS ALL ITS PUBLISHED REPORTS. An order can deliver
+ * several documents, and a client negotiating repairs does not care which one a
+ * defect came from — they are negotiating about one house. So the defect list is
+ * gathered per inspection, not per report, and stays that way: splitting it
+ * would make the client assemble their own list from two or three documents
+ * before they could ask for anything.
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
