@@ -257,8 +257,16 @@ export const inspectionResults = sqliteTable('inspection_results', {
     // source rating system afterwards never mutates an existing inspection.
     ratingSystemId:       text('rating_system_id'),
     ratingSystemSnapshot: text('rating_system_snapshot', { mode: 'json' }),
+    // The report this document belongs to. One order can now deliver several —
+    // a standard report and a radon report — so the uniqueness that used to be
+    // per INSPECTION is per REPORT. Nullable only so the backfill can run in
+    // order; every row carries one afterwards.
+    // Appended at table end for D1 rebuild safety.
+    reportId:             text('report_id'),
 }, (t) => [
     index('idx_results_tenant').on(t.tenantId),
     index('idx_results_inspection').on(t.inspectionId),
-    uniqueIndex('uq_results_inspection').on(t.inspectionId),
+    // Was uq_results_inspection. A second report on one order is the whole
+    // point of the reports entity; the old index made it impossible.
+    uniqueIndex('uq_results_report').on(t.reportId),
 ]);
