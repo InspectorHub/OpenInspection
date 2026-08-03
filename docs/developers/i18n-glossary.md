@@ -92,7 +92,7 @@ catalogue.
 | Booking | reserva | — | The public self-scheduling flow. "Online Booking" → "Reservas en línea". |
 | Appointment | cita | — | A scheduled visit. Deliberately a different word from *reserva*. |
 | Schedule (noun) | agenda | — | |
-| Schedule (verb) | programar | — | "Scheduled" → *programada*. |
+| Schedule (verb) | programar | — | The verb. For the *status* "Scheduled" see the Status labels section — it is *Programado*, masculine, and that section explains why. |
 | Invoice | factura | — | |
 | Estimate | presupuesto | — | Not *estimado*, which reads as a guess rather than a priced offer. |
 | Agreement | acuerdo | — | The document itself stays in English; this is the word for it in chrome. |
@@ -101,6 +101,15 @@ catalogue.
 | Property | propiedad | — | |
 | Licenses & affiliations | licencias y afiliaciones | — | The `settings_profile_credentials_*` family. This is licences plus association memberships — **not** login credentials. |
 | Credentials (sign-in / provider secrets) | credenciales | — | Only for authentication: the login form, and email/SMS/accounting provider secrets. Never for the licences feature above. |
+| Library | biblioteca | — | The reusable-content area: templates, canned comments, repair items, tags, agreements, rating systems. |
+| Marketplace | Marketplace | — | Left in English. It is a feature name, it is the word Latin American software actually uses, and the `MP` badge that abbreviates it has no Spanish equivalent. *Mercado* is deliberately not banned — "market value" is a legitimate phrase elsewhere in the product. |
+| Dashboard | panel | — | "Back to Dashboard" → *Volver al panel*. Not *tablero*, which this product needs for the electrical panel. |
+| Tag | etiqueta | — | The library tagging feature. |
+| Label (of a template item) | etiqueta | — | The same word as Tag, on purpose. Both are *etiqueta* in ordinary Spanish, they never appear on the same surface, and inventing *rótulo* for one of them would be a word nobody uses to avoid a collision nobody sees. |
+| Severity | gravedad | — | Not *severidad*, which is an anglicism in this sense. |
+| Rating | calificación | — | "Rating system" → *sistema de calificación*; "Rating icons" → *iconos de calificación*. |
+| Est. min / Est. max | Est. mín / Est. máx | — | The abbreviated repair-cost range on a repair item. Kept abbreviated because the field is a narrow numeric input, and *est.* abbreviates *estimado* in Spanish exactly as it does in English. The Estimate row still bans the unabbreviated *estimado*: that ban is about the noun for a priced offer, not about this abbreviation. |
+| Amended (a report) | modificado | — | "Report amended" → *Informe modificado*. The feature is a revision after publication, not a legislative amendment, so not *enmendado*. |
 
 ## Roles and parties
 
@@ -160,8 +169,10 @@ vocabulary**: the commercial standard excludes routine maintenance from
 
 | English | es-419 | Never | Why |
 |---|---|---|---|
-| Satisfactory | Satisfactorio | — | |
+| Satisfactory | Satisfactorio | — | The top residential tier. |
 | Monitor | Vigilar | monitorear | The middle tier. "Monitorear" is a calque and long for a chip. |
+| Defect (severity level) | Defecto | — | The bottom residential tier, capitalised as a chip. Same word as the Defect product noun; the two must not drift apart. |
+| N/A (severity level) | N/A | — | Left as written. In Spanish *N/A* abbreviates *no aplica* — the same abbreviation with the same expansion, so translating it would only make it longer. |
 | Not Inspected | No inspeccionado | — | |
 | Not Present | No presente | — | |
 | Deficient | Deficiente | — | The commercial/TREC wording. |
@@ -170,6 +181,47 @@ vocabulary**: the commercial standard excludes routine maintenance from
 | Functional | Funcional | — | |
 | Marginal | Marginal | — | |
 | Maintenance | Mantenimiento | — | |
+
+## Status labels
+
+A status word attaches to a different noun in every module: an inspection
+(*inspección*, feminine), a report (*informe*, masculine), an invoice
+(*factura*, feminine), an agreement (*acuerdo*, masculine), an event
+(*evento*, masculine). The same English word therefore cannot both agree with
+its subject and stay consistent — and the consistency check forces exactly one
+Spanish string per English string. "Published" already labels an inspections tab
+*and* two report states in `labels.json` alone.
+
+So **status labels are masculine singular**, agreeing with the implicit
+*estado*: "Cancelado", never "Cancelada". This is the only form that scales to
+the whole catalogue — it needs no divergence declaration in any module — and it
+is what a chip actually means: it names the state, not the thing.
+
+**Prose is different.** A hint that reads "Cancelled inspections" is a sentence,
+not a chip, and agrees normally: *Inspecciones canceladas*. The rule above binds
+the standalone label only.
+
+<!-- gate:terms -->
+
+| English | es-419 | Never | Why |
+|---|---|---|---|
+| Requested | Solicitado | — | |
+| Scheduled (status) | Programado | — | Masculine by the rule above. This is the row that governs the status chip; the Schedule (verb) row governs the verb. |
+| Confirmed | Confirmado | — | |
+| Completed | Completado | — | |
+| Cancelled | Cancelado | — | |
+| Active | Activo | — | |
+| In Progress | En curso | — | Not *En progreso*, a calque. |
+| Submitted | Enviado | — | The report was sent for review; same participle as Send. |
+| Published (status) | Publicado | — | |
+| Paid | Pagado | — | "Partially paid" → *Pagado parcialmente*. |
+| Signed | Firmado | — | |
+| Viewed | Visto | — | |
+| Declined | Rechazado | — | |
+| Expired | Vencido | — | |
+| Not sent | No enviado | — | The "Not …" agreement/invoice states all take this shape: *No requerido*, *Sin facturar*, *Sin factura*. |
+| Awaiting X | En espera de X | — | "Awaiting payment" → *En espera de pago*; "Awaiting signature" → *En espera de firma*; "Awaiting report" → *En espera del informe*. One shape for the whole family. |
+| All (filter / tab) | Todo | — | The uncountable form. The same English "All" labels an inspection filter, an inspection-status tab, a canned-comment tab and a marketplace tab; *Todo* is the only form that agrees with all four and sits correctly beside the singular status labels next to it. *Todos* is deliberately not banned — it is correct in ordinary prose ("a todos los destinatarios"). |
 
 ## Recurring UI verbs and states
 
