@@ -70,8 +70,15 @@ export default defineConfig({
             testMatch: 'route-auth-boundary.spec.ts',
         },
         {
+            // Its beforeAll seeds the admin password and then logs in, so it
+            // needs the workspace to exist. That was true before this line and
+            // it worked anyway, because with workers:1 the projects run in
+            // declaration order and `api` is declared first — an ordering that
+            // held by accident, not by contract, and one that any reordering or
+            // parallel run would break.
             name: 'inspector-portal',
             testMatch: 'inspector-portal.spec.ts',
+            dependencies: ['api'],
         },
         {
             // IA-29 / IA-30 — publishing is decoupled from order completion.

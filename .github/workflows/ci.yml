@@ -371,6 +371,17 @@ jobs:
       - name: Provision ephemeral E2E secrets
         run: node scripts/gen-e2e-dev-vars.mjs
 
+      # Keyed on the resolved Playwright version, because the browser build a
+      # given Playwright pins is a pure function of it — a hit can only ever
+      # restore the binary that version asked for. `--with-deps` still runs on a
+      # hit; it installs system libraries into /usr, which is outside the cached
+      # path and cheap once the download is skipped.
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Install Playwright browser (chromium)
         run: npx playwright install --with-deps chromium
 
