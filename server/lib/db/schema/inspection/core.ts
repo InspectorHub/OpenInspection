@@ -201,6 +201,26 @@ export const inspections = sqliteTable('inspections', {
     // App-layer soft reference to contacts.id; no FK per Schema Rules.
     // Appended at table end for D1 rebuild safety.
     referredByContactId: text('referred_by_contact_id'),
+    // Manual release of the report gate for THIS inspection.
+    //
+    // The gate is order-wide by design: any required agreement left unsigned, or
+    // payment outstanding, blocks every report on the inspection. That rule is
+    // simple to explain and matches what a client thinks they bought — one job,
+    // one set of paperwork — but it means an add-on's unsigned addendum can hold
+    // back a report that is finished and that someone is waiting for.
+    //
+    // The release for that is a deliberate human action, not a finer-grained
+    // gate: an owner or manager opens this one inspection and says why. Making
+    // the gate itself per-report would put a service dimension on
+    // `agreement_requests`, which is signed evidence with a retention rule, to
+    // solve a problem a one-line override solves.
+    //
+    // NULL = still gated. The reason is required at the API, not by the column,
+    // so existing rows do not need one.
+    // Appended at table end for D1 rebuild safety.
+    unlockedAt:          integer('unlocked_at', { mode: 'timestamp_ms' }),
+    unlockedBy:          text('unlocked_by'),
+    unlockReason:        text('unlock_reason'),
 }, (t) => [
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),

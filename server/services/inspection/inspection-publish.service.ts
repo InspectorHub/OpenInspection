@@ -91,10 +91,28 @@ export class InspectionPublishService extends InspectionSubService {
             paymentRequired:   inspections.paymentRequired,
             paymentStatus:     inspections.paymentStatus,
             agreementRequired: inspections.agreementRequired,
+            unlockedAt:        inspections.unlockedAt,
         }).from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
         if (!insp) return null;
+
+        // A manual unlock releases the gate for this whole inspection, which is
+        // the same scope the gate itself has.
+        //
+        // THE GATE IS ORDER-WIDE, DELIBERATELY. Any required agreement left
+        // unsigned, or payment outstanding, blocks EVERY report on this
+        // inspection — not just the report belonging to the service whose
+        // agreement is missing. One job, one set of paperwork, one rule a client
+        // and an inspector can both state without looking it up.
+        //
+        // The cost of that rule is real: an add-on's unsigned addendum can hold
+        // back a report that is finished and that someone is waiting for. The
+        // answer is this unlock — a named person opening one inspection and
+        // recording why — rather than resolving the gate per report, which would
+        // require a service dimension on `agreement_requests`, a signed-evidence
+        // table with a retention rule, to solve what one override solves.
+        if (insp.unlockedAt) return null;
 
         // Resolve the outstanding gate. Agreement before payment (signed first).
         let reason: 'payment' | 'agreement' | null = null;

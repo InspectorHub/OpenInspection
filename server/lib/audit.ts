@@ -12,6 +12,11 @@ export type AuditAction =
     | 'inspection.status_changed'
     | 'inspection.complete'
     | 'inspection.send_pdf'
+    // The order-wide report gate released for one inspection, and put back.
+    // Audited because an unlock hands a client a report the tenant's own rules
+    // said to hold, and the reason for that is worth keeping.
+    | 'inspection.report_unlocked'
+    | 'inspection.report_relocked'
     | 'inspection.send_sms'
     | 'inspection.send_text_fallback'
     | 'inspection.bulk_assign'

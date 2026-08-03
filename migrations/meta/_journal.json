@@ -204,6 +204,13 @@
       "when": 1785717479440,
       "tag": "0028_closed_robin_chapel",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1785721030453,
+      "tag": "0029_rich_leader",
+      "breakpoints": true
     }
   ]
 }

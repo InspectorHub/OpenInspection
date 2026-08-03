@@ -113,4 +113,48 @@ export class InspectionStatusService extends InspectionSubService {
             .set({ paymentStatus: 'paid' })
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
     }
+
+    /**
+     * Release the report gate for one inspection.
+     *
+     * The gate is order-wide: an unsigned agreement or an outstanding payment
+     * blocks every report on the inspection. This is the deliberate way out when
+     * a finished report is being held back by paperwork attached to something
+     * else on the same job.
+     *
+     * `reason` is required and stored. An override with no stated reason is
+     * indistinguishable later from a mistake, and this one is visible to a
+     * client — it hands over a report that the tenant's own rules said to hold.
+     *
+     * Idempotent: unlocking an already-unlocked inspection keeps the ORIGINAL
+     * timestamp, person and reason, so the record shows who actually made the
+     * call rather than whoever pressed it last.
+     */
+    async unlockReportGate(
+        tenantId: string, inspectionId: string, userId: string, reason: string,
+    ): Promise<{ alreadyUnlocked: boolean }> {
+        const db = this.getDrizzle();
+        const existing = await db.select({ unlockedAt: inspections.unlockedAt })
+            .from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!existing) throw Errors.NotFound('Inspection not found');
+        if (existing.unlockedAt) return { alreadyUnlocked: true };
+
+        await db.update(inspections)
+            .set({ unlockedAt: new Date(), unlockedBy: userId, unlockReason: reason })
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
+        return { alreadyUnlocked: false };
+    }
+
+    /**
+     * Put the gate back. The reason for the original unlock is cleared with it —
+     * it described a decision that no longer stands.
+     */
+    async relockReportGate(tenantId: string, inspectionId: string): Promise<void> {
+        const db = this.getDrizzle();
+        await db.update(inspections)
+            .set({ unlockedAt: null, unlockedBy: null, unlockReason: null })
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
+    }
 }
