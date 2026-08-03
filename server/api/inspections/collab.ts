@@ -31,6 +31,8 @@ import { CollabRestoreRequestSchema, CollabSnapshotParamSchema } from '../../lib
 import type { HonoConfig } from '../../types/hono';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 import { getInspectionRoster } from '../../lib/inspection/roster';
+import { collabDocName } from '../../lib/collab/doc-name';
+import { resolvePrimaryReportId } from '../../lib/inspection/reports';
 import { getDrizzle } from '../../lib/route-helpers';
 
 /**
@@ -39,7 +41,7 @@ import { getDrizzle } from '../../lib/route-helpers';
  */
 type AuthResult =
     | { ok: false; response: Response }
-    | { ok: true; tenantId: string; inspectionId: string; userId: string };
+    | { ok: true; tenantId: string; inspectionId: string; reportId: string; userId: string };
 
 /**
  * Shared fail-closed auth for every collab route (checks 1–5 above, excluding
@@ -88,19 +90,36 @@ async function authorizeCollab(c: Context<HonoConfig>): Promise<AuthResult> {
         return { ok: false, response: new Response('forbidden', { status: 403 }) };
     }
 
-    return { ok: true, tenantId, inspectionId: id, userId };
+    // Which DOCUMENT is being edited. The route is addressed by inspection, so
+    // the primary report is the answer for every caller today; when a client
+    // can open the radon report directly it passes its own id and this becomes
+    // a lookup rather than a default.
+    const primaryReportId = await resolvePrimaryReportId(getDrizzle(c), tenantId, id);
+    if (!primaryReportId) {
+        // No report row means nothing to edit. Fail closed rather than falling
+        // back to an inspection-keyed document, which is the shared-Y.Doc bug.
+        return { ok: false, response: new Response('not found', { status: 404 }) };
+    }
+
+    return { ok: true, tenantId, inspectionId: id, reportId: primaryReportId, userId };
 }
 
 /**
  * Resolve the tenant-scoped DO stub for an authorized collab request.
+ *
+ * Keyed on the REPORT, not the inspection. Two inspectors working the standard
+ * report and the sewer report of one order used to land in the same Durable
+ * Object and share one Y.Doc — nothing threw, the CRDT merged content belonging
+ * to two different documents, and the corruption surfaced when a client read a
+ * report containing someone else's findings.
  * Only reached after `authorizeCollab` has proven `INSPECTION_DOC` is bound;
  * the explicit guard re-narrows for the type checker (the binding is optional
  * in the generated Env) and never throws in practice.
  */
-function collabStub(c: Context<HonoConfig>, tenantId: string, inspectionId: string) {
+function collabStub(c: Context<HonoConfig>, tenantId: string, reportId: string) {
     const ns = c.env.INSPECTION_DOC;
     if (!ns) throw new Error('INSPECTION_DOC binding missing');
-    const doId = ns.idFromName(`${tenantId}:${inspectionId}`);
+    const doId = ns.idFromName(collabDocName(tenantId, reportId));
     return ns.get(doId);
 }
 
@@ -115,7 +134,7 @@ const collabRoutes = createApiRouter()
         if (!auth.ok) return auth.response;
 
         // ── Forward the WS upgrade to the INSPECTION_DOC Durable Object ────────
-        const stub = collabStub(c, auth.tenantId, auth.inspectionId);
+        const stub = collabStub(c, auth.tenantId, auth.reportId);
         const fwd = new Request('https://do.local/ws', {
             method:  'GET',
             headers: {
@@ -132,7 +151,7 @@ const collabRoutes = createApiRouter()
         const auth = await authorizeCollab(c);
         if (!auth.ok) return auth.response;
 
-        const stub = collabStub(c, auth.tenantId, auth.inspectionId);
+        const stub = collabStub(c, auth.tenantId, auth.reportId);
         const fwd = new Request('https://do.local/snapshots', {
             method:  'GET',
             headers: {
@@ -157,7 +176,7 @@ const collabRoutes = createApiRouter()
             return c.json({ error: 'invalid snapshot seq' }, 400);
         }
 
-        const stub = collabStub(c, auth.tenantId, auth.inspectionId);
+        const stub = collabStub(c, auth.tenantId, auth.reportId);
         const fwd = new Request(`https://do.local/snapshots/${parsedParam.data.seq}`, {
             method:  'GET',
             headers: {
@@ -173,7 +192,7 @@ const collabRoutes = createApiRouter()
         const auth = await authorizeCollab(c);
         if (!auth.ok) return auth.response;
 
-        const stub = collabStub(c, auth.tenantId, auth.inspectionId);
+        const stub = collabStub(c, auth.tenantId, auth.reportId);
         const fwd = new Request('https://do.local/snapshots', {
             method:  'POST',
             headers: {
@@ -201,7 +220,7 @@ const collabRoutes = createApiRouter()
             return c.json({ error: 'invalid restore request' }, 400);
         }
 
-        const stub = collabStub(c, auth.tenantId, auth.inspectionId);
+        const stub = collabStub(c, auth.tenantId, auth.reportId);
         const fwd = new Request('https://do.local/restore', {
             method:  'POST',
             headers: {
@@ -224,7 +243,7 @@ const collabRoutes = createApiRouter()
         const auth = await authorizeCollab(c);
         if (!auth.ok) return auth.response;
 
-        const stub = collabStub(c, auth.tenantId, auth.inspectionId);
+        const stub = collabStub(c, auth.tenantId, auth.reportId);
         const fwd = new Request('https://do.local/restructure', {
             method:  'POST',
             headers: {
