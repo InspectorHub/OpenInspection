@@ -32,6 +32,14 @@ export interface TriggerContext {
     triggerEvent:  string;
     companyName:   string;
     reportBaseUrl: string;
+    /**
+     * Which DELIVERABLE a report event is about. One order can publish a
+     * standard report on Tuesday and a radon report on Thursday, and the
+     * `report.published` dedup key has to tell those apart — keyed on the
+     * inspection alone, the second publish is silently swallowed as a retry of
+     * the first. Absent for every non-report trigger.
+     */
+    reportId?:     string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

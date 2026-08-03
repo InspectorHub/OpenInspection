@@ -6,11 +6,30 @@
  * WHICH. This module is where callers that still address things by inspection
  * resolve that.
  */
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { reports } from '../db/schema';
 import { logger } from '../logger';
 import { REPORT_STATUS } from '../status/report-status';
+
+/**
+ * Every deliverable on one order, in the order a person would read them.
+ *
+ * `sort_order` first, `created_at` second: generation writes several rows in the
+ * same millisecond, so a timestamp alone leaves the list to whatever the
+ * database happened to return — and "which report is the standard one" is not a
+ * question the UI should answer differently on two page loads.
+ */
+export async function listReports(
+    db: DrizzleD1Database,
+    tenantId: string,
+    inspectionId: string,
+): Promise<Array<typeof reports.$inferSelect>> {
+    return db.select().from(reports)
+        .where(and(eq(reports.tenantId, tenantId), eq(reports.inspectionId, inspectionId)))
+        .orderBy(asc(reports.sortOrder), asc(reports.createdAt))
+        .all();
+}
 
 /**
  * The primary report of an inspection, or null when it has none.

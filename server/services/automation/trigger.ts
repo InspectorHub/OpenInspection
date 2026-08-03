@@ -90,8 +90,13 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             // Other events keep eventId NULL: some (e.g. agreement.viewed) legitimately
             // recur and must not be collapsed to once-per-inspection. Computed once per
             // rule/inspection — it doesn't depend on channel/recipient.
+            // Keyed on the REPORT when the caller names one: an order that
+            // delivers a standard report and a radon report publishes twice, and
+            // an inspection-keyed dedup treats the second as a retry of the
+            // first and never sends it. Callers that address the order as a
+            // whole keep the inspection key.
             const dedupEventId = ctx.triggerEvent === 'report.published'
-                ? `auto:report.published:${ctx.inspectionId}`
+                ? `auto:report.published:${ctx.inspectionId}${ctx.reportId ? `:${ctx.reportId}` : ''}`
                 : null;
             // Track L — fan out one pending log per enabled channel, each stamped with
             // the channel-appropriate recipient (email address or normalized E.164 phone).

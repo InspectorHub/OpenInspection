@@ -211,6 +211,13 @@
       "when": 1785721030453,
       "tag": "0029_rich_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1785765436571,
+      "tag": "0030_glamorous_blindfold",
+      "breakpoints": true
     }
   ]
 }

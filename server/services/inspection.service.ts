@@ -626,7 +626,8 @@ export class InspectionService {
     }
 
     /**
-     * Publishes an inspection report (transitions to delivered status).
+     * Publishes one of an inspection's reports (transitions to delivered status).
+     * `reportId` defaults to the order's primary report.
      */
     async publishInspection(inspectionId: string, tenantId: string, _options: {
         theme: string;
@@ -638,6 +639,7 @@ export class InspectionService {
         // (legacy publish modal, AI agent flows) keep working without it.
         recipients?: Array<{ contactId: string | null; channels: Array<'email' | 'text'> }>;
         sendAgreementCopy?: boolean;
+        reportId?: string;
     }) {
         return this.publish.publishInspection(inspectionId, tenantId, _options);
     }

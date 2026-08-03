@@ -40,6 +40,27 @@ export const reports = sqliteTable('reports', {
     title:        text('title').notNull(),
     status:       text('status', { enum: ['in_progress', 'published'] }).notNull().default('in_progress'),
     createdAt:    integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // When THIS deliverable went out. `inspections.report_status` is the
+    // order-wide roll-up and cannot answer "when did the radon report ship",
+    // which is the question a client waiting on one of several documents is
+    // actually asking. NULL = not published.
+    // Appended at table end for D1 rebuild safety.
+    publishedAt:  integer('published_at', { mode: 'timestamp_ms' }),
+    // When a publish of THIS report actually raised a notification.
+    //
+    // Not the same instant as `published_at`, and that difference is the whole
+    // point: a standard report and a sewer scope finished in one sitting are one
+    // delivery to the client, so the second publish coalesces into the first and
+    // leaves this NULL. A report published two days later announces itself,
+    // which is the reason the client waited. See
+    // `lib/inspection/report-notifications.ts` for the window.
+    notifiedAt:   integer('notified_at', { mode: 'timestamp_ms' }),
+    // Presentation order within one order. Reports are generated from the sold
+    // service lines, and the sequence a tenant put their catalogue in is the
+    // sequence they think of the work in — an ordering by `created_at` alone
+    // ties when several rows are written in the same millisecond, which is
+    // exactly what generation does.
+    sortOrder:    integer('sort_order').notNull().default(0),
 }, (t) => [
     index('idx_reports_inspection').on(t.inspectionId),
     index('idx_reports_tenant').on(t.tenantId),

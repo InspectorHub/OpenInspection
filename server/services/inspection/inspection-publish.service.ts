@@ -1,6 +1,15 @@
 import { eq, and, desc, inArray } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, users, tenantConfigs, tenants, inspectionServices, agreements, agreementRequests, agreementSigners, invoices, contacts } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
+import { logger } from '../../lib/logger';
+import { applyAutoSignatureOnPublish } from '../../lib/inspection/auto-sign';
+import {
+    lastSiblingNotifiedAt,
+    markReportNotified,
+    markReportPublished,
+    resolvePublishTargetReport,
+    shouldCoalesceNotification,
+} from '../../lib/inspection/report-notifications';
 import { safeISODate } from '../../lib/date';
 import { resolveLocale } from '../../lib/locale';
 import { InvoiceService } from '../invoice.service';
@@ -510,7 +519,11 @@ export class InspectionPublishService extends InspectionSubService {
     }
 
     /**
-     * Publishes an inspection report (transitions to delivered status).
+     * Publishes one of an inspection's reports (transitions to delivered status).
+     *
+     * `reportId` names WHICH deliverable — a standard report today, the radon
+     * report on Thursday. Omitted, it means the order's primary report, which is
+     * what every caller predating multi-report delivery intends.
      */
     async publishInspection(inspectionId: string, tenantId: string, _options: {
         theme: string;
@@ -522,6 +535,8 @@ export class InspectionPublishService extends InspectionSubService {
         // (legacy publish modal, AI agent flows) keep working without it.
         recipients?: Array<{ contactId: string | null; channels: Array<'email' | 'text'> }>;
         sendAgreementCopy?: boolean;
+        /** Which report to publish. Defaults to the inspection's primary. */
+        reportId?: string;
     }) {
         const db = this.getDrizzle();
 
@@ -532,9 +547,17 @@ export class InspectionPublishService extends InspectionSubService {
         // The order lifecycle does not gate delivery — a report can ship while
         // the order is still scheduled. Content completeness: publishReadiness.
 
+        // Which deliverable — the standard report today, radon on Thursday.
+        // Validation and tenant re-resolution live in resolvePublishTargetReport.
+        const now = new Date();
+        const targetReportId = await resolvePublishTargetReport(
+            db, tenantId, inspectionId, _options.reportId);
+
         await db.update(inspections)
             .set({ reportStatus: REPORT_STATUS.PUBLISHED })
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
+        if (targetReportId) await markReportPublished(db, tenantId, targetReportId, now);
+
         // Await so AutomationService.trigger actually inserts automation_logs
         // before the response goes out — the prior fire-and-forget pattern
         // dangled the promise so CF terminated the isolate before the insert
@@ -542,44 +565,28 @@ export class InspectionPublishService extends InspectionSubService {
         // below — all four paths now block on trigger). First publish fires
         // report.published; a re-publish (a prior version row exists) fires
         // report.amended so the client gets a distinct amendment notice.
-        const reportTrigger = await resolvePublishTrigger(this.db, tenantId, inspectionId);
-        await fireAutomation(this.db, tenantId, inspectionId, reportTrigger);
+        const reportTrigger = await resolvePublishTrigger(
+            this.db, tenantId, inspectionId, targetReportId ?? undefined);
 
-        // Spec 5H D2 — auto-sign on publish: if the inspection has the flag
-        // enabled AND the assigned inspector has a saved signature, inject
-        // _inspector_signature into inspection_results.data so the published
-        // report renders with the signature without requiring a manual step.
-        const inspForSign = await db.select().from(inspections)
-            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
-            .get();
-        if (inspForSign?.autoSignOnPublish && inspForSign.inspectorId) {
-            const inspector = await db.select().from(users)
-                .where(eq(users.id, inspForSign.inspectorId)).get();
-            if (inspector?.defaultSignatureBase64) {
-                const resultsRow = await db.select().from(inspectionResults)
-                    .where(eq(inspectionResults.inspectionId, inspectionId)).get();
-                const data: Record<string, unknown> = (resultsRow?.data as Record<string, unknown>) ?? {};
-                data._inspector_signature = {
-                    signatureBase64: inspector.defaultSignatureBase64,
-                    signedAt:        Date.now(),
-                    userId:          inspector.id,
-                    auto:            true,
-                };
-                if (resultsRow) {
-                    await db.update(inspectionResults)
-                        .set({ data: data as object, lastSyncedAt: new Date() })
-                        .where(and(eq(inspectionResults.id, resultsRow.id), eq(inspectionResults.tenantId, tenantId)));
-                } else {
-                    await db.insert(inspectionResults).values({
-                        id:           crypto.randomUUID(),
-                        tenantId,
-                        inspectionId,
-                        data:         data as object,
-                        lastSyncedAt: new Date(),
-                    });
-                }
-            }
+        // COALESCE WITHIN A WINDOW (see lib/inspection/report-notifications).
+        // An AMENDMENT is never coalesced — "your report changed" is its own
+        // thing to say, and suppressing it leaves the client reading a document
+        // they think they have already seen.
+        const coalesced = reportTrigger === 'report.published' && shouldCoalesceNotification(
+            targetReportId ? await lastSiblingNotifiedAt(db, tenantId, inspectionId, targetReportId) : null,
+            now.getTime());
+
+        if (coalesced) {
+            logger.info('report notification coalesced into a sibling delivery',
+                { inspectionId, reportId: targetReportId });
+        } else {
+            await fireAutomation(this.db, tenantId, inspectionId, reportTrigger,
+                targetReportId ?? undefined);
+            if (targetReportId) await markReportNotified(db, tenantId, targetReportId, now);
         }
+
+        // Spec 5H D2 — auto-sign on publish (lib/inspection/auto-sign).
+        await applyAutoSignatureOnPublish(db, tenantId, inspectionId);
 
         const tenantRow = await db.select({ slug: tenants.slug })
             .from(tenants).where(eq(tenants.id, tenantId)).get();

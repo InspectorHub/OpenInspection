@@ -216,6 +216,9 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'reports',               column: 'template_id',              reason: 'template reference, not personal data' },
     { table: 'reports',               column: 'status',                   reason: 'workflow enum, not personal data' },
     { table: 'reports',               column: 'created_at',               reason: 'record timestamp, not personal data' },
+    { table: 'reports',               column: 'published_at',             reason: 'record timestamp, not personal data' },
+    { table: 'reports',               column: 'notified_at',              reason: 'record timestamp, not personal data' },
+    { table: 'reports',               column: 'sort_order',               reason: 'presentation ordering integer, not personal data' },
     // The tenant's own published Privacy / Terms. `body_snapshot` is the
     // company's prose, not a data subject's data, and the row's whole purpose is
     // to be immutable — erasing it would destroy the record of what a document

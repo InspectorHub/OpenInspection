@@ -254,6 +254,20 @@ export async function scheduled(
         logger.error('[cron] _pending cleanup failed', {}, e instanceof Error ? e : undefined);
     }
 
+    // 5a-bis. Turn sold service lines into reports for orders whose scheduled
+    //     start has arrived. Deliberately not at booking: a report that
+    //     materialises weeks early clutters the order and freezes a template the
+    //     tenant may still be editing. Latched per inspection, so a re-run is a
+    //     no-op rather than a re-titling of documents someone has filled in.
+    try {
+        const { sweepScheduledReportGeneration } = await import('./lib/inspection/report-generation');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const generated = await sweepScheduledReportGeneration(drizzle(env.DB) as any, Date.now());
+        if (generated > 0) logger.info('[cron] generated reports from sold services', { inspections: generated });
+    } catch (e) {
+        logger.error('[cron] report generation sweep failed', {}, e instanceof Error ? e : undefined);
+    }
+
     // 5b. Background GC of orphaned inspection R2 blobs (Q8). Idempotent; grace-windowed.
     try {
         if (env.PHOTOS) {
