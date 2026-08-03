@@ -35,6 +35,12 @@ import { isValidLocale } from '../locale';
  * `project.inlang/settings.json` is asserted by
  * `tests/unit/contacts/contact-locale.spec.ts`, because a resolver that
  * returns a locale with no messages behind it degrades to English silently.
+ *
+ * This constant is also read by the booking UI (`app/components/booking/
+ * LanguageChoice.tsx`) so the options offered and the values accepted are one
+ * list. That makes this module part of the browser bundle: keep it PURE — no
+ * DB, no bindings, no `app/paraglide` — exactly as `server/lib/people/
+ * capabilities.ts` is kept.
  */
 export const SUPPORTED_CONTACT_LOCALES = ['en', 'es-419'] as const;
 
@@ -50,8 +56,12 @@ export const DEFAULT_CONTACT_LOCALE: ContactLocale = 'en';
  * its regional catalogue: `es-MX` and `es-CL` both resolve to `es-419`,
  * because the alternative is answering a Spanish speaker in English over a
  * country code.
+ *
+ * Exported because collection sites need the same reduction the resolver
+ * applies: what a booking STORES has to be a locale this module would later
+ * hand back, or the stored value silently degrades to English at send time.
  */
-function normalizeLocale(raw: string | null | undefined): ContactLocale | null {
+export function normalizeLocale(raw: string | null | undefined): ContactLocale | null {
     if (!raw || !isValidLocale(raw)) return null;
     const language = new Intl.Locale(raw).language;
     return SUPPORTED_CONTACT_LOCALES.find(

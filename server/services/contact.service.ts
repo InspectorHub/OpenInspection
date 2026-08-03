@@ -247,7 +247,7 @@ export class ContactService {
      */
     async upsertClientContact(
         tenantId: string,
-        input: { name: string; email?: string; phone?: string; type: 'client' | 'agent' },
+        input: { name: string; email?: string; phone?: string; type: 'client' | 'agent'; locale?: string | null },
     ): Promise<{ id: string; created: boolean }> {
         const db = this.getDrizzle();
         const normalizedEmail = input.email ? input.email.toLowerCase().trim() : undefined;
@@ -268,12 +268,20 @@ export class ContactService {
 
             if (existing) {
                 // Fill-forward: only update name/phone if currently null/empty.
-                const updates: Partial<{ name: string; phone: string }> = {};
+                const updates: Partial<{ name: string; phone: string; locale: string }> = {};
                 if ((!existing.name || existing.name.trim() === '') && input.name) {
                     updates.name = input.name;
                 }
                 if ((!existing.phone || existing.phone.trim() === '') && input.phone) {
                     updates.phone = input.phone;
+                }
+                // Locale does NOT fill forward: the contact has just told us
+                // again, and the newer answer is the true one. Being written to
+                // in English after asking for Spanish is the failure this
+                // avoids. An omitted choice still never clears a stored one —
+                // silence is not a retraction.
+                if (input.locale && input.locale !== existing.locale) {
+                    updates.locale = input.locale;
                 }
                 if (Object.keys(updates).length > 0) {
                     await db
@@ -300,6 +308,7 @@ export class ContactService {
             phone: input.phone ?? null,
             agency: null,
             notes: null,
+            locale: input.locale ?? null,
             createdAt: new Date(),
         });
         return { id, created: true };
