@@ -1,0 +1,1 @@
+ALTER TABLE `inspection_services` ADD `is_active` integer DEFAULT true NOT NULL;

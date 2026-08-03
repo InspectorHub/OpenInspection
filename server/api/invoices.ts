@@ -261,6 +261,8 @@ const invoiceRoutes = createApiRouter()
                 .where(and(
                     eq(inspectionServices.tenantId, tenantId),
                     eq(inspectionServices.inspectionId, inspectionId),
+                    // A declined line must not appear on the invoice.
+                    eq(inspectionServices.active, true),
                 ))
                 .all();
 

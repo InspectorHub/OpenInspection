@@ -45,6 +45,21 @@ export const inspectionServices = sqliteTable('inspection_services', {
     priceOverride: integer('price_override_cents'),
     nameSnapshot: text('name_snapshot').notNull(),
     priceSnapshot: integer('price_snapshot_cents').notNull(),
+    // A client changing scope at the door is routine — add a sewer scope, drop
+    // the pool inspection, decline the radon. That used to be a hard delete,
+    // which was harmless only while nothing hung off a line.
+    //
+    // Once a `reports` row or a pay split points here, a delete leaves dangling
+    // rows and NOTHING surfaces it: Schema Rules forbid new foreign keys, so
+    // there is no constraint to catch it. The invoice disagrees too —
+    // `invoices.amountCents` is authoritative over the line sum, so removing a
+    // line does not change what was billed while a split keeps paying against
+    // it.
+    //
+    // Matches `services` and `discount_codes` in this same file. Appended at
+    // table end for D1 rebuild safety. EVERY reader must filter on it — the
+    // money chain in effective-price.sql.ts first.
+    active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
 }, (t) => [
     index('idx_insp_services_tenant').on(t.tenantId),
     index('idx_insp_services_insp').on(t.inspectionId),

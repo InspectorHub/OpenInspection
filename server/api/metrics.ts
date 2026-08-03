@@ -88,7 +88,8 @@ const metricsRoutes = createApiRouter()
             eq(inspections.id, inspectionServices.inspectionId),
             eq(inspections.tenantId, inspectionServices.tenantId),
         ))
-        .where(and(eq(inspectionServices.tenantId, tenantId), inWindow))
+        // Soft-deleted lines are history; revenue must not count them.
+        .where(and(eq(inspectionServices.tenantId, tenantId), eq(inspectionServices.active, true), inWindow))
         .groupBy(inspectionServices.nameSnapshot)
         .orderBy(sql`count(*) desc`)
         .limit(10);

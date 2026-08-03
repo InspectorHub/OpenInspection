@@ -14,7 +14,7 @@
   "server/api/admin/admin-settings.ts": 742,
   "server/api/inspections/report-delivery.ts": 736,
   "app/routes/settings-communication-templates.tsx": 731,
-  "server/services/inspection/inspection-analytics.service.ts": 727,
+  "server/services/inspection/inspection-analytics.service.ts": 729,
   "app/routes/template-edit.tsx": 719,
   "server/index.ts": 693,
   "app/components/media-studio/PhotoAnnotator.tsx": 692,

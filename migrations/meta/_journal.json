@@ -183,6 +183,13 @@
       "when": 1785680855335,
       "tag": "0025_hot_venom",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1785714900847,
+      "tag": "0026_charming_earthquake",
+      "breakpoints": true
     }
   ]
 }
