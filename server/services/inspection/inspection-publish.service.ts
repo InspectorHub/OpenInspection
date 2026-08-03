@@ -275,6 +275,10 @@ export class InspectionPublishService extends InspectionSubService {
             paymentStatus: string;
             paymentRequired: boolean;
             agreementRequired: boolean;
+            // The order-wide gate's release record. Null when still gated.
+            unlockedAt: string | null;
+            unlockedByName: string | null;
+            unlockReason: string | null;
             coverPhoto: string | null;
             referredByAgentId: string | null;
             sellingAgentId: string | null;
@@ -310,6 +314,18 @@ export class InspectionPublishService extends InspectionSubService {
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
         if (!insp) return null;
+
+        // The unlock record is meant to be READ by a person later, so resolve
+        // the name here rather than shipping an opaque id to the browser. A
+        // deleted teammate leaves it null and the UI says "a teammate" — the
+        // release still happened and the reason still stands.
+        let unlockedByName: string | null = null;
+        if (insp.unlockedBy) {
+            const u = await db.select({ name: users.name, email: users.email }).from(users)
+                .where(and(eq(users.id, insp.unlockedBy), eq(users.tenantId, tenantId)))
+                .get();
+            unlockedByName = u?.name ?? u?.email ?? null;
+        }
 
         // Service lines — effective price = priceOverride ?? priceSnapshot
         // (P-4 authority chain, tier 2). Tenant-scoped on both columns.
@@ -428,6 +444,11 @@ export class InspectionPublishService extends InspectionSubService {
                 paymentStatus:     insp.paymentStatus,
                 paymentRequired:   insp.paymentRequired === true,
                 agreementRequired: insp.agreementRequired === true,
+                unlockedAt:        safeISODate(insp.unlockedAt) ?? null,
+                // The NAME, not the id: this record exists to be read by a
+                // person later, and an opaque uuid tells them nothing.
+                unlockedByName:    unlockedByName,
+                unlockReason:      insp.unlockReason ?? null,
                 coverPhoto:        insp.coverPhotoId ?? null,
                 referredByAgentId: buyerAgentId,
                 sellingAgentId:    listingAgentId,

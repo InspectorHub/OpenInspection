@@ -1,6 +1,6 @@
 {
   "app/routes/inspection-edit.tsx": 2530,
-  "app/routes/inspector-portal.tsx": 1180,
+  "app/routes/inspector-portal.tsx": 1202,
   "server/services/inspection/inspection-core.service.ts": 1117,
   "server/services/booking.service.ts": 966,
   "server/services/inspection/inspection-report.service.ts": 952,
@@ -20,8 +20,8 @@
   "app/components/media-studio/PhotoAnnotator.tsx": 692,
   "app/hooks/usePhotoOps.ts": 661,
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,
+  "server/services/inspection/inspection-publish.service.ts": 655,
   "app/components/editor/ItemEditor.tsx": 637,
-  "server/services/inspection/inspection-publish.service.ts": 634,
   "app/components/inspection-edit/CompliancePanel.tsx": 623,
   "app/components/portal/sections/RepairBuilderSection.tsx": 616,
   "app/hooks/useInspection.ts": 600,

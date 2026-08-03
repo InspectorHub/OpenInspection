@@ -73,6 +73,14 @@ export function BookingPoliciesPanel({ initialConfig }: { initialConfig: TenantC
           <span className="block text-[12px] text-ih-fg-3 mt-0.5">
             {m.settings_policies_signed_desc()}
           </span>
+          {/* The gate is order-wide, and that is the part an operator finds out
+              the hard way otherwise: an add-on's unsigned addendum holding back
+              a report that is finished. Stated here rather than discovered. */}
+          {blockUnsigned && (
+            <span className="block text-[12px] text-ih-watch-fg mt-1">
+              {m.settings_policies_signed_scope()}
+            </span>
+          )}
         </span>
       </label>
 

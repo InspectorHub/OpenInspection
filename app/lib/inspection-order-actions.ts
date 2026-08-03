@@ -129,6 +129,41 @@ export async function handleServiceRemove(
 }
 
 /**
+ * `unlock-report` — release the order-wide gate for this inspection.
+ *
+ * The reason is required here as well as at the API. Failing in the browser
+ * means the operator is told by the field they are looking at rather than by a
+ * round trip, and it keeps the API from being the only thing standing between a
+ * blank reason and the audit log.
+ */
+export async function handleUnlockReport(
+    api: Api,
+    inspectionId: string,
+    formData: FormData,
+): Promise<{ ok: boolean; intent: "unlock-report"; error: string | undefined }> {
+    const reason = String(formData.get("reason") ?? "").trim();
+    if (!reason) {
+        return { ok: false, intent: "unlock-report", error: m.hub_gate_unlock_reason_required() };
+    }
+    const res = await api.inspections[":id"]["unlock-report"].$post({
+        param: { id: inspectionId },
+        json: { reason },
+    });
+    return toActionResult(res, "unlock-report", m.hub_gate_unlock_failed());
+}
+
+/** `relock-report` — put the gate back. No reason needed to restore a default. */
+export async function handleRelockReport(
+    api: Api,
+    inspectionId: string,
+): Promise<{ ok: boolean; intent: "relock-report"; error: string | undefined }> {
+    const res = await api.inspections[":id"]["relock-report"].$post({
+        param: { id: inspectionId },
+    });
+    return toActionResult(res, "relock-report", m.hub_gate_relock_failed());
+}
+
+/**
  * A money field that was left blank means "no override", which is a different
  * thing from zero — a free line is a real thing an operator may want. `''` and
  * a missing field both read as absent; anything unparseable does too, rather

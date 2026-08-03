@@ -53,12 +53,15 @@ import {
   handleServiceAdd,
   handleServicePrice,
   handleServiceRemove,
+  handleUnlockReport,
+  handleRelockReport,
 } from "~/lib/inspection-order-actions";
 import { ScheduleCard, type TeamMember } from "~/components/inspector-portal/ScheduleCard";
 import { ServicesCard, type CatalogService } from "~/components/inspector-portal/ServicesCard";
 import { OrderDetailsCard } from "~/components/inspector-portal/OrderDetailsCard";
 import { InvoiceCard } from "~/components/inspector-portal/InvoiceCard";
 import { GateToggle } from "~/components/inspector-portal/GateToggle";
+import { ReportGateUnlock } from "~/components/inspector-portal/ReportGateUnlock";
 import { CommunicationSection } from "~/components/inspector-portal/CommunicationSection";
 import { resolveReferralSources } from "../../server/lib/referral-sources";
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspector-portal-helpers";
@@ -85,6 +88,10 @@ interface HubData extends HubPayload {
   inspection: HubPayload["inspection"] & {
     id: string;
     propertyAddress: string;
+    // The order-wide gate's release record; null while still gated.
+    unlockedAt: string | null;
+    unlockedByName: string | null;
+    unlockReason: string | null;
     date: string | null;
     inspectorId: string | null;
     templateId: string | null;
@@ -313,6 +320,8 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   if (intent === "service-add") return handleServiceAdd(api, id, formData);
   if (intent === "service-price") return handleServicePrice(api, id, formData);
   if (intent === "service-remove") return handleServiceRemove(api, id, formData);
+  if (intent === "unlock-report") return handleUnlockReport(api, id, formData);
+  if (intent === "relock-report") return handleRelockReport(api, id);
 
   if (intent === "request-payment") {
     const res = await api.invoices["request-payment"].$post({
@@ -1008,6 +1017,19 @@ export default function InspectionHubPage() {
                 })}
               </ul>
             </div>
+          )}
+
+          {/* The order-wide gate's release. It belongs on the REPORT card by the
+              same rule GateToggle follows — the card for the artifact it gates —
+              and the artifact here is the reports, plural. Admin-only: this
+              hands a client something the tenant's own rules said to hold. */}
+          {isAdmin && (
+            <ReportGateUnlock
+              unlockedAt={inspection.unlockedAt ?? null}
+              unlockedByName={inspection.unlockedByName ?? null}
+              unlockReason={inspection.unlockReason ?? null}
+              formatDate={(iso) => formatInspectionDateTime(iso, undefined, displayTz)}
+            />
           )}
         </Card>
         {/* 7. Invoice — getting paid for it. IA-87 ②: the amount was display
