@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // tests/web/unit/ItemCommentsPanel.spec.tsx
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";

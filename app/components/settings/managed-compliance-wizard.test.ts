@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * ManagedComplianceWizard render tests — Plan 2 Task 5 (review fix).
  *

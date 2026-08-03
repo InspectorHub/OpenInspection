@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * One notice, three portals (C4).
  *

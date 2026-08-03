@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest";
 import { createRef } from "react";
 import { render, fireEvent } from "@testing-library/react";

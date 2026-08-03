@@ -2,12 +2,16 @@ import { sqliteTable, text, integer, uniqueIndex, index, primaryKey } from 'driz
 import { sql } from 'drizzle-orm';
 import { tenants, users } from '../tenant';
 
-// DB-8 — assignment link table replacing JSON helper_inspector_ids for
-// QUERYING. inspections.inspectorId/leadInspectorId/helperInspectorIds stay
-// canonical for existing reads; this table is double-written on every
-// assignment change and is the query face for "which inspections does user X
-// work on a given day" (tenant slot aggregation, conflict detection, future
-// per-inspector metrics). App-layer integrity — no DB FKs (Schema Rules).
+// Where assignment lives. One row per person on an inspection, carrying their
+// ROLE — which is what `inspections.lead_inspector_id` plus a JSON
+// `helper_inspector_ids` could never express without two readers disagreeing
+// about how to combine them. Written by syncInspectionAssignments from every
+// assignment change, and read for "which inspections does user X work on a
+// given day" (tenant slot aggregation, conflict detection, per-inspector
+// metrics). `inspections.inspector_id` remains only as a fallback for rows
+// created before this table existed and never re-assigned since; the lead and
+// helper columns are no longer written at all.
+// App-layer integrity — no DB FKs (Schema Rules).
 export const inspectionInspectors = sqliteTable('inspection_inspectors', {
     inspectionId: text('inspection_id').notNull(),
     userId:       text('user_id').notNull(),

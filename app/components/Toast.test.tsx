@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, it, expect, afterEach } from 'vitest';
 import { act, render, cleanup } from '@testing-library/react';
 import { ToastPortal } from '~/components/Toast';

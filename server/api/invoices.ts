@@ -20,6 +20,7 @@ import { resolveSignatureInspector } from '../lib/signature-helpers';
 import { getTenantId, getDrizzle } from '../lib/route-helpers';
 import { resolveLocale } from '../lib/locale';
 import { formatCurrency } from '../lib/format';
+import { qboPaymentKey } from '../lib/qbo-payment-key';
 
 /**
  * `invoices.id` is an opaque TEXT id, so the route must not demand a UUID
@@ -192,7 +193,11 @@ const invoiceRoutes = createApiRouter()
         }
         if (c.env.QBO_CLIENT_ID && inv) {
             c.executionCtx.waitUntil(
-                c.var.services.qbo.recordPayment(tenantId, id, inv.amountCents / 100),
+                // Same key the Stripe webhook uses, deliberately: an invoice
+                // settled online and then also marked paid by hand is ONE
+                // payment, and QBO collapses the second push on the repeated
+                // requestid instead of booking it twice.
+                c.var.services.qbo.recordPayment(tenantId, id, inv.amountCents / 100, qboPaymentKey(id)),
             );
         }
         return c.json({ success: true }, 200);
@@ -256,6 +261,8 @@ const invoiceRoutes = createApiRouter()
                 .where(and(
                     eq(inspectionServices.tenantId, tenantId),
                     eq(inspectionServices.inspectionId, inspectionId),
+                    // A declined line must not appear on the invoice.
+                    eq(inspectionServices.active, true),
                 ))
                 .all();
 

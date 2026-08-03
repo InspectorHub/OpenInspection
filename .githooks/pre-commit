@@ -83,7 +83,12 @@ needs_typegen() {
     # Editing a route module's body does not change its generated types — those
     # infer from `typeof loader` when tsc runs. A route file APPEARING or
     # DISAPPEARING changes the tree, and that does.
-    echo "$STAGED_TREE" | grep -qE '^app/routes/'
+    #
+    # A colocated SPEC is not a route: `app/routes/foo.test.tsx` never enters
+    # routes.ts, so typegen's output cannot differ because one arrived. The Test
+    # Layout in CLAUDE.md REQUIRES frontend specs to sit beside what they test,
+    # so this fires on ordinary work — and typegen costs ~60s measured here.
+    echo "$STAGED_TREE" | grep -E '^app/routes/' | grep -qvE '\.(test|spec)\.(ts|tsx)$'
 }
 
 step "Type check"

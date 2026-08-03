@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Spec 3 Task 5 — core `/agent-login` dual-mode front door page.
  *

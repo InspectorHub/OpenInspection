@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-65 — the inspection's signing requests, rendered on the inspection.
  *

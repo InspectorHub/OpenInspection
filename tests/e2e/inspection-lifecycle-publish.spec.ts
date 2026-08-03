@@ -14,8 +14,6 @@
  * editor-seed: this spec mutates order state (marks complete), and the
  * editor-seed inspection is read in parallel by the subsystem-a specs.
  */
-import { execFileSync } from 'node:child_process';
-import { writeFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
@@ -27,33 +25,9 @@ const ADMIN_EMAIL = process.env.TEST_EMAIL || 'admin@autotest.com';
 const ADMIN_PASSWORD = process.env.TEST_PASSWORD || 'Password123!';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP_DIR = path.resolve(__dirname, '..', '..');
 
-/** PBKDF2-SHA256 (100k iters, 16-byte salt) — matches server/lib/password.ts. */
-async function hashPassword(password: string): Promise<string> {
-  const toHex = (b: Uint8Array) => Array.from(b).map((x) => x.toString(16).padStart(2, '0')).join('');
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), { name: 'PBKDF2' }, false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' }, key, 256);
-  return `pbkdf2:${toHex(salt)}:${toHex(new Uint8Array(bits))}`;
-}
 
 /** Reset the api-seeded admin's password in the LOCAL D1 for a deterministic login. */
-async function seedAdminPassword(): Promise<void> {
-  const hash = await hashPassword(ADMIN_PASSWORD);
-  const sql = `UPDATE users SET password_hash='${hash}' WHERE email='${ADMIN_EMAIL.replace(/'/g, "''")}';`;
-  const sqlFile = path.join(APP_DIR, '.lifecycle-e2e-seed.tmp.sql');
-  writeFileSync(sqlFile, sql, 'utf8');
-  try {
-    execFileSync(
-      process.execPath,
-      [path.join(APP_DIR, 'scripts', 'wrangler.mjs'), 'd1', 'execute', 'DB', '--local', '--file', sqlFile],
-      { cwd: APP_DIR, stdio: ['ignore', 'ignore', 'inherit'] },
-    );
-  } finally {
-    rmSync(sqlFile, { force: true });
-  }
-}
 
 async function loginApi(request: APIRequestContext, email: string, password: string): Promise<string> {
   const csrf = 'deadbeefdeadbeefdeadbeefdeadbeef';
@@ -84,7 +58,12 @@ let inspectionId = '';
 
 test.describe.serial('Publish is decoupled from order completion (IA-29 / IA-30)', () => {
   test.beforeAll(async ({ request }) => {
-    await seedAdminPassword();
+    // The admin password is already what POST /api/auth/setup wrote (both
+    // sides use ADMIN_PASSWORD), so the local seedAdminPassword() that used to
+    // run here re-hashed the same value onto the same row — at the cost of a
+    // `wrangler d1 execute --local` that held the SQLite file lock and forced
+    // workers:1 on the whole suite. The `api` project dependency guarantees
+    // the row exists.
     token = await loginApi(request, ADMIN_EMAIL, ADMIN_PASSWORD);
 
     const richItem = (id: string, label: string) => ({

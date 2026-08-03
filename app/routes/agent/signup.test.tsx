@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Task 4 (report-link conversion) — /agent-signup query-param prefill + guarded returnTo redirect.
  *

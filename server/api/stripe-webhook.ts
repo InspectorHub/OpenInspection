@@ -4,6 +4,7 @@ import { logger } from '../lib/logger';
 import { extractSettledPayment } from '../lib/stripe-helpers';
 import { appendWebhookLogEntry } from '../lib/stripe-webhook-log';
 import { AppError } from '../lib/errors';
+import { qboPaymentKey } from '../lib/qbo-payment-key';
 
 /**
  * Stripe webhook (bring-your-own-keys). Excluded from JWT middleware (see
@@ -94,6 +95,30 @@ api.post('/', async (c) => {
         }
         logger.error('Stripe webhook processing error', {}, e instanceof Error ? e : undefined);
         return c.json({ success: false, error: { message: 'Processing failed' } }, 500);
+    }
+
+    // QuickBooks learns about card payments here or not at all. `recordPayment`
+    // had exactly one caller — the manual "mark as paid" route — so a tenant
+    // reconciling their books found every online payment missing.
+    //
+    // In waitUntil, and deliberately after the ACK path is settled: the customer
+    // has already paid, and a QuickBooks outage must not turn a successful
+    // payment into a 500 that Stripe redelivers forever. `markPaid` above is
+    // idempotent on our side; the requestid is what keeps their side clean when
+    // Stripe redelivers anyway.
+    if (c.env.QBO_CLIENT_ID) {
+        c.executionCtx.waitUntil((async () => {
+            try {
+                const inv = await c.var.services.invoice.findById(tenantId, settled.invoiceId);
+                if (!inv) return;
+                await c.var.services.qbo.recordPayment(
+                    tenantId, settled.invoiceId, inv.amountCents / 100, qboPaymentKey(settled.invoiceId),
+                );
+            } catch (e) {
+                logger.error('Stripe webhook: QBO payment push failed',
+                    { invoiceId: settled.invoiceId.slice(0, 8) }, e instanceof Error ? e : undefined);
+            }
+        })());
     }
 
     await appendWebhookLogEntry(c.env.TENANT_CACHE, tenantId, {

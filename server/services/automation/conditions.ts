@@ -52,8 +52,13 @@ export function AutomationConditions<TBase extends Constructor<AutomationBase>>(
 
             let bookedServiceIds: string[] = [];
             if (cond?.serviceIds && cond.serviceIds.length > 0) {
+                // A declined line must not keep firing an automation for a
+                // service the client is no longer buying.
                 const rows = await db.select({ serviceId: inspectionServices.serviceId }).from(inspectionServices)
-                    .where(eq(inspectionServices.inspectionId, inspection.id));
+                    .where(and(
+                        eq(inspectionServices.inspectionId, inspection.id),
+                        eq(inspectionServices.active, true),
+                    ));
                 bookedServiceIds = rows.map((r) => r.serviceId);
             }
 

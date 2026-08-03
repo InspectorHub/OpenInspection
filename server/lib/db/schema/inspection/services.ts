@@ -17,6 +17,19 @@ export const services = sqliteTable('services', {
     active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // The visits this service implies. Radon needs two — a drop-off and a
+    // pickup at least 48h later — while a sewer scope needs none beyond the
+    // main visit.
+    //
+    // Stored as event_type SLUGS, not ids, and that is the load-bearing choice:
+    // slugs are stable identifiers that survive a tenant deleting and
+    // re-creating a type, they do not depend on seed ordering (services and
+    // event types are seeded in the same run), and an unmatched slug degrades
+    // to "propose nothing" instead of dangling. A hard FK would additionally
+    // block deleting an event type, which is not a trade worth making for a
+    // proposal.
+    // Appended at table end for D1 rebuild safety.
+    defaultEventTypeSlugs: text('default_event_type_slugs', { mode: 'json' }).$type<string[]>(),
 }, (t) => [
     index('idx_services_tenant').on(t.tenantId),
 ]);
@@ -32,6 +45,21 @@ export const inspectionServices = sqliteTable('inspection_services', {
     priceOverride: integer('price_override_cents'),
     nameSnapshot: text('name_snapshot').notNull(),
     priceSnapshot: integer('price_snapshot_cents').notNull(),
+    // A client changing scope at the door is routine — add a sewer scope, drop
+    // the pool inspection, decline the radon. That used to be a hard delete,
+    // which was harmless only while nothing hung off a line.
+    //
+    // Once a `reports` row or a pay split points here, a delete leaves dangling
+    // rows and NOTHING surfaces it: Schema Rules forbid new foreign keys, so
+    // there is no constraint to catch it. The invoice disagrees too —
+    // `invoices.amountCents` is authoritative over the line sum, so removing a
+    // line does not change what was billed while a split keeps paying against
+    // it.
+    //
+    // Matches `services` and `discount_codes` in this same file. Appended at
+    // table end for D1 rebuild safety. EVERY reader must filter on it — the
+    // money chain in effective-price.sql.ts first.
+    active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
 }, (t) => [
     index('idx_insp_services_tenant').on(t.tenantId),
     index('idx_insp_services_insp').on(t.inspectionId),

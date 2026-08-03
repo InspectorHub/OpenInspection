@@ -64,17 +64,26 @@ export function ServiceFields({
   templates,
   initialPriceCents = null,
   initialTemplateId = "",
+  otherServices = [],
 }: {
   fields: ServiceFieldMetas;
   templates: Array<{ id: string; name: string }>;
   initialPriceCents?: number | null;
   initialTemplateId?: string;
+  /** Every OTHER service in the catalogue — the one being edited is excluded. */
+  otherServices?: Array<{ id: string; name: string; templateId: string | null }>;
 }) {
   // Price is held in integer cents; a hidden field carries dollars so the zod
   // schema (which multiplies by 100) sees the same contract as the API.
   const [priceCents, setPriceCents] = useState<number | null>(initialPriceCents);
   const onlyTemplate = templates.length === 1 ? templates[0].id : "";
   const [templateId, setTemplateId] = useState(initialTemplateId || onlyTemplate);
+
+  // Two services sharing a default template is the single most common way to
+  // end up with duplicate reports — the competitor keeps an FAQ entry for it.
+  // Nothing downstream is invalid, so this warns and does not block: there are
+  // legitimate reasons to want it, and the failure mode is surprise.
+  const sharing = templateId ? otherServices.filter((s) => s.templateId === templateId) : [];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
@@ -155,9 +164,31 @@ export function ServiceFields({
             {/* Reserved, not conditional: appearing and disappearing moved the
                 form's Save button by two lines, under whatever the cursor was
                 already aiming at. */}
-            <div className="mt-1 min-h-[30px]">
+            {/* Both messages share the reserved slot and are mutually exclusive
+                — one needs a blank template, the other needs a chosen one — so
+                the Save button stays put either way. The height is the TALLEST
+                of them, measured in the browser: at 30px the sharing warning
+                wrapped to a third line and pushed Save down 20px, which is the
+                exact thing this slot exists to stop.
+
+                role="status", not "alert": this is advice about a choice the
+                admin just made deliberately, not an error. Assertive would
+                interrupt them on every keystroke through the select. */}
+            <div className="mt-1 min-h-[48px]" role="status">
               {!templateId && (
                 <p className="text-[11px] text-ih-watch-fg">{m.settings_services_template_consequence()}</p>
+              )}
+              {sharing.length === 1 && (
+                <p className="text-[11px] text-ih-watch-fg">
+                  {m.settings_services_template_shared_one({ name: sharing[0].name })}
+                </p>
+              )}
+              {sharing.length > 1 && (
+                <p className="text-[11px] text-ih-watch-fg">
+                  {m.settings_services_template_shared_many({
+                    name: sharing[0].name, count: sharing.length - 1,
+                  })}
+                </p>
               )}
             </div>
           </>

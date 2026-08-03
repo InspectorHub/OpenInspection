@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // Spec 3 Task 3 — <AgentReportActions> report-landing CTA.
 //
 // AgentReportActions calls useFetcher(), which requires a data-router context

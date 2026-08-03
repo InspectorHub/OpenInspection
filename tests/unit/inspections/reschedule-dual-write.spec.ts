@@ -133,12 +133,27 @@ describe('PATCH /api/inspections/:id — reschedule dual-write (§7.5 item 3)', 
         );
     });
 
-    it('a legacy row with no scheduled instant updates date only, ms stays NULL', async () => {
+    it('a row whose date carries no time keeps a NULL instant', async () => {
+        // Nothing to derive a wall-clock from. Inventing midnight would be worse
+        // than NULL: the sameDayHour bucket is at least honest about being
+        // imprecise, whereas a fabricated 00:00 reads as a real appointment.
         await seed({ date: '2026-01-15', startMs: null, endMs: null });
         expect(await patchDate('2026-01-20')).toBe(200);
         const row = await readRow();
         expect(row?.date).toBe('2026-01-20');
         expect(row?.scheduledStartMs).toBeNull();
+        expect(row?.scheduledEndMs).toBeNull();
+    });
+
+    it('derives the instant for a row that never had one, from the date suffix', async () => {
+        // Manually-created inspections never went through fulfillBooking, so they
+        // carry no instant at all — and without this they never would, leaving
+        // conflict detection on the hour bucket for them forever.
+        await seed({ date: '2026-01-15T10:00:00Z', startMs: null, endMs: null });
+        expect(await patchDate('2026-01-20')).toBe(200);
+        const row = await readRow();
+        expect(toMs(row?.scheduledStartMs)).toBe(wallClockToEpochMs('2026-01-20', '10:00', TZ));
+        // No prior instant means no prior end either — a duration would be invented.
         expect(row?.scheduledEndMs).toBeNull();
     });
 

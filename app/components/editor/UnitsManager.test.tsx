@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { render, screen, fireEvent } from "@testing-library/react";
 import { vi, beforeEach, afterEach } from "vitest";
 import { UnitsManager, type UnitsManagerProps } from "~/components/editor/UnitsManager";

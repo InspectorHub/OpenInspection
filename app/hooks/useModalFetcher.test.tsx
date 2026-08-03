@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The modal must reopen after a successful submit.
  *

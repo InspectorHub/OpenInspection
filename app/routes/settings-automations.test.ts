@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The Automations editor must offer every value the schema accepts.
  *

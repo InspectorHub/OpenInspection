@@ -131,10 +131,12 @@ export const automationLogs = sqliteTable('automation_logs', {
     // Communication C1 (design §3.13) — the NOTICE HEADER this channel-attempt
     // belongs to (notifications.id). The header carries the recipient and read
     // state; this row carries one channel's delivery outcome. App-layer soft
-    // reference, no .references() per Schema Rules. Nullable: legacy rows are
-    // stamped by scripts/backfill-notice-headers.mjs, and a row whose
-    // recipient resolves to neither a contact nor a user keeps NULL (the
-    // Outbox grouping falls back to the interim (automation_id, send_at) key).
+    // reference, no .references() per Schema Rules. Nullable, and the NULL is
+    // load-bearing in two ways: a row whose recipient resolves to neither a
+    // contact nor a user keeps NULL, and the Outbox grouping falls back to the
+    // interim (automation_id, send_at) key. Rows written before the split keep
+    // NULL permanently — they recorded no recipient at all, so no header can be
+    // derived for them and no backfill could ever have helped.
     // Appended at table end for D1 rebuild safety.
     noticeId: text('notice_id'),
 }, (t) => [

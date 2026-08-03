@@ -20,6 +20,14 @@ import path from 'node:path';
 //     so producer tests can assert the message actually traversed the queue.
 //   `max_batch_timeout: 0` delivers immediately so the producer poll resolves.
 export default defineConfig({
+    resolve: {
+        // `server/lib/i18n/messages.ts` re-exports the compiled Paraglide
+        // catalogue, which lives under `app/`. This is the FOURTH resolver that
+        // has to agree on that — tsconfig.api.json's paths, vitest.api.config.ts,
+        // vite.config.ts and here — and it is the one that only fails inside
+        // real workerd, long after the other three are green.
+        alias: { '~': path.resolve(__dirname, 'app') },
+    },
     plugins: [
         cloudflareTest({
             main: path.resolve(__dirname, 'tests/workers/test-worker.ts'),

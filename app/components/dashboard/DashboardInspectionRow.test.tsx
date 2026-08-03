@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * The price on a dashboard row is integer CENTS and must be formatted as money.
  *

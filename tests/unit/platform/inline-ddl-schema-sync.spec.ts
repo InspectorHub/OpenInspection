@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
-import { tenantConfigs } from '../../../server/lib/db/schema';
-import { TENANT_CONFIGS_TEST_DDL } from '../../helpers/inline-ddl';
+import { tenantConfigs, inspectionResults } from '../../../server/lib/db/schema';
+import { TENANT_CONFIGS_TEST_DDL, INSPECTION_RESULTS_TEST_DDL } from '../../helpers/inline-ddl';
 
 /**
  * Drift guard for the hand-maintained workers-runtime DDL.
@@ -43,6 +43,23 @@ describe('workers inline DDL stays in sync with the Drizzle schema', () => {
             missing,
             `tests/helpers/inline-ddl.ts is missing tenant_configs column(s): ${missing.join(', ')}. ` +
                 'Add them to TENANT_CONFIGS_TEST_DDL so the workers cmd-apply path does not park.',
+        ).toEqual([]);
+    });
+
+    it('inspection_results test DDL covers every Drizzle schema column', () => {
+        // Learned the hard way on the reports work: the DDL was copy-pasted into
+        // four collab specs, the Drizzle table gained `report_id`, and the only
+        // thing that noticed was the Durable Object's persist() throwing inside
+        // real workerd — AFTER lint + test:unit + test:web had all gone green.
+        // test:workers is not in the standard three-suite run, so that failure
+        // reached CI. This assertion is the fast one that stops it there.
+        const ddlColumns = ddlColumnNames(INSPECTION_RESULTS_TEST_DDL);
+        const schemaColumns = getTableConfig(inspectionResults).columns.map((c) => c.name);
+        const missing = schemaColumns.filter((name) => !ddlColumns.has(name));
+        expect(
+            missing,
+            `tests/helpers/inline-ddl.ts is missing inspection_results column(s): ${missing.join(', ')}. ` +
+                'Add them to INSPECTION_RESULTS_TEST_DDL so the collab DO can persist in workers tests.',
         ).toEqual([]);
     });
 });

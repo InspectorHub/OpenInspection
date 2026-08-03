@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, it, expect } from "vitest";
 import { loader } from "./report-gate";
 import type { Route } from "./+types/report-gate";

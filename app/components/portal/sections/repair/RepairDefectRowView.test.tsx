@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * <RepairDefectRowView> is the one defect presentation shared by the client
  * repair builder and the agent repair-items page. Both portals show the same

@@ -604,7 +604,9 @@ export class InspectionAnalyticsService extends InspectionSubService {
             priceOverride: inspectionServices.priceOverride,
         })
             .from(inspectionServices)
-            .where(eq(inspectionServices.tenantId, tenantId));
+            // Feeds getEffectivePriceCents — a soft-deleted line is history and
+            // must not be summed into what an inspection is worth.
+            .where(and(eq(inspectionServices.tenantId, tenantId), eq(inspectionServices.active, true)));
         for (const r of serviceRows) {
             const key = r.inspectionId as string;
             const list = serviceLinesByInspection.get(key);

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-92 — the editor header's date used `toLocaleDateString(undefined, …)`,
  * i.e. the RUNTIME's default locale. That is en-US on the Workers server and

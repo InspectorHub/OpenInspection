@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Admin Roles tab table (Plan 1B Task 4). Covers the behaviors the review
  * checks for: renders the role-profile list, flags isSystem rows with a

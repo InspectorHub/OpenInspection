@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // Shared browser-timezone affordance under the tenant + agent timezone pickers.
 // Detection is client-only (post-mount) and the line only appears when the
 // detected zone differs from what's already in effect.

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-102 — adding a person to an inspection is an AUTHORIZATION act wearing
  * the clothes of a data-entry one. Naming someone on the inspection is what

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Workspace editor preferences — a failed save must not stand (IA-129).
  *

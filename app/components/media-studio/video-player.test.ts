@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // Plan 7 — VideoPlayer provider branch: 'stream' renders an <iframe>;
 // 'r2' renders a native <video>. Uses react-dom/client + happy-dom.
 import { describe, it, expect, afterEach } from 'vitest';

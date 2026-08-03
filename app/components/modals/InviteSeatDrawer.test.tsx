@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Free-tier/seat-capped "at limit" gate — the Invite drawer should show the
  * seat-limit panel IMMEDIATELY when it opens for a tenant already at its

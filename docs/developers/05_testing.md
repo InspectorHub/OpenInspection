@@ -109,9 +109,27 @@ tests/
 ### E2E (`tests/e2e/*.spec.ts`)
 
 - **One spec = one Playwright project.** Register the project in
-  `playwright.config.ts` with a `testMatch` pointing at the file. `workers: 1` —
-  every project shares ONE `wrangler dev` worker and ONE mutable D1, so specs
-  must not assume isolation.
+  `playwright.config.ts` with a `testMatch` pointing at the file. Projects run a
+  few at a time (`workers: 3`) but still share ONE `wrangler dev` worker and ONE
+  mutable D1, so a spec must never assume isolation it has not arranged.
+- **Own the rows you write.** The `editor-seed` setup project mints one
+  inspection **per editing project** (`EXCLUSIVE_SEED_PROJECTS` in
+  `tests/e2e/helpers/editor-seed.ts`); `readEditorSeed()` resolves the caller's
+  own from the running project name. Add your project to that list if it changes
+  the inspection — the test is "does it write?", not "does it read the id?",
+  because a reader sharing rows with a writer is equally broken and merely fails
+  later. Projects that need only a login share one entry and have nothing to
+  corrupt. Before this, ten projects shared one inspection and it worked only
+  because nothing ran at the same time: SpeedMode's overlay opens while unrated
+  items remain, and a concurrent spec rating those items left it with none.
+- **Gate on hydration, not on markup.** The app is server-rendered, so `<main>`
+  and a full item list are on screen before React attaches any handler — waiting
+  for them proves the SSR shell arrived and nothing more. Use
+  `awaitEditorInteractive` (or `awaitEditorShortcutsReady`, which also blurs, as
+  `useKeyboard` ignores shortcuts while focus is in a field) from
+  `tests/e2e/helpers/editor-ready.ts`. It retries an **idempotent** selection
+  until the editor pane opens, so it ends as soon as the handler exists and
+  cannot mask a real break — a broken editor never opens the pane at all.
 - **Ordering & dependencies.** The `api` project runs **first**: it asserts
   `POST /api/auth/setup` returns a fresh 200 and creates the shared admin
   (`admin@autotest.com` / `Password123!`). Any project that logs in as that admin

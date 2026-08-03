@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * A failed roster fetch must not answer "nobody is here", and must not quietly
  * take away permissions it already knows the caller has (IA-118).

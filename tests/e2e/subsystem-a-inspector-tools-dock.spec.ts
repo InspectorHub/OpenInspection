@@ -9,6 +9,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { readEditorSeed } from './helpers/editor-seed';
+import { awaitEditorShortcutsReady } from './helpers/editor-ready';
 
 test.describe('InspectorTools FAB dock (subsystem A M15)', () => {
     test.beforeEach(async ({ page }) => {
@@ -24,9 +25,7 @@ test.describe('InspectorTools FAB dock (subsystem A M15)', () => {
         await page.click('button[type=submit]');
         await page.waitForURL('**/inspections');
         await page.goto(`/inspections/${seed!.inspectionId}/edit`);
-        // The RR v7 editor shell renders a single <main>; wait for it to hydrate
-        // before driving keyboard/pointer flows.
-        await page.getByRole('main').waitFor({ state: 'visible' });
+        await awaitEditorShortcutsReady(page);
     });
 
     test('FAB visible at page load', async ({ page }) => {

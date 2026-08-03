@@ -2,7 +2,7 @@ import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { MetricsQuerySchema, MetricsApiResponseSchema } from '../lib/validations/metrics.schema';
-import { inspections, inspectionServices, contacts, users, reportVersions } from '../lib/db/schema';
+import { inspections, inspectionServices, contacts, users, reportVersions, inspectionInspectors } from '../lib/db/schema';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { sumEffectivePriceCentsSql } from '../lib/effective-price.sql';
@@ -88,7 +88,8 @@ const metricsRoutes = createApiRouter()
             eq(inspections.id, inspectionServices.inspectionId),
             eq(inspections.tenantId, inspectionServices.tenantId),
         ))
-        .where(and(eq(inspectionServices.tenantId, tenantId), inWindow))
+        // Soft-deleted lines are history; revenue must not count them.
+        .where(and(eq(inspectionServices.tenantId, tenantId), eq(inspectionServices.active, true), inWindow))
         .groupBy(inspectionServices.nameSnapshot)
         .orderBy(sql`count(*) desc`)
         .limit(10);
@@ -107,13 +108,21 @@ const metricsRoutes = createApiRouter()
 
     // Per-inspector productivity (IA-63) — multi-inspector companies need count,
     // revenue, and turnaround per inspector for team management + commission.
-    // "Who did this inspection" authority: lead_inspector_id, falling back to
-    // inspector_id (schema: lead is primary, NULL ⇒ inspector_id). Turnaround =
+    // "Who did this inspection" authority: the ROSTER's lead row. It used to be
+    // coalesce(lead_inspector_id, inspector_id), which agreed with everything
+    // else only because lead_inspector_id is NULL on every row — the first write
+    // of a lead would have made these numbers disagree with the rest of the app.
+    //
+    // Joined on role = 'lead' deliberately, NOT the whole roster: grouping over
+    // every link row would count an inspection once per assigned person and
+    // double its revenue the moment a job has a helper. One inspection is
+    // attributed to one person here; this change moves the SOURCE, not the
+    // meaning. Turnaround =
     // first publish (report_versions v1 published_at) − inspection date, in days;
     // the LEFT JOIN keeps unpublished inspections in the count while avg() skips
     // their NULL turnaround (so an all-unpublished inspector reports null, not 0).
     // Explicit column projection keeps well under D1's 100-column result cap.
-    const inspectorKey = sql<string>`coalesce(${inspections.leadInspectorId}, ${inspections.inspectorId})`;
+    const inspectorKey = inspectionInspectors.userId;
     const byInspector = await db.select({
         inspectorId:       inspectorKey,
         inspectorName:     users.name,
@@ -126,6 +135,11 @@ const metricsRoutes = createApiRouter()
             eq(reportVersions.inspectionId, inspections.id),
             eq(reportVersions.tenantId, inspections.tenantId),
             eq(reportVersions.versionNumber, 1),
+        ))
+        .leftJoin(inspectionInspectors, and(
+            eq(inspectionInspectors.inspectionId, inspections.id),
+            eq(inspectionInspectors.tenantId, inspections.tenantId),
+            eq(inspectionInspectors.role, 'lead'),
         ))
         .leftJoin(users, eq(users.id, inspectorKey))
         .where(and(

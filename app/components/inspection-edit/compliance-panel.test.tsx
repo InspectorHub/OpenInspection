@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { render, fireEvent, waitFor } from "@testing-library/react";
 import { createRoutesStub, useLoaderData } from "react-router";
 import { CompliancePanel, type CompliancePanelData } from "~/components/inspection-edit/CompliancePanel";

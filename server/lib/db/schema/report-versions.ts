@@ -33,8 +33,15 @@ export const reportVersions = sqliteTable('report_versions', {
     publishedAt:    integer('published_at', { mode: 'timestamp_ms' }).notNull(),
     publishedBy:    text('published_by').notNull(),
     createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull().default(sql`(unixepoch() * 1000)`),
+    // The report this version belongs to. Two reports on one order publish
+    // independently and each needs its OWN v1 and its own prev_hash chain —
+    // interleaving them into one chain fails verification for both, including
+    // for versions published before the second report existed.
+    // Appended at table end for D1 rebuild safety.
+    reportId:       text('report_id'),
 }, (t) => [
-    index('idx_report_versions_inspection').on(t.inspectionId, t.versionNumber),
-    uniqueIndex('uq_report_versions_inspection_version').on(t.inspectionId, t.versionNumber),
+    index('idx_report_versions_report').on(t.reportId, t.versionNumber),
+    // Version numbers are monotonic per REPORT, not per inspection.
+    uniqueIndex('uq_report_versions_report_version').on(t.reportId, t.versionNumber),
     uniqueIndex('idx_report_versions_verify_token').on(t.verificationToken),
 ]);

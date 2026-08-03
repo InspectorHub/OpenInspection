@@ -12,6 +12,7 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
+import { getInspectionRoster } from '../../lib/inspection/roster';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
@@ -358,18 +359,13 @@ const coreRoutes = createApiRouter()
             await db.update(inspectionTable).set(updateValues).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
         }
 
-        // DB-8: re-sync link table when inspectorId is explicitly updated.
-        // DB-8: mirror ALL canonical assignment columns — PATCH can only change
-        // inspectorId, so preserve the pre-patch team-mode fields (leadInspectorId,
-        // helperInspectorIds) from the fetched row so the link table stays a faithful
-        // mirror of post-patch canonical state and team-mode rows are not wiped.
+        // DB-8: re-sync the link table when inspectorId is explicitly updated.
+        // The pre-patch lead/helper columns used to be read back and re-supplied
+        // here to avoid wiping "team mode" rows. They are frozen dead and were
+        // NULL / '[]' on every row, so there was never anything to preserve.
         if ('inspectorId' in body) {
-            let helpers: string[] = [];
-            try { helpers = JSON.parse(inspection.helperInspectorIds ?? '[]'); } catch { /* malformed legacy JSON -> no helpers */ }
             await syncInspectionAssignments(db, tenantId, id, {
-                inspectorId:        body.inspectorId ?? null,
-                leadInspectorId:    inspection.leadInspectorId,
-                helperInspectorIds: helpers,
+                inspectorId: body.inspectorId ?? null,
             });
         }
 
@@ -525,21 +521,24 @@ const coreRoutes = createApiRouter()
         // with its landing page, so there is no second identity to try.)
         if (!userId || !tenantId) return new Response('unauthorized', { status: 401 });
 
-        let ins;
+        // For the guard, not the row: throws when the inspection is missing or
+        // belongs to another tenant. Who may edit comes from the roster below.
         try {
-            const out = await c.var.services.inspection.getInspection(id, tenantId);
-            ins = out.inspection;
+            await c.var.services.inspection.getInspection(id, tenantId);
         } catch {
             return new Response('not found', { status: 404 });
         }
 
         const userRole = c.get('userRole') as string | undefined;
-        if (!canAccessInspectionCollab(ins, { id: userId, role: userRole ?? '' })) {
+        const roster = await getInspectionRoster(getDrizzle(c), tenantId, id);
+        if (!canAccessInspectionCollab(roster, { id: userId, role: userRole ?? '' })) {
             return new Response('forbidden', { status: 403 });
         }
 
         const attachUserId = userId;
-        const attachName   = ins.inspectorId === userId ? 'Inspector' : 'Helper';
+        // Label from the roster too, so the presence badge cannot say "Helper"
+        // about the person the roster calls the lead.
+        const attachName   = roster.lead?.id === userId ? 'Inspector' : 'Helper';
 
         const doId = c.env.INSPECTION_PRESENCE.idFromName(id);
         const stub = c.env.INSPECTION_PRESENCE.get(doId);

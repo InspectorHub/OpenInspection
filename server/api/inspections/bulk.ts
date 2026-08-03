@@ -252,31 +252,19 @@ const bulkRoutes = createApiRouter()
         if (body.action === 'assignInspector') {
             if (!body.inspectorId) throw Errors.BadRequest('inspectorId is required for assignInspector.');
             // DB-8: fetch team fields BEFORE the update so the link-table mirror
-            // carries ALL canonical assignment columns (preserves team-mode lead/
-            // helpers that bulk-assign cannot change).
+            // carries the ids being reassigned.
             const affected = await db.select({
-                id:                 inspectionTable.id,
-                leadInspectorId:    inspectionTable.leadInspectorId,
-                helperInspectorIds: inspectionTable.helperInspectorIds,
+                id: inspectionTable.id,
             }).from(inspectionTable)
                 .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)))
                 .all();
             await db.update(inspectionTable).set({ inspectorId: body.inspectorId })
                 .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
-            // DB-8: re-sync the link table for each reassigned inspection, preserving
-            // team-mode rows that this bulk operation cannot change. B-29: one
-            // db.batch round trip for all N resyncs (was a 2N-statement loop).
+            // DB-8: re-sync the link table for each reassigned inspection. B-29:
+            // one db.batch round trip for all N resyncs (was a 2N-statement loop).
             const inspectorId = body.inspectorId;
-            await syncInspectionAssignmentsBatch(db, tenantId, affected.map(row => {
-                let helpers: string[] = [];
-                try { helpers = JSON.parse(row.helperInspectorIds ?? '[]'); } catch { /* malformed legacy JSON */ }
-                return {
-                    inspectionId:       row.id,
-                    inspectorId,
-                    leadInspectorId:    row.leadInspectorId,
-                    helperInspectorIds: helpers,
-                };
-            }));
+            await syncInspectionAssignmentsBatch(db, tenantId,
+                affected.map(row => ({ inspectionId: row.id, inspectorId })));
 
             auditFromContext(c, 'inspection.bulk_assign', 'inspection', {
                 metadata: { ids: body.ids, inspectorId: body.inspectorId },

@@ -30,20 +30,28 @@ describe('EventService', () => {
     });
 
     describe('bulkSeed', () => {
-        it('seeds 5 default event types on first run', async () => {
+        // 7, not 5: this endpoint and provisioning used to seed from two
+        // different lists that disagreed with each other (`starter_sewer_scope`
+        // vs `sewer_scope` was one real thing under two slugs). They are now
+        // one list, so this is a repair tool — it fills gaps for a tenant
+        // provisioned before a type existed, and no-ops for everyone else.
+        it('seeds every default event type on first run', async () => {
             const r = await svc.bulkSeed(TENANT);
-            expect(r.seeded).toBe(5);
+            expect(r.seeded).toBe(7);
             expect(r.skipped).toBe(0);
             const types = await svc.listEventTypes(TENANT);
-            expect(types).toHaveLength(5);
-            expect(types.map(t => t.slug).sort()).toEqual(['mold_test', 'radon_dropoff', 'radon_pickup', 'sewer_scope', 'water_test']);
+            expect(types).toHaveLength(7);
+            expect(types.map(t => t.slug).sort()).toEqual([
+                'mold_test', 'radon_dropoff', 'radon_pickup', 'sewer_scope',
+                'starter_pre_listing', 'starter_standard_home', 'water_test',
+            ]);
         });
 
-        it('is idempotent — second run skips all 5', async () => {
+        it('is idempotent — second run skips them all', async () => {
             await svc.bulkSeed(TENANT);
             const r = await svc.bulkSeed(TENANT);
             expect(r.seeded).toBe(0);
-            expect(r.skipped).toBe(5);
+            expect(r.skipped).toBe(7);
         });
 
         it('respects tenant scoping — seeds only for given tenant', async () => {

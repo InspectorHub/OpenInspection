@@ -8,11 +8,12 @@
  *   - 3 inspection templates  (Residential / Pre-Listing / Sewer Scope)
  *   - 1 agreement template    (generic pre-inspection w/ disclaimer)
  *   - 250 canned comments     (from starter-content/fixtures/canned-comments)
- *   - 3 event_types           (Standard / Pre-Listing / Sewer Scope)
+ *   - 7 event_types           (main visits + the radon pair, mold and water tests)
  *   - 4 tags                  (Safety concern / Needs maintenance / Cosmetic / Follow-up needed)
  *   - 80 recommendations      (from server/data/recommendation-seeds.ts)
  *   - 4 rating systems        (from server/data/rating-system-seeds.ts)
  *   - 10 contractor types     (standard repair-contractor taxonomy)
+ *   - 7 services              (the catalogue a tenant can actually sell from)
  *   - N marketplace libraries (global; idempotent at the libraries table)
  *
  * "Idempotent" means: safe to call twice — the second call inserts 0 rows
@@ -26,6 +27,7 @@
  *   recommendations          → (tenantId, category, name)
  *   rating_systems           → (tenantId, slug)                       (enforced by uniqueIndex)
  *   contractor_types         → (tenantId, name)
+ *   services                 → (tenantId, name)
  *   marketplace_libraries    → (name)                                  (global table — name unique)
  *
  * The function never throws on individual-row insert failure unless the
@@ -75,6 +77,8 @@ const INSPECTION_TEMPLATES = [
 import { AGREEMENT_TEMPLATE } from './starter-content/fixtures/agreement-template';
 import { CANNED_COMMENTS } from './starter-content/fixtures/canned-comments';
 import { EVENT_TYPES } from './starter-content/fixtures/event-types';
+import { seedServices } from './starter-content/seed-services';
+import { batchInsert } from './starter-content/batch-insert';
 import { TAGS } from './starter-content/fixtures/tags';
 import { RECOMMENDATIONS } from './starter-content/fixtures/recommendations';
 import { RATING_SYSTEMS } from './starter-content/fixtures/rating-systems';
@@ -97,39 +101,6 @@ const CONTRACTOR_TYPES: ReadonlyArray<{ name: string; sortOrder: number }> = [
     { name: 'Grading/Drainage',       sortOrder: 10 },
 ];
 
-/**
- * Insert many rows in as few D1 round-trips as possible: multi-row INSERTs
- * chunked to stay under D1's 100-bound-parameter-per-statement limit, all sent
- * in a single db.batch(). No-op for an empty array. This turns hundreds of
- * sequential awaited inserts (slow, and a long window during which a closed
- * setup tab leaves partial data) into one batched round-trip per table.
- */
-async function batchInsert(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    d: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    table: any,
-    rows: Record<string, unknown>[],
-): Promise<void> {
-    if (rows.length === 0) return;
-
-    // Drivers without batch support (e.g. unit-test mocks): sequential inserts.
-    if (typeof d.batch !== 'function') {
-        for (const row of rows) await d.insert(table).values(row).run();
-        return;
-    }
-
-    const colsPerRow = Object.keys(rows[0]!).length || 1;
-    const maxRowsPerStmt = Math.max(1, Math.floor(100 / colsPerRow));
-    const stmts = [];
-    for (let i = 0; i < rows.length; i += maxRowsPerStmt) {
-        stmts.push(d.insert(table).values(rows.slice(i, i + maxRowsPerStmt)));
-    }
-    // d.batch wants a non-empty tuple; stmts is guaranteed non-empty here.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await d.batch(stmts as [any, ...any[]]);
-}
-
 export interface StarterContentResult {
     inspectionTemplatesSeeded: number;
     agreementTemplatesSeeded:  number;
@@ -140,6 +111,7 @@ export interface StarterContentResult {
     ratingSystemsSeeded:       number;
     marketplaceLibrariesSeeded: number;
     contractorTypesSeeded:     number;
+    servicesSeeded:            number;
 }
 
 /**
@@ -246,6 +218,11 @@ export async function seedStarterContent(
         await batchInsert(d, eventTypes, rows);
         eventTypesSeeded = rows.length;
     }
+
+    // ── service catalogue ───────────────────────────────────────────────
+    // Deliberately AFTER templates: each entry resolves its template by name.
+    // Extracted to keep this file under the size ratchet.
+    const servicesSeeded = await seedServices(d, tenantId);
 
     // ── tags ────────────────────────────────────────────────────────────
     let tagsSeeded = 0;
@@ -388,6 +365,7 @@ export async function seedStarterContent(
         ratingSystemsSeeded,
         marketplaceLibrariesSeeded,
         contractorTypesSeeded,
+        servicesSeeded,
     };
     logger.info('starter-content.seeded', { tenantId, ...result });
     return result;

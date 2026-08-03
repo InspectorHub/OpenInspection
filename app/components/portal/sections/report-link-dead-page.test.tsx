@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * IA-36 ⑨ — one page for a report link that does not work, whichever way it
  * stopped working.
