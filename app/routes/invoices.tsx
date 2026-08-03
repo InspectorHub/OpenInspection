@@ -5,6 +5,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, StatCard, Button, EmptyState, Table, Pill, Banner, Modal, type PillTone } from "@core/shared-ui";
 import { formatCurrency, formatDate } from "~/lib/format";
+import { InvoiceAmountCell } from "~/components/invoices/InvoiceAmountCell";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
@@ -18,6 +19,8 @@ type InvoiceRow = {
   id: string;
   clientName: string | null;
   amountCents: number;
+  /** Cumulative amount received; null when a partial carries no recorded figure. */
+  amountPaidCents: number | null;
   dueDate: string | null;
   status: "draft" | "sent" | "paid" | "partial" | "void";
   paymentMethod: "card" | "check" | "cash" | "offline" | "other" | null;
@@ -282,7 +285,7 @@ export default function InvoicesPage() {
                 <span className="font-medium text-ih-fg-1">{invoice.clientName || "—"}</span>
               ),
             },
-            { label: m.invoices_col_amount(), cell: (invoice) => <span className="font-mono text-ih-fg-1">{formatCurrency(invoice.amountCents, { locale, currency: invoice.currency || currency })}</span> },
+            { label: m.invoices_col_amount(), cell: (invoice) => <InvoiceAmountCell invoice={invoice} currency={currency} locale={locale} /> },
             { label: m.invoices_col_due(), cell: (invoice) => <span className="text-ih-fg-3">{invoice.dueDate ? formatDate(invoice.dueDate, { locale, timeZone: "UTC" }) : "—"}</span> },
             {
               label: m.invoices_col_status(),

@@ -1037,6 +1037,7 @@ export default function InspectionHubPage() {
         <InvoiceCard
           pill={blocks.invoice}
           amountCents={invoiceAmountCents}
+          currency={hub.invoice?.currency}
           paid={invoicePaid}
           sent={invoiceSent}
           payUrl={hub.invoice?.payUrl}

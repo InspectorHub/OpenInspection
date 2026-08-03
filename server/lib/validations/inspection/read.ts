@@ -177,6 +177,14 @@ export const InspectionHubSchema = z.object({
     id:         z.string().describe('Invoice id'),
     status:     z.string().describe('draft | sent | partial | paid'),
     amountCents: z.number().optional().describe('Invoice total in cents. ABSENT without the financial capability.'),
+    // Cumulative amount RECEIVED, not a remaining balance — the remainder is
+    // derived against our own authoritative total (`amountCents`), never against
+    // an external system's. Null when the invoice is partial but no figure was
+    // recorded, which the UI must render as "unknown" rather than as zero.
+    // ABSENT (not null) without the financial capability — `redactMoney` drops
+    // every `*Cents` key.
+    amountPaidCents: z.number().nullable().optional().describe('Cumulative amount received in cents; null when unrecorded. ABSENT without the financial capability.'),
+    currency:   z.string().optional().describe("ISO 4217 currency snapshot the invoice was created in — what its figures must be formatted in, not the viewer's default."),
     sentAt:     z.string().nullable().describe('ISO sent timestamp'),
     paidAt:     z.string().nullable().describe('ISO paid timestamp'),
     // IA-34 — the public pay page is token-gated, so a bare `/invoice/:id` is

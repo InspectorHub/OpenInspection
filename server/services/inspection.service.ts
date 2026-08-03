@@ -535,7 +535,12 @@ export class InspectionService {
             signersTotal: number;
             signersSigned: number;
         }>;
-        invoice: { id: string; status: string; amountCents: number; sentAt: string | null; paidAt: string | null } | null;
+        invoice: {
+            id: string; status: string; amountCents: number;
+            /** Cumulative amount received; null when partial with no recorded figure. */
+            amountPaidCents: number | null;
+            currency: string; sentAt: string | null; paidAt: string | null;
+        } | null;
         publishReadiness: { ready: boolean; blockingCount: number };
     } | null> {
         return this.publish.getInspectionHub(inspectionId, tenantId, tenantSlug);

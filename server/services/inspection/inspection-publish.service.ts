@@ -318,7 +318,12 @@ export class InspectionPublishService extends InspectionSubService {
             signersTotal: number;
             signersSigned: number;
         }>;
-        invoice: { id: string; status: string; amountCents: number; sentAt: string | null; paidAt: string | null } | null;
+        invoice: {
+            id: string; status: string; amountCents: number;
+            /** Cumulative amount received; null when partial with no recorded figure. */
+            amountPaidCents: number | null;
+            currency: string; sentAt: string | null; paidAt: string | null;
+        } | null;
         publishReadiness: { ready: boolean; blockingCount: number };
         communication: { delivered: number; needsAttention: number; unread: number };
     } | null> {
@@ -506,6 +511,8 @@ export class InspectionPublishService extends InspectionSubService {
                     id:         invoice.id,
                     status:     invoice.status,
                     amountCents: invoice.amountCents,
+                    amountPaidCents: invoice.amountPaidCents ?? null,
+                    currency:   invoice.currency,
                     sentAt:     invoice.sentAt,
                     paidAt:     invoice.paidAt,
                 }

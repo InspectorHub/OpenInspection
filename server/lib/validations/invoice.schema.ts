@@ -45,6 +45,12 @@ export const InvoiceResponseSchema = z.object({
     clientName: z.string().nullable().describe('TODO describe clientName field for the OpenInspection MCP integration'),
     clientEmail: z.string().nullable().describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
     amountCents: z.number().describe('TODO describe amountCents field for the OpenInspection MCP integration'),
+    // Cumulative amount RECEIVED — not a remaining balance. What is still owed is
+    // `amountCents - amountPaidCents`, derived against our own authoritative
+    // total. Null means "partial, amount unknown" (rows that predate the column,
+    // or a partial the source system reported without a figure): a consumer must
+    // render that as unknown, never as a zero balance.
+    amountPaidCents: z.number().nullable().describe('Cumulative amount received in cents, or null when no figure was recorded'),
     lineItems: z.array(LineItemSchema).describe('TODO describe lineItems field for the OpenInspection MCP integration'),
     dueDate: z.string().nullable().describe('TODO describe dueDate field for the OpenInspection MCP integration'),
     notes: z.string().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
@@ -69,6 +75,11 @@ export const InvoiceResponseSchema = z.object({
 export const PublicInvoiceBodySchema = z.object({
     id: z.string(),
     amountCents: z.number(),
+    // The payer's own record of what has already been received. Undeclared until
+    // now, and because the route PARSES the row through this schema (IA-86), zod
+    // stripped it — the pay page could not have shown a balance even though the
+    // column was populated. Nullable: "partial, amount unknown" is a real state.
+    amountPaidCents: z.number().nullable().optional(),
     // Phase B — the invoice's snapshot currency (ISO 4217); the pay page renders
     // this, not the tenant's live setting, so history stays self-describing.
     currency: z.string().optional(),

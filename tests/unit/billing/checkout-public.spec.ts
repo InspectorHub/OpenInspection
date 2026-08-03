@@ -148,7 +148,13 @@ describe('GET /api/public/checkout/:token (Track I-a Task 7)', () => {
         expect(d.envelope.progress).toEqual({ signed: 0, total: 1 });
         // Phase B — the checkout payload now carries the invoice's snapshot
         // currency (defaults to USD for this seed) so the pay UI renders it.
-        expect(d.invoice).toEqual({ id: INV_ID, amountCents: 45000, currency: 'USD', status: expect.any(String) });
+        // `amountPaidCents` rides the SAME explicit projection: null here means
+        // nothing has been received, which is distinct from "partial, unknown"
+        // and from a zero the reader could mistake for a settled balance.
+        expect(d.invoice).toEqual({
+            id: INV_ID, amountCents: 45000, amountPaidCents: null,
+            currency: 'USD', status: expect.any(String),
+        });
         expect(d.payment).toEqual({ required: true, paid: false });
         expect(d.inspection).toEqual({ id: INSP_ID, propertyAddress: '1 Main St' });
         expect(d.branding).toEqual({ companyName: 'Acme Inspections', primaryColor: '#ff5500' });
