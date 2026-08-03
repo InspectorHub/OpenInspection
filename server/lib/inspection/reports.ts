@@ -10,6 +10,7 @@ import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { reports } from '../db/schema';
 import { logger } from '../logger';
+import { REPORT_STATUS } from '../status/report-status';
 
 /**
  * The primary report of an inspection, or null when it has none.
@@ -64,7 +65,12 @@ export async function createPrimaryReport(
             inspectionServiceId: null,
             templateId,
             title: 'Inspection Report',
-            status: 'in_progress',
+            // The constant, not the literal — the status-literal gate exists
+            // because a hand-typed status bypasses the type layer, which is how
+            // ghost values reach runtime. `reports.status` is a narrower axis
+            // than REPORT_STATUS (no 'submitted'), but 'in_progress' means the
+            // same thing on both and they must not drift apart.
+            status: REPORT_STATUS.IN_PROGRESS,
             createdAt: new Date(),
         });
     } catch (err) {
