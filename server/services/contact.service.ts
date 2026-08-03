@@ -6,6 +6,7 @@ import { Errors } from '../lib/errors';
 import { buildContactDetail } from './contact-detail';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate } from '../lib/date';
+import { normalizeLocale } from '../lib/i18n/contact-locale';
 import { tenantConfigs } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 
@@ -86,13 +87,18 @@ export class ContactService {
         return buildContactDetail(this.getDrizzle(), id, tenantId);
     }
 
-    async createContact(tenantId: string, data: { type: ContactType; name: string; email?: string | null | undefined; phone?: string | null | undefined; agency?: string | null | undefined; notes?: string | null | undefined; createdByUserId?: string | null | undefined }) {
+    async createContact(tenantId: string, data: { type: ContactType; name: string; email?: string | null | undefined; phone?: string | null | undefined; agency?: string | null | undefined; notes?: string | null | undefined; locale?: string | null | undefined; createdByUserId?: string | null | undefined }) {
         const db = this.getDrizzle();
         const normalized = {
             email: data.email ?? null,
             phone: data.phone ?? null,
             agency: data.agency ?? null,
             notes: data.notes ?? null,
+            // Reduced to a locale the catalogue actually covers, so what is
+            // stored is always something resolveContactLocale would hand back;
+            // anything else becomes NULL rather than a promise broken at send
+            // time. Same reduction the booking path applies.
+            locale: normalizeLocale(data.locale),
             // A1 auto-link uses this to populate agent_tenant_links.invited_by_user_id
             // when the agent later signs up with the same email — keeps the
             // /agent-inspectors card pointing at the actual inviting inspector.
@@ -103,7 +109,7 @@ export class ContactService {
         return { ...row, createdAt: safeISODate(row.createdAt), inspectionCount: 0 };
     }
 
-    async updateContact(id: string, tenantId: string, data: Partial<{ type: ContactType; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null }>) {
+    async updateContact(id: string, tenantId: string, data: Partial<{ type: ContactType; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null; locale: string | null }>) {
         const db = this.getDrizzle();
         const existing = await db.select().from(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Contact not found');
@@ -115,6 +121,11 @@ export class ContactService {
         // change an agent's email, archive the record and add a new one.
         const patch = { ...data };
         if (existing.type === 'agent' && 'email' in patch) delete patch.email;
+        // Only when the caller actually said something about it: an absent key
+        // must leave a stored preference alone, while an explicit null is a
+        // correction back to "not stated". Normalizing on the way in keeps the
+        // column's contract — every stored value is one the resolver returns.
+        if ('locale' in patch) patch.locale = normalizeLocale(patch.locale);
         await db.update(contacts).set(patch).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
         return { ...existing, ...patch, createdAt: safeISODate(existing.createdAt) };
     }

@@ -3,6 +3,8 @@ import { useForm, type SubmissionResult } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import { makeAddContactSchema } from "~/lib/forms/contacts.schema";
 import { Modal, Button } from "@core/shared-ui";
+import { SUPPORTED_CONTACT_LOCALES } from "../../../server/lib/i18n/contact-locale";
+import { localeLabel } from "~/lib/locales";
 import { m } from "~/paraglide/messages";
 import type { Contact } from "./contacts-helpers";
 
@@ -144,6 +146,31 @@ export function ContactModal({
               placeholder={m.contacts_modal_agency_placeholder()}
               className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none text-sm"
             />
+          </div>
+
+          {/* The language to address this person in. Staff set it as a
+              CORRECTION — the client said so on the phone, or picked wrong on
+              the booking form — so "Not set" has to be reachable again, and is
+              the first option rather than a pre-selected English: a stored
+              value is a stated preference, and only a stated preference is
+              evidence anyone wants another language.
+
+              Same three-state shape and the same option labels as the profile
+              picker in Settings, from one table (`app/lib/locales.ts`), over
+              the same list of tags the server accepts. */}
+          <div>
+            <label htmlFor={fields.locale.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_field_language()}</label>
+            <select
+              id={fields.locale.id}
+              name={fields.locale.name}
+              defaultValue={contact?.locale ?? ""}
+              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none text-sm"
+            >
+              <option value="">{m.contacts_modal_language_unset_option()}</option>
+              {SUPPORTED_CONTACT_LOCALES.map((tag) => (
+                <option key={tag} value={tag}>{localeLabel(tag)}</option>
+              ))}
+            </select>
           </div>
 
         {form.errors && (

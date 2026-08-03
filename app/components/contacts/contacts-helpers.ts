@@ -27,6 +27,9 @@ export interface Contact {
   phone: string;
   type: string;
   agency: string;
+  /** BCP-47 tag the contact asked to be addressed in; null/absent means they
+   *  have not said, which is NOT the same as English. */
+  locale?: string | null;
   inspectionCount?: number;
   referralCount?: number;
 }
