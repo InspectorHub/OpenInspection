@@ -447,6 +447,27 @@ translated one would be a compliance failure, not a typo.
 | Slot | horario | — | A bookable start time. "Slot rules" → *Reglas de horarios*, "Slot interval" → *Intervalo entre horarios*. |
 | Weekday names | Domingo … Sábado | — | Capitalised, because each is a standalone row label and buttons/labels take sentence case. Spanish lowercases weekdays mid-sentence; nothing in this catalogue puts one mid-sentence. |
 
+### Communication, billing and compliance settings
+
+Fixed while translating `settings-integrations.json` (294 keys).
+
+<!-- gate:terms -->
+
+| English | es-419 | Never | Why |
+|---|---|---|---|
+| Subject (email) | Asunto | — | The subject line. Distinct from the GDPR data subject — see the declared divergence. |
+| Data subject | Interesado | — | The GDPR term for the person a record is about. The regulation's own Spanish text uses *interesado*. |
+| Seat | puesto | — | A licensed team member. Never *asiento*: that is a chair, an *asiento contable* is a ledger entry, and in this product's own domain *asiento* is foundation settlement. Deliberately not machine-banned for exactly that last reason. |
+| Managed (SMS, provider, number) | gestionado | — | Run by the platform on the tenant's behalf. |
+| Self-hosted | autoalojado | — | "Self-host docs" → *Documentación de autoalojamiento*. |
+| Standalone mode | modo autónomo | — | The single-tenant deployment. |
+| Deployment | instalación | despliegue | *Despliegue* is a military deployment; an operator reads *instalación*. |
+| Opt-in / opt-out | consentimiento / baja | — | SMS compliance. The keywords themselves (STOP / START / HELP) stay English. |
+| Erasure request | solicitud de eliminación | — | GDPR Art. 17. Uses *eliminar*, the Delete verb. |
+| Anonymized / Retained | Anonimizado / Conservado | — | Erasure-log columns, masculine singular alongside *Eliminado*. |
+| Built-in | Integrado | — | A platform-supplied template or referral source, against the tenant's own. |
+| Estimated monthly cost | Costo mensual estimado | — | The one place *estimado* is the right word — see the Estimate row, which bans the noun and not this adjective. The figure itself is *un cálculo aproximado*, never *un estimado*. |
+
 ## Register enforcement
 
 Every entry here is wrong in `es-419` in every context, which is what makes it
@@ -490,6 +511,8 @@ apply at all.
   **Resend the company**, the transactional email vendor, and rule 3 forbids
   translating a product name — *Reenviar* there would name a provider that does
   not exist. The two readings never share a surface.
+
+- `settings_comms_template_subject_label`, `settings_compliance_col_subject` — English "Subject" is a homograph, not a shared concept. On the email-template editor it is the subject line (*Asunto*); in the erasure log it is the GDPR **data subject**, a person (*Interesado*). No Spanish word covers both, and picking either would make one of the two screens nonsense.
 
 *(Add further divergences as `- \`key_one\`, \`key_two\` — reason.)*
 
