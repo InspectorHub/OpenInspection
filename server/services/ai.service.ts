@@ -1,8 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { inspections, inspectionResults } from '../lib/db/schema';
-import { logger } from '../lib/logger';
 import { Errors } from '../lib/errors';
+import { GeminiProvider } from '../lib/ai/providers/gemini';
 
 /**
  * Service to handle AI-powered features using Google Gemini.
@@ -58,42 +58,19 @@ export class AIService {
     }
 
     /**
-     * Internal helper to call Gemini API.
+     * Run one completion through the resolved provider.
+     *
+     * The Gemini HTTP shape lives in `lib/ai/providers/gemini.ts` and nowhere
+     * else. Keeping a second copy here would mean every future backend gets
+     * written twice, which is the exact cost the abstraction exists to avoid.
+     * Credential and model validation (including the fail-closed empty-model
+     * case) is the adapter's, so the two entry points below that do not
+     * pre-check are still covered.
      */
     private async callGemini(prompt: string) {
-        if (!this.apiKey || this.apiKey.includes('your_api_key')) {
-            throw new Error('Gemini API Key missing');
-        }
-        // Backstop for the two entry points that do not pre-check
-        // (generateProfessionalComment / generateInspectionSummary).
-        this.assertModelConfigured();
-
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(this.model)}:generateContent?key=${this.apiKey}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: prompt }]
-                }],
-                generationConfig: {
-                    temperature: 0.2,
-                    topP: 0.8,
-                    topK: 40,
-                    maxOutputTokens: 1024,
-                }
-            })
-        });
-
-        if (!res.ok) {
-            const error = await res.text();
-            logger.error('Gemini API Error', { response: error });
-            throw new Error('Failed to generate content from AI');
-        }
-
-        const data = await res.json() as { candidates: Array<{ content: { parts: Array<{ text: string }> } }> };
-        return data.candidates[0].content.parts[0].text.trim();
+        const provider = new GeminiProvider({ apiKey: this.apiKey, model: this.model });
+        const { text } = await provider.complete({ prompt });
+        return text;
     }
 
     /**
