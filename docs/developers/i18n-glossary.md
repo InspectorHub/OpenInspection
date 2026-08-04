@@ -393,6 +393,25 @@ once here.
 | Unknown action | Acción desconocida | — | The form-action fallback error, shared by several settings routes. |
 | Free plan limit reached | Límite del plan gratuito alcanzado | — | |
 
+### The services / event-types catalogue
+
+Fixed while translating `settings-catalog.json` (123 keys). These recur in
+`settings-components`, `contacts` and `public`.
+
+<!-- gate:terms -->
+
+| English | es-419 | Never | Why |
+|---|---|---|---|
+| Slug | Identificador | — | The URL-safe key of an event type or a booking page. *Slug* is untranslatable jargon in Spanish and the column shows values like `radon_pickup`, which explain themselves. The placeholder that shows that value stays English — it is a format sample. |
+| Duration | Duración | — | |
+| Platform | Plataforma | — | The vendor-shipped tier of inspection types, against *Su organización*. |
+| Enabled / Disabled | Habilitado / Deshabilitado | — | Paired with the verbs *Habilitar* / *Deshabilitar* so the chip and the button that flips it share a root. |
+| Inactive | Inactivo | — | Masculine singular by the status-label rule. |
+| My Schedule | Mi agenda | — | Uses the Schedule (noun) row: *agenda*, not *horario*, which is the weekly-hours grid inside it. |
+| No access / View only / View and edit | Sin acceso / Solo lectura / Ver y editar | — | The three capability levels, shared by the workflow settings and the contact-role modal. *Solo lectura* is the recognised access level; the third stays a verb pair because English does. |
+| Sort order | Orden de clasificación | — | |
+| Report link expiry | Vencimiento del enlace del informe | — | *Vencimiento*, matching Expired → *Vencido*. The bulk actions are phrased as *Aplicar vencimiento a…* / *Quitar vencimiento de…*: Spanish *vencer* is intransitive, so "Expire N links" has no verb-for-verb rendering. |
+
 ## Register enforcement
 
 Every entry here is wrong in `es-419` in every context, which is what makes it
