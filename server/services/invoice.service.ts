@@ -253,6 +253,87 @@ export class InvoiceService {
     }
 
     /**
+     * Correct a mistyped payment. The original row SURVIVES; the correction is
+     * a second row, because an append-only ledger is only reconcilable if
+     * nothing in it is ever rewritten.
+     *
+     * The correcting row is a `refund`-kind row carrying `refundsId`, NOT a
+     * signed `adjustment`. This is the choice a future reader will want to
+     * reverse, so: `kind` carries direction in this table and `adjustment` is
+     * ADDITIVE in the recompute, so a downward correction expressed as an
+     * adjustment would have to smuggle a negative into `amount_cents` — the
+     * exact thing the schema forbids, because an unfiltered SUM over a signed
+     * column is a wrong total nobody notices. `refund` already means "money
+     * going the other way" and `refunds_id` already means "the row this
+     * reverses". Reusing them beats inventing a second mechanism that means
+     * the same thing.
+     *
+     * It also inherits the ORIGINAL row's `occurred_at`: the money never moved
+     * on the day the typo was spotted, so the correction belongs to the period
+     * the mistake landed in, not to the day of data entry.
+     *
+     * Upward corrections are refused. More money arriving than was recorded is
+     * not a correction, it is another payment, and recording it as one keeps
+     * both facts true.
+     */
+    async correctPayment(tenantId: string, id: string, paymentId: string, input: {
+        correctedAmountCents: number;
+        reason: string;
+        recordedBy: string;
+    }) {
+        const db = this.getDrizzle();
+        const original = await db.select().from(orderPayments)
+            .where(and(
+                eq(orderPayments.tenantId, tenantId),
+                eq(orderPayments.id, paymentId),
+                eq(orderPayments.invoiceId, id),
+            ))
+            .get();
+        if (!original) throw Errors.NotFound('Payment not found on this invoice');
+        if (original.kind === 'refund') {
+            throw Errors.UnprocessableEntity('A refund cannot be corrected. Record the money that actually moved instead.');
+        }
+
+        const alreadyCorrected = await db.select({ id: orderPayments.id }).from(orderPayments)
+            .where(and(eq(orderPayments.tenantId, tenantId), eq(orderPayments.refundsId, paymentId)))
+            .get();
+        if (alreadyCorrected) {
+            throw Errors.Conflict('This payment has already been corrected.');
+        }
+
+        const delta = original.amountCents - input.correctedAmountCents;
+        if (delta <= 0) {
+            throw Errors.UnprocessableEntity(
+                'A correction can only lower a recorded payment. If more money arrived than was recorded, record the extra as its own payment.',
+            );
+        }
+
+        const appended = await recordPayment(db, tenantId, {
+            invoiceId: id,
+            inspectionId: original.inspectionId,
+            kind: 'refund',
+            amountCents: delta,
+            method: original.method,
+            provider: null,
+            providerRef: null,
+            recordedBy: input.recordedBy,
+            refundsId: original.id,
+            note: `Correction: ${input.reason}`,
+            occurredAt: original.occurredAt,
+        });
+        if (!appended) throw Errors.Conflict('This correction was already recorded.');
+
+        // Lowering a payment can take the invoice back out of paid, and a
+        // report left publicly unlocked with no backing payment is the whole
+        // point of that gate existing.
+        await this.syncInspectionPaymentGate(original.inspectionId, tenantId);
+
+        // The caller renders this row, so it gets the fields the ledger row
+        // actually carries rather than a plausible-looking guess.
+        return { ...appended, method: original.method, note: `Correction: ${input.reason}`, refundsId: original.id };
+    }
+
+    /**
      * Every ledger row for one invoice, oldest movement first, with the
      * recording user's name resolved.
      *

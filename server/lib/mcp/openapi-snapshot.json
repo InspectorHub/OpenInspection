@@ -1058,6 +1058,47 @@
     "description": "Records a granted SMS consent event (captured_via=optin_link) for the contact encoded in the token. Idempotent — confirming twice simply appends a second granted event."
   },
   {
+    "operationId": "correctInvoicePayment",
+    "method": "POST",
+    "pathTemplate": "/api/invoices/{id}/payments/{paymentId}/corrections",
+    "scopes": [
+      "write"
+    ],
+    "tag": "invoices",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Invoice the mistyped payment was recorded against.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Invoice the mistyped payment was recorded against."
+          }
+        },
+        {
+          "name": "paymentId",
+          "in": "path",
+          "required": true,
+          "description": "Ledger row id of the payment being corrected.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Ledger row id of the payment being corrected."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/CorrectPayment"
+      }
+    },
+    "summary": "Correct a mistyped payment on an invoice",
+    "description": "Corrects a mistyped payment by appending a reversing ledger row rather than editing the original, which survives. The correcting row inherits the date the money moved, so the correction lands in the period the mistake did."
+  },
+  {
     "operationId": "countsInspection",
     "method": "GET",
     "pathTemplate": "/api/inspections/counts",

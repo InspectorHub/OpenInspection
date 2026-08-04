@@ -82,6 +82,25 @@ export const RecordOfflinePaymentSchema = z.object({
 }).openapi('RecordOfflinePayment');
 
 /**
+ * Body of POST /api/invoices/{id}/payments/{paymentId}/corrections.
+ *
+ * The ledger is append-only, so a mistyped amount is fixed by a NEW row and
+ * never by editing the old one. Without this path the first typo becomes a
+ * manual database edit.
+ *
+ * `.strict()` on purpose: a correction is the shape where a forgiving parser
+ * does real damage. Anything the caller did not send must be ABSENT, not
+ * quietly filled in — an unknown key here means the caller believes it is
+ * changing something it is not.
+ */
+export const CorrectPaymentSchema = z.object({
+    correctedAmountCents: z.number().int().nonnegative()
+        .describe('What the payment should have been, in integer cents. Must be lower than the recorded amount.'),
+    reason: z.string().trim().min(1).max(500)
+        .describe('Why the original figure was wrong. Stored on the correcting row so the pair explains itself.'),
+}).strict().openapi('CorrectPayment');
+
+/**
  * One ledger row as the staff invoice surface reads it. `recordedByName` is
  * resolved server-side because "who took this money" is the question a disputed
  * payment turns on, and a bare user id cannot answer it.

@@ -247,6 +247,115 @@ describe('POST /api/invoices/{id}/payments — the capability gate', () => {
     });
 });
 
+describe('POST /api/invoices/{id}/payments/{paymentId}/corrections', () => {
+    async function recordAndGetId(amountCents: number, occurredAt = TUESDAY) {
+        const res = await postPayment({ amountCents, method: 'cash', occurredAt: occurredAt.toISOString(), note: 'at the door' });
+        expect(res.status).toBe(201);
+        return ((await res.json()) as { data: { id: string } }).data.id;
+    }
+
+    function postCorrection(paymentId: string, body: unknown, role = 'manager') {
+        const req = new Request(`https://acme.example.com/api/invoices/${INV_ID}/payments/${paymentId}/corrections`, {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+        });
+        return buildApp(role).fetch(req, ENV, CTX);
+    }
+
+    it('corrects a mistyped payment with a reversing row, leaving the original', async () => {
+        const origId = await recordAndGetId(20000);
+        const res = await postCorrection(origId, { correctedAmountCents: 2000, reason: 'decimal typo' });
+        expect(res.status).toBe(201);
+
+        const rows = await ledgerRows();
+        expect(rows).toHaveLength(2);                       // the original survives
+        expect((await getInvoice()).amountPaidCents).toBe(2000);   // net is the corrected figure
+        const correction = rows.find(r => r.id !== origId)!;
+        expect(correction.note).toContain('decimal typo');
+        // A refund-kind row with refundsId, NOT a signed adjustment: `kind`
+        // carries direction in this table and amount_cents is always positive.
+        expect(correction.kind).toBe('refund');
+        expect(correction.amountCents).toBe(18000);
+        expect(correction.refundsId).toBe(origId);
+        expect(correction.recordedBy).toBe(USER_ID);
+    });
+
+    it('does not touch a single field of the original row', async () => {
+        // A correction is exactly the shape where a forgiving parser does real
+        // damage — a body that omits a field must leave it ABSENT, never
+        // silently rewritten. Assert the original as a whole, not one column.
+        const origId = await recordAndGetId(20000);
+        const before = (await ledgerRows()).find(r => r.id === origId)!;
+
+        await postCorrection(origId, { correctedAmountCents: 2000, reason: 'decimal typo' });
+
+        const after = (await ledgerRows()).find(r => r.id === origId)!;
+        expect(after).toEqual(before);
+    });
+
+    it('rejects a body carrying keys the endpoint does not accept', async () => {
+        // The caller believes it is changing `method`; nothing would. Better a
+        // 400 than a silent no-op on a money edit.
+        const origId = await recordAndGetId(20000);
+        const res = await postCorrection(origId, { correctedAmountCents: 2000, reason: 'typo', method: 'check' });
+        expect(res.status).toBe(400);
+        expect(await ledgerRows()).toHaveLength(1);
+    });
+
+    it('books the correction in the period the mistake landed in, not the day it was spotted', async () => {
+        const origId = await recordAndGetId(20000, TUESDAY);
+        await postCorrection(origId, { correctedAmountCents: 2000, reason: 'decimal typo' });
+
+        const correction = (await ledgerRows()).find(r => r.id !== origId)!;
+        expect(correction.occurredAt?.getTime()).toBe(TUESDAY.getTime());
+        expect(correction.occurredAt?.getTime()).not.toBe(correction.createdAt?.getTime());
+    });
+
+    it('refuses to correct upward — extra money is another payment, not a correction', async () => {
+        const origId = await recordAndGetId(20000);
+        const res = await postCorrection(origId, { correctedAmountCents: 30000, reason: 'undercounted' });
+        expect(res.status).toBe(422);
+        expect(await ledgerRows()).toHaveLength(1);
+    });
+
+    it('refuses to correct the same payment twice', async () => {
+        const origId = await recordAndGetId(20000);
+        expect((await postCorrection(origId, { correctedAmountCents: 2000, reason: 'typo' })).status).toBe(201);
+        const second = await postCorrection(origId, { correctedAmountCents: 1000, reason: 'typo again' });
+        expect(second.status).toBe(409);
+        expect(await ledgerRows()).toHaveLength(2);
+    });
+
+    it('404s a payment id from another invoice', async () => {
+        const origId = await recordAndGetId(20000);
+        await db.update(schema.orderPayments).set({ invoiceId: 'inv-somewhere-else' })
+            .where(eq(schema.orderPayments.id, origId));
+        const res = await postCorrection(origId, { correctedAmountCents: 2000, reason: 'typo' });
+        expect(res.status).toBe(404);
+    });
+
+    it('403s an inspector without the financial capability', async () => {
+        const origId = await recordAndGetId(20000);
+        const res = await postCorrection(origId, { correctedAmountCents: 2000, reason: 'typo' }, 'inspector');
+        expect(res.status).toBe(403);
+        expect(await ledgerRows()).toHaveLength(1);
+    });
+
+    it('clears the report payment gate when the correction unsettles the invoice', async () => {
+        // Paid in full, then corrected downward: the report must not stay
+        // publicly unlocked with no backing payment.
+        await postPayment({ amountCents: 45000, method: 'cash', occurredAt: TUESDAY.toISOString() });
+        const origId = (await ledgerRows())[0].id;
+        await db.update(schema.inspections).set({ paymentStatus: 'paid' })
+            .where(eq(schema.inspections.id, INSP_ID));
+
+        await postCorrection(origId, { correctedAmountCents: 5000, reason: 'decimal typo' });
+
+        const insp = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
+        expect(insp?.paymentStatus).toBe('unpaid');
+        expect((await getInvoice()).paidAt).toBeNull();
+    });
+});
+
 describe('GET /api/invoices/{id}/payments', () => {
     it('returns the rows ordered by when the money moved, with the recorder named', async () => {
         // Adverse order: THURSDAY's cheque is recorded FIRST, so an
