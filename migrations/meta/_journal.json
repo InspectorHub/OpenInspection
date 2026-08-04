@@ -239,6 +239,13 @@
       "when": 1785803986362,
       "tag": "0033_lumpy_calypso",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1785805642371,
+      "tag": "0034_sweet_smiling_tiger",
+      "breakpoints": true
     }
   ]
 }
