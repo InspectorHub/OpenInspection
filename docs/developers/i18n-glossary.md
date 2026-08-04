@@ -68,6 +68,14 @@ catalogue.
 6. **Numbers, dates, money and addresses are formatted by code**
    (`app/lib/format.ts`, `app/lib/money.ts`), never spelled into a message. Do
    not hardcode a currency symbol or a date pattern in a translated string.
+7. **A format literal a parser matches on stays English.** Some strings show the
+   user an input format that code then compares against, character for
+   character. `editor_unitsmanager_csv_placeholder` and `_csv_hint` show
+   `label,floor`, and `parseUnitCsv` (`server/lib/unit-pattern.ts`) skips a
+   header row only when it reads exactly that. Translating the hint to
+   `etiqueta,piso` would teach a Spanish user to type a header the parser then
+   imports as a unit named "etiqueta". Translate the prose around such a
+   literal; leave the literal alone.
 
 ---
 
@@ -84,7 +92,7 @@ catalogue.
 | Template | plantilla | — | Standard software Spanish. |
 | Finding | hallazgo | — | Rare in the UI (a repair-request column, a metrics chart). Distinct from *defecto*: a hallazgo is observed, a defecto is judged. |
 | Defect | defecto | — | The severity level. See the rating table. |
-| Repair Items | elementos de reparación | recomendaciones | English forbids "Recommendations" for this feature; the Spanish ban mirrors it exactly. |
+| Repair Items | elementos de reparación | — | English forbids "Recommendations" **for this feature**, and so does Spanish — but that prohibition cannot be a machine ban. English uses the same word legitimately elsewhere: the ASTM PCA report's "1.5 Recommendations" section, the "Recommendation" custom-defect category, and the agent portal's "grouped under Recommendations". A blanket ban on *recomendaciones* false-fires on all of them, and a gate with false positives gets bypassed. Rule, not gate: never name **this feature** *recomendaciones*. |
 | Repair Request | solicitud de reparación | — | The client-facing document built from repair items. |
 | Canned Comment | comentario predefinido | comentario enlatado | "Enlatado" is a literal calque of the English idiom and reads as a joke. |
 | Notes | notas | apuntes | Inspector free text. Keep distinct from *comentarios*. |
@@ -94,7 +102,7 @@ catalogue.
 | Schedule (noun) | agenda | — | |
 | Schedule (verb) | programar | — | The verb. For the *status* "Scheduled" see the Status labels section — it is *Programado*, masculine, and that section explains why. |
 | Invoice | factura | — | |
-| Estimate | presupuesto | — | Not *estimado*, which reads as a guess rather than a priced offer. |
+| Estimate | presupuesto | — | The **noun** for a priced offer. Not *estimado*, which reads as a guess. The ban is on the noun only and is deliberately not machine-enforced: *estimado* is the ordinary adjective and the only right word in "Estimated cost" → *Costo estimado* and "Estimated monthly cost" → *Costo mensual estimado*. Banning the string would false-fire on both. |
 | Agreement | acuerdo | — | The document itself stays in English; this is the word for it in chrome. |
 | Trade | oficio | — | The contractor discipline. English also says "contractor type" and "recommended contractor" for adjacent things — translate each as written (rule 1). |
 | Contractor | contratista | — | |
@@ -261,6 +269,57 @@ These are a few hundred keys between them. One word each.
 | Saving… | Guardando… | — | |
 | Sending… | Enviando… | — | |
 | Uploading… | Subiendo… | — | |
+
+## The editor and field workflow
+
+Fixed while translating the four `editor*.json` files (595 keys). Several of
+these words also appear in `media`, `settings*`, `misc`, `contacts` and
+`components`, so they are decided here rather than re-argued there.
+
+<!-- gate:terms -->
+
+| English | es-419 | Never | Why |
+|---|---|---|---|
+| Speed mode | modo rápido | — | The one-item-at-a-time rating flow. Not *modo de velocidad*. |
+| Burst camera | cámara en ráfaga | — | *Ráfaga* is the standard photographic term. |
+| Snippet | fragmento | — | A saved piece of note text. Distinct from *comentario predefinido*, which is a library entry. |
+| Unit (of a multi-unit property) | unidad | — | The per-unit inspection mode. Not the unit of measure — that is *UM* in the cost table. |
+| Cost item | elemento de costo | — | A line in the PCA Opinion of Cost. Parallel to *elemento de reparación*. |
+| Sign-off | aprobación | — | The commercial reviewer's approval. *Firmar* is the signature act; the sign-off is the recorded approval, and the two appear side by side on the compliance panel. |
+| Location | ubicación | — | Where a defect is. Not *localización*. |
+| Version history | historial de versiones | — | |
+| Restore | Restaurar | — | Bringing back a saved version. Distinct from *Recuperar* (recover one value). |
+| Rename | Cambiar nombre | — | Sentence case, no article, because it is a menu item. The aria form takes one: *Cambiar el nombre de {name}*. |
+| Cover photo | foto de portada | — | "Set as cover" → *Establecer como portada*. |
+| Completion | Avance | — | A percentage stat. *Completitud* is a mathematics word; *avance* is what a progress figure is called. |
+| Saved | Guardado | — | The save-state indicator, masculine singular by the status-label rule. |
+| Connected / Connecting… | Conectado / Conectando… | — | Collaboration presence. |
+| inspector-added | agregado por el inspector | — | The badge on a defect the inspector wrote rather than the library. Lowercase, as in English. |
+| Unrated | Sin calificar | — | |
+| Batch mode | modo por lotes | — | Multi-select rating. Bulk create is *creación en lote*. |
+
+## Commercial PCA (ASTM E2018)
+
+Commercial report vocabulary. The section numbers are part of the string and
+never change; the same headings appear in `editor-4.json` and `pca-report.json`
+character for character, so the consistency check binds them together.
+
+<!-- gate:terms -->
+
+| English | es-419 | Never | Why |
+|---|---|---|---|
+| PCA / PSQ / PCR / EUL / RUL | PCA / PSQ / PCR / EUL / RUL | — | Acronyms of the standard. Left as written — they are how the document names itself, and expanding them in Spanish would not match the report a client receives. |
+| Transmittal Letter | Carta de remisión | — | The cover letter ASTM E2018 requires. *Remisión* is the term used for a document formally forwarded to a client. |
+| Opinion of Cost | Opinión de Costo | — | The ASTM name for the cost tables. Capitalised because it names a document part. |
+| 1.1 General Description | 1.1 Descripción general | — | |
+| 1.2 General Physical Condition | 1.2 Condición física general | — | |
+| 1.5 Recommendations | 1.5 Recomendaciones | — | See the Repair Items row: this is the legitimate use of the word. |
+| 2.1 Purpose | 2.1 Propósito | — | |
+| 2.3 Limitations & Exceptions | 2.3 Limitaciones y excepciones | — | |
+| 2.4 General Property Reconnaissance | 2.4 Reconocimiento general de la propiedad | — | |
+| Additional Considerations | Consideraciones adicionales | — | |
+| Immediate / Short-term / Long-term | Inmediato / Corto plazo / Largo plazo | — | The three cost buckets. Masculine singular — they label a bucket, like a status. |
+| Conforms / Does not conform | Conforme / No conforme | — | The ASTM conformance statement. |
 
 ## Register enforcement
 
