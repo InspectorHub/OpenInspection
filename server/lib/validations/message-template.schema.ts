@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { SUPPORTED_CONTACT_LOCALES } from '../i18n/contact-locale';
 
 // B1 — `in_app` templates hold a notice's title (`subject`) and body.
 const ChannelSchema = z.enum(['email', 'sms', 'in_app']);
@@ -10,8 +11,14 @@ export const CreateMessageTemplateSchema = z.object({
     subject: z.string().max(500).nullish().describe('Email subject line (email channel only; max 500 chars).'),
     body: z.string().min(1).describe('Template body text; supports {{variable}} interpolation.'),
     variables: z.array(z.string()).optional().describe('Named interpolation variables used in the body.'),
+    locale: z.enum(SUPPORTED_CONTACT_LOCALES).optional()
+        .describe('Language variant this template is written in. Variants of one template share name + channel. Defaults to en.'),
 }).strip();
 
+// Deliberately absent from the update schema: a variant's language is what the
+// row IS, like its channel. Allowing a PATCH to change it would silently
+// reassign Spanish copy to English readers, and `.partial()` semantics make that
+// the kind of field a caller overwrites without ever naming it.
 export const UpdateMessageTemplateSchema = z.object({
     name: z.string().min(1).max(200).optional().describe('Updated display name (max 200 chars).'),
     subject: z.string().max(500).nullish().describe('Updated email subject line (email channel only).'),
@@ -38,6 +45,7 @@ export const MessageTemplateSchema = z.object({
     id: z.string(), tenantId: z.string(), name: z.string(),
     channel: ChannelSchema, subject: z.string().nullable(), body: z.string(),
     variables: z.array(z.string()), isSeeded: z.boolean(),
+    locale: z.string(),
     createdAt: z.number(), updatedAt: z.number(),
 });
 

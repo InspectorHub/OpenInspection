@@ -4541,6 +4541,14 @@
               "type": "string"
             },
             "description": "Named interpolation variables used in the body."
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en",
+              "es-419"
+            ],
+            "description": "Language variant this template is written in. Variants of one template share name + channel. Defaults to en."
           }
         },
         "required": [

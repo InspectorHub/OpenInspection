@@ -6,6 +6,23 @@
 // {{agreement_sign_url}} is special: when present, AutomationService.flush()
 // lazily creates an agreement_request row + token before substitution.
 // Rules using this var are auto-skipped if inspection.agreementRequired === false.
+//
+// ─── ENGLISH ONLY, ON PURPOSE ────────────────────────────────────────────────
+// These seeds ship in English and no other language, and that is a DECISION,
+// not an oversight — do not "finish the job" by adding Spanish rows here.
+//
+// message_templates now carries a `locale` and the send path picks a variant by
+// the RECIPIENT's language, so seeding Spanish would be technically trivial. It
+// is the content that stops us: this is copy a tenant sends under their own
+// company name, and inspection terminology varies enough between markets that
+// our translation would be wrong for someone and disputed by someone else. A
+// tenant who edits the English seed owns the wording; a tenant who inherits our
+// Spanish inherits our vocabulary choices without ever agreeing to them.
+//
+// So: ship the mechanism, let each tenant author their own market's Spanish.
+// The authoring surface (Settings → Communication → Templates) shows which
+// variants are missing so this reads as an invitation rather than a gap.
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const AUTOMATION_SEEDS = [
     {

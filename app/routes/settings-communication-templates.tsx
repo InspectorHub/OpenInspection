@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLoaderData, useFetcher } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-communication-templates";
@@ -7,32 +7,62 @@ import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Button, Pill, TabStrip, EmptyState, Card, Modal } from "@core/shared-ui";
+import {
+  TemplateEditorModal, smsSegmentsClient,
+  type MessageTemplate, type EditorTarget,
+} from "~/components/settings/TemplateEditorModal";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
-
-// ─── Exported pure helper ────────────────────────────────────────────────────
-
-/** GSM-ish client segment estimate — mirrors server smsSegmentInfo thresholds. */
-export function smsSegmentsClient(body: string): number {
-  const len = [...body].length;
-  if (len === 0) return 0;
-  // Client keeps the GSM happy-path estimate (server is authoritative on send).
-  return len <= 160 ? 1 : Math.ceil(len / 153);
-}
+import { SUPPORTED_CONTACT_LOCALES } from "../../server/lib/i18n/contact-locale";
+import { localeLabel } from "~/lib/locales";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface MessageTemplate {
-  id: string;
-  tenantId: string;
+// Re-exported: the SMS segment estimate moved to the editor that uses it, and
+// the co-located spec addresses it here.
+export { smsSegmentsClient };
+
+/** One template, in however many languages the tenant has written it. */
+export interface TemplateGroup {
+  key: string;
   name: string;
   channel: "email" | "sms";
-  subject: string | null;
-  body: string;
-  variables: string[];
-  isSeeded: boolean;
-  createdAt: number;
-  updatedAt: number;
+  /** Oldest first — the same order the send path resolves duplicates in. */
+  variants: MessageTemplate[];
+  /** The row a new language version is seeded from. */
+  base: MessageTemplate;
+  /** Supported languages this template has NOT been written in yet. */
+  missing: string[];
+}
+
+/**
+ * Group rows into templates-with-versions.
+ *
+ * The tenant thinks "my reminder email, in Spanish" — one template they have
+ * written twice. A flat list showing two unrelated rows called "Reminder"
+ * invites deleting the wrong one, and hides the fact that a language is
+ * missing, which is the thing they cannot otherwise see.
+ *
+ * Grouping is by (name, channel), matching how the send path finds a variant.
+ * Nothing enforces uniqueness on (name, channel, locale), so a group can hold
+ * two rows in one language; both are listed rather than silently collapsed, so
+ * a duplicate is visible to the person who can fix it.
+ */
+export function groupTemplateVariants(templates: MessageTemplate[]): TemplateGroup[] {
+  const groups = new Map<string, TemplateGroup>();
+  for (const t of templates) {
+    const key = `${t.channel}::${t.name}`;
+    const g = groups.get(key);
+    if (g) { g.variants.push(t); continue; }
+    groups.set(key, { key, name: t.name, channel: t.channel, variants: [t], base: t, missing: [] });
+  }
+  for (const g of groups.values()) {
+    g.variants.sort((a, b) => (a.createdAt - b.createdAt) || a.id.localeCompare(b.id));
+    g.base = g.variants[0];
+    const present = new Set(g.variants.map((v) => v.locale));
+    g.missing = SUPPORTED_CONTACT_LOCALES.filter((l) => !present.has(l));
+  }
+  return [...groups.values()];
 }
 
 interface ReferencingAutomation {
@@ -86,9 +116,15 @@ export async function action({ request, context }: Route.ActionArgs) {
     const subject = channel === "email" ? (String(form.get("subject") ?? "").trim() || null) : null;
     const body = String(form.get("body") ?? "");
     const variables = form.getAll("variables").map(String).filter(Boolean);
-    const res = await api.messageTemplates.index.$post({
-      json: { name, channel, subject, body, variables },
-    });
+    // A version's language is set once, at create. There is deliberately no
+    // update path for it: changing it would reassign copy to readers it was
+    // not written for.
+    const locale = String(form.get("locale") ?? "en");
+    const res = await (
+      api.messageTemplates.index.$post as unknown as (a: {
+        json: { name: string; channel: "email" | "sms"; subject: string | null; body: string; variables: string[]; locale: string };
+      }) => Promise<Response>
+    )({ json: { name, channel, subject, body, variables, locale } });
     if (!res.ok) return { ok: false, error: m.settings_msgtpl_create_error(), intent };
     return { ok: true, intent };
   }
@@ -185,13 +221,14 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function SettingsCommunicationTemplates() {
   const data = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState<"email" | "sms">("email");
-  const [editing, setEditing] = useState<MessageTemplate | "new-email" | "new-sms" | null>(null);
+  const [editing, setEditing] = useState<EditorTarget | null>(null);
   const [deleting, setDeleting] = useState<MessageTemplate | null>(null);
 
   if ("forbidden" in data) return <AccessDenied />;
   const { emailTemplates, smsTemplates } = data;
 
   const templates = activeTab === "email" ? emailTemplates : smsTemplates;
+  const groups = groupTemplateVariants(templates);
 
   return (
     <div className="space-y-ih-list">
@@ -208,7 +245,7 @@ export default function SettingsCommunicationTemplates() {
         <p className="text-[13px] text-ih-fg-3">{m.settings_msgtpl_intro()}</p>
         <Button
           variant="primary"
-          onClick={() => setEditing(activeTab === "email" ? "new-email" : "new-sms")}
+          onClick={() => setEditing({ kind: "new", channel: activeTab, locale: "en", prefill: null })}
         >
           {m.settings_msgtpl_new_button()}
         </Button>
@@ -224,8 +261,11 @@ export default function SettingsCommunicationTemplates() {
       />
 
       <TemplateList
-        templates={templates}
-        onEdit={setEditing}
+        groups={groups}
+        onEdit={(t) => setEditing({ kind: "edit", template: t })}
+        onAddVariant={(g, locale) =>
+          setEditing({ kind: "new", channel: g.channel, locale, prefill: g.base })
+        }
         onDelete={setDeleting}
       />
 
@@ -234,16 +274,7 @@ export default function SettingsCommunicationTemplates() {
 
       {editing !== null && (
         <TemplateEditorModal
-          template={
-            editing === "new-email" || editing === "new-sms" ? null : editing
-          }
-          defaultChannel={
-            editing === "new-email"
-              ? "email"
-              : editing === "new-sms"
-              ? "sms"
-              : editing.channel
-          }
+          target={editing}
           onClose={() => setEditing(null)}
         />
       )}
@@ -258,17 +289,19 @@ export default function SettingsCommunicationTemplates() {
 // ─── Template list ────────────────────────────────────────────────────────────
 
 function TemplateList({
-  templates,
+  groups,
   onEdit,
+  onAddVariant,
   onDelete,
 }: {
-  templates: MessageTemplate[];
+  groups: TemplateGroup[];
   onEdit: (t: MessageTemplate) => void;
+  onAddVariant: (g: TemplateGroup, locale: string) => void;
   onDelete: (t: MessageTemplate) => void;
 }) {
   const fetcher = useFetcher<{ ok: boolean; error?: string }>();
 
-  if (templates.length === 0) {
+  if (groups.length === 0) {
     return (
       <Card>
         <EmptyState
@@ -282,14 +315,16 @@ function TemplateList({
   return (
     <Card>
       <div className="divide-y divide-ih-border">
-        {templates.map((t) => (
+        {groups.map((g) => {
+          const t = g.base;
+          return (
           <div
-            key={t.id}
-            className="flex items-center gap-4 px-5 py-3.5 hover:bg-ih-bg-muted transition-colors"
+            key={g.key}
+            className="flex items-start gap-4 px-5 py-3.5 hover:bg-ih-bg-muted transition-colors"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[13px] font-bold text-ih-fg-1">{t.name}</span>
+                <span className="text-[13px] font-bold text-ih-fg-1">{g.name}</span>
                 {t.isSeeded && <Pill tone="info">{m.settings_msgtpl_builtin_pill()}</Pill>}
               </div>
               {t.subject && (
@@ -300,14 +335,9 @@ function TemplateList({
                   {m.settings_msgtpl_variables_prefix({ vars: t.variables.map((v) => `{{${v}}}`).join(", ") })}
                 </p>
               )}
+              <VariantRow group={g} onEdit={onEdit} onAddVariant={onAddVariant} onDelete={onDelete} />
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => onEdit(t)}
-                className="text-[12px] text-ih-primary font-semibold hover:underline"
-              >
-                {m.common_edit()}
-              </button>
               <fetcher.Form method="post">
                 <input type="hidden" name="intent" value="duplicate" />
                 <input type="hidden" name="id" value={t.id} />
@@ -318,19 +348,74 @@ function TemplateList({
                   {m.settings_msgtpl_duplicate()}
                 </button>
               </fetcher.Form>
-              {!t.isSeeded && (
-                <button
-                  onClick={() => onDelete(t)}
-                  className="text-[12px] text-ih-bad-fg font-semibold hover:underline"
-                >
-                  {m.common_delete()}
-                </button>
-              )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </Card>
+  );
+}
+
+// ─── Language versions ────────────────────────────────────────────────────────
+
+/**
+ * Which languages this template has been written in, and which it has not.
+ *
+ * The missing ones are shown as an INVITATION, not an error: most companies
+ * will only ever write one language, and a warning colour would tell them
+ * something is broken when nothing is. Recipients in a language nobody wrote
+ * still receive the message — that is the fallback, and saying so here is what
+ * stops "my Spanish clients got English" being filed as a bug.
+ */
+function VariantRow({
+  group,
+  onEdit,
+  onAddVariant,
+  onDelete,
+}: {
+  group: TemplateGroup;
+  onEdit: (t: MessageTemplate) => void;
+  onAddVariant: (g: TemplateGroup, locale: string) => void;
+  onDelete: (t: MessageTemplate) => void;
+}) {
+  return (
+    <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+      <span className="text-[11px] text-ih-fg-3 mr-0.5">{m.settings_msgtpl_languages_label()}</span>
+      {group.variants.map((v) => (
+        <span key={v.id} className="inline-flex items-center rounded-md border border-ih-border bg-ih-bg-input">
+          <button
+            onClick={() => onEdit(v)}
+            className="text-[11px] px-2 py-0.5 font-semibold text-ih-primary hover:underline"
+          >
+            {localeLabel(v.locale)}
+          </button>
+          {!v.isSeeded && (
+            <button
+              onClick={() => onDelete(v)}
+              aria-label={m.settings_msgtpl_delete_variant_aria({ language: localeLabel(v.locale) })}
+              className="text-[11px] pr-2 pl-0.5 text-ih-fg-3 hover:text-ih-bad-fg"
+            >
+              ×
+            </button>
+          )}
+        </span>
+      ))}
+      {group.missing.map((loc) => (
+        <button
+          key={loc}
+          onClick={() => onAddVariant(group, loc)}
+          className="text-[11px] px-2 py-0.5 rounded-md border border-dashed border-ih-border text-ih-fg-3 hover:text-ih-fg-1 hover:border-ih-fg-3 transition-colors"
+        >
+          {m.settings_msgtpl_variant_add({ language: localeLabel(loc) })}
+        </button>
+      ))}
+      {group.missing.length > 0 && (
+        <span className="text-[11px] text-ih-fg-3 basis-full mt-0.5">
+          {m.settings_msgtpl_variant_missing_note()}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -404,297 +489,6 @@ function DeleteModal({
           {m.settings_msgtpl_delete_confirm_prefix()} <strong className="text-ih-fg-1">{template.name}</strong>{m.settings_msgtpl_delete_confirm_suffix()}
         </p>
       )}
-    </Modal>
-  );
-}
-
-// ─── Template editor modal ────────────────────────────────────────────────────
-
-function TemplateEditorModal({
-  template,
-  defaultChannel,
-  onClose,
-}: {
-  template: MessageTemplate | null;
-  defaultChannel: "email" | "sms";
-  onClose: () => void;
-}) {
-  const channel = template?.channel ?? defaultChannel;
-  const isEmail = channel === "email";
-
-  const fetcher = useFetcher<{
-    ok: boolean;
-    intent?: string;
-    preview?: { subject?: string; html?: string; text?: string };
-    error?: string;
-  }>();
-  const previewFetcher = useFetcher<{
-    ok: boolean;
-    intent?: string;
-    preview?: { subject?: string; html?: string; text?: string };
-    error?: string;
-  }>();
-
-  const [name, setName] = useState(template?.name ?? "");
-  const [subject, setSubject] = useState(template?.subject ?? "");
-  const [body, setBody] = useState(template?.body ?? "");
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
-  const [testTo, setTestTo] = useState("");
-  const [testSent, setTestSent] = useState(false);
-
-  const segmentCount = !isEmail ? smsSegmentsClient(body) : 0;
-
-  useEffect(() => {
-    if (
-      fetcher.state === "idle" &&
-      fetcher.data?.ok &&
-      fetcher.data.intent !== "preview" &&
-      fetcher.data.intent !== "test-send"
-    ) {
-      onClose();
-    }
-  }, [fetcher.state, fetcher.data, onClose]);
-
-  useEffect(() => {
-    if (
-      fetcher.state === "idle" &&
-      fetcher.data?.ok &&
-      fetcher.data.intent === "test-send"
-    ) {
-      setTestSent(true);
-    }
-  }, [fetcher.state, fetcher.data]);
-
-  function insertVariable(v: string) {
-    const ta = bodyRef.current;
-    if (!ta) {
-      setBody((b) => b + `{{${v}}}`);
-      return;
-    }
-    const start = ta.selectionStart ?? body.length;
-    const end = ta.selectionEnd ?? body.length;
-    const snippet = `{{${v}}}`;
-    const next = body.slice(0, start) + snippet + body.slice(end);
-    setBody(next);
-    requestAnimationFrame(() => {
-      ta.setSelectionRange(start + snippet.length, start + snippet.length);
-      ta.focus();
-    });
-  }
-
-  const variables = template?.variables ?? [];
-  const isSaving = fetcher.state !== "idle";
-  const isTesting =
-    fetcher.state !== "idle" && fetcher.formData?.get("intent") === "test-send";
-  const isPreviewing = previewFetcher.state !== "idle";
-  const previewData = previewFetcher.data?.preview;
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={template ? m.settings_msgtpl_edit_title() : m.settings_msgtpl_new_channel_title({ channel })}
-      size="lg"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            {m.common_cancel()}
-          </Button>
-          <fetcher.Form method="post">
-            <input type="hidden" name="intent" value={template ? "update" : "create"} />
-            {template && <input type="hidden" name="id" value={template.id} />}
-            <input type="hidden" name="channel" value={channel} />
-            <input type="hidden" name="name" value={name} />
-            {isEmail && <input type="hidden" name="subject" value={subject} />}
-            <input type="hidden" name="body" value={body} />
-            {variables.map((v) => (
-              <input key={v} type="hidden" name="variables" value={v} />
-            ))}
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={isSaving || !name.trim() || !body.trim()}
-            >
-              {template ? m.common_save() : m.settings_msgtpl_create()}
-            </Button>
-          </fetcher.Form>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        {fetcher.data && !fetcher.data.ok && fetcher.data.intent !== "test-send" && (
-          <div className="px-3 py-2 rounded-md bg-ih-bad-bg text-ih-bad-fg text-[12px]">
-            {fetcher.data.error ?? m.settings_error_generic()}
-          </div>
-        )}
-
-        {/* Name */}
-        <div>
-          <label
-            htmlFor="tpl-name"
-            className="block text-xs font-bold text-ih-fg-2 mb-1"
-          >
-            {m.settings_msgtpl_name_label()}
-          </label>
-          <input
-            id="tpl-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={m.settings_msgtpl_name_placeholder()}
-            required
-            className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
-          />
-        </div>
-
-        {/* Subject (email only) */}
-        {isEmail && (
-          <div>
-            <label
-              htmlFor="tpl-subject"
-              className="block text-xs font-bold text-ih-fg-2 mb-1"
-            >
-              {m.settings_msgtpl_subject_line_label()}
-            </label>
-            <input
-              id="tpl-subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder={m.settings_msgtpl_subject_placeholder()}
-              className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
-            />
-          </div>
-        )}
-
-        {/* Body */}
-        <div>
-          <label
-            htmlFor="tpl-body"
-            className="block text-xs font-bold text-ih-fg-2 mb-1"
-          >
-            {isEmail ? m.settings_msgtpl_email_body_label() : m.settings_msgtpl_sms_body_label()}
-          </label>
-          {variables.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              <span className="text-[11px] text-ih-fg-3 self-center">{m.settings_msgtpl_insert_label()}</span>
-              {variables.map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => insertVariable(v)}
-                  className="text-[11px] px-1.5 py-0.5 rounded border border-ih-border bg-ih-bg-input text-ih-primary font-mono hover:bg-ih-primary-tint transition-colors"
-                >
-                  {`{{${v}}}`}
-                </button>
-              ))}
-            </div>
-          )}
-          <textarea
-            id="tpl-body"
-            ref={bodyRef}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={isEmail ? 8 : 5}
-            placeholder={
-              isEmail
-                ? "Hi {{inspector_name}}, your report for {{address}} is ready."
-                : "Hi {{name}}, your report is ready: {{link}}"
-            }
-            className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 resize-y focus:outline-none focus:border-ih-primary"
-          />
-          {!isEmail && (
-            <p className="text-[11px] text-ih-fg-3 mt-1">
-              {segmentCount === 0
-                ? m.settings_msgtpl_segments_zero()
-                : m.settings_msgtpl_segments_count({ chars: [...body].length, segments: segmentCount, plural: segmentCount !== 1 ? "s" : "" })}
-            </p>
-          )}
-        </div>
-
-        {/* Email preview */}
-        {isEmail && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-ih-fg-2 uppercase tracking-wide">
-                {m.settings_msgtpl_preview_label()}
-              </span>
-              <previewFetcher.Form method="post">
-                <input type="hidden" name="intent" value="preview" />
-                <input type="hidden" name="channel" value="email" />
-                <input type="hidden" name="subject" value={subject} />
-                <input type="hidden" name="body" value={body} />
-                <Button
-                  type="submit"
-                  variant="secondary"
-                  size="sm"
-                  disabled={isPreviewing || !body.trim()}
-                >
-                  {isPreviewing ? m.common_loading() : m.settings_msgtpl_refresh_preview()}
-                </Button>
-              </previewFetcher.Form>
-            </div>
-            {previewData && (
-              <div className="rounded-md border border-ih-border bg-ih-bg-muted p-3 space-y-2">
-                {previewData.subject && (
-                  <p className="text-[12px] font-bold text-ih-fg-2">
-                    {m.settings_msgtpl_preview_subject_label()}{" "}
-                    <span className="font-normal text-ih-fg-1">{previewData.subject}</span>
-                  </p>
-                )}
-                {previewData.html && (
-                  <div
-                    className="text-[12px] text-ih-fg-1 prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ __html: previewData.html }}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Test send */}
-        <div className="border-t border-ih-border pt-3">
-          <p className="text-xs font-bold text-ih-fg-2 uppercase tracking-wide mb-2">
-            {isEmail ? m.settings_msgtpl_test_send_email_heading() : m.settings_msgtpl_test_send_sms_heading()}
-          </p>
-          <div className="flex gap-2 items-end">
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-ih-fg-2 mb-1">
-                {isEmail ? m.settings_msgtpl_to_email_label() : m.settings_msgtpl_to_phone_label()}
-              </label>
-              <input
-                value={testTo}
-                onChange={(e) => {
-                  setTestTo(e.target.value);
-                  setTestSent(false);
-                }}
-                placeholder={isEmail ? m.settings_msgtpl_to_email_placeholder() : m.settings_msgtpl_to_phone_placeholder()}
-                type={isEmail ? "email" : "tel"}
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
-              />
-            </div>
-            <fetcher.Form method="post">
-              <input type="hidden" name="intent" value="test-send" />
-              <input type="hidden" name="channel" value={channel} />
-              {isEmail && <input type="hidden" name="subject" value={subject} />}
-              <input type="hidden" name="body" value={body} />
-              <input type="hidden" name="to" value={testTo} />
-              <Button
-                type="submit"
-                variant="secondary"
-                disabled={isTesting || !testTo.trim() || !body.trim()}
-              >
-                {isTesting ? m.settings_sending() : m.settings_send()}
-              </Button>
-            </fetcher.Form>
-          </div>
-          {testSent && (
-            <p className="text-[12px] text-ih-ok-fg mt-1">{m.settings_msgtpl_test_sent()}</p>
-          )}
-          {fetcher.data && !fetcher.data.ok && fetcher.data.intent === "test-send" && (
-            <p className="text-[12px] text-ih-bad-fg mt-1">{fetcher.data.error}</p>
-          )}
-        </div>
-      </div>
     </Modal>
   );
 }
