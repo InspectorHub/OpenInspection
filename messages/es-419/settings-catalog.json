@@ -27,7 +27,7 @@
   "settings_inspection_autoadvance_off": "Nunca (permanecer siempre en el elemento)",
   "settings_inspection_autoadvance_note": "Las calificaciones de tipo Defecto o Vigilar siempre permanecen en el elemento y activan Notas para que usted pueda describir el hallazgo.",
   "settings_inspection_autoadvance_delay_value": "{ms} ms",
-  "settings_inspection_autoadvance_delay_help": "Espera antes de que el editor avance al siguiente elemento.",
+  "settings_inspection_autoadvance_delay_help": "Retraso antes de que el editor avance al siguiente elemento.",
   "settings_inspection_required_heading": "Campos obligatorios del defecto al publicar",
   "settings_inspection_required_help": "Campos que todo defecto debe tener antes de que se pueda publicar un informe. Cada inspección puede cambiar esto para su propio trabajo en la configuración de la inspección.",
   "settings_inspection_required_none": "Ninguno — los campos faltantes advierten, nunca bloquean",
