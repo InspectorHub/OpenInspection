@@ -534,6 +534,8 @@ apply at all.
 
 - `settings_comms_template_subject_label`, `settings_compliance_col_subject` — English "Subject" is a homograph, not a shared concept. On the email-template editor it is the subject line (*Asunto*); in the erasure log it is the GDPR **data subject**, a person (*Interesado*). No Spanish word covers both, and picking either would make one of the two screens nonsense.
 
+- `auth_agent_invite_prop3_title`, `media_cropper_free` — English "Free" is price in one place and shape in the other. On the agent-portal invite it is the cost of the account (*Gratis*); in the photo cropper it is the unconstrained aspect ratio beside Portrait and Landscape (*Libre*). *Gratis* on a crop button says the crop costs nothing, which is not a thing anyone was wondering.
+
 *(Add further divergences as `- \`key_one\`, \`key_two\` — reason.)*
 
 ## Working through a module
