@@ -76,3 +76,32 @@ export const DISCLOSURE_SANITIZER_PROFILE = Object.freeze({
     ALLOWED_TAGS: Object.freeze(['section', 'p', 'strong', 'em', 'br']),
     ALLOWED_ATTR: Object.freeze(['class', 'role']),
 });
+
+/**
+ * May an EVIDENCE surface — the archived copy, the public verifier — print the
+ * copy above against this set of signatures?
+ *
+ * Only when every signature recorded the version that is in this file right
+ * now. `versions` is one entry per SIGNED signer, taken from
+ * `agreement_signers.language_disclosure_version`.
+ *
+ * The rule is narrow on purpose. Superseded copy is not archived anywhere: a
+ * bump replaces the string, and there is no table of old ones. So for a
+ * signature that recorded version N < current, the honest options are "print
+ * nothing" and "print a sentence this person never saw", and the second is a
+ * claim the record cannot support — precisely the claim a dispute would be
+ * about. NULL (no version recorded — a pre-feature signature, or a surface the
+ * platform did not draw) fails the same way and for the same reason.
+ *
+ * A signing SURFACE must not consult this: it shows the current copy to a
+ * person standing in front of it, which is always truthful, and it is what puts
+ * the version on the record in the first place.
+ */
+export function signaturesRecordCurrentDisclosure(
+    versions: ReadonlyArray<number | null | undefined>,
+): boolean {
+    // No signatures = nothing to vouch for. An empty set trivially satisfying
+    // "every" would print the copy onto a document nobody signed.
+    if (versions.length === 0) return false;
+    return versions.every((v) => v === DISCLOSURE_VERSION);
+}

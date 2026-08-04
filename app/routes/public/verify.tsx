@@ -3,6 +3,7 @@ import type { Route } from "./+types/verify";
 import { createApi } from "~/lib/api-client.server";
 import { formatDateTime } from "~/lib/format";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
+import { AgreementLanguageDisclosure } from "~/components/agreements/AgreementLanguageDisclosure";
 import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
 import { ViewerTimeZoneNotice } from "~/components/public/ViewerTimeZoneNotice";
 import { m } from "~/paraglide/messages";
@@ -32,6 +33,12 @@ interface VerifyData {
   contentSnapshot: string | null;
   contentHash: string | null;
   signers: VerifySigner[];
+  // Server-decided: every signature here recorded the language-disclosure
+  // version that is live now, so this page may show that copy beside the
+  // snapshot as part of what these signers were shown. False on a pre-feature
+  // signature and on any surface the platform did not draw — the page then says
+  // nothing rather than showing today's words against an older signature.
+  languageDisclosureCurrent: boolean;
 }
 
 export async function loader({ params, context }: Route.LoaderArgs) {
@@ -131,6 +138,14 @@ function VerifyBody() {
           className="prose prose-sm max-w-none rounded-lg border border-ih-border bg-ih-bg-card p-4 text-[13px] text-ih-fg-2 leading-relaxed mb-6"
           html={result.contentSnapshot}
         />
+      )}
+
+      {/* Outside the snapshot box, never inside it: that box is the string the
+          content hash is taken over, and this is the platform speaking about the
+          document rather than a term of it. Shown only when every signature on
+          this envelope recorded the version of the copy that is live now. */}
+      {result.languageDisclosureCurrent && (
+        <AgreementLanguageDisclosure className="rounded-lg border border-ih-border mb-6" />
       )}
 
       {/* Signers */}

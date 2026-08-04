@@ -5,7 +5,10 @@ import { eq, and, asc } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
 import { qrToSvg } from '../lib/qr';
 import { AgreementService } from '../services/agreement.service';
-import { AGREEMENT_LANGUAGE_DISCLOSURE } from '../lib/legal/agreement-language-disclosure';
+import {
+  AGREEMENT_LANGUAGE_DISCLOSURE,
+  signaturesRecordCurrentDisclosure,
+} from '../lib/legal/agreement-language-disclosure';
 import { safeISODate } from '../lib/date';
 
 /**
@@ -133,12 +136,22 @@ const escapeHtml = (s: string): string =>
  * so there is no sanitizer pass available on this path; the guard is that the
  * string is ours and fixed, asserted by
  * `tests/unit/agreements/language-disclosure.spec.ts`.
+ *
+ * Returns '' unless every signature on this document recorded the version of
+ * the copy that is live right now — see `signaturesRecordCurrentDisclosure`.
+ * This document is produced in a dispute, and a signing screen's copy printed
+ * next to a signature that predates it would read as evidence of what that
+ * person was shown. Silence is the accurate answer when the record has none.
  */
-const languageNoteHtml = (): string =>
-  `<div class="lang-note">` +
+const languageNoteHtml = (
+  signerDisclosureVersions: ReadonlyArray<number | null | undefined>,
+): string => {
+  if (!signaturesRecordCurrentDisclosure(signerDisclosureVersions)) return '';
+  return `<div class="lang-note">` +
     `<div class="label">${escapeHtml(AGREEMENT_LANGUAGE_DISCLOSURE.label)}</div>` +
     AGREEMENT_LANGUAGE_DISCLOSURE.html +
   `</div>`;
+};
 
 /**
  * Pure render handler exported for unit testing. Takes a D1Database and the
@@ -232,7 +245,9 @@ export async function agreementRenderHandler(
   const html = HTML_HEAD +
     `<h1>${escapeHtml(agreement.name)}</h1>` +
     `<div class="body">${escapeHtml(snapshotContent)}</div>` +
-    languageNoteHtml() +
+    // Legacy envelope-level fallback above leaves `signedSigners` empty, which
+    // is exactly the "no version on the record" case — the note drops out.
+    languageNoteHtml(signedSigners.map((s) => s.languageDisclosureVersion)) +
     `<div class="sig-block">` +
       `<div class="sig-row">` +
         signerCellsHtml +
@@ -300,7 +315,15 @@ export async function certRenderHandler(
         const name = escapeHtml(s.name || s.email || 'Signer');
         const inPerson = s.channel === 'in_person' ? ' · Signed in person' : '';
         const onBehalf = s.onBehalfOf ? ` · on behalf of ${escapeHtml(s.onBehalfOf)}` : '';
-        return `<li>${escapeHtml(roleLabel(s.role))}: ${name}${inPerson}${onBehalf} · ${at}</li>`;
+        // The certificate states FACTS about the signing event, so unlike the
+        // archived copy it can carry a superseded version number honestly: it
+        // reports which notice was displayed, it does not reproduce the notice.
+        // Omitted entirely when nothing was recorded — an absent line says "no
+        // record", which is true, where "v0" or "none" would sound like a finding.
+        const langNotice = typeof s.languageDisclosureVersion === 'number'
+          ? ` · Language notice v${s.languageDisclosureVersion} displayed`
+          : '';
+        return `<li>${escapeHtml(roleLabel(s.role))}: ${name}${inPerson}${onBehalf}${langNotice} · ${at}</li>`;
       }).join('')
     : `<li>Client: ${escapeHtml(clientLabel)}${reqRow.signedAt ? ` · ${escapeHtml(utcDisplay(reqRow.signedAt))}` : ''}</li>`;
 

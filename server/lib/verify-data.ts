@@ -36,6 +36,9 @@ export async function loadVerifyData(c: Context<HonoConfig>, envelopeId: string)
         status: schema.agreementSigners.status,
         signedAt: schema.agreementSigners.signedAt,
         channel: schema.agreementSigners.channel,
+        // Not exposed per-signer by the verifier — it decides ONE thing with it:
+        // whether the page may print the current language disclosure at all.
+        languageDisclosureVersion: schema.agreementSigners.languageDisclosureVersion,
     })
         .from(schema.agreementSigners)
         .where(eq(schema.agreementSigners.requestId, envelopeId))

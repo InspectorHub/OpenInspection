@@ -7,6 +7,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { agreementRenderHandler, certRenderHandler } from '../../../server/api/agreements-render';
+import { AGREEMENT_LANGUAGE_DISCLOSURE } from '../../../server/lib/legal/agreement-language-disclosure';
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
 const INSP_ID  = '00000000-0000-0000-0000-000000000010';
@@ -375,7 +376,32 @@ describe('cert-render handler', () => {
 // content snapshot verbatim, `content_hash` is taken over the stored string, and
 // anything added inside it would both rewrite the record of what was signed and
 // make us the author of a term in a contract we are not a party to.
+//
+// And the agreement has to be MUTUAL: the document may only carry the note when
+// the signatures on it recorded the version of the copy that is live now. There
+// is no archive of superseded copy, so against an older signature the choice is
+// between printing nothing and printing words that signer never read.
 // ---------------------------------------------------------------------------
+
+const SIGNER_ID = '00000000-0000-0000-0000-000000000200';
+
+/**
+ * A signed signer on REQ_ID whose record says which disclosure version it saw.
+ * `version` null = the record says nothing (pre-feature signature, or the
+ * on-site API surface the platform does not draw).
+ */
+async function insertSignedSigner(
+  db: BetterSQLite3Database<typeof schema>,
+  version: number | null,
+): Promise<void> {
+  await db.insert(schema.agreementSigners).values({
+    id: SIGNER_ID, tenantId: TENANT_A, requestId: REQ_ID,
+    name: 'Jane Doe', email: 'jane@x', role: 'client', status: 'signed',
+    signatureBase64: 'data:image/png;base64,clientsig',
+    signedAt: new Date(), createdAt: new Date(),
+    languageDisclosureVersion: version,
+  });
+}
 
 /** The verbatim contents of the `.body` box — the snapshot, and nothing else. */
 function bodyBoxOf(html: string): string {
@@ -415,6 +441,7 @@ describe('agreement-render handler — language disclosure', () => {
       contentHash: 'deadbeef',
       createdAt: new Date(),
     });
+    await insertSignedSigner(db, AGREEMENT_LANGUAGE_DISCLOSURE.version);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
   });
 
@@ -455,5 +482,115 @@ describe('agreement-render handler — language disclosure', () => {
     const agreement = await db.select().from(schema.agreements)
       .where(eq(schema.agreements.id, AGR_ID)).get();
     expect(agreement!.content).toBe('<p>Agreement body</p>');
+  });
+
+  // The three cases below are the whole reason the version is on the signature.
+  // Each replaces the signer seeded in beforeEach, so the ONLY difference
+  // between them and the passing case above is what the record says.
+
+  it('omits it when the signature recorded no version at all', async () => {
+    await db.delete(schema.agreementSigners).where(eq(schema.agreementSigners.id, SIGNER_ID));
+    await insertSignedSigner(db, null);
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const html = await res.text();
+    // The document still renders — it is only the claim that is withheld.
+    expect(html).toContain('Snapshot at sign time');
+    expect(html).not.toMatch(/provided in English/i);
+    expect(html).not.toContain('Not part of this agreement');
+  });
+
+  it('omits it when the signature recorded a SUPERSEDED version', async () => {
+    await db.delete(schema.agreementSigners).where(eq(schema.agreementSigners.id, SIGNER_ID));
+    await insertSignedSigner(db, AGREEMENT_LANGUAGE_DISCLOSURE.version - 1);
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const html = await res.text();
+    expect(html).toContain('Snapshot at sign time');
+    // Superseded copy is not archived. Printing today's words here would put a
+    // sentence in front of a judge that this signer demonstrably did not read.
+    expect(html).not.toMatch(/provided in English/i);
+  });
+
+  it('omits it when ONE of several signers has no version — the document is one record', async () => {
+    await db.insert(schema.agreementSigners).values({
+      id: '00000000-0000-0000-0000-000000000201', tenantId: TENANT_A, requestId: REQ_ID,
+      name: 'John Doe', email: 'john@x', role: 'co_client', status: 'signed',
+      signatureBase64: 'data:image/png;base64,cosig',
+      signedAt: new Date(), createdAt: new Date(),
+      languageDisclosureVersion: null,
+    });
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const html = await res.text();
+    expect(html).not.toMatch(/provided in English/i);
+  });
+
+  it('the legacy envelope-level signature (no signer rows) carries no claim', async () => {
+    await db.delete(schema.agreementSigners).where(eq(schema.agreementSigners.requestId, REQ_ID));
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const html = await res.text();
+    // Fallback block still renders the signature…
+    expect(html).toContain('Jane Doe');
+    // …and says nothing about a notice nobody recorded.
+    expect(html).not.toMatch(/provided in English/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The certificate of completion is a different kind of document: it states
+// FACTS ABOUT the signing event rather than reproducing what was signed. So it
+// can report a superseded version number honestly — "notice v1 was displayed"
+// is true forever — where the archived copy above cannot reproduce v1's words.
+// ---------------------------------------------------------------------------
+describe('cert-render handler — language disclosure version', () => {
+  let db: BetterSQLite3Database<typeof schema>;
+
+  beforeEach(async () => {
+    const fixture = createTestDb();
+    db = fixture.db;
+    await setupSchema(fixture.sqlite);
+    await db.insert(schema.tenants).values({
+      id: TENANT_A, name: 'A', slug: 'acme', status: 'active',
+      deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+    });
+    await db.insert(schema.inspections).values({
+      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane',
+      clientEmail: 'jane@x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+      price: 0, createdAt: new Date(),
+    } as never);
+    await db.insert(schema.agreements).values({
+      id: AGR_ID, tenantId: TENANT_A, name: 'Standard', content: '<p>Agreement body</p>',
+      version: 1, createdAt: new Date(),
+    });
+    await db.insert(schema.agreementRequests).values({
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+      clientEmail: 'jane@x', clientName: 'Jane Doe',
+      token: TOKEN_A, status: 'signed',
+      signatureBase64: 'data:image/png;base64,clientsig',
+      signedAt: new Date(), createdAt: new Date(),
+    });
+    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+  });
+
+  it('reports the version the signer was shown', async () => {
+    await insertSignedSigner(db, AGREEMENT_LANGUAGE_DISCLOSURE.version);
+    const res = await certRenderHandler({} as D1Database, REQ_ID);
+    const html = await res.text();
+    expect(html).toContain(`Language notice v${AGREEMENT_LANGUAGE_DISCLOSURE.version} displayed`);
+  });
+
+  it('reports a version that is NOT the current one rather than suppressing it', async () => {
+    const superseded = AGREEMENT_LANGUAGE_DISCLOSURE.version - 1;
+    await insertSignedSigner(db, superseded);
+    const res = await certRenderHandler({} as D1Database, REQ_ID);
+    const html = await res.text();
+    expect(html).toContain(`Language notice v${superseded} displayed`);
+  });
+
+  it('says nothing when nothing was recorded — no "v0", no "none"', async () => {
+    await insertSignedSigner(db, null);
+    const res = await certRenderHandler({} as D1Database, REQ_ID);
+    const html = await res.text();
+    // Prove the roster rendered before trusting the absence.
+    expect(html).toContain('Jane Doe');
+    expect(html).not.toMatch(/Language notice/i);
   });
 });

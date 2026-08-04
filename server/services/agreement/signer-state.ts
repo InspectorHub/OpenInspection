@@ -258,6 +258,14 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
         async markSignedBySigner(presented: string, signatureBase64: string, opts: {
             signedAtMs: number; channel: 'remote' | 'in_person'; ipAddress?: string | null; userAgent?: string | null;
             onBehalfOf?: string | null; onBehalfDisclaimer?: string | null;
+            /**
+             * Which language-disclosure version this signer was SHOWN, or null
+             * when the platform did not draw the screen and so cannot say.
+             * REQUIRED and never defaulted here: only the caller knows what
+             * reached a screen, and an optional field would let a future sign
+             * surface record silence that reads like a pre-feature signature.
+             */
+            languageDisclosureVersion: number | null;
         }): Promise<{ tenantId: string; inspectionId: string; requestId: string; signerId: string; envelopeCompletedNow: boolean; envelopeStatus: string }> {
             const db = this.getDrizzle();
             const resolved = await this.getSignerByPresentedToken(presented);
@@ -282,6 +290,7 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
                     userAgent: opts.userAgent ?? null,
                     onBehalfOf: opts.onBehalfOf ?? null,
                     onBehalfDisclaimer: opts.onBehalfDisclaimer ?? null,
+                    languageDisclosureVersion: opts.languageDisclosureVersion,
                 })
                 .where(and(
                     eq(agreementSigners.id, signer.id),

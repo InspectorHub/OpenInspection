@@ -29,6 +29,6 @@ describe('AgreementService', () => {
     it('markSignedBySigner on a declined signer throws Conflict', async () => {
         const { token } = await svc.findOrCreate(TENANT_A, INSP_ID);
         await svc.markDeclinedBySigner(token);
-        await expect(svc.markSignedBySigner(token, 'sig', { signedAtMs: Date.now(), channel: 'remote' })).rejects.toThrow();
+        await expect(svc.markSignedBySigner(token, 'sig', { signedAtMs: Date.now(), channel: 'remote', languageDisclosureVersion: null })).rejects.toThrow();
     });
 });

@@ -72,6 +72,7 @@ describe('loadVerifyData — Track I-a snapshot + signers', () => {
         id: 's1', tenantId: TENANT_A, requestId: REQ_ID,
         name: 'Jane Doe', email: 'jane@x', role: 'client',
         status: 'signed', channel: 'in_person', signedAt: new Date(), createdAt: new Date(1),
+        languageDisclosureVersion: 3,
       },
       {
         id: 's2', tenantId: TENANT_A, requestId: REQ_ID,
@@ -90,6 +91,10 @@ describe('loadVerifyData — Track I-a snapshot + signers', () => {
     for (const s of data!.signers) {
       expect(s).not.toHaveProperty('email');
     }
+    // The verifier decides one thing with this: whether the page may print the
+    // current language disclosure. It is not exposed per-signer in the response.
+    expect(data!.signers[0].languageDisclosureVersion).toBe(3);
+    expect(data!.signers[1].languageDisclosureVersion).toBeNull();
   });
 
   it('exposes a NULL snapshot for pre-feature envelopes', async () => {

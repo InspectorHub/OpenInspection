@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
     AGREEMENT_LANGUAGE_DISCLOSURE as D,
     DISCLOSURE_SANITIZER_PROFILE,
+    signaturesRecordCurrentDisclosure,
 } from '../../../server/lib/legal/agreement-language-disclosure';
 import { sanitizeAgreementHtml } from '../../../server/services/agreement/sanitizer';
 
@@ -56,6 +57,82 @@ describe('agreement language disclosure', () => {
 
     it('is frozen — the copy is not a string a component may edit', () => {
         expect(Object.isFrozen(D)).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// What an EVIDENCE surface may say. The signing screen shows a person the copy
+// that exists while they are standing there — always truthful. A document
+// produced afterwards is making a claim about the past, and may only make it
+// when the record supports it.
+// ---------------------------------------------------------------------------
+describe('agreement language disclosure — what the record supports', () => {
+    it('says yes when every signature recorded the version that is live now', () => {
+        expect(signaturesRecordCurrentDisclosure([D.version])).toBe(true);
+        expect(signaturesRecordCurrentDisclosure([D.version, D.version])).toBe(true);
+    });
+
+    it('says no when a signature recorded nothing', () => {
+        // Pre-feature signatures, and the on-site API surface where the caller —
+        // not the platform — draws the screen.
+        expect(signaturesRecordCurrentDisclosure([null])).toBe(false);
+        expect(signaturesRecordCurrentDisclosure([undefined])).toBe(false);
+    });
+
+    it('says no when a signature recorded a DIFFERENT version', () => {
+        // Superseded copy is archived nowhere: a bump replaces the string. So the
+        // only alternatives for an older signature are printing nothing and
+        // printing words that signer never saw.
+        expect(signaturesRecordCurrentDisclosure([D.version - 1])).toBe(false);
+        expect(signaturesRecordCurrentDisclosure([D.version + 1])).toBe(false);
+    });
+
+    it('needs EVERY signature, not just one — the document is a single record', () => {
+        expect(signaturesRecordCurrentDisclosure([D.version, null])).toBe(false);
+        expect(signaturesRecordCurrentDisclosure([null, D.version])).toBe(false);
+    });
+
+    it('says no on an empty set — "every" is vacuously true and would be a lie', () => {
+        // A document with no signatures on it is not a document that shows what
+        // anyone was shown.
+        expect(signaturesRecordCurrentDisclosure([])).toBe(false);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Who may put a version on the record. Only a surface the PLATFORM renders can
+// state what a signer saw; an API that hands the agreement text to a caller and
+// takes back a signature knows nothing about the screen in between.
+// ---------------------------------------------------------------------------
+describe('agreement language disclosure — who may claim a version', () => {
+    const PLATFORM_RENDERED_SIGN_ROUTE = 'server/api/bookings/agreement.ts';
+    const CALLER_RENDERED_SIGN_ROUTE = 'server/api/inspections/agreements.ts';
+
+    /** The `languageDisclosureVersion:` argument each sign call passes. */
+    function versionArgIn(src: string): string | null {
+        const m = src.match(/languageDisclosureVersion:\s*([^,\n]+)/);
+        return m ? m[1].trim() : null;
+    }
+
+    it('the extractor actually extracts', () => {
+        expect(versionArgIn('  languageDisclosureVersion: null,')).toBe('null');
+        expect(versionArgIn('const x = 1;')).toBeNull();
+    });
+
+    it('the route serving the platform-drawn signing pages records the live version', () => {
+        const src = readFileSync(join(REPO_ROOT, PLATFORM_RENDERED_SIGN_ROUTE), 'utf8');
+        expect(versionArgIn(src), `${PLATFORM_RENDERED_SIGN_ROUTE} stopped recording a version`)
+            .toBe('AGREEMENT_LANGUAGE_DISCLOSURE.version');
+    });
+
+    it('the on-site API route records NOTHING — it did not draw the screen', () => {
+        // `GET /:id/agreement` hands the agreement text to a caller that renders
+        // its own surface. A version written here would assert something the
+        // platform cannot know. Give this endpoint a surface we render and the
+        // answer changes; until then null is the only true value.
+        const src = readFileSync(join(REPO_ROOT, CALLER_RENDERED_SIGN_ROUTE), 'utf8');
+        expect(versionArgIn(src), `${CALLER_RENDERED_SIGN_ROUTE} now claims a version it cannot know`)
+            .toBe('null');
     });
 });
 
@@ -251,5 +328,32 @@ describe('agreement language disclosure — containment', () => {
             expect(importsDisclosure(src), `${surface} should render the component, not the copy`)
                 .toBe(false);
         }
+    });
+
+    it('the verifier ENDPOINT decides the flag from the signed signatures only', () => {
+        // A pending signer has been shown nothing and recorded nothing. Folding it
+        // into the check would suppress the notice on a document whose actual
+        // signatories all saw it — a false negative that looks like caution.
+        const src = readFileSync(join(REPO_ROOT, 'server/api/public/verify.ts'), 'utf8');
+        expect(src).toContain('signaturesRecordCurrentDisclosure');
+        expect(
+            /languageDisclosureCurrent[\s\S]{0,400}?status\s*===\s*'signed'/.test(src),
+            'the verifier endpoint no longer restricts the check to signed signers',
+        ).toBe(true);
+    });
+
+    it('the public verifier renders the disclosure ONLY behind the record check', () => {
+        // /verify is an evidence surface, not a signing surface: it shows what
+        // was signed, to someone who was not there. Reusing the same component is
+        // right — one block, one wording — but it may only appear when the server
+        // has confirmed every signature recorded the version that is live now.
+        // The gate is a server-decided boolean precisely so this page cannot
+        // re-derive the rule and drift from the archived copy.
+        const src = readFileSync(join(REPO_ROOT, 'app/routes/public/verify.tsx'), 'utf8');
+        expect(src).toMatch(/<AgreementLanguageDisclosure\b/);
+        expect(
+            /languageDisclosureCurrent\s*&&\s*\(?\s*<AgreementLanguageDisclosure\b/.test(src),
+            'the verifier renders the disclosure unconditionally — it must be gated on languageDisclosureCurrent',
+        ).toBe(true);
     });
 });

@@ -232,6 +232,13 @@
       "when": 1785773942431,
       "tag": "0032_free_matthew_murdock",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1785803986362,
+      "tag": "0033_lumpy_calypso",
+      "breakpoints": true
     }
   ]
 }
