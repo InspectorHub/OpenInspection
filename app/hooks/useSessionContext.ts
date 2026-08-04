@@ -1,4 +1,9 @@
 import { useRouteLoaderData } from "react-router";
+import {
+  resolveDisplayPrefs,
+  type DateFormat,
+  type TimeFormat,
+} from "../../server/lib/session/display-prefs";
 
 /**
  * Session context returned by GET /api/session/context.
@@ -27,6 +32,10 @@ export interface SessionContext {
     defaultLocale: string;
     /** Tenant transaction/display currency (ISO 4217; 'USD' when unset). */
     currency: string;
+    /** Tenant default date order — see #270. Never null; 'us' when unset. */
+    dateFormat: DateFormat;
+    /** Tenant default clock — see #270. Never null; '12h' when unset. */
+    timeFormat: TimeFormat;
   };
   user: {
     name: string | null;
@@ -37,6 +46,10 @@ export interface SessionContext {
     timezone: string | null;
     /** Per-user locale override (BCP-47), or null to inherit the tenant. */
     locale: string | null;
+    /** Per-user date-order override, or null to inherit the tenant (#270). */
+    dateFormat: DateFormat | null;
+    /** Per-user clock override, or null to inherit the tenant (#270). */
+    timeFormat: TimeFormat | null;
   };
   deployment: {
     mode: string;
@@ -88,4 +101,39 @@ export function useDisplayLocale(): string {
 export function useDisplayCurrency(): string {
   const ctx = useSessionContext();
   return ctx?.branding.currency || "USD";
+}
+
+/**
+ * The viewer's effective date order and clock (#270) — user override, else
+ * tenant default, else 'us' + '12h', decided PER FIELD. Mirrors
+ * useDisplayTimeZone: no context (outside the auth layout, or the fetch failed)
+ * yields the defaults rather than throwing, so the chrome always renders.
+ *
+ * This is WORKSPACE CHROME only. Anything a second party also reads —
+ * inspection dates, report dates, appointment times — must resolve from the
+ * tenant alone, because the inspector, the client and the agent discuss one
+ * inspection out loud and must say the same date.
+ */
+export function useDisplayFormatPrefs(): { dateFormat: DateFormat; timeFormat: TimeFormat } {
+  const ctx = useSessionContext();
+  return resolveDisplayPrefs(ctx?.user, ctx?.branding);
+}
+
+/** The viewer's effective date order (#270). See useDisplayFormatPrefs. */
+export function useDisplayDateFormat(): DateFormat {
+  return useDisplayFormatPrefs().dateFormat;
+}
+
+/** The viewer's effective clock (#270). See useDisplayFormatPrefs. */
+export function useDisplayTimeFormat(): TimeFormat {
+  return useDisplayFormatPrefs().timeFormat;
+}
+
+/**
+ * The TENANT's date order and clock, ignoring any personal override — the
+ * resolution for inspection / report / appointment rendering.
+ */
+export function useTenantFormatPrefs(): { dateFormat: DateFormat; timeFormat: TimeFormat } {
+  const ctx = useSessionContext();
+  return resolveDisplayPrefs(null, ctx?.branding);
 }

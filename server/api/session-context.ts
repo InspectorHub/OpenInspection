@@ -4,6 +4,13 @@ import { and, eq } from 'drizzle-orm';
 import { users, tenantConfigs, tenants } from '../lib/db/schema';
 import { getSeatUsage } from '../features/seat-quota';
 import { resolveLocale } from '../lib/locale';
+import {
+    DEFAULT_DISPLAY_PREFS,
+    isDateFormat,
+    isTimeFormat,
+    type DateFormat,
+    type TimeFormat,
+} from '../lib/session/display-prefs';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { mcpEnabled } from '../lib/mcp/flag';
@@ -42,6 +49,12 @@ const sessionContextRoutes = createApiRouter()
         let userEmail: string | null = null;
         let userTimezone: string | null = null;
         let userLocale: string | null = null;
+        // #270 — the raw stored values, not the resolved pair: the client hook
+        // owns resolution, exactly as it already does for timezone and locale.
+        let userDateFormat: DateFormat | null = null;
+        let userTimeFormat: TimeFormat | null = null;
+        let tenantDateFormat: DateFormat = DEFAULT_DISPLAY_PREFS.dateFormat;
+        let tenantTimeFormat: TimeFormat = DEFAULT_DISPLAY_PREFS.timeFormat;
         let tenantTimezone = 'UTC';
         let tenantLocale = 'en-US';
         let tenantCurrency = 'USD';
@@ -54,7 +67,14 @@ const sessionContextRoutes = createApiRouter()
         if (tenantId) {
             try {
                 const db = getDrizzle(c);
-                const row = await db.select({ name: users.name, email: users.email, timezone: users.timezone, locale: users.locale })
+                const row = await db.select({
+                    name: users.name,
+                    email: users.email,
+                    timezone: users.timezone,
+                    locale: users.locale,
+                    dateFormat: users.dateFormat,
+                    timeFormat: users.timeFormat,
+                })
                     .from(users)
                     .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
                     .get();
@@ -63,11 +83,15 @@ const sessionContextRoutes = createApiRouter()
                     userEmail = row.email;
                     userTimezone = row.timezone;
                     userLocale = row.locale;
+                    userDateFormat = isDateFormat(row.dateFormat) ? row.dateFormat : null;
+                    userTimeFormat = isTimeFormat(row.timeFormat) ? row.timeFormat : null;
                 }
                 const cfg = await db.select({
                     defaultTimezone: tenantConfigs.defaultTimezone,
                     defaultLocale: tenantConfigs.defaultLocale,
                     currency: tenantConfigs.currency,
+                    dateFormat: tenantConfigs.dateFormat,
+                    timeFormat: tenantConfigs.timeFormat,
                     // IA-100 — the contacts archive dialog states whether
                     // archiving also revokes report links, so it needs the
                     // policy, not just the link count.
@@ -82,6 +106,8 @@ const sessionContextRoutes = createApiRouter()
                 if (cfg?.defaultTimezone) tenantTimezone = cfg.defaultTimezone;
                 tenantLocale = resolveLocale(cfg?.defaultLocale);
                 if (cfg?.currency) tenantCurrency = cfg.currency;
+                if (isDateFormat(cfg?.dateFormat)) tenantDateFormat = cfg.dateFormat;
+                if (isTimeFormat(cfg?.timeFormat)) tenantTimeFormat = cfg.timeFormat;
                 archiveRevokesAccess = cfg?.archiveRevokesAccess ?? false;
                 legalCfg = cfg
                     ? {
@@ -221,6 +247,8 @@ const sessionContextRoutes = createApiRouter()
                     defaultLocale: tenantLocale,
                     currency: tenantCurrency,
                     archiveRevokesAccess,
+                    dateFormat: tenantDateFormat,
+                    timeFormat: tenantTimeFormat,
                 },
                 user: {
                     name: userName,
@@ -229,6 +257,8 @@ const sessionContextRoutes = createApiRouter()
                     initials,
                     timezone: userTimezone,
                     locale: userLocale,
+                    dateFormat: userDateFormat,
+                    timeFormat: userTimeFormat,
                 },
                 deployment: {
                     mode: profile.mode || 'standalone',
