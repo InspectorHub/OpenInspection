@@ -20,9 +20,9 @@ import { Errors } from '../lib/errors';
 /** Accepts the D1 drizzle instance in production and better-sqlite3 in tests. */
 type AnyDb = DrizzleD1Database<Record<string, unknown>> | { [k: string]: unknown };
 
-export type PaymentKind = 'deposit' | 'balance' | 'adjustment' | 'refund';
-export type PaymentMethodKind = 'card' | 'check' | 'cash' | 'offline' | 'other';
-export type PaymentProvider = 'stripe' | 'qbo';
+type PaymentKind = 'deposit' | 'balance' | 'adjustment' | 'refund';
+type PaymentMethodKind = 'card' | 'check' | 'cash' | 'offline' | 'other';
+type PaymentProvider = 'stripe' | 'qbo';
 
 export interface PaymentEntry {
     /** The order the money is against. Resolved from the invoice when omitted. */

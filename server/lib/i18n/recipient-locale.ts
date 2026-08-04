@@ -29,7 +29,7 @@ import { resolveContactLocale, type ContactLocale } from './contact-locale';
  * lands on the tenant default, so the caller must decide it from the role key,
  * not from the shape of the id.
  */
-export interface RecipientRef {
+interface RecipientRef {
     kind: 'user' | 'contact';
     id: string;
 }

@@ -29,7 +29,7 @@ import type { automations, inspections } from '../../lib/db/schema';
  * read here would be a silent mistranslation, not a type error, so the type
  * system is asked to make it one.
  */
-export function noticeTitleFor(
+function noticeTitleFor(
     event: string,
     insp: typeof inspections.$inferSelect,
     locale: ContactLocale,
