@@ -122,5 +122,10 @@
   "settings_inspection_report_link_bulk_lift_confirm": "Esto quita el vencimiento de {count} enlaces de informe que hoy funcionan, por lo que quedan abiertos indefinidamente. Los enlaces que ya vencieron o fueron revocados siguen cerrados.",
   "settings_inspection_report_link_bulk_done": "Se actualizaron {count} enlaces.",
   "settings_inspection_archive_revokes_label": "Archivar un contacto también revoca sus enlaces de informe",
-  "settings_inspection_archive_revokes_help": "Desactivado de forma predeterminada. Un enlace de informe funciona sin cuenta, así que archivar un contacto normalmente deja legibles los informes que se le dieron. Actívelo si archivar es la forma en que usted da de baja a alguien."
+  "settings_inspection_archive_revokes_help": "Desactivado de forma predeterminada. Un enlace de informe funciona sin cuenta, así que archivar un contacto normalmente deja legibles los informes que se le dieron. Actívelo si archivar es la forma en que usted da de baja a alguien.",
+  "settings_event_types_col_followup": "Seguimiento",
+  "settings_event_types_followup_hours": "{hours} h",
+  "settings_event_types_followup_immediate": "De inmediato",
+  "settings_event_types_followup_label": "Retraso del seguimiento (horas)",
+  "settings_event_types_followup_hint": "Horas que pasan desde que se completa una visita hasta que sale su seguimiento. 0 lo envía de inmediato."
 }

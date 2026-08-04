@@ -122,5 +122,10 @@
   "settings_inspection_report_link_bulk_lift_confirm": "This removes the expiry from {count} report links that work today, so they stay open indefinitely. Links that have already expired or been revoked stay closed.",
   "settings_inspection_report_link_bulk_done": "Updated {count} links.",
   "settings_inspection_archive_revokes_label": "Archiving a contact also revokes their report links",
-  "settings_inspection_archive_revokes_help": "Off by default. A report link works without an account, so archiving a contact normally leaves the reports they were given readable. Turn this on if archiving is how you offboard someone."
+  "settings_inspection_archive_revokes_help": "Off by default. A report link works without an account, so archiving a contact normally leaves the reports they were given readable. Turn this on if archiving is how you offboard someone.",
+  "settings_event_types_col_followup": "Follow-up",
+  "settings_event_types_followup_hours": "{hours} h",
+  "settings_event_types_followup_immediate": "Immediately",
+  "settings_event_types_followup_label": "Follow-up delay (hours)",
+  "settings_event_types_followup_hint": "Hours after a visit is completed before its follow-up goes out. 0 sends it immediately."
 }
