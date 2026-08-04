@@ -4,10 +4,17 @@
  * Server-side i18n has a constraint the client does not: a notification is
  * rendered FOR a recipient, whose locale is not the request's locale, and in a
  * cron or queue context there is no request at all — `getLocale()` returns
- * `baseLocale`. Recipient-locale resolution is a separate piece of work. Until
- * it lands, every message read through here resolves in the ambient locale,
- * which for notifications means English. Routing this through one module means
- * that change touches one file rather than every call site.
+ * `baseLocale`.
+ *
+ * **Every recipient-facing read through here MUST pass an explicit locale** —
+ * `m.some_message({ ...inputs }, { locale })` — resolved from the recipient via
+ * `recipient-locale.ts`. Paraglide's message functions fall back to `getLocale()`
+ * when the option is omitted, and on this side of the app that default is not a
+ * sensible one: it is a silent mistranslation in exactly the firings nobody
+ * tests, because a cron sweep and a queue consumer both answer `baseLocale` no
+ * matter who is reading. The one place that renders such a string today
+ * (`automation/trigger.ts#titleFor`) takes the locale as a REQUIRED parameter so
+ * that omitting it is a type error rather than an invisible one.
  *
  * Why the disable below, and why it does not weaken the BFF boundary: the rule
  * stops `server/` depending on `app/` because `app/` is loaders, components and
