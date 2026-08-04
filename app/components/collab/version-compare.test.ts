@@ -8,6 +8,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createElement, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+
+// #270 — the panel reads the TENANT's zone + date shape, and those hooks bottom
+// out in `useRouteLoaderData`, which invariants in this router-free harness.
+// Kept identical to version-history-panel.test.ts: both suites render the same
+// component, so a stub added to one and not the other only looks green.
+vi.mock('~/hooks/useSessionContext', () => ({
+  useDisplayTimeZone: () => 'UTC',
+  useInspectionDateTimeFormat: () => ({ locale: 'en-US', dateFormat: 'us', timeFormat: '12h' }),
+}));
+
 import { VersionCompare } from '~/components/collab/VersionCompare';
 import { VersionHistoryPanel } from '~/components/collab/VersionHistoryPanel';
 import type { FindingDiff } from '~/lib/collab/snapshot-diff';
