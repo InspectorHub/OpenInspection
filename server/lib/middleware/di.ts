@@ -161,9 +161,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                 case 'ai':
                     target.ai = new AIService(
                         c.env.DB,
-                        // Bring-your-own-key: the Gemini key comes solely from the
-                        // tenant's own bound key (Settings → Advanced → AI), never a
-                        // shared platform env key — applies to SaaS and standalone.
+                        // The tenant's own bound key (Settings → Advanced → AI) —
+                        // always wins, and still the ONLY credential reaching the
+                        // service until managed access is granted (see buildAiMeter).
                         emailCfg.dbSecrets.geminiApiKey || '',
                         // Sprint 1 A-4: pass effective deployment mode so the
                         // service can return dev-mock suggestions when the

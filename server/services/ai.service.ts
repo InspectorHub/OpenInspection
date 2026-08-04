@@ -8,6 +8,19 @@ import type { AiUsageKind } from '../lib/usage/period';
 /**
  * Service to handle AI-powered features using Google Gemini.
  *
+ * CREDENTIALS COME FROM ONE OF TWO SOURCES, not one. A tenant's own stored key
+ * (Settings → Advanced → AI) always wins and is unchanged by anything below.
+ * Where the deployment profile permits it (`hasManagedAi` — saas only), a
+ * deployment-provided key may serve tenants granted managed access instead;
+ * that grant is a boolean this service is handed, never a decision it makes.
+ * In standalone the managed path does not exist at all, so it remains the
+ * tenant's key or nothing, exactly as before. Selection lives in
+ * `lib/ai/resolve-provider.ts` — this class does not re-derive it.
+ *
+ * This paragraph replaces a "strictly bring-your-own-key" statement that the
+ * managed path contradicts; without the correction the next reader treats that
+ * path as a regression and deletes it.
+ *
  * Sprint 1 A-4: when running in `standalone` mode without a Gemini API key,
  * `suggestComment` returns dev-mock suggestions so local development can
  * exercise the UI flow end-to-end. Production deploys (`saas` mode or
