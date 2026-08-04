@@ -128,8 +128,10 @@ api.post('/sync', async (c) => {
     c.executionCtx.waitUntil(
         svc.runCDCSync(
             tenantId,
-            (invoiceId, tid) => invoiceSvc.markPaid(invoiceId, tid, 'qbo'),
-            (invoiceId, amountPaidCents, tid) => invoiceSvc.markPartial(invoiceId, tid, 'qbo', amountPaidCents),
+            // Inbound: the row appended is dropped on purpose — QuickBooks is
+            // where this figure came from, so it must not be pushed back.
+            async (invoiceId, tid) => { await invoiceSvc.markPaid(invoiceId, tid, 'qbo'); },
+            async (invoiceId, amountPaidCents, tid) => { await invoiceSvc.markPartial(invoiceId, tid, 'qbo', amountPaidCents); },
         ),
     );
     return c.json({ success: true, data: { message: 'Sync started' } });

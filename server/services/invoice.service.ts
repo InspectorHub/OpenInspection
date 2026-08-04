@@ -13,6 +13,7 @@ import {
     getNetReceivedCents,
     seedLedgerFromInvoiceRecord,
 } from './payment-ledger.service';
+import type { AppendedPayment } from './payment-ledger.service';
 
 function getStatus(inv: { sentAt: Date | null; paidAt: Date | null; partialPaidAt?: Date | null; voidedAt?: Date | null }): 'draft' | 'sent' | 'paid' | 'partial' | 'void' {
     if (inv.voidedAt) return 'void';
@@ -146,14 +147,22 @@ export class InvoiceService {
      * Mark an invoice paid in full. Appends the outstanding remainder to the
      * payment ledger; the invoice's paid/partial/amount columns are then
      * recomputed from the ledger by its single writer, never set here.
+     *
+     * Returns the ledger row appended, or `null` when nothing was — an already
+     * paid invoice, or one the ledger already covers. A caller pushing to an
+     * external book of record must use that row's amount and id: the amount is
+     * the REMAINDER collected on this occasion, which stops being the invoice
+     * total the moment a deposit exists.
      */
-    async markPaid(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi', method?: PaymentMethod): Promise<void> {
+    async markPaid(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi', method?: PaymentMethod): Promise<AppendedPayment | null> {
         const db = this.getDrizzle();
         const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Invoice not found');
         // Idempotency: webhooks redeliver. A paid invoice stays paid with its
-        // ORIGINAL timestamp — no double accounting, no date drift.
-        if (existing.paidAt) return;
+        // ORIGINAL timestamp — no double accounting, no date drift. Returning
+        // null here is also what keeps a redelivery out of QuickBooks entirely,
+        // rather than relying on their side to collapse a repeated requestid.
+        if (existing.paidAt) return null;
 
         // Record how it was paid; keep any existing value if the caller omits one.
         const paymentMethod = method ?? existing.paymentMethod ?? null;
@@ -163,20 +172,20 @@ export class InvoiceService {
         }
 
         const outstanding = existing.amountCents - await getNetReceivedCents(db, tenantId, id);
+        void source; // consumed by route handler to decide QBO sync
         if (outstanding > 0) {
-            await recordPayment(db, tenantId, {
+            return recordPayment(db, tenantId, {
                 invoiceId: id,
                 inspectionId: existing.inspectionId,
                 kind: 'balance',
                 amountCents: outstanding,
                 method: paymentMethod ?? 'offline',
             });
-        } else {
-            // Nothing left to collect (a zero-total invoice, or the ledger
-            // already covers it) — the cache still has to catch up.
-            await recomputeInvoicePaymentState(db, tenantId, id);
         }
-        void source; // consumed by route handler to decide QBO sync
+        // Nothing left to collect (a zero-total invoice, or the ledger
+        // already covers it) — the cache still has to catch up.
+        await recomputeInvoicePaymentState(db, tenantId, id);
+        return null;
     }
 
     /**
@@ -195,8 +204,11 @@ export class InvoiceService {
      * The ledger row appended is the DELTA between the reported cumulative
      * figure and what the ledger already holds, so a repeated sync of the same
      * figure appends nothing and a figure that went DOWN records a refund.
+     *
+     * Returns the appended row (or `null` when the figure had not moved) on the
+     * same contract as `markPaid`.
      */
-    async markPartial(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi', amountPaidCents: number): Promise<void> {
+    async markPartial(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi', amountPaidCents: number): Promise<AppendedPayment | null> {
         const db = this.getDrizzle();
         const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Invoice not found');
@@ -204,9 +216,9 @@ export class InvoiceService {
         const delta = amountPaidCents - await getNetReceivedCents(db, tenantId, id);
         if (delta === 0) {
             await recomputeInvoicePaymentState(db, tenantId, id);
-            return;
+            return null;
         }
-        await recordPayment(db, tenantId, {
+        return recordPayment(db, tenantId, {
             invoiceId: id,
             inspectionId: existing.inspectionId,
             kind: delta > 0 ? 'balance' : 'refund',

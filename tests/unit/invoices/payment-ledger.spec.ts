@@ -230,8 +230,12 @@ describe('payment ledger — idempotency', () => {
         const first = await recordPayment(db, TENANT, entry);
         const second = await recordPayment(db, TENANT, entry);   // webhook redelivery
 
-        expect(first).toBe(true);
-        expect(second).toBe(false);
+        // The return value is the appended ROW, because an external book of
+        // record has to be told the amount that moved and keyed on the fact —
+        // and told nothing at all when the fact turns out to be a redelivery.
+        expect(first).toMatchObject({ kind: 'balance', amountCents: 45000, occurredAt: T1 });
+        expect(first?.id).toEqual(expect.any(String));
+        expect(second).toBeNull();
         expect(await countLedgerRows()).toBe(1);
         expect((await getInvoice()).amountPaidCents).toBe(45000);
     });
@@ -259,6 +263,6 @@ describe('payment ledger — idempotency', () => {
         await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 100, method: 'card', provider: 'stripe', providerRef: 'pi_shared', occurredAt: T1 });
         const other = await recordPayment(db, 'tenant-two', { invoiceId: 'inv-other', kind: 'balance', amountCents: 100, method: 'card', provider: 'stripe', providerRef: 'pi_shared', occurredAt: T1 });
 
-        expect(other).toBe(true);
+        expect(other).toMatchObject({ amountCents: 100 });
     });
 });

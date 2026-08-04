@@ -181,23 +181,27 @@ const invoiceRoutes = createApiRouter()
         const { method } = c.req.valid('json');
         const tenantId = c.get('tenantId');
         const paymentMethod = normalizePaymentMethod(method);
-        await c.var.services.invoice.markPaid(id, tenantId, 'oi', paymentMethod);
+        const appended = await c.var.services.invoice.markPaid(id, tenantId, 'oi', paymentMethod);
 
-        const inv = (await c.var.services.invoice.listInvoices(tenantId)).find(
-            (i: Awaited<ReturnType<typeof c.var.services.invoice.listInvoices>>[number]) => i.id === id,
-        );
+        const inv = await c.var.services.invoice.findById(tenantId, id);
         // Manual payment must also close the report's payment gate (markPaid only
         // touches the invoice row; the gate reads inspections.paymentStatus).
         if (inv?.inspectionId) {
             await c.var.services.inspection.markPaymentReceived(tenantId, inv.inspectionId);
         }
-        if (c.env.QBO_CLIENT_ID && inv) {
+        // What goes to QuickBooks is the ROW that was appended — the remainder
+        // collected on this occasion — not the invoice total. Once a $90 deposit
+        // exists on a $450 invoice, pushing the total books $450 against an
+        // invoice that only just received $360, and the deposit push already
+        // there makes $540 of recorded revenue out of $450 of money.
+        //
+        // No row appended (already paid, or the ledger already covers it) means
+        // nothing happened, so there is nothing to tell them about.
+        if (c.env.QBO_CLIENT_ID && appended) {
             c.executionCtx.waitUntil(
-                // Same key the Stripe webhook uses, deliberately: an invoice
-                // settled online and then also marked paid by hand is ONE
-                // payment, and QBO collapses the second push on the repeated
-                // requestid instead of booking it twice.
-                c.var.services.qbo.recordPayment(tenantId, id, inv.amountCents / 100, qboPaymentKey(id)),
+                c.var.services.qbo.recordPayment(
+                    tenantId, id, appended.amountCents / 100, qboPaymentKey(appended.id),
+                ),
             );
         }
         return c.json({ success: true }, 200);

@@ -81,8 +81,10 @@ async function runQBOCDC(env: ScheduledEnv): Promise<void> {
         try {
             const { processed } = await svc.runCDCSync(
                 conn.tenantId,
-                (invoiceId, tid) => invoiceSvc.markPaid(invoiceId, tid, 'qbo'),
-                (invoiceId, amountPaidCents, tid) => invoiceSvc.markPartial(invoiceId, tid, 'qbo', amountPaidCents),
+                // Inbound: the row appended is dropped on purpose — QuickBooks
+                // is where this figure came from, so it must not be pushed back.
+                async (invoiceId, tid) => { await invoiceSvc.markPaid(invoiceId, tid, 'qbo'); },
+                async (invoiceId, amountPaidCents, tid) => { await invoiceSvc.markPartial(invoiceId, tid, 'qbo', amountPaidCents); },
             );
             if (processed > 0) logger.info('[cron:qbo] CDC processed invoices', { tenantId: conn.tenantId, processed });
         } catch (e) {

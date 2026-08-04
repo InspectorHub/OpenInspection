@@ -43,21 +43,37 @@ export interface PaymentEntry {
     occurredAt?: Date;
 }
 
+/**
+ * The row that was actually appended. This is the unit an external book of
+ * record is told about: its `amountCents` is what moved on this occasion — not
+ * the invoice total — and its `id` names the fact, so a retry of the same
+ * append pushes under the same key instead of booking a second payment.
+ */
+export interface AppendedPayment {
+    id: string;
+    kind: PaymentKind;
+    /** ALWAYS POSITIVE, like `PaymentEntry.amountCents`. */
+    amountCents: number;
+    occurredAt: Date;
+}
+
 /** Receipts add, refunds subtract. Nothing else is a direction. */
 const signOf = (kind: PaymentKind): 1 | -1 => (kind === 'refund' ? -1 : 1);
 
 /**
  * Append one payment and refresh the invoice cache it affects.
  *
- * Returns `true` when a row was appended and `false` when the entry was a
- * redelivery of one already recorded — the caller can log the difference, which
- * is the whole reason this is not `void`.
+ * Returns the appended row, or `null` when the entry was a redelivery of one
+ * already recorded — which is the whole reason this is not `void`. A caller
+ * that pushes to an external ledger must key that push off the RETURN VALUE and
+ * never off its own arguments: only this function knows whether a row came into
+ * existence, and only the row it returns carries the amount that moved.
  */
 export async function recordPayment(
     rawDb: AnyDb,
     tenantId: string,
     entry: PaymentEntry,
-): Promise<boolean> {
+): Promise<AppendedPayment | null> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = rawDb as any;
 
@@ -94,12 +110,14 @@ export async function recordPayment(
                 eq(orderPayments.providerRef, entry.providerRef),
             ))
             .get();
-        if (dup) return false;
+        if (dup) return null;
     }
 
     const now = new Date();
+    const id = crypto.randomUUID();
+    const occurredAt = entry.occurredAt ?? now;
     await db.insert(orderPayments).values({
-        id: crypto.randomUUID(),
+        id,
         tenantId,
         inspectionId,
         invoiceId,
@@ -111,12 +129,12 @@ export async function recordPayment(
         recordedBy: entry.recordedBy ?? null,
         refundsId: entry.refundsId ?? null,
         note: entry.note ?? null,
-        occurredAt: entry.occurredAt ?? now,
+        occurredAt,
         createdAt: now,
     }).onConflictDoNothing();
 
     if (invoiceId) await recomputeInvoicePaymentState(db, tenantId, invoiceId);
-    return true;
+    return { id, kind: entry.kind, amountCents: entry.amountCents, occurredAt };
 }
 
 /** Ledger rows for one invoice, projected to the three columns arithmetic needs. */
