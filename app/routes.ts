@@ -130,6 +130,10 @@ export default [
     // reproducing this layout's container by hand, which is now removed.
     route("inspections/:id", "routes/inspector-portal.tsx"),
     route("calendar", "routes/calendar.tsx"),
+    // Day-centric dispatch board. Static `dispatch` sits under the calendar
+    // path but is its own route, not a mode of /calendar: the audience is
+    // narrower (scheduleOthers, enforced server-side) and so is the data.
+    route("calendar/dispatch", "routes/calendar-dispatch.tsx"),
     route("contacts", "routes/contacts.tsx"),
     // IA-18 (#111) — contact detail (record + inspection history + stats).
     route("contacts/:id", "routes/contact-detail.tsx"),

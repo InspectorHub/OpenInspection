@@ -7071,6 +7071,34 @@
     "description": "Returns the contact record, its inspection history (newest first; clients match via clientContactId or legacy clientEmail, agents via referredByAgentId or sellingAgentId), and aggregate stats (inspection count + total paid-invoice revenue in cents)."
   },
   {
+    "operationId": "getDispatchBoard",
+    "method": "GET",
+    "pathTemplate": "/api/calendar/dispatch",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "date",
+          "in": "query",
+          "required": false,
+          "description": "Civil date the board shows. Omit for today IN THE TENANT TIMEZONE — the server resolves it, because the caller does not know the zone before this call returns.",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Civil date the board shows. Omit for today IN THE TENANT TIMEZONE — the server resolves it, because the caller does not know the zone before this call returns."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Dispatch board feed for one day",
+    "description": "Returns the inspector roster, every calendar item on the given civil date, the unassigned subset, and the tenant booking_conflict_policy in a single response."
+  },
+  {
     "operationId": "getEmailTemplate",
     "method": "GET",
     "pathTemplate": "/api/admin/email-templates/{trigger}",

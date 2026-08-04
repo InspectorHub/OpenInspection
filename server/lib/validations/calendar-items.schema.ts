@@ -68,6 +68,36 @@ export const CalendarItemsResponseSchema = z.object({
     }),
 });
 
+/**
+ * Dispatch board feed — the same items, one day, plus the two things a board
+ * needs that a calendar does not: WHO the columns are, and what the tenant
+ * wants done about a double-booking.
+ */
+export const DispatchBoardQuerySchema = z.object({
+    date: CivilDateSchema.optional()
+        .describe('Civil date the board shows. Omit for today IN THE TENANT TIMEZONE — the server resolves it, because the caller does not know the zone before this call returns.'),
+});
+
+const DispatchInspectorSchema = z.object({
+    id: z.string().describe('User id — the column key and the leadInspectorId a drag sends.'),
+    name: z.string().nullable().describe('Display name; null falls back to the email.'),
+    email: z.string().describe('Login email.'),
+    role: z.string().describe('Tenant role.'),
+});
+
+export const DispatchBoardResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({
+        date: CivilDateSchema.describe('The civil date actually rendered (echoes the query, or today in the tenant timezone).'),
+        conflictPolicy: z.enum(['advisory', 'block'])
+            .describe('Tenant booking_conflict_policy. `block` means the reschedule endpoint will refuse an overlapping drop with 409, so the board warns BEFORE the round trip.'),
+        inspectors: z.array(DispatchInspectorSchema).describe('One board column each, sorted by display name.'),
+        items: z.array(CalendarItemSchema).describe('Every calendar item on that day, for all inspectors.'),
+        unassigned: z.array(CalendarItemSchema)
+            .describe('The subset of `items` that are inspections with nobody on them — the unassigned lane. A SUBSET, not a disjoint list: an item here also appears in `items`.'),
+    }),
+});
+
 export const CalendarItemsErrorSchema = z.object({
     success: z.literal(false),
     error: z.object({
