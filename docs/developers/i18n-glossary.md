@@ -412,6 +412,41 @@ Fixed while translating `settings-catalog.json` (123 keys). These recur in
 | Sort order | Orden de clasificación | — | |
 | Report link expiry | Vencimiento del enlace del informe | — | *Vencimiento*, matching Expired → *Vencido*. The bulk actions are phrased as *Aplicar vencimiento a…* / *Quitar vencimiento de…*: Spanish *vencer* is intransitive, so "Expire N links" has no verb-for-verb rendering. |
 
+### Scheduling, providers and integration panels
+
+Fixed while translating `settings-components.json` (491 keys), the largest
+module in the catalogue. It is where the product talks to Google, Stripe,
+Twilio, Telnyx and four email vendors, so it also fixes how third-party text is
+handled.
+
+**Rule 7 applies heavily here, and extends to third-party navigation.** A menu
+path into someone else's product (`Stripe → Developers → Webhooks`,
+`Twilio Console → Account Info`, `Account → Customer subdomain`), the label of a
+button the user must click *in that product* (`Send test event`), a credential
+field name (`Twilio Account SID`, `Auth Token`), a key prefix (`pk_test_`,
+`whsec_`, `SG.`), a format sample (`+15551234567`, `acct_1AbCdEfGhIjKlMnO`,
+`customer.cloudflarestream.com`) and the SMS keywords carriers match on
+(**STOP / START / HELP**) all stay English. Translate the prose around them. The
+STOP/HELP case is not cosmetic: those are the words a consumer texts back, and a
+translated one would be a compliance failure, not a typo.
+
+<!-- gate:terms -->
+
+| English | es-419 | Never | Why |
+|---|---|---|---|
+| Holiday | feriado | festivo | *Festivo* is Castilian; `es-419` says *feriado*. "Company holidays" → *Feriados de la empresa*. |
+| Time off | Ausencias | — | Plural, because the panel lists blocks. *Tiempo libre* is leisure, not a scheduled absence. |
+| Tenant (the SaaS account) | cuenta | — | Deliberately **not** *inquilino*. In a product whose subject is somebody's house, *inquilino* is the person renting it — the same collision the Owner row avoids. Not machine-banned: a future English string about an actual occupant would need the word. |
+| Failed (a test / a delivery) | Fallido | — | Masculine singular by the status-label rule; the verb *Falló* is used in sentences (*Falló la sincronización del calendario.*). |
+| Not connected / Not configured | Sin conectar / Sin configurar | — | The *Sin …* shape, matching *Sin definir*. Reserve *No …* for sentences. |
+| Qualified (inspectors) | autorizados | — | Not *calificados*: this catalogue already spends *calificación* on Rating, and "inspectores calificados" reads as *rated* inspectors to anyone who has seen the editor. *Autorizados* also states what the checkbox does — the help text below it says "allow all staff". |
+| Light / Dark (theme) | Claro / Oscuro | — | |
+| Live / Test (Stripe key mode) | Producción / Prueba | — | |
+| Carrier | operador | — | The mobile carrier. |
+| Concierge review | revisión previa | conserjería | *Conserjería* is a doorman's desk. The English is internal jargon for "the office approves it first", which is what the Spanish says. |
+| Slot | horario | — | A bookable start time. "Slot rules" → *Reglas de horarios*, "Slot interval" → *Intervalo entre horarios*. |
+| Weekday names | Domingo … Sábado | — | Capitalised, because each is a standalone row label and buttons/labels take sentence case. Spanish lowercases weekdays mid-sentence; nothing in this catalogue puts one mid-sentence. |
+
 ## Register enforcement
 
 Every entry here is wrong in `es-419` in every context, which is what makes it
@@ -442,9 +477,21 @@ Where the same English genuinely needs two Spanish renderings — usually gender
 agreement, or a word that is a noun in one place and a verb in another — list
 the keys here with the reason, and the gate will allow it.
 
+**Put every key sharing that English on the bullet's first line.** The parser
+reads keys only from lines that begin with `-`, so keys wrapped onto a
+continuation line are dropped, and a divergence missing one of its keys does not
+apply at all.
+
 <!-- gate:divergence -->
 
-*(No declared divergences yet. Add them as `- \`key_one\`, \`key_two\` — reason.)*
+- `settings_team_resend_invite`, `settings_integrations_resend_name`, `settings_email_provider_resend` — English "Resend" is two unrelated things.
+  On the team page it is the verb (send the invite again) and must be
+  *Reenviar*. In the integrations catalogue and the email-provider select it is
+  **Resend the company**, the transactional email vendor, and rule 3 forbids
+  translating a product name — *Reenviar* there would name a provider that does
+  not exist. The two readings never share a surface.
+
+*(Add further divergences as `- \`key_one\`, \`key_two\` — reason.)*
 
 ## Working through a module
 
