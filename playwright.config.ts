@@ -154,6 +154,13 @@ export default defineConfig({
             testMatch: 'public-pages-responsive.spec.ts',
         },
         {
+            // #269 — i18n activation. Pre-auth only (/login), so it needs no D1
+            // seed and no dependency on another project: the whole point is
+            // that the locale resolves from the request alone.
+            name: 'locale-activation',
+            testMatch: 'locale-activation.spec.ts',
+        },
+        {
             // Sprint 1 D-8 — report-gate end-to-end (auth + payment + agreement
             // gates). Depends on browser project to ensure user is created.
             name: 'gates',
