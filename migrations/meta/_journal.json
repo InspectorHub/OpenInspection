@@ -267,6 +267,13 @@
       "when": 1785846007839,
       "tag": "0037_many_luke_cage",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1785884007195,
+      "tag": "0038_nasty_patriot",
+      "breakpoints": true
     }
   ]
 }

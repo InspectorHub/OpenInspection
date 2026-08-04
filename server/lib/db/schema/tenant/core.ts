@@ -253,6 +253,17 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Appended at END of the table per the D1 add-column-at-end rule.
     dateFormat: text('date_format', { enum: ['us', 'iso', 'eu'] }).notNull().default('us'),
     timeFormat: text('time_format', { enum: ['12h', '24h'] }).notNull().default('12h'),
+    // How internal scheduling treats a DOUBLE-BOOKING — the same inspector
+    // already busy at the proposed instant. Sibling of `holidayInternalPolicy`,
+    // which answers the same question for a closed DAY; the two are independent
+    // (a tenant may block holidays but tolerate overlaps, or the reverse).
+    // `advisory` = warn and save (today's behavior everywhere, so it is the
+    // default); `block` = refuse the write. Read by the reschedule endpoint and
+    // by the dispatch board, which shows the conflict list either way.
+    // Appended at END of the table per the D1 add-column-at-end rule.
+    bookingConflictPolicy: text('booking_conflict_policy', {
+        enum: ['advisory', 'block'],
+    }).notNull().default('advisory'),
 });
 
 /**

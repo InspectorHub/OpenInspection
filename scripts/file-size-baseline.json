@@ -10,7 +10,7 @@
   "server/api/sms.ts": 843,
   "app/components/portal/sections/ReportView.tsx": 813,
   "app/routes/settings-communication.tsx": 777,
-  "server/api/admin/admin-settings.ts": 748,
+  "server/api/admin/admin-settings.ts": 754,
   "server/services/inspection.service.ts": 741,
   "server/api/inspections/report-delivery.ts": 736,
   "server/services/inspection/inspection-analytics.service.ts": 729,

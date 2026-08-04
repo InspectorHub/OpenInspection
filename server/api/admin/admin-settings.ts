@@ -140,6 +140,7 @@ const TenantConfigGetResponseSchema = z.object({
         holidayRegion: z.string().nullable().describe('Holiday catalog region (US / US-{ST}) or null when catalog is off.'),
         holidayPublicPolicy: z.enum(['open', 'block', 'advisory']).describe('Public booking policy for catalog closed dates.'),
         holidayInternalPolicy: z.enum(['advisory', 'block']).describe('Internal scheduling policy for catalog closed dates.'),
+        bookingConflictPolicy: z.enum(['advisory', 'block']).describe('Internal scheduling policy for double-booking an inspector: advisory warns, block refuses the write.'),
         legalMode: z.enum(['hosted', 'custom']).describe('Privacy/Terms source: OI /legal pages or custom URLs.'),
         customPrivacyUrl: z.string().nullable().describe('Custom Privacy Policy URL when legalMode=custom.'),
         customTermsUrl: z.string().nullable().describe('Custom Terms URL when legalMode=custom.'),
@@ -196,6 +197,7 @@ const TenantConfigPatchSchema = z.object({
     ]).optional().describe('Holiday catalog region. null disables the catalog.'),
     holidayPublicPolicy: z.enum(['open', 'block', 'advisory']).optional().describe('Public booking holiday policy.'),
     holidayInternalPolicy: z.enum(['advisory', 'block']).optional().describe('Internal scheduling holiday policy.'),
+    bookingConflictPolicy: z.enum(['advisory', 'block']).optional().describe('Double-booking policy for internal scheduling: advisory warns, block refuses the write.'),
     legalMode: z.enum(['hosted', 'custom']).optional().describe('Privacy/Terms source.'),
     customPrivacyUrl: z.string().url().max(500).nullish().describe('Custom Privacy URL; required with customTermsUrl when legalMode=custom. null clears.'),
     customTermsUrl: z.string().url().max(500).nullish().describe('Custom Terms URL; required with customPrivacyUrl when legalMode=custom. null clears.'),
@@ -487,6 +489,7 @@ const adminSettingsRoutes = createApiRouter()
                     ? (config?.holidayPublicPolicy as 'open' | 'block' | 'advisory')
                     : 'open',
                 holidayInternalPolicy: config?.holidayInternalPolicy === 'block' ? 'block' : 'advisory',
+                bookingConflictPolicy: config?.bookingConflictPolicy === 'block' ? 'block' : 'advisory',
                 legalMode,
                 customPrivacyUrl,
                 customTermsUrl,
@@ -572,6 +575,9 @@ const adminSettingsRoutes = createApiRouter()
         }
         if (body.holidayInternalPolicy !== undefined) {
             update.holidayInternalPolicy = body.holidayInternalPolicy;
+        }
+        if (body.bookingConflictPolicy !== undefined) {
+            update.bookingConflictPolicy = body.bookingConflictPolicy;
         }
         if (body.legalMode !== undefined) {
             update.legalMode = body.legalMode;
