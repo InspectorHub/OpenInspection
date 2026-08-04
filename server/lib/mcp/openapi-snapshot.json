@@ -16120,6 +16120,36 @@
     "description": "Triggers a password reset email if the account exists. Always returns 200 even for unknown emails to avoid account enumeration."
   },
   {
+    "operationId": "rescheduleInspection",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/schedule",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id to reschedule.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id to reschedule."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/ReschedulePatch"
+      }
+    },
+    "summary": "Reschedule and/or reassign one inspection",
+    "description": "Moves an inspection to a precise instant and optionally changes who works it. The epoch-millisecond start is authoritative; the civil date is derived from it in the tenant timezone. Returns 409 when the tenant booking_conflict_policy is \"block\" and the resulting assignment overlaps existing work."
+  },
+  {
     "operationId": "resendTeamInvite",
     "method": "POST",
     "pathTemplate": "/api/team/invites/{token}/resend",

@@ -23,6 +23,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import templatesRoutes from './inspections/templates';
 import hierarchyRoutes from './inspections/hierarchy';
 import bulkRoutes from './inspections/bulk';
+import scheduleRoutes from './inspections/schedule';
 import mediaRoutes from './inspections/media';
 import mediaStudioRoutes from './inspections/media-studio';
 import publishRoutes from './inspections/publish';
@@ -43,6 +44,9 @@ import inspectionReportRoutes from './inspections/reports';
 
 export const inspectionsRoutes = createApiRouter()
     .route('/', bulkRoutes)
+    // Dispatch Phase C — PATCH /:id/schedule, the instant-authoritative
+    // reschedule + reassign write behind requireCapability('scheduleOthers').
+    .route('/', scheduleRoutes)
     .route('/', templatesRoutes)
     .route('/', coreRoutes)
     .route('/', resultsRoutes)
