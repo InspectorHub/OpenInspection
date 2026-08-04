@@ -49,7 +49,11 @@ export class BrandingService {
             billingUrl: '',
             defaultTimezone: 'UTC',
             defaultLocale: 'en-US',
-            currency: 'USD'
+            currency: 'USD',
+            // #270 — the bottom of the resolution chain; these reproduce
+            // today's rendering exactly for a tenant with no config row.
+            dateFormat: 'us',
+            timeFormat: '12h'
         };
     }
 

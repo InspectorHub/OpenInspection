@@ -134,7 +134,9 @@ const adminBrandingRoutes = createApiRouter()
             billingUrl: branding.billingUrl || null,
             defaultTimezone: branding.defaultTimezone || 'UTC',
             defaultLocale: branding.defaultLocale || 'en-US',
-            currency: branding.currency || 'USD'
+            currency: branding.currency || 'USD',
+            dateFormat: branding.dateFormat || 'us',
+            timeFormat: branding.timeFormat || '12h'
         };
 
         return c.json({ success: true, data: { branding: formattedBranding } }, 200);
@@ -185,7 +187,9 @@ const adminBrandingRoutes = createApiRouter()
             billingUrl: result.billingUrl || null,
             defaultTimezone: result.defaultTimezone || 'UTC',
             defaultLocale: result.defaultLocale || 'en-US',
-            currency: result.currency || 'USD'
+            currency: result.currency || 'USD',
+            dateFormat: result.dateFormat || 'us',
+            timeFormat: result.timeFormat || '12h'
         };
 
         return c.json({ success: true, data: { branding: formattedResult } }, 200);

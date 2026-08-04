@@ -113,8 +113,12 @@ export function useDisplayCurrency(): string {
  * inspection dates, report dates, appointment times — must resolve from the
  * tenant alone, because the inspector, the client and the agent discuss one
  * inspection out loud and must say the same date.
+ *
+ * Deliberately NOT exported: a caller wanting the shape also wants the
+ * language, and getting one without the other is how a Spanish page ends up
+ * with an English month. `useChromeDateTimeFormat` below is the whole bundle.
  */
-export function useDisplayFormatPrefs(): { dateFormat: DateFormat; timeFormat: TimeFormat } {
+function useDisplayFormatPrefs(): { dateFormat: DateFormat; timeFormat: TimeFormat } {
   const ctx = useSessionContext();
   return resolveDisplayPrefs(ctx?.user, ctx?.branding);
 }

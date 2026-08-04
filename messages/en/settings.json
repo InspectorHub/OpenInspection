@@ -138,7 +138,7 @@
   "settings_workspace_timezone_select_label": "Company timezone",
   "settings_workspace_timezone_detected": "Detected from your browser. Save to confirm, or pick another.",
   "settings_workspace_locale_currency_heading": "Locale & Currency",
-  "settings_workspace_locale_currency_subtitle": "Controls how dates, times, numbers, and money are formatted across reports and the dashboard. Individual users can override the language/locale in their profile; currency is company-wide.",
+  "settings_workspace_locale_currency_subtitle": "Controls the LANGUAGE dates, times, and numbers are written in, and the money they are billed in. The shape of a date — whether the day comes before the month, and whether 14:30 is written 2:30 PM — is the separate setting below. Individual users can override the language in their profile; currency is company-wide.",
   "settings_workspace_locale_select_label": "Company locale",
   "settings_workspace_currency_select_label": "Currency",
   "settings_workspace_report_style_heading": "Report style",
@@ -243,5 +243,12 @@
   "settings_profile_signature_upload_unreadable": "That file could not be read as an image.",
   "settings_profile_signature_crop_aria": "Crop signature",
   "settings_profile_signature_crop_save": "Save signature",
-  "settings_profile_photo_choose": "Choose photo"
+  "settings_profile_photo_choose": "Choose photo",
+  "settings_workspace_datetime_format_heading": "Date & Time Format",
+  "settings_workspace_datetime_format_subtitle": "The shape every date and time is written in across your company — including on reports and on the pages your clients and agents read. Language is the separate setting above: it decides what \"September\" is called, this decides whether the day comes before it.",
+  "settings_workspace_dateformat_select_label": "Date format",
+  "settings_workspace_timeformat_select_label": "Time format",
+  "settings_profile_dateformat_label": "Your date format",
+  "settings_profile_timeformat_label": "Your clock",
+  "settings_profile_format_hint": "Applies to your own dashboards, lists, and calendar. Inspection dates, report dates, and appointment times always use the company format — you, your client, and the agent read the same one out loud on the phone."
 }

@@ -1,3 +1,10 @@
 {
-  "$schema": "https://inlang.com/schema/inlang-message-format"
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "settings_workspace_datetime_format_heading": "Formato de fecha y hora",
+  "settings_workspace_datetime_format_subtitle": "La forma en que se escribe cada fecha y hora en toda su empresa, incluidos los informes y las páginas que leen sus clientes y agentes. El idioma es la configuración separada de arriba: decide cómo se llama \"septiembre\"; esta decide si el día va antes.",
+  "settings_workspace_dateformat_select_label": "Formato de fecha",
+  "settings_workspace_timeformat_select_label": "Formato de hora",
+  "settings_profile_dateformat_label": "Su formato de fecha",
+  "settings_profile_timeformat_label": "Su reloj",
+  "settings_profile_format_hint": "Se aplica a sus propios paneles, listas y calendario. Las fechas de inspección, las fechas de los informes y las horas de las citas siempre usan el formato de la empresa: usted, su cliente y el agente leen la misma en voz alta por teléfono."
 }

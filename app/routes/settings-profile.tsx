@@ -8,10 +8,11 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { makeProfileSchema } from "~/lib/forms/settings.schema";
+import { makeProfileSchema, overrideFieldFromForm } from "~/lib/forms/settings.schema";
 import { Select } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
 import { LOCALE_OPTIONS } from "~/lib/locales";
+import { DateTimeFormatFields } from "~/components/settings/DateTimeFormatFields";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { CredentialsEditor, type EditorCredential } from "~/components/settings/CredentialsEditor";
 import { NotificationPreferencesCard } from "~/components/settings/NotificationPreferencesCard";
@@ -36,6 +37,8 @@ interface Profile {
   savedSignature?: string | null;
   timezone?: string | null;
   locale?: string | null;
+  dateFormat?: string | null;
+  timeFormat?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -230,11 +233,16 @@ export async function action({ request, context }: Route.ActionArgs) {
   for (const key of ["name", "phone"] as const) {
     if (v[key] !== undefined) body[key] = v[key];
   }
-  // Per-user timezone override. The <select> always submits a value; an empty
-  // string clears the override (API maps '' -> NULL = inherit tenant).
-  if (v.timezone !== undefined) body.timezone = v.timezone;
-  // Per-user locale override. Same contract as timezone: '' clears (inherit tenant).
-  if (v.locale !== undefined) body.locale = v.locale;
+  // The four inherit-or-override <select>s. Their values come from the raw
+  // FormData, NOT from `submission.value`: Conform maps '' to undefined, and ''
+  // is the CLEAR signal here (API maps '' -> NULL = inherit tenant), so reading
+  // the parsed value made "Use workspace default" a no-op. See
+  // `overrideFieldFromForm`. An absent key still means "leave it alone", so a
+  // form that does not carry these controls cannot wipe them.
+  for (const key of ["timezone", "locale", "dateFormat", "timeFormat"] as const) {
+    const value = overrideFieldFromForm(fd, key);
+    if (value !== undefined) body[key] = value;
+  }
   const sigEnabled = signatureEnabledFromForm(fd);
   if (sigEnabled !== undefined) body.signatureEnabled = sigEnabled;
   const res = await api.profile.index.$patch({ json: body });
@@ -445,6 +453,20 @@ export default function SettingsProfilePage() {
               ]}
             />
           </div>
+
+          {/* #270 — the hint states what this does NOT reach: an inspection is
+              read out loud between three people who cannot see each other's
+              screens, so its dates follow the COMPANY. */}
+          <DateTimeFormatFields
+            dateLabel={m.settings_profile_dateformat_label()}
+            timeLabel={m.settings_profile_timeformat_label()}
+            dateValue={profile.dateFormat}
+            timeValue={profile.timeFormat}
+            inheritLabel={m.settings_profile_locale_inherit_option()}
+          />
+          <p className="max-w-2xl text-[12px] text-ih-fg-3 leading-relaxed">
+            {m.settings_profile_format_hint()}
+          </p>
 
           {form.errors && (
             <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
