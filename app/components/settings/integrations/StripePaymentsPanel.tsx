@@ -4,6 +4,8 @@ import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import { WebhookStatusBadge } from "./WebhookStatusBadge";
+import { useChromeDateTimeFormat, useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { formatShapedDateTime } from "~/lib/format-date";
 import type { action } from "~/routes/settings-integrations";
 import { m } from "~/paraglide/messages";
 
@@ -63,7 +65,13 @@ export function StripePaymentsPanel({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submittedOnce, setSubmittedOnce] = useState(false);
 
-  const fieldError = (name: string): string | undefined =>
+  // #270 — the delivery log used the BROWSER's zone and locale, so an admin
+  // abroad read webhook times that disagreed with every other timestamp in
+  // Settings. Chrome resolution: this is one admin reading their own page.
+  const timeZone = useDisplayTimeZone();
+  const fmt = useChromeDateTimeFormat();
+
+  const fieldError =(name: string): string | undefined =>
     fieldErrors[name] ?? (serverField === name ? serverError ?? undefined : undefined);
 
   return (
@@ -189,7 +197,7 @@ export function StripePaymentsPanel({
           <ul className="divide-y divide-ih-border rounded-md border border-ih-border bg-ih-bg-card">
             {webhookLog.map((e, i) => (
               <li key={`${e.ts}-${i}`} className="flex items-center justify-between px-3 py-2 text-[12px]">
-                <span className="text-ih-fg-3 tabular-nums flex-shrink-0">{new Date(e.ts).toLocaleString()}</span>
+                <span className="text-ih-fg-3 tabular-nums flex-shrink-0">{formatShapedDateTime(e.ts, timeZone, fmt)}</span>
                 <span className="font-mono text-ih-fg-2 truncate mx-3 flex-1">{e.eventType}</span>
                 <WebhookStatusBadge result={e.result} />
               </li>

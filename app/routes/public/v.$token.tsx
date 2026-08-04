@@ -2,6 +2,9 @@ import { useLoaderData } from "react-router";
 import { usePdfExport, pdfActionLabel, pdfBusyHint } from "~/hooks/usePdfExport";
 import type { Route } from "./+types/v.$token";
 import { createApi } from "~/lib/api-client.server";
+import { brandFormat, EMPTY_BRAND } from "~/lib/brand";
+import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { formatShapedDate, type InspectionDateTimeFormat } from "~/lib/format-date";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -51,7 +54,16 @@ export function verifyResultModel(v: VerifyInput): VerifyModel {
 // ---------------------------------------------------------------------------
 
 type LoaderResult =
-  | { kind: "report"; model: VerifyModel; token: string }
+  | {
+      kind: "report";
+      model: VerifyModel;
+      token: string;
+      /** #270 — the TENANT's display zone/language/shape. A public verifier has
+       *  no viewer preference to read, and the published-on date must read the
+       *  same to whoever was handed the link as it does inside the company. */
+      timeZone: string;
+      fmt: InspectionDateTimeFormat;
+    }
   | { kind: "agreement"; envelopeId: string }
   | { kind: "not_found" }
   | { kind: "error"; message: string };
@@ -86,10 +98,16 @@ export async function loader({
           publishedAt: number;
           contentHash: string | null;
           propertyAddressMasked: string;
+          tenantSlug?: string;
         };
+        const brand = v.tenantSlug
+          ? await resolveTenantBrand(context, v.tenantSlug)
+          : EMPTY_BRAND;
         return {
           kind: "report",
           token,
+          timeZone: brand.defaultTimezone,
+          fmt: brandFormat(brand),
           model: verifyResultModel({
             legacy: v.legacy,
             hashValid: v.hashValid,
@@ -146,12 +164,13 @@ export async function loader({
 // Component
 // ---------------------------------------------------------------------------
 
-function formatDate(unixSeconds: number): string {
-  return new Date(unixSeconds * 1000).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+/** The verify contract is unix SECONDS (report-version.service.ts says so). */
+function formatDate(
+  unixSeconds: number,
+  timeZone: string,
+  fmt: InspectionDateTimeFormat,
+): string {
+  return formatShapedDate(unixSeconds * 1000, timeZone, fmt);
 }
 
 function shortHash(hash: string): string {
@@ -202,7 +221,7 @@ export default function VerifyTokenPage() {
   }
 
   // Report result
-  const { model, token } = result;
+  const { model, token, timeZone, fmt } = result;
 
   if (model.state === "legacy") {
     return (
@@ -223,7 +242,7 @@ export default function VerifyTokenPage() {
           <p className="text-[13px] text-ih-fg-3 text-center">
             {m.report_verify_version({ version: model.versionNumber })}
             {model.publishedAt
-              ? m.report_verify_published_suffix({ date: formatDate(model.publishedAt) })
+              ? m.report_verify_published_suffix({ date: formatDate(model.publishedAt, timeZone, fmt) })
               : ""}
           </p>
         )}
@@ -270,7 +289,7 @@ export default function VerifyTokenPage() {
           <p className="text-[13px] mt-1">
             {m.report_verify_version({ version: model.versionNumber })}
             {model.publishedAt
-              ? m.report_verify_published_suffix({ date: formatDate(model.publishedAt) })
+              ? m.report_verify_published_suffix({ date: formatDate(model.publishedAt, timeZone, fmt) })
               : ""}
           </p>
         )}

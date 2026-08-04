@@ -119,14 +119,22 @@ export function useDisplayFormatPrefs(): { dateFormat: DateFormat; timeFormat: T
   return resolveDisplayPrefs(ctx?.user, ctx?.branding);
 }
 
-/** The viewer's effective date order (#270). See useDisplayFormatPrefs. */
-export function useDisplayDateFormat(): DateFormat {
-  return useDisplayFormatPrefs().dateFormat;
-}
-
-/** The viewer's effective clock (#270). See useDisplayFormatPrefs. */
-export function useDisplayTimeFormat(): TimeFormat {
-  return useDisplayFormatPrefs().timeFormat;
+/**
+ * The format bundle for WORKSPACE CHROME — settings panels, diagnostics logs,
+ * version history: surfaces whose reader is the person looking at them (#270).
+ *
+ * Counterpart to `useInspectionDateTimeFormat` below, and the difference is the
+ * whole design: here BOTH axes follow the viewer, because nobody else is
+ * reading this value off a different screen at the same time.
+ */
+export function useChromeDateTimeFormat(): {
+  locale: string;
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
+} {
+  const locale = useDisplayLocale();
+  const prefs = useDisplayFormatPrefs();
+  return { locale, ...prefs };
 }
 
 /**

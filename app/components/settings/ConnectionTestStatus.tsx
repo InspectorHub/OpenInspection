@@ -11,12 +11,29 @@
  */
 import { useMemo } from "react";
 import type { ConnectionTestResult } from "~/lib/connection-test";
+import { useChromeDateTimeFormat, useDisplayTimeZone } from "~/hooks/useSessionContext";
+import {
+  formatShapedDate,
+  formatShapedDateTime,
+  type InspectionDateTimeFormat,
+} from "~/lib/format-date";
 import { m } from "~/paraglide/messages";
 
 export type { ConnectionTestResult };
 
+/**
+ * Zone + shape are threaded in rather than read from a hook here so these stay
+ * pure. Both come from the CHROME resolution (#270): a connection test is an
+ * admin looking at their own settings page, not a value a client and an agent
+ * read to each other, so the personal override applies.
+ */
+interface Display {
+  timeZone: string;
+  fmt: InspectionDateTimeFormat;
+}
+
 /** Compact relative time: "just now", "5m ago", "3h ago", "2d ago", else a date. */
-function relativeTime(epochMs: number, nowMs: number): string {
+function relativeTime(epochMs: number, nowMs: number, d: Display): string {
   const diff = Math.max(0, nowMs - epochMs);
   const min = Math.floor(diff / 60_000);
   if (min < 1) return m.settings_conn_time_just_now();
@@ -25,11 +42,11 @@ function relativeTime(epochMs: number, nowMs: number): string {
   if (hr < 24) return m.settings_conn_time_hours({ hr });
   const day = Math.floor(hr / 24);
   if (day < 7) return m.settings_conn_time_days({ day });
-  return new Date(epochMs).toLocaleDateString();
+  return formatShapedDate(epochMs, d.timeZone, d.fmt);
 }
 
-function absoluteTime(epochMs: number): string {
-  return new Date(epochMs).toLocaleString();
+function absoluteTime(epochMs: number, d: Display): string {
+  return formatShapedDateTime(epochMs, d.timeZone, d.fmt);
 }
 
 export function ConnectionTestStatus({
@@ -44,6 +61,7 @@ export function ConnectionTestStatus({
   nowMs?: number;
 }) {
   const now = nowMs ?? Date.now();
+  const display: Display = { timeZone: useDisplayTimeZone(), fmt: useChromeDateTimeFormat() };
   const mine = useMemo(
     () =>
       results
@@ -75,8 +93,8 @@ export function ConnectionTestStatus({
         </span>
         <span className="text-ih-fg-3">
           {m.settings_conn_last_tested()}{" "}
-          <time dateTime={new Date(latest.testedAt).toISOString()} title={absoluteTime(latest.testedAt)}>
-            {relativeTime(latest.testedAt, now)}
+          <time dateTime={new Date(latest.testedAt).toISOString()} title={absoluteTime(latest.testedAt, display)}>
+            {relativeTime(latest.testedAt, now, display)}
           </time>
           {latest.provider ? ` · ${latest.provider}` : ""}
         </span>
@@ -98,8 +116,8 @@ export function ConnectionTestStatus({
                   {r.ok ? "✓" : "✗"}
                 </span>
                 <span className="text-ih-fg-3">
-                  <time dateTime={new Date(r.testedAt).toISOString()} title={absoluteTime(r.testedAt)}>
-                    {relativeTime(r.testedAt, now)}
+                  <time dateTime={new Date(r.testedAt).toISOString()} title={absoluteTime(r.testedAt, display)}>
+                    {relativeTime(r.testedAt, now, display)}
                   </time>
                   {r.detail ? ` — ${r.detail}` : ""}
                 </span>

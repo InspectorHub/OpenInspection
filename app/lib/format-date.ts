@@ -69,6 +69,66 @@ function formatDatePart(
         : `${monthWord} ${dayNum}${showYear ? `, ${year}` : ''}`;
 }
 
+/** Accepts what the straggler call sites actually hold: epoch ms, a Date, or an
+ *  ISO string. Bare `YYYY-MM-DD` is a civil date, anchored at UTC midnight. */
+function toInstant(value: string | number | Date | null | undefined): Date | null {
+    if (value == null || value === '') return null;
+    const civil = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+    const d = value instanceof Date ? value : new Date(civil ? `${value}T00:00:00.000Z` : value);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * An ABSOLUTE calendar date in the caller's zone, shaped by the preference (#270).
+ *
+ * Distinct from `formatInspectionDateTime` in two ways that matter: it takes no
+ * `now` and therefore never elides the year, and it renders no time. Both suit
+ * the surfaces it was written for — audit stamps, "last tested", a published-on
+ * date — where the reader is establishing WHEN something happened rather than
+ * scanning a list of things happening this week.
+ */
+export function formatShapedDate(
+    value: string | number | Date | null | undefined,
+    timeZone: string,
+    fmt: InspectionDateTimeFormat,
+): string {
+    const d = toInstant(value);
+    if (!d) return '';
+    return formatDatePart(
+        d,
+        timeZone || 'UTC',
+        fmt.locale || 'en-US',
+        fmt.dateFormat ?? DEFAULT_DISPLAY_PREFS.dateFormat,
+        true,
+    );
+}
+
+/**
+ * An absolute date AND time-of-day, both shaped (#270), with the short zone
+ * name always attached.
+ *
+ * The zone label is not optional here on purpose: every caller is a diagnostic
+ * or audit stamp, and a timestamp whose zone the reader has to guess is the
+ * defect this whole pass exists to remove.
+ */
+export function formatShapedDateTime(
+    value: string | number | Date | null | undefined,
+    timeZone: string,
+    fmt: InspectionDateTimeFormat,
+): string {
+    const d = toInstant(value);
+    if (!d) return '';
+    const tz = timeZone || 'UTC';
+    const timeFormat: TimeFormat = fmt.timeFormat ?? DEFAULT_DISPLAY_PREFS.timeFormat;
+    const time = formatTime(d, {
+        locale: fmt.locale || 'en-US',
+        timeZone: tz,
+        timeZoneName: 'short',
+        hourCycle: timeFormat === '24h' ? 'h23' : 'h12',
+    });
+    return `${formatShapedDate(d, tz, fmt)} · ${time}`;
+}
+
 /** C-14 part 1: humanize raw ISO timestamps on dashboard rows.
  *  `now` is injectable for deterministic tests; callers pass undefined.
  *

@@ -5,6 +5,8 @@ import { applyItemPatch } from "../../../server/lib/collab/results-doc";
 import type { ResultsProjection } from "../../../server/lib/collab/results-doc.types";
 import { diffProjections, type FindingDiff, type ScalarField } from "~/lib/collab/snapshot-diff";
 import { VersionCompare } from "~/components/collab/VersionCompare";
+import { useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
+import { formatShapedDate, type InspectionDateTimeFormat } from "~/lib/format-date";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -78,9 +80,21 @@ function reasonLabel(reason: SnapshotReason | undefined, byUserId: string | null
 
 /**
  * Tiny dependency-free relative-time formatter ("just now", "2 minutes ago",
- * "3 hours ago", "5 days ago"). Falls back to a locale date for older entries.
+ * "3 hours ago", "5 days ago"). Falls back to an absolute date past a week.
+ *
+ * `timeZone` and `fmt` are REQUIRED for the fallback branch (#270). The old
+ * `new Date(atMs).toLocaleDateString()` read the BROWSER's zone and locale, so
+ * two collaborators on the same document could see two different dates against
+ * the same snapshot — and this list is the one place they point at a version
+ * and say "restore that one". Both resolve from the TENANT
+ * (`useInspectionDateTimeFormat`) for exactly that reason.
  */
-export function formatRelativeTime(atMs: number, now: number = Date.now()): string {
+export function formatRelativeTime(
+    atMs: number,
+    now: number,
+    timeZone: string,
+    fmt: InspectionDateTimeFormat,
+): string {
     const diffMs = now - atMs;
     if (!Number.isFinite(diffMs) || diffMs < 0) return m.editor_collab_just_now();
     const sec = Math.floor(diffMs / 1000);
@@ -91,7 +105,7 @@ export function formatRelativeTime(atMs: number, now: number = Date.now()): stri
     if (hr < 24) return m.editor_collab_hours_ago({ hr, s: hr === 1 ? "" : "s" });
     const day = Math.floor(hr / 24);
     if (day < 7) return m.editor_collab_days_ago({ day, s: day === 1 ? "" : "s" });
-    return new Date(atMs).toLocaleDateString();
+    return formatShapedDate(atMs, timeZone, fmt);
 }
 
 /** Narrow an `unknown` JSON payload to the snapshot list shape. */
@@ -160,6 +174,11 @@ export function VersionHistoryPanel({
     const [compareBusy, setCompareBusy] = useState(false);
 
     const canCompare = !!currentResults;
+
+    // Tenant-anchored (#270): every collaborator on this document must read the
+    // same date off this list.
+    const timeZone = useDisplayTimeZone();
+    const fmt = useInspectionDateTimeFormat();
 
     const base = `/api/inspections/${inspectionId}/collab`;
 
@@ -370,7 +389,7 @@ export function VersionHistoryPanel({
                                 >
                                     <div className="min-w-0">
                                         <div className="text-[13px] font-semibold text-ih-fg-1">
-                                            {formatRelativeTime(snap.atMs)}
+                                            {formatRelativeTime(snap.atMs, Date.now(), timeZone, fmt)}
                                         </div>
                                         <div className="text-[11px] text-ih-fg-3 truncate">
                                             {reasonLabel(snap.reason, snap.byUserId)}

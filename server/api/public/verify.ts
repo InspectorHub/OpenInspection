@@ -75,6 +75,10 @@ const reportVerifyRoute = createRoute(withMcpMetadata({
             hashValid: z.boolean(), signatureValid: z.boolean(), chainValid: z.boolean(),
             propertyAddressMasked: z.string(),
             notPublished: z.boolean(),
+            // #270 — lets the verifier page resolve the tenant brand and render
+            // the published-on date in the company's own date shape and
+            // language. Empty string when the tenant cannot be resolved.
+            tenantSlug: z.string(),
         })) } }, description: 'Verification result' },
         404: { description: 'Token not found' },
     },
@@ -156,6 +160,7 @@ const publicVerifyRoutes = createApiRouter()
             chainValid:    data.verify.chainValid,
             propertyAddressMasked: data.propertyAddressMasked,
             notPublished: data.notPublished,
+            tenantSlug: data.tenantSlug,
         } }, 200);
     })
     .openapi(reportVerifyPdfRoute, async (c) => {
