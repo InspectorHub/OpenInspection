@@ -11,6 +11,14 @@ const TypeBody = z.object({
     defaultPriceCents:  z.number().int().min(0).default(0).describe('TODO describe defaultPriceCents field for the OpenInspection MCP integration'),
     color:              z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#6366f1').describe('TODO describe color field for the OpenInspection MCP integration'),
     sortOrder:          z.number().int().min(0).default(0).describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
+    // Hours after completion before the follow-up is queued. `.optional()` with
+    // NO `.default()`: this schema is re-used as `.partial()` for PUT, and a
+    // default survives `.partial()` — it would reset a tenant's configured delay
+    // to 72 on every update that omits the field. Omitted on create leaves the
+    // column default (72). `min(0)` because zero is a real setting: a sewer
+    // scope's results exist when the camera comes out.
+    followUpDelayHours: z.number().int().min(0).max(8760).optional()
+        .describe('Hours after a visit is completed before its follow-up is queued. 0 = immediately.'),
 });
 
 const EventBody = z.object({

@@ -189,6 +189,18 @@ export const eventTypes = sqliteTable('event_types', {
     sortOrder:          integer('sort_order').notNull().default(0),
     active:             integer('is_active', { mode: 'boolean' }).notNull().default(true),
     createdAt:          integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // How long after a visit is marked COMPLETED its follow-up notification is
+    // queued. This was a constant in EventService: reasonable for radon, where
+    // sampling is a 48-hour standard and the lab takes its own time, and wrong
+    // for a sewer scope, whose results exist the moment the camera comes out.
+    //
+    // ZERO IS A LEGITIMATE VALUE — "tell them when the visit ends" — so every
+    // read of this column must use `??`, never `||`, and no validation may
+    // reject it.
+    //
+    // Defaults to the 72 hours that used to be hard-coded, so nothing moves for
+    // any existing tenant on deploy. Appended at table end for D1 rebuild safety.
+    followUpDelayHours: integer('follow_up_delay_hours').notNull().default(72),
 }, (t) => [
     uniqueIndex('uq_event_types_tenant_slug').on(t.tenantId, t.slug),
 ]);

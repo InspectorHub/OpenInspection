@@ -236,6 +236,7 @@ const EventTypeRowSchema = z.object({
     color:              z.string().nullable().describe('Calendar color hex.'),
     sortOrder:          z.number().nullable().describe('Display sort order.'),
     active:             z.boolean().describe('Whether the type is selectable.'),
+    followUpDelayHours: z.number().nullable().describe('Hours after a visit is completed before its follow-up is queued. 0 = immediately.'),
 });
 const EventTypeCreateSchema = z.object({
     name:               z.string().min(1).describe('Display name.'),
@@ -244,6 +245,11 @@ const EventTypeCreateSchema = z.object({
     defaultPriceCents:  z.number().int().optional().describe('Default price in cents.'),
     color:              z.string().optional().describe('Calendar color hex.'),
     sortOrder:          z.number().int().optional().describe('Display sort order.'),
+    // 0 is legitimate — see the column comment. No `.default()`: the Update
+    // schema is this one `.partial()`, and a default would survive that and
+    // overwrite a configured delay on any patch that omits the field.
+    followUpDelayHours: z.number().int().min(0).max(8760).optional()
+        .describe('Hours after a visit is completed before its follow-up is queued. 0 = immediately.'),
 }).openapi('EventTypeCreate');
 const EventTypeUpdateSchema = EventTypeCreateSchema.partial().openapi('EventTypeUpdate');
 const EventTypeIdParam = z.object({ id: z.string().describe('Event-type id.') });

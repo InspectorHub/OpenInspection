@@ -7,7 +7,13 @@ import { PeopleService } from './people.service';
 
 const REMINDER_MIN_DELAY_MS = 5 * 60_000;
 const REMINDER_LEAD_MS      = 24 * 3600_000;
-const FOLLOWUP_DELAY_MS     = 72 * 3600_000;
+/**
+ * Used only when an event's type cannot be resolved at all. The real value is
+ * `event_types.follow_up_delay_hours`, whose column default is this same 72 —
+ * so a tenant who has never touched the setting sees exactly the behaviour this
+ * constant used to impose on everyone.
+ */
+const DEFAULT_FOLLOWUP_DELAY_HOURS = 72;
 
 export type EventStatus = 'scheduled' | 'completed' | 'results_received' | 'cancelled';
 
@@ -131,7 +137,9 @@ export class EventService {
             const ev = await d.select().from(inspectionEvents)
                 .where(and(eq(inspectionEvents.id, id), eq(inspectionEvents.tenantId, tenantId))).get();
             if (ev && status === 'completed') {
-                await this.scheduleFollowupLog(tenantId, id, ev.inspectionId as string, Date.now());
+                await this.scheduleFollowupLog(
+                    tenantId, id, ev.inspectionId as string, ev.eventTypeId as string, Date.now(),
+                );
             } else if (ev) {
                 await this.fireResultsReceived(tenantId, id, ev.inspectionId as string);
             }
@@ -197,7 +205,33 @@ export class EventService {
         logger.info('Event reminder log queued', { tenantId, eventId, sendAt });
     }
 
-    private async scheduleFollowupLog(tenantId: string, eventId: string, inspectionId: string, completedAtMs: number) {
+    /**
+     * When a completed visit's follow-up should be sent.
+     *
+     * Per event type, because 72 hours is a radon answer: a sewer scope's
+     * results exist the moment the camera comes out, and a follow-up three days
+     * later is telling the client something they already knew. Zero is
+     * therefore a real setting and is read with `??` — `||` would silently
+     * restore the 72-hour default for exactly the case the column exists for.
+     *
+     * A missing event type falls back to the same 72 hours the column defaults
+     * to, so an orphaned event behaves as it did before this was configurable.
+     */
+    async followUpSendAt(tenantId: string, eventTypeId: string | null, completedAtMs: number): Promise<number> {
+        let hours = DEFAULT_FOLLOWUP_DELAY_HOURS;
+        if (eventTypeId) {
+            const row = await drizzle(this.db)
+                .select({ followUpDelayHours: eventTypes.followUpDelayHours }).from(eventTypes)
+                .where(and(eq(eventTypes.id, eventTypeId), eq(eventTypes.tenantId, tenantId))).get();
+            hours = row?.followUpDelayHours ?? DEFAULT_FOLLOWUP_DELAY_HOURS;
+        }
+        return completedAtMs + hours * 3600_000;
+    }
+
+    private async scheduleFollowupLog(
+        tenantId: string, eventId: string, inspectionId: string,
+        eventTypeId: string | null, completedAtMs: number,
+    ) {
         const d = drizzle(this.db);
         const rule = await d.select().from(automations)
             .where(and(eq(automations.tenantId, tenantId), eq(automations.trigger, 'event.completed' as never))).get();
@@ -207,7 +241,7 @@ export class EventService {
         // inspection.clientEmail column (dropped, Task 13).
         const client = await new PeopleService({ DB: this.db }).getPrimaryClient(tenantId, inspectionId);
         if (!client?.email) return;
-        const sendAt = completedAtMs + FOLLOWUP_DELAY_MS;
+        const sendAt = await this.followUpSendAt(tenantId, eventTypeId, completedAtMs);
         await d.insert(automationLogs).values({
             id:             crypto.randomUUID(),
             tenantId,
