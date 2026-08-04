@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { inspections, inspectionResults } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { GeminiProvider } from '../lib/ai/providers/gemini';
+import type { AiUsageKind } from '../lib/usage/period';
 
 /**
  * Service to handle AI-powered features using Google Gemini.
@@ -26,6 +27,12 @@ export class AIService {
         /** Model id from deployment configuration (`AI_MODEL`). Empty = not
          *  configured, which is an error rather than a cue to pick one. */
         private model: string = '',
+        /** The ONE metering hook for AI, injected the same way the email
+         *  pipeline injects its meter. Every AI feature funnels through
+         *  `callGemini`, so one `record` there is the whole meter — a second
+         *  counter at a route or a hook is how two numbers that have to agree
+         *  stop agreeing. Undefined when there is no tenant to attribute to. */
+        private meter?: { record(kind: AiUsageKind): Promise<void> },
     ) {}
 
     private isDevMode(): boolean {
@@ -67,9 +74,14 @@ export class AIService {
      * case) is the adapter's, so the two entry points below that do not
      * pre-check are still covered.
      */
-    private async callGemini(prompt: string) {
+    private async callGemini(prompt: string, kind: AiUsageKind = 'assist') {
         const provider = new GeminiProvider({ apiKey: this.apiKey, model: this.model });
         const { text } = await provider.complete({ prompt });
+        // Meter AFTER success, never before — a model call that failed must not
+        // consume an allowance it did not spend. The swallowed rejection
+        // matches the send sites: a metering failure must never fail the
+        // inspector's operation.
+        if (this.meter) await this.meter.record(kind).catch(() => {});
         return text;
     }
 

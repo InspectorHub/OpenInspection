@@ -4,7 +4,7 @@ import { tenants } from '../../lib/db/schema';
 import { MeteringService } from '../../services/metering.service';
 import { STOCK_PERIOD } from '../../lib/usage/period';
 import { Errors } from '../../lib/errors';
-import { FREE_TIER_CAPS } from './policy';
+import { FREE_TIER_CAPS, type AiCappedMetric, type AiTierCaps } from './policy';
 
 /**
  * Free-tier usage-quota guard. Two calling shapes:
@@ -34,7 +34,13 @@ export async function readTenantTier(db: D1Database, tenantId: string): Promise<
 export class PlanQuotaGuard {
   constructor(
     private db: D1Database,
-    private opts: { enforced: boolean; billingPortalUrl: string | null },
+    private opts: {
+      enforced: boolean;
+      billingPortalUrl: string | null;
+      /** Per-tier AI allowances, when the deployment has been given any.
+       *  Absent/empty means no AI enforcement — see `checkAiQuota`. */
+      aiCaps?: AiTierCaps;
+    },
   ) {}
 
   /** Atomic consume for inspection creation. Free+enforced: increment-if-below-cap
@@ -75,6 +81,27 @@ export class PlanQuotaGuard {
     if (!this.opts.enforced || tier !== 'free') return;
     const used = await new MeteringService(this.db).lifetimeTotal(tenantId, metric);
     const cap = FREE_TIER_CAPS[metric];
+    if (used >= cap) throw Errors.QuotaExhausted({ metric, used, cap, billingPortalUrl: this.opts.billingPortalUrl });
+  }
+
+  /** Pre-flight check for a MANAGED (platform-funded) AI call. Same shape as
+   *  `checkMessagingQuota` and for the same reason: read-only, so the counter
+   *  increment stays at the single AI call-site meter and a failed model call
+   *  never consumes an allowance it did not spend. AI calls fail more often
+   *  than sends, which makes that ordering matter more here, not less.
+   *
+   *  No-op when enforcement is off (standalone) and no-op when no cap has been
+   *  configured for the tier — which is every tier today. Metering ships before
+   *  enforcement on purpose: this path exists and is tested, and the number
+   *  arrives later as configuration rather than as an invented literal.
+   *
+   *  `metric` is always a managed metric: `*_byo` volume is the tenant's own
+   *  bill and never counts toward anything this guard enforces. */
+  async checkAiQuota(tenantId: string, tier: string, metric: AiCappedMetric): Promise<void> {
+    if (!this.opts.enforced) return;
+    const cap = this.opts.aiCaps?.[tier]?.[metric];
+    if (cap === undefined) return;
+    const used = await new MeteringService(this.db).lifetimeTotal(tenantId, metric);
     if (used >= cap) throw Errors.QuotaExhausted({ metric, used, cap, billingPortalUrl: this.opts.billingPortalUrl });
   }
 }

@@ -89,6 +89,12 @@ describe('GET /api/usage/summary', () => {
         await m.record(TENANT, 'sms_byo', '2026-06', 500);
         await m.record(TENANT, 'email_byo', '2026-06', 250);
         await m.record(TENANT, 'r2_bytes', 'lifetime', 4096);
+        // AI is reported per workload AND per credential source: four counters,
+        // seeded to four distinct values so a mis-wired field cannot pass.
+        await m.record(TENANT, 'ai_translate', '2026-06', 7);
+        await m.record(TENANT, 'ai_translate_byo', '2026-06', 11);
+        await m.record(TENANT, 'ai_assist', '2026-06', 13);
+        await m.record(TENANT, 'ai_assist_byo', '2026-06', 17);
 
         const app = buildApp(testDb, SAAS_PROFILE);
         const env = { DB: testD1 } as unknown as HonoConfig['Bindings'];
@@ -101,6 +107,8 @@ describe('GET /api/usage/summary', () => {
             usage: {
                 inspections: 3, sms: 10, email: 20,
                 smsByo: 500, emailByo: 250,
+                aiTranslate: 7, aiTranslateByo: 11,
+                aiAssist: 13, aiAssistByo: 17,
                 seatsUsed: 2, seatsMax: 5,
                 r2Bytes: 4096,
             },
@@ -142,6 +150,7 @@ describe('GET /api/usage/summary', () => {
         const body = await res.json() as { data: { usage: Record<string, number | null> } };
         expect(body.data.usage).toEqual({
             inspections: 0, sms: 0, email: 0, smsByo: 0, emailByo: 0,
+            aiTranslate: 0, aiTranslateByo: 0, aiAssist: 0, aiAssistByo: 0,
             seatsUsed: 0, seatsMax: 5, r2Bytes: 0,
         });
     });

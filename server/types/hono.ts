@@ -63,6 +63,10 @@ export interface AppEnv {
     /** AI model id (e.g. a Gemini model name). No default is compiled in —
      *  when unset, AI features fail closed rather than picking a model. */
     AI_MODEL?: string;
+    /** Optional deployment-provided AI key, used only for tenants the
+     *  deployment grants managed access to. Absent in standalone, where a
+     *  tenant's own key is the only credential source. */
+    AI_MANAGED_API_KEY?: string;
 
     // Communication
     RESEND_API_KEY: string;

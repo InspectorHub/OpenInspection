@@ -6,6 +6,7 @@ import { UnitService } from '../../services/unit.service';
 import { UnitSwitchService } from '../../services/unit-switch.service';
 import { ReportVersionService } from '../../services/report-version.service';
 import { AIService } from '../../services/ai.service';
+import { buildAiMeter } from '../ai/metering';
 import { AuthService } from '../../services/auth.service';
 import { OutboxService } from '../../portal/outbox.service';
 import { publishRow } from '../../portal/outbox.service';
@@ -172,6 +173,12 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         // No default here on purpose: an unset AI_MODEL fails
                         // closed at the service rather than picking a model.
                         c.env.AI_MODEL ?? '',
+                        buildAiMeter({
+                            db: c.env.DB, profile: c.var.profile, tenantId,
+                            tenantKey: emailCfg.dbSecrets.geminiApiKey || null,
+                            managedKey: c.env.AI_MANAGED_API_KEY ?? null,
+                            model: c.env.AI_MODEL ?? '',
+                        }),
                     );
                     break;
                 case 'auth':
