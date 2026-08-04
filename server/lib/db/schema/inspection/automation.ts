@@ -2,6 +2,7 @@ import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqli
 import { sql } from 'drizzle-orm';
 import { tenants, users } from '../tenant';
 import { inspections } from './core';
+import { EVENT_STATUSES } from '../../../status/event-status';
 
 export const automations = sqliteTable('automations', {
     id: text('id').primaryKey(),
@@ -231,7 +232,7 @@ export const inspectionEvents = sqliteTable('inspection_events', {
     scheduledAt:       integer('scheduled_at', { mode: 'timestamp_ms' }).notNull(),
     durationMin:       integer('duration_min').notNull(),
     priceCents:        integer('price_cents').notNull().default(0),
-    status:            text('status', { enum: ['scheduled', 'completed', 'results_received', 'cancelled'] }).notNull().default('scheduled'),
+    status:            text('status', { enum: [...EVENT_STATUSES] }).notNull().default('scheduled'),
     notes:             text('notes'),
     completedAt:       integer('completed_at', { mode: 'timestamp_ms' }),
     resultsReceivedAt: integer('results_received_at', { mode: 'timestamp_ms' }),

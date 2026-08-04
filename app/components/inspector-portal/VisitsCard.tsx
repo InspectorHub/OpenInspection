@@ -6,6 +6,7 @@ import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { isAdminRole } from "~/lib/access";
 import { AddVisitModal } from "./AddVisitModal";
 import { m } from "~/paraglide/messages";
+import { EVENT_STATUS } from "~/lib/status";
 import type { action } from "~/routes/inspector-portal";
 
 export type VisitStatus = "scheduled" | "completed" | "results_received" | "cancelled";
@@ -55,22 +56,22 @@ export type VisitAction = "complete" | "results" | "cancel";
  */
 export function visitActions(role: string, status: VisitStatus): VisitAction[] {
     const admin = isAdminRole(role);
-    if (status === "scheduled") return admin ? ["complete", "cancel"] : ["complete"];
-    if (status === "completed") return admin ? ["results", "cancel"] : [];
+    if (status === EVENT_STATUS.SCHEDULED) return admin ? ["complete", "cancel"] : ["complete"];
+    if (status === EVENT_STATUS.COMPLETED) return admin ? ["results", "cancel"] : [];
     // results_received and cancelled are terminal: there is nothing left to offer.
     return [];
 }
 
 function statusLabel(status: VisitStatus): string {
-    if (status === "completed") return m.label_status_completed();
-    if (status === "results_received") return m.inspections_hub_visits_status_results();
-    if (status === "cancelled") return m.label_status_cancelled();
+    if (status === EVENT_STATUS.COMPLETED) return m.label_status_completed();
+    if (status === EVENT_STATUS.RESULTS_RECEIVED) return m.inspections_hub_visits_status_results();
+    if (status === EVENT_STATUS.CANCELLED) return m.label_status_cancelled();
     return m.label_status_scheduled();
 }
 
 function statusTone(status: VisitStatus): "sat" | "monitor" | "neutral" {
-    if (status === "results_received") return "sat";
-    if (status === "cancelled") return "neutral";
+    if (status === EVENT_STATUS.RESULTS_RECEIVED) return "sat";
+    if (status === EVENT_STATUS.CANCELLED) return "neutral";
     return "monitor";
 }
 

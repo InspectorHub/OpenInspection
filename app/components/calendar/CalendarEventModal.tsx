@@ -3,6 +3,7 @@ import { Modal } from "@core/shared-ui";
 import { calendarItemHref, type CalendarEvent } from "~/components/calendar/calendar-helpers";
 import { formatDate, formatDateTime } from "~/lib/format";
 import { m } from "~/paraglide/messages";
+import { EVENT_STATUS } from "~/lib/status";
 
 /**
  * A status word the viewer can read.
@@ -15,10 +16,10 @@ import { m } from "~/paraglide/messages";
  * Language follows the viewer; only date SHAPE follows the tenant.
  */
 function statusLabel(status: string): string {
-  if (status === "scheduled") return m.label_status_scheduled();
-  if (status === "completed") return m.label_status_completed();
-  if (status === "cancelled") return m.label_status_cancelled();
-  if (status === "results_received") return m.calendar_event_status_results_received();
+  if (status === EVENT_STATUS.SCHEDULED) return m.label_status_scheduled();
+  if (status === EVENT_STATUS.COMPLETED) return m.label_status_completed();
+  if (status === EVENT_STATUS.CANCELLED) return m.label_status_cancelled();
+  if (status === EVENT_STATUS.RESULTS_RECEIVED) return m.calendar_event_status_results_received();
   // Inspection lifecycle values (draft/in_progress/delivered/…) already have
   // their own labels elsewhere; until this modal is taught them, the legacy
   // rendering is better than a blank.
