@@ -60,7 +60,10 @@ export interface AppEnv {
     GOOGLE_CLIENT_ID: string;
     GOOGLE_CLIENT_SECRET: string;
     GEMINI_API_KEY: string;
-    
+    /** AI model id (e.g. a Gemini model name). No default is compiled in —
+     *  when unset, AI features fail closed rather than picking a model. */
+    AI_MODEL?: string;
+
     // Communication
     RESEND_API_KEY: string;
     SENDER_EMAIL: string;

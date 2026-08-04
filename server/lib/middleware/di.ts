@@ -169,6 +169,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         // active profile permits it (standalone) and
                         // no API key is configured, instead of throwing 503.
                         c.var.profile.aiDevMockFallback ? 'standalone' : 'saas',
+                        // No default here on purpose: an unset AI_MODEL fails
+                        // closed at the service rather than picking a model.
+                        c.env.AI_MODEL ?? '',
                     );
                     break;
                 case 'auth':

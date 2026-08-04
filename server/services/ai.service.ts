@@ -12,12 +12,20 @@ import { Errors } from '../lib/errors';
  * exercise the UI flow end-to-end. Production deploys (`saas` mode or
  * unspecified) throw `Errors.AINotConfigured` (503) so the client can
  * route the inspector to AI settings instead of showing a silent failure.
+ *
+ * The MODEL is configuration, never a source constant. There is deliberately
+ * no baked-in default: a model id compiled into the binary is how the request
+ * URL ended up pinned to one model for two years with no way to change it, and
+ * a fallback would hide the same mistake next time. Unconfigured fails closed.
  */
 export class AIService {
     constructor(
         private db: D1Database,
         private apiKey: string,
         private appMode?: 'standalone' | 'saas',
+        /** Model id from deployment configuration (`AI_MODEL`). Empty = not
+         *  configured, which is an error rather than a cue to pick one. */
+        private model: string = '',
     ) {}
 
     private isDevMode(): boolean {
@@ -26,6 +34,23 @@ export class AIService {
 
     private hasApiKey(): boolean {
         return Boolean(this.apiKey) && !this.apiKey.includes('your_api_key');
+    }
+
+    /**
+     * Fail closed on an unconfigured model.
+     *
+     * Deliberately NOT folded into the dev-mock branch: the mock exists for a
+     * self-hoster who has no key yet, and widening it to cover a missing model
+     * would write `[DEV] …` placeholder prose into a real report for someone
+     * whose key works fine. A missing model is a configuration error at every
+     * deployment mode, so it always throws.
+     */
+    private assertModelConfigured(): void {
+        if (!this.model) {
+            throw Errors.AINotConfigured(
+                'AI is unavailable: no AI model is configured. Set AI_MODEL for this deployment.',
+            );
+        }
     }
 
     private getDrizzle() {
@@ -39,8 +64,11 @@ export class AIService {
         if (!this.apiKey || this.apiKey.includes('your_api_key')) {
             throw new Error('Gemini API Key missing');
         }
+        // Backstop for the two entry points that do not pre-check
+        // (generateProfessionalComment / generateInspectionSummary).
+        this.assertModelConfigured();
 
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(this.model)}:generateContent?key=${this.apiKey}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -141,6 +169,7 @@ Summary:`;
                 'AI is not configured. Set GEMINI_API_KEY in Settings → Advanced → AI.'
             );
         }
+        this.assertModelConfigured();
 
         const ctxLines = [
             `Item: "${input.itemLabel}"`,
@@ -197,6 +226,10 @@ Return only the rewritten comment text — no preamble, no quotes, no markdown.`
                 'AI is not configured. Set GEMINI_API_KEY in Settings → Advanced → AI.'
             );
         }
+        // Outside the try/catch below on purpose: that catch turns RUNTIME
+        // failures into an empty suggestion list, and a configuration error
+        // must not disappear into "no suggestions today".
+        this.assertModelConfigured();
 
         const context = [
             params.rating    ? `Rating: ${params.rating}` : null,
