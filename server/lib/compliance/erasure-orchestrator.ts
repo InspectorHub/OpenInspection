@@ -45,6 +45,7 @@ import {
     agreementRequests,
     agreementSigners,
     invoices,
+    orderPayments,
     conciergeConfirmTokens,
     inspectionAccessTokens,
     inspectionRequests,
@@ -375,6 +376,43 @@ export async function runErasure(
             .run();
         const c = changeCount(res);
         retainedCount += c; // rows retained with identity cleared under Art. 17(3)(e)
+        return c;
+    });
+
+    // The payment ledger is append-only and financial — the ROWS stay, retained
+    // under the accounting/tax obligation. `note` is the one column a human
+    // writes free-hand on a row tied to an identified client, so it is the one
+    // column cleared. Located BOTH ways, because neither key alone reaches every
+    // row: a deposit taken before the invoice exists has no invoice_id, and a
+    // payment against a standalone invoice has no inspection_id. The invoice
+    // locator matches on contact_id, which survives the invoices step above
+    // (that one nulls client_name/client_email only).
+    await step('order_payments', 'anonymize', { legalBasis: 'art_17_3_b' }, async () => {
+        if (subjectContactIds.length === 0) return 0;
+        const inspRows = await db.select({ id: inspectionPeople.inspectionId })
+            .from(inspectionPeople)
+            .where(and(
+                eq(inspectionPeople.tenantId, tenantId),
+                inArray(inspectionPeople.contactId, subjectContactIds),
+            ))
+            .all();
+        const inspIds = [...new Set((inspRows as Array<{ id: string }>).map((i) => i.id))];
+        const invRows = await db.select({ id: invoices.id }).from(invoices)
+            .where(and(eq(invoices.tenantId, tenantId), inArray(invoices.contactId, subjectContactIds)))
+            .all();
+        const invIds = [...new Set((invRows as Array<{ id: string }>).map((i) => i.id))];
+        if (inspIds.length === 0 && invIds.length === 0) return 0;
+
+        const reach = [
+            ...(inspIds.length > 0 ? [inArray(orderPayments.inspectionId, inspIds)] : []),
+            ...(invIds.length > 0 ? [inArray(orderPayments.invoiceId, invIds)] : []),
+        ];
+        const res = await db.update(orderPayments)
+            .set({ note: null })
+            .where(and(eq(orderPayments.tenantId, tenantId), reach.length === 1 ? reach[0] : or(...reach)))
+            .run();
+        const c = changeCount(res);
+        retainedCount += c; // financial rows retained with the free text cleared
         return c;
     });
 

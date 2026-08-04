@@ -107,6 +107,14 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     { table: 'invoices', column: 'client_name',  category: 'user.name',          action: 'null' },
     { table: 'invoices', column: 'client_email', category: 'user.contact.email', action: 'null' },
 
+    // ── order_payments ────────────────────────────────────────────────────────
+    // The payment ledger is append-only and financial: the ROWS are retained
+    // under the accounting/tax obligation (Art. 17(3)(b)) and the amounts are
+    // declared out of scope below. `note` is the one free-text column a human
+    // writes on a row linked to an identified client ("check from J. Smith,
+    // 123 Oak St"), so it is cleared in place rather than left standing.
+    { table: 'order_payments', column: 'note', category: 'user.freetext', action: 'anonymize', legalBasis: 'art_17_3_b' },
+
     // ── concierge_confirm_tokens (#88) ────────────────────────────────────────
     // Single-use magic-link tokens addressed to the subject: delete the ROWS
     // (locator = client_email). Nothing references a token row.
@@ -225,6 +233,16 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // said at a date, which is the one thing it exists to answer. Listed rather
     // than left silent because the PII heuristic does not flag any column here,
     // and silence is not the same as a decision.
+    // The payment ledger. The `note` column has its own anonymize rule above;
+    // everything that carries a figure or an actor reference is declared here
+    // rather than left silent, because the heuristic flags none of it and
+    // silence is not the same as a decision.
+    { table: 'order_payments',        column: 'amount_cents',
+      reason: 'financial record retained under accounting/tax obligation; carries no subject identifier on its own' },
+    { table: 'order_payments',        column: 'recorded_by',
+      reason: 'staff user id (who keyed the payment) — not consumer-DSAR scope' },
+    { table: 'order_payments',        column: 'provider_ref',
+      reason: 'payment-processor reference on the retained financial row, not personal data' },
     { table: 'tenant_legal_versions', column: 'body_snapshot',            reason: 'company-authored policy text, not personal data of any data subject' },
     { table: 'tenant_legal_versions', column: 'published_by_user_id',     reason: 'staff author reference — not consumer-DSAR scope' },
 ];

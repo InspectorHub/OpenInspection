@@ -37,6 +37,8 @@ export { commercialSubtypes } from './commercial-subtypes';
 export { contacts } from './contact';
 export { contractorTypes } from './contractor-types';
 export { invoices } from './invoice';
+export { orderPayments } from './order-payment';
+export type { OrderPayment, NewOrderPayment } from './order-payment';
 export {
     marketplaceTemplates,
     tenantMarketplaceImports,
