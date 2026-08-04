@@ -43,11 +43,21 @@
  * toward translating one.
  */
 
-/** Version of the disclosure copy. Bump on ANY wording change. */
+/** Version of the disclosure copy. Bump on ANY wording change, `label` included. */
 const DISCLOSURE_VERSION = 1;
 
 export const AGREEMENT_LANGUAGE_DISCLOSURE = Object.freeze({
     version: DISCLOSURE_VERSION,
+    /**
+     * Plain-text heading every renderer puts directly above `html`. It is part of
+     * the disclosure, not chrome a component chose: the whole instruction from
+     * counsel is about POSITION, and this sentence is what makes the position
+     * legible to a reader who is not going to reason about borders and type
+     * sizes. Kept here rather than in each renderer so the signing screen and the
+     * archived copy cannot drift apart, and out of the message catalogue for the
+     * same reason `html` is — versioned platform copy, not a translatable string.
+     */
+    label: 'Not part of this agreement',
     html: [
         '<section class="agreement-language-disclosure" role="note">',
         '<p>This agreement is provided in English. If you would prefer to review ',

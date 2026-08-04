@@ -20,10 +20,24 @@ describe('agreement language disclosure', () => {
         // Counsel: a disclosure may state a fact, it may not decide which text
         // prevails. Every word below allocates risk between two parties we are
         // not one of. This test is the line, and it is why the plan was rewritten.
+        // The heading is held to the same standard as the sentence: it is shown
+        // to the signer in the same block and carries the same risk of reading
+        // as a term.
         for (const forbidden of [/govern/i, /prevail/i, /controls?/i,
                                  /binding/i, /conflict between/i, /shall/i]) {
             expect(D.html).not.toMatch(forbidden);
+            expect(D.label).not.toMatch(forbidden);
         }
+    });
+
+    it('carries a heading that says what the block is NOT', () => {
+        // Position is the whole instruction, and a reader does not infer position
+        // from a border. The heading states it in words, so it travels with the
+        // copy instead of living in whichever component happens to render it.
+        expect(D.label).toMatch(/not part of this agreement/i);
+        // Plain text: renderers escape it or print it as a text node. Markup here
+        // would mean two sanitizer stories for one constant.
+        expect(D.label).not.toMatch(/[<>]/);
     });
 
     it('does not reproduce the InterNACHI clause', () => {
@@ -153,18 +167,24 @@ describe('agreement language disclosure — containment', () => {
         expect(importsDisclosure(`import { sanitizeAgreementHtml } from './sanitizer';`)).toBe(false);
     });
 
-    it('no module that builds the agreement body imports the disclosure', () => {
+    it('no module that composes the agreement body imports the disclosure', () => {
         const sources = [...walk(join(REPO_ROOT, 'server')), ...walk(join(REPO_ROOT, 'app'))]
             .map((file) => ({ file: relative(REPO_ROOT, file).replace(/\\/g, '/'), src: readFileSync(file, 'utf8') }));
 
         // Explicit hosts, plus anything that touches the agreement-body sanitizer.
         // Named paths are asserted to exist so a rename fails loudly instead of
         // quietly shrinking the guard to nothing.
+        //
+        // These are the modules that BUILD THE STRING stored in
+        // `agreements.content` (and its pinned snapshot). A document renderer that
+        // merely contains that string is a different thing and is governed by the
+        // next test — see the note there; listing one here would have forbidden the
+        // archived copy from carrying the disclosure at all, which is the one place
+        // it matters most.
         const NAMED_HOSTS = [
             'server/services/agreement/sanitizer.ts',
             'server/services/agreement/template.ts',
             'server/services/agreement.service.ts',
-            'server/api/agreements-render.ts',
         ];
         const known = new Set(sources.map((s) => s.file));
         for (const host of NAMED_HOSTS) expect(known.has(host)).toBe(true);
@@ -181,5 +201,55 @@ describe('agreement language disclosure — containment', () => {
         // no longer neutral and no longer a disclosure: it is a term we wrote in a
         // contract we are not party to. Render it beside the agreement instead.
         expect(offenders).toEqual([]);
+    });
+
+    // The counterpart to the scan above. "Beside the agreement" has to hold on
+    // every surface that shows an agreement, and the archived copy is the one a
+    // dispute actually produces: a disclosure the signer saw on screen and cannot
+    // find in the signed document is worse than no disclosure, because the record
+    // then contradicts what happened. So this asserts PRESENCE, and
+    // `tests/unit/agreements/agreements-render.spec.ts` asserts the placement —
+    // outside the body box, with the stored string untouched.
+    it('the archived copy renderer carries the disclosure', () => {
+        const RENDERER = 'server/api/agreements-render.ts';
+        const src = readFileSync(join(REPO_ROOT, RENDERER), 'utf8');
+        expect(importsDisclosure(src), `${RENDERER} no longer shows the disclosure`).toBe(true);
+    });
+
+    // Which allow-list the browser pass uses cannot be settled in a DOM test:
+    // both components emit the server string on the first pass and only diverge
+    // once DOMPurify runs, and DOMPurify under happy-dom applies no allow-list at
+    // all. The choice is legible in source, so it is asserted there — and seen for
+    // real in a browser.
+    const DISCLOSURE_COMPONENT = 'app/components/agreements/AgreementLanguageDisclosure.tsx';
+
+    it('the browser renderer sanitizes with the disclosure profile', () => {
+        const src = readFileSync(join(REPO_ROOT, DISCLOSURE_COMPONENT), 'utf8');
+        expect(src).toContain('DISCLOSURE_SANITIZER_PROFILE');
+    });
+
+    it('the browser renderer does NOT route the copy through the tenant-content component', () => {
+        // Its allow-list is the Quill toolbar: no <section>, no `role`. Reusing it
+        // would hand the reader a loose paragraph among the terms — the exact
+        // reading this disclosure exists to prevent.
+        const src = readFileSync(join(REPO_ROOT, DISCLOSURE_COMPONENT), 'utf8');
+        expect(/import\s*\{[^}]*\bSanitizedHtml\b[^}]*\}/.test(src)).toBe(false);
+    });
+
+    it('every signing surface renders the disclosure component', () => {
+        // One import per surface. A surface that grows its own copy of the block,
+        // or quietly drops it, shows up here rather than in a dispute.
+        const SIGNING_SURFACES = [
+            'app/components/portal/sections/AgreementSection.tsx',
+            'app/components/checkout/SignCard.tsx',
+        ];
+        for (const surface of SIGNING_SURFACES) {
+            const src = readFileSync(join(REPO_ROOT, surface), 'utf8');
+            expect(src, `${surface} does not render the disclosure`)
+                .toMatch(/<AgreementLanguageDisclosure\b/);
+            // …and it does not reach past the component into the copy itself.
+            expect(importsDisclosure(src), `${surface} should render the component, not the copy`)
+                .toBe(false);
+        }
     });
 });

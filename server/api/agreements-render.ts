@@ -5,6 +5,7 @@ import { eq, and, asc } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
 import { qrToSvg } from '../lib/qr';
 import { AgreementService } from '../services/agreement.service';
+import { AGREEMENT_LANGUAGE_DISCLOSURE } from '../lib/legal/agreement-language-disclosure';
 import { safeISODate } from '../lib/date';
 
 /**
@@ -97,6 +98,9 @@ const HTML_HEAD = `<!doctype html><html><head><meta charset="utf-8">
   body { font: 14px/1.5 -apple-system, system-ui, sans-serif; color: #0f172a; max-width: 720px; margin: 32px auto; padding: 0 16px; }
   h1 { font-size: 18px; margin: 0 0 24px 0; }
   .body { white-space: pre-wrap; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; }
+  .lang-note { margin-top: 12px; font-size: 12px; color: #475569; }
+  .lang-note .label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; }
+  .lang-note p { margin: 4px 0 0 0; }
   .sig-block { margin-top: 32px; padding-top: 16px; border-top: 2px solid #0f172a; }
   .sig-row { display: flex; gap: 24px; margin-top: 16px; }
   .sig-cell { flex: 1; }
@@ -110,6 +114,31 @@ const HTML_FOOT = `</body></html>`;
 
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * The platform language disclosure, as it appears in the ARCHIVED copy — the
+ * document a dispute produces. Emitted as a sibling of `.body`, after it and
+ * outside its border, in the same muted register as the verify block: this is
+ * the platform speaking about the document, not a term of it, and the heading
+ * says so in words rather than relying on a reader to read a border.
+ *
+ * It is deliberately not inside `.body`. That div holds the pinned content
+ * snapshot verbatim, the snapshot is what `content_hash` is taken over, and
+ * anything added to it would both alter the record of what was signed and
+ * become a clause we wrote in a contract we are not a party to.
+ *
+ * Emitted raw rather than escaped because it is a frozen module constant with
+ * no interpolation — the markup IS the payload here, and it carries no href,
+ * src or event attribute for escaping to protect against. Workers have no DOM,
+ * so there is no sanitizer pass available on this path; the guard is that the
+ * string is ours and fixed, asserted by
+ * `tests/unit/agreements/language-disclosure.spec.ts`.
+ */
+const languageNoteHtml = (): string =>
+  `<div class="lang-note">` +
+    `<div class="label">${escapeHtml(AGREEMENT_LANGUAGE_DISCLOSURE.label)}</div>` +
+    AGREEMENT_LANGUAGE_DISCLOSURE.html +
+  `</div>`;
 
 /**
  * Pure render handler exported for unit testing. Takes a D1Database and the
@@ -203,6 +232,7 @@ export async function agreementRenderHandler(
   const html = HTML_HEAD +
     `<h1>${escapeHtml(agreement.name)}</h1>` +
     `<div class="body">${escapeHtml(snapshotContent)}</div>` +
+    languageNoteHtml() +
     `<div class="sig-block">` +
       `<div class="sig-row">` +
         signerCellsHtml +

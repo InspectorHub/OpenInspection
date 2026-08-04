@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useFetcher } from "react-router";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
+import { AgreementLanguageDisclosure } from "~/components/agreements/AgreementLanguageDisclosure";
 import {
     OnBehalfFields,
     onBehalfPayload,
@@ -126,13 +127,21 @@ export function SignCard({
                 )}
             </div>
 
-            {/* Snapshot content (scrollable) */}
-            <div className="px-6 py-5 sm:px-8 border-b border-ih-border max-h-72 overflow-y-auto">
+            {/* Snapshot content (scrollable) — tenant data, and the only thing
+                being signed. */}
+            <div
+                data-testid="agreement-body"
+                className="px-6 py-5 sm:px-8 border-b border-ih-border max-h-72 overflow-y-auto"
+            >
                 <SanitizedHtml
                     className="prose prose-sm max-w-none text-ih-fg-3 leading-relaxed"
                     html={content}
                 />
             </div>
+
+            {/* Platform disclosure — a sibling of the snapshot, outside its scroll
+                region and never composed into it. */}
+            <AgreementLanguageDisclosure className="border-b border-ih-border" />
 
             {isDone ? (
                 <div className="px-6 py-6 sm:px-8 text-center">
