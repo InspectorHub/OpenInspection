@@ -139,31 +139,47 @@ describe('QBO partial payment — capturing the amount', () => {
         expect(markPartial).toHaveBeenCalledWith(INV_ID, 25000, TENANT);
     });
 
-    it('clears the paid amount when the invoice is paid in full', async () => {
+    it('reads the whole amount received once the invoice is paid in full', async () => {
+        // The column now holds CUMULATIVE RECEIVED, summed from the payment
+        // ledger. It used to be nulled here, back when a figure could only ever
+        // describe a partial invoice; the ledger makes "paid, and here is how
+        // much arrived" expressible, and remaining is derived against
+        // amountCents, so a full figure states no outstanding balance.
         await seedInvoice(45000);
         await syncFromQbo({ Id: QBO_ID, Balance: 200, TotalAmt: 450 });
         await invoiceSvc.markPaid(INV_ID, TENANT, 'qbo');
 
         const inv = await getInvoice();
         expect(inv.partialPaidAt).toBeNull();
-        expect(inv.amountPaidCents).toBeNull();   // no stale residue on a paid invoice
+        expect(inv.amountPaidCents).toBe(45000);
+        expect(await remainingCents()).toBe(0);
     });
 
-    it('clears it on refund too', async () => {
+    it('drops back to nothing received on a refund', async () => {
+        // A refund is a ledger row reversing what arrived, not an erasure of the
+        // fact that it did: 0 RECEIVED, which is a figure — not null, which is
+        // "unknown".
         await seedInvoice(45000);
         await syncFromQbo({ Id: QBO_ID, Balance: 200, TotalAmt: 450 });
         await invoiceSvc.markRefunded(INV_ID, TENANT);
 
-        expect((await getInvoice()).amountPaidCents).toBeNull();
+        const inv = await getInvoice();
+        expect(inv.amountPaidCents).toBe(0);
+        expect(inv.paidAt).toBeNull();
+        expect(inv.partialPaidAt).toBeNull();
     });
 
-    it('leaves no stale amount when a later partial sync cannot say how much', async () => {
-        // markPartial without an amount means "partial, amount unknown" — it must
-        // not leave the previous figure standing as if it were current.
+    it('does not double-count a partial sync that repeats the same figure', async () => {
+        // QBO reports a CUMULATIVE amount and the sync runs on every webhook and
+        // every cron sweep. What is appended is the delta, so replaying the same
+        // figure appends nothing — and a figure that went down records a refund.
         await seedInvoice(45000);
         await syncFromQbo({ Id: QBO_ID, Balance: 200, TotalAmt: 450 });
-        await invoiceSvc.markPartial(INV_ID, TENANT, 'oi');
+        await syncFromQbo({ Id: QBO_ID, Balance: 200, TotalAmt: 450 });
 
-        expect((await getInvoice()).amountPaidCents).toBeNull();
+        expect((await getInvoice()).amountPaidCents).toBe(25000);
+
+        await syncFromQbo({ Id: QBO_ID, Balance: 350, TotalAmt: 450 });
+        expect((await getInvoice()).amountPaidCents).toBe(10000);
     });
 });

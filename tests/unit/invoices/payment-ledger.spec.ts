@@ -20,6 +20,8 @@
  *     not block a customer handing over $1 twice.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
@@ -183,6 +185,39 @@ describe('payment ledger — the derived invoice state', () => {
         await recomputeInvoicePaymentState(db, 'some-other-tenant', INV_ID);
 
         expect((await getInvoice()).amountPaidCents).toBe(45000);   // untouched
+    });
+});
+
+describe('payment ledger — one writer', () => {
+    it('is the only thing in server/ that writes the derived payment columns', () => {
+        // The regression this whole task exists to avoid. A second writer fails
+        // no behavioural test — it just makes the cache disagree with the money
+        // weeks later, which is the expensive kind of wrong.
+        //
+        // Scoped to `.set({...})`, i.e. UPDATEs of an existing invoice. Creating
+        // a row with `paidAt: null` in its `.values()` is not a cache write, and
+        // neither is a SELECT projection or a Zod field of the same name — which
+        // is why a bare identifier grep would be all noise.
+        const serverDir = path.resolve(__dirname, '../../../server');
+        const allowed = ['services/payment-ledger.service.ts'];
+        const offenders: string[] = [];
+
+        const walk = (dir: string) => {
+            for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, e.name);
+                if (e.isDirectory()) { walk(full); continue; }
+                if (!e.name.endsWith('.ts')) continue;
+                const rel = path.relative(serverDir, full).split(path.sep).join('/');
+                if (allowed.includes(rel)) continue;
+                const src = fs.readFileSync(full, 'utf8');
+                for (const block of src.match(/\.set\(\{[\s\S]*?\}\)/g) ?? []) {
+                    if (/\b(paidAt|partialPaidAt|amountPaidCents)\s*:/.test(block)) offenders.push(rel);
+                }
+            }
+        };
+        walk(serverDir);
+
+        expect([...new Set(offenders)]).toEqual([]);
     });
 });
 

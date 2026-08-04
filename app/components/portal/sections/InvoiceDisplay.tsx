@@ -31,6 +31,14 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, portalToken, just
   const total = invoice.total;
   const isPaid = invoice.status === "paid";
   const isVoid = invoice.status === "void";
+  // The full total, deliberately, even when the payment ledger says part of it
+  // has already arrived. The Stripe intent is minted server-side from the
+  // invoice's own `amountCents`, so showing a reduced balance here without
+  // reducing the charge would quote a price the payer is not about to be
+  // charged — worse than quoting the whole thing. Moving the two together is
+  // payment-COLLECTION behaviour (partial-payment minimums, over/underpayment,
+  // what a second intent means for the first), which the ledger enables but
+  // does not decide; it needs its own plan. Same call in checkout's PayCard.
   const balanceDue = isPaid ? 0 : total;
   const payable = !isPaid && !isVoid && balanceDue > 0;
   // IA-89 — Stripe has redirected back but the webhook has not settled the

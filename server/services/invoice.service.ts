@@ -7,6 +7,12 @@ import { safeISODate } from '../lib/date';
 import { AutomationService } from './automation.service';
 import { logger } from '../lib/logger';
 import type { PaymentMethod } from '../lib/payment-method';
+import {
+    recordPayment,
+    recomputeInvoicePaymentState,
+    getNetReceivedCents,
+    seedLedgerFromInvoiceRecord,
+} from './payment-ledger.service';
 
 function getStatus(inv: { sentAt: Date | null; paidAt: Date | null; partialPaidAt?: Date | null; voidedAt?: Date | null }): 'draft' | 'sent' | 'paid' | 'partial' | 'void' {
     if (inv.voidedAt) return 'void';
@@ -136,6 +142,11 @@ export class InvoiceService {
         await db.update(invoices).set({ sentAt: new Date() }).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
     }
 
+    /**
+     * Mark an invoice paid in full. Appends the outstanding remainder to the
+     * payment ledger; the invoice's paid/partial/amount columns are then
+     * recomputed from the ledger by its single writer, never set here.
+     */
     async markPaid(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi', method?: PaymentMethod): Promise<void> {
         const db = this.getDrizzle();
         const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
@@ -143,44 +154,94 @@ export class InvoiceService {
         // Idempotency: webhooks redeliver. A paid invoice stays paid with its
         // ORIGINAL timestamp — no double accounting, no date drift.
         if (existing.paidAt) return;
-        await db.update(invoices).set({
-            paidAt: new Date(),
-            partialPaidAt: null,
-            // Paid in full leaves no residual partial amount; a stale value here
-            // would let a paid invoice report an outstanding balance.
-            amountPaidCents: null,
-            // Record how it was paid; keep any existing value if the caller omits one.
-            paymentMethod: method ?? existing.paymentMethod ?? null,
-        }).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
+
+        // Record how it was paid; keep any existing value if the caller omits one.
+        const paymentMethod = method ?? existing.paymentMethod ?? null;
+        if (paymentMethod !== existing.paymentMethod) {
+            await db.update(invoices).set({ paymentMethod })
+                .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
+        }
+
+        const outstanding = existing.amountCents - await getNetReceivedCents(db, tenantId, id);
+        if (outstanding > 0) {
+            await recordPayment(db, tenantId, {
+                invoiceId: id,
+                inspectionId: existing.inspectionId,
+                kind: 'balance',
+                amountCents: outstanding,
+                method: paymentMethod ?? 'offline',
+            });
+        } else {
+            // Nothing left to collect (a zero-total invoice, or the ledger
+            // already covers it) — the cache still has to catch up.
+            await recomputeInvoicePaymentState(db, tenantId, id);
+        }
         void source; // consumed by route handler to decide QBO sync
     }
 
     /**
-     * Record that an invoice is partially paid. `amountPaidCents` is what has
-     * actually been RECEIVED, in integer cents; remaining is derived by the
+     * Record that an invoice is partially paid. `amountPaidCents` is the
+     * CUMULATIVE amount RECEIVED, in integer cents; remaining is derived by the
      * caller as `amountCents - amountPaidCents` because the invoice total is
      * the money authority, not any external system's view of it.
      *
-     * Omitting the amount means "partial, amount unknown" and clears any
-     * previously captured figure — a number left over from an earlier sync is
-     * not evidence of what is owed now.
+     * The amount is REQUIRED. It used to be optional, meaning "partial, amount
+     * unknown", which cleared any figure already captured. With a ledger there
+     * is no such state: every partial payment is one or more rows, and the sum
+     * of rows is always a known number. Making the parameter required is what
+     * makes that branch unreachable rather than merely unused — it cannot be
+     * called without one.
+     *
+     * The ledger row appended is the DELTA between the reported cumulative
+     * figure and what the ledger already holds, so a repeated sync of the same
+     * figure appends nothing and a figure that went DOWN records a refund.
      */
-    async markPartial(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi', amountPaidCents?: number): Promise<void> {
+    async markPartial(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi', amountPaidCents: number): Promise<void> {
         const db = this.getDrizzle();
-        await db.update(invoices).set({
-            partialPaidAt: new Date(),
-            paidAt: null,
-            amountPaidCents: amountPaidCents ?? null,
-        }).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
-        void source;
+        const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
+        if (!existing) throw Errors.NotFound('Invoice not found');
+
+        const delta = amountPaidCents - await getNetReceivedCents(db, tenantId, id);
+        if (delta === 0) {
+            await recomputeInvoicePaymentState(db, tenantId, id);
+            return;
+        }
+        await recordPayment(db, tenantId, {
+            invoiceId: id,
+            inspectionId: existing.inspectionId,
+            kind: delta > 0 ? 'balance' : 'refund',
+            amountCents: Math.abs(delta),
+            method: existing.paymentMethod ?? 'other',
+            provider: source === 'qbo' ? 'qbo' : null,
+        });
     }
 
+    /**
+     * Refund an invoice: appends a `refund` row reversing everything received,
+     * rather than nulling the columns. A fully refunded invoice therefore reads
+     * as "45000 received, 45000 refunded, 0 outstanding received" instead of a
+     * blank slate — more truthful, and the only version a reconciliation can
+     * check. An invoice paid before the ledger existed is seeded from its own
+     * record first, so there is something to reverse.
+     */
     async markRefunded(id: string, tenantId: string): Promise<void> {
         const db = this.getDrizzle();
         const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Invoice not found');
-        await db.update(invoices).set({ paidAt: null, partialPaidAt: null, amountPaidCents: null })
-            .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
+
+        await seedLedgerFromInvoiceRecord(db, tenantId, id);
+        const received = await getNetReceivedCents(db, tenantId, id);
+        if (received > 0) {
+            await recordPayment(db, tenantId, {
+                invoiceId: id,
+                inspectionId: existing.inspectionId,
+                kind: 'refund',
+                amountCents: received,
+                method: existing.paymentMethod ?? 'other',
+            });
+        } else {
+            await recomputeInvoicePaymentState(db, tenantId, id);
+        }
         await this.syncInspectionPaymentGate(existing.inspectionId, tenantId);
     }
 

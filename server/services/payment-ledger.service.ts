@@ -119,6 +119,93 @@ export async function recordPayment(
     return true;
 }
 
+/** Ledger rows for one invoice, projected to the three columns arithmetic needs. */
+async function ledgerRowsForInvoice(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    db: any,
+    tenantId: string,
+    invoiceId: string,
+): Promise<Array<{ kind: PaymentKind; amountCents: number; occurredAt: Date | number | null }>> {
+    // Explicit column projection, not select(): a wide invoice JOIN would run at
+    // D1's 100-column result cap, and we need three numbers.
+    return db.select({
+        kind: orderPayments.kind,
+        amountCents: orderPayments.amountCents,
+        occurredAt: orderPayments.occurredAt,
+    })
+        .from(orderPayments)
+        .where(and(
+            eq(orderPayments.tenantId, tenantId),
+            eq(orderPayments.invoiceId, invoiceId),
+            isNotNull(orderPayments.invoiceId),
+        ))
+        .all();
+}
+
+/**
+ * Cumulative amount RECEIVED against an invoice — receipts minus refunds.
+ * What a caller needs to work out an outstanding remainder without guessing.
+ */
+export async function getNetReceivedCents(
+    rawDb: AnyDb,
+    tenantId: string,
+    invoiceId: string,
+): Promise<number> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = await ledgerRowsForInvoice(rawDb as any, tenantId, invoiceId);
+    return rows.reduce((sum, r) => sum + signOf(r.kind) * r.amountCents, 0);
+}
+
+/**
+ * Give a PAID invoice that predates the ledger the one row its own record
+ * implies — the same row `scripts/backfill-payment-ledger.mjs` writes, so the
+ * runtime and the script cannot disagree about what a legacy invoice means.
+ *
+ * Does nothing when the ledger already has rows: the ledger, once it has an
+ * opinion, is the authority. No-op for unpaid, voided and zero-total invoices.
+ */
+export async function seedLedgerFromInvoiceRecord(
+    rawDb: AnyDb,
+    tenantId: string,
+    invoiceId: string,
+): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = rawDb as any;
+    const inv = await db.select({
+        id: invoices.id,
+        inspectionId: invoices.inspectionId,
+        amountCents: invoices.amountCents,
+        paidAt: invoices.paidAt,
+        voidedAt: invoices.voidedAt,
+        paymentMethod: invoices.paymentMethod,
+    })
+        .from(invoices)
+        .where(and(eq(invoices.tenantId, tenantId), eq(invoices.id, invoiceId)))
+        .get();
+    if (!inv || !inv.paidAt || inv.voidedAt || (inv.amountCents as number) <= 0) return;
+
+    const existing = await ledgerRowsForInvoice(db, tenantId, invoiceId);
+    if (existing.length > 0) return;
+
+    const paidAt = inv.paidAt instanceof Date ? inv.paidAt : new Date(Number(inv.paidAt));
+    await db.insert(orderPayments).values({
+        id: crypto.randomUUID(),
+        tenantId,
+        inspectionId: (inv.inspectionId as string | null) ?? null,
+        invoiceId,
+        kind: 'balance',
+        amountCents: inv.amountCents as number,
+        method: (inv.paymentMethod as PaymentMethodKind | null) ?? 'offline',
+        provider: null,
+        providerRef: null,
+        recordedBy: null,
+        refundsId: null,
+        note: 'backfilled from invoice record',
+        occurredAt: paidAt,
+        createdAt: new Date(),
+    }).onConflictDoNothing();
+}
+
 /**
  * Recompute an invoice's cached payment state from its ledger rows. THE ONLY
  * writer of `paid_at` / `partial_paid_at` / `amount_paid_cents`.
@@ -141,26 +228,18 @@ export async function recomputeInvoicePaymentState(
         .get();
     if (!inv) return;
 
-    // Explicit column projection, not select(): a wide invoice JOIN would run at
-    // D1's 100-column result cap, and we need three numbers.
-    const rows: Array<{ kind: PaymentKind; amountCents: number; occurredAt: Date | number | null }> =
-        await db.select({
-            kind: orderPayments.kind,
-            amountCents: orderPayments.amountCents,
-            occurredAt: orderPayments.occurredAt,
-        })
-            .from(orderPayments)
-            .where(and(
-                eq(orderPayments.tenantId, tenantId),
-                eq(orderPayments.invoiceId, invoiceId),
-                isNotNull(orderPayments.invoiceId),
-            ))
-            .all();
+    const total = inv.amountCents as number;
+    const rows = await ledgerRowsForInvoice(db, tenantId, invoiceId);
 
     // No rows at all means the ledger has nothing to say about this invoice —
     // NOT that nothing was paid. An invoice marked paid before the ledger
     // existed is exactly that case, and zeroing it would erase a real payment.
-    if (rows.length === 0) return;
+    //
+    // A ZERO-TOTAL invoice is the exception: there is no positive amount to
+    // append, so it can never acquire a row, and refusing to act would leave
+    // "mark this $0 invoice paid" permanently impossible — a regression against
+    // the column model this replaces.
+    if (rows.length === 0 && total > 0) return;
 
     let netCents = 0;
     let lastMovedAt = 0;
@@ -172,10 +251,9 @@ export async function recomputeInvoicePaymentState(
         const ms = r.occurredAt instanceof Date ? r.occurredAt.getTime() : Number(r.occurredAt ?? 0);
         if (ms > lastMovedAt) lastMovedAt = ms;
     }
-    const movedAt = new Date(lastMovedAt);
+    const movedAt = lastMovedAt > 0 ? new Date(lastMovedAt) : new Date();
 
-    const total = inv.amountCents as number;
-    const paidInFull = total > 0 && netCents >= total;
+    const paidInFull = netCents >= total;
     const partiallyPaid = !paidInFull && netCents > 0;
 
     await db.update(invoices).set({
