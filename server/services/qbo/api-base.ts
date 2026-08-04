@@ -229,7 +229,10 @@ export class QBOServiceBase {
                 retries:   existing.retries + 1,
                 errorMsg,
                 updatedAt: now,
-            }).where(eq(qboSyncErrors.id, existing.id));
+            }).where(and(
+                eq(qboSyncErrors.tenantId, tenantId),
+                eq(qboSyncErrors.id, existing.id),
+            ));
         } else {
             await db.insert(qboSyncErrors).values({
                 id:        crypto.randomUUID(),

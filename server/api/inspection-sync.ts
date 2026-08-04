@@ -99,7 +99,10 @@ const syncRoutes = createApiRouter()
 
     await db.update(inspectionResults)
         .set({ data: data as unknown as object, lastSyncedAt: new Date() })
-        .where(eq(inspectionResults.id, row.id));
+        .where(and(
+            eq(inspectionResults.tenantId, tenantId),
+            eq(inspectionResults.id, row.id),
+        ));
 
     if (deletedKey && c.env.PHOTOS) {
         await r2Delete(c.env.PHOTOS, deletedKey).catch(() => {});
@@ -198,7 +201,10 @@ const syncRoutes = createApiRouter()
 
     await db.update(inspections)
         .set({ templateSnapshot: tpl.schema, templateSnapshotVersion: tpl.version })
-        .where(eq(inspections.id, id));
+        .where(and(
+            eq(inspections.tenantId, tenantId),
+            eq(inspections.id, id),
+        ));
 
     auditFromContext(c, 'inspection.template_upgraded', 'inspection', {
         entityId: id, metadata: { from: fromVersion, to: tpl.version },
