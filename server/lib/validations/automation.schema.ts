@@ -7,6 +7,9 @@ const AUTOMATION_TRIGGERS = [
     'agreement.signer_signed',
     'agreement.viewed', 'agreement.declined', 'agreement.expired',
     'event.created', 'event.completed',
+    // The lab result arriving — see the schema comment: not the same event as
+    // the pickup being completed.
+    'event.results_received',
     // B3 — see the schema comment: a booking is not any inspection creation,
     // and completing an inspection is not publishing its report.
     'booking.received', 'inspection.completed',

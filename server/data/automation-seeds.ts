@@ -202,7 +202,37 @@ export const AUTOMATION_SEEDS = [
         recipientRoleKey: 'client' as const,
         delayMinutes:    0,
         subjectTemplate: '{{event_type_name}} results — {{property_address}}',
-        bodyTemplate:    '<p>Hi {{client_name}},</p><p>The results for your {{event_type_name}} at {{property_address}} are now available in your inspection report.</p><p>— {{company_name}}</p>',
+        // Names the report the results belong to. "your inspection report",
+        // singular, is the wrong document once an order carries more than one
+        // deliverable — the radon numbers are in the radon report, and pointing
+        // the client at the standard report sends them looking for something
+        // that is not there.
+        bodyTemplate:    '<p>Hi {{client_name}},</p><p>The results for your {{event_type_name}} at {{property_address}} are now available in your {{event_type_name}} report.</p><p>— {{company_name}}</p>',
+        isDefault: true,
+    },
+    // The lab result ARRIVING. Fires off `event.results_received`, which the
+    // office marks days after the pickup was completed — a different moment,
+    // a different actor, and the one the client is actually waiting on.
+    {
+        name:            'Event Results Received',
+        trigger:         'event.results_received' as const,
+        recipientKind:   'role' as const,
+        recipientRoleKey: 'client' as const,
+        delayMinutes:    0,
+        subjectTemplate: 'Your {{event_type_name}} results are in — {{property_address}}',
+        bodyTemplate:    '<p>Hi {{client_name}},</p><p>The results for your {{event_type_name}} at <strong>{{property_address}}</strong> have arrived and are now in your {{event_type_name}} report.</p><p><a href="{{report_url}}">View the report</a></p><p>— {{company_name}}</p>',
+        smsBody:         '{{company_name}}: your {{event_type_name}} results for {{property_address}} are in: {{report_url}} Reply STOP to opt out; questions? call {{company_phone}}',
+        isDefault: true,
+    },
+    {
+        name:            "Event Results Received (Buyer's Agent)",
+        trigger:         'event.results_received' as const,
+        recipientKind:   'role' as const,
+        recipientRoleKey: 'buyer_agent' as const,
+        delayMinutes:    0,
+        subjectTemplate: '{{event_type_name}} results are in — {{property_address}}',
+        bodyTemplate:    '<p>Hello,</p><p>The results for the {{event_type_name}} at <strong>{{property_address}}</strong> have arrived and are now in the {{event_type_name}} report.</p><p><a href="{{report_url}}">View the report</a></p><p>— {{company_name}}</p>',
+        smsBody:         '{{company_name}}: the {{event_type_name}} results for {{property_address}} are in: {{report_url}} Reply STOP to opt out; questions? call {{company_phone}}',
         isDefault: true,
     },
     // Track J (#122) — post-delivery follow-up. One day after the report is

@@ -95,9 +95,15 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             // an inspection-keyed dedup treats the second as a retry of the
             // first and never sends it. Callers that address the order as a
             // whole keep the inspection key.
-            const dedupEventId = ctx.triggerEvent === 'report.published'
-                ? `auto:report.published:${ctx.inspectionId}${ctx.reportId ? `:${ctx.reportId}` : ''}`
-                : null;
+            //
+            // A caller that names a REAL inspection_events row wins outright:
+            // that id is both the dedup key and what deliver-email resolves the
+            // event vars from, and a visit's terminal transition is exactly the
+            // "fires once" shape the index was built for.
+            const dedupEventId = ctx.eventId
+                ?? (ctx.triggerEvent === 'report.published'
+                    ? `auto:report.published:${ctx.inspectionId}${ctx.reportId ? `:${ctx.reportId}` : ''}`
+                    : null);
             // Track L — fan out one pending log per enabled channel, each stamped with
             // the channel-appropriate recipient (email address or normalized E.164 phone).
             const logs: (typeof automationLogs.$inferInsert)[] = [];

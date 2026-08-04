@@ -127,9 +127,44 @@ export class EventService {
         if (status === 'cancelled')        patch.cancelledAt       = new Date();
         await d.update(inspectionEvents).set(patch as never)
             .where(and(eq(inspectionEvents.id, id), eq(inspectionEvents.tenantId, tenantId))).run();
-        if (status === 'completed') {
-            const ev = await d.select().from(inspectionEvents).where(eq(inspectionEvents.id, id)).get();
-            if (ev) await this.scheduleFollowupLog(tenantId, id, ev.inspectionId as string, Date.now());
+        if (status === 'completed' || status === 'results_received') {
+            const ev = await d.select().from(inspectionEvents)
+                .where(and(eq(inspectionEvents.id, id), eq(inspectionEvents.tenantId, tenantId))).get();
+            if (ev && status === 'completed') {
+                await this.scheduleFollowupLog(tenantId, id, ev.inspectionId as string, Date.now());
+            } else if (ev) {
+                await this.fireResultsReceived(tenantId, id, ev.inspectionId as string);
+            }
+        }
+    }
+
+    /**
+     * The lab result arriving is a domain event with recipients, not just a
+     * timestamp. It goes through the ordinary automation fan-out instead of the
+     * hand-rolled pre-insert its two neighbours use: those exist only because
+     * their send time is COMPUTED (24h before the visit, N hours after it), and
+     * the price they pay is addressing exactly one recipient on exactly one
+     * channel. Results are "now", so every rule on the trigger, every channel it
+     * enables and every recipient it resolves apply — which is what makes the
+     * buyer's-agent and SMS seeds real rather than decorative.
+     *
+     * Never throws: a notification failure must not roll back the transition the
+     * office just recorded. `results_received_at` is already written above.
+     */
+    private async fireResultsReceived(tenantId: string, eventId: string, inspectionId: string): Promise<void> {
+        try {
+            const { AutomationService } = await import('./automation.service');
+            await new AutomationService(this.db).trigger({
+                tenantId, inspectionId,
+                triggerEvent: 'event.results_received',
+                companyName: '', reportBaseUrl: '',
+                // Carries the visit through to delivery: the copy names the
+                // event type from it, and a retry dedupes on it.
+                eventId,
+            });
+        } catch (err) {
+            logger.error('automation trigger failed', { event: 'event.results_received', eventId },
+                err instanceof Error ? err : undefined);
         }
     }
 

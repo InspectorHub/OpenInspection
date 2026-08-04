@@ -96,6 +96,7 @@
   "label_trigger_agreement_expired": "Acuerdo vencido",
   "label_trigger_event_created": "Evento creado",
   "label_trigger_event_completed": "Evento completado",
+  "label_trigger_event_results_received": "Resultados del evento recibidos",
   "label_cap_view_communication": "Ver mensajes y avisos enviados",
   "label_trigger_booking_received": "Reserva recibida",
   "label_trigger_inspection_completed": "Inspección completada"

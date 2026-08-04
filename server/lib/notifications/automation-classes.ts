@@ -46,6 +46,8 @@ const CLASS_BY_SEED: Record<string, string> = {
     "report.amended::Report Updated (Buyer's Agent)":           'report-amended-buyers-agent',
     'event.created::Event Reminder (24h before)':        'event-reminder',
     'event.completed::Event Follow-up (results ready)':  'event-followup',
+    'event.results_received::Event Results Received':    'event-results-received',
+    "event.results_received::Event Results Received (Buyer's Agent)": 'event-results-received-buyers-agent',
     'report.published::Post-inspection follow-up':       'post-inspection-followup',
     'report.published::Review request':                  'review-request',
 

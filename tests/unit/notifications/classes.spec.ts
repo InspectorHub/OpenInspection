@@ -65,6 +65,7 @@ const RECIPIENT_MAY_MUTE = [
     'inspection-reminder', 'inspection-cancelled', 'report-amended',
     'report-ready-listing-agent', 'booking-confirmation-buyers-agent',
     'report-amended-buyers-agent', 'event-reminder', 'event-followup',
+    'event-results-received', 'event-results-received-buyers-agent',
     'post-inspection-followup', 'review-request',
 ];
 

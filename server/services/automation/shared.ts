@@ -40,6 +40,17 @@ export interface TriggerContext {
      * the first. Absent for every non-report trigger.
      */
     reportId?:     string;
+    /**
+     * The `inspection_events` row this firing is about, when there is one.
+     *
+     * Two things depend on it and neither has another source: the delivered
+     * copy names the event type ({{event_type_name}}, resolved from the log's
+     * `event_id` in deliver-email.ts), and a retried status transition conflicts
+     * on `uq_automation_logs_event` instead of notifying the client twice —
+     * which holds only because these logs also carry an automation_id (see that
+     * index's comment). Absent for every trigger that is not about one visit.
+     */
+    eventId?:      string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

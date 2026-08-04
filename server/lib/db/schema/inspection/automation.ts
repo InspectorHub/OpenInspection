@@ -18,6 +18,14 @@ export const automations = sqliteTable('automations', {
             'agreement.signer_signed',
             'agreement.viewed', 'agreement.declined', 'agreement.expired',
             'event.created', 'event.completed',
+            // `event.results_received` is the lab result ARRIVING, which is the
+            // moment a radon client has been waiting 48 hours for. It is not
+            // `event.completed`: completing the pickup is the inspector's work
+            // finishing, and the sample only reaches the lab afterwards. The
+            // status was already writable (`inspection_events.results_received_at`)
+            // with no trigger to hang a rule on, so the single most important
+            // moment in a radon job notified nobody. Type-layer only — no DDL.
+            'event.results_received',
             // B3 — two events that raised a hard-coded staff alert but had no
             // trigger to hang a rule on. `booking.received` is NOT
             // `inspection.created`: a booking is a stranger arriving through
