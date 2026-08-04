@@ -1,7 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, desc, sql, isNotNull, isNull } from 'drizzle-orm';
+import { eq, and, asc, desc, sql, isNotNull, isNull } from 'drizzle-orm';
 import { invoices } from '../lib/db/schema/invoice';
-import { inspections, tenantConfigs } from '../lib/db/schema';
+import { orderPayments } from '../lib/db/schema/order-payment';
+import { inspections, tenantConfigs, users } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { AutomationService } from './automation.service';
@@ -186,6 +187,101 @@ export class InvoiceService {
         // already covers it) — the cache still has to catch up.
         await recomputeInvoicePaymentState(db, tenantId, id);
         return null;
+    }
+
+    /**
+     * Record money that already moved OUTSIDE the system — cash at the door, a
+     * cheque in the post. Appends exactly one ledger row; the invoice's derived
+     * columns are then recomputed by the ledger's single writer, never here.
+     *
+     * `occurredAt` is the caller's, not `now()`. The whole reason this endpoint
+     * exists rather than another `markPaid` is that the inspector records
+     * Tuesday's cash on Thursday, and a reporting period keyed on the write
+     * time is quietly wrong every month.
+     *
+     * Overpayment is refused unless the caller confirms it: it is real (a client
+     * rounds up) but far more often a decimal-point typo.
+     */
+    async recordOfflinePayment(tenantId: string, id: string, input: {
+        amountCents: number;
+        method: 'check' | 'cash' | 'offline' | 'other';
+        occurredAt: Date;
+        note?: string | null;
+        allowOverpayment?: boolean;
+        recordedBy: string;
+    }): Promise<AppendedPayment> {
+        const db = this.getDrizzle();
+        const existing = await db.select().from(invoices)
+            .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
+        if (!existing) throw Errors.NotFound('Invoice not found');
+        if (existing.voidedAt) throw Errors.Conflict('This invoice is void; it cannot take a payment.');
+
+        // An invoice paid before the ledger existed has no rows at all, so the
+        // outstanding figure below would read as the full total and every
+        // further payment would look like an overpayment. Give it the one row
+        // its own record implies first.
+        await seedLedgerFromInvoiceRecord(db, tenantId, id);
+        const outstanding = existing.amountCents - await getNetReceivedCents(db, tenantId, id);
+        if (!input.allowOverpayment && input.amountCents > outstanding) {
+            throw Errors.UnprocessableEntity(
+                `This payment exceeds the outstanding balance on this invoice (${Math.max(outstanding, 0)} cents remaining). Confirm the overpayment if the amount is right.`,
+            );
+        }
+
+        const appended = await recordPayment(db, tenantId, {
+            invoiceId: id,
+            inspectionId: existing.inspectionId,
+            // A receipt against the invoice. `deposit` is reserved for money
+            // taken at booking time, before any invoice exists to point at.
+            kind: 'balance',
+            amountCents: input.amountCents,
+            method: input.method,
+            // No provider and no provider_ref: this money moved outside every
+            // system we integrate with, so there is nothing to reconcile against.
+            provider: null,
+            providerRef: null,
+            recordedBy: input.recordedBy,
+            note: input.note ?? null,
+            occurredAt: input.occurredAt,
+        });
+        // `recordPayment` answers null only for a provider redelivery, and an
+        // offline row carries no provider. Narrow rather than assert, so a
+        // future change to that contract surfaces here instead of as a null
+        // body on a 201.
+        if (!appended) throw Errors.Conflict('This payment was already recorded.');
+        return appended;
+    }
+
+    /**
+     * Every ledger row for one invoice, oldest movement first, with the
+     * recording user's name resolved.
+     *
+     * Ordered by `occurred_at`, not `created_at`: the list is a record of when
+     * money moved, and Thursday's data entry of Tuesday's cash belongs before
+     * Wednesday's cheque. `created_at` breaks ties so the order is total.
+     */
+    async listPayments(tenantId: string, id: string) {
+        const db = this.getDrizzle();
+        // Explicit column projection — a `select()` across this join runs at
+        // D1's 100-column result cap for no benefit.
+        const rows = await db.select({
+            id: orderPayments.id,
+            kind: orderPayments.kind,
+            amountCents: orderPayments.amountCents,
+            method: orderPayments.method,
+            provider: orderPayments.provider,
+            note: orderPayments.note,
+            occurredAt: orderPayments.occurredAt,
+            recordedBy: orderPayments.recordedBy,
+            recordedByName: users.name,
+            refundsId: orderPayments.refundsId,
+        })
+            .from(orderPayments)
+            .leftJoin(users, eq(users.id, orderPayments.recordedBy))
+            .where(and(eq(orderPayments.tenantId, tenantId), eq(orderPayments.invoiceId, id)))
+            .orderBy(asc(orderPayments.occurredAt), asc(orderPayments.createdAt))
+            .all();
+        return rows.map(r => ({ ...r, occurredAt: safeISODate(r.occurredAt) }));
     }
 
     /**

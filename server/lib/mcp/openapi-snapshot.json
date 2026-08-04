@@ -10607,6 +10607,34 @@
     "description": "Returns the retained \"Test connection\" history for the active tenant (≤5 per integration, newest first). Backs the persisted \"Last tested …\" status shown next to each Test connection button."
   },
   {
+    "operationId": "listInvoicePayments",
+    "method": "GET",
+    "pathTemplate": "/api/invoices/{id}/payments",
+    "scopes": [
+      "read"
+    ],
+    "tag": "invoices",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Invoice whose ledger rows to return.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Invoice whose ledger rows to return."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the payment ledger for an invoice",
+    "description": "Returns every payment-ledger row recorded against one invoice, ordered by when the money moved, with the recording user resolved. Once an invoice can hold several payments a single total no longer answers a dispute."
+  },
+  {
     "operationId": "listInvoices",
     "method": "GET",
     "pathTemplate": "/api/invoices",
@@ -15377,6 +15405,36 @@
     },
     "summary": "Save tenant integration API secrets",
     "description": "Save integration secrets. Masked values (containing bullet characters) are skipped — they indicate unchanged fields."
+  },
+  {
+    "operationId": "recordInvoiceOfflinePayment",
+    "method": "POST",
+    "pathTemplate": "/api/invoices/{id}/payments",
+    "scopes": [
+      "write"
+    ],
+    "tag": "invoices",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Invoice the money was received against.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Invoice the money was received against."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/RecordOfflinePayment"
+      }
+    },
+    "summary": "Record an offline payment against an invoice",
+    "description": "Appends one payment-ledger row for money received outside the system (cash, cheque, other offline method). The date the money moved is supplied by the caller, never defaulted to now, and the recording user is taken from the session."
   },
   {
     "operationId": "redeemAgentMagicLogin",
