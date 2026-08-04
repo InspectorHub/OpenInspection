@@ -47,8 +47,9 @@ export const SUPPORTED_CONTACT_LOCALES = ['en', 'es-419'] as const;
 /** A locale the product can actually speak. */
 export type ContactLocale = (typeof SUPPORTED_CONTACT_LOCALES)[number];
 
-/** The base locale, used when nothing else resolves. */
-export const DEFAULT_CONTACT_LOCALE: ContactLocale = 'en';
+/** The base locale, used when nothing else resolves. Module-local: exporting it
+ *  with no consumer is a knip finding, and the resolver is the only caller. */
+const DEFAULT_CONTACT_LOCALE: ContactLocale = 'en';
 
 /**
  * A BCP-47 tag reduced to a locale we have messages for, or `null` when we
