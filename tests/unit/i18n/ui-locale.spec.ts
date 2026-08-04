@@ -146,9 +146,22 @@ describe('withResolvedUiLocale (the seam)', () => {
 
     it('leaves the request untouched once the cookie already agrees', () => {
         const original = req({ Cookie: 'PARAGLIDE_LOCALE=es-419', 'Accept-Language': 'en-US' });
-        // Identity, not equality: the steady state must not allocate a Request
-        // per page load, and must not risk dropping anything a copy would.
+        // Identity, not equality: once a choice has been persisted there is
+        // nothing to rewrite, and a copy that dropped anything off the request
+        // would be a cost paid on every page load for no benefit.
         expect(withResolvedUiLocale(original)).toBe(original);
+    });
+
+    it('does not persist what it resolved — pre-auth there is no choice yet', () => {
+        // An anonymous visitor's language is re-read from Accept-Language every
+        // request rather than frozen into a cookie they never chose. Asserted
+        // because the alternative looks like a harmless optimisation: stamping
+        // here would outrank the browser on the NEXT request and a visitor who
+        // switched their browser language would be stuck.
+        const first = withResolvedUiLocale(req({ 'Accept-Language': 'es-419' }));
+        expect(readUiLocaleCookie(first.headers.get('Cookie'))).toBe('es-419');
+        const second = withResolvedUiLocale(req({ 'Accept-Language': 'en-US' }));
+        expect(readUiLocaleCookie(second.headers.get('Cookie'))).toBe('en');
     });
 
     it('rewrites a stale tag the cookie contract cannot serve', () => {

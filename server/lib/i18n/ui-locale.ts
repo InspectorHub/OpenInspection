@@ -124,8 +124,21 @@ export function setUiLocaleInCookieHeader(
  * surface that knows them (`auth-layout`'s loader, and the switcher).
  *
  * Returns the ORIGINAL request untouched when the cookie already says the right
- * thing, which is every request after the first — so the steady-state cost is
- * one header read.
+ * thing.
+ *
+ * It does NOT persist what it resolved, and that is deliberate rather than an
+ * omission. Nothing pre-auth constitutes an explicit choice — the switcher
+ * lives in the authenticated sidebar — so an anonymous visitor's language is
+ * re-read from `Accept-Language` on every request, which is both stateless and
+ * correct: change the browser's language and the next page follows, with no
+ * stale cookie to fight. Persistence begins where a CHOICE begins, at
+ * `uiLocaleStampFor` (a stored preference) and the switcher (a click).
+ *
+ * One consequence to keep in mind when reading `uiLocaleStampFor`: by the time
+ * a loader runs, the header this rewrote is what it sees, so the "cookie" rung
+ * downstream is the locale ALREADY IN EFFECT, not necessarily one the browser
+ * ever stored. That is what makes the stamp fire only when a stored preference
+ * genuinely disagrees with the rendered page.
  */
 export function withResolvedUiLocale(request: Request): Request {
     const cookieHeader = request.headers.get('Cookie');

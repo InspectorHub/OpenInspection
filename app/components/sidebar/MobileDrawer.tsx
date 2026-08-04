@@ -2,6 +2,7 @@ import { NavLink } from "react-router";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { IC, WORKSPACE_ITEMS } from "~/components/sidebar/nav-items";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
+import { LocaleSwitcher } from "~/components/LocaleSwitcher";
 import { Avatar, Icon } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
@@ -95,6 +96,13 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
           <div className="px-1 py-0.5">
             <div className="text-[10px] font-bold text-ih-fg-4 uppercase tracking-wide mb-1.5 px-1">{m.nav_theme_label()}</div>
             <ThemeSegmentControl className="w-full" />
+          </div>
+          {/* Language (#269) — the mobile drawer is the phone's user menu, so
+              the switcher has to be here too or it is desktop-only. */}
+          <div className="px-1 py-0.5">
+            {/* ih-fg-3 — see the note in UserMenuPopover; ih-fg-4 fails AA. */}
+            <div className="text-[10px] font-bold text-ih-fg-3 uppercase tracking-wide mb-1.5 px-1">{m.nav_language_label()}</div>
+            <LocaleSwitcher className="w-full" />
           </div>
           <div className="flex items-center gap-2.5 px-2 py-1">
             <Avatar name={ctx?.user?.name || ""} size={28} variant="self" fallbackIcon="OI" />

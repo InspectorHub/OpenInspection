@@ -74,6 +74,33 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return data({ context: sessionContext }, { headers });
 }
 
+/**
+ * Surfaces the loader's `Set-Cookie` on the document response.
+ *
+ * Without this the stamp above is silently dropped: React Router does not
+ * propagate a nested loader's headers by default — it uses the deepest
+ * `headers` export it can find, and if no route on the branch exports one, the
+ * loader's headers go nowhere. Verified against a running server rather than
+ * assumed: before this existed, `document.cookie` held no PARAGLIDE_LOCALE
+ * after any number of authenticated page loads, and the language a viewer had
+ * saved in Settings never took effect.
+ *
+ * Only `Set-Cookie` is forwarded. Passing `loaderHeaders` through wholesale
+ * would let any future header set on this loader leak onto every authenticated
+ * document response, including caching directives that must not apply to a
+ * per-viewer page.
+ *
+ * No other route on this branch exports `headers` (asserted by
+ * `auth-layout-headers.test.ts`) — one that did would win as the deeper export
+ * and would have to forward this itself.
+ */
+export function headers({ loaderHeaders }: Route.HeadersArgs) {
+  const out = new Headers();
+  const cookie = loaderHeaders.get("Set-Cookie");
+  if (cookie) out.append("Set-Cookie", cookie);
+  return out;
+}
+
 export default function AuthLayout() {
   const { context } = useLoaderData<typeof loader>();
   const navigation = useNavigation();

@@ -209,6 +209,23 @@ export async function action({ request, context }: Route.ActionArgs) {
     );
   }
 
+  // The language switcher (#269) lives in the sidebar user menu, not on this
+  // page, and submits here through a fetcher — this action is already the one
+  // place `users.locale` is written, and a second writer would be a second set
+  // of rules about what a valid stored tag is.
+  //
+  // Its own intent rather than the default branch: that branch parses the WHOLE
+  // profile form, and a submission carrying two fields would fail validation on
+  // everything the switcher does not know about.
+  if (intent === "set-locale") {
+    const res = await api.profile.index.$patch({ json: { locale: String(fd.get("locale") ?? "") } });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: (err as Record<string, string>)?.message || m.settings_error_save_failed(), intent };
+    }
+    return { success: true, error: null, intent };
+  }
+
   // The email-signature toggle saves itself (it is no longer inside the profile
   // form), so it needs its own intent rather than riding the default branch.
   if (intent === "signature-toggle") {
