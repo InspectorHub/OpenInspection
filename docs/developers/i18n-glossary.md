@@ -468,6 +468,25 @@ Fixed while translating `settings-integrations.json` (294 keys).
 | Built-in | Integrado | — | A platform-supplied template or referral source, against the tenant's own. |
 | Estimated monthly cost | Costo mensual estimado | — | The one place *estimado* is the right word — see the Estimate row, which bans the noun and not this adjective. The figure itself is *un cálculo aproximado*, never *un estimado*. |
 
+### Authentication
+
+Fixed while finishing `auth.json` (126 keys beyond the 15-key login pilot). This
+module is almost entirely imperatives, which is where the register decision is
+either kept or quietly lost — the gate catches *tus*, it does not catch
+*Ingresa*.
+
+<!-- gate:terms -->
+
+| English | es-419 | Never | Why |
+|---|---|---|---|
+| Log in / Sign in | Iniciar sesión | loguearse, iniciar la sesión | English uses both verbs for one act; Spanish has one. "Log In" and "Sign in" therefore land on the same string, and "Back to log in" / "Back to sign in" both become *Volver al inicio de sesión* — the destination is the page, not the act. Still distinct from *Firmar*, which signs a document. |
+| Reset (a password) | Restablecer | resetear | *Resetear* is an anglicism. "Reset link" → *enlace de restablecimiento*. |
+| Setup (first-run) | Configuración inicial | — | Distinguished from Settings → *Configuración*, which is the ongoing page. The `SETUP_CODE` secret name and the Cloudflare dashboard path beside it stay English. |
+| Sign up | Registrarse | — | Creating an account. Distinct from *Iniciar sesión*. |
+| Partner agent | agente asociado | — | The agent-portal relationship. |
+| Referral (an agent's) | referencia | — | Also *Fuentes de referencia* in company settings; one root for both. |
+| You have been invited | Usted recibió una invitación | — | The passive shape avoids *Ha sido invitado/invitada*: the catalogue cannot know the reader's gender, and every second-person sentence in `auth` has to survive that. Prefer a construction with no participle agreeing with the reader. |
+
 ## Register enforcement
 
 Every entry here is wrong in `es-419` in every context, which is what makes it
