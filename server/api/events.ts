@@ -2,6 +2,7 @@ import {} from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
+import { isAdminRole } from '../lib/auth/roles';
 import { Errors } from '../lib/errors';
 
 const TypeBody = z.object({
@@ -83,6 +84,19 @@ const eventsRoutes = createApiRouter()
         const id = c.req.param('id') as string;
         const parsed = EventStatusBody.safeParse(await c.req.json());
         if (!parsed.success) throw Errors.BadRequest('Invalid status', parsed.error.flatten().fieldErrors);
+        // Completing a visit is the FIELD's own act: the inspector standing on
+        // site is the person who knows it is over, so every role on this route
+        // may do it. Recording that lab RESULTS arrived is an office act about a
+        // different event entirely, so it is owner/manager.
+        //
+        // The distinction is body-dependent — one method, one path, two very
+        // different transitions — so route-level `requireRole` cannot express
+        // it. `visitActions` (app/components/inspector-portal/VisitsCard.tsx)
+        // declines to OFFER the verb; this is where it is ENFORCED, so a
+        // hand-rolled request cannot walk around the UI.
+        if (parsed.data.status === 'results_received' && !isAdminRole(c.get('userRole'))) {
+            throw Errors.Forbidden('Requires one of [owner, manager]');
+        }
         await c.var.services.event.updateEventStatus(c.get('tenantId'), id, parsed.data.status);
         return c.json({ success: true });
     })
