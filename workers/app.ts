@@ -10,6 +10,11 @@ import { buildOAuthHandler } from "../server/lib/mcp/oauth-provider";
 // module-global) across the multi-tenant Worker. Generated (git-ignored); the
 // paraglide vite plugin + the prebuild `i18n:compile` step keep it present.
 import { paraglideMiddleware } from "../app/paraglide/server.js";
+// i18n activation (#269) — the request-borne half of locale resolution. Runs
+// BEFORE paraglideMiddleware because paraglide reads the locale off the
+// INCOMING request: a locale decided later cannot change the render that is
+// already under way. See the seam note in ui-locale.ts.
+import { withResolvedUiLocale } from "../server/lib/i18n/ui-locale";
 import type { WorkerEnv } from "./env";
 import { cloudflareContext } from "../app/lib/load-context";
 
@@ -60,7 +65,13 @@ const ssr = (c: Ctx) => {
   // middleware: it has to cover loaders, actions, AND the render pass, and only
   // the outer position does. Moving it inside would narrow the scope silently —
   // locale would fall back to baseLocale with nothing raising an error.
-  return paraglideMiddleware(c.req.raw, ({ request }) =>
+  //
+  // withResolvedUiLocale stamps the resolved locale into the Cookie header the
+  // middleware is about to read, so a first visit renders in the visitor's
+  // language instead of English-then-Spanish. It returns the SAME request
+  // object once the cookie already agrees, which is every request after the
+  // first — the steady-state cost here is one header read.
+  return paraglideMiddleware(withResolvedUiLocale(c.req.raw), ({ request }) =>
     requestHandler(request, context),
   );
 };

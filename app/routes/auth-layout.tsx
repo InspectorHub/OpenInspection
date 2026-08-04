@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Outlet, useLoaderData, useLocation, useNavigate, useNavigation } from "react-router";
+import { data, Outlet, useLoaderData, useLocation, useNavigate, useNavigation } from "react-router";
+import { uiLocaleStampFor } from "../../server/lib/i18n/ui-locale";
 import type { Route } from "./+types/auth-layout";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -43,7 +44,34 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   } catch {
     // Graceful fallback — layout renders with defaults
   }
-  return { context: sessionContext };
+
+  // i18n activation (#269) — the DATABASE half of locale resolution.
+  //
+  // The worker entry resolves the request-borne rungs (the PARAGLIDE_LOCALE
+  // cookie, then Accept-Language) before the paraglide scope opens. It cannot
+  // read the other two: `users.locale` and `tenant_configs.default_locale` live
+  // in D1, and querying them ahead of the router on every page load — for a
+  // value that changes about once per user per career — is not a trade worth
+  // making. They arrive here instead, on the one loader that already fetches
+  // the session context for every authenticated page, at no extra query.
+  //
+  // By the time this runs the render has already committed to a locale, so the
+  // stored preference is STAMPED INTO THE COOKIE and takes effect from the next
+  // request. The cost is one render in the previous language, on the single
+  // page load where a stored preference first differs from the cookie. It
+  // cannot oscillate: the value written is the same value this chain resolves
+  // once the cookie carries it, so the next request finds them equal and writes
+  // nothing. The switcher (LocaleSwitcher) is the interactive path and does not
+  // pay this lag — it writes the cookie itself and revalidates.
+  const headers = new Headers();
+  const stamp = sessionContext
+    ? uiLocaleStampFor(request, {
+        userLocale: sessionContext.user?.locale ?? null,
+        tenantDefault: sessionContext.branding?.defaultLocale ?? null,
+      })
+    : null;
+  if (stamp) headers.append("Set-Cookie", stamp);
+  return data({ context: sessionContext }, { headers });
 }
 
 export default function AuthLayout() {

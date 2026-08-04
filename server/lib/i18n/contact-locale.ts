@@ -47,9 +47,9 @@ export const SUPPORTED_CONTACT_LOCALES = ['en', 'es-419'] as const;
 /** A locale the product can actually speak. */
 export type ContactLocale = (typeof SUPPORTED_CONTACT_LOCALES)[number];
 
-/** The base locale, used when nothing else resolves. Module-local: exporting it
- *  with no consumer is a knip finding, and the resolver is the only caller. */
-const DEFAULT_CONTACT_LOCALE: ContactLocale = 'en';
+/** The base locale, used when nothing else resolves. Shared with `ui-locale.ts`
+ *  so the recipient chain and the UI chain cannot end at different languages. */
+export const DEFAULT_CONTACT_LOCALE: ContactLocale = 'en';
 
 /**
  * A BCP-47 tag reduced to a locale we have messages for, or `null` when we
@@ -75,8 +75,12 @@ export function normalizeLocale(raw: string | null | undefined): ContactLocale |
  * Entries are ranked by their `q` weight (absent means 1), ties broken by the
  * order sent, and unsupported entries are skipped rather than stopping the
  * scan — `fr-FR,es-MX;q=0.9` means Spanish here, not English.
+ *
+ * Exported for `ui-locale.ts`: the UI chain reads the SAME header off the same
+ * request and must rank it identically, or a visitor's browser would mean one
+ * language for the page and another for the notification the page sends.
  */
-function fromAcceptLanguage(header: string | null | undefined): ContactLocale | null {
+export function localeFromAcceptLanguage(header: string | null | undefined): ContactLocale | null {
     if (!header) return null;
     return header
         .split(',')
@@ -114,6 +118,6 @@ export function resolveContactLocale(input: ContactLocaleInput): ContactLocale {
     return normalizeLocale(input.contactLocale)
         ?? normalizeLocale(input.linkedUserLocale)
         ?? normalizeLocale(input.tenantDefault)
-        ?? fromAcceptLanguage(input.acceptLanguage)
+        ?? localeFromAcceptLanguage(input.acceptLanguage)
         ?? DEFAULT_CONTACT_LOCALE;
 }
