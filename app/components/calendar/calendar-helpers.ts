@@ -92,8 +92,34 @@ export function calendarItemToEvent(item: CalendarItem): CalendarEvent {
       ...(item.inspectionId ? { inspectionId: item.inspectionId } : {}),
       ...(item.userId ? { userId: item.userId } : {}),
       ...(typeof item.meta?.notes === "string" ? { notes: item.meta.notes } : {}),
+      ...(typeof item.meta?.durationMin === "number" ? { durationMin: item.meta.durationMin } : {}),
     },
   };
+}
+
+/**
+ * Where tapping this item should take someone — or `null` when the answer is
+ * "nowhere".
+ *
+ * An inspector opening the calendar on a phone in a driveway is choosing a JOB.
+ * The modal used to offer "Open inspection" for every item that had an id and
+ * fall back to `event.id` when no inspection id was carried, so a company
+ * holiday — whose id is `holiday:2026-08-04` — navigated to
+ * `/inspections/holiday:2026-08-04`. Landing on a 404 in a crawlspace is the
+ * failure this function exists to remove: an item with nowhere to go says so by
+ * returning null, and the caller renders no action at all rather than a
+ * confident button into nothing.
+ *
+ * A VISIT (`inspection_event`) resolves to its inspection, never to its own id:
+ * `/inspections/<event id>` is the same 404 wearing a different hat.
+ */
+export function calendarItemHref(event: CalendarEvent): string | null {
+  const kind = event.extendedProps?.kind;
+  const inspectionId = event.extendedProps?.inspectionId;
+  if (typeof inspectionId === "string" && inspectionId) return `/inspections/${inspectionId}`;
+  // An inspection item carries its own id as the inspection id.
+  if (kind === "inspection" && event.id) return `/inspections/${event.id}`;
+  return null;
 }
 
 export function isEventDraggable(event: CalendarEvent): boolean {

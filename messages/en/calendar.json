@@ -60,5 +60,8 @@
   "calendar_sync_not_connected": "Calendar not connected",
   "calendar_sync_stale_short": "Out of sync",
   "calendar_sync_not_connected_short": "Not connected",
-  "calendar_sync_never": "Never synced"
+  "calendar_sync_never": "Never synced",
+  "calendar_event_time_label": "Time:",
+  "calendar_event_time_range": "{start} - {end}",
+  "calendar_event_status_results_received": "Results received"
 }

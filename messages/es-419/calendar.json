@@ -60,5 +60,8 @@
   "calendar_sync_not_connected": "Calendario sin conectar",
   "calendar_sync_stale_short": "Desincronizado",
   "calendar_sync_not_connected_short": "Sin conectar",
-  "calendar_sync_never": "Nunca se sincronizó"
+  "calendar_sync_never": "Nunca se sincronizó",
+  "calendar_event_time_label": "Hora:",
+  "calendar_event_time_range": "{start} - {end}",
+  "calendar_event_status_results_received": "Resultados recibidos"
 }
