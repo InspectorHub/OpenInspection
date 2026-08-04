@@ -4,7 +4,7 @@ import type { Route } from "./+types/inspector-portal";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
-import { useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import {
   deriveBlockStates,
   formatCents,
@@ -510,6 +510,7 @@ export default function InspectionHubPage() {
   // list PeopleEditor renders. Two different shapes, hence the rename here.
   const { inspection, people: peopleCard, services, tenantSlug } = hub;
   const displayTz = useDisplayTimeZone();
+  const fmt = useInspectionDateTimeFormat();
   const blocks = deriveBlockStates(hub);
   const navigate = useNavigate();
   const revalidator = useRevalidator();
@@ -720,7 +721,7 @@ export default function InspectionHubPage() {
               {humanizeStatus(inspection.status)}
             </Pill>
             <span className="text-ih-fg-3">
-              {formatInspectionDateTime(inspection.date, undefined, displayTz)}
+              {formatInspectionDateTime(inspection.date, undefined, displayTz, fmt)}
             </span>
             {peopleCard.inspector?.name && (
               <span className="text-ih-fg-3">&middot; {peopleCard.inspector.name}</span>
@@ -862,7 +863,7 @@ export default function InspectionHubPage() {
               <p className="text-[12px] text-ih-fg-3 mb-3">
                 {publishedAt
                   ? m.inspections_hub_report_published_on({
-                      date: formatInspectionDateTime(new Date(publishedAt * 1000).toISOString(), undefined, displayTz),
+                      date: formatInspectionDateTime(new Date(publishedAt * 1000).toISOString(), undefined, displayTz, fmt),
                     })
                   : m.inspections_hub_report_published()}
               </p>
@@ -996,7 +997,7 @@ export default function InspectionHubPage() {
                           )}
                           {v.publishedAt && (
                             <span className="text-[11px] text-ih-fg-4">
-                              {formatInspectionDateTime(new Date(v.publishedAt * 1000).toISOString(), undefined, displayTz)}
+                              {formatInspectionDateTime(new Date(v.publishedAt * 1000).toISOString(), undefined, displayTz, fmt)}
                             </span>
                           )}
                         </div>
@@ -1028,7 +1029,7 @@ export default function InspectionHubPage() {
               unlockedAt={inspection.unlockedAt ?? null}
               unlockedByName={inspection.unlockedByName ?? null}
               unlockReason={inspection.unlockReason ?? null}
-              formatDate={(iso) => formatInspectionDateTime(iso, undefined, displayTz)}
+              formatDate={(iso) => formatInspectionDateTime(iso, undefined, displayTz, fmt)}
             />
           )}
         </Card>

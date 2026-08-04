@@ -62,15 +62,27 @@ export function formatRelativeTime(
   return fmt.format(0, "minute");
 }
 
+/**
+ * `hourCycle` is the CLOCK, which is a separate axis from the locale (#270):
+ * en-US implies h12 and en-GB implies h23, but "English words, 24-hour clock"
+ * is a normal field preference and no locale expresses it. Omit it to keep the
+ * locale's own convention.
+ */
 export function formatTime(
   value: DateInput,
-  opts: { locale: string; timeZone?: string; timeZoneName?: "short" | "long" },
+  opts: {
+    locale: string;
+    timeZone?: string;
+    timeZoneName?: "short" | "long";
+    hourCycle?: "h12" | "h23";
+  },
 ): string {
   const d = toDate(value);
   if (!d) return "";
   return new Intl.DateTimeFormat(opts.locale, {
-    hour: "numeric",
+    hour: opts.hourCycle === "h23" ? "2-digit" : "numeric",
     minute: "2-digit",
+    ...(opts.hourCycle ? { hourCycle: opts.hourCycle } : {}),
     ...(opts.timeZone
       ? { timeZone: opts.timeZone, ...(opts.timeZoneName ? { timeZoneName: opts.timeZoneName } : {}) }
       : {}),

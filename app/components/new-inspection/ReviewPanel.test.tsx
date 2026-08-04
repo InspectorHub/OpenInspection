@@ -4,6 +4,13 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { ReviewPanel } from "./ReviewPanel";
 import type { NewInspectionSummary } from "~/lib/wizard-review";
 
+// The panel renders a scheduled datetime, so it reads the session display
+// preferences (#270). These hooks go through useRouteLoaderData, which throws
+// outside a data router — this suite renders bare, so it stubs them.
+vi.mock("~/hooks/useSessionContext", () => ({
+    useInspectionDateTimeFormat: () => ({ locale: "en-US", dateFormat: "us", timeFormat: "12h" }),
+}));
+
 afterEach(cleanup);
 
 const FULL: NewInspectionSummary = {

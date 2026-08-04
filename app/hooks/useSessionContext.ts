@@ -137,3 +137,23 @@ export function useTenantFormatPrefs(): { dateFormat: DateFormat; timeFormat: Ti
   const ctx = useSessionContext();
   return resolveDisplayPrefs(null, ctx?.branding);
 }
+
+/**
+ * The format bundle for anything a SECOND PARTY also reads — inspection dates,
+ * report dates, appointment times (#270).
+ *
+ * The two axes resolve from different places on purpose. **Language** follows
+ * the viewer, because a Spanish-speaking agent should read Spanish. **Shape**
+ * follows the tenant, because `Sep 11` on one screen and `11/09` on another is
+ * a support call and, on a date-sensitive transaction, a missed appointment.
+ * Translating a month name cannot be misread; reordering one can.
+ */
+export function useInspectionDateTimeFormat(): {
+  locale: string;
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
+} {
+  const locale = useDisplayLocale();
+  const prefs = useTenantFormatPrefs();
+  return { locale, ...prefs };
+}

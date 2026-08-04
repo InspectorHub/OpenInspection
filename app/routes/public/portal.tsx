@@ -14,7 +14,7 @@ import type { Route } from "./+types/portal";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
-import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
+import { brandFormat, brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
 import InspectionList, { type InspectionRow } from "~/components/portal/InspectionList";
 import { PublicLegalFooter } from "~/components/PublicLegalFooter";
 import { signOut } from "~/components/portal/sign-out";
@@ -65,7 +65,7 @@ export async function loader({
         const inspections = data.inspections.map((row) => ({
           ...row,
           date: row.date
-            ? formatInspectionDateTime(row.date, undefined, brand.defaultTimezone)
+            ? formatInspectionDateTime(row.date, undefined, brand.defaultTimezone, brandFormat(brand))
             : row.date,
         }));
         return { authed: true, tenant, email: data.email, inspections, brand };

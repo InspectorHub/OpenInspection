@@ -6,6 +6,7 @@ import { ErrorState } from "~/components/ErrorState";
 import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
 import { ViewerTimeZoneNotice } from "~/components/public/ViewerTimeZoneNotice";
 import { m } from "~/paraglide/messages";
+import { getLocale } from "~/paraglide/runtime";
 
 export function meta() {
   return [{ title: m.concierge_confirm_meta_title() }];
@@ -71,7 +72,12 @@ export async function action({ params, context }: Route.ActionArgs) {
 function ConciergeConfirmBody() {
   const { view, status, date } = useLoaderData<typeof loader>();
   const tz = useViewerTimeZone();
-  const displayDate = date ? formatInspectionDateTime(date, undefined, tz) : date;
+  // This surface carries no tenant slug and no session (see the loader), so
+  // there is no tenant locale or shape to read. The page's own UI language is
+  // the only honest answer; the shape stays at the product default.
+  const displayDate = date
+    ? formatInspectionDateTime(date, undefined, tz, { locale: getLocale() })
+    : date;
   const nav = useNavigation();
   const submitting = nav.state === "submitting";
 
