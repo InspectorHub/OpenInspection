@@ -354,6 +354,45 @@ than any other module — so these are the rows the client-facing waves inherit.
 | Compliance | Cumplimiento | — | |
 | Not applicable | No aplica | — | Spelled out where English spells it out; *N/A* stays *N/A*. |
 
+## Settings, account and team
+
+Fixed while translating `settings.json` (244 keys). These words are the chrome
+of every settings surface and most of them recur in `settings-components`,
+`settings-integrations`, `misc`, `nav` and `communication`, so they are decided
+once here.
+
+<!-- gate:terms -->
+
+| English | es-419 | Never | Why |
+|---|---|---|---|
+| Settings | Configuración | ajustes | Singular. It is the page name, the breadcrumb and the nav entry; *Ajustes* is the other common rendering and picking one is the point. Only the **plural** is banned: the singular *ajuste* is the ordinary word for an adjustment and is already load-bearing elsewhere (*preajuste de estilo* = style preset), so banning it would false-fire. |
+| Account | Cuenta | — | |
+| Profile | Perfil | — | |
+| Billing | Facturación | — | The area. The document is a *factura*. |
+| Integrations | Integraciones | — | |
+| Automations | Automatizaciones | — | |
+| Communication | Comunicación | — | The settings section covering email and SMS delivery. |
+| Advanced | Avanzado | — | Masculine singular: it names a settings section, like a status names a state. |
+| Usage | Uso | — | |
+| Data | Datos | — | |
+| Connected applications | Aplicaciones conectadas | — | The authorized-MCP-client list. |
+| Company name | Nombre de la empresa | — | With the article. *Nombre de empresa* reads as a form field on a government paper. |
+| Timezone / Your timezone | Zona horaria / Su zona horaria | — | One word in English, two in Spanish; both halves of the pair are fixed so the company and personal settings match. |
+| Locale | Configuración regional | — | The language-and-number-format setting. Not *localización*, which is a place. |
+| Currency | Moneda | — | |
+| Branding | Marca | — | |
+| Role / Roles | Rol / Roles | — | The account role. *Rol* is the region-neutral form; *papel* is a theatre part. |
+| Export (settings action) | Exportar | — | Infinitive, matching the sibling *Importar contactos*. Used for the heading and the button alike. |
+| Import | Importar | — | |
+| GDPR | RGPD | — | The regulation's own Spanish acronym. Used in the Data and Compliance sections. |
+| Not set | Sin definir | — | The empty-value rendering of any account field. Invariant for gender, which is why it is not *No definido*. |
+| Pending | Pendiente | — | Invite and member state. Invariant for gender, so the status-label rule needs no help here. |
+| Signature | Firma | — | The drawn/uploaded mark. The email footer is the *firma de correo electrónico*; both are *firma* and they never share a surface. |
+| Saved. | Guardado. | — | The flash message, masculine singular by the status-label rule. |
+| Couldn't save that. Please try again. | No se pudo guardar. Inténtelo de nuevo. | — | Built from the two fixed halves: the impersonal failure and the one recovery sentence. |
+| Unknown action | Acción desconocida | — | The form-action fallback error, shared by several settings routes. |
+| Free plan limit reached | Límite del plan gratuito alcanzado | — | |
+
 ## Register enforcement
 
 Every entry here is wrong in `es-419` in every context, which is what makes it
