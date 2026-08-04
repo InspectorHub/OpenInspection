@@ -5753,6 +5753,45 @@
     "description": "Auto-generated placeholder for deleteInspectionMediaPool (DELETE /{id}/media/pool/{poolId}, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "deleteInspectionReport",
+    "method": "DELETE",
+    "pathTemplate": "/api/inspections/{id}/reports/{reportId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection the report belongs to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection the report belongs to."
+          }
+        },
+        {
+          "name": "reportId",
+          "in": "path",
+          "required": true,
+          "description": "reports.id of the deliverable to delete.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "reports.id of the deliverable to delete."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete one deliverable from an inspection",
+    "description": "Permanently deletes one report and everything belonging only to it — its findings document, the collaborative Yjs state, and its version rows. The billing line that produced it is untouched. Refused for the primary report (every order keeps one; without it the order cannot be edited) and for a published report (it has been delivered and its signed versions are what let a client verify what they hold)."
+  },
+  {
     "operationId": "deleteInspectionTemplate",
     "method": "DELETE",
     "pathTemplate": "/api/inspections/templates/{id}",
@@ -14461,6 +14500,25 @@
           "locale": {
             "type": "string",
             "description": "Per-user display locale (BCP-47). Empty string clears the override (inherit tenant)."
+          },
+          "dateFormat": {
+            "type": "string",
+            "enum": [
+              "",
+              "us",
+              "iso",
+              "eu"
+            ],
+            "description": "Per-user date order (us|iso|eu). Empty string clears the override (inherit tenant)."
+          },
+          "timeFormat": {
+            "type": "string",
+            "enum": [
+              "",
+              "12h",
+              "24h"
+            ],
+            "description": "Per-user clock (12h|24h). Empty string clears the override (inherit tenant)."
           }
         }
       }
