@@ -13,8 +13,11 @@
  * be a *deliberate* choice, never silent drift). Also flags STALE target keys and
  * DUPLICATE keys across modules (a real conflict in the shared namespace).
  *
- * As phases 3-5 extract more surfaces, add newly-extracted-but-untranslated keys
- * to FALLBACK_ALLOW, then remove each as its es-419 translation lands.
+ * The English-only phase ENDED with #268: es-419 reached full parity, so a key
+ * added in English and never translated is no longer the expected state — it is a
+ * gap that reaches a Spanish-speaking user as English mid-sentence. Adding an
+ * English key now means translating it in the same commit, or naming it in
+ * FALLBACK_ALLOW with a reason.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -97,15 +100,24 @@ for (const locale of TARGET_LOCALES) {
   const target = load(locale);
   const targetKeys = new Set(Object.keys(target));
 
-  // English-only extraction phase: a target translation is OPTIONAL. Keys without
-  // one fall back to English at runtime (safe). We only REPORT coverage here — we
-  // do NOT fail on untranslated keys, so the extraction sweep can add English keys
-  // without blocking on translation. (The parity hard-gate returns in the
-  // translation phase; FALLBACK_ALLOW / `allow` is retained for that.)
   const translated = sourceKeys.filter(
     (k) => targetKeys.has(k) && String(target[k]).trim() !== '',
   ).length;
   coverage.push(`${locale} ${translated}/${sourceKeys.length}`);
+
+  // Translation phase (#268 complete): a missing target key is now a FAILURE.
+  // During the English-only phase this only reported, so the sweep could add
+  // English keys without blocking. That trade is over — from here, an
+  // untranslated key is a gap that ships to a Spanish-speaking user as English
+  // mid-sentence. Keys that must stay English go in FALLBACK_ALLOW with a reason.
+  const missing = sourceKeys.filter((k) => !targetKeys.has(k) && !allow.has(k));
+  if (missing.length) {
+    failed = true;
+    console.error(
+      `[i18n-catalog] ${locale}: ${missing.length} untranslated key(s):\n` +
+        missing.map((k) => `    - ${k}`).join('\n'),
+    );
+  }
 
   // Guard: any PRESENT translation must be non-empty (an empty string is a
   // mistake — it renders blank instead of falling back to English).
@@ -133,4 +145,4 @@ if (failed) {
   console.error('[i18n-catalog] FAIL — resolve the catalog drift above.');
   process.exit(1);
 }
-console.log(`[i18n-catalog] OK (English-only phase) — ${sourceKeys.length} source key(s); translation coverage: ${coverage.join(', ')}.`);
+console.log(`[i18n-catalog] OK (parity enforced) — ${sourceKeys.length} source key(s); translation coverage: ${coverage.join(', ')}.`);
