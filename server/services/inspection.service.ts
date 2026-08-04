@@ -499,50 +499,17 @@ export class InspectionService {
      * tenantId. `tenantSlug` is passed through verbatim for building
      * `/report/:tenantSlug/:id` style links on the page.
      */
-    async getInspectionHub(inspectionId: string, tenantId: string, tenantSlug: string): Promise<{
-        inspection: {
-            id: string;
-            propertyAddress: string;
-            clientName: string | null;
-            clientEmail: string | null;
-            clientPhone: string | null;
-            clientContactId: string | null;
-            status: string;
-            reportStatus: string;
-            date: string | null;
-            inspectorId: string | null;
-            templateId: string | null;
-            price: number;
-            paymentStatus: string;
-            paymentRequired: boolean;
-            agreementRequired: boolean;
-            coverPhoto: string | null;
-            referredByAgentId: string | null;
-            sellingAgentId: string | null;
-            createdAt: string | null;
-        };
-        tenantSlug: string;
-        people: Awaited<ReturnType<InspectionService['getPeopleCard']>>;
-        services: Array<{ id: string; name: string; priceCents: number }>;
-        agreements: Array<{ id: string; name: string }>;
-        agreementRequests: Array<{
-            id: string;
-            status: string;
-            clientEmail: string;
-            signedAt: string | null;
-            createdAt: string | null;
-            agreementName: string | null;
-            signersTotal: number;
-            signersSigned: number;
-        }>;
-        invoice: {
-            id: string; status: string; amountCents: number;
-            /** Cumulative amount received; null when partial with no recorded figure. */
-            amountPaidCents: number | null;
-            currency: string; sentAt: string | null; paidAt: string | null;
-        } | null;
-        publishReadiness: { ready: boolean; blockingCount: number };
-    } | null> {
+    async getInspectionHub(
+        inspectionId: string,
+        tenantId: string,
+        tenantSlug: string,
+    ): Promise<Awaited<ReturnType<InspectionPublishService['getInspectionHub']>>> {
+        // DERIVED, never re-declared. This signature used to be a hand-copy of
+        // the delegate's, and it rotted exactly the way a hand-copy does: it
+        // was still promising a `services` array of `{ id, name, priceCents }`
+        // and no `communication`, `unlockedAt` or `reports` long after the
+        // delegate returned all of them — so callers typed against the facade
+        // could not see fields the endpoint had been sending for months.
         return this.publish.getInspectionHub(inspectionId, tenantId, tenantSlug);
     }
 

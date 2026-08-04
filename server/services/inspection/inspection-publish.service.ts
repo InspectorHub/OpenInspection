@@ -26,6 +26,7 @@ import {
     type PublishReadiness,
 } from './shared';
 import { communicationCounts } from '../../lib/communication-counts';
+import { listReportsForHub, type ReportListItem } from '../../lib/inspection/reports';
 import { InspectionSubService } from './base';
 import { CredentialService } from '../credential.service';
 import type { InspectionService } from '../inspection.service';
@@ -326,6 +327,8 @@ export class InspectionPublishService extends InspectionSubService {
         } | null;
         publishReadiness: { ready: boolean; blockingCount: number };
         communication: { delivered: number; needsAttention: number; unread: number };
+        /** The order's deliverables. One order, several reports. */
+        reports: ReportListItem[];
     } | null> {
         const db = this.getDrizzle();
 
@@ -435,6 +438,7 @@ export class InspectionPublishService extends InspectionSubService {
         ]);
 
         const communication = await communicationCounts(db, tenantId, inspectionId);
+        const reportList = await listReportsForHub(db, tenantId, inspectionId);
 
         // Task 8 — resolve the referrer's display name for the Order details
         // card. Soft reference: a deleted contact resolves null, and the card
@@ -522,6 +526,7 @@ export class InspectionPublishService extends InspectionSubService {
                 blockingCount: readiness.blockingDefects.length,
             },
             communication,
+            reports: reportList,
         };
     }
 

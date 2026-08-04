@@ -55,9 +55,11 @@ import {
   handleServiceRemove,
   handleUnlockReport,
   handleRelockReport,
+  handleReportDelete,
 } from "~/lib/inspection-order-actions";
 import { ScheduleCard, type TeamMember } from "~/components/inspector-portal/ScheduleCard";
 import { ServicesCard, type CatalogService } from "~/components/inspector-portal/ServicesCard";
+import { ReportsCard, type ReportRow } from "~/components/inspector-portal/ReportsCard";
 import { OrderDetailsCard } from "~/components/inspector-portal/OrderDetailsCard";
 import { InvoiceCard } from "~/components/inspector-portal/InvoiceCard";
 import { GateToggle } from "~/components/inspector-portal/GateToggle";
@@ -129,6 +131,8 @@ interface HubData extends HubPayload {
     priceOverride?: number | null;
   }>;
   agreements: Array<{ id: string; name: string }>;
+  // One order, several deliverables. Optional so an older payload still renders.
+  reports?: ReportRow[];
   communication?: { delivered: number; needsAttention: number; unread: number; rulesActive: number };
 }
 
@@ -320,6 +324,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   if (intent === "service-add") return handleServiceAdd(api, id, formData);
   if (intent === "service-price") return handleServicePrice(api, id, formData);
   if (intent === "service-remove") return handleServiceRemove(api, id, formData);
+  if (intent === "report-delete") return handleReportDelete(api, id, formData);
   if (intent === "unlock-report") return handleUnlockReport(api, id, formData);
   if (intent === "relock-report") return handleRelockReport(api, id);
 
@@ -805,6 +810,15 @@ export default function InspectionHubPage() {
             could never be made billable from anywhere but the report editor's
             price box. ------------------------------------------------- */}
         <ServicesCard services={services} catalog={serviceCatalog} canManage={isAdmin} />
+
+        {/* 3b. Reports — what gets DELIVERED. The order-wide report pill above
+            answers "is the report out"; with several deliverables on one order
+            that question no longer has one answer. ------------------- */}
+        <ReportsCard
+          reports={hub.reports ?? []}
+          canManage={isAdmin}
+          formatDate={(iso) => formatInspectionDateTime(iso, undefined, displayTz, fmt)}
+        />
 
         {/* 4. Signing requests — the paperwork the visit needs -------- */}
         <Card className="p-5">

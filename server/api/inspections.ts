@@ -39,6 +39,7 @@ import complianceRoutes from './inspections/compliance';
 import peopleRoutes from './inspections/people';
 import communicationRoutes from './inspections/communication';
 import inspectionServiceRoutes from './inspections/services';
+import inspectionReportRoutes from './inspections/reports';
 
 export const inspectionsRoutes = createApiRouter()
     .route('/', bulkRoutes)
@@ -69,6 +70,9 @@ export const inspectionsRoutes = createApiRouter()
     .route('/', peopleRoutes)
     // IA-87 — POST/PATCH/DELETE /:id/services: the service lines on an
     // inspection were write-once at creation until this router existed.
-    .route('/', inspectionServiceRoutes);
+    .route('/', inspectionServiceRoutes)
+    // DELETE /:id/reports/:reportId — one order delivers several reports, and
+    // removing one destroys its document. The list itself rides the hub payload.
+    .route('/', inspectionReportRoutes);
 
 export type InspectionsApi = typeof inspectionsRoutes;
