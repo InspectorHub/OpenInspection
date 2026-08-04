@@ -524,9 +524,10 @@ apply at all.
 
 <!-- gate:divergence -->
 
-- `settings_team_resend_invite`, `settings_integrations_resend_name`, `settings_email_provider_resend` — English "Resend" is two unrelated things.
-  On the team page it is the verb (send the invite again) and must be
-  *Reenviar*. In the integrations catalogue and the email-provider select it is
+- `settings_team_resend_invite`, `settings_integrations_resend_name`, `settings_email_provider_resend`, `comm_action_resend` — English "Resend" is two unrelated things.
+  On the team page and in the communication outbox it is the verb (send it
+  again) and must be *Reenviar*. In the integrations catalogue and the
+  email-provider select it is
   **Resend the company**, the transactional email vendor, and rule 3 forbids
   translating a product name — *Reenviar* there would name a provider that does
   not exist. The two readings never share a surface.
