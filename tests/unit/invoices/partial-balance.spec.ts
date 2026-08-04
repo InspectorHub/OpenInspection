@@ -171,15 +171,30 @@ describe('QBO partial payment — capturing the amount', () => {
 
     it('does not double-count a partial sync that repeats the same figure', async () => {
         // QBO reports a CUMULATIVE amount and the sync runs on every webhook and
-        // every cron sweep. What is appended is the delta, so replaying the same
-        // figure appends nothing — and a figure that went down records a refund.
+        // every cron sweep. The first sweep lands because the ledger has nothing
+        // to say yet; a replay of the same figure is agreement, and agreement
+        // writes nothing.
         await seedInvoice(45000);
         await syncFromQbo({ Id: QBO_ID, Balance: 200, TotalAmt: 450 });
         await syncFromQbo({ Id: QBO_ID, Balance: 200, TotalAmt: 450 });
 
         expect((await getInvoice()).amountPaidCents).toBe(25000);
+    });
+
+    it('flags a figure that went DOWN instead of inventing a refund', async () => {
+        // Once the ledger holds $250, QuickBooks reporting $100 is a
+        // disagreement about money, not an instruction. Writing the $150 refund
+        // that would reconcile them records a refund nobody issued — see
+        // tests/unit/qbo/payment-discrepancy.spec.ts for the flag itself.
+        await seedInvoice(45000);
+        await syncFromQbo({ Id: QBO_ID, Balance: 200, TotalAmt: 450 });
+        expect((await getInvoice()).amountPaidCents).toBe(25000);
 
         await syncFromQbo({ Id: QBO_ID, Balance: 350, TotalAmt: 450 });
-        expect((await getInvoice()).amountPaidCents).toBe(10000);
+
+        expect((await getInvoice()).amountPaidCents).toBe(25000);   // untouched
+        const flags = await db.select().from(schema.qboSyncErrors)
+            .where(eq(schema.qboSyncErrors.oiId, INV_ID)).all();
+        expect(flags.map((f) => f.errorCode)).toEqual(['PAYMENT_DISCREPANCY']);
     });
 });

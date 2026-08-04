@@ -1,10 +1,14 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray, isNull } from 'drizzle-orm';
 import { qboConnections, qboEntityMap, qboSyncErrors } from '../../lib/db/schema/qbo';
+import { invoices } from '../../lib/db/schema/invoice';
+import { orderPayments } from '../../lib/db/schema/order-payment';
 import { encryptToken } from '../../lib/qbo-crypto';
+import { QBO_PAYMENT_DISCREPANCY, decodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
 import {
     ACCESS_TOKEN_TTL_SEC,
     type Constructor,
     type QBOConnectionStatus,
+    type QBOPaymentDiscrepancy,
     type QBOServiceBase,
 } from './api-base';
 import { withToken } from './token';
@@ -68,6 +72,45 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
             if (!row) return null;
             const errorRows = await db.select().from(qboSyncErrors)
                 .where(and(eq(qboSyncErrors.tenantId, tenantId), eq(qboSyncErrors.resolved, false))).all();
+
+            // Explicit projection, not select(): the invoice join is only here
+            // for the currency each pair of figures should be read in, and a
+            // wide invoice row would run at D1's 100-column result cap.
+            const discrepancyRows = errorRows.filter(r => r.errorCode === QBO_PAYMENT_DISCREPANCY);
+            const currencies = discrepancyRows.length === 0 ? [] : await db
+                .select({ id: invoices.id, currency: invoices.currency })
+                .from(invoices)
+                .where(and(
+                    eq(invoices.tenantId, tenantId),
+                    inArray(invoices.id, discrepancyRows.map(r => r.oiId)),
+                )).all();
+            const currencyOf = new Map(currencies.map(c => [c.id, c.currency]));
+
+            const paymentDiscrepancies: QBOPaymentDiscrepancy[] = [];
+            for (const row of discrepancyRows) {
+                const figures = decodePaymentDiscrepancy(row.errorMsg);
+                // A row this codec did not write has no two figures to show, and
+                // a half-rendered discrepancy is worse than none.
+                if (!figures) continue;
+                paymentDiscrepancies.push({
+                    id:          row.id,
+                    invoiceId:   row.oiId,
+                    currency:    currencyOf.get(row.oiId) ?? 'USD',
+                    ledgerCents: figures.ledgerCents,
+                    qboCents:    figures.qboCents,
+                });
+            }
+
+            // Money we hold that predates any invoice. Never pushed: an
+            // unapplied deposit needs a liability account in the tenant's own
+            // chart of accounts, which is their accountant's call, not ours.
+            const heldDeposits = await db.select({ id: orderPayments.id })
+                .from(orderPayments)
+                .where(and(
+                    eq(orderPayments.tenantId, tenantId),
+                    isNull(orderPayments.invoiceId),
+                )).all();
+
             return {
                 realmId:               row.realmId,
                 companyName:           row.companyName,
@@ -77,7 +120,12 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                 // the column's own Date storage type.
                 lastSyncAt:            row.lastSyncAt ? Math.floor(row.lastSyncAt.getTime() / 1000) : null,
                 syncEnabled:           row.syncEnabled,
-                openErrors:            errorRows.length,
+                // Failed pushes only. A discrepancy is not a failure — nothing
+                // went wrong on the wire — and filing it under "sync errors"
+                // would bury the one thing on this page that needs a human.
+                openErrors:            errorRows.length - discrepancyRows.length,
+                paymentDiscrepancies,
+                heldDepositCount:      heldDeposits.length,
                 refreshTokenExpiresAt: Math.floor(row.refreshTokenExpiresAt.getTime() / 1000),
             };
         }

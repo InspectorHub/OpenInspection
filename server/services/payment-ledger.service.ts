@@ -161,6 +161,34 @@ async function ledgerRowsForInvoice(
 }
 
 /**
+ * What the ledger has to say about an invoice — and crucially, WHETHER it has
+ * anything to say. `netCents` alone cannot tell those apart: zero is both "no
+ * rows at all" and "every receipt was refunded", and those two lead to opposite
+ * decisions when an external system reports a different figure.
+ *
+ * No rows means the ledger has no opinion, NOT that nothing was paid — the same
+ * rule `recomputeInvoicePaymentState` applies to the cache.
+ */
+export interface LedgerOpinion {
+    rowCount: number;
+    /** Receipts minus refunds, in integer cents. Meaningless when rowCount is 0. */
+    netCents: number;
+}
+
+export async function getLedgerOpinion(
+    rawDb: AnyDb,
+    tenantId: string,
+    invoiceId: string,
+): Promise<LedgerOpinion> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = await ledgerRowsForInvoice(rawDb as any, tenantId, invoiceId);
+    return {
+        rowCount: rows.length,
+        netCents: rows.reduce((sum, r) => sum + signOf(r.kind) * r.amountCents, 0),
+    };
+}
+
+/**
  * Cumulative amount RECEIVED against an invoice — receipts minus refunds.
  * What a caller needs to work out an outstanding remainder without guessing.
  */
@@ -169,9 +197,7 @@ export async function getNetReceivedCents(
     tenantId: string,
     invoiceId: string,
 ): Promise<number> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows = await ledgerRowsForInvoice(rawDb as any, tenantId, invoiceId);
-    return rows.reduce((sum, r) => sum + signOf(r.kind) * r.amountCents, 0);
+    return (await getLedgerOpinion(rawDb, tenantId, invoiceId)).netCents;
 }
 
 /**

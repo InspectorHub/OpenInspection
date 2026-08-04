@@ -8,6 +8,7 @@ import { getApiUrl } from "~/lib/api.server";
 import { SecretField } from "~/components/SecretField";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
+import { QboBooksHealth, type QboDiscrepancy } from "~/components/settings/QboBooksHealth";
 
 interface QboStatus {
   connected: boolean;
@@ -15,6 +16,9 @@ interface QboStatus {
   syncEnabled?: boolean;
   lastSyncAt?: number | null;
   openErrors?: number;
+  /** Both figures, never one: the point is that a human compares them. */
+  paymentDiscrepancies?: QboDiscrepancy[];
+  heldDepositCount?: number;
   refreshTokenExpiresAt?: number;
 }
 
@@ -145,6 +149,7 @@ export default function SettingsIntegrationsQbo() {
   const qboFetcher = useFetcher<{ success: boolean; intent?: string | null; error: string | null; syncEnabled?: boolean }>();
 
   const connected = status?.connected;
+  const discrepancies = status?.paymentDiscrepancies ?? [];
   const syncing = qboFetcher.state !== "idle" && qboFetcher.formData?.get("intent") === "qbo-sync";
   const expiryWarning =
     status?.refreshTokenExpiresAt &&
@@ -345,30 +350,13 @@ export default function SettingsIntegrationsQbo() {
             </div>
           </div>
 
-          {/* Sync errors */}
-          {(status.openErrors ?? 0) > 0 && (
-            <div className="bg-ih-bg-card border border-ih-bad rounded-lg p-6">
-              <h3 className="font-bold text-[14px] text-ih-fg-1 mb-2 flex items-center gap-2">
-                <svg
-                  className="w-4 h-4 text-ih-bad-fg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                {m.settings_qbo_sync_errors({ count: status.openErrors ?? 0 })}
-              </h3>
-              <p className="text-[12px] text-ih-fg-3">
-                {m.settings_qbo_sync_errors_desc()}
-              </p>
-            </div>
-          )}
+          {/* Failed pushes, disagreements and what is never sent — see
+              QboBooksHealth for why a discrepancy shows both figures. */}
+          <QboBooksHealth
+            openErrors={status.openErrors ?? 0}
+            discrepancies={discrepancies}
+            heldDepositCount={status.heldDepositCount ?? 0}
+          />
         </div>
       )}
     </div>
