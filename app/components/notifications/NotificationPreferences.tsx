@@ -230,7 +230,12 @@ export function NotificationPreferences({
                     // screen-reader user gets row/column context, and the header
                     // row is only a visual convenience for everyone else.
                     <div role="table" aria-labelledby="notif-choose-h" className="mt-4">
-                        <div role="row" className="hidden sm:grid grid-cols-[1fr_repeat(3,5rem)] gap-2 pb-2 border-b border-ih-border">
+                        {/* Channel columns are 6rem, not 5: the widest header is
+                            the localized channel name, and es-419 "Correo
+                            electrónico" measures 85px — it outgrew a 5rem column
+                            and bled into the next one. Sized for the label, not
+                            for the English word "Email". */}
+                        <div role="row" className="hidden sm:grid grid-cols-[1fr_repeat(3,6rem)] gap-2 pb-2 border-b border-ih-border">
                             <span role="columnheader" className="flex items-center gap-2">
                                 {bulk && bulkStateOf(youChoose, {}) && (
                                     <>
@@ -267,7 +272,7 @@ export function NotificationPreferences({
                                 <div
                                     key={row.id}
                                     role="row"
-                                    className="py-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_repeat(3,5rem)] sm:items-center"
+                                    className="py-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_repeat(3,6rem)] sm:items-center"
                                 >
                                     <span role="rowheader" className="text-[13px] text-ih-fg-1 flex items-center gap-2">
                                         {bulk && bulkStateOf(youChoose, { classId: row.id }) && (
