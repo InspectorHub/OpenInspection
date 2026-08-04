@@ -67,6 +67,13 @@ export async function resolvePrimaryReportId(
  * Non-fatal by design. Both callers have already written the canonical
  * `inspections` row, and throwing here would lose it over a row that a backfill
  * can add later.
+ *
+ * Returns the new report's id, or null when the insert failed. Callers need it:
+ * the `inspection_results` row born alongside it must carry `report_id`, and a
+ * results row left NULL is invisible rather than loud — `uq_results_report` is a
+ * unique index on a nullable column, so SQLite permits any number of NULLs, and
+ * every read that asks "which document belongs to this report" silently matches
+ * nothing or matches a sibling.
  */
 export async function createPrimaryReport(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,10 +81,11 @@ export async function createPrimaryReport(
     tenantId: string,
     inspectionId: string,
     templateId: string | null,
-): Promise<void> {
+): Promise<string | null> {
+    const id = crypto.randomUUID();
     try {
         await db.insert(reports).values({
-            id: crypto.randomUUID(),
+            id,
             tenantId,
             inspectionId,
             kind: 'primary',
@@ -92,8 +100,10 @@ export async function createPrimaryReport(
             status: REPORT_STATUS.IN_PROGRESS,
             createdAt: new Date(),
         });
+        return id;
     } catch (err) {
         logger.error('primary report create failed', { inspectionId },
             err instanceof Error ? err : undefined);
+        return null;
     }
 }
