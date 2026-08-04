@@ -1,9 +1,54 @@
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { resolveContactLocale, SUPPORTED_CONTACT_LOCALES } from '../../../server/lib/i18n/contact-locale';
+import { normalizeLocale, resolveContactLocale, SUPPORTED_CONTACT_LOCALES } from '../../../server/lib/i18n/contact-locale';
 
 const NONE = { contactLocale: null, linkedUserLocale: null, tenantDefault: null, acceptLanguage: null };
+
+/**
+ * The tag reduction, tested directly rather than only through the resolver.
+ *
+ * This is the load-bearing half of UI-locale activation (#269): the stored
+ * preferences are BCP-47 and do NOT match the Paraglide tags. `tenant_configs
+ * .default_locale` ships as 'en-US' and the settings picker offers 'en-US' /
+ * 'es-419' (`app/lib/locales.ts`), while the catalogue is compiled for 'en' /
+ * 'es-419'. If 'en-US' reduced to null, every tenant default would fall through
+ * to the browser hint and the tenant setting would silently stop working — a
+ * failure that looks exactly like "the feature does nothing".
+ *
+ * Returning NULL rather than a default is the other half: every caller is a
+ * precedence chain (`resolveContactLocale` here, `resolveUiLocale` for the UI),
+ * and a wrong non-null answer would stop the chain at its first rung and make
+ * every later rung unreachable.
+ */
+describe('normalizeLocale', () => {
+    it('reduces the tags the product actually stores', () => {
+        // Both values the settings pickers can write.
+        expect(normalizeLocale('en-US')).toBe('en');
+        expect(normalizeLocale('es-419')).toBe('es-419');
+    });
+
+    it('lands every Spanish variant on the one Spanish catalogue', () => {
+        expect(normalizeLocale('es')).toBe('es-419');
+        expect(normalizeLocale('es-MX')).toBe('es-419');
+        expect(normalizeLocale('es-ES')).toBe('es-419');
+    });
+
+    it('is case-insensitive, because Accept-Language is not normalised for us', () => {
+        expect(normalizeLocale('EN-us')).toBe('en');
+        expect(normalizeLocale('ES-419')).toBe('es-419');
+    });
+
+    it('returns null for unsupported and absent input, never a default', () => {
+        expect(normalizeLocale('fr-FR')).toBeNull();
+        expect(normalizeLocale('')).toBeNull();
+        expect(normalizeLocale(null)).toBeNull();
+        expect(normalizeLocale(undefined)).toBeNull();
+        // Malformed enough that `new Intl.Locale` throws — must be an absence,
+        // not the thing that breaks the page.
+        expect(normalizeLocale('not a locale!!')).toBeNull();
+    });
+});
 
 describe('resolveContactLocale', () => {
     it('prefers what the contact told us', () => {
