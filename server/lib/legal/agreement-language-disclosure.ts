@@ -1,10 +1,10 @@
 /**
  * Neutral platform disclosure shown ALONGSIDE an inspection agreement.
  *
- * Rewritten on counsel's advice. An earlier design embedded InterNACHI's
- * governing-language clause into the agreement body. Counsel: "do not embed the
- * InterNACHI clause as platform contractual language — if implemented, position
- * it as a neutral platform disclosure."
+ * Rewritten on counsel's advice, received 2026-08-02. An earlier design embedded
+ * InterNACHI's governing-language clause into the agreement body. Counsel: "do
+ * not embed the InterNACHI clause as platform contractual language — if
+ * implemented, position it as a neutral platform disclosure."
  *
  * A governing-language provision allocates risk between the tenant and their
  * client. We are not a party to that contract, we author none of its text, and
@@ -41,6 +41,43 @@
  * pass. The agreement itself stays English and is never translated here — the
  * disclosure is how an English-only agreement is handled honestly, not a step
  * toward translating one.
+ *
+ * ## What is NOT settled — read before extending this (counsel, 2026-08-02)
+ *
+ * **California Civil Code §1632 is unresolved.** Counsel gave a preliminary
+ * position only: applicability turns on whether the agreement falls in an
+ * enumerated contract category AND whether the transaction was primarily
+ * negotiated in a covered language. Three facts were requested and supplied
+ * (`docs/legal/2026-08-02-counsel-response-and-followup.md`):
+ *
+ *  1. **Negotiation language: we hold no record of it**, and that absence is the
+ *     honest answer rather than a gap to paper over. Nothing captures it, and
+ *     the negotiation itself is typically a phone call outside the software.
+ *     `contacts.locale` is a stated READING preference and must not be offered
+ *     as evidence of the language a deal was struck in.
+ *  2. **Platform role: not a party.** We carry the agreement and attest to the
+ *     signing. We do not negotiate, advise, or take a fee from the transaction.
+ *  3. **Template/control: none.** Every tenant authors their own agreement body
+ *     and versions it; we review no terms. Which is why the clause would have
+ *     been the ONLY contractual text we wrote in that document.
+ *
+ * The disclosure below did NOT wait on that answer, and deliberately: it asserts
+ * nothing contractual, so it is useful under either §1632 answer and harmful
+ * under neither.
+ *
+ * **What DOES wait on it: translated agreements.** If §1632 reaches this
+ * contract type the build is a different one — translated versions, a
+ * language-of-negotiation record, a per-state rule — and none of it may be
+ * started on an assumption about the answer. If you arrived here intending to
+ * translate the agreement body, that is the work this note is about, and the
+ * §1632 answer is its gate. Translating the disclosure is not a route around it.
+ *
+ * **One question is deliberately unasked.** If a tenant later offers a courtesy
+ * Spanish REPORT, does that report's own limitations notice suffice, or does the
+ * agreement need a companion sentence? It goes to counsel when the
+ * courtesy-translation work is scheduled and not before — the answer depends on
+ * what that notice ends up saying, so asking early buys an answer to the wrong
+ * question. Whoever schedules that work owns asking it.
  */
 
 /** Version of the disclosure copy. Bump on ANY wording change, `label` included. */
