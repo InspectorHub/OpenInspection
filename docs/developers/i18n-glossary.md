@@ -321,6 +321,39 @@ character for character, so the consistency check binds them together.
 | Immediate / Short-term / Long-term | Inmediato / Corto plazo / Largo plazo | — | The three cost buckets. Masculine singular — they label a bucket, like a status. |
 | Conforms / Does not conform | Conforme / No conforme | — | The ASTM conformance statement. |
 
+## The client portal, invoices and verification
+
+Fixed while translating `reports.json` (258 keys) and `pca-report.json` (130).
+`reports.json` shares 58 English strings with `checkout`, `inspections`,
+`communication`, `booking`, `components`, `misc` and `public` — more overlap
+than any other module — so these are the rows the client-facing waves inherit.
+
+<!-- gate:terms -->
+
+| English | es-419 | Never | Why |
+|---|---|---|---|
+| Email / Email address | Correo electrónico | — | The full form both times. *Email* untranslated reads as a loanword the rest of the catalogue avoids, and *correo* alone is postal mail. |
+| Phone | Teléfono | — | |
+| Property | Propiedad | — | Also the noun in the Product nouns table; repeated here because it is a field label in six modules. |
+| Amount | Monto | — | Not *cantidad*, which is a count. "Amount due" → *Monto adeudado*; "Amount paid" → *Monto pagado*. |
+| Item | Elemento | — | A row in a list or a table. Same word as a template item — they never collide on one surface. |
+| Section | Sección | — | |
+| Document | Documento | — | |
+| Note | Nota | — | Singular of *notas*. |
+| Logo | Logotipo | — | *Logo* is understood but *logotipo* is the written form. |
+| Overview | Vista general | — | Deliberately different from Summary → *Resumen*: the client portal shows both, as a nav tab and as a report filter. |
+| Sign in (verb) / sign-in link | iniciar sesión / enlace de inicio de sesión | — | "Sign out" → *Cerrar sesión*. Distinct from *Firmar*, which signs a document — English uses "sign" for both and Spanish must not. |
+| Please try again. | Inténtelo de nuevo. | — | The recovery sentence on roughly twenty error strings. One wording, *usted* imperative. "Please try again in a moment." → *Inténtelo de nuevo en unos instantes.* |
+| Something went wrong | Algo salió mal | — | |
+| Copied! | ¡Copiado! | — | Opening exclamation mark is not optional in Spanish. |
+| Processing… | Procesando… | — | |
+| Secured by Stripe | Protegido por Stripe | — | Not *Asegurado*, which means insured. |
+| Privacy Policy | Política de privacidad | — | |
+| Repair Request Builder | Generador de solicitudes de reparación | — | The client-facing tool. The document it produces is the *solicitud de reparación*. |
+| Condition | Condición | — | The commercial systems-summary column. |
+| Compliance | Cumplimiento | — | |
+| Not applicable | No aplica | — | Spelled out where English spells it out; *N/A* stays *N/A*. |
+
 ## Register enforcement
 
 Every entry here is wrong in `es-419` in every context, which is what makes it
