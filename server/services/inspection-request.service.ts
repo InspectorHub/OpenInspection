@@ -254,14 +254,14 @@ export class InspectionRequestService {
 
         const totalAmount = subs.reduce((sum, s) => sum + (s.price ?? 0), 0);
 
-        // Quota is consumed once per sub-inspection, after every precondition
+        // Quota is consumed for the whole batch at once, after every precondition
         // check above (bounds, template ownership) and BEFORE the parent
         // request row is inserted — a request row must never be orphaned
         // (created with zero children) because the tenant hit the cap
-        // partway through.
-        for (let i = 0; i < subs.length; i++) {
-            await this.planQuota?.consumeInspection(tenantId);
-        }
+        // partway through. One call, not a loop: the guard counts existing
+        // inspection rows and these are inserted below, so N looped calls would
+        // all read the same count and all pass. See consumeInspection's `count`.
+        await this.planQuota?.consumeInspection(tenantId, subs.length);
 
         await db.insert(inspectionRequests).values({
             id:              requestId,
