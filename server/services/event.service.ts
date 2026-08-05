@@ -4,6 +4,7 @@ import { eventTypes, inspectionEvents, automations, automationLogs } from '../li
 import { EVENT_TYPES } from './starter-content/fixtures/event-types';
 import { logger } from '../lib/logger';
 import { PeopleService } from './people.service';
+import { EVENT_STATUS, type EventStatus } from '../lib/status/event-status';
 
 const REMINDER_MIN_DELAY_MS = 5 * 60_000;
 const REMINDER_LEAD_MS      = 24 * 3600_000;
@@ -14,8 +15,6 @@ const REMINDER_LEAD_MS      = 24 * 3600_000;
  * constant used to impose on everyone.
  */
 const DEFAULT_FOLLOWUP_DELAY_HOURS = 72;
-
-export type EventStatus = 'scheduled' | 'completed' | 'results_received' | 'cancelled';
 
 export class EventService {
     constructor(private db: D1Database) {}
@@ -117,7 +116,7 @@ export class EventService {
             tenantId,
             inspectionId,
             createdAt: new Date(),
-            status:    'scheduled' as const,
+            status:    EVENT_STATUS.SCHEDULED,
             ...data,
         } as typeof inspectionEvents.$inferInsert;
         await d.insert(inspectionEvents).values(row).run();
@@ -128,15 +127,15 @@ export class EventService {
     async updateEventStatus(tenantId: string, id: string, status: EventStatus) {
         const d = drizzle(this.db);
         const patch: Record<string, unknown> = { status };
-        if (status === 'completed')        patch.completedAt       = new Date();
-        if (status === 'results_received') patch.resultsReceivedAt = new Date();
-        if (status === 'cancelled')        patch.cancelledAt       = new Date();
+        if (status === EVENT_STATUS.COMPLETED)        patch.completedAt       = new Date();
+        if (status === EVENT_STATUS.RESULTS_RECEIVED) patch.resultsReceivedAt = new Date();
+        if (status === EVENT_STATUS.CANCELLED)        patch.cancelledAt       = new Date();
         await d.update(inspectionEvents).set(patch as never)
             .where(and(eq(inspectionEvents.id, id), eq(inspectionEvents.tenantId, tenantId))).run();
-        if (status === 'completed' || status === 'results_received') {
+        if (status === EVENT_STATUS.COMPLETED || status === EVENT_STATUS.RESULTS_RECEIVED) {
             const ev = await d.select().from(inspectionEvents)
                 .where(and(eq(inspectionEvents.id, id), eq(inspectionEvents.tenantId, tenantId))).get();
-            if (ev && status === 'completed') {
+            if (ev && status === EVENT_STATUS.COMPLETED) {
                 await this.scheduleFollowupLog(
                     tenantId, id, ev.inspectionId as string, ev.eventTypeId as string, Date.now(),
                 );

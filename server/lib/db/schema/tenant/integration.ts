@@ -1,6 +1,7 @@
 import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 import { tenants } from './core';
 import { users } from './user';
+import { SYNC_OUTBOX_STATUS, SYNC_OUTBOX_STATUSES } from '../../../status/sync-outbox-status';
 
 /**
  * Outbox for core → portal sync events. Append happens
@@ -20,7 +21,7 @@ export const syncOutbox = sqliteTable('sync_outbox', {
     eventType:    text('event_type').notNull(),
     payload:      text('payload').notNull(),
     // Schema Rules: state-machine column declares its enum (type-layer only).
-    status:       text('status', { enum: ['pending', 'published', 'failed'] }).notNull().default('pending'),
+    status:       text('status', { enum: [...SYNC_OUTBOX_STATUSES] }).notNull().default(SYNC_OUTBOX_STATUS.PENDING),
     attempts:     integer('attempts').notNull().default(0),
     createdAt:    integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     lastTriedAt:  integer('last_tried_at', { mode: 'timestamp_ms' }),

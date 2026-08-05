@@ -18,6 +18,7 @@ import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/valida
 import { PublishInspectionSchema, CreateReinspectionSchema, CancelInspectionSchema } from '../../lib/validations/inspection.schema';
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
+import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation } from '../../services/inspection/shared';
 import { eq, and } from 'drizzle-orm';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
@@ -494,14 +495,14 @@ const publishRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const result = await runReportTransition(() => c.var.services.inspection.submitReport(id, tenantId), 'Failed to submit report');
         if (!result.ok) return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: result.message } }, 400);
-        return c.json({ success: true as const, data: { reportStatus: 'submitted' } }, 200);
+        return c.json({ success: true as const, data: { reportStatus: REPORT_STATUS.SUBMITTED } }, 200);
     })
     .openapi(returnReportRoute, async (c) => {
         const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');
         const result = await runReportTransition(() => c.var.services.inspection.returnReport(id, tenantId), 'Failed to return report');
         if (!result.ok) return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: result.message } }, 400);
-        return c.json({ success: true as const, data: { reportStatus: 'in_progress' } }, 200);
+        return c.json({ success: true as const, data: { reportStatus: REPORT_STATUS.IN_PROGRESS } }, 200);
     })
     .openapi(unpublishReportRoute, async (c) => {
         const tenantId = getTenantId(c);
@@ -513,7 +514,7 @@ const publishRoutes = createApiRouter()
         // report the inspector has withdrawn. Expire all of this inspection's
         // access tokens immediately.
         await c.var.services.portalAccess.setExpiryForInspection(tenantId, id, Date.now());
-        return c.json({ success: true as const, data: { reportStatus: 'in_progress' } }, 200);
+        return c.json({ success: true as const, data: { reportStatus: REPORT_STATUS.IN_PROGRESS } }, 200);
     });
 
 export default publishRoutes;

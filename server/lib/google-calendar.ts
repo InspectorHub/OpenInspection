@@ -9,6 +9,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { logger } from './logger';
+import { EVENT_STATUS } from './status/event-status';
 
 export const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -161,7 +162,7 @@ export async function syncEventsToGcal(
 
     for (const ev of events) {
         // Skip cancelled / completed events — they shouldn't appear on the calendar.
-        if (ev.status === 'cancelled' || ev.status === 'completed') {
+        if (ev.status === EVENT_STATUS.CANCELLED || ev.status === EVENT_STATUS.COMPLETED) {
             skipped++;
             continue;
         }
