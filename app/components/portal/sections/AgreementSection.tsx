@@ -26,6 +26,7 @@ import { useState, useRef, useEffect } from "react";
 import { useFetcher } from "react-router";
 import { m } from "~/paraglide/messages";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
+import { AgreementLanguageDisclosure } from "~/components/agreements/AgreementLanguageDisclosure";
 import { SignaturePad, type SignaturePadHandle } from "~/components/media-studio/SignaturePad";
 import {
   OnBehalfFields,
@@ -209,13 +210,20 @@ export function AgreementSection({
           )}
         </div>
 
-        {/* Agreement content */}
-        <div className="px-6 py-6 sm:px-10 sm:py-8 border-b border-ih-border max-h-96 overflow-y-auto">
+        {/* Agreement content — tenant data, and the only thing being signed. */}
+        <div
+          data-testid="agreement-body"
+          className="px-6 py-6 sm:px-10 sm:py-8 border-b border-ih-border max-h-96 overflow-y-auto"
+        >
           <SanitizedHtml
             className="prose prose-sm max-w-none text-ih-fg-3 leading-relaxed"
             html={agreement.agreementContent}
           />
         </div>
+
+        {/* Platform disclosure — a sibling of the agreement, outside its scroll
+            region and never composed into it. */}
+        <AgreementLanguageDisclosure className="border-b border-ih-border" />
 
         {/* Signature area */}
         {alreadySigned || signed ? (

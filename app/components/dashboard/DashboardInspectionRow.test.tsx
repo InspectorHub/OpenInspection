@@ -22,6 +22,8 @@ vi.mock("~/hooks/useSessionContext", () => ({
   useDisplayLocale: () => "en-US",
   useDisplayCurrency: () => "USD",
   useDisplayTimeZone: () => "UTC",
+  // #270 — the row renders an inspection date, whose SHAPE is the tenant's.
+  useTenantFormatPrefs: () => ({ dateFormat: "us", timeFormat: "12h" }),
 }));
 
 const INSPECTION = {

@@ -64,3 +64,48 @@ describe('AgreementSection — verify link (IA-46)', () => {
     expect(container.querySelector('a[href^="/verify/"]')).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Language disclosure — beside the agreement, never inside it.
+// ---------------------------------------------------------------------------
+
+function unsigned(): AgreementData {
+  return signed({
+    status: 'sent',
+    signer: { name: 'Jane', role: 'client', status: 'sent' },
+    progress: { signed: 0, total: 1 },
+  });
+}
+
+describe('AgreementSection — language disclosure', () => {
+  it('shows it to a signer who has not signed yet', () => {
+    const { container } = renderSection(unsigned());
+    const note = container.querySelector('[data-testid="agreement-language-disclosure"]');
+    expect(note).not.toBeNull();
+    expect(note!.textContent).toMatch(/provided in English/i);
+  });
+
+  it('still shows it after signing — the screen keeps saying what the record says', () => {
+    const { container } = renderSection(signed());
+    expect(container.querySelector('[data-testid="agreement-language-disclosure"]')).not.toBeNull();
+  });
+
+  it('renders it OUTSIDE the agreement body, not within it', () => {
+    // "Append it at render" and "append it to the body" look identical on a
+    // screenshot and are completely different legally: the body is the tenant's
+    // contract, which we write no word of. Nesting is the failure this catches.
+    const { container } = renderSection(unsigned());
+    const body = container.querySelector('[data-testid="agreement-body"]');
+    const note = container.querySelector('[data-testid="agreement-language-disclosure"]');
+    expect(body).not.toBeNull();
+    expect(note).not.toBeNull();
+    expect(body!.contains(note!)).toBe(false);
+    expect(body!.textContent).not.toMatch(/provided in English/i);
+  });
+
+  it('leaves the agreement content itself untouched', () => {
+    const { container } = renderSection(unsigned());
+    const body = container.querySelector('[data-testid="agreement-body"]');
+    expect(body!.textContent?.trim()).toBe('terms');
+  });
+});

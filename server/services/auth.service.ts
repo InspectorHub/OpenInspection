@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, ne, and, or, sql, isNull, isNotNull } from 'drizzle-orm';
+import { eq, and, sql, isNull } from 'drizzle-orm';
 import { users, tenantInvites, tenants } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { hashPassword, verifyPassword } from '../lib/password';
@@ -53,31 +53,49 @@ export class AuthService {
     }
 
     /**
+     * Standalone login row selection. Scoped to the resolved single tenant so a same-email
+     * global agent (tenant_id NULL) or another tenant's row can never be authenticated, and
+     * fails closed if the composite unique index is ever violated. See spec login-email-ambiguity.
+     */
+    async findLoginUser(email: string, tenantId: string) {
+        const db = this.getDrizzle();
+        const rows = await db.select().from(users)
+            .where(and(
+                eq(users.email, email),
+                eq(users.tenantId, tenantId),   // excludes NULL-tenant agents + other tenants
+                isNull(users.deletedAt),
+            ))
+            .all();
+        if (rows.length === 0) return null;
+        if (rows.length > 1) {
+            logger.error('[login] ambiguous email within tenant — refusing auth', { tenantId });
+            return null;
+        }
+        return rows[0];
+    }
+
+    /**
      * Validates a user's credentials. Lazily upgrades legacy SHA-256 hashes to PBKDF2.
      * Runs PBKDF2 even when the email is unknown to hide user-existence via timing.
      */
-    async validateCredentials(email: string, password: string) {
+    async validateCredentials(email: string, password: string, tenantId: string) {
         const db = this.getDrizzle();
         // Soft-deleted (removed member / self-deleted account) rows are
         // excluded — a matching row that isn't NULL-deleted-at must never
         // authenticate, even if the caller somehow still knows the password.
         //
-        // Global agents (role='agent', tenant_id IS NULL) are ALSO excluded: they
-        // authenticate exclusively through /agent-login (findGlobalAgentByEmail),
-        // never this tenant front door. Without this guard, `users.email` being
-        // unique only per (tenant_id, email) means an email held by BOTH a global
-        // agent and an invited tenant member returns a nondeterministic `.get()`
-        // row — the earlier-inserted agent row can shadow the member and lock the
-        // member out (and /agent-signup is self-serve, so the collision is
-        // attacker-seedable). See #258 review.
-        // De Morgan of NOT(role='agent' AND tenant_id IS NULL): keep every row
-        // that is either not an agent OR is tenant-scoped, i.e. exclude only the
-        // global-agent rows.
-        const user = await db.select().from(users).where(and(
-            eq(users.email, email),
-            isNull(users.deletedAt),
-            or(ne(users.role, 'agent'), isNotNull(users.tenantId)),
-        )).get();
+        // Global agents (role='agent', tenant_id IS NULL) are excluded as a
+        // consequence of the tenant scoping in findLoginUser: they authenticate
+        // exclusively through /agent-login (findGlobalAgentByEmail), never this
+        // tenant front door. `users.email` is unique only per (tenant_id, email),
+        // so an email held by BOTH a global agent and an invited tenant member
+        // used to return a nondeterministic row — the earlier-inserted agent row
+        // could shadow the member and lock them out, and /agent-signup is
+        // self-serve, so that collision is attacker-seedable. See #258 review.
+        // Matching on tenant_id = :tenantId is strictly stronger than the old
+        // "not a global agent" filter: a NULL tenant_id can never match, and an
+        // ambiguous result now fails closed rather than picking a row.
+        const user = await this.findLoginUser(email, tenantId);
 
         if (!user) {
             // Perform a throwaway verification against a fixed hash so the response time

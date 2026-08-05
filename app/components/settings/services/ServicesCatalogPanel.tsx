@@ -92,8 +92,11 @@ export function ServicesCatalogPanel({
           },
           {
             label: m.settings_services_col_duration(),
+            // `whitespace-nowrap`: a duration is one token. Compacting the
+            // English (see durationLabel) was not enough — es-419 "2 h 30 min"
+            // has spaces to break at and split as "2 h 30 / min".
             cell: (svc) => (
-              <span className={svc.durationMinutes ? "text-ih-fg-2" : "text-ih-fg-3"}>
+              <span className={`whitespace-nowrap ${svc.durationMinutes ? "text-ih-fg-2" : "text-ih-fg-3"}`}>
                 {durationLabel(svc.durationMinutes)}
               </span>
             ),

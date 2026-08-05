@@ -1,6 +1,7 @@
 import { formatPriceCents, type WizardStepId } from "~/lib/wizard-steps";
 import type { NewInspectionSummary } from "~/lib/wizard-review";
 import { formatInspectionDateTime } from "~/lib/format-date";
+import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -56,6 +57,7 @@ export function ReviewPanel({
     currentStep: WizardStepId;
     onJump: (step: WizardStepId) => void;
 }) {
+    const fmt = useInspectionDateTimeFormat();
     const row = (step: WizardStepId) => ({ step, onJump, isCurrent: currentStep === step });
 
     return (
@@ -73,7 +75,7 @@ export function ReviewPanel({
                 {scheduledIso && (
                     <ReviewRow
                         label={m.newinsp_review_when()}
-                        value={formatInspectionDateTime(scheduledIso, undefined, timeZone)}
+                        value={formatInspectionDateTime(scheduledIso, undefined, timeZone, fmt)}
                         {...row("confirm")}
                     />
                 )}

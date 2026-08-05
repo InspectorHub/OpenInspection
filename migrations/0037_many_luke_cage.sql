@@ -1,0 +1,2 @@
+ALTER TABLE `message_templates` ADD `locale` text DEFAULT 'en' NOT NULL;--> statement-breakpoint
+CREATE INDEX `idx_message_templates_variant` ON `message_templates` (`tenant_id`,`name`,`channel`,`locale`);

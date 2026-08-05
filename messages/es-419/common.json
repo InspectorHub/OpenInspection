@@ -1,3 +1,21 @@
 {
-  "$schema": "https://inlang.com/schema/inlang-message-format"
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "common_back": "Atrás",
+  "common_continue": "Continuar",
+  "common_next": "Siguiente",
+  "common_delete": "Eliminar",
+  "common_cancel": "Cancelar",
+  "common_close": "Cerrar",
+  "common_clear": "Borrar",
+  "common_edit": "Editar",
+  "common_copied": "Copiado",
+  "common_save": "Guardar",
+  "common_done": "Listo",
+  "common_remove": "Quitar",
+  "common_undo": "Deshacer",
+  "common_add": "Agregar",
+  "common_loading": "Cargando…",
+  "common_saving": "Guardando…",
+  "common_redo": "Rehacer",
+  "common_copy": "Copiar"
 }

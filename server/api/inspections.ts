@@ -23,6 +23,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import templatesRoutes from './inspections/templates';
 import hierarchyRoutes from './inspections/hierarchy';
 import bulkRoutes from './inspections/bulk';
+import scheduleRoutes from './inspections/schedule';
 import mediaRoutes from './inspections/media';
 import mediaStudioRoutes from './inspections/media-studio';
 import publishRoutes from './inspections/publish';
@@ -39,9 +40,13 @@ import complianceRoutes from './inspections/compliance';
 import peopleRoutes from './inspections/people';
 import communicationRoutes from './inspections/communication';
 import inspectionServiceRoutes from './inspections/services';
+import inspectionReportRoutes from './inspections/reports';
 
 export const inspectionsRoutes = createApiRouter()
     .route('/', bulkRoutes)
+    // Dispatch Phase C — PATCH /:id/schedule, the instant-authoritative
+    // reschedule + reassign write behind requireCapability('scheduleOthers').
+    .route('/', scheduleRoutes)
     .route('/', templatesRoutes)
     .route('/', coreRoutes)
     .route('/', resultsRoutes)
@@ -69,6 +74,9 @@ export const inspectionsRoutes = createApiRouter()
     .route('/', peopleRoutes)
     // IA-87 — POST/PATCH/DELETE /:id/services: the service lines on an
     // inspection were write-once at creation until this router existed.
-    .route('/', inspectionServiceRoutes);
+    .route('/', inspectionServiceRoutes)
+    // DELETE /:id/reports/:reportId — one order delivers several reports, and
+    // removing one destroys its document. The list itself rides the hub payload.
+    .route('/', inspectionReportRoutes);
 
 export type InspectionsApi = typeof inspectionsRoutes;

@@ -8,7 +8,8 @@ import { deliverAction } from '../../lib/automation-core';
 import { buildBaseTemplateVars } from './template-vars';
 import { createOiTemplateStore } from './template-store';
 import { automationClassId } from '../../lib/notifications/automation-classes';
-import { oiClock } from './shared';
+import { oiClock, isStaffRecipient } from './shared';
+import { createRecipientLocaleResolver } from '../../lib/i18n/recipient-locale';
 import type { FlushInspection } from './shared';
 import type { EmailService } from '../email.service';
 import type { automations, automationLogs as automationLogsTable, tenants } from '../../lib/db/schema';
@@ -52,11 +53,24 @@ export async function deliverTemplatedEmail(
     // embedded subject_template / body_template, now frozen DEAD).
     // Skip fail-closed when the rule has no resolvable email template.
     const store = createOiTemplateStore(deps.rawDb);
+    // The RECIPIENT's language, resolved from the log's own recipient rather
+    // than from anything ambient — flush() runs on cron, where there is no
+    // request and `getLocale()` would answer `baseLocale` for everyone.
+    //
+    // Resolved at SEND time rather than stamped on the log at enqueue: a
+    // delayed rule can sit for days, and the language a person has told us they
+    // read is a current fact about them, not a property of the firing. The cost
+    // is two small indexed reads per log.
+    const locale = await createRecipientLocaleResolver(db, inspection.tenantId)(
+        log.recipientContactId
+            ? { kind: isStaffRecipient(log.recipientRoleKey) ? 'user' : 'contact', id: log.recipientContactId }
+            : null,
+    );
     // No rule means no referenced template, which lands on the
     // same fail-closed skip a rule with no template gets. One
     // outcome, one reason string, whichever way it got here.
     const tpl = automation?.emailTemplateId
-        ? await store.resolve(inspection.tenantId, automation.emailTemplateId)
+        ? await store.resolve(inspection.tenantId, automation.emailTemplateId, locale)
         : null;
     if (!tpl || tpl.channel !== 'email') {
         await db.update(automationLogs).set({ status: 'skipped', error: 'no email template' })

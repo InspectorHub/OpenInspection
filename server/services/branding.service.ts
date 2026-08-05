@@ -5,6 +5,8 @@ import { Errors } from '../lib/errors';
 import type { EmailIdentityConfig } from '../lib/email/sender-identity';
 import { r2Keys } from '../lib/r2-keys';
 import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
+import { resolveLocale } from '../lib/locale';
+import { resolveDisplayPrefs, type DateFormat, type TimeFormat } from '../lib/session/display-prefs';
 
 export interface IntegrationConfig {
     appBaseUrl?: string;
@@ -47,7 +49,11 @@ export class BrandingService {
             billingUrl: '',
             defaultTimezone: 'UTC',
             defaultLocale: 'en-US',
-            currency: 'USD'
+            currency: 'USD',
+            // #270 — the bottom of the resolution chain; these reproduce
+            // today's rendering exactly for a tenant with no config row.
+            dateFormat: 'us',
+            timeFormat: '12h'
         };
     }
 
@@ -93,6 +99,9 @@ export class BrandingService {
         logoUrl: string | null;
         primaryColor: string | null;
         defaultTimezone: string;
+        defaultLocale: string;
+        dateFormat: DateFormat;
+        timeFormat: TimeFormat;
         supportEmail: string | null;
         companyPhone: string | null;
         privacyUrl: string | null;
@@ -105,6 +114,9 @@ export class BrandingService {
                 logoUrl: tenantConfigs.logoUrl,
                 primaryColor: tenantConfigs.primaryColor,
                 defaultTimezone: tenantConfigs.defaultTimezone,
+                defaultLocale: tenantConfigs.defaultLocale,
+                dateFormat: tenantConfigs.dateFormat,
+                timeFormat: tenantConfigs.timeFormat,
                 supportEmail: tenantConfigs.supportEmail,
                 companyPhone: tenantConfigs.companyPhone,
                 legalMode: tenantConfigs.legalMode,
@@ -136,6 +148,10 @@ export class BrandingService {
             // Public surfaces (portal/report) anchor displayed dates to the tenant
             // timezone; NOT NULL DEFAULT 'UTC' so a config-less tenant is 'UTC'.
             defaultTimezone: row?.defaultTimezone ?? 'UTC',
+            // #270 — public surfaces render inspection dates in the tenant's
+            // language and shape; there is no viewer to override either.
+            defaultLocale: resolveLocale(row?.defaultLocale),
+            ...resolveDisplayPrefs(null, row),
             // IA-36 ⑨ — recovery channel for a reader whose link no longer works.
             supportEmail: row?.supportEmail ?? null,
             companyPhone: row?.companyPhone ?? null,

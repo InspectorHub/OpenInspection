@@ -4,6 +4,7 @@ import type { Context } from 'hono';
 import * as schema from './db/schema';
 import type { HonoConfig } from '../types/hono';
 import { isReportPublished } from './status/report-status';
+import { resolveTenantSlug } from './url';
 
 /**
  * Spec 5H P2 — Public verifier (no-auth, court-friendly) data loader.
@@ -36,6 +37,9 @@ export async function loadVerifyData(c: Context<HonoConfig>, envelopeId: string)
         status: schema.agreementSigners.status,
         signedAt: schema.agreementSigners.signedAt,
         channel: schema.agreementSigners.channel,
+        // Not exposed per-signer by the verifier — it decides ONE thing with it:
+        // whether the page may print the current language disclosure at all.
+        languageDisclosureVersion: schema.agreementSigners.languageDisclosureVersion,
     })
         .from(schema.agreementSigners)
         .where(eq(schema.agreementSigners.requestId, envelopeId))
@@ -55,11 +59,23 @@ export async function loadReportVerifyData(c: Context<HonoConfig>, token: string
     const ins = await db.select({
         propertyAddress: schema.inspections.propertyAddress,
         reportStatus: schema.inspections.reportStatus,
+        tenantId: schema.inspections.tenantId,
     })
         .from(schema.inspections)
         .where(eq(schema.inspections.id, verify.inspectionId))
         .get();
     // Mask the address to a coarse form (no unit/number) for a public endpoint.
     const masked = (ins?.propertyAddress ?? '').replace(/^\S+\s/, '••• ');
-    return { verify, propertyAddressMasked: masked, notPublished: !isReportPublished(ins?.reportStatus) };
+    // #270 — the verifier page has no viewer to hold a display preference, so it
+    // renders the published-on date in the TENANT's shape. The slug is what the
+    // page needs to reach the public brand; it is already the public identifier
+    // for a company (/book/:tenant), so this exposes nothing the reader of a
+    // report verification link does not already know.
+    const tenantSlug = ins?.tenantId ? await resolveTenantSlug(c, ins.tenantId) : '';
+    return {
+        verify,
+        propertyAddressMasked: masked,
+        notPublished: !isReportPublished(ins?.reportStatus),
+        tenantSlug,
+    };
 }

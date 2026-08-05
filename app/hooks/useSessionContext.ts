@@ -1,4 +1,10 @@
 import { useRouteLoaderData } from "react-router";
+import type { Capability, CapabilitySet } from "../../server/lib/auth/capabilities";
+import {
+  resolveDisplayPrefs,
+  type DateFormat,
+  type TimeFormat,
+} from "../../server/lib/session/display-prefs";
 
 /**
  * Session context returned by GET /api/session/context.
@@ -27,6 +33,10 @@ export interface SessionContext {
     defaultLocale: string;
     /** Tenant transaction/display currency (ISO 4217; 'USD' when unset). */
     currency: string;
+    /** Tenant default date order — see #270. Never null; 'us' when unset. */
+    dateFormat: DateFormat;
+    /** Tenant default clock — see #270. Never null; '12h' when unset. */
+    timeFormat: TimeFormat;
   };
   user: {
     name: string | null;
@@ -37,6 +47,17 @@ export interface SessionContext {
     timezone: string | null;
     /** Per-user locale override (BCP-47), or null to inherit the tenant. */
     locale: string | null;
+    /** Per-user date-order override, or null to inherit the tenant (#270). */
+    dateFormat: DateFormat | null;
+    /** Per-user clock override, or null to inherit the tenant (#270). */
+    timeFormat: TimeFormat | null;
+    /**
+     * The viewer's RESOLVED capabilities — role defaults with their personal
+     * overrides already applied, computed by the same `getCapabilities` the API
+     * guards use. Resolved server-side on purpose: the chrome must never work
+     * out a second answer to a question the server already decided.
+     */
+    capabilities: CapabilitySet;
   };
   deployment: {
     mode: string;
@@ -55,6 +76,23 @@ export interface SessionContext {
 export function useUnreadMessages(): number {
   const ctx = useSessionContext();
   return (ctx as (SessionContext & { unreadMessages?: number }) | null)?.unreadMessages ?? 0;
+}
+
+/**
+ * One capability answer for the current viewer.
+ *
+ * FAIL-CLOSED when there is no context (outside the auth layout, or the fetch
+ * failed): a chrome entry that appears on a failed load is an entry that
+ * navigates to a 403. The server is the enforcer either way; this only decides
+ * whether to offer the door.
+ */
+export function useCapability(capability: Capability): boolean {
+  return useSessionContext()?.user.capabilities?.[capability] === true;
+}
+
+/** Every resolved capability, for callers filtering a list. */
+export function useCapabilities(): Partial<CapabilitySet> | null {
+  return useSessionContext()?.user.capabilities ?? null;
 }
 
 export function useSessionContext(): SessionContext | null {
@@ -88,4 +126,71 @@ export function useDisplayLocale(): string {
 export function useDisplayCurrency(): string {
   const ctx = useSessionContext();
   return ctx?.branding.currency || "USD";
+}
+
+/**
+ * The viewer's effective date order and clock (#270) — user override, else
+ * tenant default, else 'us' + '12h', decided PER FIELD. Mirrors
+ * useDisplayTimeZone: no context (outside the auth layout, or the fetch failed)
+ * yields the defaults rather than throwing, so the chrome always renders.
+ *
+ * This is WORKSPACE CHROME only. Anything a second party also reads —
+ * inspection dates, report dates, appointment times — must resolve from the
+ * tenant alone, because the inspector, the client and the agent discuss one
+ * inspection out loud and must say the same date.
+ *
+ * Deliberately NOT exported: a caller wanting the shape also wants the
+ * language, and getting one without the other is how a Spanish page ends up
+ * with an English month. `useChromeDateTimeFormat` below is the whole bundle.
+ */
+function useDisplayFormatPrefs(): { dateFormat: DateFormat; timeFormat: TimeFormat } {
+  const ctx = useSessionContext();
+  return resolveDisplayPrefs(ctx?.user, ctx?.branding);
+}
+
+/**
+ * The format bundle for WORKSPACE CHROME — settings panels, diagnostics logs,
+ * version history: surfaces whose reader is the person looking at them (#270).
+ *
+ * Counterpart to `useInspectionDateTimeFormat` below, and the difference is the
+ * whole design: here BOTH axes follow the viewer, because nobody else is
+ * reading this value off a different screen at the same time.
+ */
+export function useChromeDateTimeFormat(): {
+  locale: string;
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
+} {
+  const locale = useDisplayLocale();
+  const prefs = useDisplayFormatPrefs();
+  return { locale, ...prefs };
+}
+
+/**
+ * The TENANT's date order and clock, ignoring any personal override — the
+ * resolution for inspection / report / appointment rendering.
+ */
+export function useTenantFormatPrefs(): { dateFormat: DateFormat; timeFormat: TimeFormat } {
+  const ctx = useSessionContext();
+  return resolveDisplayPrefs(null, ctx?.branding);
+}
+
+/**
+ * The format bundle for anything a SECOND PARTY also reads — inspection dates,
+ * report dates, appointment times (#270).
+ *
+ * The two axes resolve from different places on purpose. **Language** follows
+ * the viewer, because a Spanish-speaking agent should read Spanish. **Shape**
+ * follows the tenant, because `Sep 11` on one screen and `11/09` on another is
+ * a support call and, on a date-sensitive transaction, a missed appointment.
+ * Translating a month name cannot be misread; reordering one can.
+ */
+export function useInspectionDateTimeFormat(): {
+  locale: string;
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
+} {
+  const locale = useDisplayLocale();
+  const prefs = useTenantFormatPrefs();
+  return { locale, ...prefs };
 }

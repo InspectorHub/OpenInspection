@@ -30,6 +30,7 @@ export function BookingWizard({
     clientName, setClientName,
     clientEmail, setClientEmail,
     smsOptin, setSmsOptin,
+    locale, setLocale,
     chosenInspectorId, setChosenInspectorId,
     submitting,
     message,
@@ -128,6 +129,8 @@ export function BookingWizard({
           setClientEmail={setClientEmail}
           smsOptin={smsOptin}
           setSmsOptin={setSmsOptin}
+          locale={locale}
+          setLocale={setLocale}
           privacyUrl={privacyUrl}
           termsUrl={termsUrl}
           companyName={profile.company}

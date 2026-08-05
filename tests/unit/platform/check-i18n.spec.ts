@@ -36,10 +36,33 @@ describe('check-i18n gate', () => {
         expect(findI18nViolations('formatDate(x, { locale, timeZone: tz, month: "short" })', 'x.ts')).toEqual([]);
     });
 
-    it('does NOT flag a bare (locale-less) toLocale call', () => {
-        // Browser-default locale — already viewer-responsive; not this gate's target.
-        expect(findI18nViolations('d.toLocaleDateString()', 'x.ts')).toEqual([]);
-        expect(findI18nViolations('d.toLocaleString(undefined, { month: "short" })', 'x.ts')).toEqual([]);
+    // #270 — this used to assert the OPPOSITE, on the reasoning that a bare call
+    // is "already viewer-responsive". It is not: it reads navigator.language and
+    // the browser's timezone, which are nobody's configured preference, so the
+    // date disagrees with every other date on the page.
+    it('flags a locale-less date format', () => {
+        expect(findI18nViolations('d.toLocaleDateString()', 'x.ts')).toHaveLength(1);
+        expect(findI18nViolations('d.toLocaleTimeString(undefined, { hour: "numeric" })', 'x.ts')).toHaveLength(1);
+        expect(findI18nViolations('new Date(epochMs).toLocaleString()', 'x.ts')).toHaveLength(1);
+        expect(findI18nViolations('{new Date(e.ts).toLocaleString(undefined)}', 'x.ts')).toHaveLength(1);
+    });
+
+    it('does NOT flag number formatting via toLocaleString', () => {
+        // `.toLocaleString()` on a Number is currency/number formatting — a
+        // different concern, and the reason the Date rule anchors on `new Date(`.
+        expect(findI18nViolations('`$${(min / 100).toLocaleString()}`', 'x.ts')).toEqual([]);
+        expect(findI18nViolations('defect.estimateHigh.toLocaleString()', 'x.ts')).toEqual([]);
+    });
+
+    it('does NOT flag prose that merely describes the bad pattern', () => {
+        // Comment lines are skipped; several files explain the defect in words.
+        expect(findI18nViolations(' * `toLocaleDateString(undefined, …)` reads navigator.language', 'x.ts')).toEqual([]);
+        expect(findI18nViolations('// never toLocaleDateString() here', 'x.ts')).toEqual([]);
+    });
+
+    it('does NOT flag a date format that names its locale', () => {
+        expect(findI18nViolations('d.toLocaleDateString(locale, { weekday: "short" })', 'x.ts')).toEqual([]);
+        expect(findI18nViolations('formatDate(iso, { locale })', 'x.ts')).toEqual([]);
     });
 
     it('respects a same-line // i18n-lint-ok exemption', () => {

@@ -82,7 +82,7 @@ describe('AuthService', () => {
             createdAt: new Date(),
         });
 
-        const result = await authService.validateCredentials(email, password);
+        const result = await authService.validateCredentials(email, password, 't1');
         expect(result.id).toBe('u1');
     });
 
@@ -99,7 +99,7 @@ describe('AuthService', () => {
             createdAt: new Date(),
         });
 
-        await expect(authService.validateCredentials(email, 'wrong'))
+        await expect(authService.validateCredentials(email, 'wrong', 't1'))
             .rejects.toThrow('Invalid email or password');
     });
 
@@ -123,7 +123,7 @@ describe('AuthService', () => {
             role: 'owner', createdAt: new Date(),
         });
 
-        const result = await authService.validateCredentials(email, memberPw);
+        const result = await authService.validateCredentials(email, memberPw, 't1');
         expect(result.id).toBe('member-1');
         expect(result.tenantId).toBe('t1');
     });
@@ -137,7 +137,7 @@ describe('AuthService', () => {
             role: 'agent', createdAt: new Date(),
         });
         // Correct password, but the row is excluded → generic invalid-credentials.
-        await expect(authService.validateCredentials(email, password))
+        await expect(authService.validateCredentials(email, password, 't1'))
             .rejects.toThrow('Invalid email or password');
     });
 

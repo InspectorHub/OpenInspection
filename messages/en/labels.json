@@ -52,6 +52,8 @@
   "label_hub_invoice_draft": "Draft",
   "label_hub_invoice_awaiting_payment": "Awaiting payment",
   "label_hub_invoice_partially_paid": "Partially paid",
+  "label_hub_invoice_remaining": "{amount} remaining",
+  "label_hub_invoice_remaining_unknown": "Amount received not recorded",
   "label_hub_invoice_paid": "Paid",
   "label_hub_report_in_progress": "In Progress",
   "label_hub_report_submitted": "Submitted",
@@ -94,6 +96,7 @@
   "label_trigger_agreement_expired": "Agreement expired",
   "label_trigger_event_created": "Event created",
   "label_trigger_event_completed": "Event completed",
+  "label_trigger_event_results_received": "Event results received",
   "label_cap_view_communication": "View sent messages & notices",
   "label_trigger_booking_received": "Booking received",
   "label_trigger_inspection_completed": "Inspection completed"

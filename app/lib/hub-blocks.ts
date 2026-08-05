@@ -37,10 +37,19 @@ export type PillTone =
     | 'neutral'
     | 'warning';
 
-/** A single derived status pill: a tone + a human-readable label. */
+/**
+ * A single derived status pill: a tone + a human-readable label, plus an
+ * OPTIONAL one-line detail the card may render beside it.
+ *
+ * `detail` exists because a pill has room for a state and not for a number, and
+ * "Partially paid" without a figure is the whole defect this field closes. It is
+ * absent — never an empty string — whenever the number is not knowable, so a
+ * caller cannot accidentally render a blank line where money should be.
+ */
 interface BlockState {
     tone: PillTone;
     label: string;
+    detail?: string;
 }
 
 /** Derived states for the three action-bearing blocks. */
@@ -126,8 +135,25 @@ function deriveInvoice(hub: HubPayload): BlockState {
             return { tone: 'neutral', label: m.label_hub_invoice_draft() };
         case 'sent':
             return { tone: 'monitor', label: m.label_hub_invoice_awaiting_payment() };
-        case 'partial':
-            return { tone: 'warning', label: m.label_hub_invoice_partially_paid() };
+        case 'partial': {
+            const label = m.label_hub_invoice_partially_paid();
+            // Money redacted for this viewer (IA-95): the card already says the
+            // figure is hidden, so adding a second line about it says nothing.
+            if (typeof inv.amountCents !== 'number') return { tone: 'warning', label };
+            const remaining = remainingCents(inv);
+            // Partial with no recorded amount. Naming the gap beats both silence
+            // (which reads as "the balance is the total") and a fabricated $0.00.
+            if (remaining === null) {
+                return { tone: 'warning', label, detail: m.label_hub_invoice_remaining_unknown() };
+            }
+            return {
+                tone: 'warning',
+                label,
+                detail: m.label_hub_invoice_remaining({
+                    amount: formatCents(remaining, { currency: inv.currency }),
+                }),
+            };
+        }
         case 'paid':
             return { tone: 'sat', label: m.label_hub_invoice_paid() };
         default:
@@ -234,6 +260,32 @@ export function invoiceFromParty(
 /* ------------------------------------------------------------------ */
 /*  Money formatting                                                   */
 /* ------------------------------------------------------------------ */
+
+/**
+ * What is still owed on an invoice, in integer cents — or `null` when that
+ * cannot be stated.
+ *
+ * Two distinct reasons for `null`, both of which must silence the figure rather
+ * than substitute one:
+ *   - the viewer lacks the `financial` capability, so `amountCents` was redacted
+ *     out of the payload entirely (IA-95);
+ *   - `amountPaidCents` is null — the invoice is partial but no amount was ever
+ *     recorded (rows that predate the column, or a source that reported the
+ *     status without a figure). Rendering "$0.00 remaining" there would be a
+ *     false statement about money, and a client would read it as "nothing owed".
+ *
+ * Clamped at zero: an external system can report more received than our total
+ * after a divergent edit, and a negative balance shown to a client is never the
+ * right answer to that — it reads as a refund we are not promising.
+ */
+export function remainingCents(inv: {
+    amountCents?: number | undefined;
+    amountPaidCents?: number | null | undefined;
+}): number | null {
+    if (typeof inv.amountCents !== 'number') return null;
+    if (typeof inv.amountPaidCents !== 'number') return null;
+    return Math.max(0, inv.amountCents - inv.amountPaidCents);
+}
 
 /** Format integer cents as a currency string, e.g. 50000 → "$500.00".
  *  locale/currency default to en-US/USD; callers pass the viewer values to localize. */

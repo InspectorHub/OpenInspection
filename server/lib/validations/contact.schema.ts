@@ -8,6 +8,19 @@ export const CreateContactSchema = z.object({
     phone: z.string().max(30).optional().nullable().openapi({ example: '(555) 987-6543' }).describe('TODO describe phone field for the OpenInspection MCP integration'),
     agency: z.string().max(100).optional().nullable().openapi({ example: 'Sunrise Realty' }).describe('TODO describe agency field for the OpenInspection MCP integration'),
     notes: z.string().max(500).optional().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
+    // The language this contact asked to be addressed in. NULL is an ABSENCE
+    // of a stated preference, never English — see `contacts.locale` in the
+    // schema for why that distinction is the point of the column.
+    //
+    // Deliberately NO `.default()`. `UpdateContactSchema` below is
+    // `.partial()`, and `.partial()` KEEPS a default: a PATCH that never
+    // mentions `locale` would then arrive carrying one, and the handler would
+    // write it over a stored choice. Nullable so staff can put a contact back
+    // to "not set" — a correction path needs a way back.
+    //
+    // A free BCP-47 tag rather than an enum, matching the booking payload; the
+    // service reduces it to a locale we have messages for, or to NULL.
+    locale: z.string().trim().min(2).max(35).optional().nullable().openapi({ example: 'es-419' }).describe("Contact's preferred language as a BCP-47 tag; reduced server-side to a supported locale, or stored as null when unsupported."),
 }).openapi('CreateContact');
 
 export const UpdateContactSchema = CreateContactSchema.partial().openapi('UpdateContact');
@@ -21,6 +34,7 @@ export const ContactResponseSchema = z.object({
     phone: z.string().nullable().describe('TODO describe phone field for the OpenInspection MCP integration'),
     agency: z.string().nullable().describe('TODO describe agency field for the OpenInspection MCP integration'),
     notes: z.string().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
+    locale: z.string().nullable().describe("Contact's stated language preference (BCP-47), or null when they have not said."),
     createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
     inspectionCount: z.number().optional().describe('TODO describe inspectionCount field for the OpenInspection MCP integration'),
     referralCount: z.number().optional().describe('Inspections where this contact is the tenant buyer_agent (referrals sent).'),

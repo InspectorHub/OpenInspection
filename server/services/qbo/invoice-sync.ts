@@ -2,6 +2,7 @@ import { eq, and } from 'drizzle-orm';
 import { qboConnections, qboEntityMap } from '../../lib/db/schema/qbo';
 import { invoices } from '../../lib/db/schema/invoice';
 import { logger } from '../../lib/logger';
+import { getLedgerOpinion } from '../payment-ledger.service';
 import type {
     Constructor,
     InvoiceSummary,
@@ -57,10 +58,39 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                 syncedAt:     new Date(),
             }).where(eq(qboEntityMap.id, mapped.id));
 
+            // QuickBooks amounts are dollars (see the reverse mapping in
+            // upsertInvoice, `Amount: amountCents / 100`). Round each side to
+            // its own exact cent value before subtracting: a bare float
+            // multiply on the difference produces off-by-one-cent amounts
+            // that are impossible to explain to a customer. This is the ONLY
+            // place the conversion happens — adapters receive cents.
+            const qboPaidCents = Math.round(inv.TotalAmt * 100) - Math.round(inv.Balance * 100);
+
+            // Spec §6. Our ledger is authoritative for what WE collected;
+            // QuickBooks reports a balance and cannot reconstruct our rows. So
+            // once the ledger has an opinion, this sweep may only COMPARE:
+            // applying QuickBooks' figure here would append an adjusting row,
+            // and an adjusting row is money movement nobody performed that is
+            // indistinguishable afterwards from money that really moved.
+            const opinion = await getLedgerOpinion(db, tenantId, mapped.oiId);
+            if (opinion.rowCount > 0) {
+                if (opinion.netCents === qboPaidCents) {
+                    await this.clearPaymentDiscrepancy(tenantId, mapped.oiId);
+                } else {
+                    await this.recordPaymentDiscrepancy(tenantId, mapped.oiId, opinion.netCents, qboPaidCents);
+                }
+                return true;
+            }
+
+            // No rows means the ledger has NO OPINION — not that nothing was
+            // paid. (Same rule `recomputeInvoicePaymentState` applies to the
+            // cache.) There is nothing for QuickBooks to contradict, so it is
+            // the only account of this invoice there is and applying it is the
+            // first record rather than an adjustment.
             if (inv.Balance === 0) {
                 await markPaid(mapped.oiId, tenantId);
             } else if (inv.Balance < inv.TotalAmt) {
-                await markPartial(mapped.oiId, inv.Balance, tenantId);
+                await markPartial(mapped.oiId, qboPaidCents, tenantId);
             }
             return true;
         }

@@ -1,0 +1,1 @@
+ALTER TABLE `invoices` ADD `amount_paid_cents` integer;

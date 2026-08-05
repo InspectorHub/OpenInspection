@@ -5,7 +5,9 @@ import { logger } from '../../lib/logger';
 import { PeopleService } from '../people.service';
 import { capabilitiesForProfile } from '../../lib/people/capabilities';
 import { getInspectionRoster } from '../../lib/inspection/roster';
-import { STAFF_ROLE_KEY } from './shared';
+import { STAFF_ROLE_KEY, isStaffRecipient } from './shared';
+import { createRecipientLocaleResolver, type RecipientLocaleResolver } from '../../lib/i18n/recipient-locale';
+import type { ContactLocale } from '../../lib/i18n/contact-locale';
 import type { AutomationChannel, RecipientKind } from './shared';
 
 export interface ResolvedRecipient {
@@ -13,6 +15,20 @@ export interface ResolvedRecipient {
     roleKey: string;
     email?: string;
     phone?: string;
+    /**
+     * The language to address THIS person in — not the language of whoever's
+     * request set the fan-out going, and not the ambient locale, which in a
+     * cron or queue firing is `baseLocale` regardless of who is reading.
+     * One trigger, two recipients, two languages.
+     */
+    locale: ContactLocale;
+}
+
+/** `contactId` carries a `users.id` for the staff and inspector kinds (see the
+ *  doc below), so the role key — not the id's shape — decides which table the
+ *  locale is read from. */
+function refFor(r: { contactId: string; roleKey: string }) {
+    return { kind: isStaffRecipient(r.roleKey) ? 'user' as const : 'contact' as const, id: r.contactId };
 }
 
 /**
@@ -38,7 +54,13 @@ export async function resolveRuleRecipients(
     rule: { recipientKind: RecipientKind; recipientRoleProfileId: string | null },
     inspection: typeof inspections.$inferSelect,
     channel: AutomationChannel,
+    /** Shared across one firing so a rule fanning out to eight staff over two
+     *  channels reads the tenant config once, not sixteen times. */
+    localeFor: RecipientLocaleResolver = createRecipientLocaleResolver(drizzle(rawDb), inspection.tenantId),
 ): Promise<ResolvedRecipient[]> {
+    const withLocale = async (rows: Array<Omit<ResolvedRecipient, 'locale'>>): Promise<ResolvedRecipient[]> =>
+        Promise.all(rows.map(async (r) => ({ ...r, locale: await localeFor(refFor(r)) })));
+
     if (rule.recipientKind === 'staff') {
         // B2 — the workspace's ADMIN staff: the set `createForAllAdmins`
         // names, which is the audience every hard-coded internal alert
@@ -89,7 +111,7 @@ export async function resolveRuleRecipients(
                 ...(channel === 'sms' ? { phone: addr } : { email: addr }),
             });
         }
-        return out;
+        return withLocale(out);
     }
 
     if (rule.recipientKind === 'inspector') {
@@ -119,11 +141,11 @@ export async function resolveRuleRecipients(
         const { normalizeE164 } = await import('../../lib/sms/phone');
         const addr = channel === 'email' ? (u?.email ?? null) : normalizeE164(u?.phone ?? null);
         if (!addr) return [];
-        return [{
+        return withLocale([{
             contactId: inspectorId ?? '',
             roleKey: 'inspector',
             ...(channel === 'email' ? { email: addr } : { phone: addr }),
-        }];
+        }]);
     }
 
     // Honor the "never throws" contract (see the doc comment above): the
@@ -161,5 +183,5 @@ export async function resolveRuleRecipients(
             ...(channel === 'email' ? { email: addr } : { phone: addr }),
         });
     }
-    return out;
+    return withLocale(out);
 }

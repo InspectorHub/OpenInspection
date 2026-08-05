@@ -13,7 +13,7 @@
  * behavior.
  */
 import { describe, it, expect } from 'vitest';
-import { app } from '../../../server/index';
+import { app, idempotencyGuard } from '../../../server/index';
 import { jwtAuthMiddleware } from '../../../server/lib/middleware/jwt-auth';
 import { contextBootstrap } from '../../../server/lib/middleware/context-bootstrap';
 import { diMiddleware } from '../../../server/lib/middleware/di';
@@ -51,5 +51,15 @@ describe('global middleware order', { timeout: 30_000 }, () => {
 
         // touchLastActive consumes c.var.services.user — di must come first.
         expect(di).toBeLessThan(lastTouch);
+    });
+
+    it('the idempotency guard runs AFTER the JWT middleware', () => {
+        // The key is scoped to the authenticated tenant. Mounted any earlier
+        // (e.g. after contextBootstrap) the tenant is still unknown on authed
+        // API requests, so keys would land in one global namespace and two
+        // tenants minting the same key would replay each other's response.
+        const jwt = indexOf(jwtAuthMiddleware, 'jwtAuthMiddleware');
+        const idem = indexOf(idempotencyGuard, 'idempotencyGuard');
+        expect(jwt).toBeLessThan(idem);
     });
 });

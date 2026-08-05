@@ -226,7 +226,86 @@ describe('POST /book — client contact upsert (#111 / IA-18)', () => {
         expect(primary2?.contactId).toBe(contactId);
     });
 
-    // 3. Contact-upsert failure → booking still succeeds (200), inspection row
+    // 3. A stated language preference lands on the contact, and its ABSENCE
+    //    stays absent. These two are one pair: the field exists so someone can
+    //    count who asked for another language, and that count only means
+    //    anything if a booking that said nothing is distinguishable from one
+    //    that chose English.
+    it('stores the language the client chose on their contact', async () => {
+        const { app } = buildApp(db, booking, contact);
+        const res = await app.request('/book', morningBody({ locale: 'es-419' }), FAKE_ENV, FAKE_EXEC_CTX);
+        expect(res.status).toBe(200);
+
+        const { eq, and } = await import('drizzle-orm');
+        const row = await db.select().from(contacts)
+            .where(and(eq(contacts.tenantId, T1), eq(contacts.email, 'client@test.com'))).get();
+        expect(row?.locale).toBe('es-419');
+    });
+
+    it('never clears a stored language when a later booking says nothing', async () => {
+        // Silence is not a retraction — only a NEW answer replaces the old one.
+        const { app } = buildApp(db, booking, contact);
+        await app.request('/book', morningBody({ timeSlot: 'custom', customTime: '08:00', locale: 'es-419' }), FAKE_ENV, FAKE_EXEC_CTX);
+        await app.request('/book', morningBody({ timeSlot: 'custom', customTime: '10:00' }), FAKE_ENV, FAKE_EXEC_CTX);
+
+        const { eq, and } = await import('drizzle-orm');
+        const rows = await db.select().from(contacts)
+            .where(and(eq(contacts.tenantId, T1), eq(contacts.type, 'client'))).all();
+        expect(rows.length).toBe(1);
+        expect(rows[0].locale).toBe('es-419');
+    });
+
+    it('leaves the locale NULL when the client did not choose one', async () => {
+        const { app } = buildApp(db, booking, contact);
+        const res = await app.request('/book', morningBody(), FAKE_ENV, FAKE_EXEC_CTX);
+        expect(res.status).toBe(200);
+
+        const { eq, and } = await import('drizzle-orm');
+        const row = await db.select().from(contacts)
+            .where(and(eq(contacts.tenantId, T1), eq(contacts.email, 'client@test.com'))).get();
+        // NULL means "fall through to the tenant default", never "English".
+        expect(row?.locale).toBeNull();
+    });
+
+    it('stores a regional variant as the catalogue we can actually speak', async () => {
+        const { app } = buildApp(db, booking, contact);
+        const res = await app.request('/book', morningBody({ locale: 'es-MX' }), FAKE_ENV, FAKE_EXEC_CTX);
+        expect(res.status).toBe(200);
+
+        const { eq, and } = await import('drizzle-orm');
+        const row = await db.select().from(contacts)
+            .where(and(eq(contacts.tenantId, T1), eq(contacts.email, 'client@test.com'))).get();
+        expect(row?.locale).toBe('es-419');
+    });
+
+    it('accepts a booking in a language we do not speak, and stores no promise', async () => {
+        // Rejecting the booking would be the worse failure by far: the request
+        // is for an inspection, not for a translation.
+        const { app } = buildApp(db, booking, contact);
+        const res = await app.request('/book', morningBody({ locale: 'fr-FR' }), FAKE_ENV, FAKE_EXEC_CTX);
+        expect(res.status).toBe(200);
+
+        const { eq, and } = await import('drizzle-orm');
+        const row = await db.select().from(contacts)
+            .where(and(eq(contacts.tenantId, T1), eq(contacts.email, 'client@test.com'))).get();
+        expect(row?.locale).toBeNull();
+    });
+
+    it('lets a returning client change their mind about the language', async () => {
+        // Unlike name and phone, which fill forward, the newer answer wins:
+        // being written to in English after asking for Spanish is the failure.
+        const { app } = buildApp(db, booking, contact);
+        await app.request('/book', morningBody({ timeSlot: 'custom', customTime: '08:00', locale: 'en' }), FAKE_ENV, FAKE_EXEC_CTX);
+        await app.request('/book', morningBody({ timeSlot: 'custom', customTime: '10:00', locale: 'es-419' }), FAKE_ENV, FAKE_EXEC_CTX);
+
+        const { eq, and } = await import('drizzle-orm');
+        const rows = await db.select().from(contacts)
+            .where(and(eq(contacts.tenantId, T1), eq(contacts.type, 'client'))).all();
+        expect(rows.length).toBe(1);
+        expect(rows[0].locale).toBe('es-419');
+    });
+
+    // 4. Contact-upsert failure → booking still succeeds (200), inspection row
     //    exists with NO primary client linked (inspection_people write never
     //    ran since there is no contact id to link), and a warn was logged.
     it('does not fail the booking when contact upsert throws (non-fatal)', async () => {

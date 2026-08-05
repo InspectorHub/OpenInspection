@@ -94,6 +94,12 @@ export const users = sqliteTable('users', {
     // Per-user display-locale override (BCP-47). NULL = inherit the tenant's
     // default_locale. Affects only this user's UI.
     locale: text('locale'),
+    // #270 — per-user override. NULL = inherit the tenant's setting, the same
+    // convention as `timezone` directly above. Governs this user's own
+    // workspace chrome only; inspection/report/appointment rendering always
+    // anchors to the tenant so all three parties read the same date aloud.
+    dateFormat: text('date_format', { enum: ['us', 'iso', 'eu'] }),
+    timeFormat: text('time_format', { enum: ['12h', '24h'] }),
 }, (t) => [
     index('idx_users_deleted_at').on(t.deletedAt),
     // DB-2: soft-deleted rows must not block re-inviting the same email.

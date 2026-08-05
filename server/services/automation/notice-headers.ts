@@ -19,6 +19,8 @@ import { insertNotificationRow } from '../notification.service';
 import { nanoid } from 'nanoid';
 import { isStaffRecipient } from './shared';
 import { isPreferenceMuted, type PreferenceSubject } from '../../lib/notifications/preference-port';
+import type { RecipientLocaleResolver } from '../../lib/i18n/recipient-locale';
+import type { ContactLocale } from '../../lib/i18n/contact-locale';
 
 export interface NoticeHeaderInput {
     tenantId: string;
@@ -122,14 +124,22 @@ export async function createHeadersForInsertedLogs(
      * The wording for one rule's notice (B3/IA-115). Per-RULE, not per-batch:
      * two rules on the same event can carry different in-app templates, and a
      * single title for the whole firing would silently pick one of them.
+     *
+     * Now also per-LOCALE, and for a related reason: one firing can reach an
+     * English agent and a Spanish client, so a single wording for the whole
+     * rule would silently pick one of THEM. The locale comes from the header's
+     * own recipient (`localeFor` below) — never from the ambient locale, which
+     * in a cron firing describes nobody.
      */
-    wordingFor: (automationId: string | null) => NoticeWording,
+    wordingFor: (automationId: string | null, locale: ContactLocale) => Promise<NoticeWording>,
     /**
      * The notification class for one rule's notice — per-RULE for the same
      * reason `wordingFor` is: two rules on one event are two different things
      * to have a preference about.
      */
     classFor: (automationId: string | null) => string | undefined,
+    /** The language each header's own recipient reads in. */
+    localeFor: RecipientLocaleResolver,
     inserted: Array<{ id: string; automationId: string | null; sendAt: Date | number;
         recipientContactId: string | null; recipientRoleKey: string | null }>,
 ): Promise<void> {
@@ -148,7 +158,13 @@ export async function createHeadersForInsertedLogs(
         groups.set(key, g);
     }
     for (const g of groups.values()) {
-        const wording = wordingFor(g.automationId);
+        // A group IS one recipient (the key carries the id), so this is the
+        // language of the person who will read this notice, resolved from what
+        // we know about THEM.
+        const locale = await localeFor(g.userId
+            ? { kind: 'user', id: g.userId }
+            : { kind: 'contact', id: g.contactId! });
+        const wording = await wordingFor(g.automationId, locale);
         const classId = classFor(g.automationId);
         const noticeId = await insertNoticeHeader(db, {
             tenantId: ctx.tenantId,

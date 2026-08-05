@@ -52,6 +52,7 @@ export const TRIGGER_LABELS: Record<string, string> = {
   get "agreement.expired"() { return m.label_trigger_agreement_expired(); },
   get "event.created"() { return m.label_trigger_event_created(); },
   get "event.completed"() { return m.label_trigger_event_completed(); },
+  get "event.results_received"() { return m.label_trigger_event_results_received(); },
   get "booking.received"() { return m.label_trigger_booking_received(); },
   get "inspection.completed"() { return m.label_trigger_inspection_completed(); },
 };

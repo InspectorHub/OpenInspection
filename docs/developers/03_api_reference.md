@@ -487,7 +487,7 @@ Rewrite a rough inspector note into a professional, objective comment using Gemi
 }
 ```
 
-> Requires `GEMINI_API_KEY` to be set. Returns `500` if the key is missing or invalid.
+> Requires AI to be configured: a resolvable credential (the tenant's own key, or a deployment-provided one in `saas`) **and** `AI_MODEL`. Returns `503` when either is missing, and `500` when the model call itself fails.
 
 ---
 
@@ -513,7 +513,7 @@ If no defect-status items are recorded the response is:
 { "summary": "No significant defects observed during this inspection." }
 ```
 
-> Requires `GEMINI_API_KEY` to be set. Returns `403` if the inspection does not belong to the caller's tenant, `404` if no results exist.
+> Requires AI to be configured (a resolvable credential **and** `AI_MODEL`; `503` otherwise). Returns `403` if the inspection does not belong to the caller's tenant, `404` if no results exist.
 
 ---
 

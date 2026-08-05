@@ -74,7 +74,7 @@ describe('AutomationService.resolveRecipients', () => {
         );
 
         expect(result).toEqual([
-            { contactId: 'c-buyer-1', roleKey: 'buyer_agent', email: 'buyer-agent@example.com' },
+            { contactId: 'c-buyer-1', roleKey: 'buyer_agent', email: 'buyer-agent@example.com', locale: 'en' },
         ]);
     });
 
@@ -95,8 +95,8 @@ describe('AutomationService.resolveRecipients', () => {
         );
 
         expect(result.slice().sort((a, b) => a.contactId.localeCompare(b.contactId))).toEqual([
-            { contactId: 'c-buyer-1', roleKey: 'buyer_agent', email: 'buyer-agent@example.com' },
-            { contactId: 'c-client-1', roleKey: 'client', email: 'jane@example.com' },
+            { contactId: 'c-buyer-1', roleKey: 'buyer_agent', email: 'buyer-agent@example.com', locale: 'en' },
+            { contactId: 'c-client-1', roleKey: 'client', email: 'jane@example.com', locale: 'en' },
         ]);
         expect(result.some(r => r.contactId === 'c-listing-1')).toBe(false);
     });
@@ -115,7 +115,7 @@ describe('AutomationService.resolveRecipients', () => {
         );
 
         expect(result).toEqual([
-            { contactId: 'u-inspector-1', roleKey: 'inspector', email: 'inspector@example.com' },
+            { contactId: 'u-inspector-1', roleKey: 'inspector', email: 'inspector@example.com', locale: 'en' },
         ]);
     });
 

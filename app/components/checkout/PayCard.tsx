@@ -61,6 +61,13 @@ export function PayCard({
             {state === "todo" && invoice && !justPaid && (
                 <PayPanel
                     inspectionId={inspectionId}
+                    // The invoice TOTAL, not what the payment ledger says is
+                    // still outstanding — the Stripe intent is minted
+                    // server-side from this same figure, so quoting less here
+                    // would show a price the payer is not charged. Charge and
+                    // display only move together, and moving them is
+                    // payment-collection behaviour with its own decisions to
+                    // make. See the matching note in InvoiceDisplay.
                     amountCents={invoice.amountCents}
                     currency={invoice.currency}
                     brandColor={brandColor}

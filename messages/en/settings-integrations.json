@@ -157,6 +157,11 @@
   "settings_qbo_disconnect": "Disconnect",
   "settings_qbo_sync_errors": "Sync Errors ({count})",
   "settings_qbo_sync_errors_desc": "Check the sync error log for details. Errors will retry automatically on the next sync.",
+  "settings_qbo_discrepancy_heading": "Payment discrepancies ({count})",
+  "settings_qbo_discrepancy_desc": "QuickBooks and your payment records disagree about what was collected. Nothing has been adjusted automatically: recording an adjustment would invent money movement nobody performed. Reconcile these in QuickBooks.",
+  "settings_qbo_discrepancy_row": "Invoice {invoice}: you recorded {ours}, QuickBooks reports {theirs}.",
+  "settings_qbo_not_synced_heading": "Not sent to QuickBooks",
+  "settings_qbo_not_synced_deposits": "{count} payments were collected before an invoice existed, so they are not in QuickBooks. An unapplied deposit needs a liability account in your chart of accounts, and that is your accountant's decision.",
   "settings_apps_meta_title": "Connected applications - Settings - OpenInspection",
   "settings_apps_crumb": "Connected applications",
   "settings_apps_all_modules": "All modules",
@@ -293,5 +298,12 @@
   "settings_advanced_data_heading": "Data management",
   "settings_advanced_data_desc": "Import data from another inspection platform or export your data for backup.",
   "settings_advanced_import_export": "Import / Export data",
-  "settings_automations_recipient_kind_staff": "Office staff (owners & managers)"
+  "settings_automations_recipient_kind_staff": "Office staff (owners & managers)",
+  "settings_msgtpl_languages_label": "Languages:",
+  "settings_msgtpl_variant_add": "+ Add {language}",
+  "settings_msgtpl_variant_missing_note": "A language you have not written yet is still delivered — in the language you have.",
+  "settings_msgtpl_language_label": "Language",
+  "settings_msgtpl_language_locked": "A language version of “{name}”. Versions share a name and a channel; only the language differs.",
+  "settings_msgtpl_new_variant_title": "New {language} version",
+  "settings_msgtpl_delete_variant_aria": "Delete the {language} version"
 }

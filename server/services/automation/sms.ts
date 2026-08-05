@@ -57,8 +57,19 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
             if (!sms) return void (await skip('sms not configured'));
 
             const { createOiTemplateStore } = await import('./template-store');
+            // Same rule as the email path: the variant is chosen by the
+            // RECIPIENT's language, read from this log's own recipient. A cron
+            // flush has no request locale to leak, which is precisely why an
+            // ambient read here would look correct and be wrong.
+            const { createRecipientLocaleResolver } = await import('../../lib/i18n/recipient-locale');
+            const { isStaffRecipient } = await import('./shared');
+            const locale = await createRecipientLocaleResolver(db, inspection.tenantId)(
+                log.recipientContactId
+                    ? { kind: isStaffRecipient(log.recipientRoleKey) ? 'user' : 'contact', id: log.recipientContactId }
+                    : null,
+            );
             const tpl = automation.smsTemplateId
-                ? await createOiTemplateStore(this.db).resolve(inspection.tenantId, automation.smsTemplateId)
+                ? await createOiTemplateStore(this.db).resolve(inspection.tenantId, automation.smsTemplateId, locale)
                 : null;
             if (!tpl || tpl.channel !== 'sms' || !tpl.body.trim()) return void (await skip('no sms template'));
 

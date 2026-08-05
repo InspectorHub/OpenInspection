@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { DateFormat, TimeFormat } from "../../server/lib/session/display-prefs";
 
 /**
  * A-10 — tenant brand shared by every public surface (profile / booking /
@@ -12,6 +13,12 @@ export interface TenantBrand {
   /** Tenant display timezone (IANA; 'UTC' when unset). Public/report surfaces
    *  anchor displayed inspection dates to this zone. */
   defaultTimezone: string;
+  /** #270 — the tenant's display language and date/time shape. A public page
+   *  has no viewer to override them, and an inspection date must read the same
+   *  to the inspector, the client and the agent, so these are tenant values. */
+  defaultLocale: string;
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
   /** IA-36 ⑨ — client-facing recovery channels, null until the tenant sets
    *  them. A dead-link page needs somewhere to send the reader; naming the
    *  company without a way to reach it only says who to blame. */
@@ -27,11 +34,35 @@ export const EMPTY_BRAND: TenantBrand = {
   primaryColor: null,
   logoUrl: null,
   defaultTimezone: "UTC",
+  defaultLocale: "en-US",
+  dateFormat: "us",
+  timeFormat: "12h",
   supportEmail: null,
   companyPhone: null,
   privacyUrl: null,
   termsUrl: null,
 };
+
+/**
+ * The date/time format bundle a PUBLIC surface renders with (#270).
+ *
+ * Public pages run in loaders, where the session hooks do not exist, and they
+ * have no authenticated user to hold a personal override anyway. Everything
+ * here is the tenant's — which is also what the design requires of an
+ * inspection date: the client, the agent and the inspector must read the same
+ * one out loud.
+ */
+export function brandFormat(brand: TenantBrand): {
+  locale: string;
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
+} {
+  return {
+    locale: brand.defaultLocale,
+    dateFormat: brand.dateFormat,
+    timeFormat: brand.timeFormat,
+  };
+}
 
 /**
  * Pick a readable text color for content sitting ON the brand primary color.

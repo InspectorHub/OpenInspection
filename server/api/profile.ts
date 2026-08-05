@@ -12,6 +12,7 @@ import { inspectorSignature } from '../lib/inspector-signature';
 import { r2Keys } from '../lib/r2-keys';
 import { isValidTimeZone } from '../lib/tz';
 import { isValidLocale } from '../lib/locale';
+import { DATE_FORMATS, TIME_FORMATS } from '../lib/session/display-prefs';
 import { getDrizzle } from '../lib/route-helpers';
 import { r2Put } from '../lib/r2/objects';
 
@@ -43,6 +44,10 @@ const getProfileRoute = createRoute(withMcpMetadata({
                         signaturePreviewHtml: z.string(),
                         timezone: z.string().nullable(),
                         locale: z.string().nullable(),
+                        // #270 — null means "inherit the company setting", the
+                        // same convention as timezone/locale above.
+                        dateFormat: z.string().nullable(),
+                        timeFormat: z.string().nullable(),
                     })),
                 },
             },
@@ -62,6 +67,13 @@ export const PatchProfileSchema = z.object({
     signatureEnabled: z.boolean().optional().describe('Whether the inspector business-card footer is added to outbound emails'),
     timezone: z.string().refine((v) => v === '' || isValidTimeZone(v), 'Invalid timezone').optional().describe('Per-user display timezone (IANA). Empty string clears the override (inherit tenant).'),
     locale: z.string().refine((v) => v === '' || isValidLocale(v), 'Invalid locale').optional().describe('Per-user display locale (BCP-47). Empty string clears the override (inherit tenant).'),
+    // #270 — SHAPE, not language. `.optional()` with NO `.default()` on purpose:
+    // a default here would make an omitted key indistinguishable from an
+    // explicit one and silently rewrite a preference the caller never mentioned.
+    // Guarded by tests/unit/session/format-prefs-write-path.spec.ts, which
+    // asserts the KEY IS ABSENT rather than asserting its value.
+    dateFormat: z.enum(['', ...DATE_FORMATS]).optional().describe('Per-user date order (us|iso|eu). Empty string clears the override (inherit tenant).'),
+    timeFormat: z.enum(['', ...TIME_FORMATS]).optional().describe('Per-user clock (12h|24h). Empty string clears the override (inherit tenant).'),
 });
 
 const patchProfileRoute = createRoute(withMcpMetadata({
@@ -136,6 +148,8 @@ const profileRoutes = createApiRouter()
             signatureEnabled: users.signatureEnabled,
             timezone: users.timezone,
             locale: users.locale,
+            dateFormat: users.dateFormat,
+            timeFormat: users.timeFormat,
             // The drawn signature itself. Settings said "Signature saved" and
             // showed the reader nothing — so the one thing they might want to
             // check, that the right mark was captured, was the one thing the
@@ -189,6 +203,9 @@ const profileRoutes = createApiRouter()
         if (body.timezone !== undefined) updates.timezone = body.timezone === '' ? null : body.timezone;
         // Per-user locale override: empty string clears it (NULL = inherit tenant).
         if (body.locale !== undefined) updates.locale = body.locale === '' ? null : body.locale;
+        // #270 — per-user date/time SHAPE override, same '' = clear convention.
+        if (body.dateFormat !== undefined) updates.dateFormat = body.dateFormat === '' ? null : body.dateFormat;
+        if (body.timeFormat !== undefined) updates.timeFormat = body.timeFormat === '' ? null : body.timeFormat;
         // DB-12 / IA-26 — slug write removed; inspector booking slugs are frozen.
         // Agent slug writes go through POST /api/agent/profile (separate endpoint).
 

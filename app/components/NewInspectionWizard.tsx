@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useFetcher } from "react-router";
 import { useContactSearch } from "~/hooks/useContactSearch";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { buildWizardSteps, stepBlockedReason, todayLocalISO, type WizardStepId } from "~/lib/wizard-steps";
 import { summariseNewInspection } from "~/lib/wizard-review";
 import { buildWizardCreatePayload } from "~/lib/wizard-submit";
@@ -92,7 +93,11 @@ export function NewInspectionWizard({
    */
   quotaExceededAtOpen?: string | null;
 }) {
-  const fetcher = useFetcher();
+  // portal #105 — the create submit is guarded, not bare: one in-flight submit
+  // at a time, carrying an idempotency key the server dedupes on. A tenant
+  // created three byte-identical inspections seconds apart because Create was a
+  // plain `fetcher.submit` behind a button that stayed live.
+  const { fetcher, submit: submitCreate, busy: creating } = useGuardedSubmit();
   // The zone the Schedule step names, and the zone the typed time is read in.
   // Both must be the same value or the inspector is told one thing and the
   // booking stores another.
@@ -390,7 +395,10 @@ export function NewInspectionWizard({
   });
 
   function handleSubmit() {
-    fetcher.submit(
+    // Returns false and does nothing if a create is already in flight — the
+    // button below is disabled too, but that only takes effect on the NEXT
+    // render, which a double click beats.
+    submitCreate(
       buildWizardCreatePayload({
         propertyType,
         address,
@@ -435,6 +443,7 @@ export function NewInspectionWizard({
       stepIdx={stepIdx}
       stepLabel={stepLabel}
       blockedReason={blockedReason}
+      busy={creating}
       isLastStep={stepIdx === steps.length - 1}
       onBack={() => (stepIdx > 0 ? setStepIdx(stepIdx - 1) : onClose())}
       onNext={() => (stepIdx < steps.length - 1 ? setStepIdx(stepIdx + 1) : handleSubmit())}

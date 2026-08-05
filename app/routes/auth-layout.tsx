@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Outlet, useLoaderData, useLocation, useNavigate, useNavigation } from "react-router";
+import { data, Outlet, useLoaderData, useLocation, useNavigate, useNavigation } from "react-router";
+import { uiLocaleStampFor } from "../../server/lib/i18n/ui-locale";
 import type { Route } from "./+types/auth-layout";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -43,7 +44,61 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   } catch {
     // Graceful fallback — layout renders with defaults
   }
-  return { context: sessionContext };
+
+  // i18n activation (#269) — the DATABASE half of locale resolution.
+  //
+  // The worker entry resolves the request-borne rungs (the PARAGLIDE_LOCALE
+  // cookie, then Accept-Language) before the paraglide scope opens. It cannot
+  // read the other two: `users.locale` and `tenant_configs.default_locale` live
+  // in D1, and querying them ahead of the router on every page load — for a
+  // value that changes about once per user per career — is not a trade worth
+  // making. They arrive here instead, on the one loader that already fetches
+  // the session context for every authenticated page, at no extra query.
+  //
+  // By the time this runs the render has already committed to a locale, so the
+  // stored preference is STAMPED INTO THE COOKIE and takes effect from the next
+  // request. The cost is one render in the previous language, on the single
+  // page load where a stored preference first differs from the cookie. It
+  // cannot oscillate: the value written is the same value this chain resolves
+  // once the cookie carries it, so the next request finds them equal and writes
+  // nothing. The switcher (LocaleSwitcher) is the interactive path and does not
+  // pay this lag — it writes the cookie itself and revalidates.
+  const headers = new Headers();
+  const stamp = sessionContext
+    ? uiLocaleStampFor(request, {
+        userLocale: sessionContext.user?.locale ?? null,
+        tenantDefault: sessionContext.branding?.defaultLocale ?? null,
+      })
+    : null;
+  if (stamp) headers.append("Set-Cookie", stamp);
+  return data({ context: sessionContext }, { headers });
+}
+
+/**
+ * Surfaces the loader's `Set-Cookie` on the document response.
+ *
+ * Without this the stamp above is silently dropped: React Router does not
+ * propagate a nested loader's headers by default — it uses the deepest
+ * `headers` export it can find, and if no route on the branch exports one, the
+ * loader's headers go nowhere. Verified against a running server rather than
+ * assumed: before this existed, `document.cookie` held no PARAGLIDE_LOCALE
+ * after any number of authenticated page loads, and the language a viewer had
+ * saved in Settings never took effect.
+ *
+ * Only `Set-Cookie` is forwarded. Passing `loaderHeaders` through wholesale
+ * would let any future header set on this loader leak onto every authenticated
+ * document response, including caching directives that must not apply to a
+ * per-viewer page.
+ *
+ * No other route on this branch exports `headers` (asserted by
+ * `auth-layout-headers.test.ts`) — one that did would win as the deeper export
+ * and would have to forward this itself.
+ */
+export function headers({ loaderHeaders }: Route.HeadersArgs) {
+  const out = new Headers();
+  const cookie = loaderHeaders.get("Set-Cookie");
+  if (cookie) out.append("Set-Cookie", cookie);
+  return out;
 }
 
 export default function AuthLayout() {

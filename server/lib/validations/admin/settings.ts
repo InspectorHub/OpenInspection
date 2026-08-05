@@ -2,6 +2,7 @@ import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from '../shared.schema';
 import { isValidTimeZone } from '../../tz';
 import { isValidLocale } from '../../locale';
+import { DATE_FORMATS, TIME_FORMATS } from '../../session/display-prefs';
 
 /**
  * Validation schema for the branding configuration update.
@@ -53,6 +54,14 @@ export const UpdateBrandingSchema = z.object({
     // Tenant transaction/display currency (ISO 4217). Constrained to the
     // supported set; tenant-scoped only (no per-user override).
     currency: z.enum(['USD']).optional().openapi({ example: 'USD' }).describe('Tenant currency (ISO 4217).'),
+    // #270 — date/time SHAPE, a separate axis from `defaultLocale`: the locale
+    // decides what language "September" is written in, these decide whether the
+    // day comes before it and whether 14:30 is spelled 2:30 PM. Tenant-level and
+    // NOT nullable — this is the bottom of the resolution chain. `.optional()`
+    // with no `.default()`: a default would make an omitted key overwrite a
+    // stored preference the caller never mentioned.
+    dateFormat: z.enum(DATE_FORMATS).optional().openapi({ example: 'us' }).describe('Tenant default date order (us|iso|eu).'),
+    timeFormat: z.enum(TIME_FORMATS).optional().openapi({ example: '12h' }).describe('Tenant default clock (12h|24h).'),
     // IA-100 — whether archiving a contact also revokes the report links they
     // still hold. Off by default; see the column comment for why archiving is
     // treated as list hygiene rather than offboarding.
@@ -82,6 +91,8 @@ export const BrandingResponseSchema = createApiResponseSchema(z.object({
         defaultTimezone: z.string().describe('Tenant default IANA timezone (e.g. America/New_York); UTC when unset.'),
         defaultLocale: z.string().describe('Tenant default display locale (BCP-47, e.g. es-419); en-US when unset.'),
         currency: z.string().describe('Tenant currency (ISO 4217, e.g. USD); USD when unset.'),
+        dateFormat: z.string().describe('Tenant default date order (us|iso|eu); us when unset.'),
+        timeFormat: z.string().describe('Tenant default clock (12h|24h); 12h when unset.'),
         archiveRevokesAccess: z.boolean().optional()
             .describe('Whether archiving a contact also revokes the report links they still hold. False by default: archiving is list hygiene, not offboarding.'),
     }).describe('TODO describe branding field for the OpenInspection MCP integration'),

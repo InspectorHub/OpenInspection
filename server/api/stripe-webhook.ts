@@ -82,8 +82,9 @@ api.post('/', async (c) => {
         return c.json({ success: true }); // ACK: a retry can never succeed
     }
 
+    let appended: Awaited<ReturnType<typeof c.var.services.invoice.markPaid>> = null;
     try {
-        await c.var.services.invoice.markPaid(settled.invoiceId, tenantId, 'oi', 'card');
+        appended = await c.var.services.invoice.markPaid(settled.invoiceId, tenantId, 'oi', 'card');
         if (settled.inspectionId) {
             await c.var.services.inspection.markPaymentReceived(tenantId, settled.inspectionId);
         }
@@ -103,16 +104,19 @@ api.post('/', async (c) => {
     //
     // In waitUntil, and deliberately after the ACK path is settled: the customer
     // has already paid, and a QuickBooks outage must not turn a successful
-    // payment into a 500 that Stripe redelivers forever. `markPaid` above is
-    // idempotent on our side; the requestid is what keeps their side clean when
-    // Stripe redelivers anyway.
-    if (c.env.QBO_CLIENT_ID) {
+    // payment into a 500 that Stripe redelivers forever.
+    //
+    // The amount and the key both come from the ledger row `markPaid` appended,
+    // never from the invoice: the card settled the REMAINDER, which is the whole
+    // total only when no deposit was taken. A redelivery appends nothing and
+    // therefore pushes nothing — the requestid stays as the second line of
+    // defence rather than the only one.
+    if (c.env.QBO_CLIENT_ID && appended) {
+        const push = appended;
         c.executionCtx.waitUntil((async () => {
             try {
-                const inv = await c.var.services.invoice.findById(tenantId, settled.invoiceId);
-                if (!inv) return;
                 await c.var.services.qbo.recordPayment(
-                    tenantId, settled.invoiceId, inv.amountCents / 100, qboPaymentKey(settled.invoiceId),
+                    tenantId, settled.invoiceId, push.amountCents / 100, qboPaymentKey(push.id),
                 );
             } catch (e) {
                 logger.error('Stripe webhook: QBO payment push failed',

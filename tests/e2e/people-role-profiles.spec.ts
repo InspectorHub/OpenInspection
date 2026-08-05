@@ -152,7 +152,17 @@ test.describe.serial('People / Role Profiles (Plan 1B)', () => {
     // Primary before this test ever opens the modal.
     await expect(page.getByTestId('people-group-client')).toBeVisible();
     await expect(page.getByText('Editor Seed Client')).toBeVisible();
-    await expect(page.getByText('Primary', { exact: true })).toBeVisible();
+    // Asserted as a relationship, not as page-wide existence: the per-report card
+    // puts a second "Primary" badge on this same page, so a bare exact-text match
+    // resolves to two nodes. The pill sits in the same <p> as the person's link —
+    // note `people-group-client` is on the group HEADING, whose rows are siblings,
+    // so scoping to that testid finds nothing.
+    await expect(
+      page
+        .getByRole('link', { name: 'Editor Seed Client' })
+        .locator('xpath=..')
+        .getByText('Primary', { exact: true }),
+    ).toBeVisible();
 
     // IA-36 ⑬ — this used to 409 ("an inspection already has a primary
     // client"). It no longer does. "Exactly one primary client" is now upheld
@@ -171,8 +181,14 @@ test.describe.serial('People / Role Profiles (Plan 1B)', () => {
     await expect(page.getByRole('link', { name: SEARCH_CONTACT_CLIENT.name })).toBeVisible();
 
     // The seat moved rather than duplicating: exactly one Primary badge, and
-    // it is not on the incumbent any more.
-    await expect(page.getByText('Primary', { exact: true })).toHaveCount(1);
+    // it is not on the incumbent any more. Counted inside the People card only —
+    // the per-report card carries its own "Primary" badge for the primary
+    // deliverable, which has nothing to do with who holds the client seat.
+    // `people-group-client` marks the group HEADING; its grandparent is the
+    // container holding every people group, which is the smallest node that
+    // provably contains all the badges and none of the report card's.
+    const peopleGroups = page.getByTestId('people-group-client').locator('xpath=../..');
+    await expect(peopleGroups.getByText('Primary', { exact: true })).toHaveCount(1);
     // The incumbent stayed on the inspection, demoted to the company's
     // co-client role — losing the seat must not mean losing access.
     await expect(page.getByText('Editor Seed Client')).toBeVisible();

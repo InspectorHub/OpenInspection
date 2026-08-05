@@ -4,9 +4,18 @@ import { and, eq } from 'drizzle-orm';
 import { users, tenantConfigs, tenants } from '../lib/db/schema';
 import { getSeatUsage } from '../features/seat-quota';
 import { resolveLocale } from '../lib/locale';
+import {
+    DEFAULT_DISPLAY_PREFS,
+    isDateFormat,
+    isTimeFormat,
+    type DateFormat,
+    type TimeFormat,
+} from '../lib/session/display-prefs';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { mcpEnabled } from '../lib/mcp/flag';
+import { coerceOverrides, getCapabilities, type CapabilitySet } from '../lib/auth/capabilities';
+import { isRole } from '../lib/auth/roles';
 import { getDrizzle } from '../lib/route-helpers';
 import { getBaseUrl } from '../lib/url';
 import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
@@ -42,6 +51,17 @@ const sessionContextRoutes = createApiRouter()
         let userEmail: string | null = null;
         let userTimezone: string | null = null;
         let userLocale: string | null = null;
+        // #270 — the raw stored values, not the resolved pair: the client hook
+        // owns resolution, exactly as it already does for timezone and locale.
+        let userDateFormat: DateFormat | null = null;
+        let userTimeFormat: TimeFormat | null = null;
+        let tenantDateFormat: DateFormat = DEFAULT_DISPLAY_PREFS.dateFormat;
+        let tenantTimeFormat: TimeFormat = DEFAULT_DISPLAY_PREFS.timeFormat;
+        // RESOLVED capabilities, not the raw overrides: whether an actor may do
+        // something is decided where it is ENFORCED, and shipping the answer
+        // rather than the ingredients means the chrome cannot resolve it a
+        // second, subtly different way (see Cross-Portal Reuse in CLAUDE.md).
+        let permissionOverridesRaw: unknown = null;
         let tenantTimezone = 'UTC';
         let tenantLocale = 'en-US';
         let tenantCurrency = 'USD';
@@ -54,20 +74,33 @@ const sessionContextRoutes = createApiRouter()
         if (tenantId) {
             try {
                 const db = getDrizzle(c);
-                const row = await db.select({ name: users.name, email: users.email, timezone: users.timezone, locale: users.locale })
+                const row = await db.select({
+                    name: users.name,
+                    email: users.email,
+                    timezone: users.timezone,
+                    locale: users.locale,
+                    dateFormat: users.dateFormat,
+                    timeFormat: users.timeFormat,
+                    permissionOverrides: users.permissionOverrides,
+                })
                     .from(users)
                     .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
                     .get();
                 if (row) {
                     userName = row.name;
                     userEmail = row.email;
+                    permissionOverridesRaw = row.permissionOverrides;
                     userTimezone = row.timezone;
                     userLocale = row.locale;
+                    userDateFormat = isDateFormat(row.dateFormat) ? row.dateFormat : null;
+                    userTimeFormat = isTimeFormat(row.timeFormat) ? row.timeFormat : null;
                 }
                 const cfg = await db.select({
                     defaultTimezone: tenantConfigs.defaultTimezone,
                     defaultLocale: tenantConfigs.defaultLocale,
                     currency: tenantConfigs.currency,
+                    dateFormat: tenantConfigs.dateFormat,
+                    timeFormat: tenantConfigs.timeFormat,
                     // IA-100 — the contacts archive dialog states whether
                     // archiving also revokes report links, so it needs the
                     // policy, not just the link count.
@@ -82,6 +115,8 @@ const sessionContextRoutes = createApiRouter()
                 if (cfg?.defaultTimezone) tenantTimezone = cfg.defaultTimezone;
                 tenantLocale = resolveLocale(cfg?.defaultLocale);
                 if (cfg?.currency) tenantCurrency = cfg.currency;
+                if (isDateFormat(cfg?.dateFormat)) tenantDateFormat = cfg.dateFormat;
+                if (isTimeFormat(cfg?.timeFormat)) tenantTimeFormat = cfg.timeFormat;
                 archiveRevokesAccess = cfg?.archiveRevokesAccess ?? false;
                 legalCfg = cfg
                     ? {
@@ -201,6 +236,14 @@ const sessionContextRoutes = createApiRouter()
             unreadMessages = await c.var.services.message.unreadCountForTenant(tenantId);
         } catch { /* badge degrades to 0; the layout must never fail on it */ }
 
+        // An unknown role resolves as an inspector rather than throwing: the
+        // chrome must still render, and inspector is the least-privileged tier.
+        const roleForCaps = isRole(user.role) ? user.role : 'inspector';
+        const capabilities: CapabilitySet = getCapabilities(
+            roleForCaps,
+            coerceOverrides(permissionOverridesRaw),
+        );
+
         return c.json({
             success: true,
             data: {
@@ -221,14 +264,19 @@ const sessionContextRoutes = createApiRouter()
                     defaultLocale: tenantLocale,
                     currency: tenantCurrency,
                     archiveRevokesAccess,
+                    dateFormat: tenantDateFormat,
+                    timeFormat: tenantTimeFormat,
                 },
                 user: {
                     name: userName,
                     email: userEmail,
                     role: user.role || 'inspector',
+                    capabilities,
                     initials,
                     timezone: userTimezone,
                     locale: userLocale,
+                    dateFormat: userDateFormat,
+                    timeFormat: userTimeFormat,
                 },
                 deployment: {
                     mode: profile.mode || 'standalone',

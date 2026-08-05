@@ -101,6 +101,21 @@ export const agreementSigners = sqliteTable('agreement_signers', {
     // set = link killed regardless of expiry. Resolution fails closed on either.
     expiresAt:          integer('expires_at', { mode: 'timestamp_ms' }),
     revokedAt:          integer('revoked_at', { mode: 'timestamp_ms' }),
+    // Which version of the platform language DISCLOSURE this signer was shown.
+    // Not a contractual term (counsel, 2026-08-02) — but still the only way to
+    // answer "what was this person actually shown", which is the question a
+    // dispute turns on.
+    //
+    // NULLABLE and meant to stay that way. NULL means "the platform did not
+    // render the disclosure to this signer, or cannot vouch that it did" —
+    // signatures collected before this shipped, and the on-site
+    // `POST /api/inspections/:id/sign` surface, where the API returns the
+    // agreement text and the CALLER draws the screen. Writing a version for
+    // either would be a false statement about what they saw. Only a surface the
+    // platform renders may state a number here.
+    //
+    // Appended at the table end (see the expiresAt/revokedAt note above).
+    languageDisclosureVersion: integer('language_disclosure_version'),
 }, (t) => [
     index('idx_agreement_signers_tenant_request').on(t.tenantId, t.requestId),
     uniqueIndex('idx_agreement_signers_request_email').on(t.requestId, t.email),

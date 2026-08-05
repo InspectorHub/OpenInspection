@@ -3,6 +3,7 @@ import { Pill, Button } from "@core/shared-ui";
 import { RequestDetail } from "~/components/agreements/RequestDetail";
 import { pillToneFor, pillLabelFor } from "~/components/agreements/agreements-helpers";
 import { formatInspectionDateTime } from "~/lib/format-date";
+import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -76,6 +77,7 @@ export function SigningRequests({
   /** Inspector pre-sign, offered only while the envelope is still pending. */
   onPreSign: (requestId: string) => void;
 }) {
+  const fmt = useInspectionDateTimeFormat();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   return (
@@ -98,7 +100,7 @@ export function SigningRequests({
                     </div>
                     <div className="text-[12px] text-ih-fg-3 mt-0.5 truncate">
                       {req.clientEmail}
-                      {when && <> &middot; {formatInspectionDateTime(when, undefined, displayTz)}</>}
+                      {when && <> &middot; {formatInspectionDateTime(when, undefined, displayTz, fmt)}</>}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">

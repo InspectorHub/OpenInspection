@@ -38,6 +38,42 @@ describe('Sidebar', () => {
     expect(text).not.toContain('"/repair-items"');
   });
 
+  it('hides Dispatch without scheduleOthers and shows it with the override', async () => {
+    const { WORKSPACE_ITEMS, visibleNavItems } = await import('~/components/sidebar/nav-items');
+    const dispatchItem = WORKSPACE_ITEMS.find((i) => i.to === '/calendar/dispatch');
+    expect(dispatchItem?.capability).toBe('scheduleOthers');
+
+    // An inspector's ROLE default is scheduleOthers: false — and an inspector
+    // granted the override is exactly the user this feature was gated for, so
+    // the entry must key on the resolved capability rather than the tier.
+    const hidden = visibleNavItems(WORKSPACE_ITEMS, { scheduleOthers: false });
+    expect(hidden.some((i) => i.to === '/calendar/dispatch')).toBe(false);
+
+    const shown = visibleNavItems(WORKSPACE_ITEMS, { scheduleOthers: true });
+    expect(shown.some((i) => i.to === '/calendar/dispatch')).toBe(true);
+
+    // Ungated entries are never filtered out by this.
+    expect(hidden.some((i) => i.to === '/inspections')).toBe(true);
+  }, 20000);
+
+  it('fails CLOSED when the session context is missing', async () => {
+    const { WORKSPACE_ITEMS, visibleNavItems } = await import('~/components/sidebar/nav-items');
+    for (const capabilities of [null, undefined, {}]) {
+      const items = visibleNavItems(WORKSPACE_ITEMS, capabilities);
+      expect(items.some((i) => i.to === '/calendar/dispatch')).toBe(false);
+    }
+  }, 20000);
+
+  it('filters in BOTH nav surfaces, not just the desktop one', async () => {
+    // A capability filter applied to one surface only is invisible in review
+    // and obvious to the inspector who taps a link that redirects them.
+    for (const mod of ['~/components/Sidebar?raw', '~/components/sidebar/MobileDrawer?raw']) {
+      const src = await import(/* @vite-ignore */ mod);
+      const text = (src as unknown as { default: string }).default;
+      expect(text).toContain('visibleNavItems(WORKSPACE_ITEMS');
+    }
+  }, 20000);
+
   it('IA-25: User Menu trigger button is present in Sidebar source', async () => {
     const src = await import('~/components/Sidebar?raw');
     const text = (src as unknown as { default: string }).default;

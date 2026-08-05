@@ -2,6 +2,7 @@ import {} from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
+import { isAdminRole } from '../lib/auth/roles';
 import { Errors } from '../lib/errors';
 
 const TypeBody = z.object({
@@ -11,6 +12,14 @@ const TypeBody = z.object({
     defaultPriceCents:  z.number().int().min(0).default(0).describe('TODO describe defaultPriceCents field for the OpenInspection MCP integration'),
     color:              z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#6366f1').describe('TODO describe color field for the OpenInspection MCP integration'),
     sortOrder:          z.number().int().min(0).default(0).describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
+    // Hours after completion before the follow-up is queued. `.optional()` with
+    // NO `.default()`: this schema is re-used as `.partial()` for PUT, and a
+    // default survives `.partial()` — it would reset a tenant's configured delay
+    // to 72 on every update that omits the field. Omitted on create leaves the
+    // column default (72). `min(0)` because zero is a real setting: a sewer
+    // scope's results exist when the camera comes out.
+    followUpDelayHours: z.number().int().min(0).max(8760).optional()
+        .describe('Hours after a visit is completed before its follow-up is queued. 0 = immediately.'),
 });
 
 const EventBody = z.object({
@@ -75,6 +84,19 @@ const eventsRoutes = createApiRouter()
         const id = c.req.param('id') as string;
         const parsed = EventStatusBody.safeParse(await c.req.json());
         if (!parsed.success) throw Errors.BadRequest('Invalid status', parsed.error.flatten().fieldErrors);
+        // Completing a visit is the FIELD's own act: the inspector standing on
+        // site is the person who knows it is over, so every role on this route
+        // may do it. Recording that lab RESULTS arrived is an office act about a
+        // different event entirely, so it is owner/manager.
+        //
+        // The distinction is body-dependent — one method, one path, two very
+        // different transitions — so route-level `requireRole` cannot express
+        // it. `visitActions` (app/components/inspector-portal/VisitsCard.tsx)
+        // declines to OFFER the verb; this is where it is ENFORCED, so a
+        // hand-rolled request cannot walk around the UI.
+        if (parsed.data.status === 'results_received' && !isAdminRole(c.get('userRole'))) {
+            throw Errors.Forbidden('Requires one of [owner, manager]');
+        }
         await c.var.services.event.updateEventStatus(c.get('tenantId'), id, parsed.data.status);
         return c.json({ success: true });
     })

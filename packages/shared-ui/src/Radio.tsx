@@ -35,6 +35,11 @@ interface RadioGroupProps {
   error?: string;
   hint?: string;
   className?: string;
+  /** Overrides the legend's typography for a surface with its own field-label
+   *  idiom — the public booking form's uppercase micro-label, for one. Only the
+   *  styling is overridable: the legend element itself always renders, because
+   *  it is the group's accessible name. */
+  legendClassName?: string;
 }
 
 /**
@@ -52,12 +57,11 @@ export function RadioGroup({
   error,
   hint,
   className = "",
+  legendClassName = "block text-xs font-bold text-ih-fg-2 mb-1",
 }: RadioGroupProps) {
   return (
     <fieldset role="radiogroup" className={className}>
-      {legend && (
-        <legend className="block text-xs font-bold text-ih-fg-2 mb-1">{legend}</legend>
-      )}
+      {legend && <legend className={legendClassName}>{legend}</legend>}
       <div className="flex flex-col gap-1.5">
         {options.map((o) => (
           <Radio

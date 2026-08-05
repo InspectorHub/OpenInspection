@@ -49,7 +49,7 @@ describe('Spec 5B P2B — AIService.rewriteComment', () => {
 
     it('returns the rewritten text with surrounding quotes stripped', async () => {
         mockGeminiOK('"Major cracking observed at NW corner; recommend evaluation."');
-        const svc = new AIService({} as D1Database, 'test-key');
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'test-model');
         const out = await svc.rewriteComment({
             itemLabel: 'Roof Covering', sectionTitle: 'Roof', tab: 'defects',
             originalComment: 'Cracks observed.', instruction: 'add NW corner detail',
@@ -61,7 +61,7 @@ describe('Spec 5B P2B — AIService.rewriteComment', () => {
 
     it('includes item / section / tab / category / location in the prompt', async () => {
         mockGeminiOK('rewritten body');
-        const svc = new AIService({} as D1Database, 'test-key');
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'test-model');
         await svc.rewriteComment({
             itemLabel:       'Roof Covering',
             sectionTitle:    'Roof',
@@ -85,7 +85,7 @@ describe('Spec 5B P2B — AIService.rewriteComment', () => {
 
     it('omits defect-only context fields when tab is not "defects"', async () => {
         mockGeminiOK('rewritten');
-        const svc = new AIService({} as D1Database, 'test-key');
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'test-model');
         await svc.rewriteComment({
             itemLabel:       'Inspection Method',
             sectionTitle:    'Roof',
@@ -103,7 +103,7 @@ describe('Spec 5B P2B — AIService.rewriteComment', () => {
 
     it('throws on Gemini error responses', async () => {
         fetchMock.mockResolvedValueOnce({ ok: false, text: async () => 'rate limited' } as Response);
-        const svc = new AIService({} as D1Database, 'test-key');
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'test-model');
         await expect(svc.rewriteComment({
             itemLabel: 'Roof', sectionTitle: 'Roof', tab: 'defects',
             originalComment: 'foo', instruction: 'shorten',

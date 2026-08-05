@@ -23,8 +23,11 @@ api.post('/', async (c) => {
         svc.handleWebhook(
             rawBody,
             headerSig,
-            (invoiceId, tenantId) => invoiceSvc.markPaid(invoiceId, tenantId, 'qbo'),
-            (invoiceId, _balance, tenantId) => invoiceSvc.markPartial(invoiceId, tenantId, 'qbo'),
+            // The appended row is deliberately dropped on the INBOUND path:
+            // QuickBooks told us about this money, so pushing it back to them
+            // would book it a second time.
+            async (invoiceId, tenantId) => { await invoiceSvc.markPaid(invoiceId, tenantId, 'qbo'); },
+            async (invoiceId, amountPaidCents, tenantId) => { await invoiceSvc.markPartial(invoiceId, tenantId, 'qbo', amountPaidCents); },
         ).then(({ valid }) => {
             if (!valid) logger.info('QBO webhook: signature mismatch — discarded');
         }).catch(e => {

@@ -7,7 +7,7 @@
  *
  * An anonymous visitor must see exactly what they saw before.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, fireEvent, waitFor, screen } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
@@ -26,13 +26,15 @@ const PROFILE = {
 function renderBooking(opts: {
   agentBooking?: { agentName: string; tenantId: string } | null;
   onAction?: (form: FormData) => unknown;
+  /** Profile fields to override — e.g. a tenant with no Turnstile site key. */
+  profile?: Partial<typeof PROFILE>;
 }) {
   const Stub = createRoutesStub([
     {
       path: "/book/:tenant",
       Component: BookingPage,
       loader: () => ({
-        profile: PROFILE,
+        profile: { ...PROFILE, ...opts.profile },
         preselected: null,
         error: null,
         tenant: "acme",
@@ -109,6 +111,97 @@ describe("BookingPage — prefill", () => {
     expect(name.value).toBe("");
     // The fields are the client's, so the browser's own saved identity is wrong here too.
     expect(name.getAttribute("autocomplete")).toBe("off");
+  });
+});
+
+describe("BookingPage — language preference", () => {
+  beforeEach(() => localStorage.clear());
+
+  /**
+   * Capture what the page POSTs to the public booking endpoint. The schedule
+   * step also GETs /api/public/slots for the holiday advisory, so the stub has
+   * to answer that too rather than swallow every request.
+   */
+  function captureBookingPosts(posted: unknown[]) {
+    return vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      if (String(url).includes("/api/public/book")) {
+        posted.push(JSON.parse(String((init as RequestInit).body)));
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ data: {} }), { status: 200 });
+    });
+  }
+
+  /** Walk the wizard to the schedule step, where the contact block lives. */
+  async function toScheduleStep() {
+    fireEvent.change(await screen.findByPlaceholderText(/123 Main St/i), {
+      target: { value: "1 A St" },
+    });
+    fireEvent.click(await screen.findByText("Continue"));
+    fireEvent.click(await screen.findByText("Full Inspection"));
+    fireEvent.click(await screen.findByText("Continue"));
+  }
+
+  it("sends the chosen language with an anonymous booking, and nothing when unanswered", async () => {
+    const posted: unknown[] = [];
+    const fetchSpy = captureBookingPosts(posted);
+
+    try {
+      // A tenant with no Turnstile site key: the challenge widget cannot load
+      // in happy-dom, and Turnstile itself is exercised elsewhere. Nothing here
+      // bypasses it — the server still enforces whenever a secret is set.
+      renderBooking({ agentBooking: null, profile: { turnstileSiteKey: "" } });
+      await toScheduleStep();
+
+      const date = document.querySelector("input[type='date']") as HTMLInputElement;
+      fireEvent.change(date, { target: { value: "2026-09-01" } });
+      fireEvent.change(screen.getByPlaceholderText("Jane Doe"), { target: { value: "Sarah Buyer" } });
+      fireEvent.change(screen.getByPlaceholderText("jane@example.com"), { target: { value: "sarah@example.com" } });
+      fireEvent.click(screen.getByRole("radio", { name: /español/i }));
+      fireEvent.click(await screen.findByText("Continue"));
+      fireEvent.click(await screen.findByText("Request Inspection"));
+
+      await waitFor(() => expect(posted).toHaveLength(1));
+      expect((posted[0] as { locale?: string }).locale).toBe("es-419");
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("omits the key entirely when the client never picked a language", async () => {
+    const posted: unknown[] = [];
+    const fetchSpy = captureBookingPosts(posted);
+
+    try {
+      // A tenant with no Turnstile site key: the challenge widget cannot load
+      // in happy-dom, and Turnstile itself is exercised elsewhere. Nothing here
+      // bypasses it — the server still enforces whenever a secret is set.
+      renderBooking({ agentBooking: null, profile: { turnstileSiteKey: "" } });
+      await toScheduleStep();
+
+      const date = document.querySelector("input[type='date']") as HTMLInputElement;
+      fireEvent.change(date, { target: { value: "2026-09-01" } });
+      fireEvent.change(screen.getByPlaceholderText("Jane Doe"), { target: { value: "Sarah Buyer" } });
+      fireEvent.change(screen.getByPlaceholderText("jane@example.com"), { target: { value: "sarah@example.com" } });
+      fireEvent.click(await screen.findByText("Continue"));
+      fireEvent.click(await screen.findByText("Request Inspection"));
+
+      await waitFor(() => expect(posted).toHaveLength(1));
+      // The KEY must be absent, not null or "": a payload that always carries
+      // a locale is a payload in which every booking looks like a choice.
+      expect(Object.keys(posted[0] as object)).not.toContain("locale");
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("does not ask an agent to pick a language for someone else's client", async () => {
+    renderBooking({ agentBooking: { agentName: "Jane Smith", tenantId: "t-1" } });
+    await screen.findByText(/on behalf of a client/i);
+    await toScheduleStep();
+    // The agent would be guessing, and a guess recorded as a stated preference
+    // corrupts the only measurement this field exists to produce.
+    expect(screen.queryByRole("radio", { name: /español/i })).toBeNull();
   });
 });
 

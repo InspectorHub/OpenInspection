@@ -19,6 +19,8 @@ import { m } from "~/paraglide/messages";
  *   - email   — optional; empty string coerced to undefined so the API receives null
  *   - phone   — optional free-text (tel input)
  *   - agency  — optional free-text
+ *   - locale  — optional; "" is the real "not set" state, kept as-is here and
+ *               turned into an explicit null by the action
  */
 export function makeAddContactSchema() {
   return z.object({
@@ -31,5 +33,9 @@ export function makeAddContactSchema() {
       .or(z.literal("").transform(() => undefined)),
     phone: z.string().optional(),
     agency: z.string().optional(),
+    // No `.default()`, deliberately: "" and absent both have to survive to the
+    // action so it can send an explicit null. A default here would make every
+    // save look like a stated preference.
+    locale: z.string().optional(),
   });
 }

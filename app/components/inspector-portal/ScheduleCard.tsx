@@ -3,6 +3,7 @@ import { useFetcher } from "react-router";
 import { Card, Button, Modal } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { formatInspectionDateTime } from "~/lib/format-date";
+import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import { toLocalInputValue, fromLocalInputValue } from "~/lib/datetime-local";
 import { m } from "~/paraglide/messages";
 import type { action } from "~/routes/inspector-portal";
@@ -41,6 +42,7 @@ export function ScheduleCard({
     members: TeamMember[];
     displayTz: string;
 }) {
+    const fmt = useInspectionDateTimeFormat();
     const [open, setOpen] = useState(false);
     const fetcher = useFetcher<typeof action>();
     const saving = fetcher.state !== "idle";
@@ -75,7 +77,7 @@ export function ScheduleCard({
             <BlockHeading title={m.inspections_hub_block_schedule()} />
             <p className="text-[15px] font-medium text-ih-fg-1">
                 {date
-                    ? formatInspectionDateTime(date, undefined, displayTz)
+                    ? formatInspectionDateTime(date, undefined, displayTz, fmt)
                     : m.inspections_hub_schedule_unscheduled()}
             </p>
             {/* Labelled. An inspector's name is often just their email, and a

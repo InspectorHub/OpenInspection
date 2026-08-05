@@ -1,13 +1,15 @@
 import { NavLink } from "react-router";
-import { useSessionContext } from "~/hooks/useSessionContext";
-import { IC, WORKSPACE_ITEMS } from "~/components/sidebar/nav-items";
+import { useCapabilities, useSessionContext } from "~/hooks/useSessionContext";
+import { IC, WORKSPACE_ITEMS, visibleNavItems } from "~/components/sidebar/nav-items";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
+import { LocaleSwitcher } from "~/components/LocaleSwitcher";
 import { Avatar, Icon } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 // ─── Mobile drawer ─────────────────────────────────────────────────────────────
 export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const ctx = useSessionContext();
+  const capabilities = useCapabilities();
 
   const companyName = ctx?.branding?.companyName || "OpenInspection";
   const logoUrl = ctx?.branding?.logoUrl || "/logo.svg";
@@ -37,7 +39,7 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
             {/* ds-allow: compact mobile drawer nav rhythm (10/2px), no semantic spacing token */}
             <div className="ih-eyebrow px-3 pt-3 pb-[10px]">{m.nav_section_workspace()}</div>
             <div className="flex flex-col gap-[2px]">
-              {WORKSPACE_ITEMS.map((item) => (
+              {visibleNavItems(WORKSPACE_ITEMS, capabilities).map((item) => (
                 <NavLink key={item.to} to={item.to} onClick={onClose} className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-ih-button text-[13px] font-medium transition-all ${isActive ? "bg-ih-primary-tint text-ih-primary font-bold" : "text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary"}`}>
                   {item.icon}
                   <span>{item.label()}</span>
@@ -95,6 +97,13 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
           <div className="px-1 py-0.5">
             <div className="text-[10px] font-bold text-ih-fg-4 uppercase tracking-wide mb-1.5 px-1">{m.nav_theme_label()}</div>
             <ThemeSegmentControl className="w-full" />
+          </div>
+          {/* Language (#269) — the mobile drawer is the phone's user menu, so
+              the switcher has to be here too or it is desktop-only. */}
+          <div className="px-1 py-0.5">
+            {/* ih-fg-3 — see the note in UserMenuPopover; ih-fg-4 fails AA. */}
+            <div className="text-[10px] font-bold text-ih-fg-3 uppercase tracking-wide mb-1.5 px-1">{m.nav_language_label()}</div>
+            <LocaleSwitcher className="w-full" />
           </div>
           <div className="flex items-center gap-2.5 px-2 py-1">
             <Avatar name={ctx?.user?.name || ""} size={28} variant="self" fallbackIcon="OI" />

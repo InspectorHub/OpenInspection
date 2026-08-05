@@ -61,6 +61,7 @@
   "booking_step_yourinfo_heading": "Your info",
   "booking_step_yourinfo_subtitle": "How do we reach you with the report?",
   "booking_field_fullname_label": "Full name",
+  "booking_field_language_label": "Preferred language",
   "booking_confirm_submitted_heading": "Request Submitted",
   "booking_confirm_details_heading": "Confirm details",
   "booking_confirm_subtitle": "Review your booking before submitting.",

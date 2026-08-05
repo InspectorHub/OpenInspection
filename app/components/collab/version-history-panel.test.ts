@@ -9,7 +9,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createElement, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+
+// #270 — the panel reads the TENANT's zone + date shape, and those hooks bottom
+// out in `useRouteLoaderData`, which invariants in this router-free harness.
+vi.mock('~/hooks/useSessionContext', () => ({
+  useDisplayTimeZone: () => 'UTC',
+  useInspectionDateTimeFormat: () => ({ locale: 'en-US', dateFormat: 'us', timeFormat: '12h' }),
+}));
+
 import { VersionHistoryPanel, formatRelativeTime } from '~/components/collab/VersionHistoryPanel';
+
+const UTC_US = { locale: 'en-US', dateFormat: 'us' as const, timeFormat: '12h' as const };
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -82,10 +92,23 @@ const SNAPSHOTS = [
 describe('formatRelativeTime', () => {
   it('formats recent/minute/hour/day buckets', () => {
     const now = 10_000_000_000;
-    expect(formatRelativeTime(now - 1_000, now)).toBe('just now');
-    expect(formatRelativeTime(now - 120_000, now)).toBe('2 minutes ago');
-    expect(formatRelativeTime(now - 3_600_000, now)).toBe('1 hour ago');
-    expect(formatRelativeTime(now - 2 * 86_400_000, now)).toBe('2 days ago');
+    expect(formatRelativeTime(now - 1_000, now, 'UTC', UTC_US)).toBe('just now');
+    expect(formatRelativeTime(now - 120_000, now, 'UTC', UTC_US)).toBe('2 minutes ago');
+    expect(formatRelativeTime(now - 3_600_000, now, 'UTC', UTC_US)).toBe('1 hour ago');
+    expect(formatRelativeTime(now - 2 * 86_400_000, now, 'UTC', UTC_US)).toBe('2 days ago');
+  });
+
+  // #270 — the >7d fallback was `new Date(atMs).toLocaleDateString()`: the
+  // BROWSER's locale and zone, so two collaborators could read two different
+  // dates off the same snapshot. Shape and zone now come from the tenant.
+  it('renders the older-than-a-week fallback in the tenant date shape and zone', () => {
+    const atMs = Date.UTC(2026, 8, 11, 23, 30); // 2026-09-11T23:30Z
+    const now = atMs + 30 * 86_400_000;
+    expect(formatRelativeTime(atMs, now, 'UTC', UTC_US)).toBe('Sep 11, 2026');
+    expect(formatRelativeTime(atMs, now, 'UTC', { ...UTC_US, dateFormat: 'iso' })).toBe('2026-09-11');
+    // A zone that rolls the instant back a day proves the zone is honoured too.
+    expect(formatRelativeTime(atMs, now, 'America/New_York', UTC_US)).toBe('Sep 11, 2026');
+    expect(formatRelativeTime(atMs, now, 'Asia/Tokyo', UTC_US)).toBe('Sep 12, 2026');
   });
 });
 

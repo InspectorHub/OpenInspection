@@ -120,6 +120,7 @@ Browser → single Worker (Hono entry):
 | [`04_database_schema.md`](developers/04_database_schema.md) | D1 schema overview |
 | [`05_testing.md`](developers/05_testing.md) | E2E and unit test guide |
 | [`06_inspection_workflow.md`](developers/06_inspection_workflow.md) | Inspection engine internals |
+| [`multilingual-demand-signal.md`](developers/multilingual-demand-signal.md) | Reading `contacts.locale` as a number, and what it cannot see |
 
 ---
 

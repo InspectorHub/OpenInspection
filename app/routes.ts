@@ -112,6 +112,9 @@ export default [
     route("resources/schedule-conflicts", "routes/resources/schedule-conflicts.ts"),
     route("resources/holiday-check", "routes/resources/holiday-check.ts"),
     route("resources/week-summary", "routes/resources/week-summary.ts"),
+    // Find-a-Time: one day of slots WITH the free inspectors named (the public
+    // booking surface withholds identities by design).
+    route("resources/day-slots", "routes/resources/day-slots.ts"),
     // #198 — Google Places autocomplete/details BFF (token-relay proxy).
     route("resources/places", "routes/resources/places.tsx"),
     // Inspections workspace — the primary list/stats/wizard surface (formerly
@@ -130,6 +133,10 @@ export default [
     // reproducing this layout's container by hand, which is now removed.
     route("inspections/:id", "routes/inspector-portal.tsx"),
     route("calendar", "routes/calendar.tsx"),
+    // Day-centric dispatch board. Static `dispatch` sits under the calendar
+    // path but is its own route, not a mode of /calendar: the audience is
+    // narrower (scheduleOthers, enforced server-side) and so is the data.
+    route("calendar/dispatch", "routes/calendar-dispatch.tsx"),
     route("contacts", "routes/contacts.tsx"),
     // IA-18 (#111) — contact detail (record + inspection history + stats).
     route("contacts/:id", "routes/contact-detail.tsx"),

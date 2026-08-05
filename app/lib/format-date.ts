@@ -1,12 +1,140 @@
-import { formatDate, formatTime } from './format';
+import { formatTime } from './format';
+import {
+    DEFAULT_DISPLAY_PREFS,
+    type DateFormat,
+    type TimeFormat,
+} from '../../server/lib/session/display-prefs';
 
-/** C-14 part 1: humanize raw ISO timestamps on dashboard rows. en-US (US-market product).
+/**
+ * The three axes this formatter needs, all supplied by the caller.
+ *
+ * `locale` is REQUIRED, for exactly the reason `timeZone` is (see below). It
+ * used to be pinned to 'en-US' inside this file, with a comment promising that
+ * "Phase A threads the viewer's effective locale through" — which never
+ * happened, so a tenant on `es-419` read `Aug 3 · 7:58 AM EDT`: English month,
+ * English meridiem, on a Spanish page. Nothing at the call sites showed it,
+ * because the pin was three files away from anything a reviewer was looking at.
+ * Naming the locale is now a compile-time obligation; get one from
+ * `useDisplayLocale()` or, on a public surface, the tenant brand.
+ *
+ * `dateFormat` / `timeFormat` are the SHAPE (#270), deliberately independent of
+ * the locale: the locale decides what language "September" is written in, the
+ * enum decides whether the day comes before it and whether 14:30 is spelled
+ * 2:30 PM. Both default to today's rendering, so an un-migrated caller is
+ * byte-identical to before.
+ */
+export interface InspectionDateTimeFormat {
+    /** BCP-47 tag. Blank falls back to 'en-US' rather than the browser's. */
+    locale: string;
+    dateFormat?: DateFormat;
+    timeFormat?: TimeFormat;
+}
+
+/** Numeric date parts read in the target timezone, as strings. */
+function numericParts(d: Date, timeZone: string): { year: string; month: string; day: string } {
+    // 'en-CA' is used only as a stable NUMERIC source here — never for wording.
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric', month: '2-digit', day: '2-digit', timeZone,
+    }).formatToParts(d);
+    const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+    return { year: pick('year'), month: pick('month'), day: pick('day') };
+}
+
+/**
+ * Assemble the date in the ORDER the enum names, using the LOCALE's words.
+ *
+ * This is assembled part-by-part rather than handed to `Intl` as an option bag
+ * because an option bag cannot express the requirement: Intl derives the order
+ * from the locale, so `es-419` with `{month:'short',day:'numeric'}` yields
+ * `11 sept`, not the American order the tenant asked for. Order comes from the
+ * enum; only the month WORD is localized.
+ */
+function formatDatePart(
+    d: Date,
+    timeZone: string,
+    locale: string,
+    dateFormat: DateFormat,
+    showYear: boolean,
+): string {
+    const { year, month, day } = numericParts(d, timeZone);
+    if (dateFormat === 'iso') {
+        // ISO 8601 is not localized, and it always carries the year: `09-11` is
+        // neither ISO nor unambiguous, so `showYear` does not apply here.
+        return `${year}-${month}-${day}`;
+    }
+    const monthWord = new Intl.DateTimeFormat(locale, { month: 'short', timeZone }).format(d);
+    const dayNum = String(Number(day));
+    return dateFormat === 'eu'
+        ? `${dayNum} ${monthWord}${showYear ? ` ${year}` : ''}`
+        : `${monthWord} ${dayNum}${showYear ? `, ${year}` : ''}`;
+}
+
+/** Accepts what the straggler call sites actually hold: epoch ms, a Date, or an
+ *  ISO string. Bare `YYYY-MM-DD` is a civil date, anchored at UTC midnight. */
+function toInstant(value: string | number | Date | null | undefined): Date | null {
+    if (value == null || value === '') return null;
+    const civil = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+    const d = value instanceof Date ? value : new Date(civil ? `${value}T00:00:00.000Z` : value);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * An ABSOLUTE calendar date in the caller's zone, shaped by the preference (#270).
+ *
+ * Distinct from `formatInspectionDateTime` in two ways that matter: it takes no
+ * `now` and therefore never elides the year, and it renders no time. Both suit
+ * the surfaces it was written for — audit stamps, "last tested", a published-on
+ * date — where the reader is establishing WHEN something happened rather than
+ * scanning a list of things happening this week.
+ */
+export function formatShapedDate(
+    value: string | number | Date | null | undefined,
+    timeZone: string,
+    fmt: InspectionDateTimeFormat,
+): string {
+    const d = toInstant(value);
+    if (!d) return '';
+    return formatDatePart(
+        d,
+        timeZone || 'UTC',
+        fmt.locale || 'en-US',
+        fmt.dateFormat ?? DEFAULT_DISPLAY_PREFS.dateFormat,
+        true,
+    );
+}
+
+/**
+ * An absolute date AND time-of-day, both shaped (#270), with the short zone
+ * name always attached.
+ *
+ * The zone label is not optional here on purpose: every caller is a diagnostic
+ * or audit stamp, and a timestamp whose zone the reader has to guess is the
+ * defect this whole pass exists to remove.
+ */
+export function formatShapedDateTime(
+    value: string | number | Date | null | undefined,
+    timeZone: string,
+    fmt: InspectionDateTimeFormat,
+): string {
+    const d = toInstant(value);
+    if (!d) return '';
+    const tz = timeZone || 'UTC';
+    const timeFormat: TimeFormat = fmt.timeFormat ?? DEFAULT_DISPLAY_PREFS.timeFormat;
+    const time = formatTime(d, {
+        locale: fmt.locale || 'en-US',
+        timeZone: tz,
+        timeZoneName: 'short',
+        hourCycle: timeFormat === '24h' ? 'h23' : 'h12',
+    });
+    return `${formatShapedDate(d, tz, fmt)} · ${time}`;
+}
+
+/** C-14 part 1: humanize raw ISO timestamps on dashboard rows.
  *  `now` is injectable for deterministic tests; callers pass undefined.
  *
- *  Date/time rendering delegates to the shared formatter (app/lib/format); this
- *  wrapper keeps the dashboard-specific composition — drop the year in the current
- *  year, and join `date · time` with a short zone label. locale is pinned to
- *  'en-US'; Phase A threads the viewer's effective locale through.
+ *  This wrapper owns the dashboard-specific composition — drop the year in the
+ *  current year, and join `date · time` with a short zone label. Language,
+ *  zone and shape all arrive from the caller (see InspectionDateTimeFormat).
  *
  *  `timeZone` is REQUIRED, and that is the point. It used to be optional, and four
  *  of fourteen call sites left it off — two of them on the inspector portal, whose
@@ -22,6 +150,7 @@ export function formatInspectionDateTime(
     iso: string | null | undefined,
     now: Date | undefined,
     timeZone: string,
+    fmt: InspectionDateTimeFormat,
 ): string {
     if (!iso) return 'no date';
     const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso);
@@ -29,14 +158,21 @@ export function formatInspectionDateTime(
     if (isNaN(d.getTime())) return 'no date';
     now = now ?? new Date();
     const tz = dateOnly ? 'UTC' : timeZone || 'UTC';
-    // en-US formatDate always ends in `, YYYY`; strip it when the year matches now.
-    const full = formatDate(iso, { locale: 'en-US', timeZone: tz, month: 'short' });
-    const yearMatch = full.match(/,\s*(\d{4})$/);
-    const year = yearMatch ? Number(yearMatch[1]) : NaN;
-    const datePart = year === now.getUTCFullYear() ? full.replace(/,\s*\d{4}$/, '') : full;
+    const locale = fmt.locale || 'en-US';
+    const dateFormat = fmt.dateFormat ?? DEFAULT_DISPLAY_PREFS.dateFormat;
+    const timeFormat: TimeFormat = fmt.timeFormat ?? DEFAULT_DISPLAY_PREFS.timeFormat;
+
+    const { year } = numericParts(d, tz);
+    const showYear = Number(year) !== now.getUTCFullYear();
+    const datePart = formatDatePart(d, tz, locale, dateFormat, showYear);
     if (dateOnly) return datePart;
     // Include the short zone name so a displayed time-of-day is unambiguous
     // (e.g. "9:00 AM EDT") — matters once tenants/users configure a timezone.
-    const time = formatTime(iso, { locale: 'en-US', timeZone: tz, timeZoneName: 'short' });
+    const time = formatTime(iso, {
+        locale,
+        timeZone: tz,
+        timeZoneName: 'short',
+        hourCycle: timeFormat === '24h' ? 'h23' : 'h12',
+    });
     return `${datePart} · ${time}`;
 }
