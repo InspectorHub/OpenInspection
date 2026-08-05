@@ -271,10 +271,13 @@ export default defineConfig({
         // Destructive (reset/restore DB) — env-gated inside the specs:
         { name: 'backup-restore-seed', testMatch: 'backup-restore-seed.spec.ts' },
         { name: 'backup-restore-verify', testMatch: 'backup-restore-verify.spec.ts' },
-        // DS-0520 subsystem C/D/E — skip-shells pending multi-user seed harness:
+        // DS-0520 subsystem C — still a skip-shell, and for a reason nothing in
+        // this repo can supply: two servers plus the Stripe CLI. See the spec.
         { name: 'subsystem-c-stripe-smoke', testMatch: 'subsystem-c-stripe-cross-repo-smoke.spec.ts' },
-        { name: 'subsystem-d-flows', testMatch: 'subsystem-d-flows.spec.ts' },
-        { name: 'subsystem-e-flows', testMatch: 'subsystem-e-flows.spec.ts' },
+        // subsystem-d-flows / subsystem-e-flows moved to playwright.seeded.config.ts.
+        // They need the multi-user seed, which writes users into the standalone
+        // tenant and therefore 409s the `api` project's fresh-setup assertion —
+        // the two cannot share one D1. `npm run test:e2e:seeded` runs them.
         // Commercial PCA Task 19a — real TOC page numbers (two-pass Chrome +
         // pdf-lib). Exercises the actual worker report render + BROWSER binding;
         // see tests/e2e/report-toc-numbers.spec.ts for its harness requirements.

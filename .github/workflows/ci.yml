@@ -388,6 +388,14 @@ jobs:
       - name: E2E tests (Playwright, seeded D1)
         run: npm run test:e2e
 
+      # Second run, second config: the multi-user seed writes users into the
+      # standalone tenant, which 409s the first run's fresh-setup assertion, so
+      # the two cannot share one D1. Same worker (reuseExistingServer), so this
+      # is one extra globalSetup, not one extra boot. See
+      # playwright.seeded.config.ts for the full reasoning.
+      - name: E2E tests (multi-user seed — subsystem D/E)
+        run: npm run test:e2e:seeded
+
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
