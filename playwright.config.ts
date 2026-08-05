@@ -189,16 +189,13 @@ export default defineConfig({
             testMatch: 'estimate-range.spec.ts',
             dependencies: ['api'],
         },
-        {
-            // Sprint 2 regression — Track A fixes (A1-A4).
-            name: 'sprint2-regression',
-            testMatch: 'sprint2-regression.spec.ts',
-        },
-        {
-            // R7-06 — public booking page native date input.
-            name: 'booking-date-input',
-            testMatch: 'booking-date-input.spec.ts',
-        },
+        // `sprint2-regression` and `booking-date-input` projects deleted
+        // (2026-08 skip-debt clearance) together with their spec files. Every
+        // test in both was inside a `describe.skip` scraping Alpine-era source
+        // files the RR migration removed (src/templates/**, public/js/auth.js)
+        // or driving the Alpine booking form. A project whose testMatch
+        // resolves to nothing is a new way to report green over zero tests, so
+        // the entries go with the files.
         {
             // env-guarded (R8 fix): matches nothing by default so the dead
             // 'cloud' project no longer silently swallows via testIgnore —
