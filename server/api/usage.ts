@@ -17,9 +17,9 @@
  * directly rather than read off the context.
  */
 import { createRoute } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { count, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
+import { getDrizzle } from '../lib/route-helpers';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { MeteringService } from '../services/metering.service';
@@ -83,7 +83,7 @@ const usageRoutes = createApiRouter()
         // many they have ever created" to "how many they have now" would change
         // an analytics figure nobody asked to change.
         const inspectionsUsed = isFreeTierQuota
-            ? (await drizzle(c.env.DB).select({ n: count() }).from(inspectionsTable)
+            ? (await getDrizzle(c).select({ n: count() }).from(inspectionsTable)
                 .where(eq(inspectionsTable.tenantId, tenantId)).get())?.n ?? 0
             : inspections;
 
