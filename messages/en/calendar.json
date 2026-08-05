@@ -63,5 +63,22 @@
   "calendar_sync_never": "Never synced",
   "calendar_event_time_label": "Time:",
   "calendar_event_time_range": "{start} - {end}",
-  "calendar_event_status_results_received": "Results received"
+  "calendar_event_status_results_received": "Results received",
+  "dispatch_meta_title": "Dispatch - OpenInspection",
+  "dispatch_page_title": "Dispatch",
+  "dispatch_load_failed_what": "the dispatch board",
+  "dispatch_unassigned_heading": "Unassigned",
+  "dispatch_unassigned_empty": "Everything today has an inspector.",
+  "dispatch_no_inspectors_title": "No inspectors yet",
+  "dispatch_no_inspectors_body": "Invite someone who can be scheduled and their column appears here.",
+  "dispatch_nav_prev_day": "Previous day",
+  "dispatch_nav_next_day": "Next day",
+  "dispatch_policy_block": "Double-booking blocked",
+  "dispatch_policy_advisory": "Double-booking allowed",
+  "dispatch_closed_prefix": "Closed",
+  "dispatch_card_grip": "Drag to reschedule",
+  "dispatch_column_untimed": "No time set",
+  "dispatch_empty_day": "Nothing scheduled",
+  "dispatch_card_before_axis": "(starts earlier)",
+  "dispatch_card_after_axis": "(ends later)"
 }

@@ -63,5 +63,22 @@
   "calendar_sync_never": "Nunca se sincronizó",
   "calendar_event_time_label": "Hora:",
   "calendar_event_time_range": "{start} - {end}",
-  "calendar_event_status_results_received": "Resultados recibidos"
+  "calendar_event_status_results_received": "Resultados recibidos",
+  "dispatch_meta_title": "Despacho - OpenInspection",
+  "dispatch_page_title": "Despacho",
+  "dispatch_load_failed_what": "el tablero de despacho",
+  "dispatch_unassigned_heading": "Sin asignar",
+  "dispatch_unassigned_empty": "Todo lo de hoy tiene inspector.",
+  "dispatch_no_inspectors_title": "Aún no hay inspectores",
+  "dispatch_no_inspectors_body": "Invita a alguien que se pueda programar y su columna aparecerá aquí.",
+  "dispatch_nav_prev_day": "Día anterior",
+  "dispatch_nav_next_day": "Día siguiente",
+  "dispatch_policy_block": "Doble reserva bloqueada",
+  "dispatch_policy_advisory": "Doble reserva permitida",
+  "dispatch_closed_prefix": "Cerrado",
+  "dispatch_card_grip": "Arrastra para reprogramar",
+  "dispatch_column_untimed": "Sin hora",
+  "dispatch_empty_day": "Nada programado",
+  "dispatch_card_before_axis": "(empieza antes)",
+  "dispatch_card_after_axis": "(termina después)"
 }

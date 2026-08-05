@@ -1,10 +1,5 @@
 /**
- * /calendar/dispatch — the dispatch board's DATA half.
- *
- * This module deliberately exports a loader and no component yet: the board UI
- * (DispatchBoard, the unassigned lane, drag-drop) is the next task, and landing
- * the data contract first means it can be reviewed on its own terms. Adding the
- * default export is that task's first step.
+ * /calendar/dispatch — the dispatch board.
  *
  * The gate is a redirect, not an error page. Whether the actor may dispatch is
  * decided on the server — `GET /api/calendar/dispatch` mounts
@@ -12,41 +7,24 @@
  * and this loader simply honors its answer. That ordering matters: the page can
  * never offer an action the API would refuse, because it never learns about the
  * day at all unless the API already said yes.
+ *
+ * The board's payload types live in `~/components/dispatch/dispatch-helpers`
+ * rather than here, so the components that render them and the loader that
+ * fetches them cannot drift into two shapes of the same response.
  */
+import { Link, useLoaderData } from "react-router";
 import { redirect } from "react-router";
+import { PageHeader, Button } from "@core/shared-ui";
 import type { Route } from "./+types/calendar-dispatch";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
+import { DispatchBoard } from "~/components/dispatch/DispatchBoard";
+import { shiftCivilDate, type DispatchPayload } from "~/components/dispatch/dispatch-helpers";
+import { m } from "~/paraglide/messages";
 
-interface DispatchInspector {
-  id: string;
-  name: string | null;
-  email: string;
-  role: string;
-}
-
-interface DispatchItem {
-  id: string;
-  kind: string;
-  title: string;
-  start: string;
-  end: string;
-  civilDate: string;
-  startTime?: string;
-  endTime?: string;
-  allDay: boolean;
-  color?: string;
-  inspectionId?: string;
-  userId?: string;
-  meta?: Record<string, unknown>;
-}
-
-interface DispatchPayload {
-  date: string;
-  conflictPolicy: "advisory" | "block";
-  inspectors: DispatchInspector[];
-  items: DispatchItem[];
-  unassigned: DispatchItem[];
+export function meta() {
+  return [{ title: m.dispatch_meta_title() }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -79,4 +57,49 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (!board) return { failed: true as const, board: null };
 
   return { failed: false as const, board };
+}
+
+export default function CalendarDispatchPage() {
+  const { failed, board } = useLoaderData<typeof loader>();
+
+  return (
+    <div className="space-y-ih-list">
+      {/* A board with no cards is a statement a dispatcher acts on by leaving
+          the day alone. Say when it is not a real answer (IA-118). */}
+      {failed && <LoadFailedNotice what={m.dispatch_load_failed_what()} />}
+
+      <PageHeader
+        title={m.dispatch_page_title()}
+        meta={board ? board.date : undefined}
+        actions={
+          <span className="inline-flex items-center gap-2">
+            <span className="rounded-full bg-ih-bg-muted px-3 py-1 text-[11px] font-bold text-ih-fg-3">
+              {board?.conflictPolicy === "block"
+                ? m.dispatch_policy_block()
+                : m.dispatch_policy_advisory()}
+            </span>
+            <Link to="/calendar">
+              <Button variant="secondary" size="sm">{m.calendar_page_title()}</Button>
+            </Link>
+          </span>
+        }
+      />
+
+      {board && (
+        <div className="flex items-center gap-2">
+          <Link to={`/calendar/dispatch?date=${shiftCivilDate(board.date, -1)}`}>
+            <Button variant="secondary" size="sm">{m.dispatch_nav_prev_day()}</Button>
+          </Link>
+          <Link to="/calendar/dispatch">
+            <Button variant="secondary" size="sm">{m.calendar_nav_today()}</Button>
+          </Link>
+          <Link to={`/calendar/dispatch?date=${shiftCivilDate(board.date, 1)}`}>
+            <Button variant="secondary" size="sm">{m.dispatch_nav_next_day()}</Button>
+          </Link>
+        </div>
+      )}
+
+      {board ? <DispatchBoard board={board} /> : null}
+    </div>
+  );
 }
