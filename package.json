@@ -71,6 +71,7 @@
     "test:workers": "vitest run --config vitest.workers.config.ts",
     "test:types": "cross-env NODE_OPTIONS=--max-old-space-size=8192 vitest run --typecheck --config vitest.typecheck.config.ts",
     "test:e2e": "playwright test",
+    "test:e2e:seeded": "playwright test -c playwright.seeded.config.ts",
     "db:migrate": "node scripts/wrangler.mjs d1 migrations apply DB --local",
     "seed:local": "node scripts/seed-local-e2e.mjs",
     "db:migrate:remote": "node scripts/wrangler.mjs d1 migrations apply DB --remote",
@@ -196,6 +197,7 @@
     "@hono/node-server": ">=2.0.5",
     "brace-expansion": "^5.0.9",
     "ip-address": ">=10.2.2",
+    "fast-uri": "^3.1.5",
     "postcss": ">=8.5.18",
     "valibot": ">=1.4.2"
   },

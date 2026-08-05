@@ -45,6 +45,9 @@
     "worker-configuration.d.ts",
     "**/*.d.ts"
   ],
+  "tags": [
+    "-gateConsumed"
+  ],
   "ignoreBinaries": [
     "tsgo"
   ],

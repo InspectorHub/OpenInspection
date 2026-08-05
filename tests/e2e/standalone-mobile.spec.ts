@@ -123,11 +123,11 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
     // markup (`[data-rating-row]`, `button[data-mic-target]` attached by the
     // retired voice-input.js) that no longer exists in the RR v7 editor.
 
-    // TODO(tests-reorg): rewrite onto RR v7 selector. The mobile inspector
-    // message FAB moved into the RR editor mobile shell; the old check asserted
-    // "any button.fixed exists" behind an `if (count>0)` guard (green-while-
-    // broken). Rebind to the live message FAB before unskipping.
-    test.skip('M-05: Inspector messages floating button (needs RR rebind)', async () => {});
+    // M-05 deleted (2026-08 skip-debt clearance): an EMPTY skip placeholder
+    // (`async () => {}`) for the Alpine mobile message FAB the RR migration
+    // removed. It asserted nothing and could never be unskipped — it only
+    // inflated the skip count. Coverage of the live editor-shell message FAB
+    // belongs in a spec written against that shell.
 
     // M-06 deleted in the 2026-07 tests-reorg dedup: the /reports 301 redirect is
     // covered more strongly by inspector-portal.spec.ts (raw 301 + exact Location

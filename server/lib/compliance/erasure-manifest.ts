@@ -172,6 +172,14 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
  * A PII-heuristic column the manifest DELIBERATELY does not act on. Every entry
  * must say why — the reason is what a DSAR audit reads, and the CI gate
  * (`scripts/check-erasure-manifest.mjs`) hard-fails an entry without one.
+ *
+ * @gateConsumed `scripts/check-erasure-manifest.mjs` reads this declaration out
+ * of the SOURCE TEXT (`arrayBody(src, 'ERASURE_OUT_OF_SCOPE')`) rather than
+ * importing it — the gate is a plain .mjs script and the manifest is TypeScript.
+ * That consumption is invisible to a module-graph analyzer, so knip would report
+ * both symbols as dead. The tag (knip `tags: ["-gateConsumed"]`) says "a tool
+ * consumes this", which is true; a dead-code baseline entry would have said
+ * "this is dead and we tolerate it", which is not.
  */
 export interface ErasureOutOfScopeEntry {
     table: string;
@@ -179,6 +187,7 @@ export interface ErasureOutOfScopeEntry {
     reason: string;
 }
 
+/** @gateConsumed read as source text by `scripts/check-erasure-manifest.mjs`. */
 export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // Columns that ride with a row-delete rule above (per-column scan cannot
     // see row semantics).
