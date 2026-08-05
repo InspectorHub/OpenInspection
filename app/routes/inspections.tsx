@@ -5,6 +5,7 @@ import type { Route } from "./+types/inspections";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { buildCreateInspectionJson } from "~/lib/inspection-create";
+import { IDEMPOTENCY_FIELD } from "~/hooks/useGuardedSubmit";
 import { searchContactsForTypeahead } from "~/lib/contact-search.server";
 import type { WizardTeamMember } from "~/components/NewInspectionWizard";
 import { OnboardingChecklist } from "~/components/dashboard/OnboardingChecklist";
@@ -181,9 +182,20 @@ export async function action({ request, context }: Route.ActionArgs) {
     // The New Inspection wizard posts here with intent:"create". Map its
     // fields to the create endpoint and bounce into the new inspection's
     // editor on success (which also refreshes the dashboard list — B-8).
-    const res = await api.inspections.index.$post({
-      json: buildCreateInspectionJson(formData),
-    });
+    //
+    // portal #105 — the wizard's idempotency key arrives as a FORM FIELD
+    // (`fetcher.submit()` takes no headers and this is a BFF, so the browser
+    // never talks to /api directly), while the server middleware keys off the
+    // `Idempotency-Key` HEADER. This lift is the only thing joining the two:
+    // without it the wizard mints a key nothing reads and a double submit
+    // creates two inspections. The field is NOT forwarded in the JSON —
+    // `buildCreateInspectionJson` builds an explicit whitelist, so the key
+    // never reaches the created record.
+    const idempotencyKey = String(formData.get(IDEMPOTENCY_FIELD) || "").trim();
+    const res = await api.inspections.index.$post(
+      { json: buildCreateInspectionJson(formData) },
+      idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : undefined,
+    );
     if (res.ok) {
       const body = (await res.json().catch(() => ({}))) as { data?: { inspection?: { id?: string } } };
       const id = body?.data?.inspection?.id;
