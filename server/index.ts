@@ -26,6 +26,7 @@ import { r2Keys } from './lib/r2-keys';
 import { setupWizardRoutes } from './features/setup-wizard';
 
 import { jwtAuthMiddleware } from './lib/middleware/jwt-auth';
+import { idempotencyMiddleware } from './lib/middleware/idempotency';
 import { agreementSignPath } from './lib/public-urls';
 import { loadVerifyData } from './lib/verify-data';
 
@@ -249,6 +250,16 @@ app.use('*', enforceTenantActive);
 // exempt from type-aware linting (its import fan-in blows the heap — see
 // eslint.config.js), and authentication code must not be.
 app.use('*', jwtAuthMiddleware);
+
+// Idempotency guard (portal #107) — claims an `Idempotency-Key`, replays the
+// stored response on a repeat, and answers 409 while the first attempt is still
+// running. MUST stay AFTER the JWT middleware: the key is scoped to the
+// authenticated tenant, and a bare key is a global namespace in which two
+// tenants that minted the same key would replay EACH OTHER's stored response.
+// That is a cross-tenant leak introduced by a correctness fix — worse than the
+// duplicate it prevents. Pinned by tests/unit/platform/middleware-order.spec.ts.
+export const idempotencyGuard = idempotencyMiddleware();
+app.use('*', idempotencyGuard);
 
 
 // Secrets UI — load encrypted integration secrets from DB and merge into

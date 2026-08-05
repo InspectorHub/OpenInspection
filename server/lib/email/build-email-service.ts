@@ -9,6 +9,7 @@ import type { EmailIdentityConfig } from './sender-identity';
 import type { TemplateOverride } from '../email-templates/types';
 import { resolveEmailProvider, coerceEmailByoProvider, type EmailByoProvider } from './resolve-provider';
 import { buildEmailSuppression } from './suppression';
+import { buildEmailDedupe } from './dedupe';
 import { buildNotificationPreferences } from '../notifications/preference-port';
 import { logger } from '../logger';
 import { ResendProvider } from './providers/resend';
@@ -193,6 +194,12 @@ export function assembleTenantEmailService(
     const preferences = meterTenantId
         ? buildNotificationPreferences(env.DB, meterTenantId)
         : undefined;
+    // M1 idempotency (portal #107) — outbound dedupe, under the SAME guard as
+    // `meter`: the key is tenant-scoped, so a send with no resolved tenant gets
+    // no gate rather than a key in a shared namespace.
+    const dedupe = meterTenantId
+        ? buildEmailDedupe(drizzle(env.DB), meterTenantId)
+        : undefined;
 
     // TEST-ONLY email sink (E2E). Capture every message to KV instead of
     // sending, so E2E can read back links it cannot see from the browser (the
@@ -211,7 +218,7 @@ export function assembleTenantEmailService(
         );
     }
 
-    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider, suppression, quota, preferences);
+    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider, suppression, quota, preferences, dedupe);
 }
 
 /**

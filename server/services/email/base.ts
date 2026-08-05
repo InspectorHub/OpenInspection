@@ -7,6 +7,7 @@ import type { EmailTemplateRenderer } from '../../lib/email-templates/renderer';
 import type { RenderResult } from '../../lib/email-templates/types';
 import { ResendProvider } from '../../lib/email/providers/resend';
 import type { EmailProvider } from '../../lib/email/provider';
+import type { EmailDedupePort } from '../../lib/email/dedupe';
 
 /**
  * Sprint B-4 — when callers pass `inspector` + `host`, every customer-facing
@@ -88,6 +89,15 @@ export class EmailBaseService {
          * about one KIND of message being unwanted.
          */
         protected preferences?: { isMuted(classId: string, email: string): Promise<boolean> },
+        /**
+         * M1 of the idempotency programme (portal #107). When injected AND the
+         * caller names an `idempotencyKey`, a repeat of the same send is
+         * skipped entirely — no provider call, no meter record. Absent (no
+         * tenant to scope the key to, legacy callers) ⇒ no gate, behavior
+         * unchanged. Wired in `assembleTenantEmailService` the same way
+         * `meter` is.
+         */
+        protected dedupe?: EmailDedupePort,
     ) {
         this.provider = provider ?? new ResendProvider({ apiKey: this.apiKey });
     }
@@ -191,6 +201,55 @@ export class EmailBaseService {
              * unclassified notification still goes out, it just cannot be muted.
              */
             classId?: string;
+            /**
+             * M1 idempotency (portal #107). One key per INTENT, minted by the
+             * caller and held across a failure: an identical repeat is skipped
+             * instead of delivered twice. Only honoured when a `dedupe` port
+             * was injected (i.e. the send has a tenant to scope the key to).
+             */
+            idempotencyKey?: string;
+        },
+    ): Promise<{ delivered: boolean }> {
+        const key = opts?.idempotencyKey;
+        if (!this.dedupe || !key) return this.performSend(to, subject, html, attachments, opts);
+
+        // The claim covers the PAYLOAD, not just the key: a key reused with a
+        // different message is a caller bug, and swallowing that message would
+        // be a lost send rather than a prevented duplicate (the port sends and
+        // warns in that case).
+        const mine = await this.dedupe.claim(key, { to, subject, html, classId: opts?.classId });
+        if (!mine) {
+            // NO recipient/PII in the log — the fact and the class only.
+            logger.info('[email] duplicate send suppressed by idempotency key', { classId: opts?.classId });
+            return { delivered: false };
+        }
+        try {
+            const result = await this.performSend(to, subject, html, attachments, opts);
+            await this.dedupe.settle(key, result.delivered);
+            return result;
+        } catch (err) {
+            // Nothing went out, so the key must not stay claimed — otherwise the
+            // corrected retry is locked out of an action that never happened.
+            await this.dedupe.settle(key, false);
+            throw err;
+        }
+    }
+
+    /**
+     * The transport itself: quota pre-flight, suppression, preferences, sender
+     * identity, provider call, meter. Split out of `sendEmail` so the
+     * idempotency claim can wrap the WHOLE of it — including the meter, which
+     * a replayed send must not touch.
+     */
+    protected async performSend(
+        to: string[],
+        subject: string,
+        html: string,
+        attachments?: Array<{ filename: string; content: ArrayBuffer | string; contentType?: string }>,
+        opts?: {
+            inspector?: SenderInspector | undefined;
+            classId?: string;
+            idempotencyKey?: string;
         },
     ): Promise<{ delivered: boolean }> {
         // Free-tier pre-flight quota gate — runs BEFORE any provider request is
