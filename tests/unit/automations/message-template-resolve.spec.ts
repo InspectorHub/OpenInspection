@@ -14,7 +14,8 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MessageTemplateService } from '../../../server/services/message-template.service';
-import { tenantConfigs, tenants } from '../../../server/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { messageTemplates, tenantConfigs, tenants } from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -145,6 +146,18 @@ describe('template resolution by locale', () => {
         const es = await svc.create(T, { name: 'Reminder', channel: 'email', subject: 'Recordatorio', body: 'es', locale: 'es-419' });
         const en = await svc.create(T, { name: 'Reminder', channel: 'email', subject: 'Reminder', body: 'en', locale: 'en' });
         await svc.create(T, { name: 'Other', channel: 'email', subject: 'X', body: 'x', locale: 'en' });
+
+        // Age `es` explicitly. `createdAt` is millisecond precision and these two
+        // creates routinely land in the SAME millisecond, at which point the
+        // service's `|| a.id.localeCompare(b.id)` tiebreak decides — and the ids
+        // are random nanoids, so the order is a coin flip. This test used to fail
+        // roughly half the time under load and pass every time in isolation,
+        // which reads as "flaky test" and is really "the fixture never
+        // established the difference it asserts on".
+        testDb.update(messageTemplates)
+            .set({ createdAt: new Date(Date.now() - 60_000) })
+            .where(eq(messageTemplates.id, es.id))
+            .run();
 
         const variants = await svc.variantsOf(T, en.id);
         expect(variants.map((v) => v.id)).toEqual([es.id, en.id]);
