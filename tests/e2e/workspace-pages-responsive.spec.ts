@@ -119,6 +119,30 @@ async function overflowCulprits(page: Page): Promise<string[]> {
     });
 }
 
+/**
+ * ⚠️ OPEN, UNDIAGNOSED — `contacts @ ipad-portrait` fails deterministically when
+ * this project runs on its own (`--workers=1`), and passes in the full suite at
+ * `workers: 3`. Verified 2026-08-05 across eight runs.
+ *
+ * The failure is always the FIRST test in the matrix, never any of the other 49
+ * that issue the identical `beforeEach` navigation: `page.goto('/login')` never
+ * completes, the test timeout expires, and Playwright tears the page down —
+ * reported as `net::ERR_ABORTED; maybe frame was detached`, which looks like a
+ * navigation bug and is really the teardown.
+ *
+ * Ruled out by experiment, each with its own run — none of these is the cause:
+ *   - slowness / cold start: a 90s budget times out the same way
+ *   - `waitUntil: 'load'` hanging on a subresource: `domcontentloaded` identical
+ *   - the worker not being up: /status answers before the hook runs
+ *   - retrying the goto: the test timeout kills the hook, so the catch is dead
+ *   - warming the API in beforeAll (`request.get`), and warming the browser in
+ *     beforeAll with a separate page — neither changes the outcome
+ *
+ * It is a harness fault, not a product one: the page it cannot reach is served
+ * to the 49 navigations that follow it. NOT quarantined with `fixme`, because
+ * skipping it only promotes the next test into the same position — which would
+ * hide the fault rather than remove it.
+ */
 test.describe('Workspace pages — responsive smoke', () => {
     // Seed enough contacts to force a VERTICAL scrollbar. That matters: a
     // vertical scrollbar takes ~15px off clientWidth, and a layout with no
@@ -149,12 +173,28 @@ test.describe('Workspace pages — responsive smoke', () => {
                 headers: auth,
             });
         }
+
+        // Readiness, asked rather than waited out: /status is a plain JSON
+        // handler with no SSR and no assets, so a 200 means the worker is
+        // serving. Poll it instead of sleeping a fixed interval — a fixed wait
+        // is either too short on a cold machine or wasted on a warm one.
+        const deadline = Date.now() + 60_000;
+        for (;;) {
+            const res = await request.get(`${BASE_URL}/status`).catch(() => null);
+            if (res?.ok()) break;
+            if (Date.now() > deadline) throw new Error('worker never became ready at /status');
+        }
+
     });
 
     test.beforeEach(async ({ page }) => {
         const seed = readEditorSeed();
         test.skip(!seed, 'editor-seed fixture unavailable');
-        await page.goto('/login');
+        // `domcontentloaded` to match every navigation in the test bodies below,
+        // which all pass it explicitly. This hook used the default `load`, which
+        // was inconsistent — though it is NOT the cause of the open failure
+        // recorded above the describe.
+        await page.goto('/login', { waitUntil: 'domcontentloaded' });
         await page.fill('input[name=email]', seed!.email);
         await page.fill('input[name=password]', seed!.password);
         await page.click('button[type=submit]');
