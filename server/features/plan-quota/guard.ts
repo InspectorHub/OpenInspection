@@ -16,6 +16,16 @@ import { FREE_TIER_CAPS, type AiCappedMetric, type AiTierCaps } from './policy';
  *    The actual meter increment stays at the existing send-site call (see
  *    MeteringService.record in the sms/email pipelines) so a provider failure
  *    never consumes quota it didn't actually spend.
+ *
+ * IMPORTANT — `usage_counters.value` for the `inspections` metric is a CACHE,
+ * not the gate. The cap counts the inspection rows a tenant has; the counter is
+ * written alongside it and heals itself on the next create. A value that looks
+ * wrong (higher than the row count, e.g. after a delete) is therefore not a
+ * defect and must NOT be "corrected" by hand — that is what the 2026-08-05
+ * production hand-fix did, and it is exactly what this design makes
+ * unnecessary. Deleting the row is worse than leaving it: see the INSERT-branch
+ * gating below. `sms`/`email` are the opposite — consumed events with nothing
+ * to count, so their counters ARE the source of truth.
  */
 /**
  * One-line tenant-tier lookup, defaulting to 'free' when the row is missing

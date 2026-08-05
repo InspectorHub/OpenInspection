@@ -72,6 +72,17 @@ describe('GET /api/usage/summary', () => {
         });
     }
 
+    /** The `inspections` figure a capped tenant sees is the live row count, not
+     *  the counter — see the comment in server/api/usage.ts. */
+    async function seedInspections(tenantId: string, n: number) {
+        for (let i = 0; i < n; i++) {
+            await testDb.insert(schema.inspections).values({
+                id: `${tenantId}-insp-${i}`, tenantId, propertyAddress: '1 Main St',
+                date: '2026-08-05', createdAt: new Date(),
+            });
+        }
+    }
+
     async function seedUser(tenantId: string, id: string) {
         await testDb.insert(users).values({
             id, tenantId, email: `${id}@example.test`, passwordHash: 'x', createdAt: new Date(),
@@ -82,6 +93,7 @@ describe('GET /api/usage/summary', () => {
         await seedTenant(TENANT, { tier: 'free', maxUsers: 5 });
         await seedUser(TENANT, 'u1');
         await seedUser(TENANT, 'u2');
+        await seedInspections(TENANT, 3);
         const m = new MeteringService(testD1);
         await m.record(TENANT, 'inspections', 'lifetime', 3);
         await m.record(TENANT, 'sms', '2026-06', 10);
@@ -113,6 +125,36 @@ describe('GET /api/usage/summary', () => {
                 r2Bytes: 4096,
             },
         });
+    });
+
+    it('a capped tenant sees the ROWS they have, not a stale counter', async () => {
+        // The production state on 2026-08-05: a counter of 4 against a single
+        // inspection. Reporting the counter would tell a tenant who deleted
+        // three inspections that they are still at 4 of 5 while creating works.
+        await seedTenant(TENANT, { tier: 'free' });
+        await seedInspections(TENANT, 1);
+        await new MeteringService(testD1).record(TENANT, 'inspections', 'lifetime', 4);
+
+        const app = buildApp(testDb, SAAS_PROFILE);
+        const env = { DB: testD1 } as unknown as HonoConfig['Bindings'];
+        const res = await app.request('/api/usage/summary', {}, env, makeExecCtx());
+        const body = await res.json() as { data: { usage: { inspections: number } } };
+        expect(body.data.usage.inspections).toBe(1);
+    });
+
+    it('an UNcapped tenant keeps the cumulative lifetime counter', async () => {
+        // With `caps: null` the figure is measured against nothing, so it stays
+        // "how many they have ever created" — redefining it to a row count would
+        // silently change an analytics number for paid tiers.
+        await seedTenant(TENANT, { tier: 'pro' });
+        await seedInspections(TENANT, 1);
+        await new MeteringService(testD1).record(TENANT, 'inspections', 'lifetime', 9);
+
+        const app = buildApp(testDb, SAAS_PROFILE);
+        const env = { DB: testD1 } as unknown as HonoConfig['Bindings'];
+        const res = await app.request('/api/usage/summary', {}, env, makeExecCtx());
+        const body = await res.json() as { data: { usage: { inspections: number } } };
+        expect(body.data.usage.inspections).toBe(9);
     });
 
     it('caps is null for a pro tenant even on a hasUsageQuota profile', async () => {

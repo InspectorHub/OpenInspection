@@ -17,10 +17,13 @@
  * directly rather than read off the context.
  */
 import { createRoute } from '@hono/zod-openapi';
+import { drizzle } from 'drizzle-orm/d1';
+import { count, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { MeteringService } from '../services/metering.service';
+import { inspections as inspectionsTable } from '../lib/db/schema';
 import { getSeatUsage } from '../features/seat-quota';
 import { readTenantTier } from '../features/plan-quota/guard';
 import { FREE_TIER_CAPS } from '../features/plan-quota/policy';
@@ -68,13 +71,29 @@ const usageRoutes = createApiRouter()
 
         const isFreeTierQuota = tier === 'free' && c.var.profile.hasUsageQuota;
 
+        // The number shown against a cap must be the number the cap is enforced
+        // against. `PlanQuotaGuard.consumeInspection` gates on the inspection
+        // ROWS a tenant has, and `usage_counters.value` is only a self-healing
+        // cache of that — it reads stale-high between a delete and the next
+        // create, which would tell a tenant "5 of 5 used" while creating still
+        // works. So capped tenants get the live count.
+        //
+        // Everyone else keeps the cumulative lifetime counter: with `caps: null`
+        // it is measured against nothing, and quietly redefining it from "how
+        // many they have ever created" to "how many they have now" would change
+        // an analytics figure nobody asked to change.
+        const inspectionsUsed = isFreeTierQuota
+            ? (await drizzle(c.env.DB).select({ n: count() }).from(inspectionsTable)
+                .where(eq(inspectionsTable.tenantId, tenantId)).get())?.n ?? 0
+            : inspections;
+
         return c.json({
             success: true as const,
             data: {
                 tier,
                 caps: isFreeTierQuota ? FREE_TIER_CAPS : null,
                 usage: {
-                    inspections, sms, email,
+                    inspections: inspectionsUsed, sms, email,
                     smsByo, emailByo,
                     aiTranslate, aiTranslateByo,
                     aiAssist, aiAssistByo,
