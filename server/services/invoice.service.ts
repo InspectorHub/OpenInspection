@@ -223,8 +223,11 @@ export class InvoiceService {
         await seedLedgerFromInvoiceRecord(db, tenantId, id);
         const outstanding = existing.amountCents - await getNetReceivedCents(db, tenantId, id);
         if (!input.allowOverpayment && input.amountCents > outstanding) {
+            // No figure in the message: it would have to be raw minor units,
+            // and the surface asking the question is already showing the
+            // remaining balance formatted in the invoice's own currency.
             throw Errors.UnprocessableEntity(
-                `This payment exceeds the outstanding balance on this invoice (${Math.max(outstanding, 0)} cents remaining). Confirm the overpayment if the amount is right.`,
+                'This payment exceeds the outstanding balance on this invoice. Confirm the overpayment if the amount is right.',
             );
         }
 

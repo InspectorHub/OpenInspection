@@ -10,6 +10,7 @@ import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext"
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 import { NewInvoiceModal, type InspectionOption } from "~/components/invoices/NewInvoiceModal";
+import { PaymentsModal, type PaymentRow } from "~/components/invoices/PaymentsModal";
 
 export function meta() {
   return [{ title: m.invoices_meta_title() }];
@@ -32,25 +33,45 @@ type InvoiceRow = {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
+  // `?payments=<invoiceId>` asks for one invoice's ledger as well as the list.
+  // A query parameter rather than a second route: the modal needs the refreshed
+  // BALANCE alongside the rows, and the balance lives on the invoice list.
+  // `payments` is always present (empty by default) so the page's data shape
+  // never becomes a union.
+  const paymentsFor = new URL(request.url).searchParams.get("payments");
   try {
     const api = createApi(context, { token });
-    const [invRes, inspRes] = await Promise.all([
+    const [invRes, inspRes, payRes] = await Promise.all([
       api.invoices.index.$get(),
       api.inspections.index.$get({ query: { limit: "20" } }).catch(() => null),
+      paymentsFor
+        ? api.invoices[":id"].payments.$get({ param: { id: paymentsFor } }).catch(() => null)
+        : Promise.resolve(null),
     ]);
     const body = invRes.ok ? ((await invRes.json()) as Record<string, unknown>) : { data: [] };
     const inspBody = inspRes?.ok ? ((await inspRes.json()) as { data?: unknown[] }) : { data: [] };
+    const payBody = payRes?.ok ? ((await payRes.json()) as { data?: unknown[] }) : { data: [] };
     const inspections = ((inspBody.data ?? []) as Array<Record<string, unknown>>).map((i) => ({
       id: String(i.id ?? ""),
       propertyAddress: (i.propertyAddress as string | null) ?? null,
       clientName: (i.clientName as string | null) ?? null,
       date: (i.date as string | null) ?? null,
     }));
-    return { invoices: (body.data ?? []) as InvoiceRow[], inspections, loadFailed: false };
+    return {
+      invoices: (body.data ?? []) as InvoiceRow[],
+      inspections,
+      payments: (payBody.data ?? []) as PaymentRow[],
+      loadFailed: false,
+    };
   } catch {
     // IA-118 — an empty ledger says nothing is outstanding. That is a claim
     // about money owed to the business, and a failed fetch must not make it.
-    return { invoices: [] as InvoiceRow[], inspections: [] as InspectionOption[], loadFailed: true };
+    return {
+      invoices: [] as InvoiceRow[],
+      inspections: [] as InspectionOption[],
+      payments: [] as PaymentRow[],
+      loadFailed: true,
+    };
   }
 }
 
@@ -84,6 +105,59 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!res.ok) {
       const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
       return { intent, ok: false, error: err?.error?.message ?? m.invoices_action_error_mark_paid() };
+    }
+    return { intent, ok: true, error: null };
+  }
+
+  // The offline-payment path. `occurredAt` arrives as a full ISO instant that
+  // the BROWSER built from the date picker, because only the browser knows
+  // which zone the chosen calendar day belongs to. It is never defaulted here:
+  // an absent date is an error, not a licence to stamp now().
+  if (intent === "record-payment") {
+    const id = String(fd.get("id") || "");
+    const amountDollars = Number(String(fd.get("amount") || ""));
+    const method = String(fd.get("method") || "cash") as "check" | "cash" | "offline" | "other";
+    const occurredAt = String(fd.get("occurredAt") || "");
+    const note = String(fd.get("note") || "").trim() || null;
+    const allowOverpayment = fd.get("allowOverpayment") === "1";
+    if (!Number.isFinite(amountDollars) || amountDollars <= 0) {
+      return { intent, ok: false, error: m.invoices_payments_error_amount() };
+    }
+    if (!occurredAt) {
+      return { intent, ok: false, error: m.invoices_payments_error_date() };
+    }
+    const api = createApi(context, { token });
+    const res = await api.invoices[":id"].payments.$post({
+      param: { id },
+      json: { amountCents: Math.round(amountDollars * 100), method, occurredAt, note, allowOverpayment },
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      return { intent, ok: false, error: err?.error?.message ?? m.invoices_payments_error_record() };
+    }
+    return { intent, ok: true, error: null };
+  }
+
+  // Append-only: a typo is corrected by a new row, never by editing the old one.
+  if (intent === "correct-payment") {
+    const id = String(fd.get("id") || "");
+    const paymentId = String(fd.get("paymentId") || "");
+    const amountDollars = Number(String(fd.get("amount") || ""));
+    const reason = String(fd.get("reason") || "").trim();
+    if (!Number.isFinite(amountDollars) || amountDollars < 0) {
+      return { intent, ok: false, error: m.invoices_payments_error_amount() };
+    }
+    if (!reason) {
+      return { intent, ok: false, error: m.invoices_payments_error_reason() };
+    }
+    const api = createApi(context, { token });
+    const res = await api.invoices[":id"].payments[":paymentId"].corrections.$post({
+      param: { id, paymentId },
+      json: { correctedAmountCents: Math.round(amountDollars * 100), reason },
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      return { intent, ok: false, error: err?.error?.message ?? m.invoices_payments_error_correct() };
     }
     return { intent, ok: true, error: null };
   }
@@ -159,6 +233,18 @@ export default function InvoicesPage() {
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
 
+  // The ledger is loaded through its own fetcher so opening the modal does not
+  // navigate. React Router revalidates an active fetcher load after any action
+  // on this route, so recording or correcting a payment refreshes both the rows
+  // and the balance without a second request written by hand.
+  const ledgerFetcher = useFetcher<typeof loader>();
+  const paymentFetcher = useFetcher<typeof action>();
+  const [paymentsFor, setPaymentsFor] = useState<InvoiceRow | null>(null);
+  function openPayments(invoice: InvoiceRow) {
+    setPaymentsFor(invoice);
+    ledgerFetcher.load(`/invoices?payments=${encodeURIComponent(invoice.id)}`);
+  }
+
   const total = invoices.length;
   const paid = invoices.filter((i) => i.status === "paid").length;
   const unpaid = invoices.filter((i) => i.status !== "paid").length;
@@ -207,6 +293,18 @@ export default function InvoicesPage() {
       />
 
       <NewInvoiceModal open={newOpen} onClose={() => setNewOpen(false)} inspections={inspections} />
+
+      <PaymentsModal
+        invoice={paymentsFor}
+        // The balance is derived from these rows against the invoice total, so
+        // it moves the moment the ledger does. Nothing reads a cached paid
+        // figure — that column is a cache, and this is the thing it caches.
+        payments={ledgerFetcher.data?.payments ?? []}
+        loading={ledgerFetcher.state !== "idle"}
+        fetcher={paymentFetcher}
+        locale={locale}
+        onClose={() => setPaymentsFor(null)}
+      />
 
       {/* IA-123 — says what voiding actually does. The row survives for the
           audit trail; what changes is that the invoice stops counting and stops
@@ -308,6 +406,19 @@ export default function InvoicesPage() {
                 const isPaid = invoice.status === "paid";
                 const busy = submittingId === invoice.id;
 
+                // Present on EVERY row, paid included. "Mark paid" answers one
+                // question ("is it settled?"); this answers the one a dispute
+                // actually turns on — which payments arrived, when, by what
+                // means, and who wrote them down.
+                const payments = (
+                  <button
+                    onClick={() => openPayments(invoice)}
+                    className="px-3 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
+                  >
+                    {m.invoices_payments_button()}
+                  </button>
+                );
+
                 // The one control for the one destination (IA-122). Rendered on
                 // every row that HAS an inspection, paid or not — previously
                 // only paid rows got a button, so the invoice actually needing
@@ -342,6 +453,7 @@ export default function InvoicesPage() {
                   return (
                     <div className="inline-flex items-center justify-end gap-1.5">
                       {viewInspection}
+                      {payments}
                       {voidAction}
                     </div>
                   );
@@ -373,6 +485,7 @@ export default function InvoicesPage() {
                 return (
                   <div className="inline-flex items-center justify-end gap-1.5">
                     {viewInspection}
+                    {payments}
                     <button
                       onClick={() => setPickerFor(invoice.id)}
                       className="px-3 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
