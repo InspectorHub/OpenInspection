@@ -23,6 +23,7 @@ export function WizardLayout({
     stepIdx,
     stepLabel,
     blockedReason,
+    busy = false,
     isLastStep,
     onBack,
     onNext,
@@ -34,6 +35,12 @@ export function WizardLayout({
     stepLabel: (step: WizardStepId) => string;
     /** Why Next is disabled, or null when it is not. */
     blockedReason: string | null;
+    /**
+     * A submit is in flight (portal #105). The button goes dead and spins rather
+     * than sitting there looking untouched while nothing visibly happens — that
+     * silence is what got clicked three times in production.
+     */
+    busy?: boolean;
     isLastStep: boolean;
     /** Back on any step past the first; Cancel on the first — one way out, not two. */
     onBack: () => void;
@@ -101,11 +108,22 @@ export function WizardLayout({
                                 </p>
                             )}
                             <button
-                                disabled={blockedReason !== null}
+                                disabled={blockedReason !== null || busy}
+                                aria-busy={busy || undefined}
                                 aria-describedby={blockedReason ? "newinsp-blocked-reason" : undefined}
                                 onClick={onNext}
-                                className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-2 h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
+                                {/* border-current, so it is the button's own text
+                                    colour in either colour scheme — no second
+                                    palette to keep in step. */}
+                                {busy && (
+                                    <span
+                                        data-testid="wizard-next-spinner"
+                                        aria-hidden="true"
+                                        className="h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent animate-spin"
+                                    />
+                                )}
                                 {isLastStep ? m.new_inspection_create() : m.common_next()}
                             </button>
                         </div>

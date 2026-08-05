@@ -14,7 +14,7 @@
  *   - string    → at cap, billingPortalUrl for the "Subscribe" CTA.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, act } from '@testing-library/react';
 import { createElement } from 'react';
 
 const fetcherMocks = {
@@ -208,5 +208,35 @@ describe('NewInspectionWizard — client + buyer-agent payload', () => {
         expect(payload).toHaveProperty('templateId', 'tpl-1');
         // Batch C — the wizard sends the zone it displayed, not a bare local time.
         expect(payload).toHaveProperty('timeZone', 'UTC');
+        // Idempotency (portal #105): the create carries a key the server can
+        // dedupe on. Without it, the guard below only narrows the window.
+        expect(typeof payload.idempotencyKey).toBe('string');
+        expect(payload.idempotencyKey.length).toBeGreaterThan(0);
+    });
+
+    /**
+     * Portal #105, seen in production on 2026-08-05: one tenant created three
+     * byte-identical inspections seconds apart. Create called `fetcher.submit`
+     * with nothing guarding it and the button stayed live, so every impatient
+     * click was another inspection.
+     *
+     * Both clicks go inside ONE act(): React batches the handlers and renders
+     * nothing between them, which is what a real double click looks like and
+     * why a `fetcher.state` check cannot see the second one.
+     */
+    it('creates one inspection when Create is clicked twice in the same tick (portal #105)', () => {
+        const { getAllByRole } = walkToConfirm();
+        const createBtn = (getAllByRole('button') as HTMLButtonElement[])
+            .find((b) => b.textContent?.includes('Create Inspection'));
+        expect(createBtn).toBeTruthy();
+
+        act(() => {
+            createBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            createBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const createCalls = fetcherMocks.submit.mock.calls
+            .filter((c) => (c[0] as { intent?: string })?.intent === 'create');
+        expect(createCalls.length).toBe(1);
     });
 });
