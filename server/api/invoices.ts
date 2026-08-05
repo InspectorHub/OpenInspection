@@ -296,6 +296,7 @@ const invoiceRoutes = createApiRouter()
             c.executionCtx.waitUntil(
                 c.var.services.qbo.recordPayment(
                     tenantId, id, appended.amountCents / 100, qboPaymentKey(appended.id),
+                    appended.occurredAt,
                 ),
             );
         }
@@ -336,6 +337,7 @@ const invoiceRoutes = createApiRouter()
             c.executionCtx.waitUntil(
                 c.var.services.qbo.recordPayment(
                     tenantId, id, appended.amountCents / 100, qboPaymentKey(appended.id),
+                    appended.occurredAt,
                 ),
             );
         }

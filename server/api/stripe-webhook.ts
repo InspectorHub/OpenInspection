@@ -117,6 +117,7 @@ api.post('/', async (c) => {
             try {
                 await c.var.services.qbo.recordPayment(
                     tenantId, settled.invoiceId, push.amountCents / 100, qboPaymentKey(push.id),
+                    push.occurredAt,
                 );
             } catch (e) {
                 logger.error('Stripe webhook: QBO payment push failed',
