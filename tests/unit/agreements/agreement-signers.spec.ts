@@ -138,11 +138,11 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const link1 = await svc.getSignerLink(TENANT_A, r.requestId, signers[0].id);
         const link2 = await svc.getSignerLink(TENANT_A, r.requestId, signers[1].id);
 
-        const first = await svc.markSignedBySigner(link1, 'sig-jane', { signedAtMs: 1000, channel: 'remote' });
+        const first = await svc.markSignedBySigner(link1, 'sig-jane', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null });
         expect(first.envelopeCompletedNow).toBe(false);
         expect(first.envelopeStatus).toBe('viewed');
 
-        const second = await svc.markSignedBySigner(link2, 'sig-john', { signedAtMs: 2000, channel: 'remote' });
+        const second = await svc.markSignedBySigner(link2, 'sig-john', { signedAtMs: 2000, channel: 'remote', languageDisclosureVersion: null });
         expect(second.envelopeCompletedNow).toBe(true);
         expect(second.envelopeStatus).toBe('signed');
 
@@ -163,7 +163,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const signers = await testDb.select().from(schema.agreementSigners)
             .orderBy(asc(schema.agreementSigners.createdAt)).all();
         const link1 = await svc.getSignerLink(TENANT_A, r.requestId, signers[0].id);
-        const res = await svc.markSignedBySigner(link1, 'sig-jane', { signedAtMs: 1000, channel: 'in_person' });
+        const res = await svc.markSignedBySigner(link1, 'sig-jane', { signedAtMs: 1000, channel: 'in_person', languageDisclosureVersion: null });
         expect(res.envelopeCompletedNow).toBe(true);
         expect(res.envelopeStatus).toBe('signed');
     });
@@ -205,9 +205,9 @@ describe('AgreementService — signer-level envelope state machine', () => {
         });
         const s = await testDb.select().from(schema.agreementSigners).all();
         const link = await svc.getSignerLink(TENANT_A, r.requestId, s[0].id);
-        const first = await svc.markSignedBySigner(link, 'sig', { signedAtMs: 1000, channel: 'remote' });
+        const first = await svc.markSignedBySigner(link, 'sig', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null });
         expect(first.envelopeCompletedNow).toBe(true);
-        const second = await svc.markSignedBySigner(link, 'sig-again', { signedAtMs: 2000, channel: 'remote' });
+        const second = await svc.markSignedBySigner(link, 'sig-again', { signedAtMs: 2000, channel: 'remote', languageDisclosureVersion: null });
         expect(second.envelopeCompletedNow).toBe(false);
     });
 
@@ -328,6 +328,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
             signedAtMs: 5000, channel: 'in_person',
             ipAddress: '1.2.3.4', userAgent: 'UA/1.0',
             onBehalfOf: 'Jane Buyer', onBehalfDisclaimer: 'authorized agent',
+            languageDisclosureVersion: null,
         });
         const row = await testDb.select().from(schema.agreementSigners).where(eq(schema.agreementSigners.id, s[0].id)).get();
         expect(row!.channel).toBe('in_person');
@@ -336,6 +337,32 @@ describe('AgreementService — signer-level envelope state machine', () => {
         expect(row!.onBehalfOf).toBe('Jane Buyer');
         expect(row!.onBehalfDisclaimer).toBe('authorized agent');
         expect(row!.signatureBase64).toBe('sig');
+    });
+
+    // The version is evidence, so it has to land on the row that carries the
+    // signature — not be inferred later from a timestamp against a changelog.
+    it('records the language-disclosure version the caller states', async () => {
+        const r = await svc.findOrCreate(TENANT_A, INSP_ID, { signers: [{ name: 'Jane', email: 'jane@test.com' }], completionPolicy: 'one' });
+        const s = await testDb.select().from(schema.agreementSigners).all();
+        const link = await svc.getSignerLink(TENANT_A, r.requestId, s[0].id);
+        await svc.markSignedBySigner(link, 'sig', {
+            signedAtMs: 5000, channel: 'remote', languageDisclosureVersion: 7,
+        });
+        const row = await testDb.select().from(schema.agreementSigners).where(eq(schema.agreementSigners.id, s[0].id)).get();
+        // 7, not "whatever the constant says today" — the service must not
+        // substitute its own idea of the current version for the caller's claim.
+        expect(row!.languageDisclosureVersion).toBe(7);
+    });
+
+    it('leaves the version NULL when the caller cannot vouch for a screen', async () => {
+        const r = await svc.findOrCreate(TENANT_A, INSP_ID, { signers: [{ name: 'Jane', email: 'jane@test.com' }], completionPolicy: 'one' });
+        const s = await testDb.select().from(schema.agreementSigners).all();
+        const link = await svc.getSignerLink(TENANT_A, r.requestId, s[0].id);
+        await svc.markSignedBySigner(link, 'sig', {
+            signedAtMs: 5000, channel: 'in_person', languageDisclosureVersion: null,
+        });
+        const row = await testDb.select().from(schema.agreementSigners).where(eq(schema.agreementSigners.id, s[0].id)).get();
+        expect(row!.languageDisclosureVersion).toBeNull();
     });
 
     it('single-fire: sign A (1/2) then sign B TWICE -> exactly one envelopeCompletedNow=true', async () => {
@@ -352,13 +379,13 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const linkB = await svc.getSignerLink(TENANT_A, r.requestId, signers[1].id);
 
         // A signs first: envelope 1/2, not complete.
-        const a = await svc.markSignedBySigner(linkA, 'sig-jane', { signedAtMs: 1000, channel: 'remote' });
+        const a = await svc.markSignedBySigner(linkA, 'sig-jane', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null });
         expect(a.envelopeCompletedNow).toBe(false);
 
         // B signs (2/2) — this completes the envelope. Second call is the
         // idempotent re-sign of an already-signed signer.
-        const b1 = await svc.markSignedBySigner(linkB, 'sig-john', { signedAtMs: 2000, channel: 'remote' });
-        const b2 = await svc.markSignedBySigner(linkB, 'sig-john-again', { signedAtMs: 3000, channel: 'remote' });
+        const b1 = await svc.markSignedBySigner(linkB, 'sig-john', { signedAtMs: 2000, channel: 'remote', languageDisclosureVersion: null });
+        const b2 = await svc.markSignedBySigner(linkB, 'sig-john-again', { signedAtMs: 3000, channel: 'remote', languageDisclosureVersion: null });
 
         const fires = [a, b1, b2].filter((x) => x.envelopeCompletedNow).length;
         expect(fires).toBe(1);
@@ -383,8 +410,8 @@ describe('AgreementService — signer-level envelope state machine', () => {
         // deterministically, but the service awaits between read + write, so the
         // atomic claim (conditional UPDATE row-count) is what guarantees single-fire.
         const [c1, c2] = await Promise.all([
-            svc.markSignedBySigner(link, 'sig-1', { signedAtMs: 1000, channel: 'remote' }),
-            svc.markSignedBySigner(link, 'sig-2', { signedAtMs: 1000, channel: 'remote' }),
+            svc.markSignedBySigner(link, 'sig-1', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null }),
+            svc.markSignedBySigner(link, 'sig-2', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null }),
         ]);
         const fires = [c1, c2].filter((x) => x.envelopeCompletedNow).length;
         expect(fires).toBeLessThanOrEqual(1);
@@ -475,7 +502,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
             // Sign as Jane → envelope may stay 'viewed' (policy 'all', Bob outstanding),
             // but Jane's signer row becomes 'signed'. Her token must still resolve.
             await svc.markViewedBySigner(janeToken);
-            await svc.markSignedBySigner(janeToken, 'data:image/png;base64,XX', { signedAtMs: Date.now(), channel: 'remote' });
+            await svc.markSignedBySigner(janeToken, 'data:image/png;base64,XX', { signedAtMs: Date.now(), channel: 'remote', languageDisclosureVersion: null });
             const link = await svc.getSignerLinkByEmail(TENANT_A, INSP_ID, 'jane@test.com');
             expect(link).toBeTruthy();
         });

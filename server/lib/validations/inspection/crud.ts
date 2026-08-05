@@ -255,6 +255,11 @@ export const PublishInspectionSchema = z.object({
   // created by ReportVersionService.snapshotOnPublish during this publish.
   // Optional; max 500 chars. NULL on first publish.
   summary: z.string().max(500).optional().describe('TODO describe summary field for the OpenInspection MCP integration'),
+  // Which deliverable is being published. One order can carry several reports —
+  // a standard inspection and a radon test — and they publish independently,
+  // each with its own version chain. Omitted = the order's primary report,
+  // which is what every caller predating multi-report delivery means.
+  reportId: z.string().min(1).optional().describe('Report to publish; defaults to the inspection primary report.'),
 }).openapi('PublishInspection');
 
 /**

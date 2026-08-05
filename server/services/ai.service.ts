@@ -1,23 +1,51 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { inspections, inspectionResults } from '../lib/db/schema';
-import { logger } from '../lib/logger';
 import { Errors } from '../lib/errors';
+import { GeminiProvider } from '../lib/ai/providers/gemini';
+import type { AiUsageKind } from '../lib/usage/period';
 
 /**
  * Service to handle AI-powered features using Google Gemini.
+ *
+ * CREDENTIALS COME FROM ONE OF TWO SOURCES, not one. A tenant's own stored key
+ * (Settings → Advanced → AI) always wins and is unchanged by anything below.
+ * Where the deployment profile permits it (`hasManagedAi` — saas only), a
+ * deployment-provided key may serve tenants granted managed access instead;
+ * that grant is a boolean this service is handed, never a decision it makes.
+ * In standalone the managed path does not exist at all, so it remains the
+ * tenant's key or nothing, exactly as before. Selection lives in
+ * `lib/ai/resolve-provider.ts` — this class does not re-derive it.
+ *
+ * This paragraph replaces a "strictly bring-your-own-key" statement that the
+ * managed path contradicts; without the correction the next reader treats that
+ * path as a regression and deletes it.
  *
  * Sprint 1 A-4: when running in `standalone` mode without a Gemini API key,
  * `suggestComment` returns dev-mock suggestions so local development can
  * exercise the UI flow end-to-end. Production deploys (`saas` mode or
  * unspecified) throw `Errors.AINotConfigured` (503) so the client can
  * route the inspector to AI settings instead of showing a silent failure.
+ *
+ * The MODEL is configuration, never a source constant. There is deliberately
+ * no baked-in default: a model id compiled into the binary is how the request
+ * URL ended up pinned to one model for two years with no way to change it, and
+ * a fallback would hide the same mistake next time. Unconfigured fails closed.
  */
 export class AIService {
     constructor(
         private db: D1Database,
         private apiKey: string,
         private appMode?: 'standalone' | 'saas',
+        /** Model id from deployment configuration (`AI_MODEL`). Empty = not
+         *  configured, which is an error rather than a cue to pick one. */
+        private model: string = '',
+        /** The ONE metering hook for AI, injected the same way the email
+         *  pipeline injects its meter. Every AI feature funnels through
+         *  `callGemini`, so one `record` there is the whole meter — a second
+         *  counter at a route or a hook is how two numbers that have to agree
+         *  stop agreeing. Undefined when there is no tenant to attribute to. */
+        private meter?: { record(kind: AiUsageKind): Promise<void> },
     ) {}
 
     private isDevMode(): boolean {
@@ -28,44 +56,46 @@ export class AIService {
         return Boolean(this.apiKey) && !this.apiKey.includes('your_api_key');
     }
 
+    /**
+     * Fail closed on an unconfigured model.
+     *
+     * Deliberately NOT folded into the dev-mock branch: the mock exists for a
+     * self-hoster who has no key yet, and widening it to cover a missing model
+     * would write `[DEV] …` placeholder prose into a real report for someone
+     * whose key works fine. A missing model is a configuration error at every
+     * deployment mode, so it always throws.
+     */
+    private assertModelConfigured(): void {
+        if (!this.model) {
+            throw Errors.AINotConfigured(
+                'AI is unavailable: no AI model is configured. Set AI_MODEL for this deployment.',
+            );
+        }
+    }
+
     private getDrizzle() {
         return drizzle(this.db);
     }
 
     /**
-     * Internal helper to call Gemini API.
+     * Run one completion through the resolved provider.
+     *
+     * The Gemini HTTP shape lives in `lib/ai/providers/gemini.ts` and nowhere
+     * else. Keeping a second copy here would mean every future backend gets
+     * written twice, which is the exact cost the abstraction exists to avoid.
+     * Credential and model validation (including the fail-closed empty-model
+     * case) is the adapter's, so the two entry points below that do not
+     * pre-check are still covered.
      */
-    private async callGemini(prompt: string) {
-        if (!this.apiKey || this.apiKey.includes('your_api_key')) {
-            throw new Error('Gemini API Key missing');
-        }
-
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: prompt }]
-                }],
-                generationConfig: {
-                    temperature: 0.2,
-                    topP: 0.8,
-                    topK: 40,
-                    maxOutputTokens: 1024,
-                }
-            })
-        });
-
-        if (!res.ok) {
-            const error = await res.text();
-            logger.error('Gemini API Error', { response: error });
-            throw new Error('Failed to generate content from AI');
-        }
-
-        const data = await res.json() as { candidates: Array<{ content: { parts: Array<{ text: string }> } }> };
-        return data.candidates[0].content.parts[0].text.trim();
+    private async callGemini(prompt: string, kind: AiUsageKind = 'assist') {
+        const provider = new GeminiProvider({ apiKey: this.apiKey, model: this.model });
+        const { text } = await provider.complete({ prompt });
+        // Meter AFTER success, never before — a model call that failed must not
+        // consume an allowance it did not spend. The swallowed rejection
+        // matches the send sites: a metering failure must never fail the
+        // inspector's operation.
+        if (this.meter) await this.meter.record(kind).catch(() => {});
+        return text;
     }
 
     /**
@@ -141,6 +171,7 @@ Summary:`;
                 'AI is not configured. Set GEMINI_API_KEY in Settings → Advanced → AI.'
             );
         }
+        this.assertModelConfigured();
 
         const ctxLines = [
             `Item: "${input.itemLabel}"`,
@@ -197,6 +228,10 @@ Return only the rewritten comment text — no preamble, no quotes, no markdown.`
                 'AI is not configured. Set GEMINI_API_KEY in Settings → Advanced → AI.'
             );
         }
+        // Outside the try/catch below on purpose: that catch turns RUNTIME
+        // failures into an empty suggestion list, and a configuration error
+        // must not disappear into "no suggestions today".
+        this.assertModelConfigured();
 
         const context = [
             params.rating    ? `Rating: ${params.rating}` : null,

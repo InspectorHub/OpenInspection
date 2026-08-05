@@ -25,7 +25,7 @@ import { useState } from "react";
 import type { Route } from "./+types/portal-inspection";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
-import { EMPTY_BRAND } from "~/lib/brand";
+import { brandFormat, EMPTY_BRAND } from "~/lib/brand";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import ClientPortalHub, {
   hubSectionNavHref,
@@ -200,14 +200,14 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   // portal/report surfaces — and do it in the loader so the formatted string is
   // serialized loader data (no client re-format, so no hydration mismatch).
   if (overview.date) {
-    overview = { ...overview, date: formatInspectionDateTime(overview.date, undefined, brand.defaultTimezone) };
+    overview = { ...overview, date: formatInspectionDateTime(overview.date, undefined, brand.defaultTimezone, brandFormat(brand)) };
   }
 
   // Same treatment for the Progress section header date — loadProgressSection
   // returns the raw inspections.date; format it in the tenant timezone here so
   // <ProgressView> receives an already-humanized string (never a bare ISO).
   if (progress?.date) {
-    progress = { ...progress, date: formatInspectionDateTime(progress.date, undefined, brand.defaultTimezone) };
+    progress = { ...progress, date: formatInspectionDateTime(progress.date, undefined, brand.defaultTimezone, brandFormat(brand)) };
   }
 
   // Step 4a — the Notices bell (C3). Rides the loader rather than opening on

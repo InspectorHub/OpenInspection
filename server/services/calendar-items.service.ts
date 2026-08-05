@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lte, or } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lte, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import {
     availabilityOverrides,
@@ -146,10 +146,22 @@ export async function listCalendarItems(
     const effectiveTz = resolveTenantTimeZone(input.effectiveTz);
     const selectedUsers = input.userIds?.length ? input.userIds : undefined;
 
+    // Compare the DATE PART, not the raw column. `inspections.date` is TEXT and
+    // holds either `YYYY-MM-DD` or a datetime (`YYYY-MM-DDTHH:MM`, and full ISO
+    // for rows the create endpoint wrote) — the schedule endpoint deliberately
+    // preserves a time suffix because the busy checks read HH:MM back out of it.
+    // A plain string `<=` then excludes every timed row on the LAST day of the
+    // window, because '2026-08-05T08:00' sorts after '2026-08-05'.
+    //
+    // The month-wide calendar never noticed: it over-fetches ±a month, so its
+    // final day holds nothing anyone looks at. The dispatch board asks for a
+    // SINGLE day (start === end), where that day is the only day — so a job
+    // dropped onto a column vanished from the board it was dropped on.
+    const civilDate = sql`substr(${inspections.date}, 1, 10)`;
     const inspectionWhere = and(
         eq(inspections.tenantId, tenantId),
-        gte(inspections.date, range.startDate),
-        lte(inspections.date, range.endDate),
+        gte(civilDate, range.startDate),
+        lte(civilDate, range.endDate),
         selectedUsers
             ? or(
                 inArray(inspections.inspectorId, selectedUsers),

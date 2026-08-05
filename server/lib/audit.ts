@@ -19,6 +19,7 @@ export type AuditAction =
     | 'inspection.report_relocked'
     | 'inspection.send_sms'
     | 'inspection.send_text_fallback'
+    | 'inspection.rescheduled'
     | 'inspection.bulk_assign'
     | 'inspection.bulk_status'
     | 'inspection.template_upgraded'

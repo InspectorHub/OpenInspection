@@ -154,6 +154,13 @@ export default defineConfig({
             testMatch: 'public-pages-responsive.spec.ts',
         },
         {
+            // #269 — i18n activation. Pre-auth only (/login), so it needs no D1
+            // seed and no dependency on another project: the whole point is
+            // that the locale resolves from the request alone.
+            name: 'locale-activation',
+            testMatch: 'locale-activation.spec.ts',
+        },
+        {
             // Sprint 1 D-8 — report-gate end-to-end (auth + payment + agreement
             // gates). Depends on browser project to ensure user is created.
             name: 'gates',
@@ -254,6 +261,10 @@ export default defineConfig({
         { name: 'calendar-connect', testMatch: 'calendar-connect.spec.ts', dependencies: ['api'] },
         // Scheduling Phase A-core — G1–G3 acceptance gates (holidays + schedule + slots).
         { name: 'scheduling-phase-a-core', testMatch: 'scheduling-phase-a-core.spec.ts', dependencies: ['api'] },
+        // Scheduling Phase C — the dispatch board's drag-to-assign and the
+        // block-policy refusal. Mutates the tenant's booking_conflict_policy, so
+        // it must not share a worker slot with another spec that reads it.
+        { name: 'dispatch-board', testMatch: 'dispatch-board.spec.ts', dependencies: ['api'] },
         { name: 'repair-list', testMatch: 'repair-list.spec.ts' },
         { name: 'report-viewer', testMatch: 'report-viewer.spec.ts' },
         { name: 'inspection-edit-hotkeys', testMatch: 'inspection-edit-hotkeys.spec.ts', dependencies: ['editor-seed'] },

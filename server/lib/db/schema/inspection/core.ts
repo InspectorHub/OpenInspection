@@ -226,6 +226,16 @@ export const inspections = sqliteTable('inspections', {
     unlockedAt:          integer('unlocked_at', { mode: 'timestamp_ms' }),
     unlockedBy:          text('unlocked_by'),
     unlockReason:        text('unlock_reason'),
+    // When the sold service lines were turned into `reports` rows.
+    //
+    // Generation runs ONCE, at the point the work is scheduled to begin, and
+    // this column is what makes that true. Not at booking: a report that
+    // materialises weeks early clutters the order and freezes a template the
+    // tenant may still be editing. Not again afterwards either — re-running
+    // would re-title and re-template documents somebody has already filled in.
+    // NULL = the lines have not been turned into deliverables yet.
+    // Appended at table end for D1 rebuild safety.
+    reportsGeneratedAt:  integer('reports_generated_at', { mode: 'timestamp_ms' }),
 }, (t) => [
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),

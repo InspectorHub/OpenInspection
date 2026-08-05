@@ -251,14 +251,21 @@ const contactRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         const raw = c.req.valid('json');
-        // Strip undefined keys to satisfy exactOptionalPropertyTypes
-        const data: Partial<{ type: ContactType; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null }> = {};
+        // Strip undefined keys to satisfy exactOptionalPropertyTypes.
+        //
+        // `'x' in raw` rather than `raw.x !== undefined` for every nullable
+        // field: an explicit null is how a caller CLEARS one, and testing for
+        // undefined would silently discard the clear. `locale` needs that most
+        // — putting a contact back to "no stated preference" is the whole
+        // correction path.
+        const data: Partial<{ type: ContactType; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null; locale: string | null }> = {};
         if (raw.type !== undefined) data.type = raw.type;
         if (raw.name !== undefined) data.name = raw.name;
         if ('email' in raw) data.email = raw.email ?? null;
         if ('phone' in raw) data.phone = raw.phone ?? null;
         if ('agency' in raw) data.agency = raw.agency ?? null;
         if ('notes' in raw) data.notes = raw.notes ?? null;
+        if ('locale' in raw) data.locale = raw.locale ?? null;
         const contact = await c.var.services.contact.updateContact(id as string, tenantId, data);
         if (c.env.QBO_CLIENT_ID) {
             c.executionCtx.waitUntil(

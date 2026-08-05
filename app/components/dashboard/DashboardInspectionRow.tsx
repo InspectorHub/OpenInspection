@@ -6,7 +6,7 @@ import { REPORT_STATE_TONE, type Inspection } from "~/lib/dashboard-schema";
 import { Pill, Icon } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { formatDollars } from "~/lib/money";
-import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
+import { useDisplayLocale, useDisplayCurrency, useTenantFormatPrefs } from "~/hooks/useSessionContext";
 
 interface DashboardInspectionRowProps {
   insp: Inspection;
@@ -36,6 +36,7 @@ export function DashboardInspectionRow({
 }: DashboardInspectionRowProps) {
   const locale = useDisplayLocale();
   const currency = useDisplayCurrency();
+  const shape = useTenantFormatPrefs();
   const isSelected = selectedIds.has(insp.id);
   const showReportLink =
     reportView && tenantSlug && isReportPublished(insp.reportStatus);
@@ -65,7 +66,7 @@ export function DashboardInspectionRow({
             )}
             {isColumnVisible("date") && insp.date && (
               <span className="text-[11px] text-ih-fg-3">
-                &middot; {formatInspectionDateTime(insp.date, undefined, timeZone)}
+                &middot; {formatInspectionDateTime(insp.date, undefined, timeZone, { locale, ...shape })}
               </span>
             )}
             {isColumnVisible("agent") && insp.agentName && (

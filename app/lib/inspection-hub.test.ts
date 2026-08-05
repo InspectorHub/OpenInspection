@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 // canPublish / isReportShipped are covered in hub-blocks.test.ts — one home per rule.
-import { deriveBlockStates, formatCents, type HubPayload } from '~/lib/hub-blocks';
+import { deriveBlockStates, formatCents, remainingCents, type HubPayload } from '~/lib/hub-blocks';
 
 /**
  * Issue #111 — pure block-state derivation for the `/inspections/:id` hub page.
@@ -118,9 +118,54 @@ describe('deriveBlockStates — invoice block', () => {
         expect(s.invoice).toEqual({ tone: 'monitor', label: 'Awaiting payment' });
     });
 
-    it('partial invoice → warning / Partially paid', () => {
-        const s = deriveBlockStates(hub({ invoice: { id: 'i', status: 'partial', amountCents: 1000, sentAt: '2026-01-01', paidAt: null, payUrl: null } }));
-        expect(s.invoice).toEqual({ tone: 'warning', label: 'Partially paid' });
+    /**
+     * A partial invoice's whole point is the number: "Partially paid" without a
+     * figure tells an inspector nothing they could act on, and tells a client
+     * nothing about what they still owe. These four cases pin the only four
+     * things the card is allowed to say.
+     */
+    const partial = (over: Record<string, unknown>) =>
+        deriveBlockStates(hub({
+            invoice: {
+                id: 'i', status: 'partial', amountCents: 45000, sentAt: '2026-01-01',
+                paidAt: null, payUrl: null, ...over,
+            } as HubPayload['invoice'],
+        })).invoice;
+
+    it('shows the outstanding balance on a partially paid invoice', () => {
+        const s = partial({ amountPaidCents: 25000 });
+        expect(s.tone).toBe('warning');
+        expect(s.label).toBe('Partially paid');
+        expect(s.detail).toContain('$200.00');
+    });
+
+    it('formats the balance in the invoice’s own currency, not the viewer’s default', () => {
+        const s = partial({ amountPaidCents: 25000, currency: 'EUR' });
+        expect(s.detail).toContain('€200.00');
+        expect(s.detail).not.toContain('$');
+    });
+
+    it('does not claim a balance when the amount paid is unknown', () => {
+        // Rows written before the column shipped carry partial_paid_at and no
+        // amount. Saying "$0.00 remaining" about them would be a false statement
+        // about money, so the card names the gap instead of inventing a figure.
+        const s = partial({ amountPaidCents: null });
+        expect(s.detail).not.toMatch(/\$/);
+        expect(s.detail).toBe('Amount received not recorded');
+    });
+
+    it('says nothing about the balance when money is redacted for this viewer', () => {
+        // IA-95 — no `financial` capability, so `amountCents` never arrived. The
+        // balance is not unknown to the business, only to this reader; claiming
+        // "not recorded" would be the wrong statement.
+        const s = partial({ amountCents: undefined, amountPaidCents: 25000 });
+        expect(s).toEqual({ tone: 'warning', label: 'Partially paid' });
+    });
+
+    it('never shows a negative balance when more was received than we billed', () => {
+        // Divergent edits on either side can leave the received figure above our
+        // total. A negative "remaining" reads as a refund we are not promising.
+        expect(remainingCents({ amountCents: 45000, amountPaidCents: 60000 })).toBe(0);
     });
 
     it('paid invoice → sat / Paid', () => {

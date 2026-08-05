@@ -39,6 +39,7 @@ const FULL_ROW = {
     clientName: 'Dana Buyer',
     clientEmail: 'dana@example.com',
     amountCents: 5000,
+    amountPaidCents: 2000,
     lineItems: [{ description: 'Home inspection', amountCents: 5000 }],
     dueDate: '2026-08-01',
     notes: 'Client haggled; do not discount again.',
@@ -54,7 +55,7 @@ const FULL_ROW = {
 };
 
 const LEAKED = ['tenantId', 'contactId', 'notes', 'qboSyncStatus', 'paymentMethod', 'partialPaidAt', 'voidedAt', 'clientEmail', 'sentAt'] as const;
-const KEPT = ['id', 'amountCents', 'currency', 'status', 'createdAt', 'dueDate', 'clientName', 'lineItems', 'brand', 'tenantSlug'] as const;
+const KEPT = ['id', 'amountCents', 'amountPaidCents', 'currency', 'status', 'createdAt', 'dueDate', 'clientName', 'lineItems', 'brand', 'tenantSlug'] as const;
 
 describe('IA-86 — public invoice response carries only declared fields', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
@@ -110,6 +111,20 @@ describe('IA-86 — public invoice response carries only declared fields', () =>
         expect(data.status).toBe('sent');
         expect(data.tenantSlug).toBe('acme');
         expect(data.lineItems).toEqual([{ description: 'Home inspection', amountCents: 5000 }]);
+    });
+
+    /**
+     * The projection cuts both ways: it stops undeclared fields leaking, and it
+     * silently DROPS a field someone forgot to declare. `amountPaidCents` was
+     * added to `invoices` and populated by the QuickBooks sync while this schema
+     * said nothing about it — so the column was written, the row carried it, and
+     * zod removed it one line before the payer's page. Nothing failed; the value
+     * simply never arrived. Pin it, because the next money column will land the
+     * same way.
+     */
+    it('ships the amount already received, which the schema used to strip', async () => {
+        const { data } = await fetchInvoice();
+        expect(data.amountPaidCents).toBe(2000);
     });
 
     it('the raw text of the response contains no private note', async () => {

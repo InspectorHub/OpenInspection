@@ -177,6 +177,14 @@ export const InspectionHubSchema = z.object({
     id:         z.string().describe('Invoice id'),
     status:     z.string().describe('draft | sent | partial | paid'),
     amountCents: z.number().optional().describe('Invoice total in cents. ABSENT without the financial capability.'),
+    // Cumulative amount RECEIVED, not a remaining balance — the remainder is
+    // derived against our own authoritative total (`amountCents`), never against
+    // an external system's. Null when the invoice is partial but no figure was
+    // recorded, which the UI must render as "unknown" rather than as zero.
+    // ABSENT (not null) without the financial capability — `redactMoney` drops
+    // every `*Cents` key.
+    amountPaidCents: z.number().nullable().optional().describe('Cumulative amount received in cents; null when unrecorded. ABSENT without the financial capability.'),
+    currency:   z.string().optional().describe("ISO 4217 currency snapshot the invoice was created in — what its figures must be formatted in, not the viewer's default."),
     sentAt:     z.string().nullable().describe('ISO sent timestamp'),
     paidAt:     z.string().nullable().describe('ISO paid timestamp'),
     // IA-34 — the public pay page is token-gated, so a bare `/invoice/:id` is
@@ -189,6 +197,17 @@ export const InspectionHubSchema = z.object({
     ready:         z.boolean().describe('True when every required defect field is filled'),
     blockingCount: z.number().describe('Count of defects blocking publish'),
   }).describe('Report-status gate summary (reuses computePublishReadiness)'),
+  reports: z.array(z.object({
+    id:     z.string().describe('reports.id'),
+    kind:   z.enum(['primary', 'ancillary']).describe("'primary' is the one a client means by \"my report\"; there is exactly one."),
+    title:  z.string().describe('Report title, snapshotted from the service line that produced it'),
+    status: z.string().describe('in_progress | published'),
+    publishedAt: z.string().nullable().describe('ISO instant THIS deliverable went out; null while unpublished'),
+    versionCount: z.number().describe('Signed versions this report owns — part of what deleting it would destroy'),
+    hasContent: z.boolean().describe('Whether its document has been written into ("information you already filled out")'),
+    canDelete: z.boolean().describe('Decided server-side by the same function the DELETE endpoint enforces, so the UI cannot offer an action the API refuses'),
+    deleteBlockedReason: z.enum(['primary', 'published']).nullable().describe('Why deletion is refused, for the disabled control reason; null when it is allowed'),
+  })).describe("The order's deliverables. One order, several reports — each with its own document, signature chain and notification."),
   communication: z.object({
     delivered:      z.number().describe('Platform notices delivered (status sent, due rows only).'),
     needsAttention: z.number().describe('Platform notices skipped or failed — the count that auto-expands the block.'),

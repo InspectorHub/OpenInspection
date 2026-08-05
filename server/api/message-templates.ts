@@ -98,10 +98,11 @@ const messageTemplateRoutes = createApiRouter()
     .openapi(createMtRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const body = c.req.valid('json');
-        const createPayload: { name: string; channel: TemplateChannel; subject: string | null; body: string; variables?: string[] } = {
+        const createPayload: { name: string; channel: TemplateChannel; subject: string | null; body: string; variables?: string[]; locale?: string } = {
             name: body.name, channel: body.channel, subject: body.subject ?? null, body: body.body,
         };
         if (body.variables !== undefined) createPayload.variables = body.variables;
+        if (body.locale !== undefined) createPayload.locale = body.locale;
         const data = await new MessageTemplateService(c.env.DB).create(tenantId, createPayload);
         return c.json({ success: true as const, data }, 201);
     })

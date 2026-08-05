@@ -73,6 +73,67 @@ describe('createInspection — results row', () => {
         expect(Object.keys(data)).toHaveLength(0);
     });
 
+    it('binds the row to the primary report, not to the inspection alone', async () => {
+        // One order can now deliver several documents, and `inspection_results`
+        // is per REPORT — `uq_results_report` replaced `uq_results_inspection`.
+        // But that index is unique on a NULLABLE column, so a row written
+        // without `report_id` is accepted, and any number of them are: nothing
+        // errors, and every per-report read either matches no document or
+        // matches a sibling's. Creation is the only place the binding can be
+        // guaranteed rather than guessed at.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await inspectionSvc.createInspection(TENANT, { propertyAddress: '5 Findings Way' } as any);
+
+        const inspection = await testDb.select().from(schema.inspections).get();
+        const report = await testDb
+            .select()
+            .from(schema.reports)
+            .where(eq(schema.reports.inspectionId, inspection!.id))
+            .get();
+        const results = await testDb
+            .select()
+            .from(schema.inspectionResults)
+            .where(eq(schema.inspectionResults.inspectionId, inspection!.id))
+            .get();
+
+        expect(report, 'the order was born without a primary report').toBeTruthy();
+        expect(
+            results!.reportId,
+            'the results row carries no report_id — the document belongs to no report',
+        ).toBe(report!.id);
+    });
+
+    it('binds a re-inspection results row to the re-inspection own primary report', async () => {
+        // The second creation path, and the one that looks most like the first
+        // — which is exactly why it is the one that gets fixed in only one
+        // place. A re-inspection is its own order with its own primary report.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const baseline = await inspectionSvc.createInspection(TENANT, { propertyAddress: '6 Findings Way' } as any);
+        // `createReinspection` refuses an unpublished baseline, and it reads the
+        // latest published snapshot rather than the live row.
+        await testDb.insert(schema.reportVersions).values({
+            id: 'ver-baseline-1', tenantId: TENANT, inspectionId: baseline.id, versionNumber: 1,
+            snapshotJson: JSON.stringify({ inspection: {}, data: {}, units: [] }),
+            publishedAt: new Date(), publishedBy: 'tester', createdAt: new Date(),
+        } as never);
+
+        const reinspection = await inspectionSvc.createReinspection(TENANT, baseline.id, { selectedItemIds: [] });
+
+        const report = await testDb
+            .select()
+            .from(schema.reports)
+            .where(eq(schema.reports.inspectionId, reinspection.id))
+            .get();
+        const results = await testDb
+            .select()
+            .from(schema.inspectionResults)
+            .where(eq(schema.inspectionResults.inspectionId, reinspection.id))
+            .get();
+
+        expect(report).toBeTruthy();
+        expect(results!.reportId).toBe(report!.id);
+    });
+
     it('gives each inspection its own row', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await inspectionSvc.createInspection(TENANT, { propertyAddress: '3 Findings Way' } as any);

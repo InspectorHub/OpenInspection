@@ -56,7 +56,9 @@ export function findTzViolations(source, filename) {
 // Calendar surface only. Test/spec files are exempt (they construct fixtures).
 const SCOPE = [
   'app/components/calendar',
+  'app/components/dispatch',
   'app/routes/calendar.tsx',
+  'app/routes/calendar-dispatch.tsx',
   'server/services/calendar-items.service.ts',
 ];
 

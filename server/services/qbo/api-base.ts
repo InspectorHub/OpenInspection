@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { qboConnections, qboSyncErrors } from '../../lib/db/schema/qbo';
 import { encryptToken, decryptToken } from '../../lib/qbo-crypto';
 import { QBOTokenResponseSchema } from '../../lib/validations/qbo.schema';
+import { QBO_PAYMENT_DISCREPANCY, encodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
 
 const QBO_API_BASE = 'https://quickbooks.api.intuit.com/v3/company';
 const QBO_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
@@ -11,12 +12,31 @@ const MINOR_VERSION = '75';
 export const ACCESS_TOKEN_TTL_SEC = 3600;
 export const CDC_PAGE_SIZE = 1000;
 
+/** One invoice where QuickBooks and our ledger disagree, with BOTH figures. */
+export interface QBOPaymentDiscrepancy {
+    id: string;
+    invoiceId: string;
+    currency: string;
+    ledgerCents: number;
+    qboCents: number;
+}
+
 export interface QBOConnectionStatus {
     realmId: string;
     companyName: string | null;
     lastSyncAt: number | null;
     syncEnabled: boolean;
+    /** Failed pushes only. Discrepancies are not errors and are counted below. */
     openErrors: number;
+    paymentDiscrepancies: QBOPaymentDiscrepancy[];
+    /**
+     * Payments taken before an invoice existed. They are deliberately NOT sent
+     * to QuickBooks — see the settings copy — so the count is disclosed rather
+     * than the cash quietly under-reported. A count and not an amount: these
+     * rows predate the invoice that carries the currency, and inventing one
+     * would be a worse lie than saying less.
+     */
+    heldDepositCount: number;
     refreshTokenExpiresAt: number;
 }
 
@@ -29,7 +49,13 @@ export type QBOToken = {
 export type InvoiceSummary = { Id: string; SyncToken: string; Balance: number; TotalAmt: number };
 
 export type MarkPaidFn = (invoiceId: string, tenantId: string) => Promise<void>;
-export type MarkPartialFn = (invoiceId: string, balance: number, tenantId: string) => Promise<void>;
+/**
+ * Second argument is the amount already RECEIVED, in integer cents — not the
+ * remaining balance and not dollars. QuickBooks reports a remainder in dollars;
+ * `applyInvoiceStatusFromQBO` converts it once, so no adapter has to know the
+ * QBO shape or repeat the arithmetic. See #273.
+ */
+export type MarkPartialFn = (invoiceId: string, amountPaidCents: number, tenantId: string) => Promise<void>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Constructor<T = object> = new (...args: any[]) => T;
@@ -146,31 +172,75 @@ export class QBOServiceBase {
     }
 
     protected async logSyncError(tenantId: string, oiType: string, oiId: string, error: unknown): Promise<void> {
+        const msg = error instanceof Error ? error.message : String(error);
+        await this.upsertSyncFlag(tenantId, oiType, oiId, 'SYNC_ERROR', msg);
+    }
+
+    /**
+     * QuickBooks and our ledger disagree about what was collected. Recorded, not
+     * corrected: an adjusting entry would manufacture money movement nobody
+     * performed, and a human reconciles money. Re-detecting the same
+     * disagreement refreshes the figures instead of stacking rows.
+     */
+    protected async recordPaymentDiscrepancy(
+        tenantId: string, invoiceId: string, ledgerCents: number, qboCents: number,
+    ): Promise<void> {
+        await this.upsertSyncFlag(
+            tenantId, 'invoice', invoiceId, QBO_PAYMENT_DISCREPANCY,
+            encodePaymentDiscrepancy({ ledgerCents, qboCents }),
+        );
+    }
+
+    /** The two sides agree again — whoever reconciled it does not have to also tick it off. */
+    protected async clearPaymentDiscrepancy(tenantId: string, invoiceId: string): Promise<void> {
+        const db = this.getDrizzle();
+        await db.update(qboSyncErrors).set({ resolved: true, updatedAt: new Date() })
+            .where(and(
+                eq(qboSyncErrors.tenantId, tenantId),
+                eq(qboSyncErrors.oiType, 'invoice'),
+                eq(qboSyncErrors.oiId, invoiceId),
+                eq(qboSyncErrors.errorCode, QBO_PAYMENT_DISCREPANCY),
+                eq(qboSyncErrors.resolved, false),
+            ));
+    }
+
+    /**
+     * One open row per (entity, kind). `errorCode` is part of the identity: a
+     * failed push and a payment discrepancy on the same invoice are two
+     * different things to look at, and collapsing them would overwrite one
+     * with the other.
+     */
+    private async upsertSyncFlag(
+        tenantId: string, oiType: string, oiId: string, errorCode: string, errorMsg: string,
+    ): Promise<void> {
         const db = this.getDrizzle();
         const now = new Date();
-        const msg = error instanceof Error ? error.message : String(error);
         const existing = await db.select().from(qboSyncErrors)
             .where(and(
                 eq(qboSyncErrors.tenantId, tenantId),
                 eq(qboSyncErrors.oiType, oiType),
                 eq(qboSyncErrors.oiId, oiId),
+                eq(qboSyncErrors.errorCode, errorCode),
                 eq(qboSyncErrors.resolved, false),
             )).get();
 
         if (existing) {
             await db.update(qboSyncErrors).set({
                 retries:   existing.retries + 1,
-                errorMsg:  msg,
+                errorMsg,
                 updatedAt: now,
-            }).where(eq(qboSyncErrors.id, existing.id));
+            }).where(and(
+                eq(qboSyncErrors.tenantId, tenantId),
+                eq(qboSyncErrors.id, existing.id),
+            ));
         } else {
             await db.insert(qboSyncErrors).values({
                 id:        crypto.randomUUID(),
                 tenantId,
                 oiType,
                 oiId,
-                errorCode: 'SYNC_ERROR',
-                errorMsg:  msg,
+                errorCode,
+                errorMsg,
                 retries:   0,
                 resolved:  false,
                 createdAt: now,

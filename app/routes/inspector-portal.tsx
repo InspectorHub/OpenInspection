@@ -4,7 +4,7 @@ import type { Route } from "./+types/inspector-portal";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
-import { useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import {
   deriveBlockStates,
   formatCents,
@@ -55,9 +55,13 @@ import {
   handleServiceRemove,
   handleUnlockReport,
   handleRelockReport,
+  handleReportDelete,
 } from "~/lib/inspection-order-actions";
 import { ScheduleCard, type TeamMember } from "~/components/inspector-portal/ScheduleCard";
 import { ServicesCard, type CatalogService } from "~/components/inspector-portal/ServicesCard";
+import { ReportsCard, type ReportRow } from "~/components/inspector-portal/ReportsCard";
+import { VisitsCard } from "~/components/inspector-portal/VisitsCard";
+import { loadVisits, handleVisitAdd, handleVisitStatus } from "~/lib/inspection-visits";
 import { OrderDetailsCard } from "~/components/inspector-portal/OrderDetailsCard";
 import { InvoiceCard } from "~/components/inspector-portal/InvoiceCard";
 import { GateToggle } from "~/components/inspector-portal/GateToggle";
@@ -129,6 +133,8 @@ interface HubData extends HubPayload {
     priceOverride?: number | null;
   }>;
   agreements: Array<{ id: string; name: string }>;
+  // One order, several deliverables. Optional so an older payload still renders.
+  reports?: ReportRow[];
   communication?: { delivered: number; needsAttention: number; unread: number; rulesActive: number };
 }
 
@@ -189,6 +195,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   let canPublishCap = false;
   let canViewCommunication = false;
   let isAdmin = false;
+  // The raw role travels too: the Visits card decides its verbs through ONE
+  // function (`visitActions`) that takes a role, so the page cannot grow a
+  // second, divergent opinion about who may record lab results.
+  let role = "inspector";
   const meGet = api.auth?.me?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
   const meRes = meGet ? await meGet().catch(() => null) : null;
   if (meRes && meRes.ok) {
@@ -197,7 +207,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     };
     canPublishCap = publishCapFromMe(meBody);
     canViewCommunication = viewCommunicationCapFromMe(meBody);
-    isAdmin = isAdminRole(meBody.data?.user?.role ?? 'inspector');
+    role = meBody.data?.user?.role ?? 'inspector';
+    isAdmin = isAdminRole(role);
   }
 
   // Plan 1B Task 5 — editable People section: every contact/role pairing on
@@ -262,11 +273,15 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 
   const catalogGet = api.services?.index?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
   const catalogRes = catalogGet ? await catalogGet({}).catch(() => null) : null;
-  const serviceCatalog: CatalogService[] = catalogRes && catalogRes.ok
-    ? (((await catalogRes.json()) as { data?: Array<{ id: string; name: string; price: number; active?: boolean }> }).data ?? [])
-        .filter((s) => s.active !== false)
-        .map((s) => ({ id: s.id, name: s.name, price: s.price }))
+  // `defaultEventTypeSlugs` rides along: it is what makes the Visits card's add
+  // picker propose a radon test's drop-off AND its pickup instead of asking the
+  // user to remember that a radon job is two visits.
+  const catalogRows = catalogRes && catalogRes.ok
+    ? (((await catalogRes.json()) as {
+        data?: Array<{ id: string; name: string; price: number; active?: boolean; defaultEventTypeSlugs?: string[] | null }>;
+      }).data ?? []).filter((s) => s.active !== false)
     : [];
+  const serviceCatalog: CatalogService[] = catalogRows.map((s) => ({ id: s.id, name: s.name, price: s.price }));
 
   const brandingGet = api.adminBranding?.branding?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
   const brandingRes = brandingGet ? await brandingGet({}).catch(() => null) : null;
@@ -291,9 +306,19 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       ? (((await versionsRes.json()) as { data?: { versions?: ReportVersionRow[] } }).data?.versions ?? [])
       : [];
 
+  // The visits that make up the job (`inspection_events`), the tenant's
+  // visit-type catalogue and the types this order's services imply. See
+  // `~/lib/inspection-visits` for why all three hang off `api.events`.
+  const { visits, visitTypes, suggestedTypeIds } = await loadVisits(
+    api,
+    id,
+    new Set((hub.services ?? []).map((s) => s.serviceId)),
+    catalogRows,
+  );
+
   return {
     hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, documents, people, roleProfiles, isAdmin, versions,
-    members, serviceCatalog, referralSources,
+    members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role,
   };
 }
 
@@ -320,8 +345,15 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   if (intent === "service-add") return handleServiceAdd(api, id, formData);
   if (intent === "service-price") return handleServicePrice(api, id, formData);
   if (intent === "service-remove") return handleServiceRemove(api, id, formData);
+  if (intent === "report-delete") return handleReportDelete(api, id, formData);
   if (intent === "unlock-report") return handleUnlockReport(api, id, formData);
   if (intent === "relock-report") return handleRelockReport(api, id);
+
+  // The visits that make up the job. Both endpoints already existed with no
+  // caller — `inspection_events` shipped with an API, an automation trigger per
+  // transition, and no frontend at all, which is why production holds no rows.
+  if (intent === "visit-add") return handleVisitAdd(api, id, formData);
+  if (intent === "visit-status") return handleVisitStatus(api, formData);
 
   if (intent === "request-payment") {
     const res = await api.invoices["request-payment"].$post({
@@ -502,7 +534,7 @@ export function reportActions(
 export default function InspectionHubPage() {
   const {
     hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, documents, people, roleProfiles, isAdmin, versions,
-    members, serviceCatalog, referralSources,
+    members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role,
   } = useLoaderData<typeof loader>();
   // `peopleCard` is the read-only getPeopleCard() projection (client/agents/
   // inspector — still used for the header meta line + modal default emails);
@@ -510,6 +542,7 @@ export default function InspectionHubPage() {
   // list PeopleEditor renders. Two different shapes, hence the rename here.
   const { inspection, people: peopleCard, services, tenantSlug } = hub;
   const displayTz = useDisplayTimeZone();
+  const fmt = useInspectionDateTimeFormat();
   const blocks = deriveBlockStates(hub);
   const navigate = useNavigate();
   const revalidator = useRevalidator();
@@ -720,7 +753,7 @@ export default function InspectionHubPage() {
               {humanizeStatus(inspection.status)}
             </Pill>
             <span className="text-ih-fg-3">
-              {formatInspectionDateTime(inspection.date, undefined, displayTz)}
+              {formatInspectionDateTime(inspection.date, undefined, displayTz, fmt)}
             </span>
             {peopleCard.inspector?.name && (
               <span className="text-ih-fg-3">&middot; {peopleCard.inspector.name}</span>
@@ -805,6 +838,28 @@ export default function InspectionHubPage() {
             price box. ------------------------------------------------- */}
         <ServicesCard services={services} catalog={serviceCatalog} canManage={isAdmin} />
 
+        {/* 3a. Visits — the job as it actually happens. A radon test is a
+            drop-off and a pickup two days apart; until this card existed the
+            second half of the job was in the inspector's head and nowhere
+            else. Sits beside Services on purpose: the visits ARE what the
+            services committed the company to turning up for. -------- */}
+        <VisitsCard
+          visits={visits}
+          visitTypes={visitTypes}
+          suggestedTypeIds={suggestedTypeIds}
+          role={role}
+          formatDate={(iso) => formatInspectionDateTime(iso, undefined, displayTz, fmt)}
+        />
+
+        {/* 3b. Reports — what gets DELIVERED. The order-wide report pill above
+            answers "is the report out"; with several deliverables on one order
+            that question no longer has one answer. ------------------- */}
+        <ReportsCard
+          reports={hub.reports ?? []}
+          canManage={isAdmin}
+          formatDate={(iso) => formatInspectionDateTime(iso, undefined, displayTz, fmt)}
+        />
+
         {/* 4. Signing requests — the paperwork the visit needs -------- */}
         <Card className="p-5">
           <BlockHeading title={m.inspections_hub_block_agreement()} pill={blocks.agreement} />
@@ -862,7 +917,7 @@ export default function InspectionHubPage() {
               <p className="text-[12px] text-ih-fg-3 mb-3">
                 {publishedAt
                   ? m.inspections_hub_report_published_on({
-                      date: formatInspectionDateTime(new Date(publishedAt * 1000).toISOString(), undefined, displayTz),
+                      date: formatInspectionDateTime(new Date(publishedAt * 1000).toISOString(), undefined, displayTz, fmt),
                     })
                   : m.inspections_hub_report_published()}
               </p>
@@ -996,7 +1051,7 @@ export default function InspectionHubPage() {
                           )}
                           {v.publishedAt && (
                             <span className="text-[11px] text-ih-fg-4">
-                              {formatInspectionDateTime(new Date(v.publishedAt * 1000).toISOString(), undefined, displayTz)}
+                              {formatInspectionDateTime(new Date(v.publishedAt * 1000).toISOString(), undefined, displayTz, fmt)}
                             </span>
                           )}
                         </div>
@@ -1028,7 +1083,7 @@ export default function InspectionHubPage() {
               unlockedAt={inspection.unlockedAt ?? null}
               unlockedByName={inspection.unlockedByName ?? null}
               unlockReason={inspection.unlockReason ?? null}
-              formatDate={(iso) => formatInspectionDateTime(iso, undefined, displayTz)}
+              formatDate={(iso) => formatInspectionDateTime(iso, undefined, displayTz, fmt)}
             />
           )}
         </Card>
@@ -1037,6 +1092,7 @@ export default function InspectionHubPage() {
         <InvoiceCard
           pill={blocks.invoice}
           amountCents={invoiceAmountCents}
+          currency={hub.invoice?.currency}
           paid={invoicePaid}
           sent={invoiceSent}
           payUrl={hub.invoice?.payUrl}

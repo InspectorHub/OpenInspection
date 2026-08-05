@@ -449,6 +449,10 @@ export class InspectionCoreService extends InspectionSubService {
         // must never burn a free tenant's lifetime slot.
         await this.planQuota?.consumeInspection(tenantId);
         await this.sdb.insert(inspections, newInspection);
+        // Before the results row, because that row has to NAME it: a NULL
+        // `report_id` is accepted silently and reads match a sibling document
+        // or none. See `lib/inspection/reports.ts`.
+        const primaryReportId = await createPrimaryReport(db, tenantId, id, data.templateId ?? null);
         // Every inspection starts with a results row.
         //
         // The collaborative editor's Durable Object writes findings by UPDATEing
@@ -462,6 +466,7 @@ export class InspectionCoreService extends InspectionSubService {
             id:           crypto.randomUUID(),
             tenantId,
             inspectionId: id,
+            reportId:     primaryReportId,
             data:         {},
             lastSyncedAt: createdAt,
         });
@@ -559,11 +564,6 @@ export class InspectionCoreService extends InspectionSubService {
                 })));
             }
         }
-
-        // Every order gets its primary report. Without it the collab route —
-        // which resolves an inspection to its primary and fails closed — cannot
-        // open the editor at all for anything created from here on.
-        await createPrimaryReport(db, tenantId, id, data.templateId ?? null);
 
         return {
             ...newInspection,
@@ -670,10 +670,14 @@ export class InspectionCoreService extends InspectionSubService {
             reinspectionRound:  round,
         });
 
+        // Its own ORDER, so its own primary report — before the row naming it.
+        const primaryReportId = await createPrimaryReport(db, tenantId, id, null);
+
         await db.insert(inspectionResults).values({
             id:           crypto.randomUUID(),
             tenantId,
             inspectionId: id,
+            reportId:     primaryReportId,
             data:         seeded as unknown as object,
             lastSyncedAt: createdAt,
         });
@@ -696,9 +700,6 @@ export class InspectionCoreService extends InspectionSubService {
         } catch (err) {
             logger.error('inspection-people copy from reinspection create failed', { inspectionId: id }, err instanceof Error ? err : undefined);
         }
-
-        // A re-inspection is its own ORDER, so it gets its own primary report.
-        await createPrimaryReport(db, tenantId, id, null);
 
         const created = await db.select().from(inspections).where(eq(inspections.id, id)).get();
         return created as unknown as Inspection;

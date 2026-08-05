@@ -74,13 +74,18 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (submission.status !== "success") {
       return submission.reply();
     }
-    const { type, name, email, phone, agency } = submission.value;
+    const { type, name, email, phone, agency, locale } = submission.value;
     const body = {
       name,
       email: email ?? null,
       phone: phone || null,
       agency: agency || null,
       type,
+      // The modal always renders the whole record, so an empty selection here
+      // is a deliberate "not set" and has to travel as an explicit null —
+      // omitting the key would leave a stored preference in place and make the
+      // control look broken. The API only clears when the key is present.
+      locale: locale || null,
     };
     const res = id
       ? await api.contacts[":id"].$put({ param: { id }, json: body })

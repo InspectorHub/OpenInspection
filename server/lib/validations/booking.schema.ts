@@ -45,6 +45,15 @@ export const PublicBookingSchema = z.object({
     // Track L (D6, path A) — unchecked SMS opt-in. When true, the submit records a
     // `granted` SMS consent event (captured_via=booking_form) for the client contact.
     smsOptin: z.boolean().optional().openapi({ example: false }).describe('Client self-book SMS opt-in (TCPA consent). When true, records a granted consent event.'),
+    // The language the client asked to be addressed in, stored on their
+    // contact. Optional with NO default: an omitted choice must stay NULL,
+    // because a stored value is a stated preference and only a stated
+    // preference is evidence that anyone wants another language.
+    //
+    // Typed as a free BCP-47 tag rather than an enum so an unrecognised
+    // language can never reject a booking over a cosmetic field; the service
+    // reduces it to a locale we have messages for, or to NULL.
+    locale: z.string().trim().min(2).max(35).optional().openapi({ example: 'es-419' }).describe("Client's preferred language as a BCP-47 tag; reduced server-side to a supported locale, or ignored when unsupported."),
 }).refine(
     (data) => data.timeSlot !== 'custom' || !!data.customTime,
     { message: 'customTime is required when timeSlot is custom', path: ['customTime'] },

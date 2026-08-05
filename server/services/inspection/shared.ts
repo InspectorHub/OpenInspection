@@ -98,9 +98,18 @@ export function sanitizeDefectStates(data: Record<string, unknown>): void {
  * automation_logs row, and report.published / inspection.confirmed /
  * inspection.cancelled / inspection.created automations never fired.
  */
-export function fireAutomation(db: D1Database, tenantId: string, inspectionId: string, event: string): Promise<void> {
+export function fireAutomation(
+    db: D1Database, tenantId: string, inspectionId: string, event: string, reportId?: string,
+): Promise<void> {
     return new AutomationService(db)
-        .trigger({ tenantId, inspectionId, triggerEvent: event, companyName: '', reportBaseUrl: '' })
+        .trigger({
+            tenantId, inspectionId, triggerEvent: event, companyName: '', reportBaseUrl: '',
+            // Which DELIVERABLE this is about. `report.published` dedups on a
+            // synthetic per-event key, and an inspection-only key collapses the
+            // radon report's first publish into the standard report's — for
+            // ever, not for a window.
+            ...(reportId ? { reportId } : {}),
+        })
         .catch(err => logger.error('automation trigger failed', { event }, err instanceof Error ? err : undefined));
 }
 
@@ -116,11 +125,22 @@ export async function resolvePublishTrigger(
     db: D1Database,
     tenantId: string,
     inspectionId: string,
+    reportId?: string,
 ): Promise<'report.published' | 'report.amended'> {
+    // "A prior version exists" is a question about THIS deliverable. Asked of
+    // the whole inspection, the radon report's first publish reads as an
+    // amendment because the standard report was published on Tuesday — and the
+    // client gets a "your report was updated" notice about a document they have
+    // never seen.
     const prior = await drizzle(db)
         .select({ id: reportVersions.id })
         .from(reportVersions)
-        .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, inspectionId)))
+        .where(and(
+            eq(reportVersions.tenantId, tenantId),
+            reportId
+                ? eq(reportVersions.reportId, reportId)
+                : eq(reportVersions.inspectionId, inspectionId),
+        ))
         .limit(1)
         .get();
     return prior ? 'report.amended' : 'report.published';

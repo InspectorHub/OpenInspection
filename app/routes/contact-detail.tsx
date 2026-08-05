@@ -4,6 +4,7 @@ import { useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
+import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import { formatCents } from "~/lib/hub-blocks";
 import { humanizeStatus, capitalize } from "~/lib/status";
 import { Breadcrumb } from "~/components/Breadcrumb";
@@ -125,6 +126,7 @@ export default function ContactDetailPage() {
   const { detail, access, accessFailed } = useLoaderData<typeof loader>();
   const { contact, inspections, stats } = detail;
   const displayTz = useDisplayTimeZone();
+  const fmt = useInspectionDateTimeFormat();
   const archived = !!contact.archivedAt;
 
   return (
@@ -260,7 +262,7 @@ export default function ContactDetailPage() {
                     {insp.propertyAddress || m.contacts_detail_untitled_inspection()}
                   </p>
                   <p className="text-[12px] text-ih-fg-3">
-                    {formatInspectionDateTime(insp.date, undefined, displayTz)} &middot; {humanizeStatus(insp.status)}
+                    {formatInspectionDateTime(insp.date, undefined, displayTz, fmt)} &middot; {humanizeStatus(insp.status)}
                   </p>
                 </div>
                 <div className="text-right shrink-0">

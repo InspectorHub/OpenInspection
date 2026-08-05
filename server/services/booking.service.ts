@@ -8,6 +8,7 @@ import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
 import { fireAutomation } from './inspection/shared';
+import { normalizeLocale } from '../lib/i18n/contact-locale';
 import type { HonoConfig } from '../types/hono';
 import type { PublicBookingSchema } from '../lib/validations/booking.schema';
 import type { z } from '@hono/zod-openapi';
@@ -688,6 +689,11 @@ export class BookingService {
                     name:  body.clientName,
                     email: body.clientEmail,
                     type:  'client',
+                    // Reduced to a locale we actually have messages for, so a
+                    // regional variant lands on its catalogue and anything we
+                    // cannot speak is stored as NULL rather than as a promise
+                    // we would break at send time.
+                    locale: normalizeLocale(body.locale),
                 });
                 bookingClientContactId = clientContactId;
             } catch (e) {

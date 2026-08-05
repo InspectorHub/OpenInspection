@@ -140,9 +140,12 @@ describe('staff recipients (B2)', () => {
         await createHeadersForInsertedLogs(
             db,
             { tenantId: T, inspectionId: INSP, triggerEvent: 'report.published' },
-            () => ({ title: 'Report published', body: null }),
+            async () => ({ title: 'Report published', body: null }),
             // No class: this fixture exercises the XOR, not the preference gate.
             () => undefined,
+            // No tenant config seeded here, so the resolver would answer 'en'
+            // anyway; stubbing it keeps this fixture about the XOR.
+            async () => 'en',
             [{ id: 'log-staff-1', automationId: null, sendAt: new Date(0), recipientContactId: 'u-owner', recipientRoleKey: STAFF_ROLE_KEY }],
         );
 

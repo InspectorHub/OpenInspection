@@ -58,7 +58,9 @@ For the manual flow, see the **Quick start** section in the [README](../../READM
 | `SETUP_CODE`      | First-run setup only — any value >= 6 characters; gates `/setup` (fail-closed if unset). |
 | `RESEND_API_KEY`  | Optional, only if you want outbound email.          |
 | `SENDER_EMAIL`    | Required when `RESEND_API_KEY` is set.              |
-| `GEMINI_API_KEY`  | Optional — enables AI comment-assist.               |
+| `GEMINI_API_KEY`  | Optional — read by the Advanced-settings "Test connection" diagnostic. AI features themselves run on the tenant's own key stored via Settings → Advanced → AI (or, in `saas` mode only, `AI_MANAGED_API_KEY`). |
+| `AI_MODEL`        | Required for any AI feature — the model id every AI call uses. There is no compiled-in default; unset means AI fails closed with a 503. |
+| `AI_MANAGED_API_KEY` | Optional, `saas` only — a deployment-provided AI key for tenants the deployment grants managed access to. A standalone deploy has no managed path and ignores it. |
 | `TURNSTILE_SECRET_KEY` | Optional but recommended for the public booking page. |
 
 Set them via `wrangler secret put SECRET_NAME` or through the Cloudflare dashboard.

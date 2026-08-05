@@ -1,0 +1,1 @@
+ALTER TABLE `tenant_configs` ADD `booking_conflict_policy` text DEFAULT 'advisory' NOT NULL;

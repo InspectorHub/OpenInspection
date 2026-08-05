@@ -55,8 +55,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
   const secrets = (secretsBody.data ?? {}) as Record<string, string>;
 
-  // Gemini is bring-your-own-key: "configured" reflects the tenant's own bound
-  // key in encrypted secrets (no GET /api/ai/status route — derive from presence).
+  // "Configured" reflects the tenant's OWN bound key in encrypted secrets — the
+  // only credential this panel manages (no GET /api/ai/status route — derive
+  // from presence). A deployment may also provide a key for tenants it grants
+  // managed access to; that is resolved server-side and is not shown here.
   const geminiConfigured = !!secrets.GEMINI_API_KEY;
 
   const testResults = await parseTestResults(testResultsRes);

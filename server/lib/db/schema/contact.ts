@@ -40,6 +40,15 @@ export const contacts = sqliteTable('contacts', {
      *  Distinct from `archived_at`: archiving retires the CONTACT, revoking
      *  only severs the account binding while the contact stays usable. */
     agentRevokedAt: integer('agent_revoked_at', { mode: 'timestamp_ms' }),
+
+    /** The language this contact asked to be addressed in, BCP-47.
+     *
+     *  NULL is an ABSENCE of a stated preference, not English: only a stored
+     *  value is evidence that a client wanted another language, and that
+     *  distinction is the demand signal this column exists to produce. Read it
+     *  through `resolveContactLocale` (server/lib/i18n/contact-locale.ts),
+     *  which owns the fall-through order — never default it at a call site. */
+    locale: text('locale'),
 }, (t) => [
     index('idx_contacts_type').on(t.tenantId, t.type),
     index('idx_contacts_tenant').on(t.tenantId),

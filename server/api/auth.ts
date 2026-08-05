@@ -279,7 +279,8 @@ const coreAuthRoutes = createApiRouter()
         await checkRateLimit(c, 'login');
 
         const body = c.req.valid('json');
-        const user = await c.var.services.auth.validateCredentials(body.email, body.password);
+        const tenantId = c.env.SINGLE_TENANT_ID || '00000000-0000-0000-0000-000000000000';
+        const user = await c.var.services.auth.validateCredentials(body.email, body.password, tenantId);
 
         const keyring = await c.var.keyringPromise!;
         const now = Math.floor(Date.now() / 1000);

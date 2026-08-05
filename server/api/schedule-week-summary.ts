@@ -17,6 +17,7 @@ import {
 import { BookingService } from '../services/booking.service';
 import { isAdminRole } from '../lib/auth/roles';
 import { getDrizzle } from '../lib/route-helpers';
+import scheduleDaySlotsRoutes from './schedule-day-slots';
 
 const WEEK_LENGTH = 7;
 const DAY_MS = 86_400_000;
@@ -162,7 +163,12 @@ const scheduleWeekSummaryRoutes = createApiRouter()
         }));
 
         return c.json({ success: true as const, data: { days } }, 200);
-    });
+    })
+    // Both /api/schedule routes are composed here rather than mounted twice in
+    // server/index.ts: two `.route('/api/schedule', …)` calls work at runtime
+    // but the RPC TYPE keeps only the first, so the BFF client silently loses
+    // every route on the second router. One mount, one type.
+    .route('/', scheduleDaySlotsRoutes);
 
 export type ScheduleApi = typeof scheduleWeekSummaryRoutes;
 

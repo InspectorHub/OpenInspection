@@ -348,6 +348,11 @@ const agreementsRoutes = createApiRouter()
             userAgent: ua,
             onBehalfOf: body.onBehalfOf ?? null,
             onBehalfDisclaimer: body.onBehalfDisclaimer ?? null,
+            // NULL: this is the on-site API surface. `GET /:id/agreement` hands
+            // the caller the agreement text and the caller draws its own screen,
+            // so we cannot know whether the signer saw the language disclosure.
+            // A version here would assert something the platform does not know.
+            languageDisclosureVersion: null,
         });
 
         // Spec 2A — per-signer automation event (fires on EVERY sign).

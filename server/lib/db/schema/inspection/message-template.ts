@@ -28,6 +28,28 @@ export const messageTemplates = sqliteTable('message_templates', {
     isSeeded:  integer('is_seeded', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    /**
+     * Multilingual delivery — one row per LANGUAGE VARIANT of a template.
+     * Variants of the same template share `(tenant_id, name, channel)` and
+     * differ only here; the send path picks one by resolving the RECIPIENT's
+     * locale (`server/services/message-template.service.ts#resolveForLocale`),
+     * never the request's.
+     *
+     * NOT NULL with a default so every row that already exists is a valid `en`
+     * variant and no backfill is needed.
+     *
+     * Deliberately NOT unique on `(tenant_id, name, channel, locale)`. Nothing
+     * has ever enforced uniqueness on this table: `create()` accepts any name
+     * and `update()` renames freely, so duplicate `(name, channel)` pairs are
+     * reachable today and a tenant may well be holding some. A unique index
+     * fails OUTRIGHT on those rows, which would turn a language feature into a
+     * failed migration on someone else's data. Resolution is made deterministic
+     * in the service instead — oldest row wins, tie broken by id.
+     */
+    locale:    text('locale').notNull().default('en'),
 }, (t) => [
     index('idx_message_templates_tenant_channel').on(t.tenantId, t.channel),
+    // Variant lookup: the resolver filters tenant + name + channel and then
+    // walks locales. Non-unique on purpose — see the `locale` comment.
+    index('idx_message_templates_variant').on(t.tenantId, t.name, t.channel, t.locale),
 ]);

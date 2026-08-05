@@ -2,8 +2,9 @@
  * Tenant-scoped usage summary read API.
  *
  * `GET /api/usage/summary` returns the current tenant's cumulative usage
- * across every metered dimension (inspections, sms/email — platform and
- * bring-your-own — plus the storage gauge and seat usage) and, for a free
+ * across every metered dimension (inspections, sms/email and AI
+ * translate/assist — platform and bring-your-own for each — plus the storage
+ * gauge and seat usage) and, for a free
  * tenant on a deployment that enforces the free-tier quota (`profile.
  * hasUsageQuota`), the caps those platform metrics are measured against.
  * `caps` is null for every other tenant/deployment — the UI hides progress
@@ -43,13 +44,24 @@ const usageRoutes = createApiRouter()
         if (!tenantId) throw Errors.Unauthorized();
 
         const metering = new MeteringService(c.env.DB);
-        const [inspections, sms, email, smsByo, emailByo, r2Bytes, seatUsage, tier] = await Promise.all([
+        const [
+            inspections, sms, email, smsByo, emailByo, r2Bytes,
+            aiTranslate, aiTranslateByo, aiAssist, aiAssistByo,
+            seatUsage, tier,
+        ] = await Promise.all([
             metering.lifetimeTotal(tenantId, 'inspections'),
             metering.lifetimeTotal(tenantId, 'sms'),
             metering.lifetimeTotal(tenantId, 'email'),
             metering.lifetimeTotal(tenantId, 'sms_byo'),
             metering.lifetimeTotal(tenantId, 'email_byo'),
             metering.lifetimeTotal(tenantId, 'r2_bytes'),
+            // AI is reported platform/bring-your-own separately for the same
+            // reason sends are: only platform-funded volume is ever something
+            // this deployment could cap.
+            metering.lifetimeTotal(tenantId, 'ai_translate'),
+            metering.lifetimeTotal(tenantId, 'ai_translate_byo'),
+            metering.lifetimeTotal(tenantId, 'ai_assist'),
+            metering.lifetimeTotal(tenantId, 'ai_assist_byo'),
             getSeatUsage(tenantId, c.env.DB),
             readTenantTier(c.env.DB, tenantId),
         ]);
@@ -64,6 +76,8 @@ const usageRoutes = createApiRouter()
                 usage: {
                     inspections, sms, email,
                     smsByo, emailByo,
+                    aiTranslate, aiTranslateByo,
+                    aiAssist, aiAssistByo,
                     seatsUsed: seatUsage.used,
                     seatsMax: seatUsage.max,
                     r2Bytes,

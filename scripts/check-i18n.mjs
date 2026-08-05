@@ -13,6 +13,17 @@
  *   `.toLocaleString('en-US', …)` and `Intl.DateTimeFormat('en-US', …)` /
  *   `Intl.NumberFormat('en-US', …)`.
  *
+ * AND the mirror-image defect (#270): a date formatted with NO locale at all —
+ * `d.toLocaleDateString()` / `(undefined, …)`. An earlier revision of this file
+ * called that "already viewer-responsive; not this gate's target". It is not:
+ * the argument-less form reads `navigator.language` AND the browser's timezone,
+ * neither of which is the tenant's or the user's configured preference, so such
+ * a call renders a date that disagrees with every other date on the same page.
+ * That is not theoretical — `SmsConsentBlock` printed a Chinese date inside an
+ * otherwise-English page, caught only in Chrome. Both halves of the rule live
+ * here rather than one of them living in `lint:tz`, because two gates demanding
+ * different things of one line is how a fix gets reverted by the other gate.
+ *
  * A line opts out with a trailing — or immediately preceding — `// i18n-lint-ok:
  * <reason>` comment (e.g. a locale-neutral offset computation).
  */
@@ -22,6 +33,20 @@ import { join } from 'node:path';
 
 const TO_LOCALE = /\.toLocale(Date|Time|)String\(\s*['"]en-US['"]/;
 const INTL = /Intl\.(DateTime|Number)Format\(\s*['"]en-US['"]/;
+
+// `.toLocaleDateString()` / `.toLocaleTimeString(undefined, …)` — unambiguously
+// a date, and unambiguously nobody's configured locale.
+const NO_LOCALE_DATE = /\.toLocale(Date|Time)String\(\s*(\)|undefined\b)/;
+// `.toLocaleString()` is overloaded: on a Number it is currency/number
+// formatting, which is a different gate's concern. Anchoring on the `new Date(…)`
+// receiver keeps `(cents / 100).toLocaleString()` out of it. The cost is that a
+// Date held in a variable slips through — the receiver's type is not knowable
+// from a line of text, and a false positive on every number would get the whole
+// rule switched off.
+const NO_LOCALE_DATE_OBJ = /new Date\(.*\)\.toLocaleString\(\s*(\)|undefined\b)/;
+
+/** Prose describing the bad pattern is not the bad pattern. */
+const COMMENT_LINE = /^\s*(\/\/|\*|\/\*)/;
 
 /** @returns {string[]} human-readable violation messages */
 export function findI18nViolations(source, filename) {
@@ -35,6 +60,17 @@ export function findI18nViolations(source, filename) {
         `${filename}:${i + 1} hardcodes the 'en-US' locale in a formatter; ` +
           `route through the shared formatter with the viewer's effective locale ` +
           `(useDisplayLocale / resolveLocale), or annotate '// i18n-lint-ok: <reason>'`,
+      );
+      continue;
+    }
+    if (COMMENT_LINE.test(line)) continue;
+    if (NO_LOCALE_DATE.test(line) || NO_LOCALE_DATE_OBJ.test(line)) {
+      out.push(
+        `${filename}:${i + 1} formats a date with no locale, so it reads the ` +
+          `BROWSER's locale and timezone rather than the tenant's or the user's ` +
+          `(#270); use app/lib/format-date.ts (formatShapedDate / ` +
+          `formatShapedDateTime / formatInspectionDateTime) with a resolved ` +
+          `locale, zone and shape, or annotate '// i18n-lint-ok: <reason>'`,
       );
     }
   }

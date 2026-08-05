@@ -15,14 +15,24 @@ interface ResolvedTemplate {
     variables: string[];
 }
 export interface TemplateStore {
-    resolve(tenantId: string, templateId: string): Promise<ResolvedTemplate | null>;
+    /**
+     * `locale` names the RECIPIENT's language, and supplying it switches the
+     * lookup from "this row" to "this row's variant for that reader", with the
+     * fallback chain in `MessageTemplateService#resolveForLocale`. Omitting it
+     * is not a shorthand for English — it means the caller is inspecting the
+     * referenced row itself (the agreement-URL content gate in trigger.ts),
+     * where walking to a translation would answer a different question.
+     */
+    resolve(tenantId: string, templateId: string, locale?: string | null): Promise<ResolvedTemplate | null>;
 }
 
 export function createOiTemplateStore(db: D1Database): TemplateStore {
     const svc = new MessageTemplateService(db);
     return {
-        async resolve(tenantId, templateId) {
-            const t = await svc.get(tenantId, templateId);
+        async resolve(tenantId, templateId, locale) {
+            const t = locale === undefined
+                ? await svc.get(tenantId, templateId)
+                : await svc.resolveForLocale(tenantId, templateId, locale);
             if (!t) return null;
             const out: ResolvedTemplate = { channel: t.channel, body: t.body, variables: t.variables };
             if (t.subject != null) out.subject = t.subject;

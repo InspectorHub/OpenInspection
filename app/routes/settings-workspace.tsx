@@ -18,6 +18,7 @@ import { AccessDenied } from "~/components/AccessDenied";
 import { Select } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS, getBrowserTimeZone, onboardingTzPrefill } from "~/lib/timezones";
 import { LOCALE_OPTIONS, CURRENCY_OPTIONS } from "~/lib/locales";
+import { DateTimeFormatFields } from "~/components/settings/DateTimeFormatFields";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -39,6 +40,8 @@ interface Branding {
   defaultTimezone?: string | null;
   defaultLocale?: string | null;
   currency?: string | null;
+  dateFormat?: string | null;
+  timeFormat?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -116,6 +119,10 @@ export async function action({ request, context }: Route.ActionArgs) {
   // Tenant display locale (BCP-47) + currency (ISO 4217). Only sent when present.
   if (typeof v.defaultLocale === "string" && v.defaultLocale) body.defaultLocale = v.defaultLocale;
   if (typeof v.currency === "string" && v.currency) body.currency = v.currency;
+  // #270 — an absent key must leave the stored preference alone (which is why
+  // the API schema carries no `.default()` for these).
+  if (typeof v.dateFormat === "string" && v.dateFormat) body.dateFormat = v.dateFormat;
+  if (typeof v.timeFormat === "string" && v.timeFormat) body.timeFormat = v.timeFormat;
 
   const api = createApi(context, { token });
   // Body is runtime-assembled from Zod-validated form values matching UpdateBrandingSchema;
@@ -205,6 +212,7 @@ export default function SettingsWorkspacePage() {
     { id: "branding", label: m.settings_workspace_branding_heading() },
     { id: "timezone", label: m.settings_workspace_timezone_heading() },
     { id: "locale-currency", label: m.settings_workspace_locale_currency_heading() },
+    { id: "datetime-format", label: m.settings_workspace_datetime_format_heading() },
     { id: "report-style", label: m.settings_workspace_report_style_heading() },
     { id: "referral", label: m.settings_workspace_referral_heading() },
     { id: "report-features", label: m.settings_workspace_report_features_heading() },
@@ -323,6 +331,20 @@ export default function SettingsWorkspacePage() {
               options={CURRENCY_OPTIONS}
             />
           </div>
+        </section>
+
+        {/* Date & time format (#270) */}
+        <section id="datetime-format" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4 scroll-mt-12">
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_datetime_format_heading()}</h3>
+          <p className="text-[12px] text-ih-fg-3">
+            {m.settings_workspace_datetime_format_subtitle()}
+          </p>
+          <DateTimeFormatFields
+            dateLabel={m.settings_workspace_dateformat_select_label()}
+            timeLabel={m.settings_workspace_timeformat_select_label()}
+            dateValue={branding.dateFormat}
+            timeValue={branding.timeFormat}
+          />
         </section>
 
         {/* Report style */}

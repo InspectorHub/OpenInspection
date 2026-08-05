@@ -164,6 +164,29 @@ export async function handleRelockReport(
 }
 
 /**
+ * `report-delete` — destroy one deliverable and its document.
+ *
+ * The refusals (primary, published) are NOT re-checked here. They are enforced
+ * server-side and surfaced through the payload's `canDelete`, so this handler
+ * relays whatever the API says: a second copy of the rule in the browser is a
+ * copy that can disagree with the one that actually decides.
+ */
+export async function handleReportDelete(
+    api: Api,
+    inspectionId: string,
+    formData: FormData,
+): Promise<{ ok: boolean; intent: "report-delete"; error: string | undefined }> {
+    const reportId = String(formData.get("reportId") ?? "").trim();
+    if (!reportId) {
+        return { ok: false, intent: "report-delete", error: m.inspections_hub_error_report_delete() };
+    }
+    const res = await api.inspections[":id"].reports[":reportId"].$delete({
+        param: { id: inspectionId, reportId },
+    });
+    return toActionResult(res, "report-delete", m.inspections_hub_error_report_delete());
+}
+
+/**
  * A money field that was left blank means "no override", which is a different
  * thing from zero — a free line is a real thing an operator may want. `''` and
  * a missing field both read as absent; anything unparseable does too, rather

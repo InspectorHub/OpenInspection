@@ -1058,6 +1058,47 @@
     "description": "Records a granted SMS consent event (captured_via=optin_link) for the contact encoded in the token. Idempotent — confirming twice simply appends a second granted event."
   },
   {
+    "operationId": "correctInvoicePayment",
+    "method": "POST",
+    "pathTemplate": "/api/invoices/{id}/payments/{paymentId}/corrections",
+    "scopes": [
+      "write"
+    ],
+    "tag": "invoices",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Invoice the mistyped payment was recorded against.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Invoice the mistyped payment was recorded against."
+          }
+        },
+        {
+          "name": "paymentId",
+          "in": "path",
+          "required": true,
+          "description": "Ledger row id of the payment being corrected.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Ledger row id of the payment being corrected."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/CorrectPayment"
+      }
+    },
+    "summary": "Correct a mistyped payment on an invoice",
+    "description": "Corrects a mistyped payment by appending a reversing ledger row rather than editing the original, which survives. The correcting row inherits the date the money moved, so the correction lands in the period the mistake did."
+  },
+  {
     "operationId": "countsInspection",
     "method": "GET",
     "pathTemplate": "/api/inspections/counts",
@@ -4541,6 +4582,14 @@
               "type": "string"
             },
             "description": "Named interpolation variables used in the body."
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en",
+              "es-419"
+            ],
+            "description": "Language variant this template is written in. Variants of one template share name + channel. Defaults to en."
           }
         },
         "required": [
@@ -5751,6 +5800,45 @@
     },
     "summary": "Delete a pool photo (cancel an upload)",
     "description": "Auto-generated placeholder for deleteInspectionMediaPool (DELETE /{id}/media/pool/{poolId}, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "deleteInspectionReport",
+    "method": "DELETE",
+    "pathTemplate": "/api/inspections/{id}/reports/{reportId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection the report belongs to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection the report belongs to."
+          }
+        },
+        {
+          "name": "reportId",
+          "in": "path",
+          "required": true,
+          "description": "reports.id of the deliverable to delete.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "reports.id of the deliverable to delete."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete one deliverable from an inspection",
+    "description": "Permanently deletes one report and everything belonging only to it — its findings document, the collaborative Yjs state, and its version rows. The billing line that produced it is untouched. Refused for the primary report (every order keeps one; without it the order cannot be edited) and for a published report (it has been delivered and its signed versions are what let a client verify what they hold)."
   },
   {
     "operationId": "deleteInspectionTemplate",
@@ -7022,6 +7110,34 @@
     },
     "summary": "Contact detail: record + inspection history + stats",
     "description": "Returns the contact record, its inspection history (newest first; clients match via clientContactId or legacy clientEmail, agents via referredByAgentId or sellingAgentId), and aggregate stats (inspection count + total paid-invoice revenue in cents)."
+  },
+  {
+    "operationId": "getDispatchBoard",
+    "method": "GET",
+    "pathTemplate": "/api/calendar/dispatch",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "date",
+          "in": "query",
+          "required": false,
+          "description": "Civil date the board shows. Omit for today IN THE TENANT TIMEZONE — the server resolves it, because the caller does not know the zone before this call returns.",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Civil date the board shows. Omit for today IN THE TENANT TIMEZONE — the server resolves it, because the caller does not know the zone before this call returns."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Dispatch board feed for one day",
+    "description": "Returns the inspector roster, every calendar item on the given civil date, the unassigned subset, and the tenant booking_conflict_policy in a single response."
   },
   {
     "operationId": "getEmailTemplate",
@@ -8304,6 +8420,45 @@
     },
     "summary": "Detect same-day-hour assignment conflicts for an inspector",
     "description": "IA-6 — advisory same-day-hour collision check counting lead and helper assignments. Callers render a warning; scheduling is never blocked."
+  },
+  {
+    "operationId": "getScheduleDaySlots",
+    "method": "GET",
+    "pathTemplate": "/api/schedule/day-slots",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "date",
+          "in": "query",
+          "required": true,
+          "description": "Civil date to check, YYYY-MM-DD.",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Civil date to check, YYYY-MM-DD."
+          }
+        },
+        {
+          "name": "userIds",
+          "in": "query",
+          "required": false,
+          "description": "Comma-separated inspector ids to narrow the search to. Omit to consider everyone qualified.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated inspector ids to narrow the search to. Omit to consider everyone qualified."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Free slots for one day, naming the free inspectors",
+    "description": "Returns every slot start on a civil date with the inspectors free at each, plus the tenant slot interval. Staff-only counterpart to the identity-hiding public booking slots endpoint."
   },
   {
     "operationId": "getScheduleWeekSummary",
@@ -10530,6 +10685,34 @@
     },
     "summary": "Recent \"Test connection\" outcomes for every integration",
     "description": "Returns the retained \"Test connection\" history for the active tenant (≤5 per integration, newest first). Backs the persisted \"Last tested …\" status shown next to each Test connection button."
+  },
+  {
+    "operationId": "listInvoicePayments",
+    "method": "GET",
+    "pathTemplate": "/api/invoices/{id}/payments",
+    "scopes": [
+      "read"
+    ],
+    "tag": "invoices",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Invoice whose ledger rows to return.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Invoice whose ledger rows to return."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the payment ledger for an invoice",
+    "description": "Returns every payment-ledger row recorded against one invoice, ordered by when the money moved, with the recording user resolved. Once an invoice can hold several payments a single total no longer answers a dispute."
   },
   {
     "operationId": "listInvoices",
@@ -14461,6 +14644,25 @@
           "locale": {
             "type": "string",
             "description": "Per-user display locale (BCP-47). Empty string clears the override (inherit tenant)."
+          },
+          "dateFormat": {
+            "type": "string",
+            "enum": [
+              "",
+              "us",
+              "iso",
+              "eu"
+            ],
+            "description": "Per-user date order (us|iso|eu). Empty string clears the override (inherit tenant)."
+          },
+          "timeFormat": {
+            "type": "string",
+            "enum": [
+              "",
+              "12h",
+              "24h"
+            ],
+            "description": "Per-user clock (12h|24h). Empty string clears the override (inherit tenant)."
           }
         }
       }
@@ -15285,6 +15487,36 @@
     "description": "Save integration secrets. Masked values (containing bullet characters) are skipped — they indicate unchanged fields."
   },
   {
+    "operationId": "recordInvoiceOfflinePayment",
+    "method": "POST",
+    "pathTemplate": "/api/invoices/{id}/payments",
+    "scopes": [
+      "write"
+    ],
+    "tag": "invoices",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Invoice the money was received against.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Invoice the money was received against."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/RecordOfflinePayment"
+      }
+    },
+    "summary": "Record an offline payment against an invoice",
+    "description": "Appends one payment-ledger row for money received outside the system (cash, cheque, other offline method). The date the money moved is supplied by the caller, never defaulted to now, and the recording user is taken from the session."
+  },
+  {
     "operationId": "redeemAgentMagicLogin",
     "method": "GET",
     "pathTemplate": "/agent/magic-login",
@@ -16052,6 +16284,36 @@
     },
     "summary": "Request a password reset email",
     "description": "Triggers a password reset email if the account exists. Always returns 200 even for unknown emails to avoid account enumeration."
+  },
+  {
+    "operationId": "rescheduleInspection",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/schedule",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id to reschedule.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id to reschedule."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/ReschedulePatch"
+      }
+    },
+    "summary": "Reschedule and/or reassign one inspection",
+    "description": "Moves an inspection to a precise instant and optionally changes who works it. The epoch-millisecond start is authoritative; the civil date is derived from it in the tenant timezone. Returns 409 when the tenant booking_conflict_policy is \"block\" and the resulting assignment overlaps existing work."
   },
   {
     "operationId": "resendTeamInvite",

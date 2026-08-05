@@ -18,6 +18,10 @@ interface EventType {
   color: string | null;
   sortOrder: number | null;
   active: boolean;
+  /** Hours between a visit being completed and its follow-up going out. Zero is
+   *  a real setting ("tell them when the visit ends"), so every read uses `??`
+   *  and no control may treat 0 as "unset". */
+  followUpDelayHours: number | null;
 }
 
 export function meta() {
@@ -45,6 +49,11 @@ const EMPTY_FORM = {
   priceDollars: 0,
   color: "#4a72ff",
   sortOrder: 0,
+  // A STRING, not a number. `Number("")` is 0, and 0 is a legitimate value here
+  // ("send the follow-up the moment the visit ends") — so a numeric field that
+  // coerces an emptied box would silently rewrite a tenant's 72 to "immediately"
+  // rather than leaving it alone. Empty means "don't change it"; see save().
+  followUpDelayHours: "",
 };
 
 export default function SettingsEventTypes() {
@@ -73,12 +82,17 @@ export default function SettingsEventTypes() {
       priceDollars: (t.defaultPriceCents ?? 0) / 100,
       color: t.color ?? "#4a72ff",
       sortOrder: t.sortOrder ?? 0,
+      followUpDelayHours: t.followUpDelayHours == null ? "" : String(t.followUpDelayHours),
     });
     setModalOpen(true);
   }
 
   async function save() {
     setSaving(true);
+    // An empty follow-up box is OMITTED, never sent as 0: the PUT schema is a
+    // `.partial()`, so an absent key leaves the stored delay alone, while a 0
+    // would mean "send it immediately" — the opposite of "I didn't touch that".
+    const followUp = form.followUpDelayHours.trim();
     const body = {
       name: form.name,
       slug: form.slug,
@@ -86,6 +100,7 @@ export default function SettingsEventTypes() {
       defaultPriceCents: Math.round(form.priceDollars * 100),
       color: form.color,
       sortOrder: form.sortOrder,
+      ...(followUp === "" ? {} : { followUpDelayHours: Number(followUp) }),
     };
     const method = editingId ? "PATCH" : "POST";
     const url = editingId
@@ -175,6 +190,17 @@ export default function SettingsEventTypes() {
               { label: m.settings_event_types_col_duration(), cell: (t) => <span className="text-ih-fg-2">{m.settings_event_types_duration_value({ min: t.defaultDurationMin ?? 0 })}</span> },
               { label: m.settings_event_types_col_price(), cell: (t) => <span className="text-ih-fg-2">${((t.defaultPriceCents ?? 0) / 100).toFixed(2)}</span> },
               { label: m.settings_event_types_col_color(), cell: (t) => <span className="font-mono text-[11px] text-ih-fg-3">{t.color}</span> },
+              {
+                label: m.settings_event_types_col_followup(),
+                cell: (t) => (
+                  <span className="text-ih-fg-2 whitespace-nowrap" data-testid="event-type-followup">
+                    {/* `??`, never `||`: 0 is "immediately", not "unset". */}
+                    {(t.followUpDelayHours ?? 72) === 0
+                      ? m.settings_event_types_followup_immediate()
+                      : m.settings_event_types_followup_hours({ hours: t.followUpDelayHours ?? 72 })}
+                  </span>
+                ),
+              },
               {
                 label: m.settings_event_types_col_actions(),
                 align: "right",
@@ -330,6 +356,29 @@ export default function SettingsEventTypes() {
                     className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
+                  {m.settings_event_types_followup_label()}
+                </label>
+                <input
+                  type="number"
+                  value={form.followUpDelayHours}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, followUpDelayHours: e.target.value }))
+                  }
+                  min={0}
+                  max={8760}
+                  placeholder="72"
+                  data-testid="event-type-followup-input"
+                  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
+                />
+                {/* This one earns always-on help: the field's whole subtlety is
+                    that 0 is a setting rather than a blank, which a label and a
+                    placeholder cannot say. */}
+                <p className="mt-1 text-[11px] text-ih-fg-4">
+                  {m.settings_event_types_followup_hint()}
+                </p>
               </div>
         </div>
       </Modal>

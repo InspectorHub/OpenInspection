@@ -5,6 +5,7 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import { loadVerifyData, loadReportVerifyData } from '../../lib/verify-data';
+import { signaturesRecordCurrentDisclosure } from '../../lib/legal/agreement-language-disclosure';
 import { buildRenderReportUrl } from '../../lib/public-urls';
 import { getBookingHost, resolveTenantSlug } from '../../lib/url';
 import { isReportPublished } from '../../lib/status/report-status';
@@ -35,6 +36,12 @@ const VerifyResponseSchema = z.object({
     contentSnapshot: z.string().nullable(),
     contentHash: z.string().nullable(),
     signers: z.array(VerifySignerSchema),
+    // True only when EVERY signature here recorded the language-disclosure
+    // version that is live right now, so the page may show that copy as part of
+    // what these people were shown. Decided server-side and shipped as a boolean
+    // rather than the raw versions: the rule is about the record's ability to
+    // support a claim, and a public page must not be the place it is re-derived.
+    languageDisclosureCurrent: z.boolean(),
 });
 
 const verifyRoute = createRoute(withMcpMetadata({
@@ -68,6 +75,10 @@ const reportVerifyRoute = createRoute(withMcpMetadata({
             hashValid: z.boolean(), signatureValid: z.boolean(), chainValid: z.boolean(),
             propertyAddressMasked: z.string(),
             notPublished: z.boolean(),
+            // #270 — lets the verifier page resolve the tenant brand and render
+            // the published-on date in the company's own date shape and
+            // language. Empty string when the tenant cannot be resolved.
+            tenantSlug: z.string(),
         })) } }, description: 'Verification result' },
         404: { description: 'Token not found' },
     },
@@ -122,6 +133,13 @@ const publicVerifyRoutes = createApiRouter()
                     signedAt: s.signedAt ? new Date(s.signedAt).toISOString() : null,
                     channel: s.channel ?? null,
                 })),
+                // SIGNED signers only. A pending signer has been shown nothing
+                // and recorded nothing; counting it would suppress the notice on
+                // a document whose actual signatories all saw it.
+                languageDisclosureCurrent: signaturesRecordCurrentDisclosure(
+                    data.signers.filter((s) => s.status === 'signed')
+                        .map((s) => s.languageDisclosureVersion),
+                ),
             },
         }, 200);
     })
@@ -142,6 +160,7 @@ const publicVerifyRoutes = createApiRouter()
             chainValid:    data.verify.chainValid,
             propertyAddressMasked: data.propertyAddressMasked,
             notPublished: data.notPublished,
+            tenantSlug: data.tenantSlug,
         } }, 200);
     })
     .openapi(reportVerifyPdfRoute, async (c) => {

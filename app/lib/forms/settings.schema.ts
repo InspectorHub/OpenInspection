@@ -96,6 +96,11 @@ export function makeProfileSchema() {
     // Per-user display-locale override (BCP-47). Empty string = inherit the tenant
     // default. Constrained to a <Select> in the UI.
     locale: z.string().optional(),
+    // #270 — per-user date/time SHAPE override. Empty string = inherit. This is
+    // a SEPARATE axis from `locale`: the locale picks the language, these pick
+    // the order and the clock. Constrained to <Select>s in the UI.
+    dateFormat: z.string().optional(),
+    timeFormat: z.string().optional(),
   });
 }
 
@@ -141,6 +146,10 @@ export function makeWorkspaceSchema() {
     defaultLocale: z.string().optional(),
     // Tenant currency (ISO 4217). UI constrains to a <Select> of CURRENCY_OPTIONS.
     currency: z.string().optional(),
+    // #270 — tenant default date order + clock. Not nullable at this level: the
+    // tenant value is the bottom of the resolution chain.
+    dateFormat: z.string().optional(),
+    timeFormat: z.string().optional(),
   });
 }
 
@@ -202,3 +211,24 @@ export function makeUpdateServiceSchema() {
   });
 }
 
+
+/**
+ * Read an "inherit-or-override" <select> straight off the FormData.
+ *
+ * Conform's `parseWithZod` maps an empty string to `undefined`, which is the
+ * right call for "the user left the text box blank" and the wrong one here: for
+ * these controls `''` is not absence, it is the CLEAR signal ("use the workspace
+ * default"), and the action distinguishes clear from leave-alone by whether the
+ * key is present at all. Reading the parsed value made clearing a per-user
+ * override impossible through the UI — the field silently dropped out of the
+ * PATCH body and the old value stayed. Caught in Chrome on #270; `timezone` and
+ * `locale` had the same defect and are fixed with it.
+ *
+ * @returns `''` to clear, the chosen value to set, `undefined` when the control
+ *          was not on the submitted form at all.
+ */
+export function overrideFieldFromForm(fd: FormData, key: string): string | undefined {
+  if (!fd.has(key)) return undefined;
+  const raw = fd.get(key);
+  return typeof raw === "string" ? raw : undefined;
+}

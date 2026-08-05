@@ -10,6 +10,12 @@ export {
   isReportPublished,
 } from '../../server/lib/status/report-status';
 
+// A visit's lifecycle, NOT the order's — see event-status.ts for why they are
+// separate axes rather than one shared enum.
+export {
+  EVENT_STATUS,
+} from '../../server/lib/status/event-status';
+
 // ------------------------------------------------------------------
 //  Shared status display helpers (single source — no per-route copies)
 // ------------------------------------------------------------------

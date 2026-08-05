@@ -188,6 +188,11 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     { id: 'report-amended-buyers-agent',  label: 'A report you follow was updated',  category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
     { id: 'event-reminder',               label: 'Reminder before your appointment', category: 'transactional', required: false, channels: ['email'], audience: ['client'] },
     { id: 'event-followup',               label: 'Your results are ready',          category: 'transactional', required: false, channels: ['email'], audience: ['client'] },
+    // Distinct from `event-followup`, which is timed off the pickup and says
+    // "we expect results by now". This one fires when the lab result actually
+    // landed, so a recipient who muted the estimate can still be told the fact.
+    { id: 'event-results-received',       label: 'Your results have arrived',       category: 'transactional', required: false, channels: ['email', 'sms'], audience: ['client'] },
+    { id: 'event-results-received-buyers-agent', label: 'Results you follow have arrived', category: 'transactional', required: false, channels: ['email', 'sms'], audience: ['agent'] },
     { id: 'post-inspection-followup',     label: 'Following up after your inspection', category: 'transactional', required: false, channels: ['email'], audience: ['client'] },
     { id: 'review-request',               label: 'How did we do?',                  category: 'marketing',     required: false, channels: ['email'], audience: ['client'] },
 

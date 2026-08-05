@@ -2,6 +2,7 @@ import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqli
 import { sql } from 'drizzle-orm';
 import { tenants, users } from '../tenant';
 import { inspections } from './core';
+import { EVENT_STATUSES } from '../../../status/event-status';
 
 export const automations = sqliteTable('automations', {
     id: text('id').primaryKey(),
@@ -18,6 +19,14 @@ export const automations = sqliteTable('automations', {
             'agreement.signer_signed',
             'agreement.viewed', 'agreement.declined', 'agreement.expired',
             'event.created', 'event.completed',
+            // `event.results_received` is the lab result ARRIVING, which is the
+            // moment a radon client has been waiting 48 hours for. It is not
+            // `event.completed`: completing the pickup is the inspector's work
+            // finishing, and the sample only reaches the lab afterwards. The
+            // status was already writable (`inspection_events.results_received_at`)
+            // with no trigger to hang a rule on, so the single most important
+            // moment in a radon job notified nobody. Type-layer only — no DDL.
+            'event.results_received',
             // B3 — two events that raised a hard-coded staff alert but had no
             // trigger to hang a rule on. `booking.received` is NOT
             // `inspection.created`: a booking is a stranger arriving through
@@ -181,6 +190,18 @@ export const eventTypes = sqliteTable('event_types', {
     sortOrder:          integer('sort_order').notNull().default(0),
     active:             integer('is_active', { mode: 'boolean' }).notNull().default(true),
     createdAt:          integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // How long after a visit is marked COMPLETED its follow-up notification is
+    // queued. This was a constant in EventService: reasonable for radon, where
+    // sampling is a 48-hour standard and the lab takes its own time, and wrong
+    // for a sewer scope, whose results exist the moment the camera comes out.
+    //
+    // ZERO IS A LEGITIMATE VALUE — "tell them when the visit ends" — so every
+    // read of this column must use `??`, never `||`, and no validation may
+    // reject it.
+    //
+    // Defaults to the 72 hours that used to be hard-coded, so nothing moves for
+    // any existing tenant on deploy. Appended at table end for D1 rebuild safety.
+    followUpDelayHours: integer('follow_up_delay_hours').notNull().default(72),
 }, (t) => [
     uniqueIndex('uq_event_types_tenant_slug').on(t.tenantId, t.slug),
 ]);
@@ -211,7 +232,7 @@ export const inspectionEvents = sqliteTable('inspection_events', {
     scheduledAt:       integer('scheduled_at', { mode: 'timestamp_ms' }).notNull(),
     durationMin:       integer('duration_min').notNull(),
     priceCents:        integer('price_cents').notNull().default(0),
-    status:            text('status', { enum: ['scheduled', 'completed', 'results_received', 'cancelled'] }).notNull().default('scheduled'),
+    status:            text('status', { enum: [...EVENT_STATUSES] }).notNull().default('scheduled'),
     notes:             text('notes'),
     completedAt:       integer('completed_at', { mode: 'timestamp_ms' }),
     resultsReceivedAt: integer('results_received_at', { mode: 'timestamp_ms' }),

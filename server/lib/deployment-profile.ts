@@ -36,6 +36,12 @@ export interface DeploymentProfile {
 
     aiDevMockFallback: boolean;
 
+    /** Whether a platform-provided AI credential may ever be resolved for a
+     *  tenant. False in standalone: there is no platform behind a self-hosted
+     *  deploy, so the managed path is ABSENT rather than disabled-by-default.
+     *  Read this instead of branching on APP_MODE — see the file header. */
+    hasManagedAi: boolean;
+
     brandingSource: 'env' | 'tenant-config';
 }
 
@@ -48,6 +54,7 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
     loginRedirectBase: null,
     hasSetupWizard: true,
     aiDevMockFallback: true,
+    hasManagedAi: false,
     brandingSource: 'env',
 };
 
@@ -58,6 +65,7 @@ export const SAAS_PROFILE: DeploymentProfile = {
     loginRedirectBase: null,
     hasSetupWizard: false,
     aiDevMockFallback: false,
+    hasManagedAi: true,
     brandingSource: 'tenant-config',
 };
 

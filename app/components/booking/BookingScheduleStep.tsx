@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { timeWindows } from "./booking-constants";
 import { HolidayAdvisoryBanner } from "./HolidayAdvisoryBanner";
+import { LanguageChoice } from "./LanguageChoice";
 import { m } from "~/paraglide/messages";
 
 export function ScheduleStep({
@@ -25,6 +26,8 @@ export function ScheduleStep({
   setClientEmail,
   smsOptin,
   setSmsOptin,
+  locale,
+  setLocale,
   privacyUrl,
   termsUrl,
   companyName,
@@ -51,6 +54,9 @@ export function ScheduleStep({
   setClientEmail: (v: string) => void;
   smsOptin: boolean;
   setSmsOptin: (v: boolean) => void;
+  /** The client's stated language, or null when they have not said. */
+  locale: string | null;
+  setLocale: (v: string) => void;
   privacyUrl: string | null;
   termsUrl: string | null;
   companyName: string;
@@ -200,6 +206,11 @@ export function ScheduleStep({
             </button>
           </p>
         )}
+        {/* Asked only when the fields hold the visitor's OWN details. An agent
+            booking for someone else would be guessing at their client's
+            language, and a guess recorded as a stated preference is worse than
+            no answer: it is the one number this field exists to measure. */}
+        {contactIsSelf && <LanguageChoice value={locale} onChange={setLocale} />}
         {/* Track L (D6, path A) — unchecked SMS opt-in (TCPA consent). */}
         <label className="flex items-start gap-3 mt-4 cursor-pointer">
           <input

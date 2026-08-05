@@ -3,6 +3,7 @@ import type { WizardTeamMember } from "../NewInspectionWizard";
 import { ScheduleStep } from "./ScheduleStep";
 import { TeamStep } from "./TeamStep";
 import { m } from "~/paraglide/messages";
+import { FindATimeLauncher } from "./FindATimeLauncher";
 
 type ConflictFetcher = ReturnType<
     typeof useFetcher<{
@@ -59,9 +60,26 @@ export function ConfirmStep({
     return (
         <div className="space-y-5">
             <section className="space-y-3">
-                <p className="text-[12px] font-bold text-ih-fg-3 uppercase tracking-wide">
-                    {m.new_inspection_step_schedule()}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                    <p className="text-[12px] font-bold text-ih-fg-3 uppercase tracking-wide">
+                        {m.new_inspection_step_schedule()}
+                    </p>
+                    {/* The picker below asks "when do you want it"; this asks
+                        "when could it actually happen". It lives here because a
+                        chosen slot writes THREE of this step's fields at once. */}
+                    <FindATimeLauncher
+                        date={date}
+                        teamMembers={teamMembers}
+                        onPick={(pick) => {
+                            setDate(pick.date);
+                            setTime(pick.time);
+                            if (pick.inspectorId) {
+                                setInspectorId(pick.inspectorId);
+                                setSoloMode(false);
+                            }
+                        }}
+                    />
+                </div>
                 <ScheduleStep
                     date={date}
                     setDate={setDate}

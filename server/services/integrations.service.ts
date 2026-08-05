@@ -41,8 +41,10 @@ export class IntegrationsService {
         const qbo = await this._safeGet(() =>
             db.select().from(qboConnections).where(eq(qboConnections.tenantId, tenantId)).get(),
         );
-        // Gemini is bring-your-own-key (per-tenant). "Connected" reflects the
-        // tenant's own bound key in encrypted secrets, never a platform env key.
+        // "Connected" here is specifically about the TENANT's own bound key in
+        // encrypted secrets — that is what this settings surface manages. It is
+        // not a statement that a tenant key is the only credential AI can run
+        // on: see lib/ai/resolve-provider.ts for the full source order.
         // C-15: reads the CANONICAL `secrets_enc` store (ENV-name keys) —
         // the legacy `tenant_configs.secrets` column is retired.
         const dbSecrets = await this._safeGet(() =>

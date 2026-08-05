@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { NavLink } from "react-router";
 import { IC } from "~/components/sidebar/nav-items";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
+import { LocaleSwitcher } from "~/components/LocaleSwitcher";
 import { m } from "~/paraglide/messages";
 
 // ─── User Menu popover (desktop sidebar) ─────────────────────────────────────
@@ -83,6 +84,18 @@ export function UserMenuPopover({
       <div className="px-3 py-1.5">
         <div className="text-[10px] font-bold text-ih-fg-4 uppercase tracking-wide mb-1.5">{m.nav_theme_label()}</div>
         <ThemeSegmentControl />
+      </div>
+
+      {/* Language (#269) — beside Theme, not on a settings page. Someone who
+          cannot read the interface cannot navigate to Settings to fix that;
+          this is the one language control reachable from wherever they are. */}
+      <div className="px-3 py-1.5">
+        {/* ih-fg-3, not the ih-fg-4 its neighbour above uses: fg-4 measures
+            2.45:1 in light and 3.75:1 in dark, both below WCAG AA. The Theme
+            heading is a pre-existing instance and is left for a token sweep;
+            new text does not join it. */}
+        <div className="text-[10px] font-bold text-ih-fg-3 uppercase tracking-wide mb-1.5">{m.nav_language_label()}</div>
+        <LocaleSwitcher />
       </div>
 
       {/* Divider + Account items */}

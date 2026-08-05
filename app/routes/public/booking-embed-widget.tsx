@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
+import { LanguageChoice } from "~/components/booking/LanguageChoice";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -113,6 +114,11 @@ export function EmbedWizard({
 function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string | null }) {
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null);
+  // Not part of the FormData sweep below: a radio group with nothing selected
+  // submits no entry at all, and "absent" would then be indistinguishable from
+  // "the field is not on this form". Held in state so the unanswered case is
+  // explicit.
+  const [locale, setLocale] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -138,6 +144,7 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
           // The embed has no time picker — the API requires a timeSlot, and
           // 'all-day' is the honest default (server collapses it internally).
           timeSlot: "all-day",
+          ...(locale ? { locale } : {}),
           turnstileToken: fd.get("cf-turnstile-response") || undefined,
         }),
       });
@@ -228,6 +235,15 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
             className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
           />
         </div>
+      </div>
+
+      <div className="mb-4">
+        <LanguageChoice
+          value={locale}
+          onChange={setLocale}
+          name="embed-locale"
+          legendClassName="block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1"
+        />
       </div>
 
       <p className="mb-2 text-xs text-ih-fg-3">

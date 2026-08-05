@@ -22,6 +22,7 @@ import type { action } from "~/routes/inspector-portal";
 export function InvoiceCard({
     pill,
     amountCents,
+    currency,
     paid,
     sent,
     payUrl,
@@ -31,9 +32,12 @@ export function InvoiceCard({
     canManagePrice,
     onRequestPayment,
 }: {
-    pill: { tone: PillTone; label: string };
+    /** `detail` carries the one-line money sentence a pill has no room for. */
+    pill: { tone: PillTone; label: string; detail?: string };
     /** IA-95 — undefined when the caller lacks the `financial` capability. */
     amountCents: number | undefined;
+    /** The invoice's own ISO 4217 snapshot; every figure on this card uses it. */
+    currency: string | undefined;
     paid: boolean;
     sent: boolean;
     payUrl: string | null | undefined;
@@ -65,8 +69,15 @@ export function InvoiceCard({
                 invoice exists and its status, but not the figure. Saying so beats
                 rendering $0.00, which reads as "nothing owed". */}
             <p className="text-[15px] font-medium text-ih-fg-1 mb-1">
-                {amountCents === undefined ? m.inspections_hub_invoice_hidden() : formatCents(amountCents)}
+                {amountCents === undefined ? m.inspections_hub_invoice_hidden() : formatCents(amountCents, { currency })}
             </p>
+            {/* A partially paid invoice's outstanding balance. The total above is
+                what was billed; this is what is still owed, and without it the
+                only thing the card could say about a partial payment was that one
+                had happened. Absent whenever the number is not knowable. */}
+            {pill.detail && (
+                <p className="text-[12px] font-medium text-ih-watch-fg mb-1">{pill.detail}</p>
+            )}
             {hasServiceLines && (
                 <p className="text-[11px] text-ih-fg-4 mb-3">{m.inspections_hub_invoice_from_services()}</p>
             )}

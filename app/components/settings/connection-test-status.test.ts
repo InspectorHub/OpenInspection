@@ -9,9 +9,19 @@
  * Plain createRoot + act harness (no router) — the component renders no <Form>.
  * Precedent: tests/web/unit/media-viewer.spec.ts.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { createElement, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+
+// The component reads the viewer's zone + format (#270), and those hooks bottom
+// out in React Router's `useRouteLoaderData`, which invariants outside a data
+// router — this harness has none. Stubbing the module is what the plan calls
+// for; the values below are also what the shape assertions below depend on.
+vi.mock('~/hooks/useSessionContext', () => ({
+  useDisplayTimeZone: () => 'UTC',
+  useChromeDateTimeFormat: () => ({ locale: 'en-US', dateFormat: 'iso', timeFormat: '24h' }),
+}));
+
 import {
   ConnectionTestStatus,
   type ConnectionTestResult,
@@ -74,6 +84,23 @@ describe('ConnectionTestStatus', () => {
     );
     expect(container.textContent).toContain('Connected'); // latest is the newest ok
     expect(container.textContent).toContain('Recent tests (2)');
+  });
+
+  // #270 — both stamps used to be `new Date(ms).toLocaleDateString()` /
+  // `.toLocaleString()`, which read the BROWSER's locale and zone, so this panel
+  // disagreed with every other timestamp in Settings for anyone outside the
+  // tenant's zone. These assert the configured SHAPE reaches the render; under
+  // the old code they read `11/14/2023` / `11/14/2023, 10:13:20 PM`.
+  it('renders the older-than-a-week fallback in the configured date shape', () => {
+    render([row({ testedAt: NOW - 30 * 24 * 60 * MIN })], 'sms');
+    expect(container.textContent).toContain('2023-10-15');
+  });
+
+  it('renders the absolute-time tooltip in the configured shape and zone', () => {
+    render([row({ testedAt: NOW })], 'sms');
+    const title = container.querySelector('time')?.getAttribute('title') ?? '';
+    // iso + 24h + UTC. A 12-hour meridiem here means the preference was ignored.
+    expect(title).toBe('2023-11-14 · 22:13 UTC');
   });
 
   it('ignores rows belonging to other targets', () => {

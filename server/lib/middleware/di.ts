@@ -6,6 +6,7 @@ import { UnitService } from '../../services/unit.service';
 import { UnitSwitchService } from '../../services/unit-switch.service';
 import { ReportVersionService } from '../../services/report-version.service';
 import { AIService } from '../../services/ai.service';
+import { buildAiMeter } from '../ai/metering';
 import { AuthService } from '../../services/auth.service';
 import { OutboxService } from '../../portal/outbox.service';
 import { publishRow } from '../../portal/outbox.service';
@@ -160,15 +161,24 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                 case 'ai':
                     target.ai = new AIService(
                         c.env.DB,
-                        // Bring-your-own-key: the Gemini key comes solely from the
-                        // tenant's own bound key (Settings → Advanced → AI), never a
-                        // shared platform env key — applies to SaaS and standalone.
+                        // The tenant's own bound key (Settings → Advanced → AI) —
+                        // always wins, and still the ONLY credential reaching the
+                        // service until managed access is granted (see buildAiMeter).
                         emailCfg.dbSecrets.geminiApiKey || '',
                         // Sprint 1 A-4: pass effective deployment mode so the
                         // service can return dev-mock suggestions when the
                         // active profile permits it (standalone) and
                         // no API key is configured, instead of throwing 503.
                         c.var.profile.aiDevMockFallback ? 'standalone' : 'saas',
+                        // No default here on purpose: an unset AI_MODEL fails
+                        // closed at the service rather than picking a model.
+                        c.env.AI_MODEL ?? '',
+                        buildAiMeter({
+                            db: c.env.DB, profile: c.var.profile, tenantId,
+                            tenantKey: emailCfg.dbSecrets.geminiApiKey || null,
+                            managedKey: c.env.AI_MANAGED_API_KEY ?? null,
+                            model: c.env.AI_MODEL ?? '',
+                        }),
                     );
                     break;
                 case 'auth':

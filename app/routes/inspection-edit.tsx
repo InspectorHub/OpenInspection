@@ -2296,8 +2296,8 @@ export default function InspectionEditPage() {
  {/* Column 2: Item List (280px, items-only) — hidden in fullscreen */}
  {!state.itemFullscreen && (
  <div className="w-[280px] flex-shrink-0 border-r border-ih-border flex flex-col overflow-hidden relative">
- {/* Item filter tabs */}
- <div className="flex items-center gap-1 px-3 py-1.5 border-b border-ih-border">
+ {/* Filter tabs. Fixed 280px: es-419 "Sin calificar" broke mid-phrase inside its chip, so the STRIP wraps and labels do not. */}
+ <div className="flex flex-wrap items-center gap-1 px-3 py-1.5 border-b border-ih-border">
  <SegmentedControl
  ariaLabel={m.editor_route_item_filter()}
  value={state.itemFilter}
@@ -2305,14 +2305,14 @@ export default function InspectionEditPage() {
  options={(["all", "unrated", "issues", "flagged"] as const).map((f) => ({
  value: f,
  label: (
- <>
+ <span className="whitespace-nowrap">
  {f === "all" ? m.editor_route_filter_all() : f === "unrated" ? m.editor_route_filter_unrated() : f === "issues" ? m.editor_route_filter_issues() : m.editor_route_filter_flagged()}
  {f !== "all" && (
  <span className="ml-1 text-[10px]">
  {f === "unrated" ? state.filterCounts.unrated : f === "issues" ? state.filterCounts.issues : state.filterCounts.flagged}
  </span>
  )}
- </>
+ </span>
  ),
  }))}
  />

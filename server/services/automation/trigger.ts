@@ -2,17 +2,17 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { automations, automationLogs, inspections } from '../../lib/db/schema';
 import { nanoid } from 'nanoid';
-import { createHeadersForInsertedLogs, type NoticeWording } from './notice-headers';
+import { createHeadersForInsertedLogs } from './notice-headers';
+import { createNoticeWordingResolver } from './notice-wording';
 import { logger } from '../../lib/logger';
 import { createOiTemplateStore } from './template-store';
 import { resolveRuleRecipients, type ResolvedRecipient } from './recipients';
 import { automationClassId } from '../../lib/notifications/automation-classes';
 import { getInspectionRoster } from '../../lib/inspection/roster';
-import { interpolate } from './shared';
 import type { AutomationChannel, RecipientKind, Constructor, TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
-import { m } from '../../lib/i18n/messages';
+import { createRecipientLocaleResolver, type RecipientLocaleResolver } from '../../lib/i18n/recipient-locale';
 
 /**
  * Trigger mixin: fan out pending automation_log rows when a domain event fires,
@@ -66,6 +66,10 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             // var (the SMS path never resolves it), so only the email template matters; a
             // rule with no email template can't reference it.
             const store = createOiTemplateStore(this.db);
+            // One resolver for the whole firing: recipient locales and the
+            // tenant default are read once each, however many rules, channels
+            // and headers reach the same person.
+            const localeFor = createRecipientLocaleResolver(db, ctx.tenantId);
             const filteredRules: typeof rules = [];
             for (const rule of rules) {
                 let referencesAgreementUrl = false;
@@ -90,16 +94,27 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             // Other events keep eventId NULL: some (e.g. agreement.viewed) legitimately
             // recur and must not be collapsed to once-per-inspection. Computed once per
             // rule/inspection — it doesn't depend on channel/recipient.
-            const dedupEventId = ctx.triggerEvent === 'report.published'
-                ? `auto:report.published:${ctx.inspectionId}`
-                : null;
+            // Keyed on the REPORT when the caller names one: an order that
+            // delivers a standard report and a radon report publishes twice, and
+            // an inspection-keyed dedup treats the second as a retry of the
+            // first and never sends it. Callers that address the order as a
+            // whole keep the inspection key.
+            //
+            // A caller that names a REAL inspection_events row wins outright:
+            // that id is both the dedup key and what deliver-email resolves the
+            // event vars from, and a visit's terminal transition is exactly the
+            // "fires once" shape the index was built for.
+            const dedupEventId = ctx.eventId
+                ?? (ctx.triggerEvent === 'report.published'
+                    ? `auto:report.published:${ctx.inspectionId}${ctx.reportId ? `:${ctx.reportId}` : ''}`
+                    : null);
             // Track L — fan out one pending log per enabled channel, each stamped with
             // the channel-appropriate recipient (email address or normalized E.164 phone).
             const logs: (typeof automationLogs.$inferInsert)[] = [];
             for (const rule of filteredRules) {
                 const channels = this.parseChannels(rule.channels);
                 for (const channel of channels) {
-                    const recipients = await this.resolveRecipients(rule, insp, channel);
+                    const recipients = await this.resolveRecipients(rule, insp, channel, localeFor);
                     if (recipients.length === 0) {
                         logger.info('AutomationService.trigger: no recipients resolved for channel (skipping)',
                             { ruleId: rule.id, recipientKind: rule.recipientKind, recipientRoleProfileId: rule.recipientRoleProfileId, channel });
@@ -164,26 +179,13 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 // and legacy/failed stamps are what the backfill script and the
                 // Outbox's interim-key fallback exist for.
                 try {
-                    // B3 (IA-115) — the wording comes from each rule's in-app
-                    // template when it has one. Resolved ONCE per firing rather
-                    // than once per header: a rule fanning out to eight staff
-                    // would otherwise re-read the same template eight times.
-                    const wordingByRule = new Map<string, NoticeWording>();
-                    for (const rule of filteredRules) {
-                        if (!rule.inAppTemplateId) continue;
-                        const tpl = await store.resolve(ctx.tenantId, rule.inAppTemplateId);
-                        if (!tpl || tpl.channel !== 'in_app') continue;
-                        const vars = {
-                            property_address: insp.propertyAddress || 'inspection',
-                            company_name: ctx.companyName,
-                            scheduled_date: insp.date ?? '',
-                        };
-                        wordingByRule.set(rule.id, {
-                            title: interpolate(tpl.subject ?? '', vars) || this.titleFor(ctx.triggerEvent, insp),
-                            body: tpl.body ? interpolate(tpl.body, vars) : null,
-                        });
-                    }
-                    const fallback: NoticeWording = { title: this.titleFor(ctx.triggerEvent, insp), body: null };
+                    // Wording lives in notice-wording.ts — the in-app template
+                    // per (rule, recipient LANGUAGE), falling back to the
+                    // built-in titles.
+                    const wordingFor = createNoticeWordingResolver({
+                        store, tenantId: ctx.tenantId, triggerEvent: ctx.triggerEvent,
+                        companyName: ctx.companyName, inspection: insp, rules: filteredRules,
+                    });
                     // The class comes from the RULE, like the wording — two rules
                     // on one event are two different things to have a preference
                     // about, so a per-firing class would be wrong for the same
@@ -195,8 +197,9 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                     }
                     await createHeadersForInsertedLogs(
                         db, ctx,
-                        (automationId) => (automationId && wordingByRule.get(automationId)) || fallback,
+                        wordingFor,
                         (automationId) => (automationId ? classByRule.get(automationId) : undefined),
+                        localeFor,
                         inserted,
                     );
                 } catch (err) {
@@ -351,37 +354,11 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             rule: { recipientKind: RecipientKind; recipientRoleProfileId: string | null },
             inspection: typeof inspections.$inferSelect,
             channel: AutomationChannel,
+            localeFor?: RecipientLocaleResolver,
         ): Promise<ResolvedRecipient[]> {
-            return resolveRuleRecipients(this.db, rule, inspection, channel);
-        }
-
-        /**
-         * The title STORED on a notice when a rule's template has no subject,
-         * or resolves to no template at all. Staff/ledger voice with the address
-         * — distinct from the recipient-voiced `notice_title_*` family that
-         * `app/lib/notice-view.ts` renders for types it recognises, which is why
-         * these carry the `comm_` prefix (same split as
-         * `comm_reason_sms_opt_out` vs `notice_reason_sms_opt_out`).
-         *
-         * Reading these through the catalogue does not yet make them render in
-         * the RECIPIENT's language — nothing resolves a recipient locale, and in
-         * a cron or queue context there is no request locale at all. It makes
-         * them reachable by a translator, which they were not before.
-         */
-        protected titleFor(event: string, insp: typeof inspections.$inferSelect): string {
-            const address = insp.propertyAddress || 'inspection';
-            switch (event) {
-                case 'inspection.created':   return m.comm_notice_title_inspection_created({ address });
-                case 'inspection.confirmed': return m.comm_notice_title_inspection_confirmed({ address });
-                case 'inspection.cancelled': return m.comm_notice_title_inspection_cancelled({ address });
-                case 'report.published':     return m.comm_notice_title_report_published({ address });
-                case 'invoice.created':      return m.comm_notice_title_invoice_created({ address });
-                case 'payment.received':     return m.comm_notice_title_payment_received({ address });
-                // Deliberately kept: a trigger can be added to the enum before a
-                // template exists for it, and a readable "<event> — <address>"
-                // beats an empty notice title. It is now translatable too.
-                default:                     return m.comm_notice_title_generic({ event, address });
-            }
+            return localeFor
+                ? resolveRuleRecipients(this.db, rule, inspection, channel, localeFor)
+                : resolveRuleRecipients(this.db, rule, inspection, channel);
         }
 
     };

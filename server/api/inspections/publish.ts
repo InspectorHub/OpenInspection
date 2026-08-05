@@ -387,6 +387,7 @@ const publishRoutes = createApiRouter()
             requirePayment: body.requirePayment,
             sendAgreementCopy: body.sendAgreementCopy,
             ...(body.recipients ? { recipients: body.recipients } : {}),
+            ...(body.reportId ? { reportId: body.reportId } : {}),
         };
         const result = await service.publishInspection(id, tenantId, publishOptions);
 
@@ -401,8 +402,11 @@ const publishRoutes = createApiRouter()
         let publishedVersion: number | null = null;
         if (userId) {
             try {
+                // The version chain is per REPORT. Passing the id through is
+                // what keeps two deliverables on one order from interleaving
+                // into a single chain, which fails verification for both.
                 const out = await c.var.services.reportVersion.snapshotOnPublish(
-                    tenantId, id, userId, body.summary,
+                    tenantId, id, userId, body.summary, body.reportId,
                 );
                 publishedVersion = out.versionNumber;
                 logger.info('report-version snapshot saved', {

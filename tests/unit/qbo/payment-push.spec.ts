@@ -112,10 +112,18 @@ const SETTLED = {
     data: { object: { metadata: { invoiceId: 'inv-1', tenantId: 'tA', inspectionId: 'insp1' } } },
 };
 
+/**
+ * `markPaid` returns the ledger row it appended, and the push is keyed and
+ * priced off THAT — see `tests/unit/qbo/payment-push-amount.spec.ts` for the
+ * real-database version. Here it is a stub, so the row is a stub too; `null`
+ * stands for "nothing was appended", which must push nothing.
+ */
+const APPENDED = { id: 'row-9', kind: 'balance' as const, amountCents: 45000, occurredAt: new Date() };
+
 function makeApp(opts: {
     env?: Record<string, unknown>;
     recordPayment?: ReturnType<typeof vi.fn>;
-    findById?: ReturnType<typeof vi.fn>;
+    markPaid?: ReturnType<typeof vi.fn>;
 } = {}) {
     const kv = { get: vi.fn().mockResolvedValue(null), put: vi.fn() };
     const settled: Promise<unknown>[] = [];
@@ -125,8 +133,7 @@ function makeApp(opts: {
         (c as { env: Record<string, unknown> }).env = { TENANT_CACHE: kv, ...KEYS, ...(opts.env ?? {}) };
         c.set('services' as never, {
             invoice: {
-                markPaid: vi.fn().mockResolvedValue(undefined),
-                findById: opts.findById ?? vi.fn().mockResolvedValue({ id: 'inv-1', amountCents: 45000 }),
+                markPaid: opts.markPaid ?? vi.fn().mockResolvedValue(APPENDED),
             },
             inspection: { markPaymentReceived: vi.fn().mockResolvedValue(undefined) },
             qbo: { recordPayment: opts.recordPayment ?? vi.fn().mockResolvedValue(undefined) },
@@ -153,7 +160,7 @@ describe('a card payment reaches QuickBooks', () => {
         await Promise.all(settled);
 
         expect(res.status).toBe(200);
-        expect(recordPayment).toHaveBeenCalledWith('tA', 'inv-1', 450, 'pay-inv-1');
+        expect(recordPayment).toHaveBeenCalledWith('tA', 'inv-1', 450, 'pay-row-9');
     });
 
     it('does not push when QuickBooks is not connected', async () => {
@@ -180,11 +187,14 @@ describe('a card payment reaches QuickBooks', () => {
         expect(res.status).toBe(200);
     });
 
-    it('pushes nothing when the invoice cannot be read', async () => {
+    it('pushes nothing when no payment was appended', async () => {
+        // A redelivery, or an invoice already paid. Nothing happened, so there
+        // is nothing to tell QuickBooks — the requestid stays a second line of
+        // defence rather than the only one.
         verifyWebhook.mockResolvedValue(SETTLED);
         const recordPayment = vi.fn();
-        const findById = vi.fn().mockResolvedValue(null);
-        const { app, settled } = makeApp({ env: { QBO_CLIENT_ID: 'qbo-client' }, recordPayment, findById });
+        const markPaid = vi.fn().mockResolvedValue(null);
+        const { app, settled } = makeApp({ env: { QBO_CLIENT_ID: 'qbo-client' }, recordPayment, markPaid });
 
         const res = await app.request('/', { method: 'POST', headers: SIG, body: '{}' });
         await Promise.all(settled);

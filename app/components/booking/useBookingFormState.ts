@@ -28,6 +28,10 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
   const [clientEmail, setClientEmail] = useState("");
   // Track L (D6, path A) — unchecked-by-default SMS opt-in (TCPA consent).
   const [smsOptin, setSmsOptin] = useState(false);
+  // The language the client asked to be addressed in. Starts null and is only
+  // ever set by them clicking an option: a default here would make every
+  // booking look like a stated preference.
+  const [locale, setLocale] = useState<string | null>(null);
   const [chosenInspectorId, setChosenInspectorId] = useState<string | null>(preselected?.id ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -163,6 +167,9 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
           clientName,
           clientEmail,
           ...(smsOptin ? { smsOptin: true } : {}),
+          // Omitted entirely when unanswered — the server stores NULL, which
+          // is not the same as storing 'en'.
+          ...(locale ? { locale } : {}),
           ...(turnstileToken ? { turnstileToken } : {}),
           ...(agentRefSlug ? { agentRefSlug } : {}),
         }),
@@ -192,6 +199,7 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     clientName, setClientName,
     clientEmail, setClientEmail,
     smsOptin, setSmsOptin,
+    locale, setLocale,
     chosenInspectorId, setChosenInspectorId,
     submitting: submitting || agentFetcher.state === "submitting",
     message,

@@ -13,6 +13,7 @@ import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { PublicAgreementBodySchema } from '../../lib/validations/agreement-public.schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
 import { getDrizzle } from '../../lib/route-helpers';
+import { AGREEMENT_LANGUAGE_DISCLOSURE } from '../../lib/legal/agreement-language-disclosure';
 
 // Local aliases for the literal unions the DB columns are narrowed to in the
 // JSON responses below. Kept file-local (not exported) so the public router
@@ -90,6 +91,7 @@ const getCheckoutByTokenRoute = createRoute(withMcpMetadata({
                             invoice: z.object({
                                 id: z.string(),
                                 amountCents: z.number().int(),
+                                amountPaidCents: z.number().int().nullable().describe('Cumulative amount received in cents; null when no figure was recorded'),
                                 status: z.enum(['paid', 'partial', 'unpaid']),
                             }).nullable().describe('Latest invoice for the inspection, or null'),
                             payment: z.object({
@@ -276,6 +278,9 @@ const agreementRoutes = createApiRouter()
         const invoiceRow = await db.select({
             id: invoices.id,
             amountCents: invoices.amountCents,
+            // Explicit projection: the `partial` status derived below carries no
+            // figure unless this column is named here.
+            amountPaidCents: invoices.amountPaidCents,
             currency: invoices.currency,
             paidAt: invoices.paidAt,
             partialPaidAt: invoices.partialPaidAt,
@@ -338,7 +343,7 @@ const agreementRoutes = createApiRouter()
                     progress: { signed: signedCount, total: signers.length },
                 },
                 invoice: invoiceRow && invoiceStatus
-                    ? { id: invoiceRow.id, amountCents: invoiceRow.amountCents, currency: invoiceRow.currency, status: invoiceStatus }
+                    ? { id: invoiceRow.id, amountCents: invoiceRow.amountCents, amountPaidCents: invoiceRow.amountPaidCents ?? null, currency: invoiceRow.currency, status: invoiceStatus }
                     : null,
                 payment: {
                     required: inspectionRow.paymentRequired === true,
@@ -413,6 +418,10 @@ const agreementRoutes = createApiRouter()
             userAgent: ua,
             onBehalfOf: onBehalfOf ?? null,
             onBehalfDisclaimer: onBehalfDisclaimer ?? null,
+            // The two surfaces this route serves — standalone sign page, checkout
+            // sign card — both render <AgreementLanguageDisclosure> (asserted by
+            // the containment spec), so this states a screen the signer saw.
+            languageDisclosureVersion: AGREEMENT_LANGUAGE_DISCLOSURE.version,
         });
 
         // Spec 2A — per-signer automation event so per-tenant rules can react to
