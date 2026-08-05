@@ -43,7 +43,10 @@ export function UnassignedLane({
       className="w-56 shrink-0 border-r border-ih-border bg-ih-bg-muted"
       data-testid="dispatch-unassigned-lane"
       aria-label={m.dispatch_unassigned_heading()}
-      onDragOver={(event) => { if (draggingId) event.preventDefault(); }}
+      // Unconditional preventDefault: gating this on drag STATE loses the drop
+      // whenever the gesture outruns a React render. The lane is only a drop
+      // target during a drag anyway.
+      onDragOver={(event) => event.preventDefault()}
       onDrop={onDropItem}
     >
       <div className="border-b border-ih-border px-3 py-2">

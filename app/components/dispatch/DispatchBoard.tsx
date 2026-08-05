@@ -80,7 +80,21 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
     });
   }, [fetcher.data, fetcher.state]);
 
-  const dragged = draggingId ? byId.get(draggingId) ?? null : null;
+  /**
+   * Which card is being dropped, read from the DRAG ITSELF.
+   *
+   * `draggingId` state is set in `dragstart`, and a handler closure only sees
+   * it after React has re-rendered. A real browser leaves many frames between
+   * the two events so that usually happens — but "usually" is the whole bug:
+   * a drop that lands before the re-render read `null` and silently did
+   * nothing. `dataTransfer` carries the id through the gesture with no render
+   * in between, which is what it is for. State stays the fallback (and drives
+   * the hover indicator, where a frame of lag is invisible).
+   */
+  function draggedFrom(event: React.DragEvent<HTMLElement>): DispatchItem | null {
+    const id = event.dataTransfer?.getData("text/plain") || draggingId;
+    return id ? byId.get(id) ?? null : null;
+  }
 
   function move(item: DispatchItem, startMs: number, leadInspectorId: string) {
     if (!item.inspectionId) return;
@@ -97,6 +111,7 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
 
   function dropOnColumn(inspectorId: string, event: React.DragEvent<HTMLDivElement>) {
     event.preventDefault();
+    const dragged = draggedFrom(event);
     setHover(null);
     setDraggingId(null);
     if (!dragged || !isDraggableItem(dragged)) return;
@@ -113,6 +128,7 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
   // they look for someone to work it, so the instant is carried over unchanged.
   function dropOnLane(event: React.DragEvent<HTMLElement>) {
     event.preventDefault();
+    const dragged = draggedFrom(event);
     setHover(null);
     setDraggingId(null);
     if (!dragged || !isDraggableItem(dragged)) return;

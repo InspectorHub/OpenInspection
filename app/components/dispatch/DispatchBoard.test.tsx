@@ -88,7 +88,14 @@ function renderBoard(
  */
 function dragCardTo(cardText: string, dropzone: Element, clientY: number) {
   const card = screen.getByText(cardText).closest("[data-item-id]") as HTMLElement;
-  const dataTransfer = { setData: vi.fn(), effectAllowed: "" };
+  // A real dataTransfer, not a spy: the drop handler READS back what dragstart
+  // wrote, which is the whole point of carrying the id through the gesture.
+  const store: Record<string, string> = {};
+  const dataTransfer = {
+    setData: (key: string, value: string) => { store[key] = value; },
+    getData: (key: string) => store[key] ?? "",
+    effectAllowed: "",
+  };
   fireEvent.dragStart(card, { dataTransfer });
   for (const type of ["dragover", "drop"]) {
     const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientY });
@@ -206,6 +213,28 @@ describe("DispatchBoard drag-drop", () => {
 
     await waitFor(() => expect(screen.getByText("77 Cedar Ln")).toBeTruthy());
     expect(screen.getByText("That slot is already taken")).toBeTruthy();
+  });
+
+  it("reads the dropped card from dataTransfer, not from a rendered state flush", async () => {
+    // Found in Chrome: `dragstart` sets React state, and a drop that lands
+    // before the re-render saw `null` and silently did nothing. Firing the drop
+    // with NO preceding dragstart is that race, made deterministic.
+    const posted: Record<string, string>[] = [];
+    renderBoard(BOARD, async ({ request }) => {
+      const form = await request.formData();
+      posted.push(Object.fromEntries(form) as Record<string, string>);
+      return { ok: true, conflicts: [] };
+    });
+
+    const ada = screen.getAllByTestId("dispatch-column")[0];
+    const zone = ada.querySelector("[data-dispatch-dropzone]")!;
+    const event = new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 112 });
+    Object.defineProperty(event, "dataTransfer", { value: { getData: () => "i-3", setData: vi.fn() } });
+    fireEvent(zone, event);
+
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0].inspectionId).toBe("insp-3");
+    expect(posted[0].leadInspectorId).toBe("u-ada");
   });
 
   it("does not offer a company closure as a drag source", () => {
