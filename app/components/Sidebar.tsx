@@ -1,8 +1,8 @@
 import { useState, useRef } from "react";
 import { NavLink, useRouteLoaderData } from "react-router";
-import { useSessionContext, useUnreadMessages } from "~/hooks/useSessionContext";
+import { useCapabilities, useSessionContext, useUnreadMessages } from "~/hooks/useSessionContext";
 import { writeSidebarCookie, type UiPrefs } from "~/lib/ui-prefs";
-import { IC, WORKSPACE_ITEMS } from "~/components/sidebar/nav-items";
+import { IC, WORKSPACE_ITEMS, visibleNavItems } from "~/components/sidebar/nav-items";
 import { SidebarGroup } from "~/components/sidebar/SidebarGroup";
 import { UserMenuPopover } from "~/components/sidebar/UserMenuPopover";
 import { MobileHeader } from "~/components/sidebar/MobileHeader";
@@ -21,6 +21,7 @@ export function Sidebar() {
   // flash from the old two-pass localStorage read).
   const rootPrefs = useRouteLoaderData("root") as UiPrefs | undefined;
   const [collapsed, setCollapsed] = useState(rootPrefs?.sidebarCollapsed ?? false);
+  const capabilities = useCapabilities();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const ctx = useSessionContext();
@@ -98,7 +99,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-1 overflow-y-auto">
-        <SidebarGroup label={m.nav_section_workspace()} items={WORKSPACE_ITEMS.map((i) => (i.to === "/messages" ? { ...i, badge: unreadMessages } : i))} collapsed={collapsed} />
+        <SidebarGroup label={m.nav_section_workspace()} items={visibleNavItems(WORKSPACE_ITEMS, capabilities).map((i) => (i.to === "/messages" ? { ...i, badge: unreadMessages } : i))} collapsed={collapsed} />
         {/* ds-allow: compact sidebar nav rhythm (10/7/14px), no semantic spacing token */}
         <div className="mb-[14px]">
           <NavLink

@@ -31,5 +31,6 @@
   "nav_theme_field_title": "High-contrast large type for outdoor use",
   "nav_theme_aria": "Color theme",
   "nav_language_label": "Language",
-  "nav_language_aria": "Interface language"
+  "nav_language_aria": "Interface language",
+  "nav_item_dispatch": "Dispatch"
 }

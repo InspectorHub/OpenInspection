@@ -1,4 +1,5 @@
 import { useRouteLoaderData } from "react-router";
+import type { Capability, CapabilitySet } from "../../server/lib/auth/capabilities";
 import {
   resolveDisplayPrefs,
   type DateFormat,
@@ -50,6 +51,13 @@ export interface SessionContext {
     dateFormat: DateFormat | null;
     /** Per-user clock override, or null to inherit the tenant (#270). */
     timeFormat: TimeFormat | null;
+    /**
+     * The viewer's RESOLVED capabilities — role defaults with their personal
+     * overrides already applied, computed by the same `getCapabilities` the API
+     * guards use. Resolved server-side on purpose: the chrome must never work
+     * out a second answer to a question the server already decided.
+     */
+    capabilities: CapabilitySet;
   };
   deployment: {
     mode: string;
@@ -68,6 +76,23 @@ export interface SessionContext {
 export function useUnreadMessages(): number {
   const ctx = useSessionContext();
   return (ctx as (SessionContext & { unreadMessages?: number }) | null)?.unreadMessages ?? 0;
+}
+
+/**
+ * One capability answer for the current viewer.
+ *
+ * FAIL-CLOSED when there is no context (outside the auth layout, or the fetch
+ * failed): a chrome entry that appears on a failed load is an entry that
+ * navigates to a 403. The server is the enforcer either way; this only decides
+ * whether to offer the door.
+ */
+export function useCapability(capability: Capability): boolean {
+  return useSessionContext()?.user.capabilities?.[capability] === true;
+}
+
+/** Every resolved capability, for callers filtering a list. */
+export function useCapabilities(): Partial<CapabilitySet> | null {
+  return useSessionContext()?.user.capabilities ?? null;
 }
 
 export function useSessionContext(): SessionContext | null {

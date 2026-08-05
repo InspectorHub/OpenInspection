@@ -1,4 +1,7 @@
+import { Link } from "react-router";
+import { Button } from "@core/shared-ui";
 import { isAdminRole } from "~/lib/access";
+import { useCapability } from "~/hooks/useSessionContext";
 import type { CalendarScope } from "~/components/calendar/calendar-helpers";
 import type { CalendarMember } from "~/components/calendar/BlockTimeDrawer";
 import { InspectorSyncBadge } from "~/components/calendar/InspectorSyncBadge";
@@ -31,9 +34,20 @@ export function CalendarScopeToolbar({
   now,
 }: CalendarScopeToolbarProps) {
   const canManageTeam = isAdminRole(role);
+  // The cross-link is gated on the CAPABILITY, not on canManageTeam:
+  // /calendar/dispatch is guarded by `scheduleOthers`, so a role-tier button
+  // would offer a manager whose override was revoked a page that redirects
+  // straight back here. The existing canManageTeam uses stay as they are —
+  // reconciling /api/calendar/items with the capability is a separate gap.
+  const canDispatch = useCapability("scheduleOthers");
 
   return (
     <div className="flex flex-wrap items-center gap-3">
+      {canDispatch && scope === "team" && (
+        <Link to="/calendar/dispatch" className="order-last ml-auto" data-testid="calendar-open-dispatch">
+          <Button variant="secondary" size="sm">{m.calendar_open_dispatch()}</Button>
+        </Link>
+      )}
       <div className="inline-flex rounded-md border border-ih-border bg-ih-bg-card p-1" aria-label={m.calendar_scope_aria()}>
         <button
           type="button"

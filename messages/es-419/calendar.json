@@ -97,5 +97,7 @@
   "find_a_time_loading": "Comprobando disponibilidad...",
   "find_a_time_none": "No hay ninguna ventana libre tan larga ese día.",
   "find_a_time_failed": "No se pudo comprobar la disponibilidad. Inténtalo de nuevo.",
-  "find_a_time_free_count": "{count} libres"
+  "find_a_time_free_count": "{count} libres",
+  "calendar_open_dispatch": "Vista de despacho",
+  "dispatch_scroll_hint": "Desplázate de lado para ver a todos los inspectores."
 }

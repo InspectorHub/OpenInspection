@@ -97,5 +97,7 @@
   "find_a_time_loading": "Checking availability...",
   "find_a_time_none": "No window that long is free on this day.",
   "find_a_time_failed": "Availability could not be checked. Try again.",
-  "find_a_time_free_count": "{count} free"
+  "find_a_time_free_count": "{count} free",
+  "calendar_open_dispatch": "Dispatch view",
+  "dispatch_scroll_hint": "Scroll sideways to see every inspector."
 }

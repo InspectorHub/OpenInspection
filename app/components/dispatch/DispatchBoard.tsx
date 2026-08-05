@@ -160,6 +160,14 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
             </div>
           ) : (
             <div className="flex-1 overflow-x-auto" data-testid="dispatch-columns-scroller">
+              {/* Dispatch is a desktop-first surface. On a narrow screen the
+                  columns scroll sideways rather than reflow — a stacked board
+                  is a list, and a list cannot show two people's 10:00 at once,
+                  which is the entire reason to open this page. Say so, once,
+                  where the gesture is needed. */}
+              <p className="px-2 py-1 text-[11px] text-ih-fg-4 lg:hidden">
+                {m.dispatch_scroll_hint()}
+              </p>
               <div className="flex min-w-max">
                 <TimeGutter hours={hours} axisPx={axisPx} />
                 {board.inspectors.map((inspector) => (

@@ -14,6 +14,8 @@ import {
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { mcpEnabled } from '../lib/mcp/flag';
+import { coerceOverrides, getCapabilities, type CapabilitySet } from '../lib/auth/capabilities';
+import { isRole } from '../lib/auth/roles';
 import { getDrizzle } from '../lib/route-helpers';
 import { getBaseUrl } from '../lib/url';
 import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
@@ -55,6 +57,11 @@ const sessionContextRoutes = createApiRouter()
         let userTimeFormat: TimeFormat | null = null;
         let tenantDateFormat: DateFormat = DEFAULT_DISPLAY_PREFS.dateFormat;
         let tenantTimeFormat: TimeFormat = DEFAULT_DISPLAY_PREFS.timeFormat;
+        // RESOLVED capabilities, not the raw overrides: whether an actor may do
+        // something is decided where it is ENFORCED, and shipping the answer
+        // rather than the ingredients means the chrome cannot resolve it a
+        // second, subtly different way (see Cross-Portal Reuse in CLAUDE.md).
+        let permissionOverridesRaw: unknown = null;
         let tenantTimezone = 'UTC';
         let tenantLocale = 'en-US';
         let tenantCurrency = 'USD';
@@ -74,6 +81,7 @@ const sessionContextRoutes = createApiRouter()
                     locale: users.locale,
                     dateFormat: users.dateFormat,
                     timeFormat: users.timeFormat,
+                    permissionOverrides: users.permissionOverrides,
                 })
                     .from(users)
                     .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
@@ -81,6 +89,7 @@ const sessionContextRoutes = createApiRouter()
                 if (row) {
                     userName = row.name;
                     userEmail = row.email;
+                    permissionOverridesRaw = row.permissionOverrides;
                     userTimezone = row.timezone;
                     userLocale = row.locale;
                     userDateFormat = isDateFormat(row.dateFormat) ? row.dateFormat : null;
@@ -227,6 +236,14 @@ const sessionContextRoutes = createApiRouter()
             unreadMessages = await c.var.services.message.unreadCountForTenant(tenantId);
         } catch { /* badge degrades to 0; the layout must never fail on it */ }
 
+        // An unknown role resolves as an inspector rather than throwing: the
+        // chrome must still render, and inspector is the least-privileged tier.
+        const roleForCaps = isRole(user.role) ? user.role : 'inspector';
+        const capabilities: CapabilitySet = getCapabilities(
+            roleForCaps,
+            coerceOverrides(permissionOverridesRaw),
+        );
+
         return c.json({
             success: true,
             data: {
@@ -254,6 +271,7 @@ const sessionContextRoutes = createApiRouter()
                     name: userName,
                     email: userEmail,
                     role: user.role || 'inspector',
+                    capabilities,
                     initials,
                     timezone: userTimezone,
                     locale: userLocale,

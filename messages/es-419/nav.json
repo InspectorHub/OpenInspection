@@ -31,5 +31,6 @@
   "nav_theme_field_title": "Tipografía grande de alto contraste para uso en exteriores",
   "nav_theme_aria": "Tema de color",
   "nav_language_label": "Idioma",
-  "nav_language_aria": "Idioma de la interfaz"
+  "nav_language_aria": "Idioma de la interfaz",
+  "nav_item_dispatch": "Despacho"
 }
