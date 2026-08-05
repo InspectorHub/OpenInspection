@@ -80,5 +80,10 @@
   "dispatch_column_untimed": "No time set",
   "dispatch_empty_day": "Nothing scheduled",
   "dispatch_card_before_axis": "(starts earlier)",
-  "dispatch_card_after_axis": "(ends later)"
+  "dispatch_card_after_axis": "(ends later)",
+  "dispatch_conflict_title": "That slot is already taken",
+  "dispatch_conflict_body": "This company blocks double-booking, so nothing was moved. Pick a free time, or free the inspector first.",
+  "dispatch_conflict_close": "Close",
+  "dispatch_toast_overlap": "Moved, but it overlaps other work.",
+  "dispatch_toast_failed": "Could not move that inspection."
 }

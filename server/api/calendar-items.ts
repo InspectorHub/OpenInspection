@@ -5,7 +5,7 @@ import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
 import { createApiRouter } from '../lib/openapi-router';
 import { inspections, tenantConfigs, users } from '../lib/db/schema';
-import { epochMsToWallClockHm, epochMsToWallClockYmd, resolveTenantTimeZone } from '../lib/tz';
+import { epochMsToWallClockHm, epochMsToWallClockYmd, resolveTenantTimeZone, wallClockToEpochMs } from '../lib/tz';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import {
     CalendarItemsErrorSchema,
@@ -147,6 +147,7 @@ const calendarItemsRoutes = createApiRouter()
         const cfg = await db.select({
             defaultTimezone: tenantConfigs.defaultTimezone,
             bookingConflictPolicy: tenantConfigs.bookingConflictPolicy,
+            bookingSlotIntervalMin: tenantConfigs.bookingSlotIntervalMin,
         })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
@@ -231,9 +232,24 @@ const calendarItemsRoutes = createApiRouter()
         // would be a second place for it to be applied differently.
         const unassigned = boardItems.filter((i) => i.kind === 'inspection' && !i.userId);
 
+        // The snap grid and the day's zero point travel WITH the board, so a
+        // drag never has to guess a timezone in the browser: a dropped pixel is
+        // `dayStartMs + minutes * 60000`, and the reschedule endpoint derives
+        // the civil date back from that instant in this same zone.
+        const slotIntervalMin = cfg?.bookingSlotIntervalMin ?? 30;
+        const dayStartMs = wallClockToEpochMs(date, '00:00', tenantTz);
+
         return c.json({
             success: true as const,
-            data: { date, conflictPolicy, inspectors: roster, items: boardItems, unassigned },
+            data: {
+                date,
+                conflictPolicy,
+                slotIntervalMin,
+                dayStartMs,
+                inspectors: roster,
+                items: boardItems,
+                unassigned,
+            },
         }, 200);
     });
 

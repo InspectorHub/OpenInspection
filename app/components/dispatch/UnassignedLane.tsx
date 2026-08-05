@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { m } from "~/paraglide/messages";
-import { minutesOfDay, type DispatchItem } from "./dispatch-helpers";
+import { isDraggableItem, minutesOfDay, type DispatchItem } from "./dispatch-helpers";
 
 /**
  * The left rail: inspections on this day that nobody owns.
@@ -11,12 +11,24 @@ import { minutesOfDay, type DispatchItem } from "./dispatch-helpers";
  * timeless jobs last rather than first (a job with no time is the least urgent
  * thing to place, not the most).
  *
- * The cards are already marked up as drag sources (`data-sortable-item` +
- * the grip). Nothing is wired to a drag library in this task; the affordance
- * ships with the shape it will keep, so the drop handling lands as behavior
- * rather than as a re-layout.
+ * It is also a drop target in both directions: dragging a card OUT places it on
+ * someone's day, dragging one IN takes the person off and leaves the time
+ * alone. Unassigning by dropping is the gesture a dispatcher already has for
+ * "I need to find someone else for this".
  */
-export function UnassignedLane({ items }: { items: DispatchItem[] }) {
+export function UnassignedLane({
+  items,
+  draggingId,
+  onDragStartItem,
+  onDragEndItem,
+  onDropItem,
+}: {
+  items: DispatchItem[];
+  draggingId: string | null;
+  onDragStartItem: (id: string) => void;
+  onDragEndItem: () => void;
+  onDropItem: (event: React.DragEvent<HTMLElement>) => void;
+}) {
   const sorted = [...items].sort((a, b) => {
     const am = minutesOfDay(a.startTime);
     const bm = minutesOfDay(b.startTime);
@@ -31,6 +43,8 @@ export function UnassignedLane({ items }: { items: DispatchItem[] }) {
       className="w-56 shrink-0 border-r border-ih-border bg-ih-bg-muted"
       data-testid="dispatch-unassigned-lane"
       aria-label={m.dispatch_unassigned_heading()}
+      onDragOver={(event) => { if (draggingId) event.preventDefault(); }}
+      onDrop={onDropItem}
     >
       <div className="border-b border-ih-border px-3 py-2">
         {/* fg-2: fg-3 measured 4.34:1 on the muted rail surface in light mode. */}
@@ -48,10 +62,16 @@ export function UnassignedLane({ items }: { items: DispatchItem[] }) {
           sorted.map((item) => (
             <div
               key={item.id}
-              data-sortable-item
               data-item-id={item.id}
               data-inspection-id={item.inspectionId ?? item.id}
-              className="rounded-lg border border-ih-border bg-ih-bg-card p-2 shadow-ih-card"
+              draggable={isDraggableItem(item)}
+              onDragStart={(event) => {
+                event.dataTransfer.setData("text/plain", item.id);
+                event.dataTransfer.effectAllowed = "move";
+                onDragStartItem(item.id);
+              }}
+              onDragEnd={onDragEndItem}
+              className={`rounded-lg border border-ih-border bg-ih-bg-card p-2 shadow-ih-card${draggingId === item.id ? " opacity-40" : ""}`}
             >
               <div className="flex items-start gap-2">
                 <span

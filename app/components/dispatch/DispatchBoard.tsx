@@ -1,225 +1,195 @@
-import { Link } from "react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFetcher } from "react-router";
 import { EmptyState } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { pushToast } from "~/hooks/useToast";
 import { UnassignedLane } from "./UnassignedLane";
+import { ConflictModal } from "./ConflictModal";
+import { InspectorColumn, TimeGutter } from "./DispatchColumn";
 import {
   axisHeightPx,
   boardHours,
-  bucketColumn,
-  cardGeometry,
-  cardTone,
   closureItems,
-  hourLabel,
-  inspectorLabel,
-  HOUR_HEIGHT_PX,
-  type DispatchInspector,
+  currentStartMs,
+  isDraggableItem,
+  minuteFromOffsetY,
+  minuteToEpochMs,
   type DispatchItem,
   type DispatchPayload,
+  type RescheduleResult,
+  type ScheduleConflict,
 } from "./dispatch-helpers";
 
 /**
  * The dispatch board: one column per schedulable person, one shared time axis,
  * and the unassigned lane pinned to the left.
  *
- * Read-only in this task. Every card already carries the identifiers a drop
- * handler needs (`data-item-id`, `data-inspection-id`, the owning column's
- * `data-inspector-id`), so drag-drop lands as behavior rather than as a rebuild.
+ * Dragging uses the platform's own HTML5 drag-and-drop, the same mechanism the
+ * calendar's day/week/month views already use. The plan reached for sortablejs
+ * because it is already a dependency — but sortablejs REORDERS DOM CHILDREN,
+ * and every card here is absolutely positioned on a time axis. Its drop model
+ * ("between these two siblings") cannot express this board's only question,
+ * "which pixel did you let go at", and making it answer that means mutating the
+ * DOM and then undoing the mutation so React can re-render from server state.
+ * HTML5 DnD answers it directly with `clientY`, adds no dependency either, and
+ * leaves React the single source of truth.
  *
- * Columns are a horizontal scroller with a fixed minimum width instead of a
- * fluid grid: a company with nine inspectors would otherwise get nine 90px
- * columns, and a card that cannot show its address is not a card. The gutter
- * sticks to the left edge so the hour a card sits on stays readable at any
- * scroll offset.
+ * A drop is one write: `PATCH /api/inspections/:id/schedule` through the route
+ * action, carrying both the new instant and the new lead. Time and ownership
+ * move together because a dispatcher's gesture moves them together — two calls
+ * would leave a window where the board shows a job at a time nobody owns.
  */
 export function DispatchBoard({ board }: { board: DispatchPayload }) {
+  const fetcher = useFetcher<RescheduleResult>();
   const hours = boardHours();
   const closures = closureItems(board.items);
   const axisPx = axisHeightPx();
 
-  return (
-    <div className="overflow-hidden rounded-lg border border-ih-border bg-ih-bg-card">
-      {closures.length > 0 && (
-        <div className="flex flex-wrap gap-2 border-b border-ih-border bg-ih-bg-muted px-3 py-2">
-          {closures.map((closure) => (
-            <span
-              key={closure.id}
-              className="rounded-full bg-ih-fg-4 px-3 py-1 text-[11px] font-bold text-ih-fg-inverse"
-            >
-              {m.dispatch_closed_prefix()}: {closure.title}
-            </span>
-          ))}
-        </div>
-      )}
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [hover, setHover] = useState<{ inspectorId: string; minute: number } | null>(null);
+  const [blocked, setBlocked] = useState<ScheduleConflict[] | null>(null);
 
-      <div className="flex">
-        <UnassignedLane items={board.unassigned} />
-
-        {board.inspectors.length === 0 ? (
-          <div className="flex-1 p-6">
-            <EmptyState
-              title={m.dispatch_no_inspectors_title()}
-              description={m.dispatch_no_inspectors_body()}
-            />
-          </div>
-        ) : (
-          <div className="flex-1 overflow-x-auto" data-testid="dispatch-columns-scroller">
-            <div className="flex min-w-max">
-              <TimeGutter hours={hours} axisPx={axisPx} />
-              {board.inspectors.map((inspector) => (
-                <InspectorColumn
-                  key={inspector.id}
-                  inspector={inspector}
-                  items={board.items}
-                  hours={hours}
-                  axisPx={axisPx}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+  const byId = useMemo(
+    () => new Map(board.items.map((item) => [item.id, item])),
+    [board.items],
   );
-}
 
-function TimeGutter({ hours, axisPx }: { hours: number[]; axisPx: number }) {
-  return (
-    <div className="sticky left-0 z-10 w-16 shrink-0 border-r border-ih-border bg-ih-bg-card">
-      {/* Two spacers, not one: the gutter has to line up with BOTH the column
-          heading and the all-day strip, or every card sits an all-day row off. */}
-      <div className="h-10 border-b border-ih-border" />
-      <div className="h-10 border-b border-ih-border pr-2 pt-2 text-right text-[10px] font-bold text-ih-fg-4">
-        {m.calendar_all_day()}
-      </div>
-      <div className="relative" style={{ height: `${axisPx}px` }}>
-        {hours.map((hour, index) => {
-          const label = hourLabel(hour);
-          return (
-            /* fg-3, not the day calendar's fg-4: fg-4 measured 3.07:1 against
-               the dark card surface, and an hour label is the one thing on this
-               axis a reader must be able to resolve. */
-            <div
-              key={hour}
-              className="absolute right-0 pr-2 text-[11px] font-bold text-ih-fg-3"
-              style={{ top: `${index * HOUR_HEIGHT_PX}px` }}
-            >
-              {label.hour12}:00 {label.meridiem}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+  // Report each result once. `fetcher.data` survives across re-renders, so a
+  // plain effect on it would re-toast on every unrelated state change — the
+  // board has several (hover, drag id), and a warning that reappears when you
+  // move the mouse reads as a second failure.
+  const handled = useRef<RescheduleResult | null>(null);
+  useEffect(() => {
+    const data = fetcher.data;
+    if (!data || fetcher.state !== "idle" || handled.current === data) return;
+    handled.current = data;
+    if (data.ok) {
+      if (data.conflicts && data.conflicts.length > 0) {
+        pushToast({ message: m.dispatch_toast_overlap(), variant: "warning", durationMs: 6000 });
+      }
+      return;
+    }
+    if (data.code === "SCHEDULE_CONFLICT") {
+      setBlocked(data.conflicts ?? []);
+      return;
+    }
+    pushToast({
+      message: data.message || m.dispatch_toast_failed(),
+      variant: "error",
+      durationMs: 6000,
+    });
+  }, [fetcher.data, fetcher.state]);
 
-function InspectorColumn({
-  inspector,
-  items,
-  hours,
-  axisPx,
-}: {
-  inspector: DispatchInspector;
-  items: DispatchItem[];
-  hours: number[];
-  axisPx: number;
-}) {
-  const { timed, untimed } = bucketColumn(items, inspector.id);
+  const dragged = draggingId ? byId.get(draggingId) ?? null : null;
+
+  function move(item: DispatchItem, startMs: number, leadInspectorId: string) {
+    if (!item.inspectionId) return;
+    fetcher.submit(
+      {
+        intent: "reschedule",
+        inspectionId: item.inspectionId,
+        scheduledStartMs: String(startMs),
+        leadInspectorId,
+      },
+      { method: "post" },
+    );
+  }
+
+  function dropOnColumn(inspectorId: string, event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setHover(null);
+    setDraggingId(null);
+    if (!dragged || !isDraggableItem(dragged)) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const minute = minuteFromOffsetY(event.clientY - rect.top, board.slotIntervalMin);
+    // A drop with no usable pointer position is not a time. Sending it anyway
+    // would post NaN milliseconds and move the job to the epoch.
+    if (!Number.isFinite(minute)) return;
+    move(dragged, minuteToEpochMs(board.dayStartMs, minute), inspectorId);
+  }
+
+  // Dropping into the lane is an UNASSIGN, not a reschedule: the time the job
+  // was pencilled in for is exactly what a dispatcher is still holding while
+  // they look for someone to work it, so the instant is carried over unchanged.
+  function dropOnLane(event: React.DragEvent<HTMLElement>) {
+    event.preventDefault();
+    setHover(null);
+    setDraggingId(null);
+    if (!dragged || !isDraggableItem(dragged)) return;
+    const startMs = currentStartMs(dragged, board.dayStartMs);
+    if (startMs == null) return;
+    move(dragged, startMs, "");
+  }
+
+  const busy = fetcher.state !== "idle";
 
   return (
-    <div
-      className="w-56 shrink-0 border-r border-ih-border last:border-r-0"
-      data-inspector-id={inspector.id}
-      data-testid="dispatch-column"
-    >
-      <div className="flex h-10 items-center gap-2 border-b border-ih-border px-2">
-        <span className="truncate text-[12px] font-bold text-ih-fg-1" title={inspectorLabel(inspector)}>
-          {inspectorLabel(inspector)}
-        </span>
-        <span className="ml-auto shrink-0 text-[11px] text-ih-fg-4">{timed.length + untimed.length}</span>
-      </div>
-
-      <div className="h-10 space-y-1 overflow-y-auto border-b border-ih-border p-1">
-        {untimed.map((item) => (
-          <div
-            key={item.id}
-            data-sortable-item
-            data-item-id={item.id}
-            data-inspection-id={item.inspectionId ?? item.id}
-            className={`truncate rounded px-2 py-0.5 text-[11px] font-bold ${cardTone(item.kind)}`}
-          >
-            {item.title}
-          </div>
-        ))}
-      </div>
-
-      <div
-        className="relative"
-        style={{ height: `${axisPx}px` }}
-        data-dispatch-dropzone={inspector.id}
-      >
-        {hours.map((hour, index) => (
-          <div
-            key={hour}
-            className="absolute inset-x-0 border-b border-ih-border"
-            style={{ top: `${index * HOUR_HEIGHT_PX}px`, height: `${HOUR_HEIGHT_PX}px` }}
-          />
-        ))}
-
-        {timed.length === 0 && untimed.length === 0 && (
-          <p className="absolute inset-x-0 top-4 text-center text-[11px] text-ih-fg-4">
-            {m.dispatch_empty_day()}
-          </p>
-        )}
-
-        {timed.map((item) => (
-          <DispatchCard key={item.id} item={item} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DispatchCard({ item }: { item: DispatchItem }) {
-  const geometry = cardGeometry(item);
-  if (!geometry) return null;
-
-  const body = (
     <>
-      <span className="flex items-center gap-1">
-        <span
-          data-drag-handle
-          aria-label={m.dispatch_card_grip()}
-          className="cursor-grab select-none text-[11px] leading-none opacity-80"
-        >
-          ⠿
-        </span>
-        <span className="truncate">{item.title}</span>
-      </span>
-      <span className="mt-0.5 block truncate text-[10px] font-normal opacity-90">
-        {item.startTime}
-        {item.endTime ? `-${item.endTime}` : ""}
-        {geometry.clippedStart ? ` ${m.dispatch_card_before_axis()}` : ""}
-        {geometry.clippedEnd ? ` ${m.dispatch_card_after_axis()}` : ""}
-      </span>
-    </>
-  );
+      <div
+        className={`overflow-hidden rounded-lg border border-ih-border bg-ih-bg-card${busy ? " pointer-events-none opacity-60" : ""}`}
+        aria-busy={busy}
+      >
+        {closures.length > 0 && (
+          <div className="flex flex-wrap gap-2 border-b border-ih-border bg-ih-bg-muted px-3 py-2">
+            {closures.map((closure) => (
+              <span
+                key={closure.id}
+                className="rounded-full bg-ih-fg-4 px-3 py-1 text-[11px] font-bold text-ih-fg-inverse"
+              >
+                {m.dispatch_closed_prefix()}: {closure.title}
+              </span>
+            ))}
+          </div>
+        )}
 
-  return (
-    <div
-      data-sortable-item
-      data-item-id={item.id}
-      data-inspection-id={item.inspectionId ?? ""}
-      data-testid="dispatch-card"
-      className={`absolute inset-x-1 overflow-hidden rounded-lg px-2 py-1 text-[11px] font-bold ${cardTone(item.kind)}`}
-      style={{ top: `${geometry.topPx}px`, height: `${geometry.heightPx}px` }}
-    >
-      {item.inspectionId ? (
-        <Link to={`/inspections/${item.inspectionId}`} className="block hover:underline">
-          {body}
-        </Link>
-      ) : (
-        body
-      )}
-    </div>
+        <div className="flex">
+          <UnassignedLane
+            items={board.unassigned}
+            draggingId={draggingId}
+            onDragStartItem={setDraggingId}
+            onDragEndItem={() => setDraggingId(null)}
+            onDropItem={dropOnLane}
+          />
+
+          {board.inspectors.length === 0 ? (
+            <div className="flex-1 p-6">
+              <EmptyState
+                title={m.dispatch_no_inspectors_title()}
+                description={m.dispatch_no_inspectors_body()}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-x-auto" data-testid="dispatch-columns-scroller">
+              <div className="flex min-w-max">
+                <TimeGutter hours={hours} axisPx={axisPx} />
+                {board.inspectors.map((inspector) => (
+                  <InspectorColumn
+                    key={inspector.id}
+                    inspector={inspector}
+                    items={board.items}
+                    hours={hours}
+                    axisPx={axisPx}
+                    draggingId={draggingId}
+                    hoverMinute={hover?.inspectorId === inspector.id ? hover.minute : null}
+                    onDragStartItem={setDraggingId}
+                    onDragEndItem={() => { setDraggingId(null); setHover(null); }}
+                    onDragOverAxis={(minute) => setHover({ inspectorId: inspector.id, minute })}
+                    onDragLeaveAxis={() => setHover(null)}
+                    onDropAxis={(event) => dropOnColumn(inspector.id, event)}
+                    slotIntervalMin={board.slotIntervalMin}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <ConflictModal
+        open={blocked !== null}
+        conflicts={blocked ?? []}
+        onClose={() => setBlocked(null)}
+      />
+    </>
   );
 }

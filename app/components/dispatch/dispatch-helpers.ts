@@ -34,6 +34,10 @@ export interface DispatchItem {
 export interface DispatchPayload {
   date: string;
   conflictPolicy: "advisory" | "block";
+  /** Tenant booking_slot_interval_min — the lattice a vertical drag snaps to. */
+  slotIntervalMin: number;
+  /** Epoch ms of 00:00 on `date` in the TENANT timezone. */
+  dayStartMs: number;
   inspectors: DispatchInspector[];
   items: DispatchItem[];
   unassigned: DispatchItem[];
@@ -165,6 +169,87 @@ export function cardTone(kind: string): string {
 export function inspectorLabel(inspector: DispatchInspector): string {
   const name = inspector.name?.trim();
   return name ? name : inspector.email;
+}
+
+/** One overlap the reschedule endpoint reported, mirroring ScheduleConflictSchema. */
+export interface ScheduleConflict {
+  inspectionId: string;
+  propertyAddress: string;
+  date: string;
+  inspectorId: string;
+}
+
+/**
+ * What the route action hands back to the board after a drop.
+ *
+ * `ok: true` with a non-empty `conflicts` is the ADVISORY outcome — the write
+ * landed and the overlap is a warning. `ok: false` with SCHEDULE_CONFLICT is
+ * the BLOCK outcome — nothing was written. Collapsing the two into a single
+ * "there were conflicts" flag is how a board ends up telling a dispatcher a
+ * move succeeded when the server refused it.
+ */
+export interface RescheduleResult {
+  ok: boolean;
+  code?: string;
+  message?: string | null;
+  conflicts?: ScheduleConflict[];
+}
+
+/** A card the dispatcher may move. Blocks, busy time and closures are facts. */
+export function isDraggableItem(item: DispatchItem): boolean {
+  return item.kind === "inspection" && Boolean(item.inspectionId);
+}
+
+/**
+ * Round a minute-of-day onto the tenant's booking lattice.
+ *
+ * Snapping to `booking_slot_interval_min` rather than to a pretty number is
+ * the point: a dragged job has to land on a time the booking engine would
+ * also have offered a customer, or the board quietly creates starts that no
+ * other surface in the product can produce.
+ */
+export function snapMinute(minute: number, intervalMin: number): number {
+  const step = intervalMin > 0 ? intervalMin : 30;
+  return Math.round(minute / step) * step;
+}
+
+/**
+ * Pixel offset inside a column's axis → snapped minute-of-day, clamped so a
+ * drop near the bottom edge cannot produce a start after the axis ends.
+ */
+export function minuteFromOffsetY(offsetY: number, intervalMin: number): number {
+  const raw = AXIS_START_MIN + (offsetY / HOUR_HEIGHT_PX) * 60;
+  const snapped = snapMinute(raw, intervalMin);
+  return clamp(snapped, AXIS_START_MIN, AXIS_END_MIN);
+}
+
+/** Axis pixel for a minute-of-day — the inverse of `minuteFromOffsetY`. */
+export function offsetYFromMinute(minute: number): number {
+  return pxFromAxis(clamp(minute, AXIS_START_MIN, AXIS_END_MIN));
+}
+
+/** Minute-of-day → instant, anchored on the tenant's own midnight. */
+export function minuteToEpochMs(dayStartMs: number, minute: number): number {
+  return dayStartMs + minute * 60_000;
+}
+
+/**
+ * The instant a card currently occupies. The server layers the real
+ * `scheduledStartMs` onto every inspection it has one for; the wall-clock
+ * fallback exists for rows whose instant was never stored, so dropping such a
+ * card into the unassigned lane still has something to send.
+ */
+export function currentStartMs(item: DispatchItem, dayStartMs: number): number | null {
+  const stored = item.meta?.scheduledStartMs;
+  if (typeof stored === "number" && Number.isFinite(stored)) return stored;
+  const minute = minutesOfDay(item.startTime);
+  return minute == null ? null : minuteToEpochMs(dayStartMs, minute);
+}
+
+/** `HH:MM` for a minute-of-day — assembled, never formatted (see `lint:i18n`). */
+export function minuteToHm(minute: number): string {
+  const h = Math.floor(minute / 60) % 24;
+  return `${String(h).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 }
 
 /**

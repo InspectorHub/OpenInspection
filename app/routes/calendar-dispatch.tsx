@@ -20,7 +20,12 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 import { DispatchBoard } from "~/components/dispatch/DispatchBoard";
-import { shiftCivilDate, type DispatchPayload } from "~/components/dispatch/dispatch-helpers";
+import {
+  shiftCivilDate,
+  type DispatchPayload,
+  type RescheduleResult,
+  type ScheduleConflict,
+} from "~/components/dispatch/dispatch-helpers";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -57,6 +62,59 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (!board) return { failed: true as const, board: null };
 
   return { failed: false as const, board };
+}
+
+/**
+ * One drop, one write.
+ *
+ * The board never calls the API itself — a client `fetch('/api/…')` carries no
+ * auth in this app, so the instant and the new lead travel through here and out
+ * over the token-relay client. The three outcomes are kept DISTINCT on the way
+ * back: applied cleanly, applied with advisory overlaps, and refused (409) by a
+ * tenant that blocks double-booking. Flattening the last two into "there were
+ * conflicts" is how a board ends up reporting a move the server declined.
+ */
+export async function action({ request, context }: Route.ActionArgs): Promise<RescheduleResult> {
+  const token = await requireToken(context, request);
+  const api = createApi(context, { token });
+  const form = await request.formData();
+
+  if (String(form.get("intent") ?? "") !== "reschedule") {
+    return { ok: false, message: m.calendar_action_unknown() };
+  }
+
+  const inspectionId = String(form.get("inspectionId") ?? "");
+  const scheduledStartMs = Number(form.get("scheduledStartMs"));
+  if (!inspectionId || !Number.isFinite(scheduledStartMs) || scheduledStartMs <= 0) {
+    return { ok: false, message: m.dispatch_toast_failed() };
+  }
+
+  // Empty string is an explicit UNASSIGN (the lane drop). An ABSENT key means
+  // "leave assignment alone" — the schedule endpoint distinguishes the two by
+  // key presence, so the difference has to survive the form encoding.
+  const leadRaw = form.get("leadInspectorId");
+  const assignment = leadRaw === null
+    ? {}
+    : { leadInspectorId: String(leadRaw) === "" ? null : String(leadRaw) };
+
+  const res = await api.inspections[":id"].schedule.$patch({
+    param: { id: inspectionId },
+    json: { scheduledStartMs, ...assignment },
+  });
+
+  const body = (await res.json().catch(() => null)) as
+    | { data?: { conflicts?: ScheduleConflict[] } ; error?: { code?: string; message?: string; conflicts?: ScheduleConflict[] } }
+    | null;
+
+  if (res.ok) {
+    return { ok: true, conflicts: body?.data?.conflicts ?? [] };
+  }
+  return {
+    ok: false,
+    code: body?.error?.code ?? "RESCHEDULE_FAILED",
+    message: body?.error?.message ?? m.dispatch_toast_failed(),
+    conflicts: body?.error?.conflicts ?? [],
+  };
 }
 
 export default function CalendarDispatchPage() {

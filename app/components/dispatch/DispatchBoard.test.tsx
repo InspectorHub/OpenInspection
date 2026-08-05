@@ -10,8 +10,8 @@
  * the lane, a company holiday belongs to the whole board rather than to a
  * person, and an out-of-axis job is clamped into view rather than dropped.
  */
-import { describe, it, expect } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
 import { DispatchBoard } from "./DispatchBoard";
@@ -21,7 +21,10 @@ import {
   bucketColumn,
   cardGeometry,
   closureItems,
+  isDraggableItem,
+  minuteFromOffsetY,
   shiftCivilDate,
+  snapMinute,
   type DispatchItem,
   type DispatchPayload,
 } from "./dispatch-helpers";
@@ -43,9 +46,13 @@ const ROSTER = [
   { id: "u-bo", name: null, email: "bo@example.com", role: "manager" },
 ];
 
+const DAY_START_MS = Date.UTC(2027, 2, 15, 4, 0, 0);
+
 const BOARD: DispatchPayload = {
   date: "2027-03-15",
   conflictPolicy: "block",
+  slotIntervalMin: 30,
+  dayStartMs: DAY_START_MS,
   inspectors: ROSTER,
   items: [
     item({ id: "i-1", title: "Maple St", startTime: "09:00", endTime: "11:00", inspectionId: "insp-1", userId: "u-ada" }),
@@ -58,11 +65,36 @@ const BOARD: DispatchPayload = {
   ],
 };
 
-function renderBoard(board: DispatchPayload = BOARD) {
+function renderBoard(
+  board: DispatchPayload = BOARD,
+  action?: (args: { request: Request }) => unknown,
+) {
   const Stub = createRoutesStub([
-    { path: "/", Component: () => <DispatchBoard board={board} /> },
+    {
+      path: "/",
+      Component: () => <DispatchBoard board={board} />,
+      ...(action ? { action } : {}),
+    },
   ]);
   return render(<Stub initialEntries={["/"]} />);
+}
+
+/**
+ * happy-dom reports a zero-origin rect, so clientY IS the axis offset here.
+ *
+ * The drop is dispatched as a real MouseEvent named "drop" rather than through
+ * `fireEvent.drop`: happy-dom's DragEvent does not carry pointer coordinates,
+ * and a drop with no clientY is exactly the case these tests exist to pin down.
+ */
+function dragCardTo(cardText: string, dropzone: Element, clientY: number) {
+  const card = screen.getByText(cardText).closest("[data-item-id]") as HTMLElement;
+  const dataTransfer = { setData: vi.fn(), effectAllowed: "" };
+  fireEvent.dragStart(card, { dataTransfer });
+  for (const type of ["dragover", "drop"]) {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientY });
+    Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+    fireEvent(dropzone, event);
+  }
 }
 
 describe("DispatchBoard", () => {
@@ -108,7 +140,99 @@ describe("DispatchBoard", () => {
   });
 });
 
+describe("DispatchBoard drag-drop", () => {
+  it("sends the dropped column AND the snapped instant in one write", async () => {
+    const posted: Record<string, string>[] = [];
+    renderBoard(BOARD, async ({ request }) => {
+      const form = await request.formData();
+      posted.push(Object.fromEntries(form) as Record<string, string>);
+      return { ok: true, conflicts: [] };
+    });
+
+    const ada = screen.getAllByTestId("dispatch-column")[0];
+    // 112px below the axis top = 09:00 on a 56px hour starting at 07:00.
+    dragCardTo("Pine Rd", ada.querySelector("[data-dispatch-dropzone]")!, 112);
+
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({
+      intent: "reschedule",
+      inspectionId: "insp-3",
+      leadInspectorId: "u-ada",
+      scheduledStartMs: String(DAY_START_MS + 9 * 60 * 60_000),
+    });
+  });
+
+  it("snaps a between-slots drop onto the tenant's booking lattice", async () => {
+    const posted: Record<string, string>[] = [];
+    renderBoard(BOARD, async ({ request }) => {
+      const form = await request.formData();
+      posted.push(Object.fromEntries(form) as Record<string, string>);
+      return { ok: true, conflicts: [] };
+    });
+
+    const ada = screen.getAllByTestId("dispatch-column")[0];
+    // 130px ≈ 09:19 — with a 30-minute interval the only honest answer is 09:30.
+    dragCardTo("Pine Rd", ada.querySelector("[data-dispatch-dropzone]")!, 130);
+
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0].scheduledStartMs).toBe(String(DAY_START_MS + (9 * 60 + 30) * 60_000));
+  });
+
+  it("unassigns with the time intact when a card is dropped on the lane", async () => {
+    const posted: Record<string, string>[] = [];
+    renderBoard(BOARD, async ({ request }) => {
+      const form = await request.formData();
+      posted.push(Object.fromEntries(form) as Record<string, string>);
+      return { ok: true, conflicts: [] };
+    });
+
+    dragCardTo("Maple St", screen.getByTestId("dispatch-unassigned-lane"), 0);
+
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0].leadInspectorId).toBe("");
+    expect(posted[0].scheduledStartMs).toBe(String(DAY_START_MS + 9 * 60 * 60_000));
+  });
+
+  it("opens the conflict modal on a blocked drop instead of claiming success", async () => {
+    renderBoard(BOARD, async () => ({
+      ok: false,
+      code: "SCHEDULE_CONFLICT",
+      message: "blocked",
+      conflicts: [{ inspectionId: "insp-9", propertyAddress: "77 Cedar Ln", date: "2027-03-15", inspectorId: "u-ada" }],
+    }));
+
+    const ada = screen.getAllByTestId("dispatch-column")[0];
+    dragCardTo("Pine Rd", ada.querySelector("[data-dispatch-dropzone]")!, 112);
+
+    await waitFor(() => expect(screen.getByText("77 Cedar Ln")).toBeTruthy());
+    expect(screen.getByText("That slot is already taken")).toBeTruthy();
+  });
+
+  it("does not offer a company closure as a drag source", () => {
+    renderBoard();
+    const closure = screen.getByText(/Founders Day/);
+    expect(closure.closest("[draggable=true]")).toBeNull();
+    expect(isDraggableItem(item({ id: "h", kind: "company_holiday", allDay: true }))).toBe(false);
+    expect(isDraggableItem(item({ id: "b", kind: "calendar_block", startTime: "09:00", userId: "u-ada" }))).toBe(false);
+  });
+});
+
 describe("dispatch-helpers", () => {
+  it("snaps to the tenant interval, never to a prettier number", () => {
+    expect(snapMinute(9 * 60 + 19, 30)).toBe(9 * 60 + 30);
+    expect(snapMinute(9 * 60 + 14, 30)).toBe(9 * 60);
+    expect(snapMinute(9 * 60 + 7, 15)).toBe(9 * 60);
+    expect(snapMinute(9 * 60 + 8, 15)).toBe(9 * 60 + 15);
+    // A zero/garbage interval must not divide by zero into NaN minutes.
+    expect(snapMinute(9 * 60 + 19, 0)).toBe(9 * 60 + 30);
+  });
+
+  it("clamps a drop past either end of the axis back onto it", () => {
+    expect(minuteFromOffsetY(-500, 30)).toBe(BOARD_START_HOUR * 60);
+    expect(minuteFromOffsetY(99_999, 30)).toBe(19 * 60);
+  });
+
+
   it("places a card at the pixel its start hour implies", () => {
     const geometry = cardGeometry(item({ id: "x", startTime: "09:00", endTime: "11:00" }));
     expect(geometry).not.toBeNull();

@@ -80,5 +80,10 @@
   "dispatch_column_untimed": "Sin hora",
   "dispatch_empty_day": "Nada programado",
   "dispatch_card_before_axis": "(empieza antes)",
-  "dispatch_card_after_axis": "(termina después)"
+  "dispatch_card_after_axis": "(termina después)",
+  "dispatch_conflict_title": "Ese horario ya está ocupado",
+  "dispatch_conflict_body": "Esta empresa bloquea la doble reserva, así que no se movió nada. Elige un horario libre o libera antes al inspector.",
+  "dispatch_conflict_close": "Cerrar",
+  "dispatch_toast_overlap": "Se movió, pero se superpone con otro trabajo.",
+  "dispatch_toast_failed": "No se pudo mover esa inspección."
 }

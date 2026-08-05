@@ -36,6 +36,8 @@ const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
 interface BoardPayload {
     date: string;
     conflictPolicy: string;
+    slotIntervalMin: number;
+    dayStartMs: number;
     inspectors: Array<{ id: string; name: string | null }>;
     items: Array<{ id: string; kind: string; allDay: boolean; startTime?: string; userId?: string; meta?: Record<string, unknown> }>;
     unassigned: Array<{ id: string }>;
@@ -135,6 +137,26 @@ describe('GET /api/calendar/dispatch', () => {
         expect(body.data.inspectors.map((i) => i.name)).toEqual(['Adam', 'Owner', 'Zoe']);
         expect(body.data.date).toBe(DAY);
         expect(body.data.conflictPolicy).toBe('advisory');
+    });
+
+    it('ships the snap lattice and the tenant-local midnight a drag needs', async () => {
+        const res = await get(buildApp(db, 'owner'));
+        const body = await res.json() as { data: BoardPayload };
+        // Not decoration: the board turns a dropped pixel into an instant with
+        // dayStartMs + minutes*60000, so a wrong or missing anchor silently
+        // reschedules to the wrong day, and a wrong interval produces starts the
+        // booking engine would never have offered.
+        expect(body.data.slotIntervalMin).toBe(30);
+        expect(body.data.dayStartMs).toBe(Date.UTC(2026, 5, 1, 0, 0, 0));
+    });
+
+    it('echoes a non-default booking_slot_interval_min rather than assuming 30', async () => {
+        await db.update(schema.tenantConfigs)
+            .set({ bookingSlotIntervalMin: 45 })
+            .where(eq(schema.tenantConfigs.tenantId, TENANT));
+        const res = await get(buildApp(db, 'owner'));
+        const body = await res.json() as { data: BoardPayload };
+        expect(body.data.slotIntervalMin).toBe(45);
     });
 
     it('echoes the tenant booking_conflict_policy', async () => {

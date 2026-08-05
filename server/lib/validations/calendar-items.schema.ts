@@ -91,6 +91,10 @@ export const DispatchBoardResponseSchema = z.object({
         date: CivilDateSchema.describe('The civil date actually rendered (echoes the query, or today in the tenant timezone).'),
         conflictPolicy: z.enum(['advisory', 'block'])
             .describe('Tenant booking_conflict_policy. `block` means the reschedule endpoint will refuse an overlapping drop with 409, so the board warns BEFORE the round trip.'),
+        slotIntervalMin: z.number().int().positive()
+            .describe('Tenant booking_slot_interval_min. The grid a vertical drag snaps to, so a dragged card lands on the same lattice the booking engine offers customers.'),
+        dayStartMs: z.number().int()
+            .describe('Epoch milliseconds of 00:00 on `date` IN THE TENANT TIMEZONE. The board converts a dropped pixel to an instant with dayStartMs + minutes*60000 rather than guessing a zone in the browser; the server still derives the civil date back from the instant it is sent.'),
         inspectors: z.array(DispatchInspectorSchema).describe('One board column each, sorted by display name.'),
         items: z.array(CalendarItemSchema).describe('Every calendar item on that day, for all inspectors.'),
         unassigned: z.array(CalendarItemSchema)
