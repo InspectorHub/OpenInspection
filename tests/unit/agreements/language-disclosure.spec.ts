@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
@@ -61,47 +61,46 @@ describe('agreement language disclosure', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The counsel record. This module's header is the ONLY place the reasoning
-// lives next to the code, and it exists to stop two specific things: re-asking
-// counsel a question already answered, and starting translated-agreement work
-// on an assumption about a question that is NOT answered. A future tidy-up that
-// prunes "background" comments would delete both without anyone noticing —
-// which is what this guard is for.
+// This repo is PUBLIC. The module's header used to carry counsel's preliminary
+// position, the platform's legal posture, and a citation to a document that
+// exists only in the private superproject — and the guard here asserted all of
+// it STAYED. That was backwards twice over: it published private legal analysis
+// from an open-source file, and it could only be verified from a checkout that
+// has the superproject above it, so it failed on CI, where this repo is checked
+// out alone. That failure was the useful part: a guard that cannot run where the
+// code is published is not guarding the code that is published.
+//
+// So the guard is inverted. What must survive is the ENGINEERING instruction —
+// do not turn this notice into a contractual term, do not grow it into
+// translated agreements. What must NOT survive is anything a reader outside this
+// company was never meant to see.
 // ---------------------------------------------------------------------------
-describe('agreement language disclosure — the counsel record survives', () => {
+describe('agreement language disclosure — the module stays publishable', () => {
     const MODULE = 'server/lib/legal/agreement-language-disclosure.ts';
-    const COUNSEL_DOC = 'docs/legal/2026-08-02-counsel-response-and-followup.md';
     const src = () => readFileSync(join(REPO_ROOT, MODULE), 'utf8');
 
-    it('dates the advice — undated legal reasoning cannot be superseded safely', () => {
-        expect(src()).toContain('2026-08-02');
+    it('cites no path outside this repository', () => {
+        // A private path in a public file is either a leak or a dead link, and
+        // both are found by the same check. `docs/legal/` lives in the
+        // superproject; nothing here may reach for it.
+        expect(src()).not.toMatch(/docs\/legal\//);
         // Prove the read is of the module and not an empty string.
         expect(src()).toContain('DISCLOSURE_VERSION');
     });
 
-    it('cites a document that EXISTS, so a rename fails here and not in a dispute', () => {
-        expect(src()).toContain(COUNSEL_DOC);
-        // The superproject holds docs/; the module lives in this repo. Resolve up
-        // one level, and assert the resolution itself works before trusting it.
-        const docPath = resolve(REPO_ROOT, '..', '..', COUNSEL_DOC);
-        expect(existsSync(resolve(REPO_ROOT, '..', '..', 'docs', 'legal')),
-            'docs/legal moved — this guard is looking in the wrong place').toBe(true);
-        expect(existsSync(docPath), `${COUNSEL_DOC} is cited by ${MODULE} but does not exist`).toBe(true);
+    it('carries no counsel record, jurisdiction analysis, or platform legal posture', () => {
+        for (const forbidden of [/counsel/i, /\b1632\b/, /Civil Code/i, /not a party/i]) {
+            expect(src(), `${forbidden} reads as private legal material in a public repo`)
+                .not.toMatch(forbidden);
+        }
     });
 
-    it('says §1632 is UNRESOLVED and names what that blocks', () => {
-        // The next reader is plausibly someone about to translate the agreement
-        // body. The module has to stop them, not merely fail to encourage them.
-        expect(src()).toMatch(/1632/);
-        expect(src()).toMatch(/unresolved|not settled|NOT settled/i);
-        expect(src()).toMatch(/translated agreements?/i);
-    });
-
-    it('keeps the deliberately-unasked question findable', () => {
-        // Deferred on purpose: the answer depends on what a courtesy-translation
-        // notice ends up saying. Deferred is not the same as forgotten, and a
-        // plan file nobody re-opens is where it would have been forgotten.
-        expect(src()).toMatch(/courtesy/i);
+    it('still stops the next reader from translating the agreement body', () => {
+        // This is the instruction worth keeping, and it survives the pruning
+        // above only because it is asserted here. It is engineering guidance —
+        // what this feature is not — with no legal claim attached.
+        expect(src()).toMatch(/translating the agreement body|agreement BODY/i);
+        expect(src()).toMatch(/own legal advice/i);
     });
 });
 

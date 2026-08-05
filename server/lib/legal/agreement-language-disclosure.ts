@@ -1,21 +1,21 @@
 /**
  * Neutral platform disclosure shown ALONGSIDE an inspection agreement.
  *
- * Rewritten on counsel's advice, received 2026-08-02. An earlier design embedded
- * InterNACHI's governing-language clause into the agreement body. Counsel: "do
- * not embed the InterNACHI clause as platform contractual language — if
- * implemented, position it as a neutral platform disclosure."
+ * An earlier design embedded a governing-language clause into the agreement
+ * body. That was withdrawn, and the reason is the invariant this module exists
+ * to hold.
  *
- * A governing-language provision allocates risk between the tenant and their
- * client. We are not a party to that contract, we author none of its text, and
- * we control none of its terms. Inserting one would have made it the only
- * contractual language we wrote, in the one document where we deliberately
- * write none.
+ * A governing-language provision allocates risk between the inspector and their
+ * client. The platform is not a participant in that allocation: it carries the
+ * document, it authors none of its text, and it controls none of its terms.
+ * Inserting such a clause would make it the only contractual language the
+ * platform wrote, in the one document where it deliberately writes none.
  *
  * So: this states a fact and decides nothing. No "governs", no "prevails", no
- * responsibility for a translation's accuracy. A tenant who wants a
+ * responsibility for a translation's accuracy. An inspector who wants a
  * governing-language clause puts it in THEIR agreement text — that is theirs to
- * write, and nothing here should look like we already wrote it for them.
+ * write, and nothing here should look like the platform already wrote it for
+ * them.
  *
  * ## Why the wrapper matters
  *
@@ -24,8 +24,8 @@
  * (`server/services/agreement/sanitizer.ts`) allows only the Quill toolbar's
  * tags — no `<section>`, no `role`. So the disclosure cannot pass through the
  * agreement pipeline and come out intact: composed into the body it arrives as
- * an anonymous paragraph among the terms, which is exactly the reading counsel
- * ruled out. The shape is what makes the wrong thing visibly wrong, and
+ * an anonymous paragraph among the terms, which is exactly the reading this
+ * design rules out. The shape is what makes the wrong thing visibly wrong, and
  * `tests/unit/agreements/language-disclosure.spec.ts` asserts both halves —
  * that the agreement sanitizer destroys it, and that nothing on the
  * agreement-body path imports this module.
@@ -42,42 +42,22 @@
  * disclosure is how an English-only agreement is handled honestly, not a step
  * toward translating one.
  *
- * ## What is NOT settled — read before extending this (counsel, 2026-08-02)
+ * ## Read before extending this
  *
- * **California Civil Code §1632 is unresolved.** Counsel gave a preliminary
- * position only: applicability turns on whether the agreement falls in an
- * enumerated contract category AND whether the transaction was primarily
- * negotiated in a covered language. Three facts were requested and supplied
- * (`docs/legal/2026-08-02-counsel-response-and-followup.md`):
+ * The disclosure states a FACT and makes no contractual assertion. That is what
+ * keeps it safe to ship without a jurisdiction-by-jurisdiction analysis behind
+ * it, and it is the property to preserve: the moment this block says which text
+ * governs, prevails, or controls, it stops being a notice and becomes a term in
+ * a contract between two parties the platform is not one of. The tests next to
+ * this file enforce that as a word list, on both the sentence and the heading.
  *
- *  1. **Negotiation language: we hold no record of it**, and that absence is the
- *     honest answer rather than a gap to paper over. Nothing captures it, and
- *     the negotiation itself is typically a phone call outside the software.
- *     `contacts.locale` is a stated READING preference and must not be offered
- *     as evidence of the language a deal was struck in.
- *  2. **Platform role: not a party.** We carry the agreement and attest to the
- *     signing. We do not negotiate, advise, or take a fee from the transaction.
- *  3. **Template/control: none.** Every tenant authors their own agreement body
- *     and versions it; we review no terms. Which is why the clause would have
- *     been the ONLY contractual text we wrote in that document.
- *
- * The disclosure below did NOT wait on that answer, and deliberately: it asserts
- * nothing contractual, so it is useful under either §1632 answer and harmful
- * under neither.
- *
- * **What DOES wait on it: translated agreements.** If §1632 reaches this
- * contract type the build is a different one — translated versions, a
- * language-of-negotiation record, a per-state rule — and none of it may be
- * started on an assumption about the answer. If you arrived here intending to
- * translate the agreement body, that is the work this note is about, and the
- * §1632 answer is its gate. Translating the disclosure is not a route around it.
- *
- * **One question is deliberately unasked.** If a tenant later offers a courtesy
- * Spanish REPORT, does that report's own limitations notice suffice, or does the
- * agreement need a companion sentence? It goes to counsel when the
- * courtesy-translation work is scheduled and not before — the answer depends on
- * what that notice ends up saying, so asking early buys an answer to the wrong
- * question. Whoever schedules that work owns asking it.
+ * **Translating the agreement BODY is a different feature, not a bigger version
+ * of this one.** It needs translated versions, a record of the language a deal
+ * was actually negotiated in, and per-jurisdiction rules — none of which exist
+ * here, and none of which should be started from this file. Translating the
+ * disclosure is not a route around that. Deployments with a language-specific
+ * statutory obligation should get their own legal advice; this module does not
+ * encode one, and deliberately so.
  */
 
 /** Version of the disclosure copy. Bump on ANY wording change, `label` included. */
@@ -87,8 +67,9 @@ export const AGREEMENT_LANGUAGE_DISCLOSURE = Object.freeze({
     version: DISCLOSURE_VERSION,
     /**
      * Plain-text heading every renderer puts directly above `html`. It is part of
-     * the disclosure, not chrome a component chose: the whole instruction from
-     * counsel is about POSITION, and this sentence is what makes the position
+     * the disclosure, not chrome a component chose: the whole point is POSITION
+     * — that this block sits beside the agreement and not inside it — and this
+     * sentence is what makes the position
      * legible to a reader who is not going to reason about borders and type
      * sizes. Kept here rather than in each renderer so the signing screen and the
      * archived copy cannot drift apart, and out of the message catalogue for the
