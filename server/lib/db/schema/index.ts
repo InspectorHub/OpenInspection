@@ -90,3 +90,6 @@ export type { ReportExport, NewReportExport } from './report-export';
 // Recipient notification preferences — one answer per (subject, class, channel).
 export { notificationPreferences } from './notification-preferences';
 export type { NotificationPreference, NewNotificationPreference } from './notification-preferences';
+// Generic idempotency ledger (portal #107) — one row per (tenant, key).
+export { idempotencyKeys } from './idempotency';
+export type { IdempotencyKey, NewIdempotencyKey } from './idempotency';
