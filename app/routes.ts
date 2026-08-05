@@ -112,6 +112,9 @@ export default [
     route("resources/schedule-conflicts", "routes/resources/schedule-conflicts.ts"),
     route("resources/holiday-check", "routes/resources/holiday-check.ts"),
     route("resources/week-summary", "routes/resources/week-summary.ts"),
+    // Find-a-Time: one day of slots WITH the free inspectors named (the public
+    // booking surface withholds identities by design).
+    route("resources/day-slots", "routes/resources/day-slots.ts"),
     // #198 — Google Places autocomplete/details BFF (token-relay proxy).
     route("resources/places", "routes/resources/places.tsx"),
     // Inspections workspace — the primary list/stats/wizard surface (formerly

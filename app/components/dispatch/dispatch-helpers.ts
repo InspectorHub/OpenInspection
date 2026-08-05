@@ -252,6 +252,48 @@ export function minuteToHm(minute: number): string {
   return `${String(h).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 }
 
+export interface DaySlot {
+  time: string;
+  available: boolean;
+  inspectorIds: string[];
+}
+
+/**
+ * Which slot STARTS can actually hold a job of `durationMin`.
+ *
+ * The slots endpoint reports starts, not windows — a 09:00 slot being free says
+ * nothing about 09:30, and offering "09:00" for a three-hour job whose 10:00
+ * slot is taken is worse than offering nothing: it is a promise the calendar
+ * cannot keep. So a start qualifies only when every consecutive slot it needs
+ * exists, follows on at exactly `intervalMin`, and is free. The contiguity
+ * check is not paranoia: a gap in the grid is a closed window (lunch, a
+ * split shift), and index arithmetic alone would step straight over it.
+ */
+export function startsFittingDuration(
+  slots: DaySlot[],
+  intervalMin: number,
+  durationMin: number,
+): Set<string> {
+  const step = intervalMin > 0 ? intervalMin : 30;
+  const needed = Math.max(1, Math.ceil((durationMin > 0 ? durationMin : step) / step));
+  const fits = new Set<string>();
+
+  for (let i = 0; i < slots.length; i++) {
+    let ok = true;
+    for (let n = 0; n < needed; n++) {
+      const slot = slots[i + n];
+      const previous = n === 0 ? null : slots[i + n - 1];
+      if (!slot || !slot.available) { ok = false; break; }
+      if (previous) {
+        const gap = (minutesOfDay(slot.time) ?? 0) - (minutesOfDay(previous.time) ?? 0);
+        if (gap !== step) { ok = false; break; }
+      }
+    }
+    if (ok) fits.add(slots[i].time);
+  }
+  return fits;
+}
+
 /**
  * Shift a civil date by whole days without ever touching local time. Built on
  * `Date.UTC` and read back with the UTC accessors, so the arithmetic happens in

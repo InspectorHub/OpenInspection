@@ -85,5 +85,17 @@
   "dispatch_conflict_body": "This company blocks double-booking, so nothing was moved. Pick a free time, or free the inspector first.",
   "dispatch_conflict_close": "Close",
   "dispatch_toast_overlap": "Moved, but it overlaps other work.",
-  "dispatch_toast_failed": "Could not move that inspection."
+  "dispatch_toast_failed": "Could not move that inspection.",
+  "find_a_time_open": "Find a time",
+  "find_a_time_title": "Find a time",
+  "find_a_time_close": "Close",
+  "find_a_time_date": "Date",
+  "find_a_time_duration": "Duration",
+  "find_a_time_inspector": "Inspector",
+  "find_a_time_anyone": "Anyone available",
+  "find_a_time_minutes": "{count} min",
+  "find_a_time_loading": "Checking availability...",
+  "find_a_time_none": "No window that long is free on this day.",
+  "find_a_time_failed": "Availability could not be checked. Try again.",
+  "find_a_time_free_count": "{count} free"
 }

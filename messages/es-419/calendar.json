@@ -85,5 +85,17 @@
   "dispatch_conflict_body": "Esta empresa bloquea la doble reserva, así que no se movió nada. Elige un horario libre o libera antes al inspector.",
   "dispatch_conflict_close": "Cerrar",
   "dispatch_toast_overlap": "Se movió, pero se superpone con otro trabajo.",
-  "dispatch_toast_failed": "No se pudo mover esa inspección."
+  "dispatch_toast_failed": "No se pudo mover esa inspección.",
+  "find_a_time_open": "Buscar un horario",
+  "find_a_time_title": "Buscar un horario",
+  "find_a_time_close": "Cerrar",
+  "find_a_time_date": "Fecha",
+  "find_a_time_duration": "Duración",
+  "find_a_time_inspector": "Inspector",
+  "find_a_time_anyone": "Cualquiera disponible",
+  "find_a_time_minutes": "{count} min",
+  "find_a_time_loading": "Comprobando disponibilidad...",
+  "find_a_time_none": "No hay ninguna ventana libre tan larga ese día.",
+  "find_a_time_failed": "No se pudo comprobar la disponibilidad. Inténtalo de nuevo.",
+  "find_a_time_free_count": "{count} libres"
 }

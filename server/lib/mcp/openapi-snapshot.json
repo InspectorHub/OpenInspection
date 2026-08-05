@@ -8422,6 +8422,45 @@
     "description": "IA-6 — advisory same-day-hour collision check counting lead and helper assignments. Callers render a warning; scheduling is never blocked."
   },
   {
+    "operationId": "getScheduleDaySlots",
+    "method": "GET",
+    "pathTemplate": "/api/schedule/day-slots",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "date",
+          "in": "query",
+          "required": true,
+          "description": "Civil date to check, YYYY-MM-DD.",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Civil date to check, YYYY-MM-DD."
+          }
+        },
+        {
+          "name": "userIds",
+          "in": "query",
+          "required": false,
+          "description": "Comma-separated inspector ids to narrow the search to. Omit to consider everyone qualified.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated inspector ids to narrow the search to. Omit to consider everyone qualified."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Free slots for one day, naming the free inspectors",
+    "description": "Returns every slot start on a civil date with the inspectors free at each, plus the tenant slot interval. Staff-only counterpart to the identity-hiding public booking slots endpoint."
+  },
+  {
     "operationId": "getScheduleWeekSummary",
     "method": "GET",
     "pathTemplate": "/api/schedule/week-summary",
