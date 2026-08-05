@@ -314,6 +314,13 @@ jobs:
       - test-workers
       - test-web
       - build
+      # e2e was NOT in this list, so a red E2E run left `verify` green. Since
+      # verify is the job branch protection keys off, that made the whole E2E
+      # suite advisory without anyone deciding it should be — a gate that runs,
+      # reports, and cannot block. It costs verify the wait for e2e (~5 min,
+      # and it is the longest job), which is the price of it meaning what its
+      # name says.
+      - e2e
     steps:
       # Block scalar, not a plain one: a plain YAML scalar may not contain
       # ": " and `echo "results: …"` does, which is a parse error rather than
@@ -387,6 +394,14 @@ jobs:
 
       - name: E2E tests (Playwright, seeded D1)
         run: npm run test:e2e
+
+      # Second run, second config: the multi-user seed writes users into the
+      # standalone tenant, which 409s the first run's fresh-setup assertion, so
+      # the two cannot share one D1. Same worker (reuseExistingServer), so this
+      # is one extra globalSetup, not one extra boot. See
+      # playwright.seeded.config.ts for the full reasoning.
+      - name: E2E tests (multi-user seed — subsystem D/E)
+        run: npm run test:e2e:seeded
 
       - name: Upload Playwright report on failure
         if: failure()

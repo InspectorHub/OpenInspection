@@ -15,6 +15,18 @@ import path from 'path';
 const ADMIN_EMAIL    = 'admin-seed@seed.test';
 const LEAD_EMAIL     = 'inspector-a@seed.test';
 const INSPECTOR_B_EMAIL = 'inspector-b@seed.test';
+/**
+ * The inspector who OWNS `seed-half-done-inspection`.
+ *
+ * The "half" names the INSPECTION, not a seat/quota allowance — read off the
+ * subsystem-E assertions rather than the address of the name: the only spec
+ * that logs in as this account immediately opens
+ * `/inspections/seed-half-done-inspection/...` and asserts the publish
+ * pre-flight gates FAIL. It is the inspector standing in front of a half-filled
+ * report, and nothing in any spec touches seats. (The at-cap seat fixture is
+ * `admin-full@seed.test`, which is a separate tenant with max_users = 1.)
+ */
+const INSPECTOR_HALF_EMAIL = 'inspector-half@seed.test';
 const ADMIN_FULL_EMAIL = 'admin-full@seed.test';
 const MULTI_EMAIL    = 'multi-tenant-user@seed.test';
 const BRANCH_B_EMAIL = 'branch-b@seed.test';
@@ -53,6 +65,12 @@ const SEED_PASSWORD_HASH =
  */
 const TENANT_A_ID = '00000000-0000-0000-0000-000000000000';
 const TENANT_B_ID = '00000000-0000-0000-0000-000000000bbb';
+
+/** Tenant A's slug — the public report/booking URLs are keyed by it. */
+const TENANT_A_SLUG = 'seed-a';
+
+const LEAD_INSPECTOR_ID = '22222222-2222-2222-2222-222222222aa1';
+const HALF_INSPECTOR_ID = '44444444-4444-4444-4444-444444444aa1';
 
 /**
  * Address the DB the way global-setup does: by BINDING (`DB`) against the same
@@ -93,6 +111,9 @@ function d1(sql: string, cwd: string): void {
 export function seedFixtures(appDir: string): void {
     const cwd = appDir;
     const now = new Date().toISOString();
+    // Epoch-ms form for the timestamp_ms columns (the Schema Rules default for
+    // every new table); the older tables above still hold ISO text.
+    const nowMs = Date.now();
 
     // Two tenants — Tenant A is the default; Tenant B backs the branch-B fixture user below.
     d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
@@ -118,6 +139,19 @@ export function seedFixtures(appDir: string): void {
     d1(`INSERT OR REPLACE INTO users (id, tenant_id, email, password_hash, name, role, created_at)
         VALUES ('33333333-3333-3333-3333-333333333aa1', '${TENANT_A_ID}',
                 '${INSPECTOR_B_EMAIL}', '${SEED_PASSWORD_HASH}', 'Seed Inspector B', 'inspector', '${now}')`, cwd);
+    // Owner of the half-done inspection below — see the constant's comment.
+    d1(`INSERT OR REPLACE INTO users (id, tenant_id, email, password_hash, name, role, created_at)
+        VALUES ('${HALF_INSPECTOR_ID}', '${TENANT_A_ID}',
+                '${INSPECTOR_HALF_EMAIL}', '${SEED_PASSWORD_HASH}', 'Half-Done Inspector', 'inspector', '${now}')`, cwd);
+
+    // One credential on the lead inspector so the published report's cover has a
+    // badge line to render (subsystem-E P8). Text-only (no image_r2_key): OI
+    // ships no association trademark assets, and the report renders
+    // "label #member" for a text credential.
+    d1(`INSERT OR REPLACE INTO inspector_credentials
+         (id, tenant_id, user_id, label, member_number, image_r2_key, sort_order, is_active, created_at, updated_at)
+         VALUES ('seed-credential-lead', '${TENANT_A_ID}', '${LEAD_INSPECTOR_ID}',
+                 'InterNACHI CPI', 'NACHI-24-0001', NULL, 0, 1, ${nowMs}, ${nowMs})`, cwd);
 
     // Seat-quota / at-cap admin for the over-quota E2E.
     d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
@@ -145,35 +179,60 @@ export function seedFixtures(appDir: string): void {
     // `delivered` as the order status — neither is in INSPECTION_STATUS
     // (requested / scheduled / confirmed / completed / cancelled); "published" is
     // a REPORT status, which is the separate column set alongside it here.
+    //
+    // `propertyType` is load-bearing, not decoration: the editor only renders the
+    // units surface (scope breadcrumb + Units drawer) when it is exactly
+    // 'commercial' (`showUnitsSurface` in app/routes/inspection-edit.tsx), so the
+    // subsystem-D unit flows have nothing to drive without it.
     const inspectionRow = (
         id: string,
         addr: string,
         status: string,
         reportStatus: string,
-        tenantId = TENANT_A_ID,
-    ) =>
-        `INSERT OR REPLACE INTO inspections
-         (id, tenant_id, inspector_id, property_address, date, status, report_status, payment_status,
+        opts: { tenantId?: string; inspectorId?: string; propertyType?: string } = {},
+    ) => {
+        const tenantId     = opts.tenantId ?? TENANT_A_ID;
+        const inspectorId  = opts.inspectorId ?? LEAD_INSPECTOR_ID;
+        const propertyType = opts.propertyType ?? 'residential';
+        return `INSERT OR REPLACE INTO inspections
+         (id, tenant_id, inspector_id, property_address, property_type, date, status, report_status, payment_status,
           price_cents, is_payment_required, is_agreement_required, created_at)
          VALUES ('${id}', '${tenantId}',
-                 '22222222-2222-2222-2222-222222222aa1', '${addr}',
+                 '${inspectorId}', '${addr}', '${propertyType}',
                  '2026-06-01', '${status}', '${reportStatus}', 'unpaid', 0, 0, 0, '${now}')`;
-    d1(inspectionRow('seed-empty-inspection',        '1 Empty St',        'scheduled', 'in_progress'), cwd);
-    d1(inspectionRow('seed-half-done-inspection',    '2 Half Done Ave',   'scheduled', 'in_progress'), cwd);
+    };
+    d1(inspectionRow('seed-empty-inspection',        '1 Empty St',        'scheduled', 'in_progress',
+        { propertyType: 'commercial' }), cwd);
+    d1(inspectionRow('seed-half-done-inspection',    '2 Half Done Ave',   'scheduled', 'in_progress',
+        { inspectorId: HALF_INSPECTOR_ID }), cwd);
     d1(inspectionRow('seed-team-inspection',         '3 Team Mode Rd',    'scheduled', 'in_progress'), cwd);
     d1(inspectionRow('seed-published-inspection',    '4 Published Way',   'completed', 'published'), cwd);
     d1(inspectionRow('seed-delivered-inspection',    '5 Delivered Ln',    'completed', 'published'), cwd);
-    d1(inspectionRow('seed-republished-inspection',  '6 Republished Ct',  'completed', 'published'), cwd);
+    d1(inspectionRow('seed-republished-inspection',  '6 Republished Ct',  'completed', 'published',
+        { propertyType: 'commercial' }), cwd);
 
-    console.info('[seed-fixtures] Seeded tenants + 7 users + 6 inspections.');
+    console.info('[seed-fixtures] Seeded tenants + 8 users + 6 inspections.');
 }
 
 export const SEED_PASSWORD = 'seedpassword';
 export const SEED_EMAILS = {
-    admin:        ADMIN_EMAIL,
-    lead:         LEAD_EMAIL,
-    inspectorB:   INSPECTOR_B_EMAIL,
-    adminAtCap:   ADMIN_FULL_EMAIL,
-    multiTenant:  MULTI_EMAIL,
-    branchB:      BRANCH_B_EMAIL,
+    admin:         ADMIN_EMAIL,
+    lead:          LEAD_EMAIL,
+    inspectorB:    INSPECTOR_B_EMAIL,
+    inspectorHalf: INSPECTOR_HALF_EMAIL,
+    adminAtCap:    ADMIN_FULL_EMAIL,
+    multiTenant:   MULTI_EMAIL,
+    branchB:       BRANCH_B_EMAIL,
+};
+export const SEED_TENANT_SLUG = TENANT_A_SLUG;
+/** Fixture inspection ids the subsystem-D/E specs address by name. */
+export const SEED_INSPECTIONS = {
+    /** Commercial → the editor renders the units surface. */
+    empty:       'seed-empty-inspection',
+    /** Owned by `inspector-half@seed.test`; fails every publish pre-flight gate. */
+    halfDone:    'seed-half-done-inspection',
+    published:   'seed-published-inspection',
+    delivered:   'seed-delivered-inspection',
+    /** Commercial, so a unit can be added between two publishes to make a diff. */
+    republished: 'seed-republished-inspection',
 };

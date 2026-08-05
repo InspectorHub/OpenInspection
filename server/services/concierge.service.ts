@@ -355,7 +355,7 @@ export class ConciergeService {
         // Flip inspection state.
         await db
             .update(inspections)
-            .set({ conciergeStatus: null, status: 'confirmed' })
+            .set({ conciergeStatus: null, status: INSPECTION_STATUS.CONFIRMED })
             .where(
                 and(
                     eq(inspections.id, row.inspectionId),

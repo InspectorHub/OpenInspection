@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, asc, lt, sql, inArray } from 'drizzle-orm';
 import { syncOutbox } from '../lib/db/schema';
+import { SYNC_OUTBOX_STATUS } from '../lib/status/sync-outbox-status';
 import { logger } from '../lib/logger';
 import { toCloudEvent } from '../lib/sync-events/envelope';
 import type { SyncEnvelope } from '../lib/sync-events/envelope';
@@ -93,7 +94,7 @@ export class OutboxService implements UserSyncOutbox {
             id,
             eventType: event.type,
             payload: JSON.stringify(event.payload),
-            status: 'pending',
+            status: SYNC_OUTBOX_STATUS.PENDING,
             attempts: 0,
             createdAt: now,
         });
@@ -102,7 +103,7 @@ export class OutboxService implements UserSyncOutbox {
                 id,
                 eventType: event.type,
                 payload: JSON.stringify(event.payload),
-                status: 'pending',
+                status: SYNC_OUTBOX_STATUS.PENDING,
                 attempts: 0,
                 createdAt: now,
                 lastTriedAt: null,
@@ -121,10 +122,10 @@ export class OutboxService implements UserSyncOutbox {
         const base = this.getDb().select().from(syncOutbox);
         const rows = await (olderThanSeconds !== undefined
             ? base.where(and(
-                eq(syncOutbox.status, 'pending'),
+                eq(syncOutbox.status, SYNC_OUTBOX_STATUS.PENDING),
                 lt(syncOutbox.createdAt, new Date(Date.now() - olderThanSeconds * 1000)),
             ))
-            : base.where(eq(syncOutbox.status, 'pending')))
+            : base.where(eq(syncOutbox.status, SYNC_OUTBOX_STATUS.PENDING)))
             .orderBy(asc(syncOutbox.createdAt))
             .limit(limit)
             .all();
@@ -145,7 +146,7 @@ export class OutboxService implements UserSyncOutbox {
         });
         await queue.send(envelope);
         await this.getDb().update(syncOutbox)
-            .set({ status: 'published', lastTriedAt: new Date(), lastError: null })
+            .set({ status: SYNC_OUTBOX_STATUS.PUBLISHED, lastTriedAt: new Date(), lastError: null })
             .where(eq(syncOutbox.id, row.id));
     }
 
@@ -161,7 +162,7 @@ export class OutboxService implements UserSyncOutbox {
             .from(syncOutbox).where(eq(syncOutbox.id, id)).get();
         const attempts = (row?.attempts ?? 0) + 1;
         await this.getDb().update(syncOutbox)
-            .set({ status: 'failed', attempts, lastTriedAt: now, lastError: error.slice(0, 1000) })
+            .set({ status: SYNC_OUTBOX_STATUS.FAILED, attempts, lastTriedAt: now, lastError: error.slice(0, 1000) })
             .where(eq(syncOutbox.id, id));
     }
 
@@ -174,14 +175,14 @@ export class OutboxService implements UserSyncOutbox {
         const db = this.getDb();
         if (ids && ids.length > 0) {
             const result = await db.update(syncOutbox)
-                .set({ status: 'pending', lastError: null })
-                .where(and(eq(syncOutbox.status, 'failed'), inArray(syncOutbox.id, ids)))
+                .set({ status: SYNC_OUTBOX_STATUS.PENDING, lastError: null })
+                .where(and(eq(syncOutbox.status, SYNC_OUTBOX_STATUS.FAILED), inArray(syncOutbox.id, ids)))
                 .returning({ id: syncOutbox.id });
             return result.length;
         }
         const result = await db.update(syncOutbox)
-            .set({ status: 'pending', lastError: null })
-            .where(eq(syncOutbox.status, 'failed'))
+            .set({ status: SYNC_OUTBOX_STATUS.PENDING, lastError: null })
+            .where(eq(syncOutbox.status, SYNC_OUTBOX_STATUS.FAILED))
             .returning({ id: syncOutbox.id });
         return result.length;
     }
@@ -194,10 +195,10 @@ export class OutboxService implements UserSyncOutbox {
     async counts(): Promise<{ pending: number; failed: number; oldestPendingAge: number | null }> {
         const db = this.getDb();
         const [pendingRow, failedRow, oldest] = await Promise.all([
-            db.select({ n: sql<number>`count(*)` }).from(syncOutbox).where(eq(syncOutbox.status, 'pending')).get(),
-            db.select({ n: sql<number>`count(*)` }).from(syncOutbox).where(eq(syncOutbox.status, 'failed')).get(),
+            db.select({ n: sql<number>`count(*)` }).from(syncOutbox).where(eq(syncOutbox.status, SYNC_OUTBOX_STATUS.PENDING)).get(),
+            db.select({ n: sql<number>`count(*)` }).from(syncOutbox).where(eq(syncOutbox.status, SYNC_OUTBOX_STATUS.FAILED)).get(),
             db.select({ createdAt: syncOutbox.createdAt }).from(syncOutbox)
-                .where(eq(syncOutbox.status, 'pending'))
+                .where(eq(syncOutbox.status, SYNC_OUTBOX_STATUS.PENDING))
                 .orderBy(asc(syncOutbox.createdAt)).limit(1).get(),
         ]);
         const pending = pendingRow?.n ?? 0;

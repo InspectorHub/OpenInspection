@@ -4,6 +4,7 @@ import type { automations} from '../../lib/db/schema';
 import { agreementRequests, inspectionServices } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
 import { isReportPublished } from '../../lib/status/report-status';
+import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { evaluateConditions as coreEvaluate } from '../../lib/automation-core';
 import type { CoreCondition } from '../../lib/automation-core';
 import type { Constructor, FlushInspection } from './shared';
@@ -29,7 +30,8 @@ export function AutomationConditions<TBase extends Constructor<AutomationBase>>(
             inspection: FlushInspection,
         ): Promise<{ ok: true } | { ok: false; reason: string }> {
             // Reminder-staleness predicate (computed here; same condition as before).
-            const isStale = inspection.status === 'cancelled' || inspection.status === 'completed' ||
+            const isStale = inspection.status === INSPECTION_STATUS.CANCELLED ||
+                            inspection.status === INSPECTION_STATUS.COMPLETED ||
                             isReportPublished(inspection.reportStatus);
 
             // Parse the requested gates to decide which lazy DB reads to run. We

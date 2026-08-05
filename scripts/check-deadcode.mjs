@@ -8,18 +8,29 @@
  * entries that no longer hit are informational only (run `--update` to prune).
  *
  * Why a wrapper (and not plain `knip`): knip 6 has no native baseline file, and
- * the tree carries a large pre-existing residual of dead exports/files/deps
- * (leftovers the T9 deletion pass did not reach). Freezing that residual lets
- * the gate go green today while catching every NEW piece of dead code a future
- * change introduces — the same baseline-ratchet used by `check-tenant-scoping`
- * and `check-file-size`.
+ * the tree once carried a large residual of dead exports/files/deps (leftovers
+ * the T9 deletion pass did not reach). Freezing that residual let the gate go
+ * green while catching every NEW piece of dead code — the same baseline-ratchet
+ * used by `check-tenant-scoping` and `check-file-size`.
+ *
+ * The ratchet has since reached zero: `scripts/knip-baseline.json` is `[]` and
+ * MUST stay that way. An empty baseline means every knip finding is a failure,
+ * which is the whole point — a baseline that only ever grows has stopped being
+ * a ratchet.
  *
  *   node scripts/check-deadcode.mjs            # gate (CI + `npm run lint`)
  *   node scripts/check-deadcode.mjs --update   # regenerate the baseline snapshot
  *
- * The baseline (`scripts/knip-baseline.json`) IS the documented allow-list of
- * known residual dead code. Shrinking it (deleting real dead code, then running
- * `--update`) is always safe and encouraged; growing it requires review.
+ * When a NEW finding is legitimate, the fix is to declare WHY in `knip.json`,
+ * not to grow the baseline. The three shapes that come up:
+ *   - a file that is a graph root (a worker/config/route entry) -> `entry`
+ *   - an export a NON-TypeScript tool consumes (a gate script that reads the
+ *     source as text, so the module graph cannot see it) -> tag the export
+ *     `@gateConsumed` (wired via `tags: ["-gateConsumed"]`); this is per-export,
+ *     so the rest of the file stays under the gate. Example:
+ *     `ERASURE_OUT_OF_SCOPE`, read by `scripts/check-erasure-manifest.mjs`.
+ *   - a dependency knip cannot resolve -> `ignoreDependencies`
+ * `--update` is a last resort and needs review of every entry it adds.
  *
  * console.* is intentional — this is a build script, not server code (the
  * no-console rule is server-only).

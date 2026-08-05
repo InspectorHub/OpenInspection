@@ -189,16 +189,13 @@ export default defineConfig({
             testMatch: 'estimate-range.spec.ts',
             dependencies: ['api'],
         },
-        {
-            // Sprint 2 regression — Track A fixes (A1-A4).
-            name: 'sprint2-regression',
-            testMatch: 'sprint2-regression.spec.ts',
-        },
-        {
-            // R7-06 — public booking page native date input.
-            name: 'booking-date-input',
-            testMatch: 'booking-date-input.spec.ts',
-        },
+        // `sprint2-regression` and `booking-date-input` projects deleted
+        // (2026-08 skip-debt clearance) together with their spec files. Every
+        // test in both was inside a `describe.skip` scraping Alpine-era source
+        // files the RR migration removed (src/templates/**, public/js/auth.js)
+        // or driving the Alpine booking form. A project whose testMatch
+        // resolves to nothing is a new way to report green over zero tests, so
+        // the entries go with the files.
         {
             // env-guarded (R8 fix): matches nothing by default so the dead
             // 'cloud' project no longer silently swallows via testIgnore —
@@ -274,10 +271,13 @@ export default defineConfig({
         // Destructive (reset/restore DB) — env-gated inside the specs:
         { name: 'backup-restore-seed', testMatch: 'backup-restore-seed.spec.ts' },
         { name: 'backup-restore-verify', testMatch: 'backup-restore-verify.spec.ts' },
-        // DS-0520 subsystem C/D/E — skip-shells pending multi-user seed harness:
+        // DS-0520 subsystem C — still a skip-shell, and for a reason nothing in
+        // this repo can supply: two servers plus the Stripe CLI. See the spec.
         { name: 'subsystem-c-stripe-smoke', testMatch: 'subsystem-c-stripe-cross-repo-smoke.spec.ts' },
-        { name: 'subsystem-d-flows', testMatch: 'subsystem-d-flows.spec.ts' },
-        { name: 'subsystem-e-flows', testMatch: 'subsystem-e-flows.spec.ts' },
+        // subsystem-d-flows / subsystem-e-flows moved to playwright.seeded.config.ts.
+        // They need the multi-user seed, which writes users into the standalone
+        // tenant and therefore 409s the `api` project's fresh-setup assertion —
+        // the two cannot share one D1. `npm run test:e2e:seeded` runs them.
         // Commercial PCA Task 19a — real TOC page numbers (two-pass Chrome +
         // pdf-lib). Exercises the actual worker report render + BROWSER binding;
         // see tests/e2e/report-toc-numbers.spec.ts for its harness requirements.

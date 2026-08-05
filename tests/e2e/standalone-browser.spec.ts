@@ -226,21 +226,12 @@ test.describe.serial('Standalone Browser Tests', () => {
         expect(pageText, 'report-view must SSR-render the branded not-viewable state').toMatch(/Report not found|not published/i);
     });
 
-    // ── Alpine-only surfaces with no verified live equivalent yet ──────────────
-
-    // TODO(tests-reorg): rewrite onto RR v7 selector. Was `#agreementsList` +
-    // "Document Registry" jargon (Alpine, removed). No other browser-level
-    // coverage of /library/agreements; rebind to the live agreements list
-    // landmark once identified.
-    test.skip('UI-11: Agreements page loads (Alpine — needs RR rebind)', async () => {});
-
-    // TODO(tests-reorg): rewrite onto RR v7 selector. Was `#notifyUnreadBadge`
-    // (Alpine, removed) + a "Mark all read" button. Rebind to the live
-    // notifications page landmark + bell badge.
-    test.skip('UI-NOTIFY: Notifications page + sidebar badge (Alpine — needs RR rebind)', async () => {});
-
-    // TODO(tests-reorg): rewrite onto RR v7 selector. Was `[data-widget-embed]`
-    // /`data-widget-style` (absent from app/). Verify the /widget.js asset +
-    // /book?embed=1 chrome-strip against the live booking-embed route.
-    test.skip('UI-WIDGET: /widget.js + embed mode (needs RR rebind)', async () => {});
+    // UI-11 / UI-NOTIFY / UI-WIDGET deleted (2026-08 skip-debt clearance). All
+    // three were EMPTY skip placeholders (`async () => {}`) targeting Alpine
+    // surfaces the RR migration deleted — `#agreementsList`, `#notifyUnreadBadge`,
+    // `[data-widget-embed]`. Nothing was lost: they asserted nothing and could
+    // never be unskipped, they only inflated the suite's skip count with tests
+    // that can never run. New coverage of /library/agreements, /notifications and
+    // the booking embed belongs in a spec written against the live routes, not in
+    // a placeholder that outlives the code it was named after.
 });

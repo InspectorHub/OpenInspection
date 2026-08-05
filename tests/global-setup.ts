@@ -42,6 +42,11 @@ export default function globalSetup() {
         `npx wrangler d1 execute DB --local -c ${cfg} --file "${file}" ${extra}`.trim();
     const tmp = (name: string) => path.join(appDir, name);
 
+    // Set the moment the SEED_E2E=1 branch is entered, so the outer catch can
+    // tell "the optional D1 reset did not work" (a warning) from "the seed the
+    // caller explicitly asked for did not work" (fatal).
+    let seedRequested = false;
+
     try {
         // Ensure all schema migrations are applied (idempotent)
         execSync('npm run db:migrate', { cwd: appDir, stdio: 'pipe' });
@@ -110,18 +115,35 @@ export default function globalSetup() {
         // Set SEED_E2E=1 when running the unskipped subsystem specs.
         if (process.env.SEED_E2E === '1') {
             console.info('\n[globalSetup] Local D1 cleared — seeding E2E fixtures (SEED_E2E=1) next.');
-            try {
-                seedFixtures(appDir);
-            } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
-                console.warn(`[globalSetup] seedFixtures failed: ${msg}`);
-            }
+            // NOT wrapped in a try/catch. SEED_E2E=1 means the seed was asked
+            // for explicitly, and every spec downstream depends on the rows it
+            // writes. A swallowed failure here does not make the run more
+            // robust — it makes the run LIE: the specs then fail at a login or
+            // a missing inspection id, which reads as a broken feature rather
+            // than a broken fixture. Five separate defects in seed-fixtures.ts
+            // (wrong database name, missing -c, embedded newlines cmd.exe
+            // rejects, a password-hash format verifyPassword can never match,
+            // and a tenant id standalone login cannot resolve) survived for
+            // months behind that console.warn. Fail loudly instead.
+            //
+            // The flag is what carries the throw PAST the outer catch below,
+            // which exists to tolerate a missing/unbuilt local D1 and would
+            // otherwise re-swallow this as the same soft warning.
+            seedRequested = true;
+            seedFixtures(appDir);
         } else {
             console.info('\n[globalSetup] Local D1 cleared (set SEED_E2E=1 to also seed C/D/E fixtures).');
         }
         console.info('[globalSetup] Ready.\n');
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        if (seedRequested) {
+            // SEED_E2E=1 was passed: the seed is a precondition, not a nicety.
+            throw new Error(
+                `[globalSetup] seedFixtures failed with SEED_E2E=1 — the seeded specs cannot run.\n${msg}`,
+                { cause: err },
+            );
+        }
         console.warn(
             `\n[globalSetup] WARNING: Could not reset local D1 (${msg.split('\n')[0]}).\n` +
             '  Ensure wrangler is installed and the DB was created: npx wrangler d1 create openinspection-db\n',

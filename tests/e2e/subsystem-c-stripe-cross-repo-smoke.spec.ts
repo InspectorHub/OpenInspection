@@ -2,9 +2,22 @@
  * Design System 0520 subsystem C P11.3 — cross-repo Stripe webhook smoke.
  *
  * Documents the manual verification path for the portal → core seat-quota
- * sync. Runs against BOTH dev servers concurrently (portal on 8787,
- * core on 8789) plus the Stripe CLI for webhook forwarding. Skipped
- * pending the dual-server harness in tests/global-setup.ts.
+ * sync.
+ *
+ * TODO(cross-repo-harness): BLOCKER — this needs a run environment nothing in
+ * this repo provides, NOT a data fixture. Three things must be up at once:
+ *   1. the PORTAL worker on 127.0.0.1:8787 (a different repo, apps/portal),
+ *   2. this core worker on 127.0.0.1:8789 (playwright.config.ts webServer),
+ *   3. `stripe listen --forward-to 127.0.0.1:8787/api/billing/webhook`,
+ *      because the assertion chain depends on a REAL signed Stripe event
+ *      reaching portal and portal then pushing the new quota into core.
+ * Playwright's webServer starts one server, and globalSetup seeds one D1.
+ *
+ * The former note here — "skipped pending the multi-user seed harness in
+ * tests/global-setup.ts" — is WRONG and has been since that harness landed:
+ * SEED_E2E=1 + tests/seed-fixtures.ts exists and works, and subsystem-D/E now
+ * run on it. Do not go looking for that gap; it was closed. What is missing is
+ * the dual-server + Stripe-CLI orchestration above.
  *
  * Unit coverage of the underlying logic already lives across the two
  * repos:
