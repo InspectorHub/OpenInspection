@@ -22,7 +22,7 @@ export const ReschedulePatchSchema = z.object({
         .describe('Replace the helper list wholesale. Omit to keep the current helpers — this is NOT merged.'),
 }).openapi('ReschedulePatch');
 
-export const ScheduleConflictSchema = z.object({
+const ScheduleConflictSchema = z.object({
     inspectionId: z.string().describe('Colliding inspection id.'),
     propertyAddress: z.string().describe('Colliding inspection address.'),
     date: z.string().describe('Colliding inspection date.'),

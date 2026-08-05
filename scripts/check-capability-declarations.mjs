@@ -38,9 +38,23 @@ function walkFiles(dir, out = []) {
 const OPEN = 'createRoute(withMcpMetadata(';
 const failures = [];
 
+/**
+ * Blank out comment bodies, preserving length and newlines.
+ *
+ * The scan is textual, so a comment EXPLAINING a route's gating — "Gated on
+ * `requireCapability('scheduleOthers')`, matching the write it feeds" — counted
+ * as a mount, and got attributed to whichever route began above it. That is a
+ * false positive on prose, and a gate that fires on prose is one people learn to
+ * bypass. Replacing with spaces rather than deleting keeps every byte offset
+ * valid, which the line-number arithmetic below depends on.
+ */
+function blankComments(src) {
+    return src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, ' '));
+}
+
 for (const file of walkFiles(SCAN_DIR)) {
     const rel = relative(ROOT, file).replace(/\\/g, '/');
-    const source = readFileSync(file, 'utf8');
+    const source = blankComments(readFileSync(file, 'utf8'));
     const starts = [];
     for (let i = source.indexOf(OPEN); i !== -1; i = source.indexOf(OPEN, i + 1)) starts.push(i);
     for (let w = 0; w < starts.length; w++) {
