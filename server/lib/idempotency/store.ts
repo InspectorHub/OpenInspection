@@ -79,3 +79,16 @@ export async function completeKey(db: DrizzleD1Database, args: CompleteArgs): Pr
         .set({ state: 'done', responseStatus: args.status, responseBody: args.body })
         .where(and(eq(idempotencyKeys.tenantId, args.tenantId), eq(idempotencyKeys.key, args.key)));
 }
+
+/**
+ * Drop the claim without storing a response.
+ *
+ * Used when the handler failed: the action did not happen, so holding the key
+ * would lock the caller out of the corrected retry — the client mints one key
+ * per intent and holds it across failures on purpose.
+ */
+export async function releaseKey(db: DrizzleD1Database, args: { tenantId: string; key: string }): Promise<void> {
+    await db
+        .delete(idempotencyKeys)
+        .where(and(eq(idempotencyKeys.tenantId, args.tenantId), eq(idempotencyKeys.key, args.key)));
+}
