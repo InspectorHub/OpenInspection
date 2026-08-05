@@ -68,7 +68,13 @@ let adminToken = '';
 // Jargon patterns to reject across all pages
 const JARGON = [
   'Deploy Workflow',
-  'Dispatch',
+  // 'Dispatch' was on this list as enterprise-speak for "send". It is now a
+  // domain term: Phase C shipped a dispatch board, the multi-column day view
+  // that Jobber, Housecall Pro and ServiceTitan all call Dispatch. Every
+  // occurrence in messages/en/{nav,calendar}.json is that board — nav item,
+  // page title, board copy — and none of them means "send". Keeping the entry
+  // would have forced a worse word on the feature to satisfy a rule written
+  // before the feature existed.
   'Authorize Completion',
   'Logic Schema',
   'Personnel',
