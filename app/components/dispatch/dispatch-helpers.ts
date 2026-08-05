@@ -45,11 +45,11 @@ export interface DispatchPayload {
 
 /** Axis bounds, in tenant wall-clock hours. Tenant-configurable later. */
 export const BOARD_START_HOUR = 7;
-export const BOARD_END_HOUR = 19;
+const BOARD_END_HOUR = 19;
 /** One axis hour in pixels — matches the day calendar's row height. */
 export const HOUR_HEIGHT_PX = 56;
 /** A card whose end instant was never stored still has to be grabbable. */
-export const DEFAULT_CARD_MINUTES = 60;
+const DEFAULT_CARD_MINUTES = 60;
 /** Below this a card is a line, not a target. */
 const MIN_CARD_PX = 22;
 
