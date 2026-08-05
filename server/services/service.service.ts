@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, asc, inArray, sql } from 'drizzle-orm';
-import { services, inspectionServices, discountCodes, inspections, eventTypes } from '../lib/db/schema';
+import { services, inspectionServices, discountCodes, inspections, eventTypes, reports } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { getServiceInspectors, setServiceInspectors } from './service/qualification';
 import { nanoid } from 'nanoid';
@@ -214,13 +214,17 @@ export class ServiceService {
      * the door — and so a `reports` row or a pay split that points at this line
      * still finds it.
      *
-     * The REFUSAL half of this guard is deliberately not stubbed here. Neither
-     * `reports` nor `inspection_service_pay_splits` exists yet, so a check
-     * against them would be a function that always returns "nothing blocks
-     * this" — a gate that passes vacuously, which this repo has shipped before.
-     * Each of those tasks adds its own clause, with a test, when it creates the
-     * table. What lands now is the column and the soft delete, which is what
-     * has to exist BEFORE the first row points here.
+     * The REFUSAL half of the guard: removal is allowed while a line is bare,
+     * and refused once something hangs off it that a soft delete would strand.
+     * Nothing here carries an FK (by design), so nothing else surfaces the
+     * dangle — this check is the only thing standing between a scope change at
+     * the door and a report delivering a line that is no longer on the invoice.
+     *
+     * Today that is a `reports` row (in_progress or published — both block:
+     * both are work the line paid for). The pay-split clause stays deferred to
+     * the pay-splits plan as its own explicit step — `inspection_service_pay_
+     * splits` still does not exist, and a check against a table that does not
+     * exist is a gate that passes vacuously.
      */
     async removeInspectionService(tenantId: string, inspectionId: string, lineId: string) {
         const db = this.getDrizzle();
@@ -233,6 +237,21 @@ export class ServiceService {
             ))
             .get();
         if (!line || !line.active) throw Errors.NotFound('Service line not found');
+
+        const blockingReport = await db.select({ id: reports.id, status: reports.status })
+            .from(reports)
+            .where(and(
+                eq(reports.tenantId, tenantId),
+                eq(reports.inspectionServiceId, lineId),
+            ))
+            .limit(1).get();
+        if (blockingReport) {
+            // The refusal names what blocked it — the UI disables the control
+            // with this reason rather than a silent no-op.
+            throw Errors.Conflict(
+                `Cannot remove this service line: a report (${blockingReport.status}) delivers it. Delete the report first.`,
+            );
+        }
 
         await db.update(inspectionServices).set({ active: false })
             .where(and(

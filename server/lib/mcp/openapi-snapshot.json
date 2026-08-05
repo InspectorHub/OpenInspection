@@ -15782,7 +15782,7 @@
       "body": null
     },
     "summary": "Remove a service line from an inspection",
-    "description": "Removes one booked service line from an inspection. Does not touch the tenant service catalog."
+    "description": "Removes one booked service line from an inspection. Does not touch the tenant service catalog. Refuses with 409 when a report (in progress or published) delivers this line."
   },
   {
     "operationId": "removeRepairItem",
