@@ -3,6 +3,7 @@ import { eq, and, asc, inArray, sql } from 'drizzle-orm';
 import { services, inspectionServices, discountCodes, inspections, eventTypes, reports } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { getServiceInspectors, setServiceInspectors } from './service/qualification';
+import { syncSplitsQuietly } from './pay-split.service';
 import { nanoid } from 'nanoid';
 import type { z } from 'zod';
 import type { CreateServiceSchema, UpdateServiceSchema, CreateDiscountCodeSchema } from '../lib/validations/service.schema';
@@ -166,6 +167,7 @@ export class ServiceService {
                     eq(inspectionServices.id, existing.id),
                     eq(inspectionServices.tenantId, tenantId),
                 ));
+            await syncSplitsQuietly(db, tenantId, inspectionId);
             return { ...existing, active: true };
         }
 
@@ -179,6 +181,10 @@ export class ServiceService {
             nameSnapshot: svc.name,
             priceSnapshot: svc.price,
         });
+        // A new billing line is a new thing to be paid for (#278). Additive and
+        // quiet: no existing amount moves, and a bad pay rule must not make
+        // adding the line fail.
+        await syncSplitsQuietly(db, tenantId, inspectionId);
         const rows = await db.select().from(inspectionServices)
             .where(and(eq(inspectionServices.id, id), eq(inspectionServices.tenantId, tenantId)));
         return rows[0];
@@ -259,6 +265,9 @@ export class ServiceService {
                 eq(inspectionServices.tenantId, tenantId),
                 eq(inspectionServices.inspectionId, inspectionId),
             ));
+        // Unpaid rule-derived splits on the dropped line go with it; anything a
+        // human agreed or payroll locked survives as an orphan to resolve (#278).
+        await syncSplitsQuietly(db, tenantId, inspectionId);
     }
 
     async listDiscountCodes(tenantId: string) {

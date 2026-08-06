@@ -21,7 +21,7 @@ import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
 import { inspections as inspectionTable, tenantConfigs, users } from '../../lib/db/schema';
 import { getInspectionRoster } from '../../lib/inspection/roster';
-import { syncInspectionAssignments } from '../../lib/db/assignment-links';
+import { syncAssignmentsAndSplits } from '../../services/pay-split.service';
 import { findScheduleConflicts } from '../../lib/schedule-conflicts';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import { epochMsToWallClockHm, epochMsToWallClockYmd, resolveTenantTimeZone } from '../../lib/tz';
@@ -205,7 +205,7 @@ const scheduleRoutes = createApiRouter()
             .where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
         if (touchesAssignment) {
-            await syncInspectionAssignments(db, tenantId, id, {
+            await syncAssignmentsAndSplits(db, tenantId, id, {
                 leadInspectorId: leadId,
                 helperInspectorIds: helperIds,
             });

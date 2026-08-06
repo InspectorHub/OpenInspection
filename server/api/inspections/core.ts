@@ -19,7 +19,7 @@ import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.s
 import { inspections as inspectionTable, inspectionResults, users } from '../../lib/db/schema';
 import { datePatchValues } from '../../services/inspection/reschedule-date';
 import { deleteInspectionCascade } from '../../services/inspection/inspection-cascade';
-import { syncInspectionAssignments } from '../../lib/db/assignment-links';
+import { syncAssignmentsAndSplits } from '../../services/pay-split.service';
 import { eq, and, isNull } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import type { HonoConfig } from '../../types/hono';
@@ -364,7 +364,7 @@ const coreRoutes = createApiRouter()
         // here to avoid wiping "team mode" rows. They are frozen dead and were
         // NULL / '[]' on every row, so there was never anything to preserve.
         if ('inspectorId' in body) {
-            await syncInspectionAssignments(db, tenantId, id, {
+            await syncAssignmentsAndSplits(db, tenantId, id, {
                 inspectorId: body.inspectorId ?? null,
             });
         }
