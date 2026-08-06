@@ -15,6 +15,8 @@ import { ServicesCatalogPanel } from "~/components/settings/services/ServicesCat
 import { ServiceFields } from "~/components/settings/services/ServiceFields";
 import { ServiceEditForm } from "~/components/settings/services/ServiceEditForm";
 import { DiscountCodesPanel } from "~/components/settings/services/DiscountCodesPanel";
+import { loadPayRuleMap, savePayRule, deletePayRule } from "~/lib/settings/pay-rules.server";
+import type { PayRule } from "~/components/settings/services/PayRuleWidget";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -94,6 +96,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const restrictionMap: Record<string, string[]> = {};
     for (const r of restrictionResults) restrictionMap[r.serviceId] = r.userIds;
 
+    // #278 — what inspectors earn on each service. Without at least one rule,
+    // pay splits populate nothing, so this map is also the feature's on/off
+    // state as far as the admin can see it.
+    const payRuleMap = await loadPayRuleMap(api, rawServices.map((s) => s.id));
+
     let members: Member[] = [];
     if (membersRes?.ok) {
       const mb = (await membersRes.json()) as Record<string, unknown>;
@@ -111,6 +118,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       services: rawServices,
       discounts: rawDiscounts,
       restrictionMap,
+      payRuleMap,
       members,
       templates,
     };
@@ -119,6 +127,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       services: [] as Service[],
       discounts: [] as Discount[],
       restrictionMap: {} as Record<string, string[]>,
+      payRuleMap: {} as Record<string, PayRule[]>,
       members: [] as Member[],
       templates: [] as TemplateOption[],
     };
@@ -199,6 +208,10 @@ export async function action({ request, context }: Route.ActionArgs) {
       param: { id },
       json: { active: !active },
     });
+  } else if (intent === "pay-rule-save") {
+    return await savePayRule(api, form);
+  } else if (intent === "pay-rule-delete") {
+    return await deletePayRule(api, form);
   } else if (intent === "qualification-save") {
     const id = String(form.get("serviceId") ?? "");
     let userIds: string[];
@@ -261,7 +274,7 @@ export default function SettingsServices() {
   });
 
   if ("forbidden" in data) return <AccessDenied />;
-  const { services, discounts, restrictionMap, members, templates } = data;
+  const { services, discounts, restrictionMap, payRuleMap, members, templates } = data;
   const editingService = services.find((s) => s.id === editingId) ?? null;
 
   return (
@@ -323,6 +336,7 @@ export default function SettingsServices() {
       <ServicesCatalogPanel
         services={services}
         restrictionMap={restrictionMap}
+        payRuleMap={payRuleMap}
         members={members}
         templateNames={Object.fromEntries(templates.map((t) => [t.id, t.name]))}
         editingId={editingId}

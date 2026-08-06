@@ -1,6 +1,8 @@
 import { Form } from "react-router";
 import { Table } from "@core/shared-ui";
 import { QualificationWidget } from "./QualificationWidget";
+import { PayRuleWidget } from "./PayRuleWidget";
+import type { PayRule } from "./PayRuleWidget";
 import { splitDurationMinutes, serviceIsBookable } from "~/lib/settings-services";
 import { m } from "~/paraglide/messages";
 
@@ -24,6 +26,8 @@ interface Member {
 interface ServicesCatalogPanelProps {
   services: Service[];
   restrictionMap: Record<string, string[]>;
+  /** serviceId -> its pay rules. Empty means pay splits are off for that service. */
+  payRuleMap: Record<string, PayRule[]>;
   members: Member[];
   /** templateId → template name, for naming the template each service builds from. */
   templateNames: Record<string, string>;
@@ -45,6 +49,7 @@ function durationLabel(minutes: number | null): string {
 export function ServicesCatalogPanel({
   services,
   restrictionMap,
+  payRuleMap,
   members,
   templateNames,
   editingId = null,
@@ -85,6 +90,13 @@ export function ServicesCatalogPanel({
                 <QualificationWidget
                   service={svc}
                   initialUserIds={restrictionMap[svc.id] ?? []}
+                  members={members}
+                />
+                {/* Directly below the qualification line: who may run this,
+                    and what they earn running it, are one thought. */}
+                <PayRuleWidget
+                  serviceId={svc.id}
+                  rules={payRuleMap[svc.id] ?? []}
                   members={members}
                 />
               </>
