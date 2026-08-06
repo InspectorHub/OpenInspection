@@ -140,6 +140,66 @@ interface AuditParams {
 }
 
 /**
+ * Metadata redaction — applied at BOTH insert sites in this file (#276).
+ *
+ * `metadata` is free-form JSON a caller composes, and callers do put subject
+ * identifiers in it: a recipient email on a report delivery, a phone on an SMS
+ * send, a property address on an inspection update. Portal's counsel ruled on
+ * the identical column (`audit_logs.details`) that carrying such a column
+ * through an erasure is an incomplete DSAR. This is the write-time half of the
+ * answer; the erasure half is the `audit_logs.metadata` anonymize rule in
+ * `compliance/erasure-manifest.ts`, and it is the half that is complete.
+ *
+ * The primary filter is on the VALUE, not the key: a string that IS an email
+ * address, a phone number or an IP is removed wherever it appears and whatever
+ * it is called. That is what holds when someone adds a field — a list of key
+ * names lets the next one through by construction.
+ *
+ * The short key list below covers what has no detectable value shape. A street
+ * address or a person's name is not recognisable as a string, so only the key
+ * can flag it, and dropping metadata wholesale is not available: these rows
+ * exist for what it says (the previous token hash on a portal_access rotation,
+ * the before/after capability sets on a role change). So the list is
+ * deliberately narrow, knowingly incomplete, and NOT the reason the column is
+ * safe to keep — the manifest rule is.
+ *
+ * It is deliberately not portal's list either. Portal matches `name`, `token`
+ * and a bare `ip`, which here would redact the tag / template / rating-system
+ * names that ARE the audit value of half these events, the rotation forensics
+ * in `previousTokenHash`, and every key containing the letters "ip"
+ * (`zipPrefixes`, `description`).
+ */
+const REDACTED = '[redacted]';
+/** Anchored so a business-object name (`templateName`, `libraryName`) is kept. */
+const IDENTITY_KEY = /address|(?:client|contact|recipient|signer|customer)_?name$/i;
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+const IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
+const PHONE_RE = /(?<![\w-])(?:\+\d{1,3}[\s.-]?)?(?:\(\d{3}\)\s?|\d{3}[\s.-])\d{3}[\s.-]?\d{4}(?![\w-])|(?<![\w-])\d{3}[\s.-]\d{4}(?![\w-])/g;
+/** UUIDs and hex digests identify a record, never a person — and a digit run
+ *  inside one can look like a phone number. Left exactly as written. */
+const OPAQUE_ID = /^[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$|^[0-9a-fA-F]{32,}$/;
+
+function redactValue(value: unknown): unknown {
+    if (typeof value === 'string') {
+        if (OPAQUE_ID.test(value)) return value;
+        return value.replace(EMAIL_RE, REDACTED).replace(IPV4_RE, REDACTED).replace(PHONE_RE, REDACTED);
+    }
+    if (Array.isArray(value)) return value.map(redactValue);
+    if (value !== null && typeof value === 'object') {
+        const out: Record<string, unknown> = {};
+        for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+            out[key] = IDENTITY_KEY.test(key) ? REDACTED : redactValue(nested);
+        }
+        return out;
+    }
+    return value;
+}
+
+function redactAuditMetadata(metadata: Record<string, unknown> | undefined): Record<string, unknown> | null {
+    return metadata ? (redactValue(metadata) as Record<string, unknown>) : null;
+}
+
+/**
  * Write an audit log entry. Uses waitUntil when executionCtx is provided
  * so it never blocks the response path.
  */
@@ -157,7 +217,7 @@ function writeAuditLog(params: AuditParams): void {
             action: rest.action,
             entityType: rest.entityType,
             entityId: rest.entityId ?? null,
-            metadata: rest.metadata ?? null,
+            metadata: redactAuditMetadata(rest.metadata),
             ipAddress: rest.ipAddress ?? null,
             createdAt: new Date(),
         }).then(() => {}).catch((e) => logger.error('[audit] write failed', {}, e instanceof Error ? e : undefined));
@@ -257,7 +317,7 @@ export async function writeAuditLogWithSlug(db: D1Database, params: AuditWithSlu
             action: params.action,
             entityType: params.entityType,
             entityId: params.entityId ?? null,
-            metadata: params.metadata ?? null,
+            metadata: redactAuditMetadata(params.metadata),
             ipAddress: params.ipAddress ?? null,
             inspectorSlug,
             createdAt: new Date(),

@@ -166,6 +166,19 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // spine of a signed, delivered document, and removing it would strand the
     // version chain that proves what was delivered.
     { table: 'reports', column: 'title', category: 'user.address', action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+
+    // ── audit_logs (#276) ─────────────────────────────────────────────────────
+    // Free-form JSON a caller composes; it MAY embed names/emails/phones/
+    // addresses. `audit.ts` now strips the machine-detectable identifiers at
+    // write time, but prose is not detectable at all and historical rows
+    // predate the redactor — so the column is SCRUBBED wholesale on an erasure,
+    // the same call portal's counsel made on the identical `details` column
+    // (retaining it through an erasure is an incomplete DSAR). The ROW stays:
+    // the security/accountability trail is the retention basis, and what makes
+    // it one is the structured event (action/entity), not the blob.
+    // `ip_address` stays too — staff-action security trail, declared out of
+    // scope below.
+    { table: 'audit_logs', column: 'metadata', category: 'user.freetext', action: 'anonymize', legalBasis: 'art_17_3_b' },
 ];
 
 /**

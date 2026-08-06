@@ -24,7 +24,7 @@ import { cmdEnvelopeIssueFields, type CmdEnvelope } from '../lib/sync-events/cmd
  *  message are attacker-shaped input; the real values are far shorter. */
 const MAX_ECHOED = 200;
 
-export interface ParkedFingerprint {
+interface ParkedFingerprint {
     /** Format marker — a reader must be able to tell a fingerprint from a
      *  pre-#276 raw envelope without guessing. */
     v: 1;
