@@ -34,7 +34,6 @@
   "app/routes/settings-profile.tsx": 548,
   "server/api/calendar.ts": 547,
   "app/components/NewInspectionWizard.tsx": 539,
-  "server/api/invoices.ts": 535,
   "server/services/inspection/inspection-photo.service.ts": 531,
   "server/api/inspections/media-studio.ts": 530,
   "app/routes/settings-communication-templates.tsx": 525,
