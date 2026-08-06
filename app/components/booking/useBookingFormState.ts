@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useFetcher } from "react-router";
 import type { CompanyProfile } from "./booking-constants";
+import type { PublicAddressSuggestion } from "./PublicAddressAutocomplete";
 import { resolveOrderDeposit } from "../../../server/lib/billing/deposit-policy";
 import { m } from "~/paraglide/messages";
 
@@ -21,6 +22,10 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
 
   // Form state
   const [address, setAddress] = useState("");
+  // The structured half of the address, set only when the visitor picks a
+  // suggestion. Null for a typed address — which is a real outcome the server
+  // reports, not a value to invent.
+  const [addressPick, setAddressPick] = useState<PublicAddressSuggestion | null>(null);
   const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
   const [inspectionDate, setInspectionDate] = useState("");
   const [timeWindow, setTimeWindow] = useState("morning");
@@ -180,6 +185,12 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
         body: JSON.stringify({
           tenant,
           address,
+          // Sent only when a suggestion was picked. The server re-resolves the
+          // placeId through Places Details for the authoritative ZIP and the
+          // coordinates; the zip here is the client-side hint and the fallback
+          // when details cannot be reached.
+          ...(addressPick?.zip ? { addressZip: addressPick.zip } : {}),
+          ...(addressPick?.placeId ? { addressPlaceId: addressPick.placeId } : {}),
           date: inspectionDate,
           timeSlot: timeWindow === "custom" ? "custom" : timeWindow,
           ...(timeWindow === "custom" ? { customTime } : {}),
@@ -218,6 +229,7 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
   return {
     step, setStep,
     address, setAddress,
+    addressPick, setAddressPick,
     selectedServices,
     inspectionDate, setInspectionDate,
     timeWindow, setTimeWindow,

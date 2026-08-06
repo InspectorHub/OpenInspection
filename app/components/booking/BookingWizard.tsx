@@ -22,7 +22,7 @@ export function BookingWizard({
 }) {
   const {
     step, setStep,
-    address, setAddress,
+    address, setAddress, setAddressPick,
     selectedServices,
     inspectionDate, setInspectionDate,
     timeWindow, setTimeWindow,
@@ -101,7 +101,7 @@ export function BookingWizard({
 
       {/* Step 0: Property */}
       {step === 0 && (
-        <PropertyStep address={address} setAddress={setAddress} />
+        <PropertyStep address={address} setAddress={setAddress} onSelectAddress={setAddressPick} />
       )}
 
       {/* Step 1: Services */}

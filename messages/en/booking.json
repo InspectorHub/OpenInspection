@@ -25,6 +25,7 @@
   "booking_embed_phone_placeholder": "(555) 555-5555",
   "booking_embed_date_label": "Preferred date",
   "booking_field_address_label": "Property address",
+  "booking_field_address_hint": "Start typing and pick your address so we can match you with an inspector who covers it.",
   "booking_field_email_label": "Email",
   "booking_field_inspector_label": "Inspector",
   "booking_placeholder_name": "Jane Doe",

@@ -7101,6 +7101,22 @@
     "description": "Auto-generated placeholder for geocodeBooking (GET /geocode, bookings domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "geocodeCompanyAddress",
+    "method": "POST",
+    "pathTemplate": "/api/admin/booking-routing/geocode-company",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Resolve the company address to coordinates",
+    "description": "Resolves the stored company address once and saves the coordinates. Returns the matched address so a wrong match is visible. A failure is reported in the body with a named reason, never as a silent null."
+  },
+  {
     "operationId": "getAgentNotificationPreferences",
     "method": "GET",
     "pathTemplate": "/api/agent/notification-preferences",
@@ -7246,6 +7262,22 @@
     },
     "summary": "Get combined sign & pay checkout context (public, token-gated)",
     "description": "Combined sign & pay context for the public checkout page (GET /checkout/:token, bookings domain). Resolves a signer token to the agreement snapshot, envelope progress, outstanding invoice/payment state, and tenant branding."
+  },
+  {
+    "operationId": "getBookingRouting",
+    "method": "GET",
+    "pathTemplate": "/api/admin/booking-routing",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Booking routing strategy, rules, and geocode anchors",
+    "description": "Returns the routing strategy, lead time and cutoff, plus whether the company address and per-inspector service origins have coordinates — which is what decides whether `closest` can run at all."
   },
   {
     "operationId": "getCancellationQuote",
@@ -12565,6 +12597,24 @@
     "description": "Auto-generated placeholder for patchAutomation (PATCH /{id}, automations domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "patchBookingRouting",
+    "method": "PATCH",
+    "pathTemplate": "/api/admin/booking-routing",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/BookingRoutingPatch"
+      }
+    },
+    "summary": "Update booking routing strategy and rules",
+    "description": "Patches routing strategy, minimum lead hours, and same-day cutoff. An omitted key is left alone; an explicit null on sameDayCutoffTime clears it."
+  },
+  {
     "operationId": "patchInspection",
     "method": "PATCH",
     "pathTemplate": "/api/inspections/{id}",
@@ -15834,6 +15884,24 @@
     },
     "summary": "Publish inspection for current tenant",
     "description": "Auto-generated placeholder for publishInspection (POST /{id}/publish, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "putInspectorServiceOrigin",
+    "method": "PUT",
+    "pathTemplate": "/api/admin/booking-routing/service-origin",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/ServiceOrigin"
+      }
+    },
+    "summary": "Set or clear one inspector service origin",
+    "description": "Geocodes and stores where one inspector starts their day. A null or empty address clears the override so they inherit the company coordinates."
   },
   {
     "operationId": "putIntegrationSecrets",

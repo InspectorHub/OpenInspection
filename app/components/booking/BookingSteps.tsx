@@ -1,4 +1,5 @@
 import { timeWindows, type CompanyProfile } from "./booking-constants";
+import { PublicAddressAutocomplete, type PublicAddressSuggestion } from "./PublicAddressAutocomplete";
 import { BookingDepositPanel } from "./BookingDepositPanel";
 import { formatCurrency } from "~/lib/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
@@ -7,9 +8,12 @@ import { m } from "~/paraglide/messages";
 export function PropertyStep({
   address,
   setAddress,
+  onSelectAddress,
 }: {
   address: string;
   setAddress: (v: string) => void;
+  /** Carries the ZIP + placeId of a picked suggestion up to the form state. */
+  onSelectAddress: (sel: PublicAddressSuggestion | null) => void;
 }) {
   return (
     <section className="space-y-5">
@@ -19,14 +23,12 @@ export function PropertyStep({
       </div>
       <label className="block">
         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.booking_field_address_label()}</span>
-        <input
-          type="text"
+        <PublicAddressAutocomplete
           value={address}
-          onChange={(e) => setAddress(e.target.value)}
+          onValueChange={setAddress}
+          onSelect={onSelectAddress}
           placeholder={m.booking_step_property_address_placeholder()}
-          autoComplete="street-address"
           autoFocus
-          className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
         />
       </label>
     </section>

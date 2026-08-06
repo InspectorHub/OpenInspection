@@ -25,6 +25,7 @@
   "booking_embed_phone_placeholder": "(555) 555-5555",
   "booking_embed_date_label": "Fecha preferida",
   "booking_field_address_label": "Dirección de la propiedad",
+  "booking_field_address_hint": "Empiece a escribir y elija su dirección para que podamos asignarle un inspector que cubra esa zona.",
   "booking_field_email_label": "Correo electrónico",
   "booking_field_inspector_label": "Inspector",
   "booking_placeholder_name": "Ana Pérez",
