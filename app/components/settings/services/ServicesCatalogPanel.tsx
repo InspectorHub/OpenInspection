@@ -1,7 +1,11 @@
 import { Form } from "react-router";
 import { Table } from "@core/shared-ui";
 import { QualificationWidget } from "./QualificationWidget";
+import { PayRuleWidget } from "./PayRuleWidget";
+import type { PayRule } from "./PayRuleWidget";
+import { DepositWidget } from "./DepositWidget";
 import { splitDurationMinutes, serviceIsBookable } from "~/lib/settings-services";
+import type { DepositPolicy } from "../../../../server/lib/billing/deposit-policy";
 import { m } from "~/paraglide/messages";
 
 interface Service {
@@ -12,6 +16,8 @@ interface Service {
   active: boolean;
   durationMinutes: number | null;
   templateId: string | null;
+  /** This service's own deposit. NULL inherits the company default. */
+  depositPolicy?: DepositPolicy | null;
 }
 
 interface Member {
@@ -24,9 +30,13 @@ interface Member {
 interface ServicesCatalogPanelProps {
   services: Service[];
   restrictionMap: Record<string, string[]>;
+  /** serviceId -> its pay rules. Empty means pay splits are off for that service. */
+  payRuleMap: Record<string, PayRule[]>;
   members: Member[];
   /** templateId → template name, for naming the template each service builds from. */
   templateNames: Record<string, string>;
+  /** The company-wide deposit, so a row that inherits can say what it inherits. */
+  companyDepositPolicy?: DepositPolicy | null;
   /** The row whose edit form is open, so its own Edit reads as the way back. */
   editingId?: string | null;
   onEdit?: (id: string | null) => void;
@@ -45,8 +55,10 @@ function durationLabel(minutes: number | null): string {
 export function ServicesCatalogPanel({
   services,
   restrictionMap,
+  payRuleMap,
   members,
   templateNames,
+  companyDepositPolicy = null,
   editingId = null,
   onEdit,
 }: ServicesCatalogPanelProps) {
@@ -86,6 +98,21 @@ export function ServicesCatalogPanel({
                   service={svc}
                   initialUserIds={restrictionMap[svc.id] ?? []}
                   members={members}
+                />
+                {/* Directly below the qualification line: who may run this,
+                    and what they earn running it, are one thought. */}
+                <PayRuleWidget
+                  serviceId={svc.id}
+                  rules={payRuleMap[svc.id] ?? []}
+                  members={members}
+                />
+                {/* The third adjacent question about one service: who may run
+                    it, what they earn running it, what the client pays up
+                    front to book it. */}
+                <DepositWidget
+                  serviceId={svc.id}
+                  policy={svc.depositPolicy ?? null}
+                  companyDefault={companyDepositPolicy}
                 />
               </>
             ),

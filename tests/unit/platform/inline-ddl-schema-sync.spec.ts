@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
-import { tenantConfigs, inspectionResults } from '../../../server/lib/db/schema';
-import { TENANT_CONFIGS_TEST_DDL, INSPECTION_RESULTS_TEST_DDL } from '../../helpers/inline-ddl';
+import { tenantConfigs, inspectionResults, users } from '../../../server/lib/db/schema';
+import { TENANT_CONFIGS_TEST_DDL, INSPECTION_RESULTS_TEST_DDL, USERS_TEST_DDL } from '../../helpers/inline-ddl';
 
 /**
  * Drift guard for the hand-maintained workers-runtime DDL.
@@ -43,6 +43,26 @@ describe('workers inline DDL stays in sync with the Drizzle schema', () => {
             missing,
             `tests/helpers/inline-ddl.ts is missing tenant_configs column(s): ${missing.join(', ')}. ` +
                 'Add them to TENANT_CONFIGS_TEST_DDL so the workers cmd-apply path does not park.',
+        ).toEqual([]);
+    });
+
+    it('users test DDL covers every Drizzle schema column', () => {
+        // Learned a THIRD time, and this one reached CI: adding
+        // `service_origin_*` to the users schema parked `applyAdminCredential`
+        // in real workerd with "table users has no column named
+        // service_origin_address". The reasoning that let it through was
+        // "drizzle only binds the columns you pass" — it does not.
+        // `db.insert(users).values({ id, email, … })` emits EVERY column of the
+        // table and nulls the rest, so a partial insert is exactly as exposed
+        // to this drift as a full one. lint, test:unit and test:web are all
+        // blind to it; this assertion is not.
+        const ddlColumns = ddlColumnNames(USERS_TEST_DDL);
+        const schemaColumns = getTableConfig(users).columns.map((c) => c.name);
+        const missing = schemaColumns.filter((name) => !ddlColumns.has(name));
+        expect(
+            missing,
+            `tests/helpers/inline-ddl.ts is missing users column(s): ${missing.join(', ')}. ` +
+                'Add them to USERS_TEST_DDL so the workers cmd-apply path does not park.',
         ).toEqual([]);
     });
 

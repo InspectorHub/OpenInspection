@@ -193,11 +193,11 @@ describe('InspectionRequestService consumes the free-tier quota', () => {
         expect(reqRows).toHaveLength(1); // only the first (successful) request exists
         const inspRows = await testDb.select().from(schema.inspections).all();
         expect(inspRows).toHaveLength(3); // only the first batch's 3 children exist
-        // The cap (5) was reached mid-loop — 2 of the 3 attempted consumes for
-        // the rejected batch succeeded before the 3rd hit the cap. The counter
-        // is monotonic (no refund), matching PlanQuotaGuard's documented
-        // semantics elsewhere (deletes/aborted batches never refund).
-        expect(await new MeteringService(testD1).lifetimeTotal(TENANT, 'inspections')).toBe(5);
+        // The batch is consumed as one unit (`consumeInspection(tenantId, 3)`),
+        // so the rejected batch consumed NOTHING — the counter still reflects
+        // the 3 inspections that exist rather than being left inflated by two
+        // partial consumes.
+        expect(await new MeteringService(testD1).lifetimeTotal(TENANT, 'inspections')).toBe(3);
     });
 
     it('a rejected validation (unknown template) does not consume quota', async () => {

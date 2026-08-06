@@ -1,7 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
-import { tenantConfigs } from '../lib/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { agreements, tenantConfigs } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { policyChargesFees } from '../lib/billing/cancellation-policy';
 import type { EmailIdentityConfig } from '../lib/email/sender-identity';
 import { r2Keys } from '../lib/r2-keys';
 import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
@@ -168,10 +169,95 @@ export class BrandingService {
         return this.getBrand(tenantId);
     }
 
+    // ─── Cancellation clause attestation ─────────────────────────────────────
+
+    /**
+     * Record — or withdraw — the tenant's confirmation that their OWN agreement
+     * contains a cancellation clause covering the fees they are configuring.
+     *
+     * We cannot parse free-form agreement HTML for a notice window, so this is
+     * the honest maximum: the tenant says so, and we record WHAT they said it
+     * about. Passing the template id stamps the attestation at that template's
+     * current version; passing null withdraws it.
+     */
+    async attestCancellationClause(tenantId: string, agreementId: string | null): Promise<void> {
+        if (agreementId === null) {
+            await this.writeConfig(tenantId, {
+                cancellationClauseAgreementId: null,
+                cancellationClauseVersion: null,
+                cancellationClauseAttestedAt: null,
+            });
+            return;
+        }
+        const db = this.getDrizzle();
+        const agreement = await db.select({ id: agreements.id, version: agreements.version })
+            .from(agreements)
+            .where(and(eq(agreements.id, agreementId), eq(agreements.tenantId, tenantId)))
+            .get();
+        if (!agreement) throw Errors.NotFound('Agreement template not found');
+        await this.writeConfig(tenantId, {
+            cancellationClauseAgreementId: agreement.id,
+            cancellationClauseVersion: agreement.version,
+            cancellationClauseAttestedAt: new Date(),
+        });
+    }
+
+    /**
+     * The attestation on file, or null when there is none — or when the
+     * agreement it was made against has since been edited or deleted.
+     *
+     * Invalidation is this equality check and nothing else. The alternative,
+     * clearing the attestation from the agreement-edit path, needs every future
+     * writer of `agreements` to remember; this one cannot be forgotten because
+     * it is evaluated at the moment the answer is used.
+     */
+    async getCancellationAttestation(
+        tenantId: string,
+    ): Promise<{ agreementId: string; version: number; attestedAt: Date } | null> {
+        const db = this.getDrizzle();
+        const row = await db.select({
+            agreementId: tenantConfigs.cancellationClauseAgreementId,
+            version: tenantConfigs.cancellationClauseVersion,
+            attestedAt: tenantConfigs.cancellationClauseAttestedAt,
+        })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+        if (!row?.agreementId || row.version == null || !row.attestedAt) return null;
+
+        const current = await db.select({ version: agreements.version })
+            .from(agreements)
+            .where(and(eq(agreements.id, row.agreementId), eq(agreements.tenantId, tenantId)))
+            .get();
+        // Gone, or edited since: the words that were attested to are no longer
+        // the words the client agreed to.
+        if (!current || current.version !== row.version) return null;
+
+        return { agreementId: row.agreementId, version: row.version, attestedAt: row.attestedAt };
+    }
+
     /**
      * Updates the branding configuration for a tenant.
+     *
+     * ⚠️ This is the gate for `cancellation_policy`. The refusal cannot be a Zod
+     * rule — it compares the submitted policy against DB state — so it lives
+     * here, in the writer, and a second writer of that column would bypass it
+     * without failing anything. See the column comment in the tenant schema.
      */
     async updateBranding(tenantId: string, data: Partial<typeof tenantConfigs.$inferInsert>) {
+        if (data.cancellationPolicy !== undefined && policyChargesFees(data.cancellationPolicy)) {
+            if (!(await this.getCancellationAttestation(tenantId))) {
+                throw Errors.UnprocessableEntity(
+                    'Confirm that your agreement contains a cancellation clause before enabling cancellation fees. '
+                    + 'The agreement is what the client agreed to; this policy only enforces it.',
+                );
+            }
+        }
+        return this.writeConfig(tenantId, data);
+    }
+
+    /** Upsert of the tenant config row. NOT a gate — see `updateBranding`. */
+    private async writeConfig(tenantId: string, data: Partial<typeof tenantConfigs.$inferInsert>) {
         const db = this.getDrizzle();
         const existing = await db.select().from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
 

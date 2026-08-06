@@ -7,6 +7,7 @@ import { smsSegmentInfo } from '../lib/sms/segments';
 import { interpolate } from '../services/automation/shared';
 import { buildTenantEmailService } from '../lib/email/build-email-service';
 import { PlanQuotaGuard, readTenantTier } from '../features/plan-quota/guard';
+import { tenantAiCapsLoader } from '../features/plan-quota/ai-caps';
 import { loadProviderForTenant } from '../lib/sms/resolve-twilio';
 import { normalizeE164 } from '../lib/sms/phone';
 import { smsSendGate } from '../lib/sms/send-gate';
@@ -163,7 +164,7 @@ const messageTemplateRoutes = createApiRouter()
             // being exempt from whatever nobody remembered to copy across.
             const db = getDrizzle(c);
             const quotaGuard = c.var.profile.hasUsageQuota
-                ? new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl })
+                ? new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl, aiCaps: tenantAiCapsLoader(c.env.DB) })
                 : undefined;
             const gate = await smsSendGate({
                 db, tenantId, to: normalized, purpose: 'test', env: c.env,
@@ -203,7 +204,7 @@ const messageTemplateRoutes = createApiRouter()
         // fall back to the one-shot tier lookup (mirrors di.ts's request-context
         // resolution).
         const quotaGuard = c.var.profile.hasUsageQuota
-            ? new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl })
+            ? new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl, aiCaps: tenantAiCapsLoader(c.env.DB) })
             : undefined;
         const tenantTier = quotaGuard
             ? (c.get('tenantTier') ?? await readTenantTier(c.env.DB, tenantId))

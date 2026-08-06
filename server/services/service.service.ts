@@ -1,8 +1,12 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, asc, inArray, sql } from 'drizzle-orm';
-import { services, inspectionServices, discountCodes, inspections, eventTypes } from '../lib/db/schema';
+import { eq, and, asc, inArray } from 'drizzle-orm';
+import { services, inspectionServices, inspections, eventTypes, reports } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { getServiceInspectors, setServiceInspectors } from './service/qualification';
+import { listPayRules, createPayRule, updatePayRule, deletePayRule } from './service/pay-rules';
+import * as discounts from './service/discount-codes';
+import type { CreatePayRuleInput, UpdatePayRuleInput } from './service/pay-rules';
+import { syncSplitsQuietly } from './pay-split.service';
 import { nanoid } from 'nanoid';
 import type { z } from 'zod';
 import type { CreateServiceSchema, UpdateServiceSchema, CreateDiscountCodeSchema } from '../lib/validations/service.schema';
@@ -67,6 +71,10 @@ export class ServiceService {
             active:          true,
             sortOrder:       data.sortOrder ?? 0,
             createdAt:       now,
+            // NULL inherits the workspace deposit default; `{ type: 'none' }`
+            // opts this service out of it. `?? null` keeps those distinct —
+            // an omitted key must not read as "opted out".
+            depositPolicy:   data.depositPolicy ?? null,
         });
         const rows = await db.select().from(services).where(eq(services.id, id));
         return rows[0];
@@ -166,6 +174,7 @@ export class ServiceService {
                     eq(inspectionServices.id, existing.id),
                     eq(inspectionServices.tenantId, tenantId),
                 ));
+            await syncSplitsQuietly(db, tenantId, inspectionId);
             return { ...existing, active: true };
         }
 
@@ -179,6 +188,10 @@ export class ServiceService {
             nameSnapshot: svc.name,
             priceSnapshot: svc.price,
         });
+        // A new billing line is a new thing to be paid for (#278). Additive and
+        // quiet: no existing amount moves, and a bad pay rule must not make
+        // adding the line fail.
+        await syncSplitsQuietly(db, tenantId, inspectionId);
         const rows = await db.select().from(inspectionServices)
             .where(and(eq(inspectionServices.id, id), eq(inspectionServices.tenantId, tenantId)));
         return rows[0];
@@ -214,13 +227,17 @@ export class ServiceService {
      * the door — and so a `reports` row or a pay split that points at this line
      * still finds it.
      *
-     * The REFUSAL half of this guard is deliberately not stubbed here. Neither
-     * `reports` nor `inspection_service_pay_splits` exists yet, so a check
-     * against them would be a function that always returns "nothing blocks
-     * this" — a gate that passes vacuously, which this repo has shipped before.
-     * Each of those tasks adds its own clause, with a test, when it creates the
-     * table. What lands now is the column and the soft delete, which is what
-     * has to exist BEFORE the first row points here.
+     * The REFUSAL half of the guard: removal is allowed while a line is bare,
+     * and refused once something hangs off it that a soft delete would strand.
+     * Nothing here carries an FK (by design), so nothing else surfaces the
+     * dangle — this check is the only thing standing between a scope change at
+     * the door and a report delivering a line that is no longer on the invoice.
+     *
+     * Today that is a `reports` row (in_progress or published — both block:
+     * both are work the line paid for). The pay-split clause stays deferred to
+     * the pay-splits plan as its own explicit step — `inspection_service_pay_
+     * splits` still does not exist, and a check against a table that does not
+     * exist is a gate that passes vacuously.
      */
     async removeInspectionService(tenantId: string, inspectionId: string, lineId: string) {
         const db = this.getDrizzle();
@@ -234,62 +251,30 @@ export class ServiceService {
             .get();
         if (!line || !line.active) throw Errors.NotFound('Service line not found');
 
+        const blockingReport = await db.select({ id: reports.id, status: reports.status })
+            .from(reports)
+            .where(and(
+                eq(reports.tenantId, tenantId),
+                eq(reports.inspectionServiceId, lineId),
+            ))
+            .limit(1).get();
+        if (blockingReport) {
+            // The refusal names what blocked it — the UI disables the control
+            // with this reason rather than a silent no-op.
+            throw Errors.Conflict(
+                `Cannot remove this service line: a report (${blockingReport.status}) delivers it. Delete the report first.`,
+            );
+        }
+
         await db.update(inspectionServices).set({ active: false })
             .where(and(
                 eq(inspectionServices.id, lineId),
                 eq(inspectionServices.tenantId, tenantId),
                 eq(inspectionServices.inspectionId, inspectionId),
             ));
-    }
-
-    async listDiscountCodes(tenantId: string) {
-        const db = this.getDrizzle();
-        return db.select().from(discountCodes)
-            .where(eq(discountCodes.tenantId, tenantId));
-    }
-
-    async updateDiscountCode(
-        tenantId: string,
-        id: string,
-        data: Partial<Omit<typeof discountCodes.$inferInsert, 'expiresAt'>> & { expiresAt?: string | null },
-    ) {
-        const db = this.getDrizzle();
-        const { expiresAt, ...rest } = data;
-        const patch: Partial<typeof discountCodes.$inferInsert> = { ...rest };
-        if (expiresAt !== undefined) patch.expiresAt = expiresAt ? new Date(expiresAt) : null;
-        const updated = await db.update(discountCodes)
-            .set(patch)
-            .where(and(eq(discountCodes.id, id), eq(discountCodes.tenantId, tenantId)))
-            .returning();
-        if (updated.length === 0) throw Errors.NotFound('Discount code not found');
-        return updated[0];
-    }
-
-    async deleteDiscountCode(tenantId: string, id: string) {
-        const db = this.getDrizzle();
-        const result = await db.delete(discountCodes)
-            .where(and(eq(discountCodes.id, id), eq(discountCodes.tenantId, tenantId)))
-            .returning({ id: discountCodes.id });
-        if (result.length === 0) throw Errors.NotFound('Discount code not found');
-    }
-
-    async createDiscountCode(tenantId: string, data: CreateDiscountData) {
-        const db = this.getDrizzle();
-        const id = nanoid();
-        await db.insert(discountCodes).values({
-            id,
-            tenantId,
-            code:      data.code.toUpperCase(),
-            type:      data.type,
-            value:     data.value,
-            maxUses:   data.maxUses ?? null,
-            usesCount: 0,
-            expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
-            active:    true,
-            createdAt: new Date(),
-        });
-        const rows = await db.select().from(discountCodes).where(eq(discountCodes.id, id));
-        return rows[0];
+        // Unpaid rule-derived splits on the dropped line go with it; anything a
+        // human agreed or payroll locked survives as an orphan to resolve (#278).
+        await syncSplitsQuietly(db, tenantId, inspectionId);
     }
 
     // IA-26 — per-service inspector qualification. The implementation lives in
@@ -302,49 +287,47 @@ export class ServiceService {
         return setServiceInspectors(this.getDrizzle(), tenantId, serviceId, userIds);
     }
 
-    async validateDiscountCode(tenantId: string, code: string, subtotal: number): Promise<{
-        valid: boolean;
-        discountAmount: number;
-        discountCodeId: string | null;
-        message?: string;
-    }> {
-        const invalid = (message: string) =>
-            ({ valid: false as const, discountAmount: 0, discountCodeId: null, message });
-
-        const db = this.getDrizzle();
-        const rows = await db.select().from(discountCodes)
-            .where(and(eq(discountCodes.tenantId, tenantId), eq(discountCodes.active, true)));
-        // JS-side filter instead of SQL UPPER() — intentional for D1 compatibility
-        const dc = rows.find(r => r.code.toUpperCase() === code.toUpperCase());
-
-        if (!dc) return invalid('Code not found');
-        if (dc.expiresAt && dc.expiresAt < new Date()) return invalid('Code expired');
-        if (dc.maxUses !== null && dc.usesCount >= dc.maxUses) return invalid('Code usage limit reached');
-
-        const discountAmount = dc.type === 'fixed'
-            ? Math.min(dc.value, subtotal)
-            : Math.floor(subtotal * dc.value / 100);
-
-        return { valid: true, discountAmount, discountCodeId: dc.id };
+    // #278 — pay rules. Implementation in service/pay-rules.ts, which owns the
+    // dual-unit boundary and the 409 for the two partial unique indexes.
+    async listPayRules(tenantId: string, serviceId: string) {
+        return listPayRules(this.getDrizzle(), tenantId, serviceId);
     }
 
-    /**
-     * Atomically increments uses_count for a discount code, enforcing max_uses.
-     * Returns true if the redemption was accepted (a row changed), false if the
-     * cap blocked it (uses_count >= max_uses) or the code doesn't exist for
-     * this tenant. Tenant-scoped: the WHERE clause filters tenant_id so a
-     * cross-tenant id can never consume another tenant's quota.
-     */
+    async createPayRule(tenantId: string, serviceId: string, input: CreatePayRuleInput) {
+        return createPayRule(this.getDrizzle(), tenantId, serviceId, input);
+    }
+
+    async updatePayRule(tenantId: string, serviceId: string, ruleId: string, input: UpdatePayRuleInput) {
+        return updatePayRule(this.getDrizzle(), tenantId, serviceId, ruleId, input);
+    }
+
+    async deletePayRule(tenantId: string, serviceId: string, ruleId: string): Promise<void> {
+        return deletePayRule(this.getDrizzle(), tenantId, serviceId, ruleId);
+    }
+
+    /* Discount codes. Implementation in service/discount-codes.ts — the whole
+     * entity in one file, rather than interleaved with the service lines. */
+    async listDiscountCodes(tenantId: string) {
+        return discounts.listDiscountCodes(this.getDrizzle(), tenantId);
+    }
+
+    async createDiscountCode(tenantId: string, data: CreateDiscountData) {
+        return discounts.createDiscountCode(this.getDrizzle(), tenantId, data);
+    }
+
+    async updateDiscountCode(tenantId: string, id: string, data: discounts.DiscountCodePatch) {
+        return discounts.updateDiscountCode(this.getDrizzle(), tenantId, id, data);
+    }
+
+    async deleteDiscountCode(tenantId: string, id: string) {
+        return discounts.deleteDiscountCode(this.getDrizzle(), tenantId, id);
+    }
+
+    async validateDiscountCode(tenantId: string, code: string, subtotal: number): Promise<discounts.DiscountValidation> {
+        return discounts.validateDiscountCode(this.getDrizzle(), tenantId, code, subtotal);
+    }
+
     async redeemDiscountCode(tenantId: string, discountCodeId: string): Promise<boolean> {
-        const db = this.getDrizzle();
-        const res = await db.update(discountCodes)
-            .set({ usesCount: sql`${discountCodes.usesCount} + 1` })
-            .where(and(
-                eq(discountCodes.id, discountCodeId),
-                eq(discountCodes.tenantId, tenantId),
-                sql`(${discountCodes.maxUses} IS NULL OR ${discountCodes.usesCount} < ${discountCodes.maxUses})`,
-            )).run();
-        const r = res as unknown as { meta?: { changes?: number }; changes?: number };
-        return (r.meta?.changes ?? r.changes ?? 0) > 0;
+        return discounts.redeemDiscountCode(this.getDrizzle(), tenantId, discountCodeId);
     }
 }

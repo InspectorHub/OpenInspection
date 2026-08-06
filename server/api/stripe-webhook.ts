@@ -5,6 +5,8 @@ import { extractSettledPayment } from '../lib/stripe-helpers';
 import { appendWebhookLogEntry } from '../lib/stripe-webhook-log';
 import { AppError } from '../lib/errors';
 import { qboPaymentKey } from '../lib/qbo-payment-key';
+import { recordPayment } from '../services/payment-ledger.service';
+import { getDrizzle } from '../lib/route-helpers';
 
 /**
  * Stripe webhook (bring-your-own-keys). Excluded from JWT middleware (see
@@ -64,6 +66,16 @@ api.post('/', async (c) => {
     if (!settled) {
         // Verified but nothing to act on (includes Stripe dashboard "Send test
         // event" payloads) — the log row is the user's connectivity probe.
+        //
+        // An intent that carries a `kind` this build does not know is a
+        // DIFFERENT thing, and the difference matters: that is our own money
+        // going unrecorded, not a stray event. It still ACKs — a retry cannot
+        // teach this worker a kind it was not built with — but it says so
+        // where someone will see it.
+        const kind = (event.data?.object as { metadata?: Record<string, string> | null } | undefined)?.metadata?.kind;
+        if (kind && kind !== 'invoice' && kind !== 'deposit') {
+            logger.error('Stripe webhook: unrecognised payment kind — money settled with no ledger row', { kind });
+        }
         await appendWebhookLogEntry(c.env.TENANT_CACHE, tenantId, {
             eventType: event.type, result: 'received',
         });
@@ -82,16 +94,55 @@ api.post('/', async (c) => {
         return c.json({ success: true }); // ACK: a retry can never succeed
     }
 
+    // A DEPOSIT is money against the ORDER with no invoice behind it, so it
+    // takes neither of the two writes below: there is no invoice to mark paid,
+    // and marking the inspection "payment received" would unlock a report the
+    // client has paid a fraction of. The row is written HERE and nowhere else
+    // — the browser reporting success is not a payment authority, and a
+    // client-side write would record a declined card as collected.
+    if (settled.purpose.kind === 'deposit') {
+        try {
+            const appendedDeposit = await recordPayment(getDrizzle(c), tenantId, {
+                inspectionId: settled.purpose.inspectionId,
+                invoiceId:    null,
+                kind:         'deposit',
+                amountCents:  settled.amountCents,
+                method:       'card',
+                provider:     'stripe',
+                providerRef:  settled.providerRef,
+            });
+            await appendWebhookLogEntry(c.env.TENANT_CACHE, tenantId, {
+                eventType: event.type, result: 'processed',
+            });
+            // Null is a redelivery of a row we already have — the unique index
+            // on (tenant, provider, provider_ref) is the guard, and it is doing
+            // its job. Not an error, and not a second deposit.
+            logger.info('Stripe webhook: booking deposit settled', {
+                inspectionId: settled.purpose.inspectionId.slice(0, 8),
+                appended: appendedDeposit !== null,
+            });
+            // NOT pushed to QuickBooks. An unapplied deposit is a liability in
+            // the tenant's own chart of accounts, and which account is their
+            // accountant's decision — see the QBO Books health card, which
+            // counts these and says they are unsynced rather than pretending.
+            return c.json({ success: true });
+        } catch (e) {
+            logger.error('Stripe webhook: deposit processing error', {}, e instanceof Error ? e : undefined);
+            return c.json({ success: false, error: { message: 'Processing failed' } }, 500);
+        }
+    }
+
+    const invoiceId = settled.purpose.invoiceId;
     let appended: Awaited<ReturnType<typeof c.var.services.invoice.markPaid>> = null;
     try {
-        appended = await c.var.services.invoice.markPaid(settled.invoiceId, tenantId, 'oi', 'card');
+        appended = await c.var.services.invoice.markPaid(invoiceId, tenantId, 'oi', 'card');
         if (settled.inspectionId) {
             await c.var.services.inspection.markPaymentReceived(tenantId, settled.inspectionId);
         }
     } catch (e) {
         if (e instanceof AppError && e.status === 404) {
             // Invoice purged/gone — retrying can never succeed; ack and move on.
-            logger.warn('Stripe webhook: invoice not found — acked', { invoiceId: settled.invoiceId.slice(0, 8) });
+            logger.warn('Stripe webhook: invoice not found — acked', { invoiceId: invoiceId.slice(0, 8) });
             return c.json({ success: true });
         }
         logger.error('Stripe webhook processing error', {}, e instanceof Error ? e : undefined);
@@ -116,11 +167,12 @@ api.post('/', async (c) => {
         c.executionCtx.waitUntil((async () => {
             try {
                 await c.var.services.qbo.recordPayment(
-                    tenantId, settled.invoiceId, push.amountCents / 100, qboPaymentKey(push.id),
+                    tenantId, invoiceId, push.amountCents / 100, qboPaymentKey(push.id),
+                    push.occurredAt,
                 );
             } catch (e) {
                 logger.error('Stripe webhook: QBO payment push failed',
-                    { invoiceId: settled.invoiceId.slice(0, 8) }, e instanceof Error ? e : undefined);
+                    { invoiceId: invoiceId.slice(0, 8) }, e instanceof Error ? e : undefined);
             }
         })());
     }
@@ -129,7 +181,7 @@ api.post('/', async (c) => {
         eventType: event.type, result: 'processed',
     });
     logger.info('Stripe webhook: invoice settled', {
-        invoiceId: settled.invoiceId.slice(0, 8),
+        invoiceId: invoiceId.slice(0, 8),
         inspectionId: settled.inspectionId?.slice(0, 8),
     });
     return c.json({ success: true });

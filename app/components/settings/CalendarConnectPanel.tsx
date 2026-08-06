@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFetcher, useRevalidator, useSearchParams } from "react-router";
-import { RadioCardGroup } from "@core/shared-ui";
+import { Banner, RadioCardGroup } from "@core/shared-ui";
 import { GoogleSignInButton } from "~/components/GoogleSignInButton";
 import { CalendarGlyph } from "~/components/settings/CalendarGlyph";
 import { calendarOAuthErrorToast } from "~/lib/calendar-oauth-errors";
@@ -22,12 +22,15 @@ export function CalendarConnectPanel({
   connected,
   capability: connectedCapability,
   oauthConfigured,
+  lastSyncError,
   disabled = false,
   picker = null,
 }: {
   connected: boolean;
   capability: CalendarCapability | null;
   oauthConfigured: boolean;
+  /** Why the last sync attempt failed; null once one succeeds. */
+  lastSyncError?: string | null;
   disabled?: boolean;
   picker?: CalendarPickerData | null;
 }) {
@@ -150,6 +153,15 @@ export function CalendarConnectPanel({
         </p>
       ) : connected ? (
         <div className="space-y-3">
+          {/* A stale freshness badge cannot distinguish "nothing changed" from
+              "nobody has been able to reach Google for three days". The common
+              cause is a revoked token, and reconnecting is something only this
+              person can do — so the reason belongs next to the button. */}
+          {lastSyncError && (
+            <Banner tone="warn">
+              {m.settings_calconnect_sync_error({ reason: lastSyncError })}
+            </Banner>
+          )}
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center rounded-ih-pill px-2 py-0.5 text-[11px] font-bold bg-ih-ok-bg text-ih-ok-fg">
               {m.settings_conn_status_connected()}

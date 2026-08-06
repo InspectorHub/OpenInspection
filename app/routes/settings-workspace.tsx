@@ -13,6 +13,9 @@ import { SectionNav } from "~/components/settings/SectionNav";
 import { ProfilePicker } from "~/components/settings/ProfilePicker";
 import { ReportStylePreview } from "~/components/settings/ReportStylePreview";
 import { makeWorkspaceSchema } from "~/lib/forms/settings.schema";
+import { brandingUpdateBody } from "~/lib/forms/branding-body";
+import { ReportFeaturesPanel } from "~/components/settings/ReportFeaturesPanel";
+import { ReportPdfPanel } from "~/components/settings/ReportPdfPanel";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Select } from "@core/shared-ui";
@@ -85,44 +88,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (submission.status !== "success") {
     return submission.reply();
   }
-  const v = submission.value;
-
-  const body: Record<string, unknown> = {};
-  if (v.companyName !== undefined) body.companyName = v.companyName;
-  if (v.primaryColor !== undefined) body.primaryColor = v.primaryColor;
-  if (v.defaultProfileId !== undefined) body.defaultProfileId = v.defaultProfileId;
-
-  // Custom referral sources: one label per line
-  if (typeof v.customReferralSources === "string") {
-    body.customReferralSources = v.customReferralSources
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-
-  // Boolean feature flags — conform-native checkboxes coerce to boolean in
-  // submission.value (checked → true, absent → undefined). Always send an explicit
-  // boolean so unchecking persists false.
-  body.enableRepairList = v.enableRepairList ?? false;
-  body.enableCustomerRepairExport = v.enableCustomerRepairExport ?? false;
-
-  // Report PDF settings. companyAddress is free text (trim; empty string clears).
-  // The three toggles are conform-native checkboxes — absent (unchecked) must
-  // persist false, so coerce with `?? false` (the same pattern as the flags above).
-  if (typeof v.companyAddress === "string") body.companyAddress = v.companyAddress.trim();
-  body.pdfShowFooter = v.pdfShowFooter ?? false;
-  body.pdfShowPageNumbers = v.pdfShowPageNumbers ?? false;
-  body.pdfShowLicense = v.pdfShowLicense ?? false;
-
-  // Tenant display timezone (IANA). Only sent when a value is present.
-  if (typeof v.defaultTimezone === "string" && v.defaultTimezone) body.defaultTimezone = v.defaultTimezone;
-  // Tenant display locale (BCP-47) + currency (ISO 4217). Only sent when present.
-  if (typeof v.defaultLocale === "string" && v.defaultLocale) body.defaultLocale = v.defaultLocale;
-  if (typeof v.currency === "string" && v.currency) body.currency = v.currency;
-  // #270 — an absent key must leave the stored preference alone (which is why
-  // the API schema carries no `.default()` for these).
-  if (typeof v.dateFormat === "string" && v.dateFormat) body.dateFormat = v.dateFormat;
-  if (typeof v.timeFormat === "string" && v.timeFormat) body.timeFormat = v.timeFormat;
+  const body = brandingUpdateBody(submission.value);
 
   const api = createApi(context, { token });
   // Body is runtime-assembled from Zod-validated form values matching UpdateBrandingSchema;
@@ -380,109 +346,18 @@ export default function SettingsWorkspacePage() {
           </div>
         </section>
 
-        {/* Report features */}
-        <section id="report-features" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_report_features_heading()}</h3>
+        <ReportFeaturesPanel
+          enableRepairList={branding.enableRepairList}
+          enableCustomerRepairExport={branding.enableCustomerRepairExport}
+        />
 
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              name="enableRepairList"
-              value="on"
-              defaultChecked={branding.enableRepairList ?? false}
-              className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
-            />
-            <span>
-              <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_workspace_repair_list_title()}</span>
-              <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-                {m.settings_workspace_repair_list_desc()}
-              </span>
-            </span>
-          </label>
-
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              name="enableCustomerRepairExport"
-              value="on"
-              defaultChecked={branding.enableCustomerRepairExport ?? false}
-              className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
-            />
-            <span>
-              <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_workspace_repair_export_title()}</span>
-              <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-                {m.settings_workspace_repair_export_desc()}
-              </span>
-            </span>
-          </label>
-        </section>
-
-        {/* Report PDF */}
-        <section id="report-pdf" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_report_pdf_heading()}</h3>
-          <p className="text-[12px] text-ih-fg-3">{m.settings_workspace_report_pdf_subtitle()}</p>
-
-          <div className="space-y-2">
-            <label htmlFor={fields.companyAddress.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_company_address_label()}</label>
-            <input type="text" id={fields.companyAddress.id} name={fields.companyAddress.name}
-              defaultValue={branding.companyAddress ?? ""}
-              placeholder={m.settings_workspace_company_address_placeholder()}
-              aria-invalid={fields.companyAddress.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
-            <p className="text-[11px] text-ih-fg-3">{m.settings_workspace_company_address_hint()}</p>
-            {fields.companyAddress.errors && (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.companyAddress.errors[0]}</p>
-            )}
-          </div>
-
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              name="pdfShowFooter"
-              value="on"
-              defaultChecked={branding.pdfShowFooter ?? true}
-              className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
-            />
-            <span>
-              <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_workspace_pdf_footer_title()}</span>
-              <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-                {m.settings_workspace_pdf_footer_desc()}
-              </span>
-            </span>
-          </label>
-
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              name="pdfShowPageNumbers"
-              value="on"
-              defaultChecked={branding.pdfShowPageNumbers ?? true}
-              className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
-            />
-            <span>
-              <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_workspace_pdf_page_numbers_title()}</span>
-              <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-                {m.settings_workspace_pdf_page_numbers_desc()}
-              </span>
-            </span>
-          </label>
-
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              name="pdfShowLicense"
-              value="on"
-              defaultChecked={branding.pdfShowLicense ?? true}
-              className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
-            />
-            <span>
-              <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_workspace_pdf_license_title()}</span>
-              <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-                {m.settings_workspace_pdf_license_desc()}
-              </span>
-            </span>
-          </label>
-        </section>
+        <ReportPdfPanel
+          addressField={fields.companyAddress}
+          companyAddress={branding.companyAddress}
+          pdfShowFooter={branding.pdfShowFooter}
+          pdfShowPageNumbers={branding.pdfShowPageNumbers}
+          pdfShowLicense={branding.pdfShowLicense}
+        />
 
         {form.errors && (
           <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">

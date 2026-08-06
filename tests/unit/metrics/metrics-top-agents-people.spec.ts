@@ -75,6 +75,34 @@ describe('GET /api/metrics — topAgents via inspection_people (Task 9c)', () =>
         expect(body.data.topAgents[0].revenue).toBe(30000);
     });
 
+    it('buckets referral_source rows the contact-keyed query drops (#278)', async () => {
+        // The contact-keyed query filters `referred_by_contact_id is not null`,
+        // so a job whose only attribution is free text ("Google") was dropped
+        // ENTIRELY — and for a one-person firm those are usually the only rows
+        // there are. The two are different KINDS of answer and stay in separate
+        // rows keyed by `kind`, never merged into one column.
+        const today = new Date().toISOString().slice(0, 10);
+        await db.insert(schema.inspections).values([
+            { id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: today, status: 'confirmed', paymentStatus: 'paid', price: 10000, referredByContactId: AGENT_CONTACT, inspectorId: null, createdAt: new Date() },
+            { id: INSP_2, tenantId: TENANT, propertyAddress: '2 Oak', date: today, status: 'confirmed', paymentStatus: 'paid', price: 20000, referredByContactId: null, referralSource: 'Google', inspectorId: null, createdAt: new Date() },
+            { id: 'insp-3', tenantId: TENANT, propertyAddress: '3 Elm', date: today, status: 'confirmed', paymentStatus: 'paid', price: 5000, referredByContactId: null, referralSource: '   ', inspectorId: null, createdAt: new Date() },
+        ] as never);
+
+        const res = await buildApp().request('/api/metrics?from=2024-01-01&to=2028-12-31', {}, ENV, CTX);
+        const body = await res.json() as { data: { topAgents: { agentId: string | null; agentName: string; kind: string; count: number; revenue: number }[] } };
+
+        // Contact-keyed first, then the coarse bucket.
+        expect(body.data.topAgents.map(r => [r.kind, r.agentName])).toEqual([
+            ['contact', 'Jane'],
+            ['source', 'Google'],
+        ]);
+        const source = body.data.topAgents[1];
+        expect(source.agentId).toBeNull();
+        expect(source.count).toBe(1);
+        expect(source.revenue).toBe(20000);
+        // A whitespace-only source is not an answer and gets no row.
+    });
+
     it('inspection with no referrer is excluded from topAgents', async () => {
         const today = new Date().toISOString().slice(0, 10);
         await db.insert(schema.inspections).values({

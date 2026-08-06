@@ -9,9 +9,12 @@
  * and string-keyed cells (civilDateOf), never Date/UTC math in the views.
  *
  * SCOPED to the calendar surface on purpose: every real bug lives here, while
- * legitimate `.toISOString().slice(0,10)` uses (server UTC-today, QBO TxnDate,
- * report year) live elsewhere. A line opts out with a trailing — or immediately
- * preceding — `// tz-lint-ok: <reason>` comment.
+ * legitimate `.toISOString().slice(0,10)` uses (server UTC-today, report year,
+ * QBO document-creation dates) live elsewhere. QBO *payment* TxnDate is NOT on
+ * that list any more: it books an accounting period, so it derives from the
+ * ledger row's occurred_at in the tenant zone via epochMsToWallClockYmd (see
+ * recordPayment in server/services/qbo/invoice-sync.ts). A line opts out with a
+ * trailing — or immediately preceding — `// tz-lint-ok: <reason>` comment.
  *
  * Flags:
  *   P1  hardcoded-Z instant composed from a civil date + wall-clock time
@@ -60,6 +63,24 @@ const SCOPE = [
   'app/routes/calendar.tsx',
   'app/routes/calendar-dispatch.tsx',
   'server/services/calendar-items.service.ts',
+  // Booking rules are civil-time rules stated in the OFFICE's terms — a lead
+  // time in hours and a wall-clock same-day cutoff — and the ISO-week bucket
+  // that `least_loaded` counts is a calendar question too. A
+  // `.toISOString().slice(0,10)` here shipped green before this line existed;
+  // it was caught by a test, which is one gate later than it should have been.
+  'server/lib/booking',
+  // What a booking ANNOUNCES is calendar output: the inspector's calendar entry
+  // and the customer's .ics invite. Both used to recompose the slot time as
+  // `${date}T${time}:00Z` — a wall clock labelled UTC — so both landed hours off
+  // in every tenant zone but UTC, and disagreed with the scheduled_start_ms the
+  // office sees. Both now read the stamped instant. Scoped so they stay that way.
+  'server/services/booking',
+  // The inspector iCal feeds. toUtcStamp here composed `${day}T${time}:00Z` —
+  // a wall clock labelled UTC — so an 08:00 appointment in America/New_York was
+  // published to every subscriber as 08:00Z, four hours before it happens. The
+  // file was not in this list while the comment above claimed every real bug
+  // lives here; that is what let it survive.
+  'server/services/ics.service.ts',
 ];
 
 function collectFiles(path) {

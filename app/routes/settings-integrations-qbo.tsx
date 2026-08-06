@@ -257,7 +257,10 @@ export default function SettingsIntegrationsQbo() {
           </svg>
           <span>
             {m.settings_qbo_expiry_warning()}{" "}
-            <a href="/settings/integrations/qbo/connect" className="underline font-semibold">
+            {/* /api/*, not a child of this page's path: only API-prefixed paths
+                reach the Hono app (workers/app.ts allow-list). A link under
+                /settings/** lands on React Router, which has no such route. */}
+            <a href="/api/integrations/qbo/connect" className="underline font-semibold">
               {m.settings_qbo_reconnect_link()}
             </a>
           </span>
@@ -288,7 +291,7 @@ export default function SettingsIntegrationsQbo() {
             </li>
           </ul>
           <a
-            href="/settings/integrations/qbo/connect"
+            href="/api/integrations/qbo/connect"
             className="inline-flex items-center gap-2 px-6 py-3 bg-[#2CA01C] text-white rounded-lg font-bold text-[13px] hover:bg-[#237a16] transition-colors"
           >
             {m.settings_qbo_connect_button()}

@@ -5,7 +5,37 @@ import { encryptToken, decryptToken } from '../../lib/qbo-crypto';
 import { QBOTokenResponseSchema } from '../../lib/validations/qbo.schema';
 import { QBO_PAYMENT_DISCREPANCY, encodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
 
-const QBO_API_BASE = 'https://quickbooks.api.intuit.com/v3/company';
+/**
+ * QuickBooks serves sandbox companies and real companies from two different
+ * hosts, and the credentials are not interchangeable: Intuit Development keys
+ * authenticate only against sandbox, Production keys only against production.
+ * So the host is a deployment decision, named by `QBO_ENV`.
+ *
+ * There is deliberately NO default. Either default is wrong half the time, and
+ * both failure modes are silent to the operator: pointed at production with
+ * Development keys you get an auth error that reads like a bad secret, and
+ * pointed at sandbox with Production keys a paying customer's books quietly
+ * receive nothing. Unset raises instead — see `resolveQboApiBase`.
+ *
+ * The OAuth token and revoke endpoints below are shared by both environments;
+ * only the accounting API host differs.
+ */
+const QBO_API_HOSTS: Record<string, string> = {
+    sandbox:    'https://sandbox-quickbooks.api.intuit.com',
+    production: 'https://quickbooks.api.intuit.com',
+};
+
+/** The company-scoped API base for `QBO_ENV`. Throws when it is unset or unknown. */
+export function resolveQboApiBase(qboEnv: string | undefined): string {
+    const host = qboEnv ? QBO_API_HOSTS[qboEnv] : undefined;
+    if (!host) {
+        throw new Error(
+            `QBO_ENV must be one of [${Object.keys(QBO_API_HOSTS).join(', ')}] to reach the QuickBooks API (got ${qboEnv === undefined ? 'unset' : `"${qboEnv}"`})`,
+        );
+    }
+    return `${host}/v3/company`;
+}
+
 const QBO_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
 export const QBO_REVOKE_URL = 'https://developer.api.intuit.com/v2/oauth2/tokens/revoke';
 const MINOR_VERSION = '75';
@@ -67,7 +97,17 @@ export class QBOServiceBase {
         protected clientSecret: string,
         protected webhookSecret: string,
         protected jwtSecret: string,
+        /**
+         * `QBO_ENV` verbatim, resolved lazily rather than in the constructor:
+         * the service is built for every request that touches an invoice, and
+         * a deployment with no QuickBooks connection at all should not fail on
+         * construction for a setting it never uses.
+         */
+        protected qboEnv?: string,
     ) {}
+
+    /** Throws when `QBO_ENV` is unset or unknown — no host is guessed. */
+    protected get apiBase(): string { return resolveQboApiBase(this.qboEnv); }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     protected getDrizzle() { return drizzle(this.db as any); }
@@ -110,8 +150,29 @@ export class QBOServiceBase {
         });
 
         if (!resp.ok) {
-            await db.delete(qboConnections).where(eq(qboConnections.tenantId, tenantId));
-            throw new Error('QBO token refresh failed — reconnect required');
+            // Only an explicit refusal of the grant is terminal.
+            //
+            // Intuit rotates the refresh token every 24-26 hours, so this path
+            // runs on every connected tenant every day. Treating any non-2xx as
+            // "reauthorize required" meant a single Intuit 5xx or a rate limit
+            // permanently disconnected a paying customer and sent an owner back
+            // through the whole OAuth flow — for an outage that had nothing to
+            // say about their token. 400 (`invalid_grant`) and 401 are the
+            // answers that DO say the token is dead; everything else leaves it
+            // intact so the next attempt can use it.
+            //
+            // Intuit also began returning a field on this response that dates
+            // the refresh token's hard expiry. It is deliberately not read
+            // here: the exact key was not verifiable at the time of writing,
+            // and keying a destructive delete off a guessed field name would
+            // reintroduce the same failure it is supposed to prevent. The
+            // status code already distinguishes the two cases; the field would
+            // only let us disconnect EARLIER, which is not the useful direction.
+            if (resp.status === 400 || resp.status === 401) {
+                await db.delete(qboConnections).where(eq(qboConnections.tenantId, tenantId));
+                throw new Error('QBO refresh token rejected — reconnect required');
+            }
+            throw new Error(`QBO token refresh failed with ${resp.status} — connection left intact`);
         }
 
         const data = QBOTokenResponseSchema.parse(await resp.json());
@@ -133,9 +194,12 @@ export class QBOServiceBase {
         path: string,
         body?: unknown,
     ): Promise<T> {
+        // Resolved before the token, so a misconfigured QBO_ENV surfaces
+        // without first spending a refresh round-trip on Intuit.
+        const base = this.apiBase;
         const { accessToken, realmId } = await this.getToken(tenantId);
         const separator = path.includes('?') ? '&' : '?';
-        const url = `${QBO_API_BASE}/${realmId}/${path}${separator}minorversion=${MINOR_VERSION}`;
+        const url = `${base}/${realmId}/${path}${separator}minorversion=${MINOR_VERSION}`;
 
         const opts: RequestInit = {
             method,

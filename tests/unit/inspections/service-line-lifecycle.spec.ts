@@ -112,6 +112,40 @@ describe('inspection service lines — scope changes at the door', () => {
         expect(await svc.getInspectionServices(TENANT, INSP)).toHaveLength(1);
     });
 
+    it('refuses to remove a line that a report delivers, and says so', async () => {
+        // The deferral written at removeInspectionService came due when the
+        // `reports` table landed: a soft delete would leave the report pointing
+        // at a line that is no longer on the invoice, and nothing surfaces it
+        // (no FKs by design). The refusal must NAME what blocked it.
+        const line = await svc.addInspectionService(TENANT, INSP, SVC);
+        await db.insert(schema.reports).values({
+            id: 'rep-sewer-1', tenantId: TENANT, inspectionId: INSP,
+            kind: 'ancillary', inspectionServiceId: line!.id,
+            title: 'Sewer Scope', status: 'in_progress', createdAt: new Date(),
+        });
+
+        await expect(svc.removeInspectionService(TENANT, INSP, line!.id))
+            .rejects.toThrow(/report/i);
+
+        // Refused means untouched — not a silent no-op that flipped the flag.
+        const rows = await lineRows();
+        expect(rows[0].active).toBe(true);
+    });
+
+    it('still removes a line whose reports belong to other lines', async () => {
+        // The block is the line's OWN report. A published primary report for the
+        // main inspection must not freeze every other line on the order.
+        const line = await svc.addInspectionService(TENANT, INSP, SVC);
+        await db.insert(schema.reports).values({
+            id: 'rep-primary-1', tenantId: TENANT, inspectionId: INSP,
+            kind: 'primary', inspectionServiceId: null,
+            title: 'Home Inspection', status: 'published', createdAt: new Date(),
+        });
+
+        await svc.removeInspectionService(TENANT, INSP, line!.id);
+        expect((await lineRows())[0].active).toBe(false);
+    });
+
     it('never touches another tenant\'s line', async () => {
         const line = await svc.addInspectionService(TENANT, INSP, SVC);
         await expect(svc.removeInspectionService('other-tenant', INSP, line!.id))

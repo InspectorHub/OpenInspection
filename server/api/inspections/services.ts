@@ -86,9 +86,10 @@ const inspectionServiceRoutes = createApiRouter()
         request: { params: LineParam },
         responses: {
             200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Line removed' },
+            409: { description: 'Refused: a report delivers this line, and removing it would strand that report' },
         },
         operationId: 'removeInspectionService',
-        description: 'Removes one booked service line from an inspection. Does not touch the tenant service catalog.',
+        description: 'Removes one booked service line from an inspection. Does not touch the tenant service catalog. Refuses with 409 when a report (in progress or published) delivers this line.',
     }, { scopes: ['write'], tier: 'primary' })), async (c) => {
         const tenantId = getTenantId(c);
         const { id, lineId } = c.req.valid('param');

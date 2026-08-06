@@ -1,6 +1,8 @@
 import { eq, and } from 'drizzle-orm';
 import { qboConnections, qboEntityMap } from '../../lib/db/schema/qbo';
 import { invoices } from '../../lib/db/schema/invoice';
+import { tenantConfigs } from '../../lib/db/schema/tenant';
+import { epochMsToWallClockYmd, resolveTenantTimeZone } from '../../lib/tz';
 import { logger } from '../../lib/logger';
 import { getLedgerOpinion } from '../payment-ledger.service';
 import type {
@@ -237,6 +239,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
          */
         async recordPayment(
             tenantId: string, invoiceId: string, amountPaid: number, idempotencyKey: string,
+            occurredAt: Date,
         ): Promise<void> {
             const db = this.getDrizzle();
             const invoiceMap = await db.select().from(qboEntityMap).where(
@@ -250,11 +253,24 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                 return;
             }
 
+            // TxnDate is a calendar date with no timezone: QuickBooks books it
+            // into an accounting period as-is. It must be the day the money
+            // MOVED (the ledger row's occurred_at — the ledger separates it
+            // from created_at because Tuesday's cash gets recorded Thursday),
+            // in the TENANT's zone: a payment taken at 6pm Pacific is the same
+            // civil day locally and the next day in UTC, a real one-day period
+            // error at month end.
+            const cfg = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+                .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+            const txnDate = epochMsToWallClockYmd(
+                occurredAt.getTime(), resolveTenantTimeZone(cfg?.defaultTimezone),
+            );
+
             try {
                 await this.apiCall(tenantId, 'POST', `payment?requestid=${encodeURIComponent(idempotencyKey)}`, {
                     CustomerRef: { value: qboCustomerId },
                     TotalAmt:    amountPaid,
-                    TxnDate:     new Date().toISOString().slice(0, 10),
+                    TxnDate:     txnDate,
                     Line:        [{ Amount: amountPaid, LinkedTxn: [{ TxnId: invoiceMap.qboId, TxnType: 'Invoice' }] }],
                 });
             } catch (e) {

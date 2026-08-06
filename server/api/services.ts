@@ -9,6 +9,7 @@ import {
     ServiceListResponseSchema, CreateDiscountCodeSchema, UpdateDiscountCodeSchema,
     ValidateDiscountSchema, ValidateDiscountResponseSchema,
     ServiceInspectorListResponseSchema, SetServiceInspectorsSchema, SetServiceInspectorsResponseSchema,
+    CreatePayRuleSchema, UpdatePayRuleSchema, PayRuleResponseSchema, PayRuleListResponseSchema,
 } from '../lib/validations/service.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -161,6 +162,100 @@ export const servicesRoutes = createApiRouter()
         const { userIds } = c.req.valid('json');
         const count = await c.var.services.service.setServiceInspectors(tenantId, id, userIds);
         return c.json({ success: true, data: { count } });
+    })
+    // --- Pay rules (#278) --------------------------------------------------
+    // Mounted here rather than under a pay-splits router because a rule is
+    // CATALOGUE configuration — it belongs to a service, not to an inspection —
+    // and this is where the service's other per-service settings already live.
+    // `/{id}/pay-rules` mirrors the `/{id}/inspectors` pair exactly: same
+    // arity, same `{id}` param name, registered before the bare `/{id}` routes.
+    // Write access is owner/manager, matching every other write on this router:
+    // deciding what a person is paid is company configuration, not field work.
+    // No new capability — `financial` remains the only line.
+    // GET /api/services/:id/pay-rules
+    .openapi(createRoute(withMcpMetadata({
+        method: 'get', path: '/{id}/pay-rules',
+        tags: ["services"], summary: "List pay rules for a service",
+        middleware: [requireRole('owner', 'manager')] as const,
+        request: { params: z.object({ id: z.string().describe('Service ID') }) },
+        responses: {
+            200: { content: { 'application/json': { schema: PayRuleListResponseSchema } }, description: 'OK — the service default first, then per-inspector rules' },
+        },
+        operationId: "listServicePayRules",
+        description: "Returns what inspectors earn on this catalogue service. A rule with a null userId is the service default, applied to any inspector without one of their own. An empty list means pay splits are OFF for this service: nothing is populated when an inspection is assigned.",
+    }, { scopes: ['read'], tier: 'extended' })), async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const rows = await c.var.services.service.listPayRules(tenantId, id);
+        return c.json({ success: true, data: rows });
+    })
+    // POST /api/services/:id/pay-rules
+    .openapi(createRoute(withMcpMetadata({
+        method: 'post', path: '/{id}/pay-rules',
+        tags: ["services"], summary: "Add a pay rule to a service",
+        middleware: [requireRole('owner', 'manager')] as const,
+        request: {
+            params: z.object({ id: z.string().describe('Service ID') }),
+            body: { content: { 'application/json': { schema: CreatePayRuleSchema } } },
+        },
+        responses: {
+            201: { content: { 'application/json': { schema: PayRuleResponseSchema } }, description: 'Created' },
+            409: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'A default rule, or a rule for that inspector, already exists on this service' },
+        },
+        operationId: "createServicePayRule",
+        description: "Writes what an inspector earns on this service. Percentages are BASIS POINTS (percentBps: 6000 = 60%) and fixed amounts are integer cents (amountCents) — the field name carries the unit, and the payload is strict, so a rule written in the wrong unit is refused rather than stored a hundred times too small. Omit userId for the service default. At most one default and one rule per inspector exist per service; a duplicate is 409.",
+    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const input = c.req.valid('json');
+        const row = await c.var.services.service.createPayRule(tenantId, id, input);
+        return c.json({ success: true, data: row }, 201);
+    })
+    // PUT /api/services/:id/pay-rules/:ruleId
+    .openapi(createRoute(withMcpMetadata({
+        method: 'put', path: '/{id}/pay-rules/{ruleId}',
+        tags: ["services"], summary: "Replace the rate of a pay rule",
+        middleware: [requireRole('owner', 'manager')] as const,
+        request: {
+            params: z.object({
+                id: z.string().describe('Service ID'),
+                ruleId: z.string().describe('Pay rule ID'),
+            }),
+            body: { content: { 'application/json': { schema: UpdatePayRuleSchema } } },
+        },
+        responses: {
+            200: { content: { 'application/json': { schema: PayRuleResponseSchema } }, description: 'OK' },
+        },
+        operationId: "updateServicePayRule",
+        description: "Changes the rate of an existing pay rule, including switching between the three types. The inspector the rule applies to is not editable here — that would move the rule into a different uniqueness slot, so it is a delete plus a create. Editing a rule never restates pay that was already recorded: splits are a frozen record, and an explicit refresh is what re-derives them.",
+    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id, ruleId } = c.req.valid('param');
+        const input = c.req.valid('json');
+        const row = await c.var.services.service.updatePayRule(tenantId, id, ruleId, input);
+        return c.json({ success: true, data: row });
+    })
+    // DELETE /api/services/:id/pay-rules/:ruleId
+    .openapi(createRoute(withMcpMetadata({
+        method: 'delete', path: '/{id}/pay-rules/{ruleId}',
+        tags: ["services"], summary: "Delete a pay rule",
+        middleware: [requireRole('owner', 'manager')] as const,
+        request: {
+            params: z.object({
+                id: z.string().describe('Service ID'),
+                ruleId: z.string().describe('Pay rule ID'),
+            }),
+        },
+        responses: {
+            200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' },
+        },
+        operationId: "deleteServicePayRule",
+        description: "Removes a pay rule. Deleting the last rule on a service turns pay splits off for it — future inspections populate nothing. Splits already recorded are left alone.",
+    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id, ruleId } = c.req.valid('param');
+        await c.var.services.service.deletePayRule(tenantId, id, ruleId);
+        return c.json({ success: true });
     })
     // PUT /api/services/:id
     .openapi(createRoute(withMcpMetadata({

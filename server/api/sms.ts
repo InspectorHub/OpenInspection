@@ -42,6 +42,7 @@ import { resolveComplianceProvider } from '../lib/sms/resolve-compliance-provide
 import { recordIntegrationTest } from '../lib/integration-test-results';
 import { smsSendGate } from '../lib/sms/send-gate';
 import { PlanQuotaGuard, readTenantTier } from '../features/plan-quota/guard';
+import { tenantAiCapsLoader } from '../features/plan-quota/ai-caps';
 import { complianceWebhookUrl } from '../lib/sms/compliance-webhook';
 import { getBaseUrl } from '../lib/url';
 import { resolveTenantLegalUrls } from '../lib/legal-links';
@@ -509,7 +510,7 @@ export const smsAdminRoutes = createApiRouter()
         // of the three with no STOP-revocation check. `tenantTier` is unset by
         // session-context here, so fall back to a one-shot lookup.
         const quotaGuard = c.var.profile.hasUsageQuota
-            ? new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl })
+            ? new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl, aiCaps: tenantAiCapsLoader(c.env.DB) })
             : undefined;
         const gate = await smsSendGate({
             db, tenantId, to: normalized, purpose: 'test', env: c.env,

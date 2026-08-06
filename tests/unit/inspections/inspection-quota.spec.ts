@@ -103,14 +103,26 @@ describe('Inspection creation consumes the free-tier quota (Task 3)', () => {
         expect(await new MeteringService(testD1).lifetimeTotal(TENANT, 'inspections')).toBe(3);
     });
 
-    it('a delete does not refund quota', async () => {
+    it('a delete DOES return the allowance, and the counter heals on the next create', async () => {
         const guard = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
         const svc = makeService(guard);
 
-        const a = await svc.createInspection(TENANT, minimalCreateData());
-        await deleteInspectionCascade(testDb as unknown as DrizzleD1Database, makeR2(), TENANT, a.id);
+        // Fill the cap, then delete two — the tenant is under it again.
+        const created = [];
+        for (let i = 0; i < 5; i++) created.push(await svc.createInspection(TENANT, minimalCreateData()));
+        await expect(svc.createInspection(TENANT, minimalCreateData())).rejects.toMatchObject({
+            status: 402, code: 'QUOTA_EXHAUSTED',
+        });
+        for (const insp of created.slice(0, 2)) {
+            await deleteInspectionCascade(testDb as unknown as DrizzleD1Database, makeR2(), TENANT, insp.id);
+        }
 
-        expect(await new MeteringService(testD1).lifetimeTotal(TENANT, 'inspections')).toBe(1);
+        // The counter is momentarily stale-high (nothing writes it on delete)...
+        expect(await new MeteringService(testD1).lifetimeTotal(TENANT, 'inspections')).toBe(5);
+        // ...but it is a display cache, not the gate: the create is admitted,
+        // and the cache heals to the truth as it lands.
+        await expect(svc.createInspection(TENANT, minimalCreateData())).resolves.toBeDefined();
+        expect(await new MeteringService(testD1).lifetimeTotal(TENANT, 'inspections')).toBe(4);
     });
 
     it('cloneInspection of a nonexistent id rejects and does not consume quota', async () => {

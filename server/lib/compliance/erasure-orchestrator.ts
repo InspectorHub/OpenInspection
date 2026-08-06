@@ -50,12 +50,14 @@ import {
     inspectionAccessTokens,
     inspectionRequests,
     reports,
+    auditLogs,
     erasureLog,
 } from '../db/schema';
 import {
     ANONYMIZE_SIGNER_PII,
     ANONYMIZE_REQUEST_PII,
     ANONYMIZE_BOOKING_REQUEST_PII,
+    ANONYMIZE_AUDIT_PII,
 } from './anonymize-pii';
 
 /**
@@ -288,6 +290,18 @@ export async function runErasure(
         .all();
     const subjectContactIds = (subjectContactRows as Array<{ id: string }>).map((c) => c.id);
 
+    /** Subject's inspection ids via `inspection_people` — there is no
+     *  denormalized client column on `inspections`. Memoized: three steps
+     *  below need the same list and it cannot change mid-run. */
+    let inspIdCache: string[] | null = null;
+    async function subjectInspectionIds(): Promise<string[]> {
+        if (inspIdCache) return inspIdCache;
+        if (subjectContactIds.length === 0) return (inspIdCache = []);
+        const rows = await db.select({ id: inspectionPeople.inspectionId }).from(inspectionPeople)
+            .where(and(eq(inspectionPeople.tenantId, tenantId), inArray(inspectionPeople.contactId, subjectContactIds))).all();
+        return (inspIdCache = [...new Set((rows as Array<{ id: string }>).map((r) => r.id))]);
+    }
+
     // A preference row is keyed on a contact id, and contact ids are reused.
     // Leaving these behind gives the NEXT person at that id the erased
     // subject's mute settings — invisibly, and in the direction that withholds
@@ -356,20 +370,8 @@ export async function runErasure(
     // title text — an address can be spelled several ways, and a title that
     // happens to mention someone else's street is not this subject's data.
     await step('reports', 'anonymize', { legalBasis: 'art_17_3_e' }, async () => {
-        if (subjectContactIds.length === 0) return 0;
-        // Through inspection_people, NOT a column on `inspections`: the
-        // denormalized clientContactId was dropped when people became rows, and
-        // the schema comment says not to reintroduce it.
-        const inspRows = await db.select({ id: inspectionPeople.inspectionId })
-            .from(inspectionPeople)
-            .where(and(
-                eq(inspectionPeople.tenantId, tenantId),
-                inArray(inspectionPeople.contactId, subjectContactIds),
-            ))
-            .all();
-        const inspIds = [...new Set((inspRows as Array<{ id: string }>).map((i) => i.id))];
+        const inspIds = await subjectInspectionIds();
         if (inspIds.length === 0) return 0;
-
         const res = await db.update(reports)
             .set({ title: ANONYMIZED_TITLE })
             .where(and(eq(reports.tenantId, tenantId), inArray(reports.inspectionId, inspIds)))
@@ -389,14 +391,7 @@ export async function runErasure(
     // (that one nulls client_name/client_email only).
     await step('order_payments', 'anonymize', { legalBasis: 'art_17_3_b' }, async () => {
         if (subjectContactIds.length === 0) return 0;
-        const inspRows = await db.select({ id: inspectionPeople.inspectionId })
-            .from(inspectionPeople)
-            .where(and(
-                eq(inspectionPeople.tenantId, tenantId),
-                inArray(inspectionPeople.contactId, subjectContactIds),
-            ))
-            .all();
-        const inspIds = [...new Set((inspRows as Array<{ id: string }>).map((i) => i.id))];
+        const inspIds = await subjectInspectionIds();
         const invRows = await db.select({ id: invoices.id }).from(invoices)
             .where(and(eq(invoices.tenantId, tenantId), inArray(invoices.contactId, subjectContactIds)))
             .all();
@@ -416,24 +411,29 @@ export async function runErasure(
         return c;
     });
 
+    // `metadata` is free-form JSON: audit.ts strips the machine-detectable
+    // identifiers at write, prose it cannot see at all, and older rows predate
+    // it — so the whole value goes. Located by entity id (inspections/contacts).
+    await step('audit_logs', 'anonymize', { legalBasis: 'art_17_3_b' }, async () => {
+        const targets = [...(await subjectInspectionIds()), ...subjectContactIds];
+        if (targets.length === 0) return 0;
+        const c = changeCount(await db.update(auditLogs).set(ANONYMIZE_AUDIT_PII)
+            .where(and(eq(auditLogs.tenantId, tenantId), inArray(auditLogs.entityId, targets))).run());
+        retainedCount += c; return c;   // the event is retained, the free text is not
+    });
+
     // ── 4) Non-agreement client PII lives on `contacts` now (the
     // `inspections.client_*` columns are a frozen, unread cache dropped in a
     // later migration — the erasure orchestrator no longer writes them). ────
     //
-    // Orphan cleanup FIRST: resolve the subject's contact id(s) and delete the
-    // `inspection_people` rows that reference them, so nothing dangles once the
-    // contact row itself is deleted below. Resolving the contact id(s) before
-    // the contacts delete (rather than joining contacts.email at delete time)
-    // means this step works even if run standalone/retried after the contacts
-    // row is already gone (idempotent: 0 contacts found -> 0 rows deleted).
+    // Orphan cleanup FIRST: delete the `inspection_people` rows referencing the
+    // subject, so nothing dangles once the contact row goes below. The ids were
+    // resolved BEFORE any delete, so a standalone re-run is idempotent (0
+    // contacts found -> 0 rows deleted) rather than a no-op that misses rows.
     await step('inspection_people', 'delete', {}, async () => {
-        const subjectContacts = await db.select({ id: contacts.id }).from(contacts)
-            .where(and(eq(contacts.tenantId, tenantId), eq(contacts.email, subjectEmail)))
-            .all();
-        const contactIds = (subjectContacts as Array<{ id: string }>).map((c) => c.id);
-        if (contactIds.length === 0) return 0;
+        if (subjectContactIds.length === 0) return 0;
         const res = await db.delete(inspectionPeople)
-            .where(and(eq(inspectionPeople.tenantId, tenantId), inArray(inspectionPeople.contactId, contactIds)))
+            .where(and(eq(inspectionPeople.tenantId, tenantId), inArray(inspectionPeople.contactId, subjectContactIds)))
             .run();
         return changeCount(res);
     });

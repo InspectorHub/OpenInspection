@@ -5,7 +5,7 @@ import * as schema from '../../../server/lib/db/schema';
 import calendarRoutes from '../../../server/api/calendar';
 import type { HonoConfig } from '../../../server/types/hono';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { upsertCalendarConnection } from '../../../server/lib/calendar/connection';
+import { upsertCalendarConnection, markCalendarSyncFailed } from '../../../server/lib/calendar/connection';
 import { MockKV } from '../mocks';
 
 vi.mock('drizzle-orm/d1', () => ({
@@ -114,11 +114,14 @@ describe('calendar API — calendar_connections', () => {
             jwtSecret: JWT_SECRET,
         });
 
+        // The tenant-wide push is RETIRED, not merely capability-gated. It sent
+        // every tenant event to whoever pressed the button, and had no update or
+        // delete. Its absence is the guard: a 404 here means nobody re-added an
+        // untracked push. The write-capability boundary now lives in
+        // google-export (see tests/unit/calendar/google-export.spec.ts).
         const { app, env } = buildApp(testDb, kv);
         const res = await app.request('/api/calendar/sync-events', { method: 'POST' }, env);
-        expect(res.status).toBe(403);
-        const body = await res.json() as { error: { message: string } };
-        expect(body.error.message).toContain('write access');
+        expect(res.status).toBe(404);
     });
 
     it('callback persists encrypted credentials (not plaintext refresh token)', async () => {
@@ -224,6 +227,9 @@ describe('calendar API — calendar_connections', () => {
         const res = await app.request('/api/calendar/status', {}, env);
 
         expect(res.status).toBe(200);
+        // Exact-shape assertion on purpose: this payload is the contract the
+        // My Schedule panel reads, and a silently added or dropped field is
+        // exactly the drift a toMatchObject here would wave through.
         expect(await res.json()).toEqual({
             success: true,
             data: {
@@ -231,7 +237,33 @@ describe('calendar API — calendar_connections', () => {
                 capability: 'availability_read',
                 provider: 'google',
                 oauthConfigured: true,
+                // Never synced yet: stale, with no reason to show for it.
+                lastSyncAt: null,
+                lastSyncError: null,
             },
         });
+    });
+
+    it('status carries the reason a sync failed so the panel can prompt a reconnect', async () => {
+        await upsertCalendarConnection({
+            db: {} as D1Database,
+            tenantId: TENANT,
+            userId: USER,
+            provider: 'google',
+            authType: 'oauth',
+            capability: 'events_read_write',
+            calendarId: 'primary',
+            credentials: { refreshToken: 'rt-status', scopes: ['calendar.events'] },
+            jwtSecret: JWT_SECRET,
+        });
+        await markCalendarSyncFailed({} as D1Database, TENANT, USER, 'invalid_grant: token revoked');
+
+        const { app, env } = buildApp(testDb, kv);
+        const res = await app.request('/api/calendar/status', {}, env);
+        const body = await res.json() as { data: { lastSyncError: string | null; lastSyncAt: number | null } };
+
+        expect(body.data.lastSyncError).toContain('invalid_grant');
+        // A failed attempt refreshed nothing, so freshness must not advance.
+        expect(body.data.lastSyncAt).toBeNull();
     });
 });

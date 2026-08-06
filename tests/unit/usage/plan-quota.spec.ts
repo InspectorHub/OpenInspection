@@ -30,6 +30,16 @@ describe('PlanQuotaGuard', () => {
         testD1 = toRawD1(sqlite);
     });
 
+    /** The row the caller inserts right after a successful consume. The gate
+     *  counts these, so a test that consumes without inserting is not modelling
+     *  anything a real create path does. */
+    function seedInspection(tenantId: string, i: number) {
+        sqlite.prepare(
+            `INSERT INTO inspections (id, tenant_id, property_address, date, created_at)
+             VALUES (?, ?, '1 Main St', '2026-08-05', ?)`,
+        ).run(`${tenantId}-insp-${i}`, tenantId, Date.now());
+    }
+
     async function seedTenant(id: string, opts: { tier: 'free' | 'pro' | 'enterprise' }) {
         await testDb.insert(tenants).values({
             id,
@@ -44,7 +54,10 @@ describe('PlanQuotaGuard', () => {
         it('allows and counts the first 5 creates for a free tenant, blocks the 6th', async () => {
             await seedTenant('t1', { tier: 'free' });
             const g = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: 'https://x/billing' });
-            for (let i = 0; i < 5; i++) await g.consumeInspection('t1');
+            // The gate counts inspection ROWS, so each consume has to be paired
+            // with the insert its caller performs — see inspection-quota.spec.ts
+            // for the same thing through the real service.
+            for (let i = 0; i < 5; i++) { await g.consumeInspection('t1'); seedInspection('t1', i); }
             await expect(g.consumeInspection('t1')).rejects.toMatchObject({
                 status: 402,
                 code: 'QUOTA_EXHAUSTED',
@@ -67,11 +80,24 @@ describe('PlanQuotaGuard', () => {
             expect(await new MeteringService(testD1).lifetimeTotal('t3', 'inspections')).toBe(6);
         });
 
-        it('is race-safe: the conditional increment never exceeds the cap', async () => {
+        it('a batch consume admits the whole batch or none of it', async () => {
+            // Since the gate counts rows the caller has not inserted yet, a
+            // caller creating N at once passes `count: N` instead of looping —
+            // otherwise all N calls read the same count and all pass. See
+            // consumeInspection's `count` parameter.
             await seedTenant('t4', { tier: 'free' });
             const g = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
-            const results = await Promise.allSettled(Array.from({ length: 8 }, () => g.consumeInspection('t4')));
-            expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(5);
+
+            await g.consumeInspection('t4', 3);
+            for (let i = 0; i < 3; i++) seedInspection('t4', i);
+            expect(await new MeteringService(testD1).lifetimeTotal('t4', 'inspections')).toBe(3);
+
+            // 3 + 3 > 5 — refused outright, with nothing partially consumed.
+            await expect(g.consumeInspection('t4', 3)).rejects.toMatchObject({ code: 'QUOTA_EXHAUSTED' });
+            expect(await new MeteringService(testD1).lifetimeTotal('t4', 'inspections')).toBe(3);
+
+            // 3 + 2 fits exactly.
+            await expect(g.consumeInspection('t4', 2)).resolves.toBeUndefined();
             expect(await new MeteringService(testD1).lifetimeTotal('t4', 'inspections')).toBe(5);
         });
     });

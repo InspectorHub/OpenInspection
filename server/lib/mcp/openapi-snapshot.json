@@ -750,10 +750,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         }
       ],
@@ -762,7 +762,7 @@
       }
     },
     "summary": "Cancel inspection for current tenant",
-    "description": "Auto-generated placeholder for cancelInspection (POST /{id}/cancel, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged."
   },
   {
     "operationId": "cancelTeamInvite",
@@ -1058,6 +1058,63 @@
     "description": "Records a granted SMS consent event (captured_via=optin_link) for the contact encoded in the token. Idempotent — confirming twice simply appends a second granted event."
   },
   {
+    "operationId": "correctInspectionPaySplit",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/pay-splits/{splitId}/corrections",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the pay rows belong to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id the pay rows belong to."
+          }
+        },
+        {
+          "name": "splitId",
+          "in": "path",
+          "required": true,
+          "description": "inspection_service_pay_splits row id.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "inspection_service_pay_splits row id."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "amountCents": {
+            "type": "integer",
+            "description": "The DELTA against the locked split, in integer cents; may be negative."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Why the exported amount is being corrected."
+          }
+        },
+        "required": [
+          "amountCents",
+          "reason"
+        ]
+      }
+    },
+    "summary": "Record a correction against exported pay",
+    "description": "Adjusts an already-exported pay row by writing a NEW row carrying the delta, leaving the original untouched so both what was paid and what was owed stay answerable. An in-place edit after payroll has run destroys that, which is why this is a separate verb."
+  },
+  {
     "operationId": "correctInvoicePayment",
     "method": "POST",
     "pathTemplate": "/api/invoices/{id}/payments/{paymentId}/corrections",
@@ -1344,6 +1401,31 @@
     },
     "summary": "Submit a new booking",
     "description": "Auto-generated placeholder for createBookingBook (POST /book, bookings domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "createBookingDepositIntent",
+    "method": "POST",
+    "pathTemplate": "/api/public/inspections/{id}/deposit-intent",
+    "scopes": [],
+    "tag": "bookings",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id returned by the booking submission.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id returned by the booking submission."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Start a card payment for a booking deposit",
+    "description": "Mints a Stripe PaymentIntent for the deposit still outstanding on a booking, using the tenant's own Stripe keys. Public and unauthenticated: the inspection id returned by the booking submission is the capability. Records nothing — the ledger row is written when Stripe confirms the payment."
   },
   {
     "operationId": "createCalendarBlock",
@@ -5003,6 +5085,35 @@
     "description": "Auto-generated placeholder for createServiceDiscountCodes (POST /discount-codes, services domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "createServicePayRule",
+    "method": "POST",
+    "pathTemplate": "/api/services/{id}/pay-rules",
+    "scopes": [
+      "write"
+    ],
+    "tag": "services",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Service ID",
+          "schema": {
+            "type": "string",
+            "description": "Service ID"
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/CreatePayRule"
+      }
+    },
+    "summary": "Add a pay rule to a service",
+    "description": "Writes what an inspector earns on this service. Percentages are BASIS POINTS (percentBps: 6000 = 60%) and fixed amounts are integer cents (amountCents) — the field name carries the unit, and the payload is strict, so a rule written in the wrong unit is refused rather than stored a hundred times too small. Omit userId for the service default. At most one default and one rule per inspector exist per service; a duplicate is 409."
+  },
+  {
     "operationId": "createTag",
     "method": "POST",
     "pathTemplate": "/api/tags",
@@ -6196,6 +6307,43 @@
     "description": "Auto-generated placeholder for deleteServiceDiscountCode (DELETE /discount-codes/{id}, services domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "deleteServicePayRule",
+    "method": "DELETE",
+    "pathTemplate": "/api/services/{id}/pay-rules/{ruleId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "services",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Service ID",
+          "schema": {
+            "type": "string",
+            "description": "Service ID"
+          }
+        },
+        {
+          "name": "ruleId",
+          "in": "path",
+          "required": true,
+          "description": "Pay rule ID",
+          "schema": {
+            "type": "string",
+            "description": "Pay rule ID"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete a pay rule",
+    "description": "Removes a pay rule. Deleting the last rule on a service turns pay splits off for it — future inspections populate nothing. Splits already recorded are left alone."
+  },
+  {
     "operationId": "deleteTag",
     "method": "DELETE",
     "pathTemplate": "/api/tags/{id}",
@@ -6845,6 +6993,38 @@
     "description": "Returns the caller's user record plus their agent-tenant memberships and the inspections they ran, for GDPR/CCPA portability."
   },
   {
+    "operationId": "exportTeamPayroll",
+    "method": "POST",
+    "pathTemplate": "/api/team/payroll-export",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "team",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "fromMs": {
+            "type": "integer",
+            "description": "Epoch ms of the first instant in the payroll period, inclusive."
+          },
+          "toMs": {
+            "type": "integer",
+            "description": "Epoch ms of the last instant in the payroll period, inclusive."
+          }
+        },
+        "required": [
+          "fromMs",
+          "toMs"
+        ]
+      }
+    },
+    "summary": "Lock and export pay for a period",
+    "description": "Locks every unlocked pay split created inside the given period and returns them as one payroll run. Locking IS the export: once money has moved an edit would desynchronise the books from what was actually paid, so a later adjustment has to be recorded as a correction row instead."
+  },
+  {
     "operationId": "exportTenant",
     "method": "GET",
     "pathTemplate": "/api/admin/export",
@@ -6919,6 +7099,22 @@
     },
     "summary": "Address autocomplete proxy (public, rate-limited)",
     "description": "Auto-generated placeholder for geocodeBooking (GET /geocode, bookings domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "geocodeCompanyAddress",
+    "method": "POST",
+    "pathTemplate": "/api/admin/booking-routing/geocode-company",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Resolve the company address to coordinates",
+    "description": "Resolves the stored company address once and saves the coordinates. Returns the matched address so a wrong match is visible. A failure is reported in the body with a named reason, never as a silent null."
   },
   {
     "operationId": "getAgentNotificationPreferences",
@@ -7066,6 +7262,68 @@
     },
     "summary": "Get combined sign & pay checkout context (public, token-gated)",
     "description": "Combined sign & pay context for the public checkout page (GET /checkout/:token, bookings domain). Resolves a signer token to the agreement snapshot, envelope progress, outstanding invoice/payment state, and tenant branding."
+  },
+  {
+    "operationId": "getBookingRouting",
+    "method": "GET",
+    "pathTemplate": "/api/admin/booking-routing",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Booking routing strategy, rules, and geocode anchors",
+    "description": "Returns the routing strategy, lead time and cutoff, plus whether the company address and per-inspector service origins have coordinates — which is what decides whether `closest` can run at all."
+  },
+  {
+    "operationId": "getCancellationQuote",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/cancellation-quote",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id."
+          }
+        },
+        {
+          "name": "reason",
+          "in": "query",
+          "required": true,
+          "description": "The reason that would be recorded; it decides the outcome.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "client_cancelled",
+              "no_show",
+              "weather",
+              "inspector_unavailable",
+              "property_unavailable",
+              "rescheduled",
+              "other"
+            ],
+            "description": "The reason that would be recorded; it decides the outcome."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Price a cancellation without performing one",
+    "description": "Computes the fee, the refund and the reason a cancellation would produce, so whoever cancels sees the result before confirming it. Read-only."
   },
   {
     "operationId": "getCommunicationConfig",
@@ -8752,6 +9010,19 @@
             "minLength": 1,
             "description": "Restrict slots to a single inspector (client choice / deep link)."
           }
+        },
+        {
+          "name": "propertyZip",
+          "in": "query",
+          "required": false,
+          "description": "Property ZIP. Restricts the union to inspectors whose service area covers it; omitted means the geographic filter cannot run.",
+          "schema": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 10,
+            "example": "78701",
+            "description": "Property ZIP. Restricts the union to inspectors whose service area covers it; omitted means the geographic filter cannot run."
+          }
         }
       ],
       "body": null
@@ -9261,6 +9532,22 @@
     },
     "summary": "List referrals for the signed-in agent",
     "description": "Lists the signed-in agent's referred inspections across every tenant they have an active agent_tenant_link with, newest first, for the agent-portal dashboard."
+  },
+  {
+    "operationId": "listAllInspectorServiceAreas",
+    "method": "GET",
+    "pathTemplate": "/api/admin/service-areas/all",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List every declared inspector territory in the tenant",
+    "description": "Returns every inspector that has declared at least one ZIP prefix. Inspectors absent from the list serve every area."
   },
   {
     "operationId": "listAllTenantMcpGrants",
@@ -9960,6 +10247,34 @@
     "description": "Auto-generated placeholder for listInspectionMedia (GET /{id}/media, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "listInspectionPaySplits",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/pay-splits",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the pay rows belong to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id the pay rows belong to."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List pay splits for one inspection",
+    "description": "Returns what each inspector is owed on the active billing lines of one inspection. A caller with the financial capability receives every row and may edit them; a caller without it receives only their own rows, read-only, and a colleague's amount is absent from the payload rather than hidden in it."
+  },
+  {
     "operationId": "listInspectionPdf",
     "method": "GET",
     "pathTemplate": "/api/inspections/{id}/pdf",
@@ -10655,6 +10970,35 @@
     "description": "Lists the signed-in inspector self-asserted credentials (label, member number, badge image)."
   },
   {
+    "operationId": "listInspectorServiceAreas",
+    "method": "GET",
+    "pathTemplate": "/api/admin/service-areas",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "userId",
+          "in": "query",
+          "required": true,
+          "description": "The inspector whose service areas are being read.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "The inspector whose service areas are being read."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the ZIP prefixes one inspector serves",
+    "description": "Returns the ZIP prefixes this inspector will travel to. An empty list means they serve every area."
+  },
+  {
     "operationId": "listIntegrationStatus",
     "method": "GET",
     "pathTemplate": "/api/integrations/status",
@@ -10973,7 +11317,7 @@
       "body": null
     },
     "summary": "List metrics for current tenant",
-    "description": "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, top referring agents, per-inspector productivity, service mix, and paid/unpaid split. Omitting both bounds returns the trailing three months."
+    "description": "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the financial capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months."
   },
   {
     "operationId": "listNotifications",
@@ -11220,6 +11564,33 @@
     },
     "summary": "List service discount codes",
     "description": "Auto-generated placeholder for listServiceDiscountCodes (GET /discount-codes, services domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "listServicePayRules",
+    "method": "GET",
+    "pathTemplate": "/api/services/{id}/pay-rules",
+    "scopes": [
+      "read"
+    ],
+    "tag": "services",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Service ID",
+          "schema": {
+            "type": "string",
+            "description": "Service ID"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List pay rules for a service",
+    "description": "Returns what inspectors earn on this catalogue service. A rule with a null userId is the service default, applied to any inspector without one of their own. An empty list means pay splits are OFF for this service: nothing is populated when an inspection is assigned."
   },
   {
     "operationId": "listServices",
@@ -12224,6 +12595,24 @@
     },
     "summary": "Patch automation for current tenant",
     "description": "Auto-generated placeholder for patchAutomation (PATCH /{id}, automations domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "patchBookingRouting",
+    "method": "PATCH",
+    "pathTemplate": "/api/admin/booking-routing",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/BookingRoutingPatch"
+      }
+    },
+    "summary": "Update booking routing strategy and rules",
+    "description": "Patches routing strategy, minimum lead hours, and same-day cutoff. An omitted key is left alone; an explicit null on sameDayCutoffTime clears it."
   },
   {
     "operationId": "patchInspection",
@@ -15372,6 +15761,34 @@
     "description": "Returns the union of federal, state, and custom holidays for the configured region. Readable by inspectors for the My Schedule company-closed strip."
   },
   {
+    "operationId": "previewInspectionPaySplitRefresh",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/pay-splits/refresh-preview",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the pay rows belong to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id the pay rows belong to."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Preview what refreshing pay would change",
+    "description": "Shows which pay rows the current tenant rules and roster would move, and to what, WITHOUT moving them. Re-deriving amounts silently is how somebody's pay changes with nobody deciding it should, so the preview exists to make the decision explicit before the write."
+  },
+  {
     "operationId": "previewMessageTemplate",
     "method": "POST",
     "pathTemplate": "/api/message-templates/preview",
@@ -15467,6 +15884,24 @@
     },
     "summary": "Publish inspection for current tenant",
     "description": "Auto-generated placeholder for publishInspection (POST /{id}/publish, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "putInspectorServiceOrigin",
+    "method": "PUT",
+    "pathTemplate": "/api/admin/booking-routing/service-origin",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/ServiceOrigin"
+      }
+    },
+    "summary": "Set or clear one inspector service origin",
+    "description": "Geocodes and stores where one inspector starts their day. A null or empty address clears the override so they inherit the company coordinates."
   },
   {
     "operationId": "putIntegrationSecrets",
@@ -15568,6 +16003,34 @@
     },
     "summary": "Refresh PDF renders (Summary + Full)",
     "description": "Auto-generated placeholder for refreshInspection (POST /{id}/pdf/refresh, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "refreshInspectionPaySplits",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/pay-splits/refresh",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the pay rows belong to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id the pay rows belong to."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Re-derive rule-sourced pay for this inspection",
+    "description": "Re-derives the rule-sourced pay rows from the tenant rules and roster as they stand now, leaving hand-edited and corrected rows alone. This is the only path that moves an amount that already exists, and it is deliberately an explicit act rather than something a read performs."
   },
   {
     "operationId": "regenerateTotpRecoveryCodes",
@@ -15782,7 +16245,7 @@
       "body": null
     },
     "summary": "Remove a service line from an inspection",
-    "description": "Removes one booked service line from an inspection. Does not touch the tenant service catalog."
+    "description": "Removes one booked service line from an inspection. Does not touch the tenant service catalog. Refuses with 409 when a report (in progress or published) delivers this line."
   },
   {
     "operationId": "removeRepairItem",
@@ -15969,6 +16432,24 @@
     },
     "summary": "Replace inspection request for current tenant",
     "description": "Auto-generated placeholder for replaceInspectionRequest (PUT /{id}, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "replaceInspectorServiceAreas",
+    "method": "PUT",
+    "pathTemplate": "/api/admin/service-areas",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/ReplaceServiceAreas"
+      }
+    },
+    "summary": "Replace one inspector ZIP list",
+    "description": "Replaces the inspector ZIP list wholesale. Sending an empty array clears the territory, which means they serve every area again."
   },
   {
     "operationId": "replaceMarketplace",
@@ -17136,6 +17617,63 @@
     },
     "summary": "Set cropped report cover (baked JPEG derivative + crop transform)",
     "description": "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain)."
+  },
+  {
+    "operationId": "setInspectionPaySplit",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/pay-splits/{splitId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the pay rows belong to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id the pay rows belong to."
+          }
+        },
+        {
+          "name": "splitId",
+          "in": "path",
+          "required": true,
+          "description": "inspection_service_pay_splits row id.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "inspection_service_pay_splits row id."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "amountCents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The agreed pay for this inspector on this line, in integer cents."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Why the amount was changed, kept for payout disputes."
+          }
+        },
+        "required": [
+          "amountCents"
+        ]
+      }
+    },
+    "summary": "Set an agreed pay amount by hand",
+    "description": "Overrides the pay owed to one inspector on one billing line and marks the row manual, which exempts it from any later refresh. Refuses once a payroll export has locked the row, because editing money that has already moved desynchronises the books with nothing surfacing the divergence."
   },
   {
     "operationId": "setInspectionReportLinkExpiry",
@@ -20785,6 +21323,45 @@
     },
     "summary": "Update service discount code",
     "description": "Auto-generated placeholder for updateServiceDiscountCode (PUT /discount-codes/{id}, services domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "updateServicePayRule",
+    "method": "PUT",
+    "pathTemplate": "/api/services/{id}/pay-rules/{ruleId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "services",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Service ID",
+          "schema": {
+            "type": "string",
+            "description": "Service ID"
+          }
+        },
+        {
+          "name": "ruleId",
+          "in": "path",
+          "required": true,
+          "description": "Pay rule ID",
+          "schema": {
+            "type": "string",
+            "description": "Pay rule ID"
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/UpdatePayRule"
+      }
+    },
+    "summary": "Replace the rate of a pay rule",
+    "description": "Changes the rate of an existing pay rule, including switching between the three types. The inspector the rule applies to is not editable here — that would move the rule into a different uniqueness slot, so it is a delete plus a create. Editing a rule never restates pay that was already recorded: splits are a frozen record, and an explicit refresh is what re-derives them."
   },
   {
     "operationId": "updateTeamDefaults",

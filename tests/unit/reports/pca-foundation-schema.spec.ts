@@ -22,11 +22,12 @@ describe('Commercial PCA Phase F foundation columns', () => {
     // trio; Report Style Presets (Plan 1a) then appended the badge_layout_override
     // + report_photo_columns tweak pair; the two-layer role model then appended
     // referred_by_contact_id; the report-gate unlock then appended its trio;
-    // per-deliverable reports then appended the generation latch.
+    // per-deliverable reports then appended the generation latch; the booking
+    // deposit then appended the snapshot + its operator-override marker.
     // All appended at the tail (never mid-list) so db:generate emits
     // ALTER ADD COLUMN, not a rebuild.
     const names = getTableConfig(inspections).columns.map((c) => c.name);
-    const tail = names.slice(-16);
+    const tail = names.slice(-18);
     expect(tail).toEqual([
       'unit_inspection_mode',
       'location_options',
@@ -44,6 +45,8 @@ describe('Commercial PCA Phase F foundation columns', () => {
       'unlocked_by',
       'unlock_reason',
       'reports_generated_at',
+      'deposit_required_cents',
+      'is_deposit_overridden',
     ]);
   });
 

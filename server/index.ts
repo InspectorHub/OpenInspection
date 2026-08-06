@@ -103,6 +103,8 @@ import conciergeRoutes from './api/concierge';
 import sessionContextRoutes from './api/session-context';
 import qboRoutes from './api/qbo';
 import qboWebhookRoutes from './api/qbo-webhook';
+import qboOauthRoutes from './api/qbo-oauth';
+import { QBO_OAUTH_MOUNT } from './lib/qbo-oauth-paths';
 import stripeWebhookRoutes from './api/stripe-webhook';
 import agreementsRenderRoutes from './api/agreements-render';
 import evidenceRoutes from './api/evidence';
@@ -442,6 +444,12 @@ const routes = app
   .route('/api', notificationPreferenceRoutes)   // reader's own preferences (§4)
   .route('/settings/integrations/qbo', qboRoutes)
   .route('/api/integrations/qbo/webhook', qboWebhookRoutes)
+  // Browser-facing OAuth pair (/connect, /callback). Mounted under /api/* —
+  // NOT under /settings/** with its siblings — because workers/app.ts only
+  // forwards an allow-list of prefixes to this app and /settings/** is not on
+  // it, so a browser can never reach those. Registered AFTER the webhook so no
+  // ordering question can arise on the shared prefix. See lib/qbo-oauth-paths.ts.
+  .route(QBO_OAUTH_MOUNT, qboOauthRoutes)
   // Stripe webhook, tenant-scoped (SaaS): /api/integrations/stripe/webhook/:tenant
   // resolves the tenant via PUBLIC_PREFIXES path-param resolution so
   // integration-secrets loads THAT tenant's whsec. The bare path below stays

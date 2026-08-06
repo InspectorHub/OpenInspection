@@ -2,6 +2,7 @@ import { sqliteTable, text, integer, real, blob, uniqueIndex, index } from 'driz
 import { tenants, users } from '../tenant';
 import { INSPECTION_STATUSES } from '../../../status/inspection-status';
 import { REPORT_STATUSES } from '../../../status/report-status';
+import { CANCELLATION_REASONS } from '../../../cancellation-reason';
 import { templates } from './template-rating';
 import { discountCodes } from './services';
 
@@ -42,7 +43,11 @@ export const inspections = sqliteTable('inspections', {
     createdAt:           integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     // Phase 0 parity additions
     confirmedAt:         integer('confirmed_at', { mode: 'timestamp_ms' }),
-    cancelReason:        text('cancel_reason'),
+    // The reason drives the cancellation ladder: `classifyCancellationReason`
+    // (server/lib/cancellation-reason.ts) derives WHO ended the appointment and
+    // WHAT happened from this one value, so no second column is needed and the
+    // two can never disagree. Enum is type-layer only, no DDL.
+    cancelReason:        text('cancel_reason', { enum: [...CANCELLATION_REASONS] }),
     cancelNotes:         text('cancel_notes'),  // Spec 3A
     paymentRequired:     integer('is_payment_required', { mode: 'boolean' }).notNull().default(false),
     agreementRequired:   integer('is_agreement_required', { mode: 'boolean' }).notNull().default(false),
@@ -236,6 +241,30 @@ export const inspections = sqliteTable('inspections', {
     // NULL = the lines have not been turned into deliverables yet.
     // Appended at table end for D1 rebuild safety.
     reportsGeneratedAt:  integer('reports_generated_at', { mode: 'timestamp_ms' }),
+    // What this ORDER was asked for up front, frozen at booking.
+    //
+    // A SNAPSHOT, not a policy reference. A percentage resolves against the
+    // catalogue price on the day; if the tenant reprices the service next week,
+    // the client still owes what they agreed to. NULL = no deposit was asked
+    // for. On a multi-service booking this number lives on the PRIMARY
+    // inspection and the siblings carry 0 — one deposit per order, because the
+    // N-inspections shape is our own modelling choice and the money should not
+    // inherit it.
+    //
+    // This is the amount OWED, never the amount PAID: what was actually
+    // collected is `order_payments` rows with `kind = 'deposit'`. A declined
+    // card leaves this set and the ledger empty, which is exactly the state the
+    // tenant needs to see.
+    // Appended at table end for D1 rebuild safety.
+    depositRequiredCents: integer('deposit_required_cents'),
+    // Tier 3 — a human set the number above, so nothing may recompute it.
+    //
+    // Without this flag one column has to mean two things, and a later
+    // re-resolve silently overwrites the figure an operator agreed with a
+    // client over the phone. Same marker the pay splits adopted, for the same
+    // reason.
+    // Appended at table end for D1 rebuild safety.
+    depositOverridden:   integer('is_deposit_overridden', { mode: 'boolean' }).notNull().default(false),
 }, (t) => [
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),

@@ -39,7 +39,12 @@ const DOC = path.resolve(
 function sqlBlocks(): Map<string, string> {
     const markdown = readFileSync(DOC, 'utf8');
     const blocks = new Map<string, string>();
-    for (const match of markdown.matchAll(/```sql\n([\s\S]*?)```/g)) {
+    // `\r?` because a Windows checkout has CRLF here: without it the fence
+    // never matches, every block is silently missed, and the failure surfaces
+    // as "doc has no -- Query D block" rather than "the parser read nothing".
+    // CI is Linux so this passed there while being unrunnable on the machine
+    // the doc is edited on.
+    for (const match of markdown.matchAll(/```sql\r?\n([\s\S]*?)```/g)) {
         const sql = match[1];
         const label = /--\s*Query\s+([A-Z])\b/.exec(sql)?.[1];
         expect(label, `every SQL block must open with a "-- Query X" marker:\n${sql}`).toBeTruthy();

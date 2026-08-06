@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
-import { AvailabilityService } from '../../../server/services/booking.service';
+import { AvailabilityService } from '../../../server/services/availability.service';
 import { tenants, users, availabilityOverrides } from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';

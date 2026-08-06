@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import { ROLES } from '../../../auth/roles';
 import { tenants } from './core';
@@ -100,6 +100,23 @@ export const users = sqliteTable('users', {
     // anchors to the tenant so all three parties read the same date aloud.
     dateFormat: text('date_format', { enum: ['us', 'iso', 'eu'] }),
     timeFormat: text('time_format', { enum: ['12h', '24h'] }),
+    // Where this inspector STARTS their day, for `closest` routing. NULL on
+    // all three columns = inherit the company address coordinates
+    // (`tenant_configs.company_lat/lng`), which is the right answer for the
+    // single-office workspace and the only reason the strategy is usable
+    // without per-person setup. Set = a multi-office or home-based inspector
+    // whose drive does not start at the office.
+    //
+    // This is STAFF data, not a data subject's: it is declared in
+    // ERASURE_OUT_OF_SCOPE alongside users.email / users.phone, and consumer
+    // DSAR erasure never touches it (staff offboarding is a separate
+    // lifecycle). Do not build a DSAR export path for it.
+    //
+    // Appended at END — users is FK-referenced, so a mid-table insert would
+    // make drizzle rebuild the whole table.
+    serviceOriginAddress: text('service_origin_address'),
+    serviceOriginLat:     real('service_origin_lat'),
+    serviceOriginLng:     real('service_origin_lng'),
 }, (t) => [
     index('idx_users_deleted_at').on(t.deletedAt),
     // DB-2: soft-deleted rows must not block re-inviting the same email.

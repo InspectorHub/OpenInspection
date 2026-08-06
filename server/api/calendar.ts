@@ -1,9 +1,6 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { eq } from 'drizzle-orm';
-import { tenantConfigs } from '../lib/db/schema';
-import { resolveTenantTimeZone } from '../lib/tz';
-import { syncGoogleBusyOverrides, mergeBusyIntervals } from '../lib/calendar/sync-busy';
+import { importBusyForConnection } from '../lib/calendar/sync-engine';
 import { resolveReadSet, saveReadSet, resolveReadCalendarIds } from '../lib/calendar/read-set';
 import { SaveReadSetSchema } from '../lib/validations/calendar-read-set.schema';
 import { AppError } from '../lib/errors';
@@ -16,9 +13,8 @@ import { SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { logger } from '../lib/logger';
 import { getBaseUrl } from '../lib/url';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { getRedirectUri, syncEventsToGcal, createCalendarEvent } from '../lib/google-calendar';
+import { getRedirectUri } from '../lib/google-calendar';
 import {
-    canPushEvents,
     capabilityFromScopes,
     createPkceChallenge,
 } from '../lib/calendar/provider';
@@ -43,6 +39,7 @@ import {
     renderCalendarOAuthPopupLanding,
 } from '../lib/calendar/oauth-popup-landing';
 import calendarBlockRoutes from './calendar-blocks';
+import calendarIcsLinkRoutes from './calendar-ics-links';
 import calendarItemsRoutes from './calendar-items';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
@@ -115,6 +112,7 @@ const syncRoute = createRoute(withMcpMetadata({
 
 const calendarRoutes = createApiRouter()
     .route('/', calendarBlockRoutes)
+    .route('/', calendarIcsLinkRoutes)
     .route('/', calendarItemsRoutes)
     .openapi(disconnectRoute, async (c) => {
         const user = c.get('user');
@@ -140,69 +138,40 @@ const calendarRoutes = createApiRouter()
             return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 400);
         }
 
-        const provider = getCalendarProvider('google');
         const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
         const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
         if (!oauthCreds) {
             return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
         }
-        const timeMin = new Date();
-        const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         const db = getDrizzle(c);
 
-        // A-polish 10b — union busy across the multi-read calendar set (falls
-        // back to the write/primary calendar when no read set is configured).
-        const readCalendarIds = await resolveReadCalendarIds(db, {
-            tenantId,
-            connectionId: open.connection.id,
-            fallbackCalendarId: open.connection.calendarId,
-        });
-        let busyBlocks;
+        // One code path for the button and the cron sweep. It consumes RAW
+        // listBusy output: mergeBusyIntervals unions overlapping ranges into
+        // anonymous blocks and discards the per-event externalId, without which
+        // OI cannot recognise the events it pushed itself, cannot see
+        // recurrence, and cannot key the upsert on anything stable.
+        let result;
         try {
-            const perCalendar = await Promise.all(readCalendarIds.map((calendarId) =>
-                provider.listBusy({
-                    clientId: oauthCreds.clientId,
-                    clientSecret: oauthCreds.clientSecret,
-                    refreshToken: open.credentials.refreshToken,
-                    calendarId,
-                    range: { from: timeMin, to: timeMax },
-                    capability: open.connection.capabilities,
-                }),
-            ));
-            busyBlocks = mergeBusyIntervals(perCalendar.flat());
+            result = await importBusyForConnection(db, open.connection, {
+                clientId: oauthCreds.clientId,
+                clientSecret: oauthCreds.clientSecret,
+                refreshToken: open.credentials.refreshToken,
+            });
         } catch (e) {
             logger.error('[calendar] sync listBusy failed', { tenantId }, e instanceof Error ? e : undefined);
             return c.json({ success: false, error: { message: 'Failed to fetch Google Calendar busy blocks' } }, 500);
         }
 
         const inspectorId = jwtUser.sub;
-
-        // A-polish 10 — store busy time as TIMED overrides in the tenant tz
-        // (delete-in-range + keyed upsert), so only the busy hours block slots
-        // and transparent events are carried but ignored. Replaces the old
-        // all-day blocking-date insert.
-        const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
-        const tenantTz = resolveTenantTimeZone(tzRow?.defaultTimezone);
-        const { upserted } = await syncGoogleBusyOverrides(
-            db,
-            {
-                tenantId,
-                inspectorId,
-                tenantTz,
-                rangeFromMs: timeMin.getTime(),
-                rangeToMs: timeMax.getTime(),
-            },
-            busyBlocks,
-        );
-
         await markCalendarSynced(c.env.DB, tenantId, inspectorId, 'google');
 
         return c.json({
             success: true,
-            data: { blockedDatesCreated: upserted, totalEvents: busyBlocks.length },
+            data: {
+                blockedDatesCreated: result.upserted,
+                totalEvents: result.totalEvents,
+                skipped: result.skipped,
+            },
         }, 200);
     })
     .get('/status', async (c) => {
@@ -352,48 +321,6 @@ const calendarRoutes = createApiRouter()
         }, 200);
     })
     /**
-     * POST /api/calendar/sync-events
-     * Pushes upcoming inspection events to Google Calendar (full-sync capability only).
-     */
-    .post('/sync-events', async (c) => {
-        const jwtUser = c.get('user');
-        if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
-
-        const tenantId = c.get('tenantId') as string;
-        const open = await loadOpenGoogleConnection(
-            c.env.DB,
-            tenantId,
-            jwtUser.sub,
-            c.env.JWT_SECRET,
-            c.env.JWT_SECRET_PREVIOUS,
-        );
-        if (!open) {
-            return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 400);
-        }
-        if (!canPushEvents(open.connection.capabilities)) {
-            return c.json({
-                success: false,
-                error: { message: 'Calendar connection does not include write access. Reconnect with full sync.' },
-            }, 403);
-        }
-
-        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
-        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
-        if (!oauthCreds) {
-            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
-        }
-
-        const result = await syncEventsToGcal(
-            c.env.DB,
-            tenantId,
-            oauthCreds.clientId,
-            oauthCreds.clientSecret,
-            open.credentials.refreshToken,
-            open.connection.calendarId,
-        );
-        return c.json({ success: true, data: result });
-    })
-    /**
      * GET /api/calendar/connect?capability=…&provider=google
      * Redirects inspector to Google OAuth consent (PKCE S256).
      */
@@ -540,7 +467,5 @@ const calendarRoutes = createApiRouter()
     });
 
 export type CalendarApi = typeof calendarRoutes;
-
-export { createCalendarEvent };
 
 export default calendarRoutes;

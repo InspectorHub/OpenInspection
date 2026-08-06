@@ -4,6 +4,7 @@ import { calendarBlocks, users } from '../lib/db/schema';
 import { safeISODate } from '../lib/date';
 import { requireRole } from '../lib/middleware/rbac';
 import { createApiRouter } from '../lib/openapi-router';
+import { pushBlockAfterResponse, dropExternalAfterResponse } from '../lib/calendar/push-hooks';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { isAdminRole } from '../lib/auth/roles';
 import { getDrizzle, type AppDrizzle } from '../lib/route-helpers';
@@ -179,6 +180,7 @@ const calendarBlockRoutes = createApiRouter()
             updatedAt: now,
         }).returning().get();
 
+        pushBlockAfterResponse(c, tenantId, block.id);
         return c.json({ success: true as const, data: { block: serializeBlock(block) } }, 201);
     })
     .openapi(listBlocksRoute, async (c) => {
@@ -256,6 +258,7 @@ const calendarBlockRoutes = createApiRouter()
             .returning()
             .get();
 
+        pushBlockAfterResponse(c, tenantId, block.id);
         return c.json({ success: true as const, data: { block: serializeBlock(block) } }, 200);
     })
     .openapi(deleteBlockRoute, async (c) => {
@@ -278,6 +281,9 @@ const calendarBlockRoutes = createApiRouter()
 
         await db.delete(calendarBlocks)
             .where(and(eq(calendarBlocks.tenantId, tenantId), eq(calendarBlocks.id, id)));
+        // Deleting the block here but leaving it on the owner's Google calendar
+        // would leave them blocked by time off they just cancelled.
+        dropExternalAfterResponse(c, tenantId, 'calendar_block', id);
         return c.json({ success: true as const }, 200);
     });
 

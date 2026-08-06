@@ -31,6 +31,7 @@ export {
     defectCategories,
     costItems,
     reports,
+    inspectorServiceAreas,
 } from './inspection';
 export { inspectorCredentials } from './inspection/inspector-credentials';
 export { commercialSubtypes } from './commercial-subtypes';
@@ -53,7 +54,7 @@ export type { ReportPdf, NewReportPdf } from './report-pdf';
 export { signingKeys, esignAuditLogs } from './esign';
 export type { SigningKey, NewSigningKey, EsignAuditLog, NewEsignAuditLog } from './esign';
 export { qboConnections, qboEntityMap, qboSyncErrors } from './qbo';
-export { calendarBlocks, calendarConnections, calendarConnectionReadCalendars } from './calendar';
+export { calendarBlocks, calendarConnections, calendarConnectionReadCalendars, calendarExternalLinks } from './calendar';
 export { tenantCustomHolidays } from './holidays';
 // Apprentice review-queue subsystem removed 2026-06-13. The physical
 // `apprentice_reviews` table is orphaned (D1 cannot drop tables) but all
@@ -93,3 +94,6 @@ export type { NotificationPreference, NewNotificationPreference } from './notifi
 // Generic idempotency ledger (portal #107) — one row per (tenant, key).
 export { idempotencyKeys } from './idempotency';
 export type { IdempotencyKey, NewIdempotencyKey } from './idempotency';
+// Pay splits (#278) — per-service-line inspector earnings, recorded not derived.
+export { servicePayRules, inspectionServicePaySplits } from './pay-split';
+export type { ServicePayRule, InspectionServicePaySplit } from './pay-split';

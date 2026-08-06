@@ -11,7 +11,7 @@
  *
  * See spec 2026-08-01 payment/deposit flow §3.
  */
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { orderPayments } from '../lib/db/schema/order-payment';
 import { invoices } from '../lib/db/schema/invoice';
@@ -198,6 +198,42 @@ export async function getNetReceivedCents(
     invoiceId: string,
 ): Promise<number> {
     return (await getLedgerOpinion(rawDb, tenantId, invoiceId)).netCents;
+}
+
+/**
+ * Money HELD against an order — collected, with no invoice behind it yet.
+ *
+ * This is the number `heldDepositCount` counts one row at a time on the QBO
+ * health card, and the one every "what has this client paid" question has to
+ * include before an invoice exists. Receipts minus refunds, same arithmetic as
+ * everywhere else, scoped by `invoice_id IS NULL` rather than by `kind`:
+ * whatever refunds a held deposit is a `refund` row that is also invoice-less,
+ * and counting only deposits would report money back out as still held.
+ *
+ * Goes to ZERO for a deposit the moment its invoice is raised — the backfill
+ * sets `invoice_id`, and from then on the invoice's own total is the answer.
+ * That is what stops it being counted twice, and it is the reason this reads
+ * the link rather than the kind.
+ */
+export async function getHeldDepositCents(
+    rawDb: AnyDb,
+    tenantId: string,
+    inspectionId: string,
+): Promise<number> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = rawDb as any;
+    const rows: Array<{ kind: PaymentKind; amountCents: number }> = await db.select({
+        kind: orderPayments.kind,
+        amountCents: orderPayments.amountCents,
+    })
+        .from(orderPayments)
+        .where(and(
+            eq(orderPayments.tenantId, tenantId),
+            eq(orderPayments.inspectionId, inspectionId),
+            isNull(orderPayments.invoiceId),
+        ))
+        .all();
+    return rows.reduce((sum, r) => sum + signOf(r.kind) * r.amountCents, 0);
 }
 
 /**

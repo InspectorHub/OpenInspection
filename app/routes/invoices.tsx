@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useLoaderData, useFetcher, Link } from "react-router";
+import { useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/invoices";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { PageHeader, Card, StatCard, Button, EmptyState, Table, Pill, Banner, Modal, type PillTone } from "@core/shared-ui";
+import { PageHeader, Card, StatCard, Button, EmptyState, Table, Banner, Modal } from "@core/shared-ui";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { InvoiceAmountCell } from "~/components/invoices/InvoiceAmountCell";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
@@ -11,6 +11,8 @@ import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 import { NewInvoiceModal, type InspectionOption } from "~/components/invoices/NewInvoiceModal";
 import { PaymentsModal, type PaymentRow } from "~/components/invoices/PaymentsModal";
+import { InvoiceStatusCell } from "~/components/invoices/InvoiceStatusCell";
+import { InvoiceRowActions } from "~/components/invoices/InvoiceRowActions";
 
 export function meta() {
   return [{ title: m.invoices_meta_title() }];
@@ -73,17 +75,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       loadFailed: true,
     };
   }
-}
-
-// Built as a thunk (not a module-level const) so the Paraglide `m.*()` labels
-// resolve inside the per-request locale scope instead of freezing at import.
-function getPayMethods() {
-  return [
-    { value: "check", label: m.invoices_pay_method_check() },
-    { value: "cash", label: m.invoices_pay_method_cash() },
-    { value: "offline", label: m.invoices_pay_method_offline() },
-    { value: "other", label: m.invoices_pay_method_other() },
-  ] as const;
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -204,25 +195,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   return { intent: null, ok: false, error: null };
-}
-
-const STATUS_TONE: Record<InvoiceRow["status"], PillTone> = {
-  paid: "sat",
-  partial: "monitor",
-  sent: "info",
-  draft: "neutral",
-  void: "neutral",
-};
-
-function methodLabel(method: string): string {
-  const labels: Record<string, string> = {
-    card: m.invoices_method_label_card(),
-    check: m.invoices_method_label_check(),
-    cash: m.invoices_method_label_cash(),
-    offline: m.invoices_method_label_offline(),
-    other: m.invoices_method_label_other(),
-  };
-  return labels[method];
 }
 
 export default function InvoicesPage() {
@@ -353,149 +325,36 @@ export default function InvoicesPage() {
           empty={<EmptyState title={m.invoices_empty_title()} />}
           columns={[
             {
-              // IA-97 — the list was a dead end: no way from an invoice to the
-              // inspection it bills, and a PAID row had no control at all, so
-              // the page looked broken ("why is there no action?").
-              //
-              // The identity cell links, NOT the whole row via `onRowClick`:
-              // the Action column holds real buttons, and a row-wide handler
-              // would fire on every "Mark paid" click too. A <Link> is also
-              // keyboard-reachable and middle-clickable, which a `<tr onClick>`
-              // is not.
-              //
-              // It points at the hub rather than growing invoice actions here.
-              // The hub already owns them — including the tokenized pay link,
-              // which is minted per recipient (IA-34) and would cost one token
-              // issue per row to reproduce on a list.
+              // IA-122 — the name is TEXT, not a link, and the row has no
+              // `onRowClick`. It used to be a hover-only Link to the
+              // inspection, which gave three rows three different ways to
+              // reach one destination and announced a person's name as "View
+              // inspection". The single labelled control lives in the Action
+              // column (see InvoiceRowActions); a row-wide handler would also
+              // fire on every button inside it.
               label: m.invoices_col_client(),
-              // IA-122 — this used to be a Link to the INSPECTION, styled only
-              // on hover. Three rows could therefore offer the same destination
-              // three different ways: an unpaid row had nothing but this
-              // invisible name link, a paid row had the name link AND a button
-              // pointing at the identical href, and a standalone invoice had a
-              // bare "—". The row needing follow-up was the hardest to act on.
-              //
-              // A client's name is also the wrong label for "open the
-              // inspection" — it read as a name to a sighted user and as "View
-              // inspection" to anything using the title attribute. One
-              // destination, one control, and it lives in the Action column.
               cell: (invoice) => (
                 <span className="font-medium text-ih-fg-1">{invoice.clientName || "—"}</span>
               ),
             },
             { label: m.invoices_col_amount(), cell: (invoice) => <InvoiceAmountCell invoice={invoice} currency={currency} locale={locale} /> },
             { label: m.invoices_col_due(), cell: (invoice) => <span className="text-ih-fg-3">{invoice.dueDate ? formatDate(invoice.dueDate, { locale, timeZone: "UTC" }) : "—"}</span> },
-            {
-              label: m.invoices_col_status(),
-              cell: (invoice) => {
-                const isPaid = invoice.status === "paid";
-                return (
-                  <Pill tone={STATUS_TONE[invoice.status] ?? "neutral"} className="uppercase tracking-wide">
-                    {invoice.status}
-                    {isPaid && invoice.paymentMethod && (
-                      <span className="font-medium normal-case tracking-normal opacity-80">· {methodLabel(invoice.paymentMethod)}</span>
-                    )}
-                  </Pill>
-                );
-              },
-            },
+            { label: m.invoices_col_status(), cell: (invoice) => <InvoiceStatusCell invoice={invoice} /> },
             {
               label: m.invoices_col_action(),
               align: "right",
-              cell: (invoice) => {
-                const isPaid = invoice.status === "paid";
-                const busy = submittingId === invoice.id;
-
-                // Present on EVERY row, paid included. "Mark paid" answers one
-                // question ("is it settled?"); this answers the one a dispute
-                // actually turns on — which payments arrived, when, by what
-                // means, and who wrote them down.
-                const payments = (
-                  <button
-                    onClick={() => openPayments(invoice)}
-                    className="px-3 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
-                  >
-                    {m.invoices_payments_button()}
-                  </button>
-                );
-
-                // The one control for the one destination (IA-122). Rendered on
-                // every row that HAS an inspection, paid or not — previously
-                // only paid rows got a button, so the invoice actually needing
-                // chasing was the one you could not click through from.
-                const viewInspection = invoice.inspectionId ? (
-                  <Link
-                    to={`/inspections/${invoice.inspectionId}`}
-                    className="px-3 h-7 inline-flex items-center rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
-                  >
-                    {m.invoices_row_view_inspection()}
-                  </Link>
-                ) : null;
-
-                // IA-123 — a standalone invoice (no inspection) used to end its
-                // life as a bare "—": nothing to open, nothing to correct. Void
-                // is the verb that was missing, and it already existed on the
-                // server — DELETE /api/invoices/{id} voids rather than deletes,
-                // "the row is preserved for the audit trail", with no caller
-                // anywhere in the app. An invoice raised in error had no way
-                // out except leaving it standing.
-                const voidAction = (
-                  <button
-                    onClick={() => setPendingVoid(invoice)}
-                    disabled={busy}
-                    className="px-3 h-7 rounded-md text-[12px] font-bold text-ih-bad-fg hover:underline disabled:opacity-50"
-                  >
-                    {m.invoices_action_void()}
-                  </button>
-                );
-
-                if (isPaid) {
-                  return (
-                    <div className="inline-flex items-center justify-end gap-1.5">
-                      {viewInspection}
-                      {payments}
-                      {voidAction}
-                    </div>
-                  );
-                }
-                if (pickerFor === invoice.id) {
-                  return (
-                    <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
-                      <span className="text-[11px] text-ih-fg-3 mr-1">{m.invoices_paid_by()}</span>
-                      {getPayMethods().map((method) => (
-                        <button
-                          key={method.value}
-                          onClick={() => markPaid(invoice.id, method.value)}
-                          disabled={busy}
-                          className="px-2 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 hover:border-ih-ok-fg hover:text-ih-ok-fg transition-colors disabled:opacity-50"
-                        >
-                          {method.label}
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => setPickerFor(null)}
-                        disabled={busy}
-                        className="px-2 h-7 rounded-md text-[12px] font-semibold text-ih-fg-4 hover:text-ih-fg-2 disabled:opacity-50"
-                      >
-                        {m.common_cancel()}
-                      </button>
-                    </div>
-                  );
-                }
-                return (
-                  <div className="inline-flex items-center justify-end gap-1.5">
-                    {viewInspection}
-                    {payments}
-                    <button
-                      onClick={() => setPickerFor(invoice.id)}
-                      className="px-3 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
-                    >
-                      {m.invoices_mark_paid()}
-                    </button>
-                    {voidAction}
-                  </div>
-                );
-              },
+              cell: (invoice) => (
+                <InvoiceRowActions
+                  invoice={invoice}
+                  busy={submittingId === invoice.id}
+                  pickerOpen={pickerFor === invoice.id}
+                  onOpenPicker={() => setPickerFor(invoice.id)}
+                  onCancelPicker={() => setPickerFor(null)}
+                  onOpenPayments={() => openPayments(invoice)}
+                  onMarkPaid={(method) => markPaid(invoice.id, method)}
+                  onVoid={() => setPendingVoid(invoice)}
+                />
+              ),
             },
           ]}
         />

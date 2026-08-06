@@ -58,3 +58,24 @@ export const ANONYMIZE_BOOKING_REQUEST_PII = {
     clientEmail: null,
     clientPhone: null,
 } as const;
+
+/**
+ * Free-text SET for `audit_logs` (#276). `metadata` is a JSON blob a caller
+ * composes, so it MAY embed a name, an address or a phrase about a person that
+ * no pattern can recognise; `audit.ts` strips the machine-detectable
+ * identifiers at write time, which is not the same as the column being clean.
+ * Portal's review rejected retaining the equivalent column through an erasure
+ * as an incomplete DSAR, so the whole value goes rather than parts of it — the
+ * one action that needs no judgement and has no false-negative rate.
+ *
+ * The column is nullable, so the convention above applies: NULL, not the
+ * sentinel. What survives is the structured event — `action`, `entity_type`,
+ * `entity_id` — which is the whole reason an audit row is worth keeping.
+ * `user_id` and `ip_address` are NOT here: they are the staff actor of a
+ * security trail, not consumer-DSAR scope (see the manifest).
+ *
+ * Shared so the erasure orchestrator and the log-retention sweep cannot drift.
+ */
+export const ANONYMIZE_AUDIT_PII = {
+    metadata: null,
+} as const;

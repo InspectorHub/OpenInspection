@@ -166,6 +166,19 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // spine of a signed, delivered document, and removing it would strand the
     // version chain that proves what was delivered.
     { table: 'reports', column: 'title', category: 'user.address', action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+
+    // ── audit_logs (#276) ─────────────────────────────────────────────────────
+    // Free-form JSON a caller composes; it MAY embed names/emails/phones/
+    // addresses. `audit.ts` now strips the machine-detectable identifiers at
+    // write time, but prose is not detectable at all and historical rows
+    // predate the redactor — so the column is SCRUBBED wholesale on an erasure,
+    // the same call portal's review made on the identical `details` column
+    // (retaining it through an erasure is an incomplete DSAR). The ROW stays:
+    // the security/accountability trail is the retention basis, and what makes
+    // it one is the structured event (action/entity), not the blob.
+    // `ip_address` stays too — staff-action security trail, declared out of
+    // scope below.
+    { table: 'audit_logs', column: 'metadata', category: 'user.freetext', action: 'anonymize', legalBasis: 'art_17_3_b' },
 ];
 
 /**
@@ -199,6 +212,15 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'users',               column: 'phone',                     reason: 'staff account — not consumer-DSAR scope' },
     { table: 'users',               column: 'default_signature_base64',  reason: 'inspector (staff) signature asset' },
     { table: 'users',               column: 'is_signature_enabled',      reason: 'boolean flag, not personal data' },
+    // An inspector's routing origin can be their home address, so it IS personal
+    // data — it is simply not a CONSUMER data subject's. Same posture as
+    // users.email/phone above: consumer-DSAR erasure never touches it and there
+    // is deliberately no DSAR-export path for it. Declared here so the decision
+    // is recorded rather than inferred from the PII heuristic not matching
+    // 'service_origin_address'.
+    { table: 'users',               column: 'service_origin_address',    reason: 'staff routing origin (may be a home address) — staff offboarding lifecycle, not consumer-DSAR scope' },
+    { table: 'users',               column: 'service_origin_lat',        reason: 'staff routing origin coordinate — not consumer-DSAR scope' },
+    { table: 'users',               column: 'service_origin_lng',        reason: 'staff routing origin coordinate — not consumer-DSAR scope' },
     { table: 'tenant_invites',      column: 'email',                     reason: 'staff invite — not consumer-DSAR scope' },
     { table: 'audit_logs',          column: 'ip_address',                reason: 'staff-action security audit trail' },
     { table: 'report_signoff',      column: 'signature_ref',             reason: 'inspector (staff) signoff reference' },
@@ -208,6 +230,8 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'tenant_configs',      column: 'support_email',    reason: 'company-owned support address' },
     { table: 'tenant_configs',      column: 'sender_email',     reason: 'company-owned sending address' },
     { table: 'tenant_configs',      column: 'company_phone',    reason: 'company-owned phone' },
+    { table: 'tenant_configs',      column: 'company_lat',      reason: 'company office coordinate — controller business identity' },
+    { table: 'tenant_configs',      column: 'company_lng',      reason: 'company office coordinate — controller business identity' },
 
     // Heuristic false positives — config values and references, not PII.
     { table: 'tenant_configs',        column: 'email_mode',               reason: 'config enum, not personal data' },
@@ -254,4 +278,22 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
       reason: 'payment-processor reference on the retained financial row, not personal data' },
     { table: 'tenant_legal_versions', column: 'body_snapshot',            reason: 'company-authored policy text, not personal data of any data subject' },
     { table: 'tenant_legal_versions', column: 'published_by_user_id',     reason: 'staff author reference — not consumer-DSAR scope' },
+    // Pay splits (#278). A split is a payroll record about a STAFF member, held
+    // under accounting and employment obligations. A client's erasure request
+    // never reaches it — the client is not the data subject here. Declared
+    // rather than left silent: the PII heuristic flags none of these columns,
+    // and silence is not the same as a decision.
+    { table: 'inspection_service_pay_splits', column: 'user_id',
+      reason: 'payroll record for a staff member, retained under accounting and employment obligations; not client data, so a client erasure request does not reach it' },
+    { table: 'inspection_service_pay_splits', column: 'reason',
+      reason: 'free text a manager writes about a payout adjustment to a staff member — payroll audit trail, not consumer-DSAR scope' },
+    { table: 'service_pay_rules',             column: 'user_id',
+      reason: 'staff compensation rule — not consumer-DSAR scope' },
+    // The portal->core dead-letter queue (#276). Registered although the PII
+    // heuristic flags neither column, because silence here is exactly how this
+    // one hid: `envelope` and `reason` look like nothing.
+    { table: 'parked_cmd_events', column: 'envelope',
+      reason: 'Fingerprint only (type/dataschema/id/seq/size/digest) — the command payload is never written, so no subject PII reaches this table. It WAS payload-bearing before #276, when a cmd.tenant.update that failed to parse wrote an admin password hash here. Naming that history is deliberate: an out-of-scope entry that only says "no PII" invites restoring raw parking as a debugging convenience.' },
+    { table: 'parked_cmd_events', column: 'reason',
+      reason: 'Fixed diagnostic enum (parse-failed / unknown-type-or-version), not personal data.' },
 ];
