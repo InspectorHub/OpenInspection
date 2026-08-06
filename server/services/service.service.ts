@@ -3,6 +3,8 @@ import { eq, and, asc, inArray, sql } from 'drizzle-orm';
 import { services, inspectionServices, discountCodes, inspections, eventTypes, reports } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { getServiceInspectors, setServiceInspectors } from './service/qualification';
+import { listPayRules, createPayRule, updatePayRule, deletePayRule } from './service/pay-rules';
+import type { CreatePayRuleInput, UpdatePayRuleInput } from './service/pay-rules';
 import { syncSplitsQuietly } from './pay-split.service';
 import { nanoid } from 'nanoid';
 import type { z } from 'zod';
@@ -328,6 +330,24 @@ export class ServiceService {
 
     async setServiceInspectors(tenantId: string, serviceId: string, userIds: string[]): Promise<number> {
         return setServiceInspectors(this.getDrizzle(), tenantId, serviceId, userIds);
+    }
+
+    // #278 — pay rules. Implementation in service/pay-rules.ts, which owns the
+    // dual-unit boundary and the 409 for the two partial unique indexes.
+    async listPayRules(tenantId: string, serviceId: string) {
+        return listPayRules(this.getDrizzle(), tenantId, serviceId);
+    }
+
+    async createPayRule(tenantId: string, serviceId: string, input: CreatePayRuleInput) {
+        return createPayRule(this.getDrizzle(), tenantId, serviceId, input);
+    }
+
+    async updatePayRule(tenantId: string, serviceId: string, ruleId: string, input: UpdatePayRuleInput) {
+        return updatePayRule(this.getDrizzle(), tenantId, serviceId, ruleId, input);
+    }
+
+    async deletePayRule(tenantId: string, serviceId: string, ruleId: string): Promise<void> {
+        return deletePayRule(this.getDrizzle(), tenantId, serviceId, ruleId);
     }
 
     async validateDiscountCode(tenantId: string, code: string, subtotal: number): Promise<{

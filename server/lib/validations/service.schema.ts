@@ -108,3 +108,99 @@ export const SetServiceInspectorsSchema = z.object({
 export const SetServiceInspectorsResponseSchema = createApiResponseSchema(z.object({
     count: z.number().int().describe('Number of restriction rows now in effect'),
 }));
+
+/* ------------------------------------------------------------------ */
+/*  Pay rules — the switch that turns pay splits on (#278)             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * THE UNIT CONTRACT, stated once here because it is where money goes wrong.
+ *
+ * `service_pay_rules.value` is a DUAL-UNIT column: basis points when `type` is
+ * a percentage, integer cents when it is `fixed`. That is defensible in the
+ * schema (the column comment explains why a `_cents` suffix would be a lie half
+ * the time) and indefensible on the wire, where the caller is a person or a
+ * script with no view of the type/unit coupling. `60` meaning 0.6% when the
+ * caller meant 60% is a hundredfold error that no type system catches.
+ *
+ * So `value` never appears on the wire. Each variant names its own unit
+ * (`percentBps`, `amountCents`) and the objects are STRICT: a payload written
+ * against the column — `{ type: 'percent', value: 6000 }` — is a 400 that names
+ * the unexpected key, not a row stored in the wrong unit. Converting a human
+ * percent server-side was the alternative and is worse: it puts two
+ * representations of the same number in the system, and the off-by-100 moves
+ * from the wire (where a strict schema catches it) into arithmetic (where
+ * nothing does). The UI does the ×100 where a human can see the "%" beside it.
+ *
+ * The union is discriminated on `type` for the same reason: `deductionCents` is
+ * meaningful ONLY for `percent_after_deduction`, where the deduction comes off
+ * the top BEFORE the percentage. A `percent` rule carrying one is ambiguous —
+ * the caller either wanted the other type or made a mistake — so it is refused
+ * rather than silently dropped.
+ */
+const PercentBps = z.number().int().min(1).max(10000)
+    .describe(
+        'Share of the line price in BASIS POINTS: 6000 = 60%, 1 = 0.01%, 10000 = 100%. '
+        + 'NOT a human percent — sending 60 here means 0.6%. '
+        + 'Capped at 10000 because above 100% the gross exceeds the line price for every '
+        + 'roster size, so no such rule could ever pay out; the split ceiling itself is '
+        + 'checked at populate time, not here.',
+    );
+
+const PayRuleTarget = z.string().min(1).nullable().optional()
+    .describe(
+        'The inspector this rule is written for. Omit or send null for the SERVICE DEFAULT, '
+        + 'which applies to any inspector without a rule of their own. At most one default '
+        + 'and one rule per inspector exist per service.',
+    );
+
+const PercentRule = z.object({
+    type:       z.literal('percent').describe('A straight share of the line price.'),
+    userId:     PayRuleTarget,
+    percentBps: PercentBps,
+}).strict().openapi('PercentPayRule');
+
+const FixedRule = z.object({
+    type:        z.literal('fixed').describe('A flat amount, whatever the line is priced at.'),
+    userId:      PayRuleTarget,
+    amountCents: z.number().int().min(1)
+        .describe('Flat amount in integer cents: 12500 = $125.00.'),
+}).strict().openapi('FixedPayRule');
+
+const PercentAfterDeductionRule = z.object({
+    type: z.literal('percent_after_deduction')
+        .describe('A share of what is left after a fixed amount comes off the top.'),
+    userId:         PayRuleTarget,
+    percentBps:     PercentBps,
+    deductionCents: z.number().int().min(1)
+        .describe(
+            'Taken off the line price BEFORE the percentage — materials, a franchise fee. '
+            + '($500 − $100) × 60% = $240, which is not 60% of $500 less $100.',
+        ),
+}).strict().openapi('PercentAfterDeductionPayRule');
+
+export const CreatePayRuleSchema = z.discriminatedUnion('type', [
+    PercentRule, FixedRule, PercentAfterDeductionRule,
+]).describe('What one inspector earns on one catalogue service. See the unit contract above.');
+
+/** Same shapes minus the target: `userId` identifies the rule, so moving it is a delete + create. */
+export const UpdatePayRuleSchema = z.discriminatedUnion('type', [
+    PercentRule.omit({ userId: true }).strict().openapi('UpdatePercentPayRule'),
+    FixedRule.omit({ userId: true }).strict().openapi('UpdateFixedPayRule'),
+    PercentAfterDeductionRule.omit({ userId: true }).strict().openapi('UpdatePercentAfterDeductionPayRule'),
+]).describe('Replace the rate of an existing pay rule. The inspector it applies to cannot be changed here.');
+
+/** The read face mirrors the write face — again, no `value`. */
+const PayRuleSchema = z.object({
+    id:             z.string().describe('service_pay_rules row id.'),
+    serviceId:      z.string().describe('Catalogue service this rule prices the work on.'),
+    userId:         z.string().nullable().describe('Inspector this rule is for; null is the service default.'),
+    type:           z.enum(['percent', 'fixed', 'percent_after_deduction']).describe('Which of the three rate shapes this is.'),
+    percentBps:     z.number().int().nullable().describe('Basis points, on the two percentage types; null on a fixed rule.'),
+    amountCents:    z.number().int().nullable().describe('Integer cents, on a fixed rule; null on the percentage types.'),
+    deductionCents: z.number().int().nullable().describe('Cents off the top, only on percent_after_deduction.'),
+    createdAt:      z.string().nullable().describe('When the rule was written, ISO-8601.'),
+}).openapi('PayRule');
+
+export const PayRuleResponseSchema     = createApiResponseSchema(PayRuleSchema);
+export const PayRuleListResponseSchema = createApiResponseSchema(z.array(PayRuleSchema));

@@ -5060,6 +5060,54 @@
     "description": "Auto-generated placeholder for createServiceDiscountCodes (POST /discount-codes, services domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "createServicePayRule",
+    "method": "POST",
+    "pathTemplate": "/api/services/{id}/pay-rules",
+    "scopes": [
+      "write"
+    ],
+    "tag": "services",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Service ID",
+          "schema": {
+            "type": "string",
+            "description": "Service ID"
+          }
+        }
+      ],
+      "body": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PercentPayRule"
+          },
+          {
+            "$ref": "#/components/schemas/FixedPayRule"
+          },
+          {
+            "$ref": "#/components/schemas/PercentAfterDeductionPayRule"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "percent": "#/components/schemas/PercentPayRule",
+            "fixed": "#/components/schemas/FixedPayRule",
+            "percent_after_deduction": "#/components/schemas/PercentAfterDeductionPayRule"
+          }
+        },
+        "description": "What one inspector earns on one catalogue service. See the unit contract above."
+      }
+    },
+    "summary": "Add a pay rule to a service",
+    "description": "Writes what an inspector earns on this service. Percentages are BASIS POINTS (percentBps: 6000 = 60%) and fixed amounts are integer cents (amountCents) — the field name carries the unit, and the payload is strict, so a rule written in the wrong unit is refused rather than stored a hundred times too small. Omit userId for the service default. At most one default and one rule per inspector exist per service; a duplicate is 409."
+  },
+  {
     "operationId": "createTag",
     "method": "POST",
     "pathTemplate": "/api/tags",
@@ -6251,6 +6299,43 @@
     },
     "summary": "Delete service discount code",
     "description": "Auto-generated placeholder for deleteServiceDiscountCode (DELETE /discount-codes/{id}, services domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "deleteServicePayRule",
+    "method": "DELETE",
+    "pathTemplate": "/api/services/{id}/pay-rules/{ruleId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "services",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Service ID",
+          "schema": {
+            "type": "string",
+            "description": "Service ID"
+          }
+        },
+        {
+          "name": "ruleId",
+          "in": "path",
+          "required": true,
+          "description": "Pay rule ID",
+          "schema": {
+            "type": "string",
+            "description": "Pay rule ID"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete a pay rule",
+    "description": "Removes a pay rule. Deleting the last rule on a service turns pay splits off for it — future inspections populate nothing. Splits already recorded are left alone."
   },
   {
     "operationId": "deleteTag",
@@ -11337,6 +11422,33 @@
     },
     "summary": "List service discount codes",
     "description": "Auto-generated placeholder for listServiceDiscountCodes (GET /discount-codes, services domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "listServicePayRules",
+    "method": "GET",
+    "pathTemplate": "/api/services/{id}/pay-rules",
+    "scopes": [
+      "read"
+    ],
+    "tag": "services",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Service ID",
+          "schema": {
+            "type": "string",
+            "description": "Service ID"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List pay rules for a service",
+    "description": "Returns what inspectors earn on this catalogue service. A rule with a null userId is the service default, applied to any inspector without one of their own. An empty list means pay splits are OFF for this service: nothing is populated when an inspection is assigned."
   },
   {
     "operationId": "listServices",
@@ -21015,6 +21127,64 @@
     },
     "summary": "Update service discount code",
     "description": "Auto-generated placeholder for updateServiceDiscountCode (PUT /discount-codes/{id}, services domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "updateServicePayRule",
+    "method": "PUT",
+    "pathTemplate": "/api/services/{id}/pay-rules/{ruleId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "services",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Service ID",
+          "schema": {
+            "type": "string",
+            "description": "Service ID"
+          }
+        },
+        {
+          "name": "ruleId",
+          "in": "path",
+          "required": true,
+          "description": "Pay rule ID",
+          "schema": {
+            "type": "string",
+            "description": "Pay rule ID"
+          }
+        }
+      ],
+      "body": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/UpdatePercentPayRule"
+          },
+          {
+            "$ref": "#/components/schemas/UpdateFixedPayRule"
+          },
+          {
+            "$ref": "#/components/schemas/UpdatePercentAfterDeductionPayRule"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "percent": "#/components/schemas/UpdatePercentPayRule",
+            "fixed": "#/components/schemas/UpdateFixedPayRule",
+            "percent_after_deduction": "#/components/schemas/UpdatePercentAfterDeductionPayRule"
+          }
+        },
+        "description": "Replace the rate of an existing pay rule. The inspector it applies to cannot be changed here."
+      }
+    },
+    "summary": "Replace the rate of a pay rule",
+    "description": "Changes the rate of an existing pay rule, including switching between the three types. The inspector the rule applies to is not editable here — that would move the rule into a different uniqueness slot, so it is a delete plus a create. Editing a rule never restates pay that was already recorded: splits are a frozen record, and an explicit refresh is what re-derives them."
   },
   {
     "operationId": "updateTeamDefaults",
