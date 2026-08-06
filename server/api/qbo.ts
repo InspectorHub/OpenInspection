@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { HonoConfig } from '../types/hono';
 import { getCookie } from 'hono/cookie';
 import { verifyJwt } from '../lib/jwt-keyring';
+import { requireRole } from '../lib/middleware/rbac';
 import { QBOTokenResponseSchema, QBOCompanyInfoResponseSchema, QBOLinkCustomerBodySchema } from '../lib/validations/qbo.schema';
 import { logger } from '../lib/logger';
 
@@ -22,6 +23,34 @@ api.use('*', async (c, next) => {
         return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
     }
 });
+
+/**
+ * Authentication above is NOT authorization, and this router needs both.
+ *
+ * Every route here administers a COMPANY-level finance integration.
+ * `/disconnect` in particular revokes the Intuit refresh token and deletes the
+ * tenant's whole `qbo_entity_map` — the OI-invoice -> QBO-invoice
+ * correspondence table — which reconnecting does not restore, so the next push
+ * writes duplicate invoices against the same DocNumbers. Until this line
+ * existed, any signed-in inspector could do that, while listing a Stripe
+ * webhook log next door (`integrations.ts`) already required owner/manager.
+ *
+ * Applied router-wide rather than per route: a uniform surface has no per-route
+ * reasoning for a future edit to get wrong, and the read (`/status`) exposes the
+ * connected realm, company name and sync errors, which is company books state.
+ *
+ * `requireRole` also refuses a caller with no role, which is what an agent
+ * (client/realtor) JWT is — it satisfies the verifier above and deliberately
+ * carries no tenant, so it must never reach a handler.
+ *
+ * Note for whoever makes `/connect` and `/callback` reachable from a browser:
+ * they are not today (`workers/app.ts` routes `/settings/*` to SSR, which has no
+ * matching route), and this guard must stay in place when they are — otherwise
+ * that change turns an in-app escalation into an internet-addressable one.
+ * Asserted at the HTTP boundary in `tests/unit/qbo/qbo-route-authorization.spec.ts`,
+ * because neither authorization gate can see a hand-rolled Hono router.
+ */
+api.use('*', requireRole('owner', 'manager'));
 
 api.get('/status', async (c) => {
     const status = await c.var.services.qbo.getConnectionStatus(c.get('tenantId'));
