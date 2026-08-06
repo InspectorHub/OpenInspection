@@ -138,11 +138,16 @@ export const googleCalendarProvider: CalendarProvider = {
             const start = event.start?.dateTime ?? (event.start?.date ? `${event.start.date}T00:00:00.000Z` : null);
             const end = event.end?.dateTime ?? (event.end?.date ? `${event.end.date}T23:59:59.000Z` : null);
             if (start && end) {
+                const createdMs = event.created ? Date.parse(event.created) : NaN;
+                const updatedMs = event.updated ? Date.parse(event.updated) : NaN;
                 blocks.push({
                     start,
                     end,
                     externalId: event.id,
                     transparency: event.transparency === 'transparent' ? 'transparent' : 'opaque',
+                    ...(event.recurringEventId ? { recurringEventId: event.recurringEventId } : {}),
+                    ...(Number.isFinite(createdMs) ? { createdMs } : {}),
+                    ...(Number.isFinite(updatedMs) ? { updatedMs } : {}),
                 });
             }
         }

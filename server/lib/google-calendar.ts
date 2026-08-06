@@ -40,6 +40,17 @@ export interface GoogleEvent {
     end?: { date?: string; dateTime?: string };
     // 'transparent' = the event shows the owner as free (does not block).
     transparency?: string;
+    /**
+     * Present on every INSTANCE of a recurring series (singleEvents=true
+     * expands series into instances), naming the series it came from. Its
+     * presence is how the import tells a one-off appointment from a weekly
+     * standup — Spectora imports only the former.
+     */
+    recurringEventId?: string;
+    /** RFC-3339 creation time; drives the do-not-backfill-before-connect rule. */
+    created?: string;
+    /** RFC-3339 last-modified time; an old event edited after connect counts as new. */
+    updated?: string;
 }
 
 export async function refreshAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<string> {

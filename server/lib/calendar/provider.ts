@@ -10,6 +10,15 @@ export interface BusyBlock {
     // defaults transparency to 'opaque'.
     externalId?: string;
     transparency?: 'opaque' | 'transparent';
+    /**
+     * Set when this block is one instance of a recurring series. Only the
+     * events path can know this; freeBusy ranges never carry it.
+     */
+    recurringEventId?: string;
+    /** Epoch ms the provider created the event, when it reports one. */
+    createdMs?: number;
+    /** Epoch ms the provider last modified the event, when it reports one. */
+    updatedMs?: number;
 }
 
 /** A-polish 10b — one calendar from the provider's calendar list. */

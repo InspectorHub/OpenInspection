@@ -1,9 +1,6 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { eq } from 'drizzle-orm';
-import { tenantConfigs } from '../lib/db/schema';
-import { resolveTenantTimeZone } from '../lib/tz';
-import { syncGoogleBusyOverrides, mergeBusyIntervals } from '../lib/calendar/sync-busy';
+import { importBusyForConnection } from '../lib/calendar/sync-engine';
 import { resolveReadSet, saveReadSet, resolveReadCalendarIds } from '../lib/calendar/read-set';
 import { SaveReadSetSchema } from '../lib/validations/calendar-read-set.schema';
 import { AppError } from '../lib/errors';
@@ -139,69 +136,40 @@ const calendarRoutes = createApiRouter()
             return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 400);
         }
 
-        const provider = getCalendarProvider('google');
         const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
         const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
         if (!oauthCreds) {
             return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
         }
-        const timeMin = new Date();
-        const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         const db = getDrizzle(c);
 
-        // A-polish 10b — union busy across the multi-read calendar set (falls
-        // back to the write/primary calendar when no read set is configured).
-        const readCalendarIds = await resolveReadCalendarIds(db, {
-            tenantId,
-            connectionId: open.connection.id,
-            fallbackCalendarId: open.connection.calendarId,
-        });
-        let busyBlocks;
+        // One code path for the button and the cron sweep. It consumes RAW
+        // listBusy output: mergeBusyIntervals unions overlapping ranges into
+        // anonymous blocks and discards the per-event externalId, without which
+        // OI cannot recognise the events it pushed itself, cannot see
+        // recurrence, and cannot key the upsert on anything stable.
+        let result;
         try {
-            const perCalendar = await Promise.all(readCalendarIds.map((calendarId) =>
-                provider.listBusy({
-                    clientId: oauthCreds.clientId,
-                    clientSecret: oauthCreds.clientSecret,
-                    refreshToken: open.credentials.refreshToken,
-                    calendarId,
-                    range: { from: timeMin, to: timeMax },
-                    capability: open.connection.capabilities,
-                }),
-            ));
-            busyBlocks = mergeBusyIntervals(perCalendar.flat());
+            result = await importBusyForConnection(db, open.connection, {
+                clientId: oauthCreds.clientId,
+                clientSecret: oauthCreds.clientSecret,
+                refreshToken: open.credentials.refreshToken,
+            });
         } catch (e) {
             logger.error('[calendar] sync listBusy failed', { tenantId }, e instanceof Error ? e : undefined);
             return c.json({ success: false, error: { message: 'Failed to fetch Google Calendar busy blocks' } }, 500);
         }
 
         const inspectorId = jwtUser.sub;
-
-        // A-polish 10 — store busy time as TIMED overrides in the tenant tz
-        // (delete-in-range + keyed upsert), so only the busy hours block slots
-        // and transparent events are carried but ignored. Replaces the old
-        // all-day blocking-date insert.
-        const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
-        const tenantTz = resolveTenantTimeZone(tzRow?.defaultTimezone);
-        const { upserted } = await syncGoogleBusyOverrides(
-            db,
-            {
-                tenantId,
-                inspectorId,
-                tenantTz,
-                rangeFromMs: timeMin.getTime(),
-                rangeToMs: timeMax.getTime(),
-            },
-            busyBlocks,
-        );
-
         await markCalendarSynced(c.env.DB, tenantId, inspectorId, 'google');
 
         return c.json({
             success: true,
-            data: { blockedDatesCreated: upserted, totalEvents: busyBlocks.length },
+            data: {
+                blockedDatesCreated: result.upserted,
+                totalEvents: result.totalEvents,
+                skipped: result.skipped,
+            },
         }, 200);
     })
     .get('/status', async (c) => {

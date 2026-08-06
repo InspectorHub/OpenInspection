@@ -85,6 +85,40 @@ describe('googleCalendarProvider.listBusy', () => {
         const freeBusyCall = fetchMock.mock.calls[1];
         expect(String(freeBusyCall[0])).toContain('/freeBusy');
     });
+
+    /**
+     * The import rules are decided on fields the PARSER has to carry through.
+     * A rule test that builds its own BusyBlock literals proves the rule, not
+     * that the provider ever supplies what the rule reads.
+     */
+    it('carries recurringEventId and created/updated off the events endpoint', async () => {
+        const fetchMock = vi.mocked(fetch);
+        fetchMock
+            .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'at' }), { status: 200 }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({
+                items: [{
+                    id: 'inst-1',
+                    recurringEventId: 'series-a',
+                    created: '2026-05-01T00:00:00Z',
+                    updated: '2026-06-02T00:00:00Z',
+                    start: { dateTime: '2026-07-14T10:00:00Z' },
+                    end: { dateTime: '2026-07-14T11:00:00Z' },
+                }],
+            }), { status: 200 }));
+
+        const blocks = await googleCalendarProvider.listBusy({
+            clientId: 'cid', clientSecret: 'sec', refreshToken: 'rt', calendarId: 'primary',
+            range: { from: new Date('2026-07-14T00:00:00Z'), to: new Date('2026-07-15T00:00:00Z') },
+            capability: 'events_read_write',
+        });
+
+        expect(blocks[0]).toMatchObject({
+            externalId: 'inst-1',
+            recurringEventId: 'series-a',
+            createdMs: Date.parse('2026-05-01T00:00:00Z'),
+            updatedMs: Date.parse('2026-06-02T00:00:00Z'),
+        });
+    });
 });
 
 /**
