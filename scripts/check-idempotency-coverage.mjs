@@ -51,13 +51,23 @@
  *     but only when the call is a bare top-level `registerX(someRouter);`
  *     statement. A helper called conditionally, or with a router built inline,
  *     is invisible.
- *   - A router's chain body is delimited by indentation: it runs from the
- *     `const X = createApiRouter()` line to the next line that starts at column
- *     zero. A handler holding a template literal with column-zero content would
- *     truncate it — which is what the `coverage` counters in the baseline are
- *     for: `declaredMutating` counts the raw mutating declarations in the
- *     source, `resolvedMutating` counts the ones this walk actually resolved to
- *     a full path, and a DROP in the resolved count fails the gate.
+ *   - A router's chain body runs from the `const X = createApiRouter()` line to
+ *     the next TOP-LEVEL STATEMENT (`const`/`export`/`function`/…), not to the
+ *     next line at column zero: several modules close a registration with a
+ *     column-zero `}, { scopes: [...] })), async (c) => {`, and the old
+ *     column-zero rule cut those chains off after their first route.
+ *
+ * THE COUNTERS ARE THE GATE, not a footnote. `declaredMutating` is a raw,
+ * parser-independent scan of the source for mutating route declarations, keyed
+ * by `<file>:<line>`; `resolvedMutating` is how many of those exact sites the
+ * walk placed on a full path. **They must be equal, and the gate fails when
+ * they are not.** For months they sat side by side in the baseline reading 316
+ * and 306, and that difference of 10 was the precise number of routes the
+ * parser could not see — inline `.openapi(createRoute({...}))` registrations it
+ * silently dropped, including three money-moving `/services` routes that
+ * appeared in no list at all. A counter that reports a hole without failing is
+ * a note. A route form this parser does not understand must turn the gate RED,
+ * not quietly shrink its coverage.
  *
  * Usage:
  *   node scripts/check-idempotency-coverage.mjs            # verify (exit 1 on drift)
@@ -99,6 +109,39 @@ function walkTs(dir, prefix = '') {
         else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) out.push(rel);
     }
     return out;
+}
+
+function countNewlines(s) {
+    return (s.match(/\n/g) ?? []).length;
+}
+
+/**
+ * A DECLARATION SITE: `<file relative to server/api>:<1-based line>` of the line
+ * that declares a mutating route — the `method: 'post'` of a createRoute object,
+ * or the `.post('/path'` of an inline verb registration. It is the join key
+ * between the two counters: the raw source tally (below, deliberately parser-
+ * independent) and the set of sites the walk actually resolved to a full path.
+ * Line-keyed rather than name-keyed because an INLINE route has no name.
+ */
+const DECL_METHOD_RE = /\bmethod:\s*'(?:post|put|patch|delete)'/;
+const DECL_VERB_RE = /\.(?:post|put|patch|delete)\(\s*'\//;
+
+/**
+ * The start of a new top-level statement — the terminator for a declaration's
+ * block. NOT "any line starting at column zero": several route modules close an
+ * `.openapi(createRoute(withMcpMetadata({…}` registration with a column-zero
+ * `}, { scopes: […] })), async (c) => {` and a column-zero `})`, so the naive
+ * rule cut the chain off after its FIRST route and every registration below was
+ * invisible — five in marketplace.ts, two in inspection-sync.ts. A closing
+ * brace continues the expression; a `const`/`export`/`function` starts a new one.
+ */
+const TOP_LEVEL_RE = /^(?:export|const|let|var|function|async\s+function|class|type|interface|enum|declare|import)\b/;
+
+/** Lines `i..end` of a declaration, as one string; `end` is the last line before the next top-level statement. */
+function blockFrom(lines, i) {
+    let last = i;
+    for (let j = i + 1; j < lines.length && !TOP_LEVEL_RE.test(lines[j]); j++) last = j;
+    return lines.slice(i, last + 1).join('\n');
 }
 
 function joinPaths(prefix, path) {
@@ -156,14 +199,16 @@ function parseRouteConsts(src) {
     const lines = src.split('\n');
     const out = new Map();
     for (let i = 0; i < lines.length; i++) {
-        const decl = lines[i].match(/^(?:export )?const (\w+) = createRoute\(/);
+        // `const X = createRoute(…)` and `const X = withMcpMetadata(createRoute(…))`
+        // are the same declaration wearing different wrappers; inspection-prefs.ts
+        // uses the second and its PATCH route was invisible for it.
+        const decl = lines[i].match(/^(?:export )?const (\w+)(?::[^=]+)? = (?:\w+\()*createRoute\(/);
         if (!decl) continue;
-        let body = lines[i];
-        for (let j = i + 1; j < lines.length && !/^\S/.test(lines[j]); j++) body += `\n${lines[j]}`;
-        const method = body.match(/\bmethod:\s*'(\w+)'/)?.[1];
+        const body = blockFrom(lines, i);
+        const m = body.match(/\bmethod:\s*'(\w+)'/);
         const path = body.match(/\bpath:\s*'([^']*)'/)?.[1];
-        if (!method || !path) continue;
-        out.set(decl[1], { method, path });
+        if (!m || path === undefined) continue;
+        out.set(decl[1], { method: m[1], path, line: i + 1 + countNewlines(body.slice(0, m.index)) });
     }
     return out;
 }
@@ -183,28 +228,64 @@ function parseRouters(src) {
         return routers.get(name);
     };
 
-    const harvest = (target, body) => {
-        for (const m of body.matchAll(/\.openapi\(\s*(\w+)/g)) target.routeConsts.push(m[1]);
+    /**
+     * `baseLine` is the 1-based file line of `body`'s first line, so every route
+     * harvested out of a substring still carries the declaration site it came
+     * from. Without it an inline route could be seen but not attributed, and the
+     * declared-vs-resolved reconciliation below would have nothing to join on.
+     */
+    const harvest = (target, body, baseLine) => {
+        // Two registration shapes, told apart by what follows the ident:
+        //   `.openapi(NAME, handler)`            → a named const, resolved later
+        //                                          via the const/import tables.
+        //   `.openapi(FACTORY({ … }), handler)`  → the route object is written
+        //                                          INLINE; there is no const to
+        //                                          look up, so method+path are
+        //                                          read from the literal here.
+        // The discriminator is the trailing `(` — a CALL — not the callee's
+        // name. Matching on the name `createRoute` would go blind again the day
+        // someone wraps it, and the old `.openapi(\s*(\w+)` captured the literal
+        // word `createRoute` as if it were a const, found no declaration, and
+        // dropped the route in silence.
+        const opens = [...body.matchAll(/\.openapi\(\s*(\w+)\s*(\()?/g)];
+        for (let k = 0; k < opens.length; k++) {
+            const m = opens[k];
+            if (!m[2]) {
+                target.routeConsts.push(m[1]);
+                continue;
+            }
+            // The inline object runs until the next registration in the chain.
+            const stop = k + 1 < opens.length ? opens[k + 1].index : body.length;
+            const chunk = body.slice(m.index, stop);
+            const method = chunk.match(/\bmethod:\s*'(\w+)'/);
+            const path = chunk.match(/\bpath:\s*'([^']*)'/)?.[1];
+            if (!method || path === undefined) continue;
+            target.chained.push({
+                method: method[1],
+                path,
+                line: baseLine + countNewlines(body.slice(0, m.index + method.index)),
+            });
+        }
         for (const m of body.matchAll(/\.route\(\s*'([^']*)'\s*,\s*(\w+)\s*\)/g)) {
             target.mounts.push({ prefix: m[1], ident: m[2] });
         }
         // The leading `/` separates a route registration from an unrelated
         // method call (`ALLOWED.delete('x')`, `map.get('k')`).
         for (const m of body.matchAll(/\.(post|put|patch|delete|get)\(\s*'(\/[^']*)'/g)) {
-            target.chained.push({ method: m[1], path: m[2] });
+            target.chained.push({
+                method: m[1],
+                path: m[2],
+                line: baseLine + countNewlines(body.slice(0, m.index)),
+            });
         }
     };
 
-    const bodyFrom = (i) => {
-        let body = lines[i];
-        for (let j = i + 1; j < lines.length && !/^\S/.test(lines[j]); j++) body += `\n${lines[j]}`;
-        return body;
-    };
+    const bodyFrom = (i) => blockFrom(lines, i);
 
     for (let i = 0; i < lines.length; i++) {
         const decl = lines[i].match(/^(?:export )?const (\w+)(?::[^=]+)? = (?:createApiRouter\(|new (?:OpenAPIHono|Hono))/);
         if (!decl) continue;
-        harvest(ensure(decl[1]), bodyFrom(i));
+        harvest(ensure(decl[1]), bodyFrom(i), i + 1);
     }
 
     // Alias chains: `const base = createApiRouter();` followed by
@@ -220,7 +301,7 @@ function parseRouters(src) {
             target.routeConsts.push(...base.routeConsts);
             target.chained.push(...base.chained);
             target.mounts.push(...base.mounts);
-            harvest(target, bodyFrom(i));
+            harvest(target, bodyFrom(i), i + 1);
         }
     }
 
@@ -228,7 +309,9 @@ function parseRouters(src) {
     // `clientMessageRoutes.post('/inspections/:id/messages', …)`.
     for (const name of [...routers.keys()]) {
         const stmt = new RegExp(`^${name}\\s*\\n?\\s*\\.[\\s\\S]*?(?=\\n\\S|$)`, 'gm');
-        for (const m of src.matchAll(stmt)) harvest(routers.get(name), m[0]);
+        for (const m of src.matchAll(stmt)) {
+            harvest(routers.get(name), m[0], countNewlines(src.slice(0, m.index)) + 1);
+        }
     }
 
     return routers;
@@ -245,10 +328,15 @@ function parseRouterHelpers(src) {
     for (let i = 0; i < lines.length; i++) {
         const decl = lines[i].match(/^export function (\w+)\(\s*router\b/);
         if (!decl) continue;
-        let body = '';
-        for (let j = i + 1; j < lines.length && !/^\S/.test(lines[j]); j++) body += `\n${lines[j]}`;
+        const body = `\n${blockFrom(lines, i + 1)}`;
+        // `body` starts with a leading "\n", so its first character sits on the
+        // helper's declaration line: baseLine is that line, 1-based.
         const chained = [...body.matchAll(/\brouter\.(post|put|patch|delete|get)\(\s*'(\/[^']*)'/g)]
-            .map(m => ({ method: m[1], path: m[2] }));
+            .map(m => ({
+                method: m[1],
+                path: m[2],
+                line: i + 1 + countNewlines(body.slice(0, m.index)),
+            }));
         out.set(decl[1], chained);
     }
     return out;
@@ -267,16 +355,21 @@ function parseDefaultExport(src) {
 function collect() {
     const files = walkTs(API_DIR);
     const parsed = new Map();
-    let declaredMutating = 0;
+    /** declaration site -> the source line that declares it. */
+    const declSites = new Map();
 
     for (const f of files) {
         const src = stripComments(read(join(API_DIR, f)));
         // Declared-side tally: every mutating createRoute + every inline
-        // mutating verb with a quoted path. The resolved count is ratcheted
-        // against this, because a parser that quietly sees less than the
-        // surface reports OK either way.
-        declaredMutating += (src.match(/\bmethod:\s*'(?:post|put|patch|delete)'/g) ?? []).length;
-        declaredMutating += (src.match(/\.(?:post|put|patch|delete)\(\s*'\//g) ?? []).length;
+        // mutating verb with a quoted path, recorded BY SITE rather than as a
+        // bare count. This scan is deliberately independent of the parser —
+        // a parser that quietly sees less than the surface reports OK either
+        // way, so the surface has to be measured without it. Every site here
+        // must come back resolved; see the reconciliation in main().
+        src.split('\n').forEach((text, i) => {
+            if (!DECL_METHOD_RE.test(text) && !DECL_VERB_RE.test(text)) return;
+            declSites.set(`${f}:${i + 1}`, text.trim());
+        });
         parsed.set(f, {
             imports: parseImports(src, f),
             consts: parseRouteConsts(src),
@@ -292,8 +385,15 @@ function collect() {
 
     const routes = [];
     const seen = new Set();
-    const push = (method, fullPath, file) => {
+    /** Declaration sites the walk placed on a full path. */
+    const resolvedSites = new Set();
+    const push = (method, fullPath, file, site) => {
         if (!MUTATING.has(method)) return;
+        // Marked resolved even when the path is a duplicate: a dual-mounted
+        // router (coreAuthRoutes at both `/api/auth` and `/`) resolves ONE
+        // declaration to two paths, and a router reached twice resolves it to
+        // the same path twice. Either way the declaration was placed.
+        resolvedSites.add(site);
         const route = `${method.toUpperCase()} ${fullPath}`;
         if (seen.has(route)) return;
         seen.add(route);
@@ -315,13 +415,13 @@ function collect() {
             // (several files declare `deleteRoute`), so the import table is
             // consulted before any global lookup.
             const imported = entry.imports.get(constName);
-            const rc = entry.consts.get(constName)
-                ?? (imported ? parsed.get(imported.file)?.consts.get(imported.exported) : undefined);
+            const own = entry.consts.get(constName);
+            const rc = own ?? (imported ? parsed.get(imported.file)?.consts.get(imported.exported) : undefined);
             if (!rc) continue;
-            push(rc.method, joinPaths(prefix, rc.path), file);
+            push(rc.method, joinPaths(prefix, rc.path), file, `${own ? file : imported.file}:${rc.line}`);
         }
-        for (const { method, path } of router.chained) {
-            push(method, joinPaths(prefix, path), file);
+        for (const { method, path, line } of router.chained) {
+            push(method, joinPaths(prefix, path), file, `${file}:${line}`);
         }
         // Helper-registered verbs land on the router the helper was called with.
         for (const { fn, ident } of entry.helperCalls) {
@@ -330,8 +430,9 @@ function collect() {
             const source = imported ? parsed.get(imported.file) : entry;
             const chained = source?.helpers.get(imported ? imported.exported : fn);
             if (!chained) continue;
-            for (const { method, path } of chained) {
-                push(method, joinPaths(prefix, path), imported ? imported.file : file);
+            const declFile = imported ? imported.file : file;
+            for (const { method, path, line } of chained) {
+                push(method, joinPaths(prefix, path), declFile, `${declFile}:${line}`);
             }
         }
         for (const { prefix: sub, ident } of router.mounts) {
@@ -364,7 +465,18 @@ function collect() {
         visit(imported.file, name, prefix, new Set());
     }
 
-    return Object.assign(routes, { declaredMutating });
+    // Reconciliation. `resolvedSites` is a subset of `declSites` by
+    // construction (the parser reads method/path with the same patterns the raw
+    // scan uses), so the difference is exactly the surface the walk cannot see.
+    const unresolved = [...declSites.keys()]
+        .filter(site => !resolvedSites.has(site))
+        .map(site => ({ site, text: declSites.get(site) }));
+
+    return Object.assign(routes, {
+        declaredMutating: declSites.size,
+        resolvedMutating: declSites.size - unresolved.length,
+        unresolved,
+    });
 }
 
 /** Route paths named as string literals in the replay-evidence specs. */
@@ -436,9 +548,40 @@ function main() {
     };
 
     const pendingNow = routes.filter(r => classify(r) === 'pending');
-    const coverage = { declaredMutating: routes.declaredMutating, resolvedMutating: routes.length };
+    const coverage = {
+        declaredMutating: routes.declaredMutating,
+        resolvedMutating: routes.resolvedMutating,
+    };
+    const unresolvedReport = () => {
+        console.error(
+            `Idempotency-coverage gate — ${routes.unresolved.length} mutating routes were ` +
+            'DECLARED but could not be resolved to a path:'
+        );
+        for (const { site, text } of routes.unresolved) {
+            console.error(`  x server/api/${site}`);
+            console.error(`      ${text}`);
+        }
+        console.error('');
+        console.error('The parser does not understand how these are registered, so they appear in');
+        console.error('NO list in the baseline — not pending, not verified, not by-design. Their');
+        console.error('retry safety is unaudited and this gate is quietly smaller than it claims.');
+        console.error('');
+        console.error('Do one of:');
+        console.error('  - register them in a shape the walk follows: a router mounted (directly or');
+        console.error('    transitively) from server/index.ts, chained with `.openapi(routeConst)`,');
+        console.error("    `.openapi(createRoute({...}))`, or `.verb('/path', ...)`;");
+        console.error('  - teach parseRouters() / parseRouteConsts() the new registration shape;');
+        console.error('  - if the route is genuinely unreachable from server/index.ts, say so with a');
+        console.error('    reason rather than leaving it silent.');
+        console.error('Do NOT close the gap by lowering the declared count — that is the same');
+        console.error('blindness written down as a number.');
+    };
 
     if (update) {
+        // --update regenerates `pending`; it cannot launder an unresolved
+        // declaration, because the verify path recomputes the gap from source
+        // every run rather than diffing it against the baseline.
+        if (routes.unresolved.length > 0) unresolvedReport();
         writeFileSync(
             BASELINE_PATH,
             JSON.stringify({
@@ -461,7 +604,7 @@ function main() {
             }, null, 4) + '\n',
             'utf8'
         );
-        console.log(`Updated ${BASELINE_PATH}: ${pendingNow.length} pending routes (${routes.length} mutating routes resolved of ${routes.declaredMutating} declared).`);
+        console.log(`Updated ${BASELINE_PATH}: ${pendingNow.length} pending routes (${routes.length} distinct mutating paths from ${coverage.resolvedMutating} of ${coverage.declaredMutating} declarations).`);
         return;
     }
 
@@ -472,6 +615,17 @@ function main() {
 
     const pendingBaseline = prior.pending ?? [];
     let failed = false;
+
+    // THE structural check. These two counters sat side by side in the baseline
+    // for months, 316 against 306, and the difference was the exact number of
+    // mutating routes the parser could not place — inline
+    // `.openapi(createRoute({...}))` registrations it dropped in silence. A
+    // counter that reports a hole without failing is a note, not a gate.
+    if (routes.unresolved.length > 0) {
+        failed = true;
+        unresolvedReport();
+        console.error('');
+    }
 
     if (priorCoverage && coverage.resolvedMutating < priorCoverage.resolvedMutating) {
         failed = true;
