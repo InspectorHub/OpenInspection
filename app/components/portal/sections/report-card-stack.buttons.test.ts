@@ -63,7 +63,17 @@ describe('report-card-stack buttons (Task 9)', () => {
   it('FAB button still reads "Download PDF" as the default label', async () => {
     const text = await source();
 
-    expect(text).toContain('Download PDF');
+    // This asserted `toContain('Download PDF')` for a long time, and the only
+    // thing it ever matched was a COMMENT — the label is an i18n call, so the
+    // literal string does not appear in the source at all. Deleting the FAB
+    // would have left it green as long as a comment survived.
+    //
+    // Two halves make the claim in the test name: the render calls the message,
+    // and the message says that. Neither alone is the label a reader sees.
+    expect(text).toContain('m.report_view_download_pdf()');
+
+    const en = await import('../../../../messages/en/reports.json');
+    expect(en.report_view_download_pdf).toBe('Download PDF');
   });
 
   // The fetch→blob download + generating/cooldown state moved into the shared

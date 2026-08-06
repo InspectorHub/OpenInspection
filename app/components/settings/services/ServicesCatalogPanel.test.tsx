@@ -13,7 +13,12 @@ import { ServicesCatalogPanel } from "./ServicesCatalogPanel";
  */
 function renderPanel(
     services: Parameters<typeof ServicesCatalogPanel>[0]["services"],
-    opts: { onEdit?: (id: string | null) => void; editingId?: string | null; members?: Parameters<typeof ServicesCatalogPanel>[0]["members"] } = {},
+    opts: {
+        onEdit?: (id: string | null) => void;
+        editingId?: string | null;
+        members?: Parameters<typeof ServicesCatalogPanel>[0]["members"];
+        payRuleMap?: Parameters<typeof ServicesCatalogPanel>[0]["payRuleMap"];
+    } = {},
 ) {
     // The panel renders <Form> for the activate/deactivate action, so it needs a
     // router context.
@@ -28,6 +33,7 @@ function renderPanel(
                     templateNames={{ "tpl-1": "Residential Standard" }}
                     editingId={opts.editingId ?? null}
                     onEdit={opts.onEdit}
+                    payRuleMap={opts.payRuleMap ?? {}}
                 />
             ),
         },
@@ -64,7 +70,9 @@ describe("ServicesCatalogPanel", () => {
 
     it("says a duration is not set rather than showing a bare dash", () => {
         renderPanel([{ ...base, templateId: "tpl-1" }]);
-        expect(screen.getByText("Not set")).toBeTruthy();
+        // Scoped to the DURATION cell: the row says "Not set" twice since #278
+        // added the pay-rule summary, and a bare getByText now matches both.
+        expect(screen.getByRole("cell", { name: "Not set" })).toBeTruthy();
     });
 
     it("names the template a service builds from", () => {
@@ -111,5 +119,46 @@ describe("ServicesCatalogPanel — a row's actions", () => {
     it("keeps deactivation available beside it", () => {
         renderPanel([{ ...base, templateId: "tpl-1" }], { onEdit: () => {} });
         expect(screen.getByRole("button", { name: /deactivate/i })).toBeTruthy();
+    });
+});
+
+/**
+ * `payRuleMap` (#278) arrived as a REQUIRED prop with nothing in this file
+ * passing it, and the panel indexes it unguarded — so every test here threw
+ * during render. It went in green because co-located `app/**` tests are
+ * excluded from the app tsc program (see the comment on `exclude` in
+ * tsconfig.json), so nothing type-checks this call site: only actually running
+ * `test:web` can see it.
+ *
+ * Passing `{}` to make the crash stop would assert nothing about the prop, so
+ * this pins the difference a reader sees instead — which is also what makes the
+ * fix above load-bearing rather than padding.
+ */
+describe("ServicesCatalogPanel — the pay-rule summary on a row", () => {
+    const MEMBERS = [{ id: "u1", email: "dana@example.com", role: "inspector", createdAt: "" }];
+
+    /**
+     * Read through the "Pay:" label rather than by text: the DURATION cell of
+     * the same row also says "Not set", and `getByText` matches an element's
+     * direct text nodes — so the summary span (`<span>Pay:</span> Not set`)
+     * and the duration cell are both hits for the bare string.
+     */
+    const paySummary = () => screen.getByText("Pay:").parentElement?.textContent;
+
+    it("says a service has no pay rule when the map has no entry for it", () => {
+        renderPanel([{ ...base, templateId: "tpl-1" }], { members: MEMBERS });
+        expect(paySummary()).toBe("Pay: Not set");
+    });
+
+    it("counts the rules the map does carry for that service", () => {
+        renderPanel([{ ...base, templateId: "tpl-1" }], {
+            members: MEMBERS,
+            payRuleMap: {
+                "svc-1": [
+                    { id: "pr-1", userId: "u1", type: "percent", percentBps: 6000, amountCents: null, deductionCents: null },
+                ],
+            },
+        });
+        expect(paySummary()).toBe("Pay: 1 pay rule");
     });
 });
