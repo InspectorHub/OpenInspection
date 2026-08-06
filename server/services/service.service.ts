@@ -1,9 +1,10 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, asc, inArray, sql } from 'drizzle-orm';
-import { services, inspectionServices, discountCodes, inspections, eventTypes, reports } from '../lib/db/schema';
+import { eq, and, asc, inArray } from 'drizzle-orm';
+import { services, inspectionServices, inspections, eventTypes, reports } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { getServiceInspectors, setServiceInspectors } from './service/qualification';
 import { listPayRules, createPayRule, updatePayRule, deletePayRule } from './service/pay-rules';
+import * as discounts from './service/discount-codes';
 import type { CreatePayRuleInput, UpdatePayRuleInput } from './service/pay-rules';
 import { syncSplitsQuietly } from './pay-split.service';
 import { nanoid } from 'nanoid';
@@ -70,6 +71,10 @@ export class ServiceService {
             active:          true,
             sortOrder:       data.sortOrder ?? 0,
             createdAt:       now,
+            // NULL inherits the workspace deposit default; `{ type: 'none' }`
+            // opts this service out of it. `?? null` keeps those distinct —
+            // an omitted key must not read as "opted out".
+            depositPolicy:   data.depositPolicy ?? null,
         });
         const rows = await db.select().from(services).where(eq(services.id, id));
         return rows[0];
@@ -272,56 +277,6 @@ export class ServiceService {
         await syncSplitsQuietly(db, tenantId, inspectionId);
     }
 
-    async listDiscountCodes(tenantId: string) {
-        const db = this.getDrizzle();
-        return db.select().from(discountCodes)
-            .where(eq(discountCodes.tenantId, tenantId));
-    }
-
-    async updateDiscountCode(
-        tenantId: string,
-        id: string,
-        data: Partial<Omit<typeof discountCodes.$inferInsert, 'expiresAt'>> & { expiresAt?: string | null },
-    ) {
-        const db = this.getDrizzle();
-        const { expiresAt, ...rest } = data;
-        const patch: Partial<typeof discountCodes.$inferInsert> = { ...rest };
-        if (expiresAt !== undefined) patch.expiresAt = expiresAt ? new Date(expiresAt) : null;
-        const updated = await db.update(discountCodes)
-            .set(patch)
-            .where(and(eq(discountCodes.id, id), eq(discountCodes.tenantId, tenantId)))
-            .returning();
-        if (updated.length === 0) throw Errors.NotFound('Discount code not found');
-        return updated[0];
-    }
-
-    async deleteDiscountCode(tenantId: string, id: string) {
-        const db = this.getDrizzle();
-        const result = await db.delete(discountCodes)
-            .where(and(eq(discountCodes.id, id), eq(discountCodes.tenantId, tenantId)))
-            .returning({ id: discountCodes.id });
-        if (result.length === 0) throw Errors.NotFound('Discount code not found');
-    }
-
-    async createDiscountCode(tenantId: string, data: CreateDiscountData) {
-        const db = this.getDrizzle();
-        const id = nanoid();
-        await db.insert(discountCodes).values({
-            id,
-            tenantId,
-            code:      data.code.toUpperCase(),
-            type:      data.type,
-            value:     data.value,
-            maxUses:   data.maxUses ?? null,
-            usesCount: 0,
-            expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
-            active:    true,
-            createdAt: new Date(),
-        });
-        const rows = await db.select().from(discountCodes).where(eq(discountCodes.id, id));
-        return rows[0];
-    }
-
     // IA-26 — per-service inspector qualification. The implementation lives in
     // service/qualification.ts; these delegates keep every caller unchanged.
     async getServiceInspectors(tenantId: string, serviceId: string): Promise<string[]> {
@@ -350,49 +305,29 @@ export class ServiceService {
         return deletePayRule(this.getDrizzle(), tenantId, serviceId, ruleId);
     }
 
-    async validateDiscountCode(tenantId: string, code: string, subtotal: number): Promise<{
-        valid: boolean;
-        discountAmount: number;
-        discountCodeId: string | null;
-        message?: string;
-    }> {
-        const invalid = (message: string) =>
-            ({ valid: false as const, discountAmount: 0, discountCodeId: null, message });
-
-        const db = this.getDrizzle();
-        const rows = await db.select().from(discountCodes)
-            .where(and(eq(discountCodes.tenantId, tenantId), eq(discountCodes.active, true)));
-        // JS-side filter instead of SQL UPPER() — intentional for D1 compatibility
-        const dc = rows.find(r => r.code.toUpperCase() === code.toUpperCase());
-
-        if (!dc) return invalid('Code not found');
-        if (dc.expiresAt && dc.expiresAt < new Date()) return invalid('Code expired');
-        if (dc.maxUses !== null && dc.usesCount >= dc.maxUses) return invalid('Code usage limit reached');
-
-        const discountAmount = dc.type === 'fixed'
-            ? Math.min(dc.value, subtotal)
-            : Math.floor(subtotal * dc.value / 100);
-
-        return { valid: true, discountAmount, discountCodeId: dc.id };
+    /* Discount codes. Implementation in service/discount-codes.ts — the whole
+     * entity in one file, rather than interleaved with the service lines. */
+    async listDiscountCodes(tenantId: string) {
+        return discounts.listDiscountCodes(this.getDrizzle(), tenantId);
     }
 
-    /**
-     * Atomically increments uses_count for a discount code, enforcing max_uses.
-     * Returns true if the redemption was accepted (a row changed), false if the
-     * cap blocked it (uses_count >= max_uses) or the code doesn't exist for
-     * this tenant. Tenant-scoped: the WHERE clause filters tenant_id so a
-     * cross-tenant id can never consume another tenant's quota.
-     */
+    async createDiscountCode(tenantId: string, data: CreateDiscountData) {
+        return discounts.createDiscountCode(this.getDrizzle(), tenantId, data);
+    }
+
+    async updateDiscountCode(tenantId: string, id: string, data: discounts.DiscountCodePatch) {
+        return discounts.updateDiscountCode(this.getDrizzle(), tenantId, id, data);
+    }
+
+    async deleteDiscountCode(tenantId: string, id: string) {
+        return discounts.deleteDiscountCode(this.getDrizzle(), tenantId, id);
+    }
+
+    async validateDiscountCode(tenantId: string, code: string, subtotal: number): Promise<discounts.DiscountValidation> {
+        return discounts.validateDiscountCode(this.getDrizzle(), tenantId, code, subtotal);
+    }
+
     async redeemDiscountCode(tenantId: string, discountCodeId: string): Promise<boolean> {
-        const db = this.getDrizzle();
-        const res = await db.update(discountCodes)
-            .set({ usesCount: sql`${discountCodes.usesCount} + 1` })
-            .where(and(
-                eq(discountCodes.id, discountCodeId),
-                eq(discountCodes.tenantId, tenantId),
-                sql`(${discountCodes.maxUses} IS NULL OR ${discountCodes.usesCount} < ${discountCodes.maxUses})`,
-            )).run();
-        const r = res as unknown as { meta?: { changes?: number }; changes?: number };
-        return (r.meta?.changes ?? r.changes ?? 0) > 0;
+        return discounts.redeemDiscountCode(this.getDrizzle(), tenantId, discountCodeId);
     }
 }

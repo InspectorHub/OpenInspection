@@ -3,6 +3,7 @@ import { createApiResponseSchema } from '../shared.schema';
 import { isValidTimeZone } from '../../tz';
 import { isValidLocale } from '../../locale';
 import { DATE_FORMATS, TIME_FORMATS } from '../../session/display-prefs';
+import { DepositPolicySchema } from '../deposit-policy.schema';
 
 /**
  * One rung of the cancellation ladder.
@@ -120,6 +121,13 @@ export const UpdateBrandingSchema = z.object({
     // attesting can be one save.
     attestCancellationClause: z.string().min(1).nullable().optional()
         .describe("Agreement template id the tenant attests contains their cancellation clause; null withdraws it."),
+    // Tier 1 of the booking deposit — the workspace default. `null` clears it
+    // back to "no deposit anywhere", which is where every workspace starts.
+    // `.optional()` with NO `.default()`, for the same reason the policy above
+    // has none: a default would make a save that never mentions the deposit
+    // silently wipe a configured one.
+    depositPolicy: DepositPolicySchema.nullable().optional()
+        .describe('Default deposit taken at booking; null clears it. A service may override or opt out.'),
 }).openapi('UpdateBranding');
 
 /**

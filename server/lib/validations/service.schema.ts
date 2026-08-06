@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from './shared.schema';
+import { DepositPolicySchema } from './deposit-policy.schema';
 
 const ServiceSchema = z.object({
     id:              z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
@@ -13,6 +14,8 @@ const ServiceSchema = z.object({
     active:          z.boolean().describe('TODO describe active field for the OpenInspection MCP integration'),
     sortOrder:       z.number().int().describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
     createdAt:       z.string().nullable().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    depositPolicy:   DepositPolicySchema.nullable().optional()
+        .describe("This service's deposit policy; null inherits the workspace default."),
 }).openapi('Service');
 
 export const CreateServiceSchema = z.object({
@@ -23,6 +26,12 @@ export const CreateServiceSchema = z.object({
     templateId:      z.string().optional().describe('TODO describe templateId field for the OpenInspection MCP integration'),
     agreementId:     z.string().optional().describe('TODO describe agreementId field for the OpenInspection MCP integration'),
     sortOrder:       z.number().int().optional().describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
+    // Tier 2 of the booking deposit. Omitted or null = inherit the workspace
+    // default; `{ type: 'none' }` = this service asks for no deposit even when
+    // the workspace does. Those are different answers, which is why the column
+    // is nullable rather than defaulted.
+    depositPolicy:   DepositPolicySchema.nullable().optional()
+        .describe("This service's deposit; null inherits the workspace default, { type: 'none' } opts out of it."),
 }).openapi('CreateService');
 
 export const UpdateServiceSchema = CreateServiceSchema.partial().extend({

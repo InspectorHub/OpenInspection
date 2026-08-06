@@ -2,6 +2,7 @@ import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm';
 import type { ReportLinkTtl } from '../../../report-link-ttl';
 import type { CancellationPolicy } from '../../../billing/cancellation-policy';
+import type { DepositPolicy } from '../../../billing/deposit-policy';
 
 export const tenants = sqliteTable('tenants', {
     id: text('id').primaryKey(),
@@ -294,6 +295,19 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     cancellationClauseAgreementId: text('cancellation_clause_agreement_id'),
     cancellationClauseVersion: integer('cancellation_clause_version'),
     cancellationClauseAttestedAt: integer('cancellation_clause_attested_at', { mode: 'timestamp_ms' }),
+    // Tier 1 of the booking deposit: what the workspace asks for up front on
+    // any service that does not say otherwise. NULL = no deposit anywhere,
+    // which is how every workspace ships — nothing changes for an existing
+    // tenant until they opt in.
+    //
+    // Tier 2 is the same shape on `services`; tier 3 is
+    // `inspections.deposit_required_cents` + `deposit_overridden`. The
+    // arithmetic that combines them is `lib/billing/deposit-policy.ts`, and it
+    // is pure precisely so the number a client is quoted and the number they
+    // are charged come from one function.
+    // Appended at END of the table per the D1 add-column-at-end rule
+    // (tenant_configs is FK-referenced).
+    depositPolicy: text('deposit_policy', { mode: 'json' }).$type<DepositPolicy>(),
 });
 
 /**

@@ -189,6 +189,12 @@ export const UpdateInspectionSchema = z.object({
     // 'tpl-e2e-trackA' are valid), so this is a plain string, not `.uuid()`.
     // null detaches the template; omitted leaves it unchanged.
     templateId: z.string().min(1).nullable().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('Template assigned to this inspection (free-text template id).'),
+    // Tier 3 of the booking deposit — a human's number for THIS order, which is
+    // the only tier the resolver cannot produce. Sending it also raises
+    // `is_deposit_overridden` in the handler, so a later re-resolve cannot
+    // quietly replace what an operator agreed with a client; null clears both.
+    depositRequiredCents: z.number().int().min(0).nullable().optional().openapi({ example: 9000 })
+        .describe('Deposit owed on this order, in integer cents. Setting it marks the order as operator-overridden; null clears the override.'),
 }).openapi('UpdateInspection');
 
 export const InspectionCountsSchema = z.object({
