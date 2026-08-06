@@ -214,7 +214,6 @@
         "POST /api/inspections/{id}/results/batch",
         "POST /api/inspections/{id}/return",
         "POST /api/inspections/{id}/send-report-pdf",
-        "POST /api/inspections/{id}/send-sms",
         "POST /api/inspections/{id}/submit",
         "POST /api/inspections/{id}/switch-rating-system",
         "POST /api/inspections/{id}/unit-mode",
