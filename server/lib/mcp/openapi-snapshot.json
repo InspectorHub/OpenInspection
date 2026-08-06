@@ -5082,26 +5082,7 @@
         }
       ],
       "body": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/PercentPayRule"
-          },
-          {
-            "$ref": "#/components/schemas/FixedPayRule"
-          },
-          {
-            "$ref": "#/components/schemas/PercentAfterDeductionPayRule"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type",
-          "mapping": {
-            "percent": "#/components/schemas/PercentPayRule",
-            "fixed": "#/components/schemas/FixedPayRule",
-            "percent_after_deduction": "#/components/schemas/PercentAfterDeductionPayRule"
-          }
-        },
-        "description": "What one inspector earns on one catalogue service. See the unit contract above."
+        "$ref": "#/components/schemas/CreatePayRule"
       }
     },
     "summary": "Add a pay rule to a service",
@@ -21161,26 +21142,7 @@
         }
       ],
       "body": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/UpdatePercentPayRule"
-          },
-          {
-            "$ref": "#/components/schemas/UpdateFixedPayRule"
-          },
-          {
-            "$ref": "#/components/schemas/UpdatePercentAfterDeductionPayRule"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type",
-          "mapping": {
-            "percent": "#/components/schemas/UpdatePercentPayRule",
-            "fixed": "#/components/schemas/UpdateFixedPayRule",
-            "percent_after_deduction": "#/components/schemas/UpdatePercentAfterDeductionPayRule"
-          }
-        },
-        "description": "Replace the rate of an existing pay rule. The inspector it applies to cannot be changed here."
+        "$ref": "#/components/schemas/UpdatePayRule"
       }
     },
     "summary": "Replace the rate of a pay rule",

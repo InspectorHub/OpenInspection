@@ -51,20 +51,36 @@ export interface PayRuleWire {
     createdAt: string | null;
 }
 
-/** Wire shape → the dual-unit column. The ONLY place a percentage becomes `value`. */
+/**
+ * Wire shape → the dual-unit column. The ONLY place a percentage becomes
+ * `value`, and the only place cents does.
+ *
+ * The schema's cross-field refinement already guarantees the field each type
+ * needs is present, so `need` re-asserts rather than re-validates — but it DOES
+ * re-assert, with a throw and not a `!`. The refinement lives in another file,
+ * and the failure being guarded is "the money column silently took undefined".
+ */
 function toColumns(input: CreatePayRuleInput | UpdatePayRuleInput): {
     type: ServicePayRule['type']; value: number; deductionCents: number | null;
 } {
+    const need = (n: number | undefined, field: string): number => {
+        if (n === undefined) throw Errors.BadRequest(`${field} is required when type is "${input.type}".`);
+        return n;
+    };
     if (input.type === 'fixed') {
-        return { type: 'fixed', value: input.amountCents, deductionCents: null };
+        return { type: 'fixed', value: need(input.amountCents, 'amountCents'), deductionCents: null };
     }
     if (input.type === 'percent_after_deduction') {
-        return { type: 'percent_after_deduction', value: input.percentBps, deductionCents: input.deductionCents };
+        return {
+            type: 'percent_after_deduction',
+            value: need(input.percentBps, 'percentBps'),
+            deductionCents: need(input.deductionCents, 'deductionCents'),
+        };
     }
     // A `percent` rule must carry NO deduction, including when it replaces a
     // percent_after_deduction rule: a stale value left in the column would keep
     // coming off the top and the arithmetic would quietly disagree with the type.
-    return { type: 'percent', value: input.percentBps, deductionCents: null };
+    return { type: 'percent', value: need(input.percentBps, 'percentBps'), deductionCents: null };
 }
 
 /** The column → wire shape. `value` is never echoed under its own name. */

@@ -132,11 +132,21 @@ export const SetServiceInspectorsResponseSchema = createApiResponseSchema(z.obje
  * from the wire (where a strict schema catches it) into arithmetic (where
  * nothing does). The UI does the ×100 where a human can see the "%" beside it.
  *
- * The union is discriminated on `type` for the same reason: `deductionCents` is
- * meaningful ONLY for `percent_after_deduction`, where the deduction comes off
- * the top BEFORE the percentage. A `percent` rule carrying one is ambiguous —
- * the caller either wanted the other type or made a mistake — so it is refused
- * rather than silently dropped.
+ * `deductionCents` is meaningful ONLY for `percent_after_deduction`, where the
+ * deduction comes off the top BEFORE the percentage. A `percent` rule carrying
+ * one is ambiguous — the caller either wanted the other type or made a mistake —
+ * so it is REFUSED rather than silently dropped, by `exactlyTheFieldsFor` below.
+ *
+ * NOT a `z.discriminatedUnion`, which is what this was first written as and is
+ * the shape the rule naturally has. Measured: three strict members, plus the
+ * three `.omit()` members of the update union, expand through hono/client into
+ * an app-wide RPC type that takes `type-check:app` past its 8 GB heap — tsc
+ * dies with "Ineffective mark-compacts near heap limit", with no error to read.
+ * Verified by bisection: the same tree with these routes reverted type-checks
+ * clean. One strict object with an exhaustive cross-field refinement enforces
+ * the identical contract — the wire shape, the field names, the rejections and
+ * the tests are all unchanged — at one plain object's type cost. If hono's RPC
+ * inference ever gets cheaper, this is the place to put the union back.
  */
 const PercentBps = z.number().int().min(1).max(10000)
     .describe(
@@ -154,41 +164,82 @@ const PayRuleTarget = z.string().min(1).nullable().optional()
         + 'and one rule per inspector exist per service.',
     );
 
-const PercentRule = z.object({
-    type:       z.literal('percent').describe('A straight share of the line price.'),
-    userId:     PayRuleTarget,
-    percentBps: PercentBps,
-}).strict().openapi('PercentPayRule');
+const PayRuleTypeEnum = z.enum(['percent', 'fixed', 'percent_after_deduction'])
+    .describe(
+        'percent = a straight share of the line price. fixed = a flat amount whatever the '
+        + 'line costs. percent_after_deduction = a share of what is left after a fixed amount '
+        + 'comes off the top (materials, a franchise fee).',
+    );
 
-const FixedRule = z.object({
-    type:        z.literal('fixed').describe('A flat amount, whatever the line is priced at.'),
-    userId:      PayRuleTarget,
-    amountCents: z.number().int().min(1)
-        .describe('Flat amount in integer cents: 12500 = $125.00.'),
-}).strict().openapi('FixedPayRule');
+/** Which fields each type requires, and — just as load-bearing — which it forbids. */
+const FIELDS_BY_TYPE = {
+    percent:                 { required: ['percentBps'],                   forbidden: ['amountCents', 'deductionCents'] },
+    fixed:                   { required: ['amountCents'],                  forbidden: ['percentBps', 'deductionCents'] },
+    percent_after_deduction: { required: ['percentBps', 'deductionCents'], forbidden: ['amountCents'] },
+} as const;
 
-const PercentAfterDeductionRule = z.object({
-    type: z.literal('percent_after_deduction')
-        .describe('A share of what is left after a fixed amount comes off the top.'),
-    userId:         PayRuleTarget,
-    percentBps:     PercentBps,
-    deductionCents: z.number().int().min(1)
+// `| undefined` spelled out on each: the repo runs `exactOptionalPropertyTypes`,
+// under which `percentBps?: number` means "absent, or a number" and refuses an
+// explicit undefined — which is exactly what zod hands the refinement.
+type PayRuleFields = {
+    type: keyof typeof FIELDS_BY_TYPE;
+    percentBps?: number | undefined;
+    amountCents?: number | undefined;
+    deductionCents?: number | undefined;
+};
+
+/**
+ * Only what the refinement uses. `z.RefinementCtx` is generic over the value
+ * being refined, so naming it here would pin this helper to ONE of the two
+ * schemas and the other would stop compiling — the whole point is that both
+ * share it.
+ */
+interface IssueSink {
+    addIssue: (issue: { code: 'custom'; path: (string | number)[]; message: string }) => void;
+}
+
+function exactlyTheFieldsFor(v: PayRuleFields, ctx: IssueSink) {
+    const spec = FIELDS_BY_TYPE[v.type];
+    for (const key of spec.required) {
+        if (v[key] === undefined) {
+            ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required when type is "${v.type}".` });
+        }
+    }
+    for (const key of spec.forbidden) {
+        if (v[key] !== undefined) {
+            ctx.addIssue({
+                code: 'custom', path: [key],
+                message: `${key} is not meaningful when type is "${v.type}" — remove it, or change the type.`,
+            });
+        }
+    }
+}
+
+const payRuleRateFields = {
+    type:       PayRuleTypeEnum,
+    percentBps: PercentBps.optional(),
+    amountCents: z.number().int().min(1).optional()
+        .describe('Flat amount in integer cents: 12500 = $125.00. Only on a fixed rule.'),
+    deductionCents: z.number().int().min(1).optional()
         .describe(
             'Taken off the line price BEFORE the percentage — materials, a franchise fee. '
-            + '($500 − $100) × 60% = $240, which is not 60% of $500 less $100.',
+            + '($500 − $100) × 60% = $240, which is not 60% of $500 less $100. '
+            + 'Only on a percent_after_deduction rule; sending it with any other type is a 400.',
         ),
-}).strict().openapi('PercentAfterDeductionPayRule');
+};
 
-export const CreatePayRuleSchema = z.discriminatedUnion('type', [
-    PercentRule, FixedRule, PercentAfterDeductionRule,
-]).describe('What one inspector earns on one catalogue service. See the unit contract above.');
+export const CreatePayRuleSchema = z.object({ ...payRuleRateFields, userId: PayRuleTarget })
+    .strict()
+    .openapi('CreatePayRule')
+    .superRefine(exactlyTheFieldsFor)
+    .describe('What one inspector earns on one catalogue service. See the unit contract above.');
 
-/** Same shapes minus the target: `userId` identifies the rule, so moving it is a delete + create. */
-export const UpdatePayRuleSchema = z.discriminatedUnion('type', [
-    PercentRule.omit({ userId: true }).strict().openapi('UpdatePercentPayRule'),
-    FixedRule.omit({ userId: true }).strict().openapi('UpdateFixedPayRule'),
-    PercentAfterDeductionRule.omit({ userId: true }).strict().openapi('UpdatePercentAfterDeductionPayRule'),
-]).describe('Replace the rate of an existing pay rule. The inspector it applies to cannot be changed here.');
+/** Same shape minus the target: `userId` identifies the rule, so moving it is a delete + create. */
+export const UpdatePayRuleSchema = z.object(payRuleRateFields)
+    .strict()
+    .openapi('UpdatePayRule')
+    .superRefine(exactlyTheFieldsFor)
+    .describe('Replace the rate of an existing pay rule. The inspector it applies to cannot be changed here.');
 
 /** The read face mirrors the write face — again, no `value`. */
 const PayRuleSchema = z.object({
