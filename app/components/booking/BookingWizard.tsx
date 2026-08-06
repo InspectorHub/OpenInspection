@@ -38,6 +38,10 @@ export function BookingWizard({
     turnstileRef,
     toggleService,
     totalPrice,
+    depositQuoteCents,
+    depositDueCents,
+    bookedInspectionId,
+    currency,
     needsTurnstile,
     canNext,
     inspectorOptions,
@@ -107,6 +111,8 @@ export function BookingWizard({
           selectedServices={selectedServices}
           toggleService={toggleService}
           totalPrice={totalPrice}
+          depositQuoteCents={depositQuoteCents}
+          currency={currency}
         />
       )}
 
@@ -157,6 +163,11 @@ export function BookingWizard({
           totalPrice={totalPrice}
           clientName={clientName}
           clientEmail={clientEmail}
+          depositQuoteCents={depositQuoteCents}
+          depositDueCents={depositDueCents}
+          bookedInspectionId={bookedInspectionId}
+          currency={currency}
+          companyName={profile.company}
         />
       )}
 

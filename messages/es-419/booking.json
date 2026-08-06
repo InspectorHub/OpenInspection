@@ -73,5 +73,18 @@
   "booking_confirm_row_total": "Total",
   "booking_confirm_row_name": "Nombre",
   "booking_holiday_advisory_concierge": "Es posible que la oficina esté cerrada — {name}. Solicitud recibida — la oficina confirmará.",
-  "booking_holiday_advisory_default": "Es posible que la oficina esté cerrada — {name}. Confirmaremos la disponibilidad."
+  "booking_holiday_advisory_default": "Es posible que la oficina esté cerrada — {name}. Confirmaremos la disponibilidad.",
+  "booking_confirm_row_deposit": "Depósito a pagar hoy",
+  "booking_deposit_quote_note": "Se cobra un depósito de {amount} al reservar. Se descuenta del total, no se suma.",
+  "booking_deposit_confirm_note": "Después de reservar, se le pedirá un depósito de {amount} para asegurar este horario. Se descuenta de su total.",
+  "booking_deposit_pay_heading": "Depósito para asegurar su horario",
+  "booking_deposit_pay_body": "{company} cobra un depósito para reservar la cita. Se descuenta de su total final.",
+  "booking_deposit_pay_button": "Pagar depósito de {amount}",
+  "booking_deposit_starting": "Iniciando el pago seguro…",
+  "booking_deposit_processing": "Procesando…",
+  "booking_deposit_already_booked": "Su cita ya está reservada. Pagar el depósito asegura el horario.",
+  "booking_deposit_already_paid": "Ya recibimos su depósito. No se requiere nada más.",
+  "booking_deposit_unavailable": "No se pudo iniciar el pago con tarjeta. Su cita está reservada; {company} se comunicará con usted sobre el depósito.",
+  "booking_deposit_error_generic": "No se pudo cobrar esa tarjeta.",
+  "booking_deposit_decline_keeps_booking": "Su cita sigue reservada. Puede intentar con otra tarjeta o esperar a que lo contacten."
 }

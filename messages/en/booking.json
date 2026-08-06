@@ -73,5 +73,18 @@
   "booking_confirm_row_total": "Total",
   "booking_confirm_row_name": "Name",
   "booking_holiday_advisory_concierge": "Office may be closed — {name}. Request received — office will confirm.",
-  "booking_holiday_advisory_default": "Office may be closed — {name}. We'll confirm availability."
+  "booking_holiday_advisory_default": "Office may be closed — {name}. We'll confirm availability.",
+  "booking_confirm_row_deposit": "Deposit due today",
+  "booking_deposit_quote_note": "A deposit of {amount} is collected when you book. It comes off the total, not on top of it.",
+  "booking_deposit_confirm_note": "After you book, you will be asked for a {amount} deposit to hold this slot. It is deducted from your total.",
+  "booking_deposit_pay_heading": "Deposit to hold your slot",
+  "booking_deposit_pay_body": "{company} takes a deposit to hold the appointment. It comes off your final total.",
+  "booking_deposit_pay_button": "Pay {amount} deposit",
+  "booking_deposit_starting": "Starting secure payment…",
+  "booking_deposit_processing": "Processing…",
+  "booking_deposit_already_booked": "Your appointment is already booked. Paying the deposit secures the slot.",
+  "booking_deposit_already_paid": "Your deposit has already been received. Nothing further is needed.",
+  "booking_deposit_unavailable": "Card payment could not be started. Your appointment is booked — {company} will be in touch about the deposit.",
+  "booking_deposit_error_generic": "That card could not be charged.",
+  "booking_deposit_decline_keeps_booking": "Your appointment is still booked. You can try another card, or wait to be contacted."
 }

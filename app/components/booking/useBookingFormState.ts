@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useFetcher } from "react-router";
 import type { CompanyProfile } from "./booking-constants";
+import { resolveOrderDeposit } from "../../../server/lib/billing/deposit-policy";
 import { m } from "~/paraglide/messages";
 
 /** Where a returning visitor's own contact details are remembered (this device only). */
@@ -36,6 +37,8 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  /** Set once the booking exists — the capability the deposit-intent route keys on. */
+  const [bookedInspectionId, setBookedInspectionId] = useState<string | null>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
 
   // Repeat visitors re-typed their own name and email on every booking. Their
@@ -93,6 +96,24 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
       .filter((s) => selectedServices.has(s.id))
       .reduce((sum, s) => sum + s.price / 100, 0);
   }, [selectedServices, profile]);
+
+  // A QUOTE of what will be asked for up front, from the same arithmetic the
+  // server runs. Shown before the client commits, because a charge discovered
+  // after clicking Book is a chargeback and a review. The authoritative figure
+  // comes back in the booking response and is what the payment step charges.
+  const depositQuoteCents = useMemo(() => {
+    if (!profile) return 0;
+    return resolveOrderDeposit({
+      tenant: profile.depositPolicy ?? null,
+      lines: profile.services
+        .filter((s) => selectedServices.has(s.id))
+        .map((s) => ({ priceCents: s.price, policy: s.depositPolicy ?? null })),
+    });
+  }, [selectedServices, profile]);
+
+  // What the SERVER froze, once the booking exists. Null until then; 0 means it
+  // asked for nothing, and the payment step is not rendered at all.
+  const [depositDueCents, setDepositDueCents] = useState<number | null>(null);
 
   // An authenticated agent is not an anonymous visitor, so the bot challenge
   // does not apply to them; every anonymous submit still faces it.
@@ -176,6 +197,11 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
       });
       if (res.ok) {
         saveRememberedContact();
+        const created = (await res.json().catch(() => ({}))) as {
+          data?: { inspectionId?: string; depositRequiredCents?: number };
+        };
+        setBookedInspectionId(created.data?.inspectionId ?? null);
+        setDepositDueCents(created.data?.depositRequiredCents ?? 0);
         setMessage({ text: m.helper_booking_submit_success(), ok: true });
         setStep(3);
       } else {
@@ -207,6 +233,10 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     turnstileRef,
     toggleService,
     totalPrice,
+    depositQuoteCents,
+    depositDueCents,
+    bookedInspectionId,
+    currency: profile?.currency ?? "USD",
     needsTurnstile,
     canNext,
     inspectorOptions,
