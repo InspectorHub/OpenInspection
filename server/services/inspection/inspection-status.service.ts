@@ -5,6 +5,7 @@ import { fireAutomation } from './shared';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { InspectionSubService } from './base';
+import type { CancellationReason } from '../../lib/cancellation-reason';
 
 /**
  * Inspection + report status-machine transitions: confirm / cancel / uncancel
@@ -33,7 +34,7 @@ export class InspectionStatusService extends InspectionSubService {
         await fireAutomation(this.db, tenantId, id, 'inspection.confirmed');
     }
 
-    async cancelInspection(tenantId: string, id: string, reason: string, notes?: string): Promise<void> {
+    async cancelInspection(tenantId: string, id: string, reason: CancellationReason, notes?: string): Promise<void> {
         const { db } = await this.fetchForStatusChange(tenantId, id);
         await db.update(inspections).set({
             status:       INSPECTION_STATUS.CANCELLED,

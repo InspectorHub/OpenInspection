@@ -15,7 +15,7 @@ import { getBookingHost, resolveTenantSlug } from '../../lib/url';
 import { buildRenderReportUrl } from '../../lib/public-urls';
 import { logger } from '../../lib/logger';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
-import { PublishInspectionSchema, CreateReinspectionSchema, CancelInspectionSchema } from '../../lib/validations/inspection.schema';
+import { PublishInspectionSchema, CreateReinspectionSchema } from '../../lib/validations/inspection.schema';
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
@@ -340,24 +340,8 @@ const publishRoutes = createApiRouter()
         await c.var.services.inspection.confirmInspection(tenantId, id);
         return c.json({ success: true });
     })
-    .openapi(createRoute(withMcpMetadata({
-        method: 'post', path: '/{id}/cancel',
-        tags: ["inspections"], summary: "Cancel inspection for current tenant",
-        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        request: {
-            params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-            body: { content: { 'application/json': { schema: CancelInspectionSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
-        },
-        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Cancelled' } },
-        operationId: "cancelInspection",
-        description: "Auto-generated placeholder for cancelInspection (POST /{id}/cancel, inspections domain). TODO: replace with a real description sourced from the handler."
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const { reason, notes } = c.req.valid('json');
-        await c.var.services.inspection.cancelInspection(tenantId, id, reason, notes);
-        return c.json({ success: true });
-    })
+    // POST /{id}/cancel MOVED to ./cancellation.ts, which owns the whole
+    // cancellation surface: the quote, the fee acknowledgement, and the refund.
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/uncancel',
         tags: ["inspections"], summary: "Create inspection uncancel for current tenant",

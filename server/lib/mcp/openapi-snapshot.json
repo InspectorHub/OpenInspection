@@ -750,10 +750,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         }
       ],
@@ -762,7 +762,7 @@
       }
     },
     "summary": "Cancel inspection for current tenant",
-    "description": "Auto-generated placeholder for cancelInspection (POST /{id}/cancel, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged."
   },
   {
     "operationId": "cancelTeamInvite",
@@ -7221,6 +7221,52 @@
     },
     "summary": "Get combined sign & pay checkout context (public, token-gated)",
     "description": "Combined sign & pay context for the public checkout page (GET /checkout/:token, bookings domain). Resolves a signer token to the agreement snapshot, envelope progress, outstanding invoice/payment state, and tenant branding."
+  },
+  {
+    "operationId": "getCancellationQuote",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/cancellation-quote",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id."
+          }
+        },
+        {
+          "name": "reason",
+          "in": "query",
+          "required": true,
+          "description": "The reason that would be recorded; it decides the outcome.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "client_cancelled",
+              "no_show",
+              "weather",
+              "inspector_unavailable",
+              "property_unavailable",
+              "rescheduled",
+              "other"
+            ],
+            "description": "The reason that would be recorded; it decides the outcome."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Price a cancellation without performing one",
+    "description": "Computes the fee, the refund and the reason a cancellation would produce, so whoever cancels sees the result before confirming it. Read-only."
   },
   {
     "operationId": "getCommunicationConfig",

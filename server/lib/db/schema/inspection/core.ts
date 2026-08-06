@@ -2,6 +2,7 @@ import { sqliteTable, text, integer, real, blob, uniqueIndex, index } from 'driz
 import { tenants, users } from '../tenant';
 import { INSPECTION_STATUSES } from '../../../status/inspection-status';
 import { REPORT_STATUSES } from '../../../status/report-status';
+import { CANCELLATION_REASONS } from '../../../cancellation-reason';
 import { templates } from './template-rating';
 import { discountCodes } from './services';
 
@@ -42,7 +43,11 @@ export const inspections = sqliteTable('inspections', {
     createdAt:           integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     // Phase 0 parity additions
     confirmedAt:         integer('confirmed_at', { mode: 'timestamp_ms' }),
-    cancelReason:        text('cancel_reason'),
+    // The reason drives the cancellation ladder: `classifyCancellationReason`
+    // (server/lib/cancellation-reason.ts) derives WHO ended the appointment and
+    // WHAT happened from this one value, so no second column is needed and the
+    // two can never disagree. Enum is type-layer only, no DDL.
+    cancelReason:        text('cancel_reason', { enum: [...CANCELLATION_REASONS] }),
     cancelNotes:         text('cancel_notes'),  // Spec 3A
     paymentRequired:     integer('is_payment_required', { mode: 'boolean' }).notNull().default(false),
     agreementRequired:   integer('is_agreement_required', { mode: 'boolean' }).notNull().default(false),

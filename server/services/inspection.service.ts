@@ -34,6 +34,7 @@ import { InspectionReportService } from './inspection/inspection-report.service'
 import { InspectionPublishService } from './inspection/inspection-publish.service';
 import { InspectionCoreService } from './inspection/inspection-core.service';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
+import type { CancellationReason } from '../lib/cancellation-reason';
 export {
     resolveCoverUrl,
     sanitizeDefectStates,
@@ -620,7 +621,7 @@ export class InspectionService {
         return this.status.confirmInspection(tenantId, id);
     }
 
-    async cancelInspection(tenantId: string, id: string, reason: string, notes?: string): Promise<void> {
+    async cancelInspection(tenantId: string, id: string, reason: CancellationReason, notes?: string): Promise<void> {
         return this.status.cancelInspection(tenantId, id, reason, notes);
     }
 
