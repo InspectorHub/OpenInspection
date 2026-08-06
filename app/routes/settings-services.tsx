@@ -17,6 +17,8 @@ import { ServiceEditForm } from "~/components/settings/services/ServiceEditForm"
 import { DiscountCodesPanel } from "~/components/settings/services/DiscountCodesPanel";
 import { loadPayRuleMap, savePayRule, deletePayRule } from "~/lib/settings/pay-rules.server";
 import type { PayRule } from "~/components/settings/services/PayRuleWidget";
+import { parseDepositPolicy } from "~/lib/deposit-policy-form";
+import type { DepositPolicy } from "../../server/lib/billing/deposit-policy";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -33,6 +35,8 @@ interface Service {
   durationMinutes: number | null;
   /** The template a booking builds this service's inspection from. */
   templateId: string | null;
+  /** This service's own deposit; NULL inherits the company default. */
+  depositPolicy?: DepositPolicy | null;
 }
 
 /** Template choices for the service's report-template picker. */
@@ -61,7 +65,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (forbidden) return { forbidden: true as const };
   try {
     const api = createApi(context, { token });
-    const [svcRes, discountRes, membersRes, templatesRes] = await Promise.all([
+    const [svcRes, discountRes, membersRes, templatesRes, brandingRes] = await Promise.all([
       api.services.index.$get({}),
       api.services["discount-codes"].$get().catch(() => null),
       api.admin.members.$get().catch(() => null),
@@ -69,6 +73,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       // inspection from — without it the create form cannot set templateId and
       // multi-service booking fails at request time.
       api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }).catch(() => null),
+      // The company deposit default, so a service that inherits it can say what
+      // it inherits. Read from branding, which is where the column is written.
+      api.adminBranding.branding.$get({}).catch(() => null),
     ]);
     // GET /api/services returns { success, data: Service[] } — data IS the
     // array (the pre-C-10 admin endpoint wrapped it in { services, discounts },
@@ -114,6 +121,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       templates = (tb.data ?? []).map((t) => ({ id: t.id, name: t.name }));
     }
 
+    let companyDepositPolicy: DepositPolicy | null = null;
+    if (brandingRes?.ok) {
+      const bb = (await brandingRes.json()) as { data?: { branding?: Record<string, unknown> } };
+      companyDepositPolicy = parseDepositPolicy(bb.data?.branding?.depositPolicy);
+    }
+
     return {
       services: rawServices,
       discounts: rawDiscounts,
@@ -121,6 +134,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       payRuleMap,
       members,
       templates,
+      companyDepositPolicy,
     };
   } catch {
     return {
@@ -130,6 +144,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       payRuleMap: {} as Record<string, PayRule[]>,
       members: [] as Member[],
       templates: [] as TemplateOption[],
+      companyDepositPolicy: null as DepositPolicy | null,
     };
   }
 }
@@ -212,6 +227,32 @@ export async function action({ request, context }: Route.ActionArgs) {
     return await savePayRule(api, form);
   } else if (intent === "pay-rule-delete") {
     return await deletePayRule(api, form);
+  } else if (intent === "deposit-policy-save") {
+    // Tier 2 of the booking deposit. `null` is "inherit the company default"
+    // and `{ type: 'none' }` is "charge nothing for this service"; both are
+    // forwarded as themselves, because the column's whole purpose is that the
+    // two are different answers.
+    const id = String(form.get("serviceId") ?? "");
+    let raw: unknown = null;
+    try {
+      raw = JSON.parse(String(form.get("depositPolicy") ?? "null"));
+    } catch {
+      return { ok: false, intent: "deposit-policy-save", serviceId: id, message: m.settings_deposit_error_save() };
+    }
+    const res = await api.services[":id"].$put({
+      param: { id },
+      json: { depositPolicy: parseDepositPolicy(raw) },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return {
+        ok: false,
+        intent: "deposit-policy-save",
+        serviceId: id,
+        message: (err as Record<string, unknown>)?.message as string | undefined ?? m.settings_deposit_error_save(),
+      };
+    }
+    return { ok: true, intent: "deposit-policy-save", serviceId: id };
   } else if (intent === "qualification-save") {
     const id = String(form.get("serviceId") ?? "");
     let userIds: string[];
@@ -274,7 +315,7 @@ export default function SettingsServices() {
   });
 
   if ("forbidden" in data) return <AccessDenied />;
-  const { services, discounts, restrictionMap, payRuleMap, members, templates } = data;
+  const { services, discounts, restrictionMap, payRuleMap, members, templates, companyDepositPolicy } = data;
   const editingService = services.find((s) => s.id === editingId) ?? null;
 
   return (
@@ -339,6 +380,7 @@ export default function SettingsServices() {
         payRuleMap={payRuleMap}
         members={members}
         templateNames={Object.fromEntries(templates.map((t) => [t.id, t.name]))}
+        companyDepositPolicy={companyDepositPolicy}
         editingId={editingId}
         onEdit={setEditingId}
       />

@@ -524,5 +524,19 @@
   "settings_pay_rule_error_save": "No se pudo guardar la regla de pago.",
   "settings_pay_rule_error_remove": "No se pudo quitar la regla de pago.",
   "settings_deposit_error_percent": "Ingrese un porcentaje entre 1 y 100, o elija Sin depósito.",
-  "settings_deposit_error_amount": "Ingrese un monto mayor que cero, o elija Sin depósito."
+  "settings_deposit_error_amount": "Ingrese un monto mayor que cero, o elija Sin depósito.",
+  "settings_deposit_label": "Depósito:",
+  "settings_deposit_summary_inherit": "Predeterminado de la empresa ({value})",
+  "settings_deposit_summary_none": "Sin depósito",
+  "settings_deposit_summary_percent": "{percent} % del precio",
+  "settings_deposit_company_nothing": "nada",
+  "settings_deposit_change_link": "Cambiar el depósito",
+  "settings_deposit_heading": "Lo que el cliente paga por adelantado por este servicio",
+  "settings_deposit_explain": "La reserva pide el depósito predeterminado de la empresa, salvo que este servicio defina el suyo. Elija Sin depósito para no pedir nada por este servicio, mientras el predeterminado de la empresa sigue aplicándose al resto.",
+  "settings_deposit_field_label": "Depósito",
+  "settings_deposit_type_inherit": "Predeterminado de la empresa",
+  "settings_deposit_type_none": "Sin depósito",
+  "settings_deposit_type_percent": "Porcentaje del precio",
+  "settings_deposit_type_fixed": "Monto fijo",
+  "settings_deposit_error_save": "No se pudo guardar el depósito."
 }

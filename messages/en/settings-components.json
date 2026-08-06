@@ -524,5 +524,19 @@
   "settings_pay_rule_error_save": "Could not save the pay rule.",
   "settings_pay_rule_error_remove": "Could not remove the pay rule.",
   "settings_deposit_error_percent": "Enter a percent between 1 and 100, or choose No deposit.",
-  "settings_deposit_error_amount": "Enter an amount greater than zero, or choose No deposit."
+  "settings_deposit_error_amount": "Enter an amount greater than zero, or choose No deposit.",
+  "settings_deposit_label": "Deposit:",
+  "settings_deposit_summary_inherit": "Company default ({value})",
+  "settings_deposit_summary_none": "No deposit",
+  "settings_deposit_summary_percent": "{percent}% of the price",
+  "settings_deposit_company_nothing": "nothing",
+  "settings_deposit_change_link": "Change deposit",
+  "settings_deposit_heading": "What the client pays up front for this service",
+  "settings_deposit_explain": "Booking asks for the company default unless this service sets its own. Choose No deposit to ask nothing for this service while the company default still applies everywhere else.",
+  "settings_deposit_field_label": "Deposit",
+  "settings_deposit_type_inherit": "Company default",
+  "settings_deposit_type_none": "No deposit",
+  "settings_deposit_type_percent": "Percent of the price",
+  "settings_deposit_type_fixed": "Fixed amount",
+  "settings_deposit_error_save": "Could not save the deposit."
 }
