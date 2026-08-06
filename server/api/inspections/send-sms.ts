@@ -26,6 +26,7 @@ import { resolveRoleSmsTemplate } from '../../lib/people/role-template';
 import { sendOneSms } from '../../services/automation/send-one-sms';
 import { loadProviderForTenant } from '../../lib/sms/resolve-twilio';
 import { PlanQuotaGuard } from '../../features/plan-quota/guard';
+import { tenantAiCapsLoader } from '../../features/plan-quota/ai-caps';
 import { MeteringService } from '../../services/metering.service';
 
 const DEFAULT_SMS_BODY =
@@ -87,7 +88,7 @@ const sendSmsRoutes = createApiRouter()
 
         const deployProfile = c.var.profile;
         const quotaGuard = deployProfile?.hasUsageQuota
-            ? new PlanQuotaGuard(rawDb, { enforced: true, billingPortalUrl: deployProfile.billingPortalUrl })
+            ? new PlanQuotaGuard(rawDb, { enforced: true, billingPortalUrl: deployProfile.billingPortalUrl, aiCaps: tenantAiCapsLoader(rawDb) })
             : undefined;
         const metering = deployProfile?.hasUsageQuota ? new MeteringService(rawDb) : undefined;
 
