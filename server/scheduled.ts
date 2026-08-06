@@ -6,6 +6,7 @@ import { AgreementService } from './services/agreement.service';
 import { buildTenantEmailService } from './lib/email/build-email-service';
 import type { EmailServiceEnv } from './lib/email/build-email-service';
 import { PlanQuotaGuard, readTenantTier } from './features/plan-quota/guard';
+import { tenantAiCapsLoader } from './features/plan-quota/ai-caps';
 import { getDeploymentProfile } from './lib/deployment-profile';
 import type { AppEnv, BrowserRun } from './types/hono';
 import { QBOService } from './services/qbo.service';
@@ -196,7 +197,7 @@ export async function scheduled(
         // `tenant.tier` column — no extra lookup needed there.
         const profile = getDeploymentProfile(env as unknown as AppEnv);
         const quotaGuard = profile.hasUsageQuota
-            ? new PlanQuotaGuard(env.DB, { enforced: true, billingPortalUrl: profile.billingPortalUrl })
+            ? new PlanQuotaGuard(env.DB, { enforced: true, billingPortalUrl: profile.billingPortalUrl, aiCaps: tenantAiCapsLoader(env.DB) })
             : undefined;
         const appBaseUrl = env.APP_BASE_URL || '';
         // Spec 2 Task 2b — report.published PDF-email delivery deps. Guarded on

@@ -48,8 +48,16 @@ export class PlanQuotaGuard {
       enforced: boolean;
       billingPortalUrl: string | null;
       /** Per-tier AI allowances, when the deployment has been given any.
-       *  Absent/empty means no AI enforcement — see `checkAiQuota`. */
-      aiCaps?: AiTierCaps;
+       *  Absent/empty means no AI enforcement — see `checkAiQuota`.
+       *
+       *  Either the caps themselves, or a loader that fetches them for one
+       *  tenant. Production passes the loader (`tenantAiCapsLoader`): two of the
+       *  seven construction sites are hostile to an eager read — one runs on
+       *  every authenticated request, and one is reused across every tenant in a
+       *  cron tick, where a single resolved value would bind the first tenant's
+       *  caps to everyone else's check. Tests pass the object, which is what
+       *  keeps a configured-cap control cheap to write. */
+      aiCaps?: AiTierCaps | ((tenantId: string) => Promise<AiTierCaps | undefined>);
     },
   ) {}
 
@@ -138,7 +146,10 @@ export class PlanQuotaGuard {
    *  bill and never counts toward anything this guard enforces. */
   async checkAiQuota(tenantId: string, tier: string, metric: AiCappedMetric): Promise<void> {
     if (!this.opts.enforced) return;
-    const cap = this.opts.aiCaps?.[tier]?.[metric];
+    const caps = typeof this.opts.aiCaps === 'function'
+      ? await this.opts.aiCaps(tenantId)
+      : this.opts.aiCaps;
+    const cap = caps?.[tier]?.[metric];
     if (cap === undefined) return;
     const used = await new MeteringService(this.db).lifetimeTotal(tenantId, metric);
     if (used >= cap) throw Errors.QuotaExhausted({ metric, used, cap, billingPortalUrl: this.opts.billingPortalUrl });

@@ -23,7 +23,7 @@ import { getDrizzle } from '../../lib/route-helpers';
 
 // ─── Integration Config & Secrets ────────────────────────────────────────────
 
-const IntegrationConfigSchema = z.object({
+export const IntegrationConfigSchema = z.object({ // closed on purpose: features/plan-quota/ai-caps.ts
     appBaseUrl: z.string().optional().describe('TODO describe appBaseUrl field for the OpenInspection MCP integration'),
     turnstileSiteKey: z.string().optional().describe('TODO describe turnstileSiteKey field for the OpenInspection MCP integration'),
     googleClientId: z.string().optional().describe('TODO describe googleClientId field for the OpenInspection MCP integration'),

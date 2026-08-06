@@ -63,6 +63,7 @@ import { ComplianceService } from '../../services/compliance/pca-compliance.serv
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../../portal/portal.provider';
 import { PlanQuotaGuard, readTenantTier } from '../../features/plan-quota/guard';
+import { tenantAiCapsLoader } from '../../features/plan-quota/ai-caps';
 
 /**
  * Middleware that injects a lazy-loaded service registry into the Hono context.
@@ -137,7 +138,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
     // InspectionRequestService (multi-service request + append-a-sub-inspection).
     const buildPlanQuota = (): PlanQuotaGuard | undefined => {
         if (!c.var.profile.hasUsageQuota) return undefined;
-        return new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl });
+        return new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl, aiCaps: tenantAiCapsLoader(c.env.DB) });
     };
 
     const services = {} as AppServices;

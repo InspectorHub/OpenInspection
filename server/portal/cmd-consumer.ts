@@ -5,10 +5,11 @@ import { logger } from '../lib/logger';
 import {
     parseCmdEnvelope, isKnownCmd, cmdTenantUpdateDataSchema, cmdSyncQuotaDataSchema,
     cmdSeedStarterContentDataSchema, cmdDataExportDataSchema, cmdPurgeDataSchema,
+    cmdTenantAiCapsDataSchema,
     type CmdEnvelope,
 } from '../lib/sync-events/cmd-envelope';
 import type { SyncEnvelope } from '../lib/sync-events/envelope';
-import { applySyncQuota, applyTenantUpdate, applySeedStarterContent } from './apply-commands';
+import { applySyncQuota, applyTenantUpdate, applySeedStarterContent, applyAiCaps } from './apply-commands';
 import { applyCredentialIfFresh } from './admin-credential';
 import { OutboxService, type OutboxRow } from './outbox.service';
 
@@ -234,6 +235,18 @@ async function applyKnownCmd(
             const { TenantPurgeService } = await import('../services/tenant-purge.service');
             const result = await new TenantPurgeService(dbBinding, buckets.photos, kv).purge(data.tenantId);
             return { ...result };
+        }
+        case 'io.inspectorhub.cmd.tenant.ai_caps': {
+            const data = cmdTenantAiCapsDataSchema.parse(env.data);
+            const result = await applyAiCaps(dbBinding, kv, data);
+            if (result === 'tenant-not-found') {
+                // Same reasoning as sync_quota: the caps fan-out may have raced
+                // ahead of the tenant upsert, so throw and let the retry give it
+                // time to land rather than writing a config row for a tenant
+                // that does not exist.
+                throw new Error(`ai_caps: tenant not found ${data.tenantId}`);
+            }
+            return;
         }
         case 'io.inspectorhub.cmd.tenant.sync_quota': {
             const data = cmdSyncQuotaDataSchema.parse(env.data);
