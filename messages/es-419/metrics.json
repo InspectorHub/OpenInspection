@@ -54,5 +54,5 @@
   "metrics_turnaround_basis": "El tiempo de entrega se mide desde que termina el trabajo en campo hasta que se publica el informe, y se atribuye al inspector líder.",
   "metrics_turnaround_no_basis": "No se han registrado horas de finalización en campo, así que el tiempo de entrega no tiene punto de partida.",
   "metrics_referrer_source_tag": "Origen",
-  "metrics_self_scope_notice": "Estas son tus propias cifras. Los totales de la empresa los ven los propietarios y gerentes."
+  "metrics_self_scope_notice": "Estas son sus propias cifras. Los totales de la empresa los ven los propietarios y gerentes."
 }
