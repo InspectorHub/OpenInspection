@@ -1,7 +1,6 @@
 {
   "app/routes/inspection-edit.tsx": 2530,
   "app/routes/inspector-portal.tsx": 1258,
-  "server/services/inspection/inspection-core.service.ts": 1132,
   "server/services/inspection/inspection-report.service.ts": 952,
   "server/durable-objects/inspection-doc.ts": 928,
   "app/routes/inspections.tsx": 879,
@@ -47,6 +46,7 @@
   "server/api/bookings.ts": 477,
   "server/api/admin/admin-config.ts": 472,
   "server/lib/compliance/erasure-orchestrator.ts": 472,
+  "server/services/inspection/inspection-core.service.ts": 465,
   "app/components/inspection/PeopleEditor.tsx": 457,
   "app/components/editor/CostItemsPanel.tsx": 449,
   "server/portal/integration.routes.ts": 441,
