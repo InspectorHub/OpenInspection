@@ -4,6 +4,7 @@ import { requireRole } from '../lib/middleware/rbac';
 import { QBOTokenResponseSchema, QBOCompanyInfoResponseSchema } from '../lib/validations/qbo.schema';
 import { logger } from '../lib/logger';
 import { qboRedirectUri } from '../lib/qbo-oauth-paths';
+import { resolveQboApiBase } from '../services/qbo/api-base';
 import { loadTenantSecrets } from '../lib/secrets-cache';
 import { applyIntegrationSecrets } from '../lib/middleware/integration-secrets';
 
@@ -113,6 +114,17 @@ api.get('/callback', async (c) => {
         return c.redirect('/settings/integrations/qbo?error=not_configured');
     }
 
+    // Which Intuit host this deployment talks to. Checked here rather than
+    // after the exchange: connecting sandbox books with no QBO_ENV would store
+    // a working token against an API the worker refuses to call, and the
+    // integration would look connected while syncing nothing.
+    let apiBase: string;
+    try {
+        apiBase = resolveQboApiBase(c.env.QBO_ENV);
+    } catch {
+        return c.redirect('/settings/integrations/qbo?error=not_configured');
+    }
+
     // Byte-identical to the value `/connect` authorized with, and to what is
     // registered on the Intuit app — one function, no second literal.
     const redirectUri = qboRedirectUri(c.env.APP_BASE_URL);
@@ -134,7 +146,7 @@ api.get('/callback', async (c) => {
         let companyName: string | null = null;
         try {
             const infoResp = await fetch(
-                `https://quickbooks.api.intuit.com/v3/company/${realmId}/companyinfo/${realmId}?minorversion=75`,
+                `${apiBase}/${realmId}/companyinfo/${realmId}?minorversion=75`,
                 { headers: { Authorization: `Bearer ${tokens.access_token}`, Accept: 'application/json' } },
             );
             if (infoResp.ok) {

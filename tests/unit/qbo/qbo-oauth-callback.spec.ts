@@ -84,6 +84,7 @@ function buildApp(kv: ReturnType<typeof makeKv>, role?: UserRole) {
 const ENV = (kv: ReturnType<typeof makeKv>) => ({
     QBO_CLIENT_ID:     'test-client-id',
     QBO_CLIENT_SECRET: 'test-client-secret',
+    QBO_ENV:           'sandbox',
     APP_BASE_URL,
     TENANT_CACHE:      kv,
     DB:                {},
@@ -158,6 +159,19 @@ describe('QBO OAuth callback authorization', () => {
         const body = new URLSearchParams(String((call![1] as RequestInit).body));
         expect(body.get('redirect_uri')).toBe(qboRedirectUri(APP_BASE_URL));
         expect(body.get('redirect_uri')).toBe(`${APP_BASE_URL}/api/integrations/qbo/callback`);
+    });
+
+    it('refuses to complete when QBO_ENV is unset', async () => {
+        // Storing a token against an API host the worker will refuse to call
+        // would leave the page saying "connected" while nothing ever syncs.
+        kv.store.set('qbo_oauth_state:st-4', TENANT_ID);
+        const env = { ...(ENV(kv) as object), QBO_ENV: undefined } as never;
+
+        const res = await buildApp(kv).request(
+            `${QBO_OAUTH_MOUNT}/callback?code=c1&state=st-4&realmId=${REALM_ID}`, {}, env, CTX);
+
+        expect(res.headers.get('location')).toBe('/settings/integrations/qbo?error=not_configured');
+        expect(qboService.saveConnection).not.toHaveBeenCalled();
     });
 
     it('refuses an unknown state', async () => {

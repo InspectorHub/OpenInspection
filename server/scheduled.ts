@@ -33,6 +33,7 @@ export interface ScheduledEnv {
     JWT_SECRET_PREVIOUS?: string;
     QBO_CLIENT_ID?: string;
     QBO_CLIENT_SECRET?: string;
+    QBO_ENV?: string;
     QBO_WEBHOOK_SECRET?: string;
     // Track L — platform-default Twilio creds + the KV used by loadTwilioForTenant
     // to read per-tenant secrets. The cron SMS runtime is built only when both
@@ -72,6 +73,7 @@ async function runQBOCDC(env: ScheduledEnv): Promise<void> {
         env.QBO_CLIENT_SECRET ?? '',
         env.QBO_WEBHOOK_SECRET ?? '',
         env.JWT_SECRET,
+        env.QBO_ENV,
     );
     const invoiceSvc = new InvoiceService(env.DB);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -395,6 +395,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         c.env.QBO_CLIENT_SECRET ?? '',
                         c.env.QBO_WEBHOOK_SECRET ?? '',
                         c.env.JWT_SECRET,
+                        c.env.QBO_ENV,
                     );
                     break;
                 case 'unit':
