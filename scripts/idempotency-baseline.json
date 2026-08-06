@@ -12,8 +12,8 @@
         "run so it is never silently forgotten."
     ],
     "coverage": {
-        "declaredMutating": 312,
-        "resolvedMutating": 302
+        "declaredMutating": 316,
+        "resolvedMutating": 306
     },
     "knownUnreachable": {},
     "uncoveredByDesign": {

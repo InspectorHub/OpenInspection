@@ -1058,6 +1058,63 @@
     "description": "Records a granted SMS consent event (captured_via=optin_link) for the contact encoded in the token. Idempotent — confirming twice simply appends a second granted event."
   },
   {
+    "operationId": "correctInspectionPaySplit",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/pay-splits/{splitId}/corrections",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the pay rows belong to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id the pay rows belong to."
+          }
+        },
+        {
+          "name": "splitId",
+          "in": "path",
+          "required": true,
+          "description": "inspection_service_pay_splits row id.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "inspection_service_pay_splits row id."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "amountCents": {
+            "type": "integer",
+            "description": "The DELTA against the locked split, in integer cents; may be negative."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Why the exported amount is being corrected."
+          }
+        },
+        "required": [
+          "amountCents",
+          "reason"
+        ]
+      }
+    },
+    "summary": "Record a correction against exported pay",
+    "description": "Adjusts an already-exported pay row by writing a NEW row carrying the delta, leaving the original untouched so both what was paid and what was owed stay answerable. An in-place edit after payroll has run destroys that, which is why this is a separate verb."
+  },
+  {
     "operationId": "correctInvoicePayment",
     "method": "POST",
     "pathTemplate": "/api/invoices/{id}/payments/{paymentId}/corrections",
@@ -6845,6 +6902,38 @@
     "description": "Returns the caller's user record plus their agent-tenant memberships and the inspections they ran, for GDPR/CCPA portability."
   },
   {
+    "operationId": "exportTeamPayroll",
+    "method": "POST",
+    "pathTemplate": "/api/team/payroll-export",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "team",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "fromMs": {
+            "type": "integer",
+            "description": "Epoch ms of the first instant in the payroll period, inclusive."
+          },
+          "toMs": {
+            "type": "integer",
+            "description": "Epoch ms of the last instant in the payroll period, inclusive."
+          }
+        },
+        "required": [
+          "fromMs",
+          "toMs"
+        ]
+      }
+    },
+    "summary": "Lock and export pay for a period",
+    "description": "Locks every unlocked pay split created inside the given period and returns them as one payroll run. Locking IS the export: once money has moved an edit would desynchronise the books from what was actually paid, so a later adjustment has to be recorded as a correction row instead."
+  },
+  {
     "operationId": "exportTenant",
     "method": "GET",
     "pathTemplate": "/api/admin/export",
@@ -9958,6 +10047,34 @@
     },
     "summary": "Media Center — all attached + pool photos",
     "description": "Auto-generated placeholder for listInspectionMedia (GET /{id}/media, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "listInspectionPaySplits",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/pay-splits",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the pay rows belong to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id the pay rows belong to."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List pay splits for one inspection",
+    "description": "Returns what each inspector is owed on the active billing lines of one inspection. A caller with the financial capability receives every row and may edit them; a caller without it receives only their own rows, read-only, and a colleague's amount is absent from the payload rather than hidden in it."
   },
   {
     "operationId": "listInspectionPdf",
@@ -15372,6 +15489,34 @@
     "description": "Returns the union of federal, state, and custom holidays for the configured region. Readable by inspectors for the My Schedule company-closed strip."
   },
   {
+    "operationId": "previewInspectionPaySplitRefresh",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/pay-splits/refresh-preview",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the pay rows belong to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id the pay rows belong to."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Preview what refreshing pay would change",
+    "description": "Shows which pay rows the current tenant rules and roster would move, and to what, WITHOUT moving them. Re-deriving amounts silently is how somebody's pay changes with nobody deciding it should, so the preview exists to make the decision explicit before the write."
+  },
+  {
     "operationId": "previewMessageTemplate",
     "method": "POST",
     "pathTemplate": "/api/message-templates/preview",
@@ -15568,6 +15713,34 @@
     },
     "summary": "Refresh PDF renders (Summary + Full)",
     "description": "Auto-generated placeholder for refreshInspection (POST /{id}/pdf/refresh, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "refreshInspectionPaySplits",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/pay-splits/refresh",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the pay rows belong to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id the pay rows belong to."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Re-derive rule-sourced pay for this inspection",
+    "description": "Re-derives the rule-sourced pay rows from the tenant rules and roster as they stand now, leaving hand-edited and corrected rows alone. This is the only path that moves an amount that already exists, and it is deliberately an explicit act rather than something a read performs."
   },
   {
     "operationId": "regenerateTotpRecoveryCodes",
@@ -17136,6 +17309,63 @@
     },
     "summary": "Set cropped report cover (baked JPEG derivative + crop transform)",
     "description": "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain)."
+  },
+  {
+    "operationId": "setInspectionPaySplit",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/pay-splits/{splitId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the pay rows belong to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id the pay rows belong to."
+          }
+        },
+        {
+          "name": "splitId",
+          "in": "path",
+          "required": true,
+          "description": "inspection_service_pay_splits row id.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "inspection_service_pay_splits row id."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "amountCents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The agreed pay for this inspector on this line, in integer cents."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Why the amount was changed, kept for payout disputes."
+          }
+        },
+        "required": [
+          "amountCents"
+        ]
+      }
+    },
+    "summary": "Set an agreed pay amount by hand",
+    "description": "Overrides the pay owed to one inspector on one billing line and marks the row manual, which exempts it from any later refresh. Refuses once a payroll export has locked the row, because editing money that has already moved desynchronises the books with nothing surfacing the divergence."
   },
   {
     "operationId": "setInspectionReportLinkExpiry",

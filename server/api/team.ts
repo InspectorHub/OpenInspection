@@ -3,6 +3,9 @@ import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
+import { requireCapability } from '../lib/middleware/require-capability';
+import { exportPayroll } from '../services/pay-split.service';
+import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validations/pay-split.schema';
 import { requireSeatAvailable } from '../features/seat-quota';
 import { getBaseUrl } from '../lib/url';
 import { tenantConfigs } from '../lib/db/schema';
@@ -15,6 +18,38 @@ import {
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { getDrizzle } from '../lib/route-helpers';
+
+/**
+ * POST /api/team/payroll-export — the company-level half of #278.
+ *
+ * Lives on the TEAM router rather than under an inspection because a payroll
+ * run spans a period and everyone in it, and because `server/index.ts` sits at
+ * its size cap so a new top-level mount would hard-fail the file-size ratchet
+ * for no gain. Payroll is staff administration; this is the
+ * staff-administration surface.
+ *
+ * Gated on `financial` and not on a new `payroll` bit: the competitor evidence
+ * put the line at "sees the company's money", and a second flag that nothing
+ * else reads is a permission nobody would maintain.
+ *
+ * A NAMED const, not inlined into the chain — `check-idempotency-coverage.mjs`
+ * resolves `.openapi(IDENT)` and cannot see a route written inline. Exporting
+ * LOCKS every row it returns, so an unguarded retry hands the operator an empty
+ * run and the money reads as unowed; that route may not be invisible to the
+ * retry-safety ledger.
+ */
+const exportPayrollRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/payroll-export',
+    operationId: 'exportTeamPayroll',
+    tags: ['team'],
+    summary: 'Lock and export pay for a period',
+    description: 'Locks every unlocked pay split created inside the given period and returns them as one payroll run. Locking IS the export: once money has moved an edit would desynchronise the books from what was actually paid, so a later adjustment has to be recorded as a correction row instead.',
+    middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
+    request: { body: { content: { 'application/json': { schema: PayrollExportSchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: PayrollRunResponseSchema } }, description: 'The pay rows this run locked' },
+    },
+}, { scopes: ['admin'], tier: 'extended', capability: 'financial' }));
 
 /**
  * GET /api/team/members
@@ -312,6 +347,25 @@ const teamRoutes = createApiRouter()
             await c.var.services.branding.updateBranding(tenantId, update);
         }
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(exportPayrollRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { fromMs, toMs } = c.req.valid('json');
+        const rows = await exportPayroll(getDrizzle(c), tenantId, { fromMs, toMs });
+        return c.json({
+            success: true as const,
+            data: {
+                lockedCount: rows.length,
+                totalCents:  rows.reduce((sum, r) => sum + r.amountCents, 0),
+                splits:      rows.map(r => ({
+                    id: r.id, inspectionServiceId: r.inspectionServiceId, userId: r.userId,
+                    amountCents: r.amountCents, source: r.source,
+                    lockedAtMs: r.lockedAt === null ? null : Number(r.lockedAt),
+                    correctsSplitId: r.correctsSplitId, reason: r.reason,
+                    createdAtMs: Number(r.createdAt), updatedAtMs: Number(r.updatedAt),
+                })),
+            },
+        }, 200);
     });
 
 export type TeamApi = typeof teamRoutes;

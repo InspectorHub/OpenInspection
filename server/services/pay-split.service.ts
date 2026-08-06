@@ -57,13 +57,8 @@ export async function getSplitsForLine(
     return await splitsForLines(db, tenantId, [inspectionServiceId]);
 }
 
-/** Splits across every ACTIVE line of an inspection.
- *
- *  Not exported: its only caller today is `refreshSplits` below. Task 3 gives it
- *  a route and will export it then — `knip-baseline.json` is empty on purpose,
- *  so an export with no consumer outside this module fails `lint:deadcode`
- *  rather than sitting in an allow-list. */
-async function getSplitsForInspection(
+/** Splits across every ACTIVE line of an inspection. */
+export async function getSplitsForInspection(
     db: Db, tenantId: string, inspectionId: string,
 ): Promise<InspectionServicePaySplit[]> {
     const lines = await activeLines(db, tenantId, inspectionId);
