@@ -64,7 +64,6 @@
   "server/services/qbo/invoice-sync.ts::voidInvoice::}).where(eq(qboEntityMap.id, mapped.id));",
   "server/services/recommendation.service.ts::create::const c = await db.select().from(comments).where(eq(comments.id, row.id)).get();",
   "server/services/report-pdf.service.ts::markQueued::.where(eq(reportPdfs.id, existing.id));",
-  "server/services/service.service.ts::createDiscountCode::const rows = await db.select().from(discountCodes).where(eq(discountCodes.id, id));",
   "server/services/service.service.ts::createService::const rows = await db.select().from(services).where(eq(services.id, id));",
   "server/services/service.service.ts::updateService::const rows = await db.select().from(services).where(eq(services.id, id));",
   "server/services/template-migration.service.ts::preview::.where(eq(inspectionResults.id, row.id as string))",

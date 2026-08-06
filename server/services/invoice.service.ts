@@ -142,7 +142,9 @@ export class InvoiceService {
                     amountPaidCents: invoices.amountPaidCents,
                     partialPaidAt: invoices.partialPaidAt,
                 })
-                    .from(invoices).where(eq(invoices.id, row.id)).get();
+                    .from(invoices)
+                    .where(and(eq(invoices.id, row.id), eq(invoices.tenantId, tenantId)))
+                    .get();
                 amountPaidCents = fresh?.amountPaidCents ?? 0;
                 partialPaidAt = fresh?.partialPaidAt ?? null;
             }

@@ -42,7 +42,9 @@ export interface PaymentIntentParams {
  * Intents minted before this field existed carry no `kind`; they are read as
  * `invoice`, which is what they all were.
  */
-export type PaymentPurpose =
+// Not exported: consumers narrow on `settled.purpose.kind` structurally, and an
+// exported name nothing imports is dead surface the knip gate is right to flag.
+type PaymentPurpose =
     | { kind: 'invoice'; invoiceId: string }
     | { kind: 'deposit'; inspectionId: string };
 

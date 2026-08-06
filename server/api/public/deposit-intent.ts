@@ -117,5 +117,6 @@ const depositIntentRoutes = createApiRouter()
         }
     });
 
-export type PublicDepositIntentApi = typeof depositIntentRoutes;
+// No exported router type: this mounts inside the bookings aggregator, so
+// `BookingsApi` already carries its RPC shape and a second name is dead surface.
 export default depositIntentRoutes;

@@ -47,7 +47,8 @@ export async function createDiscountCode(db: DrizzleD1Database, tenantId: string
         active:    true,
         createdAt: new Date(),
     });
-    const rows = await db.select().from(discountCodes).where(eq(discountCodes.id, id));
+    const rows = await db.select().from(discountCodes)
+        .where(and(eq(discountCodes.id, id), eq(discountCodes.tenantId, tenantId)));
     return rows[0];
 }
 
