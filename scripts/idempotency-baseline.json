@@ -235,7 +235,6 @@
         "POST /api/integrations/stripe/test",
         "POST /api/integrations/stripe/webhook",
         "POST /api/integrations/stripe/webhook/:tenant",
-        "POST /api/invoices",
         "POST /api/invoices/request-payment",
         "POST /api/invoices/{id}/mark-paid",
         "POST /api/invoices/{id}/mark-sent",
