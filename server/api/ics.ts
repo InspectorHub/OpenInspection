@@ -6,9 +6,49 @@ import { tenantConfigs, contactRoleProfiles, inspectionPeople } from '../lib/db/
 import { contacts } from '../lib/db/schema/contact';
 import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { logger } from '../lib/logger';
+import { IcsService } from '../services/ics.service';
+import { resolveInspectorIcsToken } from '../lib/calendar/inspector-ics-token';
 import type { AppEnv } from '../types/hono';
 
 const icsRoutes = new Hono<{ Bindings: AppEnv }>();
+
+/**
+ * GET /api/ics/inspector/:token
+ *
+ * One inspector's own schedule WITH property addresses, for their phone.
+ *
+ * Deliberately not hung off `/inspector/<tenant>/<slug>/` like the busy feed:
+ * that surface is unauthenticated and `users.slug` is a name, so a guessable
+ * URL would publish an inspector's daily route. The token is sealed under the
+ * tenant AAD and resolves to (tenantId, userId) on its own — an unopenable or
+ * tampered token is indistinguishable from a missing one (404 either way).
+ *
+ * Registered BEFORE `/:token`; that route matches a single segment, so the two
+ * cannot collide, but order keeps the intent obvious.
+ */
+icsRoutes.get('/inspector/:token', async (c) => {
+    const { token } = c.req.param();
+    if (!token || !c.env.JWT_SECRET) return c.text('Not found', 404);
+
+    const resolved = await resolveInspectorIcsToken(
+        token, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+    );
+    if (!resolved) return c.text('Not found', 404);
+
+    const host = c.req.header('host') ?? 'openinspection';
+    const ics = await new IcsService(c.env.DB, host)
+        .scheduleFeedForInspector(resolved.tenantId, resolved.userId);
+
+    return new Response(ics, {
+        status: 200,
+        headers: {
+            'Content-Type': 'text/calendar; charset=utf-8',
+            // Private: this body contains addresses. No shared-cache storage.
+            'Cache-Control': 'private, max-age=300',
+            'Content-Disposition': 'inline; filename="my-schedule.ics"',
+        },
+    });
+});
 
 /**
  * GET /api/ics/:token

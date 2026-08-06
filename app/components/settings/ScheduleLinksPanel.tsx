@@ -1,6 +1,12 @@
 import { useCopyClipboard } from "~/hooks/useCopyClipboard";
 import { m } from "~/paraglide/messages";
 
+/**
+ * The inspector's personal BOOKING link. Calendar subscription feeds moved to
+ * IcsSubscribePanel — they are a different job (reading your schedule, not
+ * taking bookings) and describing them in two places let the descriptions
+ * disagree about what each feed contains.
+ */
 export function ScheduleLinksPanel({
   tenant,
   slug,
@@ -43,21 +49,6 @@ export function ScheduleLinksPanel({
         </p>
       )}
 
-      <div className="pt-3 border-t border-ih-border space-y-1">
-        <p className="text-[12px] font-bold text-ih-fg-2">{m.settings_schedlinks_ics_label()}</p>
-        <p className="text-[11px] text-ih-fg-3">
-          {m.settings_schedlinks_ics_desc()}{" "}
-          <a
-            href="https://support.google.com/calendar/answer/37100"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-ih-primary font-semibold hover:underline"
-          >
-            {m.settings_schedlinks_ics_learn()}
-          </a>
-          .
-        </p>
-      </div>
     </section>
   );
 }

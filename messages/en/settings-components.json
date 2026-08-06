@@ -584,5 +584,16 @@
   "settings_deposit_type_none": "No deposit",
   "settings_deposit_type_percent": "Percent of the price",
   "settings_deposit_type_fixed": "Fixed amount",
-  "settings_deposit_error_save": "Could not save the deposit."
+  "settings_deposit_error_save": "Could not save the deposit.",
+  "settings_icsfeeds_heading": "Calendar subscriptions",
+  "settings_icsfeeds_intro": "Subscribe any calendar app to these links and it stays up to date on its own. Each feed shows a different amount of detail — pick the one that matches who will see it.",
+  "settings_icsfeeds_none": "Your subscription links appear once your company and user slugs are configured.",
+  "settings_icsfeeds_private_badge": "Private link",
+  "settings_icsfeeds_privacy_note": "Anyone holding a link marked private can read that calendar without signing in. Share those only with people already allowed to see the work.",
+  "settings_icsfeeds_company_label": "Company inspections",
+  "settings_icsfeeds_company_desc": "Every inspection in the company, with addresses. For an office calendar.",
+  "settings_icsfeeds_busy_label": "My busy time",
+  "settings_icsfeeds_schedule_label": "My schedule",
+  "settings_icsfeeds_busy_desc": "When you are booked, and nothing else — no addresses, names, or emails. Safe to share with agents and partners.",
+  "settings_icsfeeds_schedule_desc": "Your own jobs with the property address, for your phone."
 }

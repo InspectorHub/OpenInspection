@@ -75,6 +75,12 @@ const SCOPE = [
   // in every tenant zone but UTC, and disagreed with the scheduled_start_ms the
   // office sees. Both now read the stamped instant. Scoped so they stay that way.
   'server/services/booking',
+  // The inspector iCal feeds. toUtcStamp here composed `${day}T${time}:00Z` —
+  // a wall clock labelled UTC — so an 08:00 appointment in America/New_York was
+  // published to every subscriber as 08:00Z, four hours before it happens. The
+  // file was not in this list while the comment above claimed every real bug
+  // lives here; that is what let it survive.
+  'server/services/ics.service.ts',
 ];
 
 function collectFiles(path) {

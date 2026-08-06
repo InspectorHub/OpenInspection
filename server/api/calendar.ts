@@ -39,6 +39,7 @@ import {
     renderCalendarOAuthPopupLanding,
 } from '../lib/calendar/oauth-popup-landing';
 import calendarBlockRoutes from './calendar-blocks';
+import calendarIcsLinkRoutes from './calendar-ics-links';
 import calendarItemsRoutes from './calendar-items';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
@@ -111,6 +112,7 @@ const syncRoute = createRoute(withMcpMetadata({
 
 const calendarRoutes = createApiRouter()
     .route('/', calendarBlockRoutes)
+    .route('/', calendarIcsLinkRoutes)
     .route('/', calendarItemsRoutes)
     .openapi(disconnectRoute, async (c) => {
         const user = c.get('user');

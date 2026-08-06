@@ -1,4 +1,4 @@
-import { useLoaderData, useNavigate } from "react-router";
+import { useLoaderData } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-schedule";
 import { requireToken } from "~/lib/session.server";
@@ -24,6 +24,8 @@ import {
 } from "~/components/settings/CalendarConnectPanel";
 import type { CalendarPickerData } from "~/components/settings/CalendarReadSetPicker";
 import { ScheduleLinksPanel } from "~/components/settings/ScheduleLinksPanel";
+import { IcsSubscribePanel, type IcsLinks } from "~/components/settings/IcsSubscribePanel";
+import { ManageOthersPicker, type SchedulingMember } from "~/components/settings/ManageOthersPicker";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { m } from "~/paraglide/messages";
 
@@ -40,13 +42,6 @@ interface DateOverride {
   isAvailable: boolean;
   startTime: string | null;
   endTime: string | null;
-}
-
-interface Member {
-  id: string;
-  email: string;
-  role: string;
-  createdAt: string;
 }
 
 function civilToday(): string {
@@ -86,12 +81,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const year = Number(start.slice(0, 4));
   const weekStart = startOfCivilWeek(start);
 
-  const [availRes, overridesRes, membersRes, calendarStatusRes, blocksRes, configRes, previewRes, weekSummaryRes] =
+  const [availRes, overridesRes, membersRes, calendarStatusRes, icsLinksRes, blocksRes, configRes, previewRes, weekSummaryRes] =
     await Promise.all([
       api.availability.index.$get({ query: inspectorId ? { inspectorId } : {} }).catch(() => null),
       api.availability.overrides.$get({ query: inspectorId ? { inspectorId } : {} }).catch(() => null),
       api.admin.members.$get().catch(() => null),
       api.calendar.status.$get().catch(() => null),
+      api.calendar["ics-links"].$get().catch(() => null),
       api.calendar.blocks
         .$get({
           query: {
@@ -124,10 +120,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     overrides = (body.data ?? []) as DateOverride[];
   }
 
-  let members: Member[] = [];
+  let members: SchedulingMember[] = [];
   if (membersRes?.ok) {
     const body = (await membersRes.json()) as Record<string, unknown>;
-    members = (body.data ?? []) as Member[];
+    members = (body.data ?? []) as SchedulingMember[];
   }
 
   const calendarStatus = calendarStatusRes?.ok
@@ -167,6 +163,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       }
     }
   }
+
+  const icsLinks: IcsLinks = icsLinksRes?.ok
+    ? ((await icsLinksRes.json()) as { data?: IcsLinks }).data
+      ?? { busyPath: null, schedulePath: null, companyPath: null }
+    : { busyPath: null, schedulePath: null, companyPath: null };
 
   let timeOffBlocks: TimeOffBlock[] = [];
   if (blocksRes?.ok) {
@@ -218,6 +219,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     overrides,
     members,
     managedInspectorId: inspectorId ?? null,
+    icsLinks,
     timeOffBlocks,
     weekSummary,
     companyClosed: holidayRegion
@@ -338,6 +340,7 @@ export default function SettingsSchedulePage() {
     { id: "time-off", label: m.settings_timeoff_heading() },
     { id: "date-overrides", label: m.settings_dateoverrides_heading() },
     { id: "schedule-links", label: m.settings_schedlinks_heading() },
+    { id: "ics-feeds", label: m.settings_icsfeeds_heading() },
   ];
 
   return (
@@ -401,36 +404,9 @@ export default function SettingsSchedulePage() {
       <div id="schedule-links" className="scroll-mt-12">
         <ScheduleLinksPanel tenant={tenant} slug={slug} />
       </div>
+      <div id="ics-feeds" className="scroll-mt-12">
+        <IcsSubscribePanel links={data.icsLinks} />
+      </div>
     </div>
-  );
-}
-
-function ManageOthersPicker({
-  members,
-  managedInspectorId,
-}: {
-  members: Member[];
-  managedInspectorId: string | null;
-}) {
-  const navigate = useNavigate();
-  return (
-    <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 flex items-center gap-3">
-      <span className="text-[13px] font-bold text-ih-fg-1">{m.settings_schedule_managing_for()}</span>
-      <select
-        value={managedInspectorId ?? ""}
-        onChange={(e) => {
-          const v = e.target.value;
-          navigate(v ? `/settings/schedule?inspectorId=${v}` : "/settings/schedule");
-        }}
-        className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-      >
-        <option value="">{m.settings_schedule_myself()}</option>
-        {members.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.email}
-          </option>
-        ))}
-      </select>
-    </section>
   );
 }
