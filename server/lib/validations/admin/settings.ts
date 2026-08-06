@@ -28,7 +28,7 @@ const CancellationFeeSchema = z.discriminatedUnion('type', [
  * The ladder itself. Hours only in v1 — see the column comment for why
  * "2 business days" is deferred rather than approximated.
  */
-export const CancellationPolicySchema = z.object({
+const CancellationPolicySchema = z.object({
     noticeHours: z.number().int().min(0).max(720).openapi({ example: 24 })
         .describe('Notice threshold in hours. Cancelling with at least this much notice is free.'),
     lateFee: CancellationFeeSchema.describe('Charged when the client cancels inside the notice window.'),

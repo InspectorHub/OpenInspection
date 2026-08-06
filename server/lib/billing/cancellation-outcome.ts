@@ -33,7 +33,7 @@ export type CancellationEvent = 'cancellation' | 'no_show';
  * UI that has to render it in the reader's language, and an English sentence
  * baked in here would be untranslatable by construction.
  */
-export type CancellationReasonCode =
+type CancellationReasonCode =
     /** The company cancelled. Always a full refund; not configurable. */
     | 'inspector_initiated'
     /** No ladder configured. The platform charges nothing. */

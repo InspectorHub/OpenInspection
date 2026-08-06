@@ -140,5 +140,6 @@ const cancellationRoutes = createApiRouter()
         }, 200);
     });
 
-export type InspectionCancellationApi = typeof cancellationRoutes;
+// No `...Api` type export: no sibling inspection sub-router has one, and the
+// merged RPC type is published by `server/api/inspections.ts`.
 export default cancellationRoutes;
