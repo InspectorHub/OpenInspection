@@ -121,6 +121,14 @@ describe('idempotencyMiddleware', () => {
         const app = buildApp(async () => { ran++; await gate; return { status: 200, body: { id: 'abc' } }; });
 
         const first = post(app, 'same-key');
+        // ...and the second must meet a claim that ALREADY EXISTS. Firing it
+        // straight after the first is a race the test used to lose under load:
+        // if the first has not reached claimKey yet, BOTH claim, both enter the
+        // handler, and both park on a gate that is only released after the
+        // second returns — a deadlock that surfaces as a 5s timeout rather than
+        // as a wrong answer. Waiting for the handler to be ENTERED is strictly
+        // after the claim, so the overlap is ordered instead of hoped for.
+        while (ran === 0) await new Promise((r) => setImmediate(r));
         const second = await post(app, 'same-key');
         release();
         const firstRes = await first;
