@@ -22,6 +22,17 @@ export const calendarConnections = sqliteTable('calendar_connections', {
      * sync-freshness badge on the calendar Team chips.
      */
     lastSyncAt: integer('last_sync_at', { mode: 'timestamp_ms' }),
+    /**
+     * Why the most recent sync attempt failed, or NULL when the last attempt
+     * succeeded. Cleared on every success, so it always describes the CURRENT
+     * state rather than accumulating history.
+     *
+     * It exists because the freshness badge cannot tell "nothing changed" from
+     * "we have not been able to reach Google for three days" — both look like
+     * an old lastSyncAt. A revoked token is the common case and the inspector
+     * is the only person who can fix it, so the reason has to reach them.
+     */
+    lastSyncError: text('last_sync_error'),
 }, (t) => [
     uniqueIndex('uq_calendar_connections_user_provider').on(t.userId, t.provider),
     index('idx_calendar_connections_tenant_user').on(t.tenantId, t.userId),
@@ -43,6 +54,48 @@ export const calendarConnectionReadCalendars = sqliteTable('calendar_connection_
 }, (t) => [
     uniqueIndex('uq_conn_read_cal').on(t.connectionId, t.externalCalendarId),
     index('idx_conn_read_cal_tenant').on(t.tenantId, t.connectionId),
+]);
+
+/**
+ * OI entity <-> provider event id. One row answers "does this OI thing already
+ * exist on that person's calendar, and under which id" — so a re-push updates
+ * instead of duplicating, a cancel can delete the remote copy, and an import can
+ * recognise its own events and skip them.
+ *
+ * `user_id` is the point of the table: an external event lives in ONE person's
+ * calendar, and both the update and the delete have to be issued against that
+ * person's credentials. A row that cannot name the user is worse than no row —
+ * it would send a DELETE to the wrong calendar.
+ *
+ * `entity_type` covers inspections and calendar blocks only. Inspection EVENTS
+ * are deliberately absent: `inspection_events.gcal_event_id` already held that
+ * mapping, and the push that wrote it sent every tenant event to whichever user
+ * pressed the button without ever recording who that was — so there is no
+ * `user_id` to migrate, and inventing one would make this table lie about the
+ * single fact it exists to record. The events surface earns a link row when a
+ * push path that knows its target user exists, not before. Two writers of one
+ * fact is how the roster column diverged.
+ *
+ * No `.references()` per Schema Rules; the neighbouring legacy FKs on
+ * `availability_overrides` are frozen, not a pattern.
+ */
+export const calendarExternalLinks = sqliteTable('calendar_external_links', {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull(),
+    userId: text('user_id').notNull(),
+    provider: text('provider', { enum: ['google', 'microsoft', 'apple'] }).notNull(),
+    entityType: text('entity_type', { enum: ['inspection', 'calendar_block'] }).notNull(),
+    entityId: text('entity_id').notNull(),
+    /** Provider event id (Google `event.id`). */
+    externalId: text('external_id').notNull(),
+    /** Provider concurrency tag when it gives one; advisory, never required. */
+    etag: text('etag'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    uniqueIndex('uq_calendar_external_links_entity')
+        .on(t.tenantId, t.provider, t.entityType, t.entityId),
+    index('idx_calendar_external_links_user').on(t.tenantId, t.userId, t.provider),
 ]);
 
 export const calendarBlocks = sqliteTable('calendar_blocks', {

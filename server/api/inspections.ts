@@ -41,6 +41,8 @@ import peopleRoutes from './inspections/people';
 import communicationRoutes from './inspections/communication';
 import inspectionServiceRoutes from './inspections/services';
 import inspectionReportRoutes from './inspections/reports';
+import paySplitRoutes from './inspections/pay-splits';
+import cancellationRoutes from './inspections/cancellation';
 
 export const inspectionsRoutes = createApiRouter()
     .route('/', bulkRoutes)
@@ -77,6 +79,15 @@ export const inspectionsRoutes = createApiRouter()
     .route('/', inspectionServiceRoutes)
     // DELETE /:id/reports/:reportId — one order delivers several reports, and
     // removing one destroys its document. The list itself rides the hub payload.
-    .route('/', inspectionReportRoutes);
+    .route('/', inspectionReportRoutes)
+    // #278 — /:id/pay-splits. Mounted HERE rather than as a top-level router
+    // because server/index.ts sits at its size cap; and it belongs here anyway,
+    // since every path is per-inspection. Visibility is query scoping inside
+    // the handler, not a capability: an inspector reads only their own row.
+    .route('/', paySplitRoutes)
+    // /:id/cancel + /:id/cancellation-quote. Split out of publish.ts: the
+    // report lifecycle and the money a cancellation moves are different
+    // concerns, and that file was at its size ceiling.
+    .route('/', cancellationRoutes);
 
 export type InspectionsApi = typeof inspectionsRoutes;

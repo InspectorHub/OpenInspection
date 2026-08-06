@@ -7,23 +7,20 @@
  */
 
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, gte, lte, inArray, desc } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
     inspectionRequests,
     inspections,
     templates,
     contactRoleProfiles,
-    inspectionPeople,
-    contacts,
 } from '../lib/db/schema';
-import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { Errors } from '../lib/errors';
-import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { PeopleService } from './people.service';
 import { ContactService } from './contact.service';
+import { listRequests, getRequest, type ListFilter } from './inspection-request/request-read';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
 export interface CreateRequestInput {
@@ -64,28 +61,6 @@ export interface UpdateRequestInput {
     totalAmount?:     number;
 }
 
-interface ListFilter {
-    status?: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
-    from?:   string;
-    to?:     string;
-    limit?:  number;
-    offset?: number;
-}
-
-type SubInspectionRow = {
-    id:              string;
-    templateId:      string | null;
-    propertyAddress: string;
-    clientName:      string | null;
-    status:          string;
-    date:            string;
-    price:           number;
-    inspectorId:     string | null;
-    requestId:       string | null;
-};
-
-type RequestRow = typeof inspectionRequests.$inferSelect;
-
 export class InspectionRequestService {
     /**
      * Free-tier usage-quota guard (optional). Present only in SaaS deploys
@@ -101,117 +76,19 @@ export class InspectionRequestService {
 
     /**
      * List parent requests for the tenant, eager-loading child inspections.
-     * Filters can narrow by status / date window. Pagination is offset-based
-     * (offset/limit) — cursor pagination not needed at this scale.
+     * Body in `./inspection-request/request-read`.
      */
     async list(tenantId: string, filter: ListFilter = {}) {
-        const db = this.getDrizzle();
-        const conds = [eq(inspectionRequests.tenantId, tenantId)];
-        if (filter.status) conds.push(eq(inspectionRequests.status, filter.status));
-        if (filter.from)   conds.push(gte(inspectionRequests.scheduledAt, new Date(filter.from)));
-        if (filter.to)     conds.push(lte(inspectionRequests.scheduledAt, new Date(filter.to)));
-
-        const limit  = filter.limit  ?? 50;
-        const offset = filter.offset ?? 0;
-
-        const reqs = await db.select().from(inspectionRequests)
-            .where(and(...conds))
-            .orderBy(desc(inspectionRequests.scheduledAt))
-            .limit(limit)
-            .offset(offset)
-            .all();
-
-        const reqIds = reqs.map(r => r.id);
-        // Task 9c — clientName is sourced via the client-role inspection_people
-        // LEFT JOIN (role filter joined FIRST to avoid fanning out over every
-        // role on the sub-inspection — same pattern as api/metrics.ts /
-        // InspectionCoreService.listInspections), NOT the legacy
-        // inspections.client_name column, which survives GDPR erasure as a
-        // stale denormalized cache and would leak the erased subject's name.
-        const subRows: SubInspectionRow[] = reqIds.length === 0 ? [] : await db.select({
-            id:              inspections.id,
-            templateId:      inspections.templateId,
-            propertyAddress: inspections.propertyAddress,
-            clientName:      contacts.name,
-            status:          inspections.status,
-            date:            inspections.date,
-            price:           inspections.price,
-            inspectorId:     inspections.inspectorId,
-            requestId:       inspections.requestId,
-        }).from(inspections)
-            .leftJoin(contactRoleProfiles, and(
-                eq(contactRoleProfiles.tenantId, inspections.tenantId),
-                eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
-                eq(contactRoleProfiles.active, true),
-            ))
-            .leftJoin(inspectionPeople, and(
-                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
-                eq(inspectionPeople.inspectionId, inspections.id),
-                eq(inspectionPeople.tenantId, inspections.tenantId),
-            ))
-            .leftJoin(contacts, and(
-                eq(contacts.id, inspectionPeople.contactId),
-                eq(contacts.tenantId, inspections.tenantId),
-            ))
-            .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.requestId, reqIds)))
-            .all();
-
-        return reqs.map(r => this.shapeRequest(r, subRows.filter(s => s.requestId === r.id)));
+        return listRequests(this.getDrizzle(), tenantId, filter);
     }
 
     /**
-     * Fetch a single parent request with its children (tenant-scoped).
-     * Returns null when not found. Resolves child template names so callers
-     * (e.g. the inspection-edit request switcher) can render readable chips
-     * without an extra round-trip.
+     * Fetch a single parent request with its children (tenant-scoped), or null.
+     * Stays a method: `create`, `addSubInspection` and `update` all reload
+     * through it, as does `getByInspectionId` below.
      */
     async get(tenantId: string, id: string) {
-        const db = this.getDrizzle();
-        const req = await db.select().from(inspectionRequests)
-            .where(and(eq(inspectionRequests.id, id), eq(inspectionRequests.tenantId, tenantId)))
-            .get();
-        if (!req) return null;
-
-        // Task 9c — same client-role inspection_people join as list() above.
-        const subs: SubInspectionRow[] = await db.select({
-            id:              inspections.id,
-            templateId:      inspections.templateId,
-            propertyAddress: inspections.propertyAddress,
-            clientName:      contacts.name,
-            status:          inspections.status,
-            date:            inspections.date,
-            price:           inspections.price,
-            inspectorId:     inspections.inspectorId,
-            requestId:       inspections.requestId,
-        }).from(inspections)
-            .leftJoin(contactRoleProfiles, and(
-                eq(contactRoleProfiles.tenantId, inspections.tenantId),
-                eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
-                eq(contactRoleProfiles.active, true),
-            ))
-            .leftJoin(inspectionPeople, and(
-                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
-                eq(inspectionPeople.inspectionId, inspections.id),
-                eq(inspectionPeople.tenantId, inspections.tenantId),
-            ))
-            .leftJoin(contacts, and(
-                eq(contacts.id, inspectionPeople.contactId),
-                eq(contacts.tenantId, inspections.tenantId),
-            ))
-            .where(and(eq(inspections.tenantId, tenantId), eq(inspections.requestId, id)))
-            .all();
-
-        const tplIds = Array.from(new Set(subs.map(s => s.templateId).filter((x): x is string => !!x)));
-        const tplNameById = new Map<string, string>();
-        if (tplIds.length > 0) {
-            const tplRows = await db.select({ id: templates.id, name: templates.name })
-                .from(templates)
-                .where(and(eq(templates.tenantId, tenantId), inArray(templates.id, tplIds)))
-                .all();
-            for (const t of tplRows) tplNameById.set(t.id, t.name);
-        }
-
-        return this.shapeRequest(req, subs, tplNameById);
+        return getRequest(this.getDrizzle(), tenantId, id);
     }
 
     /**
@@ -254,14 +131,14 @@ export class InspectionRequestService {
 
         const totalAmount = subs.reduce((sum, s) => sum + (s.price ?? 0), 0);
 
-        // Quota is consumed once per sub-inspection, after every precondition
+        // Quota is consumed for the whole batch at once, after every precondition
         // check above (bounds, template ownership) and BEFORE the parent
         // request row is inserted — a request row must never be orphaned
         // (created with zero children) because the tenant hit the cap
-        // partway through.
-        for (let i = 0; i < subs.length; i++) {
-            await this.planQuota?.consumeInspection(tenantId);
-        }
+        // partway through. One call, not a loop: the guard counts existing
+        // inspection rows and these are inserted below, so N looped calls would
+        // all read the same count and all pass. See consumeInspection's `count`.
+        await this.planQuota?.consumeInspection(tenantId, subs.length);
 
         await db.insert(inspectionRequests).values({
             id:              requestId,
@@ -464,37 +341,5 @@ export class InspectionRequestService {
         const detail = await this.get(tenantId, id);
         if (!detail) throw Errors.Internal('Failed to reload updated request');
         return detail;
-    }
-
-    private shapeRequest(req: RequestRow, subs: SubInspectionRow[], tplNameById?: Map<string, string>) {
-        return {
-            id:               req.id,
-            tenantId:         req.tenantId,
-            clientName:       req.clientName,
-            clientEmail:      req.clientEmail,
-            clientPhone:      req.clientPhone,
-            propertyAddress:  req.propertyAddress,
-            propertyCity:     req.propertyCity,
-            propertyState:    req.propertyState,
-            propertyZip:      req.propertyZip,
-            scheduledAt:      safeISODate(req.scheduledAt),
-            status:           req.status,
-            notes:            req.notes,
-            totalAmount:      req.totalAmount,
-            paymentStatus:    req.paymentStatus,
-            createdAt:        safeISODate(req.createdAt),
-            updatedAt:        safeISODate(req.updatedAt),
-            inspections:      subs.map(s => ({
-                id:              s.id,
-                templateId:      s.templateId,
-                templateName:    (s.templateId && tplNameById?.get(s.templateId)) || null,
-                propertyAddress: s.propertyAddress,
-                clientName:      s.clientName,
-                status:          s.status,
-                date:            s.date,
-                price:           s.price,
-                inspectorId:     s.inspectorId,
-            })),
-        };
     }
 }

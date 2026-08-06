@@ -28,7 +28,7 @@ import { GeminiProvider } from './providers/gemini';
 /** Where the credentials for a resolved call came from. Also selects the
  *  usage metric at the call site — platform-funded volume is metered apart
  *  from bring-your-own volume, the same split `policy.ts` documents for sends. */
-type AiCredentialSource = 'managed' | 'byo';
+export type AiCredentialSource = 'managed' | 'byo';
 
 export interface ResolvedAi {
     provider: AiProvider;

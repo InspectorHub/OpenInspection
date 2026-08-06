@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { splitDurationMinutes, serviceIsBookable, didSaveService } from "~/lib/settings-services";
+import { splitDurationMinutes, serviceIsBookable, didSaveService, toHundredths, fromHundredths } from "~/lib/settings-services";
 import { makeCreateServiceSchema, makeUpdateServiceSchema } from "~/lib/forms/settings.schema";
 
 /**
@@ -125,5 +125,52 @@ describe("makeCreateServiceSchema — duration and template", () => {
         // (e.g. "1800" for 18:00), and it would size a booking window absurdly.
         expect(parse({ name: "Roof", durationMinutes: "1440" }).success).toBe(false);
         expect(parse({ name: "Roof", durationMinutes: "1439" }).success).toBe(true);
+    });
+});
+
+/**
+ * The pay-rule unit boundary (#278).
+ *
+ * The wire is basis points and integer cents; a person types percent and
+ * dollars. This conversion is the only place the ×100 happens, so it is the
+ * only place the hundredfold money error can be introduced — 60 sent straight
+ * through pays 0.6% of the job.
+ */
+describe("pay-rule human units", () => {
+    it("turns a typed percent into basis points, not into itself", () => {
+        expect(toHundredths("60")).toBe(6000);
+        expect(toHundredths(60)).toBe(6000);
+        // The boundary the whole feature turns on: 60 must never reach the API
+        // as 60, which the schema would accept as a legal 0.6%.
+        expect(toHundredths("60")).not.toBe(60);
+    });
+
+    it("keeps a fractional rate exact instead of losing it to float drift", () => {
+        expect(toHundredths("62.5")).toBe(6250);
+        // 8.2 * 100 is 819.9999999999999 in IEEE-754. Flooring — the obvious
+        // way to write this — pays 8.19% forever and the shortfall is invisible
+        // because the number on screen still reads 8.2.
+        expect(toHundredths("8.2")).toBe(820);
+        expect(toHundredths("0.01")).toBe(1);
+    });
+
+    it("turns typed dollars into cents the same way", () => {
+        expect(toHundredths("125")).toBe(12500);
+        expect(toHundredths("125.50")).toBe(12550);
+        // 4.35 * 100 is 434.99999999999994 — a cent short of $4.35.
+        expect(toHundredths("4.35")).toBe(435);
+    });
+
+    it("refuses anything that is not a positive number rather than sending NaN", () => {
+        for (const bad of ["", "  ", "abc", "0", "-5", null, undefined]) {
+            expect(toHundredths(bad)).toBeNull();
+        }
+    });
+
+    it("round-trips a stored rule back into the form", () => {
+        expect(fromHundredths(6000)).toBe("60");
+        expect(fromHundredths(6250)).toBe("62.5");
+        expect(fromHundredths(1)).toBe("0.01");
+        expect(fromHundredths(null)).toBe("");
     });
 });

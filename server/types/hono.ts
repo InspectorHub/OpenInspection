@@ -223,13 +223,20 @@ export interface AppEnv {
     QBO_CLIENT_ID?: string;
     QBO_CLIENT_SECRET?: string;
     QBO_WEBHOOK_SECRET?: string;
+    /**
+     * `sandbox` | `production` — which Intuit API host to call. No default:
+     * Development and Production keys are not interchangeable, so guessing is
+     * always wrong for one of them. See services/qbo/api-base.ts.
+     */
+    QBO_ENV?: string;
 }
 
 import type { AdminService } from '../services/admin.service';
 import type { AIService } from '../services/ai.service';
 import type { AuthService } from '../services/auth.service';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
-import type { BookingService, AvailabilityService } from '../services/booking.service';
+import type { BookingService } from '../services/booking.service';
+import type { AvailabilityService } from '../services/availability.service';
 import type { BrandingService } from '../services/branding.service';
 import type { LegalVersionService } from '../services/legal-version.service';
 import type { EmailService } from '../services/email.service';

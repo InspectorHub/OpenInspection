@@ -1,6 +1,15 @@
 import { z } from '@hono/zod-openapi';
 import { PublicBrandSchema } from './public-brand.schema';
 
+/**
+ * `invoices.id` is an opaque TEXT id, so a route must not demand a UUID shape it
+ * never promised. The mark-paid endpoint rejected one with a 400 that the page
+ * then swallowed, leaving an operator who had just banked a cheque looking at an
+ * unchanged "SENT" pill. Same defect as the contacts id contract and as the
+ * `inspectorId` `.uuid()` in IA-87.
+ */
+export const INVOICE_ID = z.string().trim().min(1);
+
 const LineItemSchema = z.object({
     description: z.string().min(1).max(200).describe('TODO describe description field for the OpenInspection MCP integration'),
     amountCents: z.number().int().min(0).describe('TODO describe amountCents field for the OpenInspection MCP integration'),

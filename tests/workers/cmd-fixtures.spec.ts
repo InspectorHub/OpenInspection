@@ -5,7 +5,7 @@ import update from '../fixtures/cmd-events/cmd-tenant-update-v1.json';
 import quota from '../fixtures/cmd-events/cmd-tenant-sync-quota-v1.json';
 import updateReplyto from '../fixtures/cmd-events/cmd-tenant-update-replyto-v1.json';
 import seed from '../fixtures/cmd-events/cmd-tenant-seed-starter-content-v1.json';
-import { TENANT_CONFIGS_TEST_DDL } from '../helpers/inline-ddl';
+import { TENANT_CONFIGS_TEST_DDL, USERS_TEST_DDL } from '../helpers/inline-ddl';
 
 // Batch 2: the seed fixture exercises the consumer pipeline, not the content
 // seeder (which touches 8 tables and has its own coverage) — stubbed here.
@@ -33,11 +33,12 @@ describe('cmd golden fixtures — consumer can apply every fixture (A-21)', () =
         await b.DB.exec(
             "CREATE TABLE IF NOT EXISTS sync_outbox (id TEXT PRIMARY KEY, event_type TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, last_tried_at INTEGER, last_error TEXT);",
         );
-        // Full users DDL (mirrors cmd-consumer.spec.ts) — the replyto fixture
-        // carries credentials, and the drizzle insert binds every column.
-        await b.DB.exec(
-            "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, tenant_id TEXT, email TEXT NOT NULL, password_hash TEXT NOT NULL, name TEXT, phone TEXT, photo_url TEXT, default_signature_base64 TEXT, is_signature_enabled INTEGER NOT NULL DEFAULT true, bio TEXT, service_areas TEXT, slug TEXT, role TEXT NOT NULL DEFAULT 'admin', google_refresh_token TEXT, google_calendar_id TEXT, google_access_token TEXT, google_token_expiry INTEGER, locale TEXT, onboarding_state TEXT, created_at INTEGER NOT NULL, totp_secret TEXT, is_totp_enabled INTEGER NOT NULL DEFAULT false, totp_recovery_codes TEXT, totp_verified_at INTEGER, is_referral_notification_enabled INTEGER NOT NULL DEFAULT true, is_report_notification_enabled INTEGER NOT NULL DEFAULT true, is_paid_notification_enabled INTEGER NOT NULL DEFAULT false, last_active_at INTEGER, mentor_id TEXT, assigned_section_ids TEXT NOT NULL DEFAULT '[]', expires_at INTEGER, signup_role TEXT, deleted_at INTEGER, terms_accepted TEXT, permission_overrides TEXT, timezone TEXT, date_format TEXT, time_format TEXT);",
-        );
+        // Full users DDL — the replyto fixture carries credentials, and the
+        // drizzle insert binds every column of the table even for a partial
+        // values() object. Shared with cmd-consumer.spec.ts and guarded by
+        // inline-ddl-schema-sync.spec.ts; it used to be a second copy here,
+        // which is how three columns went missing without a local gate noticing.
+        await b.DB.exec(USERS_TEST_DDL);
         await b.DB.exec('CREATE TABLE IF NOT EXISTS processed_cmd_events (event_id TEXT PRIMARY KEY, cmd_type TEXT NOT NULL, processed_at INTEGER NOT NULL);');
         await b.DB.exec('CREATE TABLE IF NOT EXISTS parked_cmd_events (id TEXT PRIMARY KEY, envelope TEXT NOT NULL, reason TEXT NOT NULL, received_at INTEGER NOT NULL);');
         // The update fixture carries `name` → PortalProvider initializes

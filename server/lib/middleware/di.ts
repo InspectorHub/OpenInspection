@@ -21,7 +21,7 @@ import { PortalService } from '../../services/portal.service';
 import { TeamService } from '../../services/team.service';
 import { TemplateService } from '../../services/template.service';
 import { AgreementService } from '../../services/agreement.service';
-import { AvailabilityService } from '../../services/booking.service';
+import { AvailabilityService } from '../../services/availability.service';
 import { ContactService } from '../../services/contact.service';
 import { InvoiceService } from '../../services/invoice.service';
 import { PortalAccessService } from '../../services/portal-access.service';
@@ -63,6 +63,7 @@ import { ComplianceService } from '../../services/compliance/pca-compliance.serv
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../../portal/portal.provider';
 import { PlanQuotaGuard, readTenantTier } from '../../features/plan-quota/guard';
+import { tenantAiCapsLoader } from '../../features/plan-quota/ai-caps';
 
 /**
  * Middleware that injects a lazy-loaded service registry into the Hono context.
@@ -137,7 +138,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
     // InspectionRequestService (multi-service request + append-a-sub-inspection).
     const buildPlanQuota = (): PlanQuotaGuard | undefined => {
         if (!c.var.profile.hasUsageQuota) return undefined;
-        return new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl });
+        return new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl, aiCaps: tenantAiCapsLoader(c.env.DB) });
     };
 
     const services = {} as AppServices;
@@ -394,6 +395,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         c.env.QBO_CLIENT_SECRET ?? '',
                         c.env.QBO_WEBHOOK_SECRET ?? '',
                         c.env.JWT_SECRET,
+                        c.env.QBO_ENV,
                     );
                     break;
                 case 'unit':

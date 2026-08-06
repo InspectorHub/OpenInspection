@@ -1,12 +1,19 @@
 import { timeWindows, type CompanyProfile } from "./booking-constants";
+import { PublicAddressAutocomplete, type PublicAddressSuggestion } from "./PublicAddressAutocomplete";
+import { BookingDepositPanel } from "./BookingDepositPanel";
+import { formatCurrency } from "~/lib/format";
+import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
 export function PropertyStep({
   address,
   setAddress,
+  onSelectAddress,
 }: {
   address: string;
   setAddress: (v: string) => void;
+  /** Carries the ZIP + placeId of a picked suggestion up to the form state. */
+  onSelectAddress: (sel: PublicAddressSuggestion | null) => void;
 }) {
   return (
     <section className="space-y-5">
@@ -16,14 +23,12 @@ export function PropertyStep({
       </div>
       <label className="block">
         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.booking_field_address_label()}</span>
-        <input
-          type="text"
+        <PublicAddressAutocomplete
           value={address}
-          onChange={(e) => setAddress(e.target.value)}
+          onValueChange={setAddress}
+          onSelect={onSelectAddress}
           placeholder={m.booking_step_property_address_placeholder()}
-          autoComplete="street-address"
           autoFocus
-          className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
         />
       </label>
     </section>
@@ -35,12 +40,18 @@ export function ServicesStep({
   selectedServices,
   toggleService,
   totalPrice,
+  depositQuoteCents,
+  currency,
 }: {
   profile: CompanyProfile;
   selectedServices: Set<string>;
   toggleService: (id: string) => void;
   totalPrice: number;
+  /** Quoted, not charged. 0 renders nothing at all. */
+  depositQuoteCents: number;
+  currency: string;
 }) {
+  const locale = useDisplayLocale();
   return (
     <section className="space-y-5">
       <div className="space-y-1">
@@ -92,6 +103,13 @@ export function ServicesStep({
           </span>
         </div>
       )}
+      {selectedServices.size > 0 && depositQuoteCents > 0 && (
+        <p className="px-4 text-[12px] text-ih-fg-3 leading-relaxed">
+          {m.booking_deposit_quote_note({
+            amount: formatCurrency(depositQuoteCents, { locale, currency }),
+          })}
+        </p>
+      )}
     </section>
   );
 }
@@ -109,6 +127,11 @@ export function ConfirmStep({
   totalPrice,
   clientName,
   clientEmail,
+  depositQuoteCents,
+  depositDueCents,
+  bookedInspectionId,
+  currency,
+  companyName,
 }: {
   message: { text: string; ok: boolean } | null;
   address: string;
@@ -121,7 +144,15 @@ export function ConfirmStep({
   totalPrice: number;
   clientName: string;
   clientEmail: string;
+  /** What the form expects to be asked for, before submitting. */
+  depositQuoteCents: number;
+  /** What the SERVER froze, once the booking exists. Null before then. */
+  depositDueCents: number | null;
+  bookedInspectionId: string | null;
+  currency: string;
+  companyName: string;
 }) {
+  const locale = useDisplayLocale();
   return (
     <section className="space-y-5">
       {message?.ok ? (
@@ -133,6 +164,16 @@ export function ConfirmStep({
           </div>
           <h2 className="text-xl font-bold text-ih-fg-1 mb-2">{m.booking_confirm_submitted_heading()}</h2>
           <p className="text-[14px] text-ih-fg-3">{message.text}</p>
+          {/* Only once the server has said what it froze, and only if it froze
+              anything. A workspace with no deposit sees no payment step. */}
+          {bookedInspectionId && depositDueCents != null && depositDueCents > 0 && (
+            <BookingDepositPanel
+              inspectionId={bookedInspectionId}
+              depositCents={depositDueCents}
+              currency={currency}
+              companyName={companyName}
+            />
+          )}
         </div>
       ) : (
         <>
@@ -169,6 +210,14 @@ export function ConfirmStep({
               <span className="font-bold text-ih-fg-2">{m.booking_confirm_row_total()}</span>
               <span className="font-bold text-ih-fg-1">${totalPrice.toFixed(2)}</span>
             </div>
+            {depositQuoteCents > 0 && (
+              <div className="flex justify-between">
+                <span className="text-ih-fg-3">{m.booking_confirm_row_deposit()}</span>
+                <span className="font-medium text-ih-fg-1 tabular-nums">
+                  {formatCurrency(depositQuoteCents, { locale, currency })}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-ih-fg-3">{m.booking_confirm_row_name()}</span>
               <span className="font-medium text-ih-fg-1">{clientName}</span>
@@ -178,6 +227,13 @@ export function ConfirmStep({
               <span className="font-medium text-ih-fg-1">{clientEmail}</span>
             </div>
           </div>
+          {depositQuoteCents > 0 && (
+            <p className="text-[12px] text-ih-fg-3 leading-relaxed">
+              {m.booking_deposit_confirm_note({
+                amount: formatCurrency(depositQuoteCents, { locale, currency }),
+              })}
+            </p>
+          )}
         </>
       )}
     </section>

@@ -16,11 +16,13 @@ import { getInspectionRoster } from '../../lib/inspection/roster';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
-import { inspections as inspectionTable, inspectionResults, users } from '../../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults } from '../../lib/db/schema';
 import { datePatchValues } from '../../services/inspection/reschedule-date';
+import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
+import { findPatchRefusal } from './patch-guards';
 import { deleteInspectionCascade } from '../../services/inspection/inspection-cascade';
-import { syncInspectionAssignments } from '../../lib/db/assignment-links';
-import { eq, and, isNull } from 'drizzle-orm';
+import { syncAssignmentsAndSplits } from '../../services/pay-split.service';
+import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import type { HonoConfig } from '../../types/hono';
 import { logger } from '../../lib/logger';
@@ -298,55 +300,28 @@ const coreRoutes = createApiRouter()
 
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
 
-        // DB-16 — coverPhotoId holds the R2 key of a photo belonging to THIS
-        // inspection (an attached item photo or a loose pool photo); null clears
-        // the cover. Reject foreign/dangling keys so the preflight gate + report
-        // renderer can always resolve the image.
-        if (typeof body.coverPhotoId === 'string') {
-            const ok = await c.var.services.inspection.isInspectionPhotoKey(id, tenantId, body.coverPhotoId);
-            if (!ok) {
-                return c.json({ success: false as const, error: { code: 'INVALID_COVER_PHOTO', message: 'coverPhotoId does not reference a photo of this inspection' } }, 400);
-            }
-        }
-
-        // `inspectorId` names a row in `users`, and nothing downstream re-checks
-        // it: the value is written straight onto the inspection and mirrored
-        // into the assignment link table. A format check can't stand in for a
-        // membership check — a UUID from another tenant is still a UUID — so
-        // resolve it inside the caller's tenant, exactly as the sibling people
-        // route re-resolves contactId and roleProfileId before linking them.
-        if (typeof body.inspectorId === 'string') {
-            const member = await db.select({ id: users.id }).from(users)
-                .where(and(
-                    eq(users.id, body.inspectorId),
-                    eq(users.tenantId, tenantId),
-                    isNull(users.deletedAt),
-                ))
-                .limit(1).get();
-            if (!member) {
-                return c.json({ success: false as const, error: { code: 'INVALID_INSPECTOR', message: 'inspectorId is not a member of this tenant' } }, 400);
-            }
-        }
-
-        // Task 8 — a referrer must be one of THIS tenant's contacts. Reject a
-        // foreign or unknown id with a 400 rather than writing a dangling soft
-        // reference (the column has no FK by Schema Rules, so the app layer is
-        // the only guard).
-        if (typeof body.referredByContactId === 'string' && body.referredByContactId) {
-            const { contacts } = await import('../../lib/db/schema');
-            const owner = await db.select({ id: contacts.id }).from(contacts)
-                .where(and(eq(contacts.id, body.referredByContactId), eq(contacts.tenantId, tenantId)))
-                .get();
-            if (!owner) {
-                return c.json({ success: false as const, error: { code: 'INVALID_REFERRER', message: 'referredByContactId is not a contact in this tenant' } }, 400);
-            }
-        }
+        // Every soft reference this patch can dangle, resolved inside the
+        // caller's tenant before anything is written. See ./patch-guards.
+        const refusal = await findPatchRefusal(
+            db, tenantId, id, body,
+            (i, t, key) => c.var.services.inspection.isInspectionPhotoKey(i, t, key),
+        );
+        if (refusal) return c.json({ success: false as const, error: refusal }, 400);
 
         // A date PATCH moves the scheduled instant with the civil day
         // (§7.5 item 3) — see services/inspection/reschedule-date.ts.
         const updateValues: Record<string, unknown> = typeof body.date === 'string'
             ? await datePatchValues(db, tenantId, id, body as Record<string, unknown> & { date: string })
-            : body;
+            : { ...body };
+
+        // Deposit tier 3. The FLAG is the whole point: `deposit_required_cents`
+        // alone cannot tell a computed snapshot from a figure an operator
+        // agreed on the phone, so a later re-resolve would silently overwrite
+        // the second. Clearing the amount clears the override with it —
+        // otherwise the order stays pinned to a number that no longer exists.
+        if ('depositRequiredCents' in body) {
+            updateValues.depositOverridden = body.depositRequiredCents != null;
+        }
 
         // Tenant-ownership pre-check above guards access. The validated `body`
         // can legitimately be empty: the settings sheet forwards its whole form
@@ -364,9 +339,18 @@ const coreRoutes = createApiRouter()
         // here to avoid wiping "team mode" rows. They are frozen dead and were
         // NULL / '[]' on every row, so there was never anything to preserve.
         if ('inspectorId' in body) {
-            await syncInspectionAssignments(db, tenantId, id, {
+            await syncAssignmentsAndSplits(db, tenantId, id, {
                 inspectorId: body.inspectorId ?? null,
             });
+        }
+
+        // Keep the lead's own calendar in step with whatever this patch changed.
+        // One call covers all three cases it can produce: a moved date UPDATEs
+        // the existing entry, a new inspectorId moves it between calendars, and
+        // a cancel takes it off — pushInspectionToGoogle re-reads the row and
+        // decides, so the route does not have to enumerate them.
+        if ('date' in body || 'inspectorId' in body || 'status' in body) {
+            pushInspectionAfterResponse(c, tenantId, id);
         }
 
         if (body.status && body.status !== inspection.status) {

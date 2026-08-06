@@ -36,22 +36,25 @@ interface Call { method: string; path: string; body: unknown }
  * that rather than standing up sqlite, because what this spec is about is the
  * request we build, not the join that finds the id.
  */
-function stubDb(qboId: string | null) {
+function stubDb(qboId: string | null, defaultTimezone?: string) {
     const chain = {
         select: () => chain,
         from: () => chain,
         where: () => chain,
-        get: async () => (qboId == null ? undefined : { qboId }),
+        get: async () => (qboId == null ? undefined : { qboId, defaultTimezone }),
     };
     return chain;
 }
 
 class ProbeQbo extends withInvoiceSync(QBOServiceBase) {
     calls: Call[] = [];
-    constructor(private readonly mappedQboId: string | null = 'QBO-INV-1') {
+    constructor(
+        private readonly mappedQboId: string | null = 'QBO-INV-1',
+        private readonly tenantTz?: string,
+    ) {
         super({} as never, 'cid', 'secret', 'whsec', 'jwt');
     }
-    protected override getDrizzle() { return stubDb(this.mappedQboId) as never; }
+    protected override getDrizzle() { return stubDb(this.mappedQboId, this.tenantTz) as never; }
     protected override async getQBOCustomerIdForInvoice(): Promise<string | null> { return 'QBO-CUST-9'; }
     protected override async apiCall<T>(
         _tenantId: string, method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown,
@@ -64,10 +67,13 @@ class ProbeQbo extends withInvoiceSync(QBOServiceBase) {
 const requestIdOf = (path: string) =>
     new URLSearchParams(path.slice(path.indexOf('?') + 1)).get('requestid');
 
+/** The ledger row's occurred_at — any fixed instant will do for these probes. */
+const OCCURRED = new Date('2026-03-01T10:00:00Z');
+
 describe('recordPayment → QuickBooks', () => {
     it('carries a requestid derived from the OI record, not a random uuid', async () => {
         const qbo = new ProbeQbo();
-        await qbo.recordPayment('t1', 'inv-abc12345', 450, 'pay-inv-abc12345');
+        await qbo.recordPayment('t1', 'inv-abc12345', 450, 'pay-inv-abc12345', OCCURRED);
 
         expect(qbo.calls).toHaveLength(1);
         expect(qbo.calls[0].path.startsWith('payment')).toBe(true);
@@ -76,8 +82,8 @@ describe('recordPayment → QuickBooks', () => {
 
     it('sends the same key twice for the same fact — QBO collapses the second', async () => {
         const qbo = new ProbeQbo();
-        await qbo.recordPayment('t1', 'inv-abc12345', 450, 'pay-inv-abc12345');
-        await qbo.recordPayment('t1', 'inv-abc12345', 450, 'pay-inv-abc12345');
+        await qbo.recordPayment('t1', 'inv-abc12345', 450, 'pay-inv-abc12345', OCCURRED);
+        await qbo.recordPayment('t1', 'inv-abc12345', 450, 'pay-inv-abc12345', OCCURRED);
 
         expect(qbo.calls).toHaveLength(2);                                  // both attempted
         expect(new Set(qbo.calls.map((c) => requestIdOf(c.path))).size).toBe(1); // one key
@@ -85,7 +91,7 @@ describe('recordPayment → QuickBooks', () => {
 
     it('still posts the amount and the invoice link', async () => {
         const qbo = new ProbeQbo();
-        await qbo.recordPayment('t1', 'inv-1', 450, 'pay-inv-1');
+        await qbo.recordPayment('t1', 'inv-1', 450, 'pay-inv-1', OCCURRED);
 
         const body = qbo.calls[0].body as {
             TotalAmt: number; CustomerRef: { value: string };
@@ -98,8 +104,30 @@ describe('recordPayment → QuickBooks', () => {
 
     it('pushes nothing when the invoice has no QBO mapping', async () => {
         const qbo = new ProbeQbo(null);
-        await qbo.recordPayment('t1', 'inv-1', 450, 'pay-inv-1');
+        await qbo.recordPayment('t1', 'inv-1', 450, 'pay-inv-1', new Date('2026-09-08T00:00:00Z'));
         expect(qbo.calls).toHaveLength(0);
+    });
+
+    // TxnDate is a calendar date with no timezone: QuickBooks books it into an
+    // accounting period as-is. The ledger separates occurred_at from created_at
+    // because an inspector records Tuesday's cash on Thursday — the push date is
+    // the wrong accounting period. An occurredAt far from "now" is deliberate:
+    // a test that passes on today's date proves nothing.
+    it('books the payment on the date the money moved, not the push date', async () => {
+        const qbo = new ProbeQbo();
+        await qbo.recordPayment(
+            't1', 'inv-1', 200, 'pay-row-1',
+            new Date('2026-09-08T00:00:00Z'),           // Tuesday; pushed some Thursday
+        );
+        expect((qbo.calls[0].body as { TxnDate: string }).TxnDate).toBe('2026-09-08');
+    });
+
+    it("derives the calendar date in the tenant's timezone, not UTC", async () => {
+        // 01:00 UTC on the 8th is still the evening of the 7th in Los Angeles —
+        // a payment taken at 6pm Pacific belongs to the 7th's books.
+        const qbo = new ProbeQbo('QBO-INV-1', 'America/Los_Angeles');
+        await qbo.recordPayment('t1', 'inv-1', 200, 'pay-row-1', new Date('2026-09-08T01:00:00Z'));
+        expect((qbo.calls[0].body as { TxnDate: string }).TxnDate).toBe('2026-09-07');
     });
 });
 
@@ -160,7 +188,7 @@ describe('a card payment reaches QuickBooks', () => {
         await Promise.all(settled);
 
         expect(res.status).toBe(200);
-        expect(recordPayment).toHaveBeenCalledWith('tA', 'inv-1', 450, 'pay-row-9');
+        expect(recordPayment).toHaveBeenCalledWith('tA', 'inv-1', 450, 'pay-row-9', APPENDED.occurredAt);
     });
 
     it('does not push when QuickBooks is not connected', async () => {

@@ -146,8 +146,33 @@ export async function markCalendarSynced(
     provider: CalendarProviderId = 'google',
 ): Promise<void> {
     const drizzleDb = drizzle(db);
+    // Clearing lastSyncError is half the job. Left behind, a fixed connection
+    // would keep showing the reconnect prompt for the failure it recovered from.
     await drizzleDb.update(calendarConnections)
-        .set({ lastSyncAt: new Date() })
+        .set({ lastSyncAt: new Date(), lastSyncError: null })
+        .where(and(
+            eq(calendarConnections.tenantId, tenantId),
+            eq(calendarConnections.userId, userId),
+            eq(calendarConnections.provider, provider),
+        ));
+}
+
+/**
+ * Records why the latest sync attempt failed. Deliberately does NOT touch
+ * lastSyncAt: that column vouches for the freshness of data we actually hold,
+ * and a failed attempt did not refresh anything. The badge stays stale AND
+ * gains a reason, which is the honest pair.
+ */
+export async function markCalendarSyncFailed(
+    db: D1Database,
+    tenantId: string,
+    userId: string,
+    message: string,
+    provider: CalendarProviderId = 'google',
+): Promise<void> {
+    const drizzleDb = drizzle(db);
+    await drizzleDb.update(calendarConnections)
+        .set({ lastSyncError: message.slice(0, 500) })
         .where(and(
             eq(calendarConnections.tenantId, tenantId),
             eq(calendarConnections.userId, userId),

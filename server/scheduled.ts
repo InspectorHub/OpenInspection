@@ -6,6 +6,7 @@ import { AgreementService } from './services/agreement.service';
 import { buildTenantEmailService } from './lib/email/build-email-service';
 import type { EmailServiceEnv } from './lib/email/build-email-service';
 import { PlanQuotaGuard, readTenantTier } from './features/plan-quota/guard';
+import { tenantAiCapsLoader } from './features/plan-quota/ai-caps';
 import { getDeploymentProfile } from './lib/deployment-profile';
 import type { AppEnv, BrowserRun } from './types/hono';
 import { QBOService } from './services/qbo.service';
@@ -32,6 +33,7 @@ export interface ScheduledEnv {
     JWT_SECRET_PREVIOUS?: string;
     QBO_CLIENT_ID?: string;
     QBO_CLIENT_SECRET?: string;
+    QBO_ENV?: string;
     QBO_WEBHOOK_SECRET?: string;
     // Track L — platform-default Twilio creds + the KV used by loadTwilioForTenant
     // to read per-tenant secrets. The cron SMS runtime is built only when both
@@ -49,6 +51,10 @@ export interface ScheduledEnv {
     /** Shared Messaging Service SID for managed_shared tenants (Task 8 send gate). */
     TWILIO_SHARED_MESSAGING_SERVICE_SID?: string;
     TENANT_CACHE?: KVNamespace;
+    /** Platform Google OAuth client, for the calendar sync sweep. Tenants with
+     *  their OWN client are resolved from encrypted tenant secrets instead. */
+    GOOGLE_CLIENT_ID?: string;
+    GOOGLE_CLIENT_SECRET?: string;
     // Core -> portal user-sync transport (A-13/A-14). Producer binding to the
     // sync queue; the outbox sweeper republishes pending rows through it.
     // Optional — sweeper is a no-op when missing (standalone).
@@ -71,6 +77,7 @@ async function runQBOCDC(env: ScheduledEnv): Promise<void> {
         env.QBO_CLIENT_SECRET ?? '',
         env.QBO_WEBHOOK_SECRET ?? '',
         env.JWT_SECRET,
+        env.QBO_ENV,
     );
     const invoiceSvc = new InvoiceService(env.DB);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -196,7 +203,7 @@ export async function scheduled(
         // `tenant.tier` column — no extra lookup needed there.
         const profile = getDeploymentProfile(env as unknown as AppEnv);
         const quotaGuard = profile.hasUsageQuota
-            ? new PlanQuotaGuard(env.DB, { enforced: true, billingPortalUrl: profile.billingPortalUrl })
+            ? new PlanQuotaGuard(env.DB, { enforced: true, billingPortalUrl: profile.billingPortalUrl, aiCaps: tenantAiCapsLoader(env.DB) })
             : undefined;
         const appBaseUrl = env.APP_BASE_URL || '';
         // Spec 2 Task 2b — report.published PDF-email delivery deps. Guarded on
@@ -309,6 +316,21 @@ export async function scheduled(
         } catch (e) {
             logger.error('[cron] managed compliance sweep failed', {}, e instanceof Error ? e : undefined);
         }
+    }
+
+    // 5d. Pull each connected inspector's Google busy time on a schedule, so
+    //     "Sync now" stops being something anyone has to remember. Body lives
+    //     in lib/calendar/sync-sweep; it never throws and records its own
+    //     per-connection failures as last_sync_error.
+    if (env.TENANT_CACHE && env.JWT_SECRET) {
+        const { sweepCalendarSyncs } = await import('./lib/calendar/sync-sweep');
+        const swept = await sweepCalendarSyncs({
+            DB: env.DB, TENANT_CACHE: env.TENANT_CACHE, JWT_SECRET: env.JWT_SECRET,
+            ...(env.JWT_SECRET_PREVIOUS ? { JWT_SECRET_PREVIOUS: env.JWT_SECRET_PREVIOUS } : {}),
+            ...(env.GOOGLE_CLIENT_ID ? { GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID } : {}),
+            ...(env.GOOGLE_CLIENT_SECRET ? { GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET } : {}),
+        });
+        if (swept.attempted > 0) logger.info('[cron] calendar sync sweep', swept);
     }
 
     // 6. Track I-a GDPR retention sweep (spec §7) — final destruction of

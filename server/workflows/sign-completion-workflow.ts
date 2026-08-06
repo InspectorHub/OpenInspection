@@ -9,6 +9,7 @@ import { buildEvidencePack } from '../services/evidence-pack.service';
 import { buildTenantEmailService } from '../lib/email/build-email-service';
 import { getDeploymentProfile } from '../lib/deployment-profile';
 import { PlanQuotaGuard, readTenantTier } from '../features/plan-quota/guard';
+import { tenantAiCapsLoader } from '../features/plan-quota/ai-caps';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
@@ -230,7 +231,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                 // lookup (mirrors PlanQuotaGuard.consumeInspection's own pattern).
                 const profile = getDeploymentProfile(env);
                 const quotaGuard = profile.hasUsageQuota
-                    ? new PlanQuotaGuard(env.DB, { enforced: true, billingPortalUrl: profile.billingPortalUrl })
+                    ? new PlanQuotaGuard(env.DB, { enforced: true, billingPortalUrl: profile.billingPortalUrl, aiCaps: tenantAiCapsLoader(env.DB) })
                     : undefined;
                 const tenantTier = quotaGuard ? await readTenantTier(env.DB, req.tenantId) : undefined;
                 const email = await buildTenantEmailService(env, req.tenantId, quotaGuard, tenantTier);

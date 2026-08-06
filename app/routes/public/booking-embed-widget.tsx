@@ -144,6 +144,14 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
           // The embed has no time picker — the API requires a timeSlot, and
           // 'all-day' is the honest default (server collapses it internally).
           timeSlot: "all-day",
+          // NO `services`, and therefore NO DEPOSIT from this surface, even for
+          // a workspace that requires one. Not an oversight and not a quick fix:
+          // a deposit resolves against the price of what was selected, and this
+          // form selects nothing — the order it creates carries `price: 0`. A
+          // percentage of zero is zero, and a flat amount against an order with
+          // no priced work is a charge with nothing behind it. Giving the embed
+          // a deposit means giving it service selection first. Tracked as its
+          // own issue; see the booking-deposit plan, Risk 3.
           ...(locale ? { locale } : {}),
           turnstileToken: fd.get("cf-turnstile-response") || undefined,
         }),

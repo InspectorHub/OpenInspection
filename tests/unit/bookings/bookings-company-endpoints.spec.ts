@@ -292,7 +292,12 @@ describe('GET /slots — aggregated tenant slots (IA-26)', () => {
         expect(body.data.slots).toHaveLength(3);
         expect(body.data.slots[0]).toEqual({ time: '08:00', available: true });
         expect(body.data.slots[2]).toEqual({ time: '09:00', available: false });
-        expect(getTenantSlots).toHaveBeenCalledWith(TENANT_ID, TEST_DATE, []);
+        // The 4th arg is the optional precomputed qualified set (the route does
+        // not precompute) and the 5th is the property ZIP. `null` rather than
+        // undefined is deliberate at the call site: the service distinguishes
+        // "no ZIP was supplied" from "the caller has not been updated", and
+        // reports the former as `geoSkipped: 'property_zip_unknown'`.
+        expect(getTenantSlots).toHaveBeenCalledWith(TENANT_ID, TEST_DATE, [], undefined, null);
         // inspectorIds must NOT be in the response (private field).
         expect(body.data.slots[0]).not.toHaveProperty('inspectorIds');
     });
@@ -302,7 +307,7 @@ describe('GET /slots — aggregated tenant slots (IA-26)', () => {
         const app = buildApp(db, { getTenantSlots });
         const res = await app.request(`/slots?tenant=${TENANT_SLUG}&date=${TEST_DATE}&serviceIds=svc-1,svc-2`, {}, FAKE_ENV);
         expect(res.status).toBe(200);
-        expect(getTenantSlots).toHaveBeenCalledWith(TENANT_ID, TEST_DATE, ['svc-1', 'svc-2']);
+        expect(getTenantSlots).toHaveBeenCalledWith(TENANT_ID, TEST_DATE, ['svc-1', 'svc-2'], undefined, null);
     });
 
     it('filters slots by inspectorId when provided (client-choice flow)', async () => {

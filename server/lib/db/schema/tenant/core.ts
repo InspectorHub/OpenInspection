@@ -1,6 +1,8 @@
-import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import type { ReportLinkTtl } from '../../../report-link-ttl';
+import type { CancellationPolicy } from '../../../billing/cancellation-policy';
+import type { DepositPolicy } from '../../../billing/deposit-policy';
 
 export const tenants = sqliteTable('tenants', {
     id: text('id').primaryKey(),
@@ -264,6 +266,78 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     bookingConflictPolicy: text('booking_conflict_policy', {
         enum: ['advisory', 'block'],
     }).notNull().default('advisory'),
+    // The tenant's cancellation ladder. NULL = no policy configured, which is
+    // how every workspace ships: the platform charges nothing and cancellations
+    // are free until the tenant says otherwise. There is no default policy and
+    // no model clause — both are the tenant's, because the agreement is the
+    // tenant's content and it is the agreement that governs.
+    //
+    // ⚠️ WRITE PATH IS LOAD-BEARING. The only legitimate writer of this column
+    // is `BrandingService.updateBranding`, which refuses a fee-bearing policy
+    // unless the attestation below is present AND still matches the agreement
+    // it was made against. That gate compares DB state, so no Zod schema can
+    // express it and no constraint enforces it — it lives in the writer.
+    // `tenant_configs` has ~19 write sites across 11 files; a second writer of
+    // THIS column would bypass the gate in silence and charge a fee the
+    // contract may not support. Route new writes through that method, or move
+    // the gate somewhere both writers can see it.
+    // Appended at END of the table per the D1 add-column-at-end rule
+    // (tenant_configs is FK-referenced).
+    cancellationPolicy: text('cancellation_policy', { mode: 'json' }).$type<CancellationPolicy>(),
+    // The tenant's confirmation that their OWN agreement contains a
+    // cancellation clause covering those fees. Recorded as the agreement
+    // template id plus the VERSION attested, never a bare timestamp:
+    // `agreements` is multi-row per tenant with a per-row version, so a bare
+    // timestamp lets a commercial template's edit void a residential
+    // attestation — and, worse, lets an attestation outlive the very clause it
+    // attested to. Storing id + version makes invalidation an equality check
+    // instead of an event somebody has to remember to fire.
+    cancellationClauseAgreementId: text('cancellation_clause_agreement_id'),
+    cancellationClauseVersion: integer('cancellation_clause_version'),
+    cancellationClauseAttestedAt: integer('cancellation_clause_attested_at', { mode: 'timestamp_ms' }),
+    // Tier 1 of the booking deposit: what the workspace asks for up front on
+    // any service that does not say otherwise. NULL = no deposit anywhere,
+    // which is how every workspace ships — nothing changes for an existing
+    // tenant until they opt in.
+    //
+    // Tier 2 is the same shape on `services`; tier 3 is
+    // `inspections.deposit_required_cents` + `deposit_overridden`. The
+    // arithmetic that combines them is `lib/billing/deposit-policy.ts`, and it
+    // is pure precisely so the number a client is quoted and the number they
+    // are charged come from one function.
+    // Appended at END of the table per the D1 add-column-at-end rule
+    // (tenant_configs is FK-referenced).
+    depositPolicy: text('deposit_policy', { mode: 'json' }).$type<DepositPolicy>(),
+    // How the server chooses WHICH qualified inspector gets an auto-assigned
+    // booking. 'first_available' is the shipped behaviour (stable name sort)
+    // and stays the default, so nothing changes until a workspace opts in.
+    //
+    // The other two can be INAPPLICABLE to a given request — `least_loaded`
+    // when nothing in the ISO week is dated, `closest` when the property or
+    // every candidate lacks coordinates. When that happens the server falls
+    // back to first_available and RECORDS the substitution with a named reason
+    // (see server/lib/booking/routing.ts). A strategy that silently degrades
+    // into first_available is indistinguishable from one that works.
+    bookingRoutingStrategy: text('booking_routing_strategy', {
+        enum: ['first_available', 'least_loaded', 'closest'],
+    }).notNull().default('first_available'),
+    // Minimum hours between NOW and the start of a bookable slot. 0 (the
+    // default) preserves the prior behaviour of accepting any future slot.
+    bookingMinLeadHours: integer('booking_min_lead_hours').notNull().default(0),
+    // Wall-clock `HH:MM` in the TENANT timezone after which today's remaining
+    // slots stop being offered. NULL = no cutoff. Deliberately a civil time,
+    // not an instant: "no same-day after 3pm" is a statement about the office
+    // clock and must survive DST without anyone editing it.
+    bookingSameDayCutoffTime: text('booking_same_day_cutoff_time'),
+    // Coordinates of `company_address`, resolved ONCE through the Places
+    // details path when an admin saves the address. They are the default
+    // service origin for every inspector who has not set their own, which is
+    // what makes `closest` usable for a single-office workspace with no
+    // per-inspector setup at all. NULL = never geocoded (or the lookup failed);
+    // `closest` treats that as "this workspace has no anchor", not as (0,0).
+    companyLat: real('company_lat'),
+    companyLng: real('company_lng'),
+    companyGeocodedAt: integer('company_geocoded_at', { mode: 'timestamp_ms' }),
 });
 
 /**

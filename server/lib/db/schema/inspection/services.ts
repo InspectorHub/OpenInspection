@@ -4,6 +4,7 @@ import { tenants } from '../tenant';
 import { templates } from './template-rating';
 import { agreements } from './agreements';
 import { inspections } from './core';
+import type { DepositPolicy } from '../../../billing/deposit-policy';
 
 export const services = sqliteTable('services', {
     id: text('id').primaryKey(),
@@ -30,6 +31,17 @@ export const services = sqliteTable('services', {
     // proposal.
     // Appended at table end for D1 rebuild safety.
     defaultEventTypeSlugs: text('default_event_type_slugs', { mode: 'json' }).$type<string[]>(),
+    // Tier 2 of the booking deposit — this service's own answer, overriding the
+    // workspace default in `tenant_configs.deposit_policy`.
+    //
+    // NULL and `{ type: 'none' }` are DIFFERENT answers and the distinction is
+    // the reason this column is nullable rather than defaulted: NULL inherits,
+    // `none` opts out. A workspace that takes 20% on everything still has one
+    // $95 add-on it never asks a deposit for, and there is no way to say that
+    // without both values.
+    // Appended at table end for D1 rebuild safety (`services` is FK-referenced
+    // by inspection_services and service_inspectors).
+    depositPolicy: text('deposit_policy', { mode: 'json' }).$type<DepositPolicy>(),
 }, (t) => [
     index('idx_services_tenant').on(t.tenantId),
 ]);

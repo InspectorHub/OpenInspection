@@ -1,0 +1,176 @@
+import { Hono } from 'hono';
+import type { HonoConfig } from '../types/hono';
+import { requireRole } from '../lib/middleware/rbac';
+import { QBOTokenResponseSchema, QBOCompanyInfoResponseSchema } from '../lib/validations/qbo.schema';
+import { logger } from '../lib/logger';
+import { qboRedirectUri } from '../lib/qbo-oauth-paths';
+import { resolveQboApiBase } from '../services/qbo/api-base';
+import { loadTenantSecrets } from '../lib/secrets-cache';
+import { applyIntegrationSecrets } from '../lib/middleware/integration-secrets';
+
+/**
+ * The two halves of the QuickBooks OAuth handshake that a BROWSER walks
+ * through, split out from the rest of the QBO admin router (`api/qbo.ts`) and
+ * mounted under `/api/integrations/qbo` beside the webhook.
+ *
+ * They live here, and not with their siblings, because they are the only QBO
+ * routes the outside world navigates to. The siblings (`/status`, `/pause`,
+ * `/sync`, …) are fetched by the settings page through the in-process
+ * `API_WORKER` binding, so their `/settings/**` mount is fine; these two are
+ * not reachable there at all — `workers/app.ts` forwards an explicit prefix
+ * allow-list to this API app, `/settings/**` is not on it, and everything else
+ * goes to React Router, which has no `/settings/integrations/qbo/connect` page.
+ *
+ * NOTE: no router-wide `use('*')` middleware. This router shares its mount
+ * prefix with the webhook router, and prefix middleware here would run on
+ * `/api/integrations/qbo/webhook` too — a session check in front of a route
+ * Intuit calls with an HMAC and no cookie. The guards are per-route.
+ */
+const api = new Hono<HonoConfig>();
+
+/**
+ * Authenticated entry point — keeps the owner/manager guard the rest of the QBO
+ * router carries (see the rationale in `api/qbo.ts`). Connecting company books
+ * is company-level administration, and this is the door.
+ *
+ * The global JWT middleware has already verified the cookie and set `userRole`
+ * by the time this runs; `requireRole` also refuses a caller with no role,
+ * which is what an agent (client/realtor) JWT is.
+ */
+api.get('/connect', requireRole('owner', 'manager'), async (c) => {
+    if (!c.env.QBO_CLIENT_ID || !c.env.QBO_CLIENT_SECRET) {
+        return c.redirect('/settings/integrations/qbo?error=not_configured', 302);
+    }
+    if (!c.env.APP_BASE_URL) {
+        return c.redirect('/settings/integrations/qbo?error=missing_base_url', 302);
+    }
+
+    const state = crypto.randomUUID();
+    // The state IS the callback's authorization, so it carries the tenant.
+    //
+    // Why that is safe: this value is a server-generated UUID, single-use (the
+    // callback deletes it before doing anything with it), expires in 600
+    // seconds, and is only ever issued to a caller who has just passed the
+    // owner/manager guard above. Possession of a valid state is therefore proof
+    // that an owner or manager initiated this exchange — which is precisely
+    // what the OAuth `state` parameter is for. It is never sent to the browser
+    // as a credential for anything else, and it grants exactly one action:
+    // finishing the handshake it was minted for.
+    //
+    // It cannot be a session instead: Intuit sends the user back as a
+    // cross-site top-level navigation, and `__Host-inspector_token` is
+    // `SameSite=Strict` (`lib/auth-helpers.ts`), so the cookie is withheld on
+    // exactly that navigation. There is no session on the callback to read.
+    await c.env.TENANT_CACHE.put(`qbo_oauth_state:${state}`, c.get('tenantId'), { expirationTtl: 600 });
+
+    const url = new URL('https://appcenter.intuit.com/connect/oauth2');
+    url.searchParams.set('client_id', c.env.QBO_CLIENT_ID);
+    url.searchParams.set('redirect_uri', qboRedirectUri(c.env.APP_BASE_URL));
+    url.searchParams.set('response_type', 'code');
+    url.searchParams.set('scope', 'com.intuit.quickbooks.accounting');
+    url.searchParams.set('state', state);
+    return c.redirect(url.toString());
+});
+
+/**
+ * UNAUTHENTICATED by design — declared public in `lib/middleware/jwt-auth.ts`
+ * (the same list that exempts the QBO webhook), and authorized by `state`.
+ * See the note on `/connect` for why a session cannot reach this handler.
+ */
+api.get('/callback', async (c) => {
+    const code = c.req.query('code') ?? '';
+    const state = c.req.query('state') ?? '';
+    const realmId = c.req.query('realmId') ?? '';
+    const error = c.req.query('error');
+
+    // These redirects point at the React Router settings PAGE, which is where
+    // the user should end up — not back into this API family.
+    if (error) return c.redirect('/settings/integrations/qbo?error=' + encodeURIComponent(error));
+    if (!c.env.APP_BASE_URL) return c.redirect('/settings/integrations/qbo?error=not_configured');
+
+    const tenantId = await c.env.TENANT_CACHE.get(`qbo_oauth_state:${state}`);
+    if (!tenantId) return c.redirect('/settings/integrations/qbo?error=invalid_state');
+    // Burn it before use: a replayed callback must not be able to write a
+    // second connection, and the window closes even if the exchange below
+    // throws.
+    await c.env.TENANT_CACHE.delete(`qbo_oauth_state:${state}`);
+    c.set('tenantId', tenantId);
+
+    // The client id/secret can be a per-tenant secret (Settings -> Integrations),
+    // and `integrationSecretsMiddleware` only merges those into `c.env` once a
+    // tenant is known. On this request the tenant was unknown until the line
+    // above — in saas mode nothing upstream could resolve it — so load them
+    // here for the tenant the state names. Same helper, same precedence rule
+    // (env wins, DB is the self-host fallback); a no-op when env already has
+    // them, which is the standalone case.
+    if (!c.env.QBO_CLIENT_ID || !c.env.QBO_CLIENT_SECRET) {
+        const decrypted = await loadTenantSecrets(
+            c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+        ).catch(() => null);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (decrypted) applyIntegrationSecrets(c.env as any, decrypted as Record<string, string | undefined>);
+    }
+    if (!c.env.QBO_CLIENT_ID || !c.env.QBO_CLIENT_SECRET) {
+        return c.redirect('/settings/integrations/qbo?error=not_configured');
+    }
+
+    // Which Intuit host this deployment talks to. Checked here rather than
+    // after the exchange: connecting sandbox books with no QBO_ENV would store
+    // a working token against an API the worker refuses to call, and the
+    // integration would look connected while syncing nothing.
+    let apiBase: string;
+    try {
+        apiBase = resolveQboApiBase(c.env.QBO_ENV);
+    } catch {
+        return c.redirect('/settings/integrations/qbo?error=not_configured');
+    }
+
+    // Byte-identical to the value `/connect` authorized with, and to what is
+    // registered on the Intuit app — one function, no second literal.
+    const redirectUri = qboRedirectUri(c.env.APP_BASE_URL);
+    const basicAuth = 'Basic ' + btoa(`${c.env.QBO_CLIENT_ID}:${c.env.QBO_CLIENT_SECRET}`);
+
+    try {
+        const tokenResp = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
+            method: 'POST',
+            headers: {
+                Authorization: basicAuth,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                Accept: 'application/json',
+            },
+            body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: redirectUri }),
+        });
+        if (!tokenResp.ok) throw new Error('Token exchange failed');
+        const tokens = QBOTokenResponseSchema.parse(await tokenResp.json());
+
+        let companyName: string | null = null;
+        try {
+            const infoResp = await fetch(
+                `${apiBase}/${realmId}/companyinfo/${realmId}?minorversion=75`,
+                { headers: { Authorization: `Bearer ${tokens.access_token}`, Accept: 'application/json' } },
+            );
+            if (infoResp.ok) {
+                const info = QBOCompanyInfoResponseSchema.parse(await infoResp.json());
+                companyName = info.CompanyInfo.CompanyName;
+            }
+        } catch { /* non-fatal: company name is a UX nicety */ }
+
+        const svc = c.var.services.qbo;
+        await svc.saveConnection({
+            tenantId,
+            realmId,
+            companyName,
+            accessToken:           tokens.access_token,
+            refreshToken:          tokens.refresh_token,
+            refreshTokenExpiresIn: tokens.x_refresh_token_expires_in,
+        });
+        c.executionCtx.waitUntil(svc.bootstrapDefaultItem(tenantId));
+
+        return c.redirect('/settings/integrations/qbo?connected=1');
+    } catch (e) {
+        logger.error('QBO OAuth callback failed', { realmId }, e instanceof Error ? e : undefined);
+        return c.redirect('/settings/integrations/qbo?error=oauth_failed');
+    }
+});
+
+export default api;

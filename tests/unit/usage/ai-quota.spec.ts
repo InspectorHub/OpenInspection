@@ -127,6 +127,48 @@ describe('AI quota + metering', () => {
             });
             await expect(g.checkAiQuota(T, 'pro', 'ai_translate')).resolves.toBeUndefined();
         });
+
+        /**
+         * The DELIVERED path. Every case above hands the guard a caps OBJECT,
+         * which no production site does — the seven construction sites pass a
+         * LOADER, because two of them (the per-request DI middleware and the
+         * cron tick reused across tenants) must not resolve one tenant's caps
+         * eagerly and hand them to another tenant's check.
+         *
+         * Without these two cases the object-shaped suite above stays green
+         * against a guard that silently ignores a function.
+         */
+        it('enforces caps that arrived as a LOADER, not just as an object', async () => {
+            await seedAdversely(new MeteringService(testD1));
+            const loader = vi.fn(async (tenantId: string) =>
+                tenantId === T ? { pro: { ai_translate: 10_000 } } : undefined);
+            const g = new PlanQuotaGuard(testD1, {
+                enforced: true, billingPortalUrl: null, aiCaps: loader,
+            });
+            await expect(g.checkAiQuota(T, 'pro', 'ai_translate')).rejects.toMatchObject({
+                code: 'QUOTA_EXHAUSTED',
+                details: { metric: 'ai_translate', used: 10_000, cap: 10_000 },
+            });
+            // Resolved per check, with the tenant being checked — not once at
+            // construction. This is the assertion that makes the shared cron
+            // guard safe.
+            expect(loader).toHaveBeenCalledWith(T);
+        });
+
+        it('a loader that reports nothing configured enforces nothing', async () => {
+            // The unconfigured production state today: the deployment has been
+            // given no allowance, so AI metering runs and AI enforcement does
+            // not. FREE_TIER_CAPS is untouched by any of this — it governs
+            // inspections/sms/email and carries no AI entry at all, which is
+            // what keeps "no managed allowance" from silently inheriting one.
+            await seedAdversely(new MeteringService(testD1));
+            const g = new PlanQuotaGuard(testD1, {
+                enforced: true, billingPortalUrl: null, aiCaps: async () => undefined,
+            });
+            await expect(g.checkAiQuota(T, 'pro', 'ai_translate')).resolves.toBeUndefined();
+            expect(FREE_TIER_CAPS).not.toHaveProperty('ai_translate');
+            expect(FREE_TIER_CAPS).not.toHaveProperty('ai_assist');
+        });
     });
 
     describe('call-site metering', () => {

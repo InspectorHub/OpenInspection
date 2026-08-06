@@ -5,11 +5,13 @@ import { logger } from '../lib/logger';
 import {
     parseCmdEnvelope, isKnownCmd, cmdTenantUpdateDataSchema, cmdSyncQuotaDataSchema,
     cmdSeedStarterContentDataSchema, cmdDataExportDataSchema, cmdPurgeDataSchema,
+    cmdTenantAiCapsDataSchema,
     type CmdEnvelope,
 } from '../lib/sync-events/cmd-envelope';
 import type { SyncEnvelope } from '../lib/sync-events/envelope';
-import { applySyncQuota, applyTenantUpdate, applySeedStarterContent } from './apply-commands';
+import { applySyncQuota, applyTenantUpdate, applySeedStarterContent, applyAiCaps } from './apply-commands';
 import { applyCredentialIfFresh } from './admin-credential';
+import { parkedFingerprint } from './parked-fingerprint';
 import { OutboxService, type OutboxRow } from './outbox.service';
 
 /** A-21 batch 3 — R2 bindings the offboarding commands need. Optional: absent
@@ -34,10 +36,10 @@ export interface CmdConsumerBuckets {
 
 export type CmdApplyResult = 'applied' | 'duplicate' | 'stale' | 'stale-credential-applied' | 'parked';
 
-const PARSE_FAIL_MAX = 2000;
-
 type Db = ReturnType<typeof drizzle>;
 
+/** `envelope` holds a FINGERPRINT, never the message — see parked-fingerprint.ts
+ *  for why, and for what a reader of this row can still answer. */
 async function park(db: Db, id: string, envelope: string, reason: string): Promise<void> {
     await db.insert(parkedCmdEvents)
         .values({ id, envelope, reason, receivedAt: new Date() })
@@ -55,13 +57,12 @@ export async function applyCmdEnvelope(
     const env = parseCmdEnvelope(raw);
 
     if (!env) {
-        const rawStr = typeof raw === 'string' ? raw : safeStringify(raw);
-        await park(db, crypto.randomUUID(), rawStr.slice(0, PARSE_FAIL_MAX), 'parse-failed');
+        await park(db, crypto.randomUUID(), await parkedFingerprint(raw, null), 'parse-failed');
         logger.warn('[cmd] parked unparseable envelope');
         return 'parked';
     }
     if (!isKnownCmd(env.type, env.dataschema)) {
-        await park(db, env.id, JSON.stringify(env), 'unknown-type-or-version');
+        await park(db, env.id, await parkedFingerprint(raw, env), 'unknown-type-or-version');
         logger.warn('[cmd] parked unknown command', { id: env.id, type: env.type, dataschema: env.dataschema });
         return 'parked';
     }
@@ -235,6 +236,18 @@ async function applyKnownCmd(
             const result = await new TenantPurgeService(dbBinding, buckets.photos, kv).purge(data.tenantId);
             return { ...result };
         }
+        case 'io.inspectorhub.cmd.tenant.ai_caps': {
+            const data = cmdTenantAiCapsDataSchema.parse(env.data);
+            const result = await applyAiCaps(dbBinding, kv, data);
+            if (result === 'tenant-not-found') {
+                // Same reasoning as sync_quota: the caps fan-out may have raced
+                // ahead of the tenant upsert, so throw and let the retry give it
+                // time to land rather than writing a config row for a tenant
+                // that does not exist.
+                throw new Error(`ai_caps: tenant not found ${data.tenantId}`);
+            }
+            return;
+        }
         case 'io.inspectorhub.cmd.tenant.sync_quota': {
             const data = cmdSyncQuotaDataSchema.parse(env.data);
             const result = await applySyncQuota(dbBinding, kv, data);
@@ -293,10 +306,6 @@ async function emitReply(
         logger.error('[cmd] reply emission failed — outbox sweeper will retry if appended',
             { id: env.id, replyType }, err instanceof Error ? err : undefined);
     }
-}
-
-function safeStringify(value: unknown): string {
-    try { return JSON.stringify(value) ?? String(value); } catch { return String(value); }
 }
 
 /** Mirror of portal's queue-loop backoff. */

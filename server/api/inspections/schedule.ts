@@ -21,10 +21,11 @@ import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
 import { inspections as inspectionTable, tenantConfigs, users } from '../../lib/db/schema';
 import { getInspectionRoster } from '../../lib/inspection/roster';
-import { syncInspectionAssignments } from '../../lib/db/assignment-links';
+import { syncAssignmentsAndSplits } from '../../services/pay-split.service';
 import { findScheduleConflicts } from '../../lib/schedule-conflicts';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import { epochMsToWallClockHm, epochMsToWallClockYmd, resolveTenantTimeZone } from '../../lib/tz';
+import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
 import {
@@ -205,11 +206,16 @@ const scheduleRoutes = createApiRouter()
             .where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
         if (touchesAssignment) {
-            await syncInspectionAssignments(db, tenantId, id, {
+            await syncAssignmentsAndSplits(db, tenantId, id, {
                 leadInspectorId: leadId,
                 helperInspectorIds: helperIds,
             });
         }
+
+        // The dispatch board just moved someone's day. Mirror it onto their own
+        // calendar: the link table makes this an UPDATE of the entry already on
+        // their phone, and a reassignment takes it off the previous inspector's.
+        pushInspectionAfterResponse(c, tenantId, id);
 
         auditFromContext(c, 'inspection.rescheduled', 'inspection', {
             entityId: id,

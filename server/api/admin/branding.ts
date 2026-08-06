@@ -148,7 +148,17 @@ const adminBrandingRoutes = createApiRouter()
 
         // Phase B — `confirmCurrencyChange` is a transient acknowledgement, never a
         // persisted column; strip it before it reaches the branding service.
-        const { confirmCurrencyChange, ...brandingData } = body;
+        // `attestCancellationClause` is transient too: it names an agreement
+        // template, and the service turns it into the id + version + timestamp
+        // triple that the fee gate reads.
+        const { confirmCurrencyChange, attestCancellationClause, ...brandingData } = body;
+
+        // Applied BEFORE the policy write, so "tick the box and turn fees on"
+        // is one save rather than two. Withdrawing the attestation in the same
+        // request that enables fees correctly fails the gate below.
+        if (attestCancellationClause !== undefined) {
+            await brandingService.attestCancellationClause(tenantId, attestCancellationClause);
+        }
 
         // Guard: block a tenant currency change once invoices exist unless the
         // caller explicitly confirms (the per-invoice snapshot protects history,

@@ -62,3 +62,36 @@ export function didSaveService(
     const d = actionData as { ok?: unknown; intent?: unknown };
     return d.ok === true && d.intent === intent;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Pay rules (#278) — the human-units boundary                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The UI's half of the unit contract.
+ *
+ * The API speaks basis points and integer cents, and names both on the wire
+ * (`percentBps`, `amountCents`) so neither can be sent in the wrong unit by
+ * accident. A person types "60" meaning 60% and "125" meaning $125.00, so the
+ * ×100 has to happen somewhere — and it happens HERE, one function, beside the
+ * "%" and "$" the person can see, rather than being spread across a form
+ * handler. Getting this wrong pays someone 0.6% of a job, which is why it is
+ * a named function with a test rather than a `* 100` in a JSX callback.
+ *
+ * Returns null for anything that is not a positive number, so the caller can
+ * refuse the submission instead of sending NaN.
+ */
+export function toHundredths(input: string | number | null | undefined): number | null {
+    if (input === null || input === undefined || input === "") return null;
+    const n = typeof input === "number" ? input : Number(String(input).trim());
+    if (!Number.isFinite(n) || n <= 0) return null;
+    // Round, not floor: 62.5% is 6250 bp exactly, and float multiplication
+    // lands it at 6249.999999999999.
+    return Math.round(n * 100);
+}
+
+/** The inverse, for filling the form from a stored rule. 6000 → "60", 6250 → "62.5". */
+export function fromHundredths(value: number | null | undefined): string {
+    if (value === null || value === undefined || !Number.isFinite(value)) return "";
+    return String(Math.round(value) / 100);
+}

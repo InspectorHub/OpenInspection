@@ -1,4 +1,5 @@
 import { m } from "~/paraglide/messages";
+import type { DepositPolicy } from "../../../server/lib/billing/deposit-policy";
 
 // Functions (not module consts) so the labels resolve in the active locale at
 // call time, never frozen at import. The `id`s are the API timeSlot enum and
@@ -29,5 +30,14 @@ export interface CompanyProfile {
   allowInspectorChoice?: boolean;
   conciergeReviewRequired?: boolean;
   inspectors: { id: string; name: string | null; photoUrl: string | null }[];
-  services: { id: string; name: string; price: number; duration: number }[];
+  services: { id: string; name: string; price: number; duration: number; depositPolicy?: DepositPolicy | null }[];
+  /** ISO 4217 the company bills in. 'USD' when the workspace has not said. */
+  currency?: string;
+  /**
+   * The workspace deposit default, shipped so the form can QUOTE the amount
+   * before the client commits. It is a quote and never the authority — the
+   * server resolves it again from the same catalogue rows at booking time and
+   * freezes its own answer on the order.
+   */
+  depositPolicy?: DepositPolicy | null;
 }

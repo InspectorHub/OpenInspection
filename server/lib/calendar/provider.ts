@@ -10,6 +10,15 @@ export interface BusyBlock {
     // defaults transparency to 'opaque'.
     externalId?: string;
     transparency?: 'opaque' | 'transparent';
+    /**
+     * Set when this block is one instance of a recurring series. Only the
+     * events path can know this; freeBusy ranges never carry it.
+     */
+    recurringEventId?: string;
+    /** Epoch ms the provider created the event, when it reports one. */
+    createdMs?: number;
+    /** Epoch ms the provider last modified the event, when it reports one. */
+    updatedMs?: number;
 }
 
 /** A-polish 10b — one calendar from the provider's calendar list. */
@@ -20,12 +29,19 @@ export interface CalendarListEntry {
     primary: boolean;
 }
 
-interface CalendarPushEventInput {
+export interface CalendarPushEventInput {
     summary: string;
     location?: string;
     description?: string;
     start: Date;
     end: Date;
+    /**
+     * IANA zone the event belongs to (the tenant's). The instants above already
+     * pin the moment; this pins the zone the provider renders and recurs in, so
+     * an event does not drift an hour when the tenant crosses a DST boundary.
+     * Omitted only by callers that genuinely have no tenant zone.
+     */
+    timeZone?: string;
 }
 
 export interface PkceChallenge {
@@ -83,6 +99,20 @@ export interface CalendarProvider {
         calendarId: string;
         event: CalendarPushEventInput;
     }): Promise<string>;
+    /**
+     * Updates an event this deployment previously created. Separate from
+     * pushEvent because a reschedule must MOVE the entry the inspector already
+     * has on their phone — creating a second one and deleting the first loses
+     * their notification state and any guest responses.
+     */
+    patchEvent(params: {
+        clientId: string;
+        clientSecret: string;
+        refreshToken: string;
+        calendarId: string;
+        externalId: string;
+        event: CalendarPushEventInput;
+    }): Promise<void>;
     deleteEvent(params: {
         clientId: string;
         clientSecret: string;
@@ -90,6 +120,14 @@ export interface CalendarProvider {
         calendarId: string;
         externalId: string;
     }): Promise<void>;
+}
+
+/** Thrown when the provider says the remote event is gone (404/410). */
+export class ExternalEventGoneError extends Error {
+    constructor(externalId: string) {
+        super(`External calendar event no longer exists: ${externalId}`);
+        this.name = 'ExternalEventGoneError';
+    }
 }
 
 const GOOGLE_SCOPES: Record<CalendarCapability, string[]> = {

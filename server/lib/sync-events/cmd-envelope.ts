@@ -17,6 +17,10 @@ const KNOWN_CMD_TYPES: Record<string, readonly string[]> = {
     // A-21 batch 3 — offboarding data plane.
     'io.inspectorhub.cmd.tenant.data_export': ['cmd-tenant-data-export/v1'],
     'io.inspectorhub.cmd.tenant.purge': ['cmd-tenant-purge/v1'],
+    // Managed-AI provider tier — per-tier AI allowances, fanned out per tenant
+    // (the queue has no platform-scoped command and adding one would change the
+    // envelope contract both sides validate).
+    'io.inspectorhub.cmd.tenant.ai_caps': ['cmd-tenant-ai-caps/v1'],
 };
 
 const cmdEnvelopeSchema = z.object({
@@ -67,6 +71,29 @@ export const cmdDataExportDataSchema = z.object({
 export const cmdPurgeDataSchema = z.object({
     tenantId: z.string(),
 });
+/**
+ * Managed-AI provider tier — the caps that apply to THIS tenant, plus the tier
+ * they were computed for.
+ *
+ * `caps` is the COMPLETE set: core replaces what it holds, so clearing a cap is
+ * sending it as null (or omitting it), never a tombstone. The tier travels with
+ * the numbers because the guard looks caps up as `caps[tier][metric]` — if the
+ * tenant is moved to another tier before the next fan-out reaches them, the
+ * lookup misses and they are simply unenforced, which is the safe direction.
+ * OI receives NUMBERS, never a plan name to interpret.
+ *
+ * `caps` is a loose record on purpose (tolerant reader): a newer portal may name
+ * a metric this build cannot enforce, and the applier drops those rather than
+ * rejecting the whole command. Values are validated where they are stored.
+ * Ordering rides the shared per-tenant `tenantseq` — an AI cap is ordinary
+ * tenant state, so last-writer-wins under `tenants.applied_cmd_seq` is exactly
+ * right and it needs no private sequence the way credentials do.
+ */
+export const cmdTenantAiCapsDataSchema = z.object({
+    tenantId: z.string(),
+    tier: z.string().min(1),
+    caps: z.record(z.string(), z.unknown()),
+});
 
 export function parseCmdEnvelope(json: unknown): CmdEnvelope | null {
     let candidate: unknown = json;
@@ -75,6 +102,29 @@ export function parseCmdEnvelope(json: unknown): CmdEnvelope | null {
     }
     const result = cmdEnvelopeSchema.safeParse(candidate);
     return result.success ? result.data : null;
+}
+
+/**
+ * Which ENVELOPE fields a message failed validation on — names only, so the
+ * dead-letter row can say WHY a message could not be read without holding the
+ * message. Two things make that safe structurally rather than by promise:
+ * values never leave this function, and the returned names are intersected with
+ * this schema's own top-level keys, so nothing from inside `data` (a
+ * `z.record(z.unknown())`, which never produces an issue of its own) can appear.
+ */
+export function cmdEnvelopeIssueFields(json: unknown): string[] {
+    let candidate: unknown = json;
+    if (typeof candidate === 'string') {
+        try { candidate = JSON.parse(candidate); } catch { return ['<not-json>']; }
+    }
+    if (candidate === null || typeof candidate !== 'object') return ['<not-an-object>'];
+    const result = cmdEnvelopeSchema.safeParse(candidate);
+    if (result.success) return [];
+    const known = new Set(Object.keys(cmdEnvelopeSchema.shape));
+    const fields = result.error.issues
+        .map((issue) => String(issue.path[0] ?? ''))
+        .filter((name) => known.has(name));
+    return [...new Set(fields)].sort();
 }
 
 export function isKnownCmd(type: string, dataschema: string): boolean {

@@ -16,18 +16,23 @@
 // `/api/public` unchanged.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { eq, and, inArray } from 'drizzle-orm';
-import { users, services as servicesTable, tenants, availability, tenantConfigs } from '../lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { services as servicesTable, tenants } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { checkRateLimit } from '../lib/rate-limit';
-import { logger } from '../lib/logger';
 import {
     InspectorsResponseSchema,
     AvailabilityResponseSchema
 } from '../lib/validations/booking.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import createBookingRoutes from './bookings/create';
+import bookingProfileRoutes from './bookings/profile';
+// Mounted here rather than in server/index.ts: the deposit is part of the
+// public booking surface, and `/api/public` is where this aggregator already
+// lands, so the external path is identical either way.
+import depositIntentRoutes from './public/deposit-intent';
 import agreementRoutes from './bookings/agreement';
+import publicGeocodeRoutes from './bookings/geocode';
 import { getDrizzle } from '../lib/route-helpers';
 
 /**
@@ -121,55 +126,6 @@ const getAvailabilityRoute = createRoute(withMcpMetadata({
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
- * Sprint 1 C-5 — Public address autocomplete proxy for the unauthenticated
- * /book page. The internal `/api/places/autocomplete` endpoint is JWT-gated,
- * so we expose a thin public forwarder here with three guarantees:
- *
- *   1. Token never leaves the worker (kept off the wire entirely).
- *   2. If no token is configured, returns `{ data: [], reason: 'NO_API_KEY' }`
- *      and the client falls back silently to plain-text input.
- *   3. Rate-limited via the shared booking rate limiter to deter scraping.
- *
- * This implementation uses Google Places (existing `GOOGLE_PLACES_API_KEY`
- * binding) — same upstream that powers the dashboard's authenticated
- * autocomplete. The plan language uses "Mapbox" as a placeholder for any
- * geocoder; we align with the existing infrastructure.
- */
-const publicGeocodeRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/geocode',
-    tags: ["bookings", "public"],
-    summary: 'Address autocomplete proxy (public, rate-limited)',
-    request: {
-        query: z.object({
-            q: z.string().min(1).max(200).openapi({ example: '1005 S Gay' }).describe('TODO describe q field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
-    },
-    responses: {
-        200: {
-            content: {
-                'application/json': {
-                    schema: z.object({
-                        data: z.array(z.object({
-                            label:   z.string().describe('TODO describe label field for the OpenInspection MCP integration'),
-                            line1:   z.string().describe('TODO describe line1 field for the OpenInspection MCP integration'),
-                            city:    z.string().nullable().describe('TODO describe city field for the OpenInspection MCP integration'),
-                            state:   z.string().nullable().describe('TODO describe state field for the OpenInspection MCP integration'),
-                            zip:     z.string().nullable().describe('TODO describe zip field for the OpenInspection MCP integration'),
-                            placeId: z.string().describe('TODO describe placeId field for the OpenInspection MCP integration'),
-                        })).describe('TODO describe data field for the OpenInspection MCP integration'),
-                        reason: z.enum(['NO_API_KEY', 'UPSTREAM_ERROR']).optional().describe('TODO describe reason field for the OpenInspection MCP integration'),
-                    }),
-                },
-            },
-            description: 'Autocomplete suggestions or fallback reason',
-        },
-    },
-    operationId: "geocodeBooking",
-    description: "Auto-generated placeholder for geocodeBooking (GET /geocode, bookings domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['read'], tier: 'extended' }));
-
-/**
  * GET /api/public/slots — company-level aggregated bookable time slots (IA-26).
  */
 const getTenantSlotsRoute = createRoute(withMcpMetadata({
@@ -184,6 +140,8 @@ const getTenantSlotsRoute = createRoute(withMcpMetadata({
             date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).openapi({ example: '2026-07-01' }).describe('Date to query, YYYY-MM-DD.'),
             serviceIds: z.string().optional().openapi({ example: 'svc-1,svc-2' }).describe('Comma-separated service ids; restricts the qualified-inspector set.'),
             inspectorId: z.string().trim().min(1).optional().describe('Restrict slots to a single inspector (client choice / deep link).'),
+            propertyZip: z.string().trim().min(3).max(10).optional().openapi({ example: '78701' })
+                .describe('Property ZIP. Restricts the union to inspectors whose service area covers it; omitted means the geographic filter cannot run.'),
         }).describe('Tenant slot query parameters'),
     },
     responses: {
@@ -201,6 +159,8 @@ const getTenantSlotsRoute = createRoute(withMcpMetadata({
                                 date: z.string().describe('Civil date YYYY-MM-DD'),
                                 name: z.string().describe('Holiday display name'),
                             }).optional().describe('Present when public holiday policy is advisory and the date is in the catalog'),
+                            outsideServiceArea: z.boolean().optional()
+                                .describe('Present and true when a propertyZip was supplied and no inspector serves it. Distinguishes "we do not travel there" from "that date is full".'),
                         }).describe('Aggregated slot data'),
                     }).describe('Tenant slots response'),
                 },
@@ -212,6 +172,8 @@ const getTenantSlotsRoute = createRoute(withMcpMetadata({
 }, { scopes: ['read'], tier: 'extended' }));
 
 export const bookingsRoutes = createApiRouter()
+    .route('/', bookingProfileRoutes)
+    .route('/', depositIntentRoutes)
     .openapi(listInspectorsRoute, async (c) => {
         const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
         if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
@@ -276,71 +238,17 @@ export const bookingsRoutes = createApiRouter()
     })
     .route('/', createBookingRoutes)
     .route('/', agreementRoutes)
-    .openapi(publicGeocodeRoute, async (c) => {
-        await checkRateLimit(c, 'book');
-        const { q } = c.req.valid('query');
-        if (q.length < 3) {
-            return c.json({ success: true, data: [] }, 200);
-        }
-        const apiKey = c.env.GOOGLE_PLACES_API_KEY;
-        if (!apiKey) {
-            return c.json({ success: true, data: [], meta: { reason: 'NO_API_KEY' as const } }, 200);
-        }
-
-        try {
-            const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
-            url.searchParams.set('input', q);
-            url.searchParams.set('types', 'address');
-            url.searchParams.set('components', 'country:us');
-            url.searchParams.set('key', apiKey);
-            const res = await fetch(url.toString());
-            if (!res.ok) {
-                logger.warn('[public.geocode] upstream error', { status: res.status });
-                return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);
-            }
-            const j = await res.json() as {
-                status: string;
-                predictions?: Array<{
-                    place_id: string;
-                    description: string;
-                    terms?: Array<{ value: string }>;
-                    structured_formatting?: { main_text?: string; secondary_text?: string };
-                }>;
-            };
-            if (j.status !== 'OK' && j.status !== 'ZERO_RESULTS') {
-                logger.warn('[public.geocode] upstream status', { status: j.status });
-                return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);
-            }
-            // Best-effort split of secondary_text into city / state / zip — Google
-            // Places returns "City, ST 12345" for US addresses. We do a lenient
-            // regex split; clients should treat these as hints, not authoritative.
-            const data = (j.predictions ?? []).slice(0, 5).map(p => {
-                const main = p.structured_formatting?.main_text || p.description;
-                const secondary = p.structured_formatting?.secondary_text || '';
-                const m = secondary.match(/^([^,]+),\s*([A-Z]{2})\s*(\d{5})?/);
-                return {
-                    label:   p.description,
-                    line1:   main,
-                    city:    m?.[1] ?? null,
-                    state:   m?.[2] ?? null,
-                    zip:     m?.[3] ?? null,
-                    placeId: p.place_id,
-                };
-            });
-            return c.json({ success: true, data }, 200);
-        } catch (e) {
-            logger.error('[public.geocode] exception', {}, e instanceof Error ? e : undefined);
-            return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);
-        }
-    })
+    .route('/', publicGeocodeRoutes)
     .openapi(getTenantSlotsRoute, async (c) => {
         await checkRateLimit(c, 'availability');
-        const { tenant, date, serviceIds, inspectorId } = c.req.valid('query');
+        const { tenant, date, serviceIds, inspectorId, propertyZip } = c.req.valid('query');
         const tenantRow = await getDrizzle(c).select({ id: tenants.id })
             .from(tenants).where(eq(tenants.slug, tenant)).get();
         if (!tenantRow) throw Errors.NotFound('Tenant not found.');
         const ids = serviceIds ? serviceIds.split(',').filter(Boolean) : [];
-        const all = await c.var.services.booking.getTenantSlots(tenantRow.id, date, ids);
+        const all = await c.var.services.booking.getTenantSlots(
+            tenantRow.id, date, ids, undefined, propertyZip ?? null,
+        );
         const slots = all.slots.map(s => ({
             time: s.time,
             available: inspectorId ? s.inspectorIds.includes(inspectorId) : s.available,
@@ -350,127 +258,13 @@ export const bookingsRoutes = createApiRouter()
             data: {
                 slots,
                 ...(all.holidayAdvisory ? { holidayAdvisory: all.holidayAdvisory } : {}),
+                // IA-26 keeps inspector identities server-side, but "nobody
+                // serves your area" is about the CLIENT's property, not about
+                // who we employ — and a silent empty grid would send them
+                // hunting through dates for a slot that cannot exist.
+                ...(all.outsideServiceArea ? { outsideServiceArea: true } : {}),
             },
         }, 200);
-    })
-    /**
-     * GET /api/public/book/:tenant — company-level booking profile (IA-26).
-     * The canonical public entry. bookingOpen is company-wide: true iff ANY
-     * qualified staff member has configured recurring hours. The inspectors
-     * list is only exposed when the tenant enabled allowInspectorChoice.
-     *
-     * Round-trip budget: tenant lookup (1) + 3 parallel (services, config,
-     * getQualifiedInspectorIds) + 1 availability scan shared by bookingOpen
-     * and the choice list + 1 conditional inspector fetch = 5 max.
-     * The previous implementation ran up to 6 serial round-trips by calling
-     * hasAnyHours (which itself called getQualifiedInspectorIds + availability)
-     * and then re-running both calls inside the allowChoice branch.
-     */
-    .get('/book/:tenant', async (c) => {
-        await checkRateLimit(c, 'availability');
-        const { tenant } = c.req.param();
-        const db = getDrizzle(c);
-
-        const tenantRow = await db.select({ id: tenants.id, name: tenants.name })
-            .from(tenants).where(eq(tenants.slug, tenant)).get();
-        if (!tenantRow) return c.json({ success: false, error: { code: 'not_found', message: 'Tenant not found' } }, 404);
-
-        const booking = c.var.services.booking;
-        const [svcRows, config, qualified] = await Promise.all([
-            db.select({
-                id: servicesTable.id, name: servicesTable.name, price: servicesTable.price,
-                durationMinutes: servicesTable.durationMinutes, templateId: servicesTable.templateId,
-                active: servicesTable.active,
-            }).from(servicesTable).where(eq(servicesTable.tenantId, tenantRow.id)).all(),
-            db.select({
-                allowInspectorChoice: tenantConfigs.allowInspectorChoice,
-                conciergeReviewRequired: tenantConfigs.conciergeReviewRequired,
-            })
-                .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantRow.id)).get(),
-            booking.getQualifiedInspectorIds(tenantRow.id, []),
-        ]);
-        const visible = svcRows.filter(s => s.active && s.templateId);
-        const allowChoice = !!config?.allowInspectorChoice;
-
-        // One availability scan serves BOTH bookingOpen and the choice list.
-        const withHours = qualified.length > 0
-            ? await db.selectDistinct({ inspectorId: availability.inspectorId })
-                .from(availability)
-                .where(and(eq(availability.tenantId, tenantRow.id), inArray(availability.inspectorId, qualified)))
-                .all()
-            : [];
-        const hourIds = withHours.map(r => r.inspectorId);
-        const bookingOpen = hourIds.length > 0;
-
-        let inspectors: Array<{ id: string; name: string | null; photoUrl: string | null }> = [];
-        if (allowChoice && hourIds.length > 0) {
-            inspectors = await db.select({ id: users.id, name: users.name, photoUrl: users.photoUrl })
-                .from(users).where(and(eq(users.tenantId, tenantRow.id), inArray(users.id, hourIds))).all();
-            inspectors.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
-        }
-
-        return c.json({
-            success: true,
-            data: {
-                company: tenantRow.name,
-                turnstileSiteKey: c.env.TURNSTILE_SITE_KEY || null,
-                bookingOpen,
-                allowInspectorChoice: allowChoice,
-                conciergeReviewRequired: !!config?.conciergeReviewRequired,
-                inspectors,
-                services: visible.map(s => ({
-                    id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),
-                })),
-            },
-        });
-    })
-    /**
-     * GET /api/public/book/:tenant/:slug — public booking profile
-     * Returns inspector name, services, and availability for the booking page.
-     */
-    .get('/book/:tenant/:slug', async (c) => {
-        await checkRateLimit(c, 'availability');
-        const { tenant, slug } = c.req.param();
-        const db = getDrizzle(c);
-
-        // Resolve tenant by slug
-        const tenantRow = await db.select({ id: tenants.id, name: tenants.name })
-            .from(tenants).where(eq(tenants.slug, tenant)).get();
-        if (!tenantRow) return c.json({ success: false, error: { code: 'not_found', message: 'Tenant not found' } }, 404);
-
-        // Find inspector by slug within tenant
-        const inspector = await db.select({
-            id: users.id, name: users.name, slug: users.slug, photoUrl: users.photoUrl,
-        }).from(users).where(and(eq(users.tenantId, tenantRow.id), eq(users.slug, slug))).get();
-        if (!inspector) return c.json({ success: false, error: { code: 'not_found', message: 'Inspector not found' } }, 404);
-
-        // Get active services
-        const svcRows = await db.select({
-            id: servicesTable.id, name: servicesTable.name, price: servicesTable.price,
-            durationMinutes: servicesTable.durationMinutes,
-        }).from(servicesTable).where(and(eq(servicesTable.tenantId, tenantRow.id), eq(servicesTable.active, true))).all();
-
-        // B-16 — online booking is "open" only once the inspector has working
-        // hours configured; the page renders an honest not-open state otherwise.
-        const hasHours = await db.select({ id: availability.id }).from(availability)
-            .where(and(eq(availability.tenantId, tenantRow.id), eq(availability.inspectorId, inspector.id)))
-            .limit(1)
-            .get();
-
-        return c.json({
-            success: true,
-            data: {
-                inspectorId: inspector.id,
-                name: inspector.name,
-                company: tenantRow.name,
-                avatar: inspector.photoUrl,
-                turnstileSiteKey: c.env.TURNSTILE_SITE_KEY || null,
-                bookingOpen: !!hasHours,
-                services: svcRows.map(s => ({
-                    id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),
-                })),
-            },
-        });
     });
 
 export type BookingsApi = typeof bookingsRoutes;

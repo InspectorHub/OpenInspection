@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from '../shared.schema';
 import { INSPECTION_STATUSES } from '../../status/inspection-status';
+import { CANCELLATION_REASONS } from '../../cancellation-reason';
 
 /**
  * Core Inspection Schema (Output)
@@ -188,6 +189,12 @@ export const UpdateInspectionSchema = z.object({
     // 'tpl-e2e-trackA' are valid), so this is a plain string, not `.uuid()`.
     // null detaches the template; omitted leaves it unchanged.
     templateId: z.string().min(1).nullable().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('Template assigned to this inspection (free-text template id).'),
+    // Tier 3 of the booking deposit — a human's number for THIS order, which is
+    // the only tier the resolver cannot produce. Sending it also raises
+    // `is_deposit_overridden` in the handler, so a later re-resolve cannot
+    // quietly replace what an operator agreed with a client; null clears both.
+    depositRequiredCents: z.number().int().min(0).nullable().optional().openapi({ example: 9000 })
+        .describe('Deposit owed on this order, in integer cents. Setting it marks the order as operator-overridden; null clears the override.'),
 }).openapi('UpdateInspection');
 
 export const InspectionCountsSchema = z.object({
@@ -214,18 +221,19 @@ export const BulkInspectionSchema = z.object({
  */
 export const InspectionListResponseSchema = createApiResponseSchema(z.array(InspectionSchema)).openapi('InspectionListResponse');
 
-const CancellationReasonSchema = z.enum([
-    'client_cancelled',
-    'weather',
-    'inspector_unavailable',
-    'property_unavailable',
-    'rescheduled',
-    'other',
-]).openapi('CancellationReason');
+// Sourced from the same constant as the drizzle enum on
+// `inspections.cancel_reason`, so the wire and the column cannot drift.
+const CancellationReasonSchema = z.enum(CANCELLATION_REASONS).openapi('CancellationReason');
 
 export const CancelInspectionSchema = z.object({
-    reason: CancellationReasonSchema.describe('TODO describe reason field for the OpenInspection MCP integration'),
+    reason: CancellationReasonSchema.describe('Why the inspection was cancelled; also classifies the cancellation for the fee ladder.'),
     notes:  z.string().max(500).optional().describe('TODO describe notes field for the OpenInspection MCP integration'),
+    // The fee the caller was shown and is confirming. A cancellation that
+    // silently charges 50% is a chargeback, so the server refuses to charge a
+    // fee the caller has not echoed back: whoever cancels has to have seen the
+    // number. Omit it when the quote says the cancellation is free.
+    acknowledgedFeeCents: z.number().int().min(0).optional()
+        .describe('Fee, in cents, shown to the caller by the cancellation quote. Required when the quote charges one.'),
 }).openapi('CancelInspectionRequest');
 
 // Round-2 F1 — per-recipient delivery selection. Each recipient row chooses

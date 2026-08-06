@@ -4,7 +4,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { applyCmdEnvelope, handleCmdBatch } from '../../server/portal/cmd-consumer';
-import { TENANT_CONFIGS_TEST_DDL } from '../helpers/inline-ddl';
+import { TENANT_CONFIGS_TEST_DDL, USERS_TEST_DDL } from '../helpers/inline-ddl';
 
 // Batch 2: the seed command delegates to the starter-content service, whose
 // real implementation touches 8 content tables — out of scope for the consumer
@@ -47,9 +47,7 @@ async function seedSchema(): Promise<void> {
     await b.DB.exec(
         "CREATE TABLE IF NOT EXISTS sync_outbox (id TEXT PRIMARY KEY, event_type TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, last_tried_at INTEGER, last_error TEXT);",
     );
-    await b.DB.exec(
-        "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, tenant_id TEXT, email TEXT NOT NULL, password_hash TEXT NOT NULL, name TEXT, phone TEXT, photo_url TEXT, default_signature_base64 TEXT, is_signature_enabled INTEGER NOT NULL DEFAULT true, bio TEXT, service_areas TEXT, slug TEXT, role TEXT NOT NULL DEFAULT 'admin', google_refresh_token TEXT, google_calendar_id TEXT, google_access_token TEXT, google_token_expiry INTEGER, locale TEXT, onboarding_state TEXT, created_at INTEGER NOT NULL, totp_secret TEXT, is_totp_enabled INTEGER NOT NULL DEFAULT false, totp_recovery_codes TEXT, totp_verified_at INTEGER, is_referral_notification_enabled INTEGER NOT NULL DEFAULT true, is_report_notification_enabled INTEGER NOT NULL DEFAULT true, is_paid_notification_enabled INTEGER NOT NULL DEFAULT false, last_active_at INTEGER, mentor_id TEXT, assigned_section_ids TEXT NOT NULL DEFAULT '[]', expires_at INTEGER, signup_role TEXT, deleted_at INTEGER, terms_accepted TEXT, permission_overrides TEXT, timezone TEXT, date_format TEXT, time_format TEXT);",
-    );
+    await b.DB.exec(USERS_TEST_DDL);
     await b.DB.exec(
         'CREATE TABLE IF NOT EXISTS processed_cmd_events (event_id TEXT PRIMARY KEY, cmd_type TEXT NOT NULL, processed_at INTEGER NOT NULL);',
     );

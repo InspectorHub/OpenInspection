@@ -22,7 +22,7 @@ export function BookingWizard({
 }) {
   const {
     step, setStep,
-    address, setAddress,
+    address, setAddress, setAddressPick,
     selectedServices,
     inspectionDate, setInspectionDate,
     timeWindow, setTimeWindow,
@@ -38,6 +38,10 @@ export function BookingWizard({
     turnstileRef,
     toggleService,
     totalPrice,
+    depositQuoteCents,
+    depositDueCents,
+    bookedInspectionId,
+    currency,
     needsTurnstile,
     canNext,
     inspectorOptions,
@@ -97,7 +101,7 @@ export function BookingWizard({
 
       {/* Step 0: Property */}
       {step === 0 && (
-        <PropertyStep address={address} setAddress={setAddress} />
+        <PropertyStep address={address} setAddress={setAddress} onSelectAddress={setAddressPick} />
       )}
 
       {/* Step 1: Services */}
@@ -107,6 +111,8 @@ export function BookingWizard({
           selectedServices={selectedServices}
           toggleService={toggleService}
           totalPrice={totalPrice}
+          depositQuoteCents={depositQuoteCents}
+          currency={currency}
         />
       )}
 
@@ -157,6 +163,11 @@ export function BookingWizard({
           totalPrice={totalPrice}
           clientName={clientName}
           clientEmail={clientEmail}
+          depositQuoteCents={depositQuoteCents}
+          depositDueCents={depositDueCents}
+          bookedInspectionId={bookedInspectionId}
+          currency={currency}
+          companyName={profile.company}
         />
       )}
 
