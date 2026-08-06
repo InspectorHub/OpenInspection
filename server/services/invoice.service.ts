@@ -12,6 +12,7 @@ import { syncInspectionPaymentGate } from './invoice-payment-gate';
 import * as ledger from './invoice-payments.service';
 import type { OfflinePaymentInput, PaymentCorrectionInput } from './invoice-payments.service';
 import * as refunds from './invoice/refund';
+import { applyHeldDepositsToInvoice } from './invoice/deposit-application';
 import type { PartialRefundInput } from './invoice/refund';
 
 function getStatus(inv: { sentAt: Date | null; paidAt: Date | null; partialPaidAt?: Date | null; voidedAt?: Date | null }): 'draft' | 'sent' | 'paid' | 'partial' | 'void' {
@@ -127,12 +128,37 @@ export class InvoiceService {
             currency: cfg?.currency ?? 'USD',
         };
         await db.insert(invoices).values(row);
+        // A deposit taken at booking has been sitting against the ORDER with no
+        // invoice to belong to. This is where it becomes money against this
+        // invoice — and where the client stops being shown the full total with
+        // no sign their deposit landed. Awaited, not fired: `amountPaidCents`
+        // below has to reflect it, and a client who pays twice calls.
+        let amountPaidCents = 0;
+        let partialPaidAt: Date | null = null;
         if (data.inspectionId) {
+            const applied = await applyHeldDepositsToInvoice(db, tenantId, row.id, data.inspectionId);
+            if (applied > 0) {
+                const fresh = await db.select({
+                    amountPaidCents: invoices.amountPaidCents,
+                    partialPaidAt: invoices.partialPaidAt,
+                })
+                    .from(invoices).where(eq(invoices.id, row.id)).get();
+                amountPaidCents = fresh?.amountPaidCents ?? 0;
+                partialPaidAt = fresh?.partialPaidAt ?? null;
+            }
             new AutomationService(this.db)
                 .trigger({ tenantId, inspectionId: data.inspectionId, triggerEvent: 'invoice.created', companyName: '', reportBaseUrl: '' })
                 .catch(err => logger.error('automation trigger failed', { event: 'invoice.created' }, err instanceof Error ? err : undefined));
         }
-        return { ...row, status: 'draft' as const, createdAt: safeISODate(row.createdAt), sentAt: null, paidAt: null };
+        // `status` stays 'draft': a deposit does not send an invoice. The two
+        // payment figures are returned because the hand-built `row` above does
+        // not carry them — they are written by `recomputeInvoicePaymentState`,
+        // and a caller reading `undefined` here would report a deposit-bearing
+        // invoice as having received nothing.
+        return {
+            ...row, status: 'draft' as const, createdAt: safeISODate(row.createdAt), sentAt: null, paidAt: null,
+            amountPaidCents, partialPaidAt,
+        };
     }
 
     async markSent(id: string, tenantId: string) {
