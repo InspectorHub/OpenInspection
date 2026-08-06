@@ -595,5 +595,6 @@
   "settings_icsfeeds_busy_label": "My busy time",
   "settings_icsfeeds_schedule_label": "My schedule",
   "settings_icsfeeds_busy_desc": "When you are booked, and nothing else — no addresses, names, or emails. Safe to share with agents and partners.",
-  "settings_icsfeeds_schedule_desc": "Your own jobs with the property address, for your phone."
+  "settings_icsfeeds_schedule_desc": "Your own jobs with the property address, for your phone.",
+  "settings_calconnect_sync_error": "Google Calendar sync last failed: {reason} Reconnect below if this keeps happening."
 }

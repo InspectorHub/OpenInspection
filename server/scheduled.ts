@@ -51,6 +51,10 @@ export interface ScheduledEnv {
     /** Shared Messaging Service SID for managed_shared tenants (Task 8 send gate). */
     TWILIO_SHARED_MESSAGING_SERVICE_SID?: string;
     TENANT_CACHE?: KVNamespace;
+    /** Platform Google OAuth client, for the calendar sync sweep. Tenants with
+     *  their OWN client are resolved from encrypted tenant secrets instead. */
+    GOOGLE_CLIENT_ID?: string;
+    GOOGLE_CLIENT_SECRET?: string;
     // Core -> portal user-sync transport (A-13/A-14). Producer binding to the
     // sync queue; the outbox sweeper republishes pending rows through it.
     // Optional — sweeper is a no-op when missing (standalone).
@@ -312,6 +316,21 @@ export async function scheduled(
         } catch (e) {
             logger.error('[cron] managed compliance sweep failed', {}, e instanceof Error ? e : undefined);
         }
+    }
+
+    // 5d. Pull each connected inspector's Google busy time on a schedule, so
+    //     "Sync now" stops being something anyone has to remember. Body lives
+    //     in lib/calendar/sync-sweep; it never throws and records its own
+    //     per-connection failures as last_sync_error.
+    if (env.TENANT_CACHE && env.JWT_SECRET) {
+        const { sweepCalendarSyncs } = await import('./lib/calendar/sync-sweep');
+        const swept = await sweepCalendarSyncs({
+            DB: env.DB, TENANT_CACHE: env.TENANT_CACHE, JWT_SECRET: env.JWT_SECRET,
+            ...(env.JWT_SECRET_PREVIOUS ? { JWT_SECRET_PREVIOUS: env.JWT_SECRET_PREVIOUS } : {}),
+            ...(env.GOOGLE_CLIENT_ID ? { GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID } : {}),
+            ...(env.GOOGLE_CLIENT_SECRET ? { GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET } : {}),
+        });
+        if (swept.attempted > 0) logger.info('[cron] calendar sync sweep', swept);
     }
 
     // 6. Track I-a GDPR retention sweep (spec §7) — final destruction of

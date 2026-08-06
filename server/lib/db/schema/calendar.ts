@@ -22,6 +22,17 @@ export const calendarConnections = sqliteTable('calendar_connections', {
      * sync-freshness badge on the calendar Team chips.
      */
     lastSyncAt: integer('last_sync_at', { mode: 'timestamp_ms' }),
+    /**
+     * Why the most recent sync attempt failed, or NULL when the last attempt
+     * succeeded. Cleared on every success, so it always describes the CURRENT
+     * state rather than accumulating history.
+     *
+     * It exists because the freshness badge cannot tell "nothing changed" from
+     * "we have not been able to reach Google for three days" — both look like
+     * an old lastSyncAt. A revoked token is the common case and the inspector
+     * is the only person who can fix it, so the reason has to reach them.
+     */
+    lastSyncError: text('last_sync_error'),
 }, (t) => [
     uniqueIndex('uq_calendar_connections_user_provider').on(t.userId, t.provider),
     index('idx_calendar_connections_tenant_user').on(t.tenantId, t.userId),

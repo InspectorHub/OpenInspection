@@ -595,5 +595,6 @@
   "settings_icsfeeds_busy_label": "Mi tiempo ocupado",
   "settings_icsfeeds_schedule_label": "Mi agenda",
   "settings_icsfeeds_busy_desc": "Cuándo estás ocupado y nada más: sin direcciones, nombres ni correos. Se puede compartir con agentes y socios.",
-  "settings_icsfeeds_schedule_desc": "Tus propios trabajos con la dirección de la propiedad, para tu teléfono."
+  "settings_icsfeeds_schedule_desc": "Tus propios trabajos con la dirección de la propiedad, para tu teléfono.",
+  "settings_calconnect_sync_error": "La última sincronización con Google Calendar falló: {reason} Vuelve a conectar abajo si esto continúa."
 }

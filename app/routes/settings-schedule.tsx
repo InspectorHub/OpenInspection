@@ -18,13 +18,10 @@ import {
   AvailabilityHeatmapWeek,
   type HeatmapDay,
 } from "~/components/settings/AvailabilityHeatmapWeek";
-import {
-  CalendarConnectPanel,
-  type CalendarCapability,
-} from "~/components/settings/CalendarConnectPanel";
-import type { CalendarPickerData } from "~/components/settings/CalendarReadSetPicker";
+import { CalendarConnectPanel } from "~/components/settings/CalendarConnectPanel";
+import { loadCalendarSection } from "~/lib/settings/calendar-section.server";
 import { ScheduleLinksPanel } from "~/components/settings/ScheduleLinksPanel";
-import { IcsSubscribePanel, type IcsLinks } from "~/components/settings/IcsSubscribePanel";
+import { IcsSubscribePanel } from "~/components/settings/IcsSubscribePanel";
 import { ManageOthersPicker, type SchedulingMember } from "~/components/settings/ManageOthersPicker";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { m } from "~/paraglide/messages";
@@ -126,48 +123,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     members = (body.data ?? []) as SchedulingMember[];
   }
 
-  const calendarStatus = calendarStatusRes?.ok
-    ? ((await calendarStatusRes.json()) as {
-        data?: {
-          connected?: boolean;
-          capability?: CalendarCapability | null;
-          oauthConfigured?: boolean;
-        };
-      }).data
-    : null;
-
-  // A-polish 10b — the read-set / write-target picker data. Owner-only (the
-  // endpoint uses the current user's connection), so skip it when managing
-  // someone else's schedule. Best-effort: a Google hiccup just hides the picker.
-  let calendarPicker: CalendarPickerData | null = null;
-  if (calendarStatus?.connected && !inspectorId) {
-    const readSetRes = await api.calendar["read-set"].$get().catch(() => null);
-    if (readSetRes?.ok) {
-      const body = (await readSetRes.json()) as {
-        data?: {
-          connected?: boolean;
-          connectionId?: string;
-          writeCalendarId?: string;
-          readCalendarIds?: string[];
-          calendars?: CalendarPickerData["calendars"];
-        };
-      };
-      const d = body.data;
-      if (d?.connected && d.connectionId) {
-        calendarPicker = {
-          connectionId: d.connectionId,
-          writeCalendarId: d.writeCalendarId ?? "",
-          readCalendarIds: d.readCalendarIds ?? [],
-          calendars: d.calendars ?? [],
-        };
-      }
-    }
-  }
-
-  const icsLinks: IcsLinks = icsLinksRes?.ok
-    ? ((await icsLinksRes.json()) as { data?: IcsLinks }).data
-      ?? { busyPath: null, schedulePath: null, companyPath: null }
-    : { busyPath: null, schedulePath: null, companyPath: null };
+  const { calendar, icsLinks } = await loadCalendarSection(
+    calendarStatusRes,
+    icsLinksRes,
+    () => api.calendar["read-set"].$get().catch(() => null),
+    inspectorId !== undefined,
+  );
 
   let timeOffBlocks: TimeOffBlock[] = [];
   if (blocksRes?.ok) {
@@ -225,12 +186,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     companyClosed: holidayRegion
       ? { holidayRegion, holidayPublicPolicy, upcomingClosed }
       : null,
-    calendar: {
-      connected: calendarStatus?.connected ?? false,
-      capability: calendarStatus?.capability ?? null,
-      oauthConfigured: calendarStatus?.oauthConfigured ?? false,
-      picker: calendarPicker,
-    },
+    calendar,
   };
 }
 
@@ -362,6 +318,7 @@ export default function SettingsSchedulePage() {
           connected={data.calendar.connected}
           capability={data.calendar.capability}
           oauthConfigured={data.calendar.oauthConfigured}
+          lastSyncError={data.calendar.lastSyncError}
           disabled={data.managedInspectorId !== null}
           picker={data.calendar.picker}
         />

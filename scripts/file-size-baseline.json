@@ -57,7 +57,6 @@
   "server/api/inspections/results.ts": 430,
   "app/hooks/useStructureEdit.ts": 424,
   "app/routes/templates.tsx": 414,
-  "app/routes/settings-schedule.tsx": 413,
   "app/routes/calendar.tsx": 410,
   "server/services/agreement/signer-state.ts": 409,
   "app/lib/section-loaders.ts": 402
