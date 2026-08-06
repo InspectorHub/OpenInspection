@@ -288,6 +288,13 @@
       "when": 1785978827419,
       "tag": "0040_lovely_rockslide",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1786010842389,
+      "tag": "0041_medical_prima",
+      "breakpoints": true
     }
   ]
 }
