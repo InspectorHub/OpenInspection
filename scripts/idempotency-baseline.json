@@ -107,7 +107,6 @@
         "POST /api/admin/agreement-requests/{id}/inspector-sign",
         "POST /api/admin/agreements",
         "POST /api/admin/agreements/requests/{requestId}/signers/{signerId}/remind",
-        "POST /api/admin/agreements/send",
         "POST /api/admin/audit-logs",
         "POST /api/admin/branding",
         "POST /api/admin/branding/logo",
