@@ -36,7 +36,7 @@ export const ServiceOriginSchema = z.object({
 }).openapi('ServiceOrigin');
 
 /** Why a geocode produced no coordinates. Never a silent null. */
-export const GEOCODE_FAILURE_REASONS = ['no_api_key', 'no_address', 'not_found'] as const;
+const GEOCODE_FAILURE_REASONS = ['no_api_key', 'no_address', 'not_found'] as const;
 
 export const BookingRoutingResponseSchema = z.object({
     success: z.literal(true).describe('Always true on success.'),

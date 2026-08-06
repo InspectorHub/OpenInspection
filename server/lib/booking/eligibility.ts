@@ -37,7 +37,7 @@ export interface EligibilityOutcome {
 }
 
 /** Normalize a stored prefix or a submitted property ZIP the same way. */
-export function normalizeZip(raw: string | null | undefined): string {
+function normalizeZip(raw: string | null | undefined): string {
     return (raw ?? '').trim().toUpperCase().replace(/\s+/g, '');
 }
 

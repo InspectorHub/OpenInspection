@@ -150,5 +150,4 @@ const adminServiceAreasRoutes = createApiRouter()
         return c.json({ success: true as const, data: { userId, zipPrefixes: unique } }, 200);
     });
 
-export type AdminServiceAreasApi = typeof adminServiceAreasRoutes;
 export default adminServiceAreasRoutes;

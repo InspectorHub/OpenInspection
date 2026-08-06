@@ -244,5 +244,4 @@ const adminBookingRoutingRoutes = createApiRouter()
         }, 200);
     });
 
-export type AdminBookingRoutingApi = typeof adminBookingRoutingRoutes;
 export default adminBookingRoutingRoutes;

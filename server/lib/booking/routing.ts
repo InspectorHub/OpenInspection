@@ -33,7 +33,7 @@ export function isRoutingStrategy(raw: unknown): raw is RoutingStrategy {
 }
 
 /** Why the requested strategy was not the one applied. */
-export type RoutingFallbackReason =
+type RoutingFallbackReason =
     /** `closest`: the property has no lat/lng, so no distance exists. */
     | 'property_ungeocoded'
     /** `closest`: fewer than two candidates have a service origin to measure from. */

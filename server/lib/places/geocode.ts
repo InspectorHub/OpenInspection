@@ -38,7 +38,7 @@ interface GoogleDetailsResult {
 }
 
 /** Shape the Google details payload into our stored fields. */
-export function toResolvedPlace(r: GoogleDetailsResult): ResolvedPlace {
+function toResolvedPlace(r: GoogleDetailsResult): ResolvedPlace {
     const partOf = (type: string, useShort = false): string | null => {
         const c = r.address_components.find(x => x.types.includes(type));
         return c ? (useShort ? c.short_name : c.long_name) : null;

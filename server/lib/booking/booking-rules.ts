@@ -18,9 +18,9 @@ import { epochMsToWallClockYmd, epochMsToWallClockHm, wallClockToEpochMs, resolv
  */
 
 /** Why a slot is not offerable. `null` when it is. */
-export type BookingRuleBlockReason = 'min_lead' | 'same_day_cutoff';
+type BookingRuleBlockReason = 'min_lead' | 'same_day_cutoff';
 
-export interface BookingRules {
+interface BookingRules {
     /** Hours of notice required. 0 = no lead requirement (the default). */
     minLeadHours: number;
     /** Wall-clock `HH:MM` in the tenant zone, or null for no cutoff. */
