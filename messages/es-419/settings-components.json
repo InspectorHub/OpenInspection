@@ -171,6 +171,16 @@
   "settings_policies_signed_scope": "Un acuerdo sin firmar también retiene todos los informes de esa inspección, no solo el informe del servicio que cubre el acuerdo. Cuando un informe terminado está esperando el papeleo de otra cosa del mismo trabajo, un titular o un gerente puede desbloquear esa inspección.",
   "settings_policies_choice_label": "Permitir que los clientes elijan su inspector",
   "settings_policies_choice_desc": "Cuando está desactivado, las reservas se asignan automáticamente al primer inspector disponible.",
+  "settings_policies_deposit_label": "Depósito al reservar",
+  "settings_policies_deposit_desc": "Lo que el cliente paga por adelantado para asegurar el horario. Se descuenta de su total, no se suma.",
+  "settings_policies_deposit_aria": "Depósito al reservar",
+  "settings_policies_deposit_type_none": "Sin depósito",
+  "settings_policies_deposit_type_percent": "Porcentaje del precio",
+  "settings_policies_deposit_type_fixed": "Monto fijo",
+  "settings_deposit_percent_aria": "Porcentaje del depósito",
+  "settings_deposit_amount_aria": "Monto del depósito",
+  "settings_policies_deposit_off": "No se le pide nada por adelantado al cliente.",
+  "settings_policies_deposit_service_note": "Un servicio puede pedir algo distinto, o no pedir nada, en Configuración, Servicios y catálogo.",
   "settings_policies_save": "Guardar las políticas",
   "settings_slotrules_mode_fixed": "Horarios fijos",
   "settings_slotrules_mode_open": "Agenda abierta",
@@ -512,5 +522,7 @@
   "settings_pay_rule_remove": "Quitar",
   "settings_pay_rule_error_rate": "Ingrese una tarifa mayor que cero.",
   "settings_pay_rule_error_save": "No se pudo guardar la regla de pago.",
-  "settings_pay_rule_error_remove": "No se pudo quitar la regla de pago."
+  "settings_pay_rule_error_remove": "No se pudo quitar la regla de pago.",
+  "settings_deposit_error_percent": "Ingrese un porcentaje entre 1 y 100, o elija Sin depósito.",
+  "settings_deposit_error_amount": "Ingrese un monto mayor que cero, o elija Sin depósito."
 }

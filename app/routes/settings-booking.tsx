@@ -22,12 +22,15 @@ import {
   type HolidayPublicPolicy,
 } from "~/components/settings/HolidayClosedPanel";
 import { getHolidayDataCoverage } from "../../server/lib/holidays/resolve-closed-dates";
+import { parseDepositPolicy } from "~/lib/deposit-policy-form";
+import type { DepositPolicy } from "../../server/lib/billing/deposit-policy";
 import { m } from "~/paraglide/messages";
 
 interface TenantConfig {
   conciergeReviewRequired: boolean;
   blockUnsignedAgreement: boolean;
   allowInspectorChoice: boolean;
+  depositPolicy: DepositPolicy | null;
   bookingSlotMode: BookingSlotMode;
   bookingSlotIntervalMin: BookingSlotIntervalMin;
   holidayRegion: string | null;
@@ -65,18 +68,23 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const api = createApi(context, { token });
 
-  const [configRes, membersRes, holidaysRes] = await Promise.all([
+  const [configRes, membersRes, holidaysRes, brandingRes] = await Promise.all([
     api.admin["tenant-config"].$get().catch(() => null),
     api.admin.members.$get().catch(() => null),
     (api.admin as unknown as {
       ["custom-holidays"]: { $get: (args?: unknown) => Promise<Response> };
     })["custom-holidays"].$get().catch(() => null),
+    // The deposit default is stored on the same tenant_configs row as the
+    // policies above, but it is written through branding and is missing from
+    // the tenant-config projection — so it is read from where it is written.
+    api.adminBranding.branding.$get().catch(() => null),
   ]);
 
   let config: TenantConfig = {
     conciergeReviewRequired: false,
     blockUnsignedAgreement: false,
     allowInspectorChoice: false,
+    depositPolicy: null,
     bookingSlotMode: "fixed",
     bookingSlotIntervalMin: 30,
     holidayRegion: null,
@@ -95,7 +103,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       holidayRegion: typeof d.holidayRegion === "string" ? d.holidayRegion : null,
       holidayPublicPolicy: parsePublicPolicy(d.holidayPublicPolicy),
       holidayInternalPolicy: parseInternalPolicy(d.holidayInternalPolicy),
+      depositPolicy: config.depositPolicy,
     };
+  }
+
+  if (brandingRes?.ok) {
+    const body = (await brandingRes.json()) as { data?: { branding?: Record<string, unknown> } };
+    config.depositPolicy = parseDepositPolicy(body.data?.branding?.depositPolicy);
   }
 
   let members: Member[] = [];
@@ -143,6 +157,30 @@ export async function action({ request, context }: Route.ActionArgs) {
         | string
         | undefined;
       return { ok: false, intent, message };
+    }
+    // One panel, two endpoints: the deposit default is the only booking policy
+    // that lives behind branding. Sent only when the form carried it, because
+    // an absent key must leave a configured deposit alone (the API schema has
+    // no default for exactly that reason) — never as an implicit clear.
+    if (form.has("depositPolicy")) {
+      let raw: unknown = null;
+      try {
+        raw = JSON.parse(String(form.get("depositPolicy") ?? "null"));
+      } catch {
+        // Unparseable is not a clear-the-deposit instruction; it is a bad
+        // request. Reported through the panel's own failure line.
+        return { ok: false, intent, message: m.settings_holiday_save_failed() };
+      }
+      const depositRes = await api.adminBranding.branding.$post({
+        json: { depositPolicy: parseDepositPolicy(raw) },
+      } as unknown as Parameters<typeof api.adminBranding.branding.$post>[0]);
+      if (!depositRes.ok) {
+        const err = await depositRes.json().catch(() => null);
+        const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as
+          | string
+          | undefined;
+        return { ok: false, intent, message };
+      }
     }
     return { ok: res.ok, intent };
   }
