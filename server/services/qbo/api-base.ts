@@ -150,8 +150,29 @@ export class QBOServiceBase {
         });
 
         if (!resp.ok) {
-            await db.delete(qboConnections).where(eq(qboConnections.tenantId, tenantId));
-            throw new Error('QBO token refresh failed — reconnect required');
+            // Only an explicit refusal of the grant is terminal.
+            //
+            // Intuit rotates the refresh token every 24-26 hours, so this path
+            // runs on every connected tenant every day. Treating any non-2xx as
+            // "reauthorize required" meant a single Intuit 5xx or a rate limit
+            // permanently disconnected a paying customer and sent an owner back
+            // through the whole OAuth flow — for an outage that had nothing to
+            // say about their token. 400 (`invalid_grant`) and 401 are the
+            // answers that DO say the token is dead; everything else leaves it
+            // intact so the next attempt can use it.
+            //
+            // Intuit also began returning a field on this response that dates
+            // the refresh token's hard expiry. It is deliberately not read
+            // here: the exact key was not verifiable at the time of writing,
+            // and keying a destructive delete off a guessed field name would
+            // reintroduce the same failure it is supposed to prevent. The
+            // status code already distinguishes the two cases; the field would
+            // only let us disconnect EARLIER, which is not the useful direction.
+            if (resp.status === 400 || resp.status === 401) {
+                await db.delete(qboConnections).where(eq(qboConnections.tenantId, tenantId));
+                throw new Error('QBO refresh token rejected — reconnect required');
+            }
+            throw new Error(`QBO token refresh failed with ${resp.status} — connection left intact`);
         }
 
         const data = QBOTokenResponseSchema.parse(await resp.json());
