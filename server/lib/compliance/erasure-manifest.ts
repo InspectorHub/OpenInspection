@@ -199,6 +199,15 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'users',               column: 'phone',                     reason: 'staff account — not consumer-DSAR scope' },
     { table: 'users',               column: 'default_signature_base64',  reason: 'inspector (staff) signature asset' },
     { table: 'users',               column: 'is_signature_enabled',      reason: 'boolean flag, not personal data' },
+    // An inspector's routing origin can be their home address, so it IS personal
+    // data — it is simply not a CONSUMER data subject's. Same posture as
+    // users.email/phone above: consumer-DSAR erasure never touches it and there
+    // is deliberately no DSAR-export path for it. Declared here so the decision
+    // is recorded rather than inferred from the PII heuristic not matching
+    // 'service_origin_address'.
+    { table: 'users',               column: 'service_origin_address',    reason: 'staff routing origin (may be a home address) — staff offboarding lifecycle, not consumer-DSAR scope' },
+    { table: 'users',               column: 'service_origin_lat',        reason: 'staff routing origin coordinate — not consumer-DSAR scope' },
+    { table: 'users',               column: 'service_origin_lng',        reason: 'staff routing origin coordinate — not consumer-DSAR scope' },
     { table: 'tenant_invites',      column: 'email',                     reason: 'staff invite — not consumer-DSAR scope' },
     { table: 'audit_logs',          column: 'ip_address',                reason: 'staff-action security audit trail' },
     { table: 'report_signoff',      column: 'signature_ref',             reason: 'inspector (staff) signoff reference' },
@@ -208,6 +217,8 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'tenant_configs',      column: 'support_email',    reason: 'company-owned support address' },
     { table: 'tenant_configs',      column: 'sender_email',     reason: 'company-owned sending address' },
     { table: 'tenant_configs',      column: 'company_phone',    reason: 'company-owned phone' },
+    { table: 'tenant_configs',      column: 'company_lat',      reason: 'company office coordinate — controller business identity' },
+    { table: 'tenant_configs',      column: 'company_lng',      reason: 'company office coordinate — controller business identity' },
 
     // Heuristic false positives — config values and references, not PII.
     { table: 'tenant_configs',        column: 'email_mode',               reason: 'config enum, not personal data' },

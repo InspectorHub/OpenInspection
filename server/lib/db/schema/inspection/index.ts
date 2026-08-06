@@ -11,3 +11,4 @@ export * from './message-template';
 export * from './concierge';
 export * from './defect-category';
 export * from './cost-items';
+export * from './service-area';

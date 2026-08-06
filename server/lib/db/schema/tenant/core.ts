@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import type { ReportLinkTtl } from '../../../report-link-ttl';
 import type { CancellationPolicy } from '../../../billing/cancellation-policy';
@@ -308,6 +308,36 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Appended at END of the table per the D1 add-column-at-end rule
     // (tenant_configs is FK-referenced).
     depositPolicy: text('deposit_policy', { mode: 'json' }).$type<DepositPolicy>(),
+    // How the server chooses WHICH qualified inspector gets an auto-assigned
+    // booking. 'first_available' is the shipped behaviour (stable name sort)
+    // and stays the default, so nothing changes until a workspace opts in.
+    //
+    // The other two can be INAPPLICABLE to a given request — `least_loaded`
+    // when nothing in the ISO week is dated, `closest` when the property or
+    // every candidate lacks coordinates. When that happens the server falls
+    // back to first_available and RECORDS the substitution with a named reason
+    // (see server/lib/booking/routing.ts). A strategy that silently degrades
+    // into first_available is indistinguishable from one that works.
+    bookingRoutingStrategy: text('booking_routing_strategy', {
+        enum: ['first_available', 'least_loaded', 'closest'],
+    }).notNull().default('first_available'),
+    // Minimum hours between NOW and the start of a bookable slot. 0 (the
+    // default) preserves the prior behaviour of accepting any future slot.
+    bookingMinLeadHours: integer('booking_min_lead_hours').notNull().default(0),
+    // Wall-clock `HH:MM` in the TENANT timezone after which today's remaining
+    // slots stop being offered. NULL = no cutoff. Deliberately a civil time,
+    // not an instant: "no same-day after 3pm" is a statement about the office
+    // clock and must survive DST without anyone editing it.
+    bookingSameDayCutoffTime: text('booking_same_day_cutoff_time'),
+    // Coordinates of `company_address`, resolved ONCE through the Places
+    // details path when an admin saves the address. They are the default
+    // service origin for every inspector who has not set their own, which is
+    // what makes `closest` usable for a single-office workspace with no
+    // per-inspector setup at all. NULL = never geocoded (or the lookup failed);
+    // `closest` treats that as "this workspace has no anchor", not as (0,0).
+    companyLat: real('company_lat'),
+    companyLng: real('company_lng'),
+    companyGeocodedAt: integer('company_geocoded_at', { mode: 'timestamp_ms' }),
 });
 
 /**
