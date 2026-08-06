@@ -111,13 +111,15 @@ test.describe('Calendar connect — capability gating', () => {
         expect(location).toContain('calendar.freebusy');
     });
 
-    test('POST /api/calendar/sync-events returns 403 for availability_read connection', async ({ request }) => {
+    // The tenant-wide push (POST /api/calendar/sync-events) is retired: no
+    // assignment boundary, no update, no delete. Its absence is the assertion.
+    test('the retired tenant-wide sync-events push is no longer routed', async ({ request }) => {
         const session = await loginSession(request);
         await seedConnection(request, session.tenantId, session.userId, 'availability_read');
         const res = await request.post(`${BASE_URL}/api/calendar/sync-events`, {
             headers: authedHeaders(session.cookie),
         });
-        expect(res.status()).toBe(403);
+        expect(res.status()).toBe(404);
     });
 
     test('DELETE /api/calendar/disconnect removes calendar_connections row', async ({ request }) => {
@@ -128,7 +130,7 @@ test.describe('Calendar connect — capability gating', () => {
         });
         expect(del.ok()).toBe(true);
 
-        const sync = await request.post(`${BASE_URL}/api/calendar/sync-events`, {
+        const sync = await request.post(`${BASE_URL}/api/calendar/sync`, {
             headers: authedHeaders(session.cookie),
         });
         expect(sync.status()).toBe(400);

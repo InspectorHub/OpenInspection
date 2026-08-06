@@ -7,11 +7,33 @@ import {
     type GoogleCalendarResponse,
     type GoogleEvent,
 } from '../google-calendar';
-import { capabilityToScopes } from './provider';
-import type { CalendarProvider, OAuthExchangeResult, BusyBlock, CalendarListEntry } from './provider';
+import { capabilityToScopes, ExternalEventGoneError } from './provider';
+import type {
+    CalendarProvider,
+    OAuthExchangeResult,
+    BusyBlock,
+    CalendarListEntry,
+    CalendarPushEventInput,
+} from './provider';
 
 function toRfc3339(d: Date): string {
     return d.toISOString();
+}
+
+/**
+ * The event body Google accepts. `timeZone` rides alongside an absolute
+ * `dateTime` on purpose: the instant fixes the moment, the zone fixes how the
+ * entry renders and recurs for the owner.
+ */
+function googleEventBody(event: CalendarPushEventInput): Record<string, unknown> {
+    const zone = event.timeZone ? { timeZone: event.timeZone } : {};
+    return {
+        summary: event.summary,
+        location: event.location,
+        description: event.description,
+        start: { dateTime: event.start.toISOString(), ...zone },
+        end: { dateTime: event.end.toISOString(), ...zone },
+    };
 }
 
 async function accessTokenFor(
@@ -156,13 +178,7 @@ export const googleCalendarProvider: CalendarProvider = {
                     Authorization: `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    summary: event.summary,
-                    location: event.location,
-                    description: event.description,
-                    start: { dateTime: event.start.toISOString() },
-                    end: { dateTime: event.end.toISOString() },
-                }),
+                body: JSON.stringify(googleEventBody(event)),
             },
         );
         if (!res.ok) {
@@ -172,6 +188,29 @@ export const googleCalendarProvider: CalendarProvider = {
         const created = await res.json() as { id?: string };
         if (!created.id) throw new Error('Google Calendar did not return an event id');
         return created.id;
+    },
+
+    async patchEvent({ clientId, clientSecret, refreshToken, calendarId, externalId, event }): Promise<void> {
+        const accessToken = await accessTokenFor(clientId, clientSecret, refreshToken);
+        const res = await fetch(
+            `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(externalId)}`,
+            {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(googleEventBody(event)),
+            },
+        );
+        // The owner may have deleted the entry by hand. That is not an error to
+        // shout about — it is a signal to the caller that the link is stale and
+        // a fresh create is the right repair.
+        if (res.status === 404 || res.status === 410) throw new ExternalEventGoneError(externalId);
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+            throw new Error(err.error?.message ?? 'Failed to update calendar event');
+        }
     },
 
     async deleteEvent({ clientId, clientSecret, refreshToken, calendarId, externalId }): Promise<void> {

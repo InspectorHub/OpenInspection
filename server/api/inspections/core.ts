@@ -18,6 +18,7 @@ import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema } from
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
 import { inspections as inspectionTable, inspectionResults } from '../../lib/db/schema';
 import { datePatchValues } from '../../services/inspection/reschedule-date';
+import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
 import { findPatchRefusal } from './patch-guards';
 import { deleteInspectionCascade } from '../../services/inspection/inspection-cascade';
 import { syncAssignmentsAndSplits } from '../../services/pay-split.service';
@@ -341,6 +342,15 @@ const coreRoutes = createApiRouter()
             await syncAssignmentsAndSplits(db, tenantId, id, {
                 inspectorId: body.inspectorId ?? null,
             });
+        }
+
+        // Keep the lead's own calendar in step with whatever this patch changed.
+        // One call covers all three cases it can produce: a moved date UPDATEs
+        // the existing entry, a new inspectorId moves it between calendars, and
+        // a cancel takes it off — pushInspectionToGoogle re-reads the row and
+        // decides, so the route does not have to enumerate them.
+        if ('date' in body || 'inspectorId' in body || 'status' in body) {
+            pushInspectionAfterResponse(c, tenantId, id);
         }
 
         if (body.status && body.status !== inspection.status) {

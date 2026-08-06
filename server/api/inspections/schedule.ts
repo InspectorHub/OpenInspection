@@ -25,6 +25,7 @@ import { syncAssignmentsAndSplits } from '../../services/pay-split.service';
 import { findScheduleConflicts } from '../../lib/schedule-conflicts';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import { epochMsToWallClockHm, epochMsToWallClockYmd, resolveTenantTimeZone } from '../../lib/tz';
+import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
 import {
@@ -210,6 +211,11 @@ const scheduleRoutes = createApiRouter()
                 helperInspectorIds: helperIds,
             });
         }
+
+        // The dispatch board just moved someone's day. Mirror it onto their own
+        // calendar: the link table makes this an UPDATE of the entry already on
+        // their phone, and a reassignment takes it off the previous inspector's.
+        pushInspectionAfterResponse(c, tenantId, id);
 
         auditFromContext(c, 'inspection.rescheduled', 'inspection', {
             entityId: id,

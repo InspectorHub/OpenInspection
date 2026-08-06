@@ -69,6 +69,12 @@ const SCOPE = [
   // `.toISOString().slice(0,10)` here shipped green before this line existed;
   // it was caught by a test, which is one gate later than it should have been.
   'server/lib/booking',
+  // What a booking ANNOUNCES is calendar output: the inspector's calendar entry
+  // and the customer's .ics invite. Both used to recompose the slot time as
+  // `${date}T${time}:00Z` — a wall clock labelled UTC — so both landed hours off
+  // in every tenant zone but UTC, and disagreed with the scheduled_start_ms the
+  // office sees. Both now read the stamped instant. Scoped so they stay that way.
+  'server/services/booking',
 ];
 
 function collectFiles(path) {

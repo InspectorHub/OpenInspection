@@ -114,11 +114,14 @@ describe('calendar API — calendar_connections', () => {
             jwtSecret: JWT_SECRET,
         });
 
+        // The tenant-wide push is RETIRED, not merely capability-gated. It sent
+        // every tenant event to whoever pressed the button, and had no update or
+        // delete. Its absence is the guard: a 404 here means nobody re-added an
+        // untracked push. The write-capability boundary now lives in
+        // google-export (see tests/unit/calendar/google-export.spec.ts).
         const { app, env } = buildApp(testDb, kv);
         const res = await app.request('/api/calendar/sync-events', { method: 'POST' }, env);
-        expect(res.status).toBe(403);
-        const body = await res.json() as { error: { message: string } };
-        expect(body.error.message).toContain('write access');
+        expect(res.status).toBe(404);
     });
 
     it('callback persists encrypted credentials (not plaintext refresh token)', async () => {

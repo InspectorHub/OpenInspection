@@ -12,8 +12,8 @@
         "run so it is never silently forgotten."
     ],
     "coverage": {
-        "declaredMutating": 316,
-        "resolvedMutating": 316
+        "declaredMutating": 323,
+        "resolvedMutating": 323
     },
     "knownUnreachable": {},
     "uncoveredByDesign": {
@@ -159,7 +159,6 @@
         "POST /api/availability/overrides",
         "POST /api/calendar/blocks",
         "POST /api/calendar/sync",
-        "POST /api/calendar/sync-events",
         "POST /api/concierge/confirm",
         "POST /api/contacts",
         "POST /api/contacts/import",

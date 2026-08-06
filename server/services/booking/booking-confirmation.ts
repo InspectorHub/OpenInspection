@@ -1,13 +1,11 @@
 import type { Context } from 'hono';
 import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { users } from '../../lib/db/schema';
+import { users, inspections, tenantConfigs } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
 import { CredentialService } from '../credential.service';
-import { createCalendarEvent } from '../../api/calendar';
-import { loadOpenGoogleConnection } from '../../lib/calendar/connection';
-import { loadGoogleOAuthMode, resolveGoogleOAuthCredentials } from '../../lib/calendar/resolve-google-oauth';
-import { canPushEvents } from '../../lib/calendar/provider';
+import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
+import { resolveTenantTimeZone, wallClockToEpochMs } from '../../lib/tz';
 import { getBookingHost, getBaseUrl } from '../../lib/url';
 import type { HonoConfig } from '../../types/hono';
 import type { PublicBookingSchema } from '../../lib/validations/booking.schema';
@@ -63,45 +61,44 @@ export async function dispatchBookingConfirmation(
     const windowLabel = windowLabelFor(body);
 
     const inspector = await db.select().from(users).where(eq(users.id, inspectorId)).get();
-    const open = await loadOpenGoogleConnection(
-        c.env.DB,
-        tenantId,
-        inspectorId,
-        c.env.JWT_SECRET,
-        c.env.JWT_SECRET_PREVIOUS,
-    );
-    if (open && canPushEvents(open.connection.capabilities)) {
-        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
-        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
-        if (oauthCreds) {
-            const startDateTime = `${body.date}T${requestedTime}:00Z`;
-            await createCalendarEvent(
-                oauthCreds.clientId,
-                oauthCreds.clientSecret,
-                open.credentials.refreshToken,
-                open.connection.calendarId,
-                `Inspection: ${body.address}`,
-                startDateTime,
-                body.address,
-            ).catch(e => logger.error('Calendar sync failed', {}, e instanceof Error ? e : undefined));
-        }
-    }
+
+    // The calendar push goes through the tracked export path: it reads the
+    // instant that fulfillBooking already stamped in the TENANT zone, records
+    // the Google event id in calendar_external_links, and therefore updates
+    // rather than duplicates when the booking is later moved. The previous
+    // call composed `${body.date}T${requestedTime}:00Z` — a wall clock labelled
+    // UTC — which put the event on the inspector's calendar at the wrong hour
+    // for every tenant not actually in UTC.
+    pushInspectionAfterResponse(c, tenantId, inspectionId);
 
     const emailService = c.var.services.email;
 
-    // Sprint 1 C-10 — build the ICS event so the confirmation email
-    // carries a calendar invite the customer can import into Apple
-    // Calendar / Google Calendar. Duration defaults to 3 hours, with
-    // 4 hours for morning/afternoon windows and 9 hours for all-day.
-    const startMs = new Date(`${body.date}T${requestedTime}:00Z`).getTime();
-    let durationHours: number;
-    switch (body.timeSlot) {
-        case 'all-day':   durationHours = 9; break;
-        case 'morning':
-        case 'afternoon': durationHours = 4; break;
-        default:          durationHours = 3; break;
-    }
-    const endMs = startMs + durationHours * 60 * 60 * 1000;
+    // Sprint 1 C-10 — the ICS invite the customer imports into Apple Calendar
+    // or Google Calendar.
+    //
+    // The instant comes from the row, not from re-deriving it here. fulfillBooking
+    // stamped scheduled_start_ms/end_ms by reading the slot time in the TENANT
+    // zone; this used to recompute it as `${body.date}T${requestedTime}:00Z`,
+    // labelling a wall clock as UTC, so the customer's invite landed hours off
+    // in every zone but UTC — and it disagreed with the row the office sees.
+    // One authority, and the window-length policy stops being duplicated too.
+    const booked = await db.select({
+        scheduledStartMs: inspections.scheduledStartMs,
+        scheduledEndMs: inspections.scheduledEndMs,
+    }).from(inspections).where(eq(inspections.id, inspectionId)).get();
+
+    const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+        .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+    const tenantTz = resolveTenantTimeZone(tzRow?.defaultTimezone);
+
+    const stampedStart = booked?.scheduledStartMs instanceof Date ? booked.scheduledStartMs.getTime() : null;
+    const stampedEnd = booked?.scheduledEndMs instanceof Date ? booked.scheduledEndMs.getTime() : null;
+    // Only reached when the stamp write failed; still read in the tenant zone.
+    const startMs = stampedStart ?? wallClockToEpochMs(body.date, requestedTime, tenantTz);
+    const fallbackHours = body.timeSlot === 'all-day' ? 9
+        : body.timeSlot === 'morning' || body.timeSlot === 'afternoon' ? 4
+        : 3;
+    const endMs = stampedEnd ?? startMs + fallbackHours * 60 * 60 * 1000;
     // Booking-confirmation greeting falls back to the brand, never the
     // inspector's inbox — keeps the email looking professional even if a
     // legacy account is missing a display name.

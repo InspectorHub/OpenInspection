@@ -16,9 +16,8 @@ import { SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { logger } from '../lib/logger';
 import { getBaseUrl } from '../lib/url';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { getRedirectUri, syncEventsToGcal, createCalendarEvent } from '../lib/google-calendar';
+import { getRedirectUri } from '../lib/google-calendar';
 import {
-    canPushEvents,
     capabilityFromScopes,
     createPkceChallenge,
 } from '../lib/calendar/provider';
@@ -352,48 +351,6 @@ const calendarRoutes = createApiRouter()
         }, 200);
     })
     /**
-     * POST /api/calendar/sync-events
-     * Pushes upcoming inspection events to Google Calendar (full-sync capability only).
-     */
-    .post('/sync-events', async (c) => {
-        const jwtUser = c.get('user');
-        if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
-
-        const tenantId = c.get('tenantId') as string;
-        const open = await loadOpenGoogleConnection(
-            c.env.DB,
-            tenantId,
-            jwtUser.sub,
-            c.env.JWT_SECRET,
-            c.env.JWT_SECRET_PREVIOUS,
-        );
-        if (!open) {
-            return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 400);
-        }
-        if (!canPushEvents(open.connection.capabilities)) {
-            return c.json({
-                success: false,
-                error: { message: 'Calendar connection does not include write access. Reconnect with full sync.' },
-            }, 403);
-        }
-
-        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
-        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
-        if (!oauthCreds) {
-            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
-        }
-
-        const result = await syncEventsToGcal(
-            c.env.DB,
-            tenantId,
-            oauthCreds.clientId,
-            oauthCreds.clientSecret,
-            open.credentials.refreshToken,
-            open.connection.calendarId,
-        );
-        return c.json({ success: true, data: result });
-    })
-    /**
      * GET /api/calendar/connect?capability=…&provider=google
      * Redirects inspector to Google OAuth consent (PKCE S256).
      */
@@ -540,7 +497,5 @@ const calendarRoutes = createApiRouter()
     });
 
 export type CalendarApi = typeof calendarRoutes;
-
-export { createCalendarEvent };
 
 export default calendarRoutes;
