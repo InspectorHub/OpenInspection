@@ -24,12 +24,12 @@ import { brandFormat, brandTokens } from "~/lib/brand";
 import { presetTokens } from "~/lib/report-style/preset-tokens";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { ErrorState } from "~/components/ErrorState";
-import { getSectionIcon, itemDrivesSummary } from "~/lib/report-helpers";
+import { itemDrivesSummary } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
 import { CredentialBadges } from "./report/CredentialBadges";
 import { badgeUrl } from "../../../../server/lib/media/badge-variant";
 import { primaryBadgeOf } from "../../../../server/lib/credentials/primary";
-import { ReportDefectCard } from "./report/ReportDefectCard";
+import { ReportSectionBlock } from "./report/ReportSectionBlock";
 import { PhotoAppendix } from "./report/PhotoAppendix";
 import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
 import { ReportVerificationBlock } from "./report/ReportVerificationBlock";
@@ -43,8 +43,7 @@ import { WordExportButton } from "./report/WordExportButton";
 import { CostExportButtons } from "~/components/CostExportButtons";
 import {
   PRINT_CARD_CLASS,
-  PRINT_SECTION_HEADING_CLASS,
-  ITEM_PHOTO_GRID_CLASS,
+  REPORT_HEADING_STYLE,
   type ReportPhoto,
   type FilterKey,
   type ReportLoaderResult,
@@ -183,10 +182,6 @@ export function reportViewProps(
  * report was published). We render a calm panel rather than hiding the
  * cover section, so the report never looks half-broken to the client.
  */
-// Report heading typography — driven by the resolved profile's --report-* vars
-// (Report Style Presets). Shared by the report title and every section heading.
-const REPORT_HEADING_STYLE = { fontFamily: "var(--report-heading-font)", fontWeight: "var(--report-heading-weight)" as unknown as number, letterSpacing: "var(--report-heading-spacing)", textTransform: "var(--report-heading-transform)" as unknown as "none" };
-
 function CoverPhotoPlaceholder() {
   return (
     <div className="w-full h-44 sm:h-56 rounded-xl border border-ih-border bg-ih-bg-muted flex flex-col items-center justify-center gap-2 text-ih-fg-4">
@@ -575,184 +570,20 @@ export function ReportView(props: ReportViewProps) {
         {/* Commercial PCA Phase U — per-unit matrix + exception detail (gated on
             per_unit mode; renders nothing otherwise → report byte-identical). */}
         <PerUnitReportBlock data={data} />
-        {filteredSections.map((section, sectionIdx) => {
-          if (filter === "defects" && section.items.length === 0) return null;
-          return (
-            <div key={section.id} id={section.id} className="mb-6 group/section relative scroll-mt-4" style={section.alwaysPageBreak ? { breakBefore: "page" } : undefined}>
-              <div className={`flex items-center gap-3 mb-4 ${PRINT_SECTION_HEADING_CLASS}`}>
-                <span className="text-2xl">{getSectionIcon(section.title)}</span>
-                <h2 className="text-2xl text-ih-fg-1" style={REPORT_HEADING_STYLE}>
-                  <span className="mr-1 text-ih-fg-4">
-                    {sectionIdx + 1} -
-                  </span>
-                  {section.title}
-                </h2>
-                <div className="flex-1 h-px" style={{ borderTop: "1px solid var(--report-band)" }} />
-                <span className="text-xs font-mono text-ih-fg-4">
-                  {m.report_view_section_items({ count: section.items.length })}
-                </span>
-              </div>
-
-              {/* Items (hidden in summary mode) */}
-              {filter !== "summary" && (
-                <div className="space-y-3">
-                  {section.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`bg-ih-bg-card border border-ih-border overflow-hidden ${PRINT_CARD_CLASS}`}
-                      style={{ borderRadius: "var(--report-radius)", borderLeftWidth: 4, borderLeftColor: item.ratingColor }}
-                    >
-                      <div className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className="font-semibold text-ih-fg-1">
-                            {item.label}
-                          </h3>
-                          {item.ratingLabel && (
-                            <span
-                              className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide"
-                              style={{
-                                background: `${item.ratingColor}20`,
-                                color: item.ratingColor,
-                              }}
-                            >
-                              {item.ratingLabel}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Non-rich item value */}
-                        {item.type &&
-                          item.type !== "rich" &&
-                          item.value !== undefined &&
-                          item.value !== null &&
-                          item.value !== "" && (
-                            <p className="mt-2 text-sm font-semibold text-ih-fg-1">
-                              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mr-2">
-                                {item.type}
-                              </span>
-                              {Array.isArray(item.value)
-                                ? (item.value as unknown[]).join(" · ")
-                                : item.type === "boolean"
-                                ? (item.value as boolean)
-                                  ? "Yes"
-                                  : "No"
-                                : String(item.value)}
-                              {item.unit && (
-                                <span className="text-ih-fg-4 ml-1.5">
-                                  {item.unit}
-                                </span>
-                              )}
-                            </p>
-                          )}
-
-                        {item.notes && (
-                          <p className="text-sm text-ih-fg-3 mt-2 leading-relaxed">
-                            {item.notes}
-                          </p>
-                        )}
-
-                        {/* FE-3/B-20 — findings: included canned + custom defects with their
-                        own photos. Previously the viewer rendered neither (field-authored
-                        defects never appeared in the published report at all). */}
-                        <ReportDefectCard
-                          item={item}
-                          mediaVisible={mediaVisible}
-                          renderMediaTile={renderMediaTile}
-                          showPhotos={data.photoMode !== "appendix"}
-                        />
-
-                        {item.recommendation && (
-                          <div className="mt-2 flex items-center gap-2 flex-wrap">
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-ih-info-bg text-ih-info-fg uppercase">
-                              {m.report_view_recommend({ value: item.recommendation })}
-                            </span>
-                            {data.showEstimates &&
-                              (item.estimateMin != null || item.estimateMax != null) && (
-                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-ih-ok-bg text-ih-ok-fg tabular-nums">
-                                  {m.report_view_estimated_cost_label()} $
-                                  {item.estimateMin?.toLocaleString() ?? "?"} - $
-                                  {item.estimateMax?.toLocaleString() ?? "?"}
-                                </span>
-                              )}
-                          </div>
-                        )}
-
-                        {(item.repairItems?.length ?? 0) > 0 && (
-                          <div className="mt-2 space-y-1.5">
-                            {item.repairItems!.map((ri, i) => (
-                              <div key={i} className="flex items-center gap-2 flex-wrap text-[12px]">
-                                <span className="font-semibold text-ih-fg-2">{ri.summary}</span>
-                                {ri.contractorType && (
-                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-ih-info-bg text-ih-info-fg uppercase">{ri.contractorType}</span>
-                                )}
-                                {data.showEstimates && (ri.estimateMin != null || ri.estimateMax != null) && (
-                                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-ih-ok-bg text-ih-ok-fg tabular-nums">
-                                    ${ri.estimateMin?.toLocaleString() ?? "?"} – ${ri.estimateMax?.toLocaleString() ?? "?"}
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {data.photoMode !== "appendix" && item.photos.filter(mediaVisible).length > 0 && (
-                          <div className={`mt-3 ${ITEM_PHOTO_GRID_CLASS}`}>
-                            {item.photos
-                              .filter(mediaVisible)
-                              .map((photo, idx) => renderMediaTile(photo, `${item.label} — photo ${idx + 1}`, idx))}
-                          </div>
-                        )}
-
-                        {itemDrivesSummary(item) && (
-                          <label className="print:hidden flex items-center gap-2 mt-3 cursor-pointer text-sm text-ih-fg-3">
-                            <input
-                              type="checkbox"
-                              checked={!!repairItems[item.id]}
-                              onChange={() => toggleRepairItem(item.id)}
-                              className="rounded border-ih-border-strong"
-                            />
-                            {m.report_view_add_to_repair()}
-                          </label>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Summary card */}
-              {filter === "summary" && (
-                <div className="bg-ih-bg-card border border-ih-border rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-ih-fg-1">
-                      {m.report_view_items_inspected({ count: section.items.length })}
-                    </span>
-                    <span
-                      className="text-sm font-semibold"
-                      style={{
-                        color: section.defectCount > 0 ? "#f43f5e" : "#22c55e",
-                      }}
-                    >
-                      {section.defectCount > 0
-                        ? m.report_view_defect_count({ count: section.defectCount, plural: section.defectCount > 1 ? "s" : "" })
-                        : m.report_view_all_clear()}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Disclaimer */}
-              {section.disclaimerText && filter !== "summary" && (
-                <div className="mt-4 px-4 py-3 rounded-md border border-ih-border bg-ih-watch-bg/40 text-[12px] leading-relaxed text-ih-fg-3">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-watch-fg mb-1">
-                    {m.report_view_disclaimer()}
-                  </div>
-                  <p className="whitespace-pre-line">{section.disclaimerText}</p>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {filteredSections.map((section, sectionIdx) => (
+          <ReportSectionBlock
+            key={section.id}
+            section={section}
+            sectionIdx={sectionIdx}
+            filter={filter}
+            showEstimates={data.showEstimates}
+            showPhotos={data.photoMode !== "appendix"}
+            mediaVisible={mediaVisible}
+            renderMediaTile={renderMediaTile}
+            repairItems={repairItems}
+            onToggleRepairItem={toggleRepairItem}
+          />
+        ))}
 
         {/* Commercial PCA Phase C — TABLE 1 (Opinion of Cost) + opt-in TABLE 2
             (Reserve Schedule), following the body per the real-PCA layout.

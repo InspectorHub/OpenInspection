@@ -27,6 +27,7 @@ async function source(): Promise<string> {
     import('~/components/portal/sections/ReportView?raw'),
     import('~/components/portal/sections/report/ReportMediaTile?raw'),
     import('~/components/portal/sections/report/ReportDefectCard?raw'),
+    import('~/components/portal/sections/report/ReportItemCard?raw'),
   ]);
   return mods.map((m) => (m as unknown as { default: string }).default).join('\n');
 }
