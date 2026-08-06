@@ -10,10 +10,17 @@
  * The agent report (?view=agent) reuses the SAME standalone route, so it is
  * covered automatically by the wrapper — there is no separate agent component.
  *
- * The presentational sub-blocks (media tile / defect card / signature /
- * verification / repair panel) live colocated in ./report/*; the pure helpers
- * live in ~/lib/report-helpers. This file composes them and owns the report's
- * interactive state (filter, lightbox, repair selection, failed-photo Set).
+ * The presentational blocks (masthead, cover, summary row, export bar, one
+ * block per section and one card per item, signature / verification / repair
+ * panel) live colocated in ./report/*, as do the prop contract
+ * (./report/report-view-props) and the shared types. The pure helpers live in
+ * ~/lib/report-helpers.
+ *
+ * WHAT STAYS HERE is what no single block can own: the report-wide interactive
+ * state (filter, lightbox, repair selection, failed-photo Set), the media-tile
+ * renderer those pieces close over, and the composition order of the page.
+ * Anything a reader would look up by name — "the item card", "the cover photo",
+ * "the dead-link page" — is a file next door.
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
@@ -22,11 +29,11 @@ import { m } from "~/paraglide/messages";
 import { usePdfExport } from "~/hooks/usePdfExport";
 import { brandTokens } from "~/lib/brand";
 import { presetTokens } from "~/lib/report-style/preset-tokens";
-import { ErrorState } from "~/components/ErrorState";
 import { itemDrivesSummary } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
 import { badgeUrl } from "../../../../server/lib/media/badge-variant";
 import { primaryBadgeOf } from "../../../../server/lib/credentials/primary";
+import { ReportUnavailable } from "./report/ReportUnavailable";
 import { ReportExportBar } from "./report/ReportExportBar";
 import { ReportHeader } from "./report/ReportHeader";
 import { ReportCoverPhoto } from "./report/ReportCoverPhoto";
@@ -41,17 +48,15 @@ import { PcaSkeleton } from "./report/PcaSkeleton";
 import { ReportToc } from "./report/ReportToc";
 import { PerUnitReportBlock } from "./report/PerUnitReportBlock";
 import { CostTables } from "./report/CostTables";
-import type {
-  ReportPhoto,
-  FilterKey,
-  ReportLoaderResult,
-} from "./report/types";
+import type { ReportPhoto, FilterKey } from "./report/types";
+import type { ReportViewProps } from "./report/report-view-props";
 
 /* ------------------------------------------------------------------ */
 /* Re-exports — keep ReportView's public type/constant/helper surface  */
 /* identical after the structural split (route + tests import these).  */
 /* ------------------------------------------------------------------ */
 
+export { reportViewProps, type ReportViewProps } from "./report/report-view-props";
 export type {
   ReportPhoto,
   ResolvedDefect,
@@ -76,99 +81,6 @@ export {
   type SignatureBlockResult,
   type VerificationBlockResult,
 } from "~/lib/report-helpers";
-
-/* ------------------------------------------------------------------ */
-/* Component props + pure adapter */
-/* ------------------------------------------------------------------ */
-
-export interface ReportViewProps extends ReportLoaderResult {
-  /** Route params, supplied by the wrapper (not from loader payload). */
-  tenant: string;
-  /** The inspection id (params); falls back to loader inspectionId. */
-  reportId: string;
-  /** Public access token (?token=) used for token-scoped action links. */
-  token?: string;
-  /**
-   * When true (the STANDALONE `/report-view/...` page) the component renders its
-   * own full-page chrome: a `min-h-screen` page background and the big property-
-   * ADDRESS title block. When false (default — rendered INLINE inside the Hub)
-   * that chrome is dropped: the Hub already supplies the page container, header
-   * and address, so the bare report content is rendered to avoid a double
-   * background and a duplicated address. The functional bits (filters, toolbar,
-   * Download-PDF FAB, signature/verification, lightbox) render in BOTH modes.
-   * Mirrors `PaymentSection`'s `showStandaloneChrome` convention.
-   */
-  showStandaloneChrome?: boolean;
-  /** Spec 3: hide client-transaction affordances (repair-list / build-repair
-   *  links + the in-report Repair Request toggle) when an AGENT is viewing the
-   *  report via their link. Report-viewing actions (Print, Download PDF) stay. */
-  hideClientActions?: boolean;
-}
-
-/**
- * Pure adapter: loader payload (+ route params) → component props. Unit-testable
- * (no React / router). Defensive defaults keep it safe against partial payloads.
- */
-export function reportViewProps(
-  data: ReportLoaderResult & {
-    tenant?: string;
-    inspectionId?: string;
-    token?: string;
-    showStandaloneChrome?: boolean;
-  },
-): ReportViewProps {
-  const reportId = data.inspectionId ?? "";
-  return {
-    inspectionId: data.inspectionId ?? "",
-    address: data.address ?? "",
-    date: data.date ?? "",
-    inspectorName: data.inspectorName ?? null,
-    coverPhotoUrl: data.coverPhotoUrl ?? null,
-    stats: data.stats ?? { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
-    sections: data.sections ?? [],
-    outline: data.outline ?? [],
-    showEstimates: data.showEstimates ?? false,
-    costTables: data.costTables ?? null,
-    enableRepairList: data.enableRepairList ?? false,
-    enableCustomerRepairExport: data.enableCustomerRepairExport ?? false,
-    reportTimeZone: data.reportTimeZone ?? "UTC",
-    isDelivered: data.isDelivered ?? false,
-    brand: data.brand,
-    error: data.error ?? null,
-    notPublished: data.notPublished ?? false,
-    linkInactive: data.linkInactive ?? false,
-    styleProfile: data.styleProfile,
-    inspectorCredentials: data.inspectorCredentials,
-    initialFilter: data.initialFilter ?? "all",
-    printMode: data.printMode ?? false,
-    tocPages: data.tocPages,
-    isPublished: data.isPublished ?? false,
-    signature: data.signature ?? null,
-    verification: data.verification ?? null,
-    astmConformance: data.astmConformance ?? null,
-    reportSignoffs: data.reportSignoffs ?? [],
-    psq: data.psq ?? null,
-    documentReview: data.documentReview ?? [],
-    relianceText: data.relianceText ?? { userReliance: "", pointInTime: "", siteSpecific: "" },
-    ownerPreview: data.ownerPreview ?? false,
-    baseUrl: data.baseUrl ?? "",
-    photoMode: data.photoMode ?? "inline",
-    photoAppendix: data.photoAppendix ?? [],
-    propertyType: data.propertyType ?? null,
-    commercialSubtype: data.commercialSubtype ?? null,
-    reportTier: data.reportTier ?? null,
-    buildingProfile: data.buildingProfile ?? [],
-    pcaReport: data.pcaReport ?? null,
-    unitInspectionMode: data.unitInspectionMode ?? "tagged",
-    units: data.units ?? [],
-    unitConditionMatrix: data.unitConditionMatrix ?? [],
-    defectCountsByUnit: data.defectCountsByUnit ?? {},
-    tenant: data.tenant ?? "",
-    reportId,
-    token: data.token,
-    showStandaloneChrome: data.showStandaloneChrome ?? false,
-  };
-}
 
 /**
  * React key for a media tile. Videos key on their stream/media id (stable across
@@ -251,52 +163,12 @@ export function ReportView(props: ReportViewProps) {
   };
 
   if (data.error) {
-    if (data.notPublished) {
-      return (
-        <ErrorState
-          title={m.report_view_not_published_title()}
-          message={m.report_view_not_published_message()}
-        />
-      );
-    }
-    // IA-36 ⑨ — "we took this link offline" (410) and "this link names nothing"
-    // (404) render the SAME page on purpose.
-    //
-    // The reader cannot act on the difference and we cannot always tell them
-    // the truth anyway: rotating a link overwrites its row in place, so a
-    // recipient holding the superseded URL is indistinguishable from someone
-    // who mistyped one — both arrive as 404. Splitting the copy would mean
-    // confidently telling a legitimate client "no such report" when we in fact
-    // replaced their link ten minutes ago.
-    //
-    // So the page states both possibilities and names the recovery path. The
-    // wire keeps 410 and 404 distinct — support and the audit trail need to
-    // know which happened even when the reader doesn't.
-    const notFound = data.error === "Report not found";
-    if (notFound || data.linkInactive) {
-      // Name the company and give a channel. "Ask your inspector" is not
-      // actionable to someone who received one email months ago and no longer
-      // remembers who sent it.
-      const company = data.brand?.companyName;
-      return (
-        <ErrorState
-          title={m.report_link_inactive_title()}
-          message={
-            company
-              ? m.report_link_inactive_message_company({ company })
-              : m.report_link_inactive_message()
-          }
-          contacts={{
-            email: data.brand?.supportEmail,
-            phone: data.brand?.companyPhone,
-          }}
-        />
-      );
-    }
     return (
-      <ErrorState
-        title={m.report_view_unavailable_title()}
-        message={m.report_view_load_error()}
+      <ReportUnavailable
+        error={data.error}
+        notPublished={data.notPublished}
+        linkInactive={data.linkInactive}
+        brand={data.brand}
       />
     );
   }
