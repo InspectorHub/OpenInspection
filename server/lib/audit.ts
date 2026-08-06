@@ -84,6 +84,10 @@ export type AuditAction =
     | 'config.attention_thresholds.update'
     | 'config.dashboard_columns.update'
     | 'config.tenant_config.patch'
+    // The ZIP territories that decide who is even OFFERED a booking. Audited
+    // because clearing a list silently widens one inspector's reach and
+    // narrowing one can make a workspace look closed in a whole postcode.
+    | 'config.service_areas.replace'
     | 'tag.created'
     | 'tag.updated'
     | 'tag.deleted'

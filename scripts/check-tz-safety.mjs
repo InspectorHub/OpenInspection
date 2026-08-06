@@ -63,6 +63,12 @@ const SCOPE = [
   'app/routes/calendar.tsx',
   'app/routes/calendar-dispatch.tsx',
   'server/services/calendar-items.service.ts',
+  // Booking rules are civil-time rules stated in the OFFICE's terms — a lead
+  // time in hours and a wall-clock same-day cutoff — and the ISO-week bucket
+  // that `least_loaded` counts is a calendar question too. A
+  // `.toISOString().slice(0,10)` here shipped green before this line existed;
+  // it was caught by a test, which is one gate later than it should have been.
+  'server/lib/booking',
 ];
 
 function collectFiles(path) {

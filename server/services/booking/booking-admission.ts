@@ -7,6 +7,8 @@ import { resolvePublicHolidayEffect } from '../../lib/holidays/load-tenant-holid
 import type { HonoConfig } from '../../types/hono';
 import type { PublicBookingSchema } from '../../lib/validations/booking.schema';
 import type { z } from '@hono/zod-openapi';
+import { fetchPlaceDetails, placeDetailsCacheKey, type ResolvedPlace } from '../../lib/places/geocode';
+import type { RoutingDecision } from '../../lib/booking/routing';
 
 /** What survives admission: a slot claimed for a named, tenant-owned inspector. */
 export interface BookingClaim {
@@ -15,6 +17,43 @@ export interface BookingClaim {
     /** Carried through for the widget success/error telemetry the caller emits. */
     isWidgetSubmit: boolean;
     originHeader: string | undefined;
+    /**
+     * The property's resolved location, or null when the booking carried no
+     * placeId / the lookup failed. Written onto the inspection row by the
+     * caller and fed to `closest` routing here.
+     */
+    place: ResolvedPlace | null;
+    /**
+     * How the inspector was chosen — including a substitution and its reason.
+     * Null only when the client named an inspector, in which case no strategy
+     * ran and there is nothing to report.
+     */
+    routing: RoutingDecision | null;
+}
+
+/**
+ * Resolve the selected address to coordinates. Fail-soft by contract: a
+ * booking whose geocode fails is still a booking, and the consequence (no
+ * `closest` routing for it) is reported by the routing decision rather than
+ * guessed at.
+ */
+async function resolveProperty(
+    c: Context<HonoConfig>,
+    placeId: string | undefined,
+): Promise<ResolvedPlace | null> {
+    if (!placeId) return null;
+    const apiKey = c.env.GOOGLE_PLACES_API_KEY;
+    if (!apiKey) return null;
+    const cacheKey = placeDetailsCacheKey(placeId);
+    if (c.env.TENANT_CACHE) {
+        const cached = await c.env.TENANT_CACHE.get(cacheKey, 'json') as ResolvedPlace | null;
+        if (cached) return cached;
+    }
+    const resolved = await fetchPlaceDetails(apiKey, placeId);
+    if (resolved && c.env.TENANT_CACHE) {
+        await c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(resolved), { expirationTtl: 60 * 24 * 60 * 60 });
+    }
+    return resolved;
 }
 
 /**
@@ -117,16 +156,31 @@ export async function admitBooking(
     // Accepted for launch traffic; a post-insert recheck/compensation is
     // tracked in the backlog. Do NOT "fix" by randomizing the pick — the
     // determinism is intentional (idempotent re-submits).
-    const { slots } = await service.getTenantSlots(tenantId, body.date, serviceIdsForQual, qualifiedIds);
+    // The property's own location, resolved once: the ZIP narrows who is even
+    // offered a slot, and the coordinates are what `closest` measures to.
+    const place = await resolveProperty(c, body.addressPlaceId);
+    const propertyZip = place?.zip ?? body.addressZip ?? null;
+
+    const { slots, outsideServiceArea } = await service.getTenantSlots(
+        tenantId, body.date, serviceIdsForQual, qualifiedIds, propertyZip,
+    );
+    if (outsideServiceArea) {
+        throw Errors.Conflict('No inspector currently serves that area. Please contact the company directly to schedule.');
+    }
     const target = slots.find(s => s.time === requestedTime);
     const freeIds = (target?.inspectorIds ?? []).filter(id => !inspectorId || id === inspectorId);
     if (freeIds.length === 0) {
         throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
     }
+    let routing: RoutingDecision | null = null;
     if (!inspectorId) {
-        inspectorId = await service.pickInspector(tenantId, freeIds);
+        routing = await service.routeInspector(tenantId, freeIds, {
+            civilDate: body.date,
+            property: place ? { lat: place.lat, lng: place.lng } : null,
+        });
+        inspectorId = routing.inspectorId;
         if (!inspectorId) throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
     }
 
-    return { inspectorId, requestedTime, isWidgetSubmit, originHeader };
+    return { inspectorId, requestedTime, isWidgetSubmit, originHeader, place, routing };
 }

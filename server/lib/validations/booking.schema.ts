@@ -16,6 +16,20 @@ export const PublicBookingSchema = z.object({
     // GET /book/:tenant/:slug page data.
     tenant: z.string().min(1, 'Tenant is required').openapi({ example: 'acme-inspections' }).describe('Tenant slug from the booking page URL; resolved server-side to the tenant id.'),
     address: z.string().min(5, 'Address is too short').openapi({ example: '123 Main St, City, ST 12345' }).describe('TODO describe address field for the OpenInspection MCP integration'),
+    // The structured half of the address, present when the visitor picked a
+    // suggestion from the public autocomplete instead of typing free text.
+    //
+    // Both stay OPTIONAL and neither is trusted as the last word: `addressZip`
+    // is the lenient client-side parse of Google's secondary text, and the
+    // server re-resolves `addressPlaceId` through Places Details to get the
+    // authoritative ZIP and the coordinates. A booking typed by hand — or made
+    // on a deployment with no Places key — still submits, and simply has no
+    // geocode. That absence is reported by the routing decision rather than
+    // being invented as (0,0).
+    addressZip: z.string().trim().min(3).max(10).optional().openapi({ example: '78701' })
+        .describe('ZIP hint from the selected autocomplete suggestion. Re-resolved server-side when a placeId is supplied.'),
+    addressPlaceId: z.string().trim().min(8).max(200).optional().openapi({ example: 'ChIJxxx' })
+        .describe('Google place id of the selected suggestion. Resolved server-side to the property coordinates used by `closest` routing.'),
     clientName: z.string().min(1, 'Client name is required').openapi({ example: 'John Doe' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
     clientEmail: z.string().email('Invalid email address').openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').openapi({ example: '2024-04-15' }).describe('TODO describe date field for the OpenInspection MCP integration'),

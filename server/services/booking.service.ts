@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
-import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, users } from '../lib/db/schema';
+import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, serviceInspectors, users } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import type { HonoConfig } from '../types/hono';
 import type { PublicBookingSchema } from '../lib/validations/booking.schema';
@@ -12,6 +12,17 @@ import { computeBusyTimes } from '../lib/booking/busy-times';
 import { buildTenantSlotMap } from '../lib/booking/tenant-slot-map';
 import { resolvePublicHolidayEffect } from '../lib/holidays/load-tenant-holidays';
 import { fulfillBooking as runFulfillBooking } from './booking/fulfill-booking';
+import {
+    arbitrateSlotRace as runArbitrateSlotRace,
+    revokeBooking as runRevokeBooking,
+} from './booking/slot-arbitration';
+import {
+    routeInspector as runRouteInspector,
+    type RouteInspectorOptions,
+} from './booking/route-inspector';
+import type { RoutingDecision } from '../lib/booking/routing';
+import { filterEligibleInspectors, loadServiceAreasByUser, type EligibilitySkipReason } from '../lib/booking/eligibility';
+import { applyBookingRules, loadBookingRules } from '../lib/booking/booking-rules';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 /**
  * Service to handle public booking flow and availability lookups.
@@ -170,16 +181,29 @@ export class BookingService {
      * override that date, and (c) has no inspection at that time (via the
      * inspection_inspectors link table, so helper assignments count as busy
      * too). Storage stays per-inspector; this only changes the query face.
+     * Geographic eligibility runs BEFORE the union (an inspector who will not
+     * travel to this ZIP should never contribute a slot), and the tenant
+     * booking rules run AFTER it (they mark computed slots unbookable). Both
+     * report why they did nothing — `geoSkipped` / `rulesActive` are on the
+     * return value precisely so "the filter degraded gracefully" can never
+     * again be indistinguishable from "the filter ran".
+     *
      * @param qualifiedIds Optional precomputed result of getQualifiedInspectorIds to avoid duplicate lookups.
+     * @param propertyZip  The property's ZIP when the booking carries one.
      */
     async getTenantSlots(
         tenantId: string,
         dateStr: string,
         serviceIds: string[],
         qualifiedIds?: string[],
+        propertyZip?: string | null,
     ): Promise<{
         slots: Array<{ time: string; available: boolean; inspectorIds: string[] }>;
         holidayAdvisory?: { date: string; name: string };
+        /** Set when the ZIP filter could NOT run; null when it did. */
+        geoSkipped?: EligibilitySkipReason | null;
+        /** True when the ZIP filter ran and left nobody serving this area. */
+        outsideServiceArea?: boolean;
     }> {
         const holiday = await resolvePublicHolidayEffect(this.db, tenantId, dateStr);
         if (holiday.effect === 'block') {
@@ -188,25 +212,35 @@ export class BookingService {
 
         const db = this.getDrizzle();
         const qualified = qualifiedIds ?? await this.getQualifiedInspectorIds(tenantId, serviceIds);
-        if (qualified.length === 0) {
-            return {
-                slots: [],
-                ...(holiday.effect === 'advisory' && holiday.name
-                    ? { holidayAdvisory: { date: dateStr, name: holiday.name } }
-                    : {}),
-            };
+        const advisory = holiday.effect === 'advisory' && holiday.name
+            ? { holidayAdvisory: { date: dateStr, name: holiday.name } }
+            : {};
+        if (qualified.length === 0) return { slots: [], ...advisory };
+
+        const geo = filterEligibleInspectors(
+            qualified,
+            propertyZip ?? null,
+            await loadServiceAreasByUser(this.db, tenantId, qualified),
+        );
+        if (geo.reason) {
+            logger.info('booking.eligibility.not-applied', { tenantId, reason: geo.reason });
         }
+        if (geo.excludedEveryone) {
+            return { slots: [], ...advisory, geoSkipped: null, outsideServiceArea: true };
+        }
+        const eligible = geo.eligibleIds;
+        const reported = { geoSkipped: geo.reason, outsideServiceArea: false };
         const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
 
         const [windows, overrides, busy, blocks] = await Promise.all([
             db.select().from(availability).where(and(
                 eq(availability.tenantId, tenantId),
-                inArray(availability.inspectorId, qualified),
+                inArray(availability.inspectorId, eligible),
                 eq(availability.dayOfWeek, dayOfWeek),
             )).all(),
             db.select().from(availabilityOverrides).where(and(
                 eq(availabilityOverrides.tenantId, tenantId),
-                inArray(availabilityOverrides.inspectorId, qualified),
+                inArray(availabilityOverrides.inspectorId, eligible),
                 eq(availabilityOverrides.date, dateStr),
             )).all(),
             db.select({ userId: inspectionInspectors.userId, date: inspections.date })
@@ -214,30 +248,39 @@ export class BookingService {
                 .innerJoin(inspections, eq(inspections.id, inspectionInspectors.inspectionId))
                 .where(and(
                     eq(inspectionInspectors.tenantId, tenantId),
-                    inArray(inspectionInspectors.userId, qualified),
+                    inArray(inspectionInspectors.userId, eligible),
                     sql`date(${inspections.date}) = ${dateStr}`,
                     sql`${inspections.status} not in ('cancelled')`,
                 )).all(),
             db.select().from(calendarBlocks).where(and(
                 eq(calendarBlocks.tenantId, tenantId),
-                inArray(calendarBlocks.userId, qualified),
+                inArray(calendarBlocks.userId, eligible),
                 eq(calendarBlocks.date, dateStr),
             )).all(),
         ]);
 
         const gridOpts = await loadSlotGridOptions(this.db, tenantId);
-        const slotMap = buildTenantSlotMap(qualified, windows, overrides, busy, blocks, gridOpts);
+        const slotMap = buildTenantSlotMap(eligible, windows, overrides, busy, blocks, gridOpts);
+        const rules = await loadBookingRules(this.db, tenantId);
 
         const slots = [...slotMap.entries()]
             .sort(([a], [b]) => (a < b ? -1 : 1))
-            .map(([time, ids]) => ({ time, available: ids.size > 0, inspectorIds: [...ids].sort() }));
+            .map(([time, ids]) => {
+                // Lead time and same-day cutoff mark an otherwise-free slot
+                // unbookable. Applied here rather than inside the grid builder
+                // so the reason stays a property of the tenant's POLICY, not of
+                // anyone's calendar.
+                const blocked = rules.inactive ? false : !applyBookingRules({
+                    ...rules, civilDate: dateStr, slotTime: time, nowMs: Date.now(),
+                }).allowed;
+                return {
+                    time,
+                    available: !blocked && ids.size > 0,
+                    inspectorIds: blocked ? [] : [...ids].sort(),
+                };
+            });
 
-        return {
-            slots,
-            ...(holiday.effect === 'advisory' && holiday.name
-                ? { holidayAdvisory: { date: dateStr, name: holiday.name } }
-                : {}),
-        };
+        return { slots, ...advisory, ...reported };
     }
 
     /**
@@ -255,19 +298,20 @@ export class BookingService {
     }
 
     /**
-     * B-28 — post-insert TOCTOU arbitration. The slot read and the inspection
-     * insert in POST /book are not atomic (D1 has no row locks), so two
-     * concurrent submits can both pass the advisory check and double-book the
-     * same inspector. Instead of preventing the race we resolve it after the
-     * fact: every racer calls this AFTER its own insert and BEFORE any side
-     * effect (emails, calendar). All racers see the same conflicting rows and
-     * apply the same deterministic order — sort by (createdAt, id) — so the
-     * earliest booking wins and every later racer self-compensates
-     * (revokeBooking + 409). Exactly one winner, no coordination needed.
-     *
-     * Busy semantics mirror getTenantSlots: link-table join, non-cancelled,
-     * HH:MM read from the ISO datetime at slice(11,16).
+     * Strategy-aware auto-assignment. Returns the DECISION, not just an id:
+     * `least_loaded` and `closest` can be inapplicable to a request, and the
+     * substitution has to be visible to the caller so it reaches the audit
+     * record. See `./booking/route-inspector`.
      */
+    async routeInspector(
+        tenantId: string,
+        freeIds: string[],
+        opts: RouteInspectorOptions,
+    ): Promise<RoutingDecision> {
+        return runRouteInspector(this.db, tenantId, freeIds, opts);
+    }
+
+    /** B-28 post-insert TOCTOU arbitration — see `./booking/slot-arbitration`. */
     async arbitrateSlotRace(
         tenantId: string,
         inspectorId: string,
@@ -275,65 +319,12 @@ export class BookingService {
         time: string,
         myRequestId: string,
     ): Promise<'win' | 'lose'> {
-        const db = this.getDrizzle();
-        const rows = await db.select({
-            inspectionId: inspectionInspectors.inspectionId,
-            requestId:    inspections.requestId,
-            date:         inspections.date,
-            createdAt:    inspections.createdAt,
-        })
-            .from(inspectionInspectors)
-            .innerJoin(inspections, eq(inspections.id, inspectionInspectors.inspectionId))
-            .where(and(
-                eq(inspectionInspectors.tenantId, tenantId),
-                eq(inspectionInspectors.userId, inspectorId),
-                sql`date(${inspections.date}) = ${dateStr}`,
-                sql`${inspections.status} not in ('cancelled')`,
-            )).all();
-
-        const atSlot = rows.filter(r => String(r.date).slice(11, 16) === time);
-        const mine   = atSlot.filter(r => r.requestId === myRequestId);
-        const others = atSlot.filter(r => r.requestId !== myRequestId);
-        // No competitor — or our rows are not visible (nothing to arbitrate).
-        if (mine.length === 0 || others.length === 0) return 'win';
-
-        type Key = [number, string];
-        const key = (r: typeof rows[number]): Key => [
-            r.createdAt instanceof Date ? r.createdAt.getTime() : Number(r.createdAt ?? 0),
-            r.inspectionId,
-        ];
-        const cmp = (a: Key, b: Key) => a[0] - b[0] || (Number(a[1] > b[1]) - Number(a[1] < b[1]));
-        const myKey    = mine.map(key).sort(cmp)[0]!;
-        const otherKey = others.map(key).sort(cmp)[0]!;
-        return cmp(otherKey, myKey) < 0 ? 'lose' : 'win';
+        return runArbitrateSlotRace(this.db, tenantId, inspectorId, dateStr, time, myRequestId);
     }
 
-    /**
-     * B-28 compensation — fully retract a booking this request just created:
-     * link rows, inspections, then the request row. Only ever called on rows
-     * the caller inserted milliseconds ago (the client got a 409, never a
-     * confirmation), so hard delete is correct — no cancelled tombstones.
-     */
+    /** B-28 compensation — see `./booking/slot-arbitration`. */
     async revokeBooking(tenantId: string, requestId: string): Promise<void> {
-        const db = this.getDrizzle();
-        const rows = await db.select({ id: inspections.id }).from(inspections)
-            .where(and(eq(inspections.tenantId, tenantId), eq(inspections.requestId, requestId)))
-            .all();
-        const ids = rows.map(r => r.id);
-        if (ids.length > 0) {
-            await db.delete(inspectionInspectors).where(and(
-                eq(inspectionInspectors.tenantId, tenantId),
-                inArray(inspectionInspectors.inspectionId, ids),
-            ));
-            await db.delete(inspections).where(and(
-                eq(inspections.tenantId, tenantId),
-                inArray(inspections.id, ids),
-            ));
-        }
-        await db.delete(inspectionRequests).where(and(
-            eq(inspectionRequests.tenantId, tenantId),
-            eq(inspectionRequests.id, requestId),
-        ));
+        return runRevokeBooking(this.db, tenantId, requestId);
     }
 
     /**

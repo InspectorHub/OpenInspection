@@ -8978,6 +8978,19 @@
             "minLength": 1,
             "description": "Restrict slots to a single inspector (client choice / deep link)."
           }
+        },
+        {
+          "name": "propertyZip",
+          "in": "query",
+          "required": false,
+          "description": "Property ZIP. Restricts the union to inspectors whose service area covers it; omitted means the geographic filter cannot run.",
+          "schema": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 10,
+            "example": "78701",
+            "description": "Property ZIP. Restricts the union to inspectors whose service area covers it; omitted means the geographic filter cannot run."
+          }
         }
       ],
       "body": null
@@ -9487,6 +9500,22 @@
     },
     "summary": "List referrals for the signed-in agent",
     "description": "Lists the signed-in agent's referred inspections across every tenant they have an active agent_tenant_link with, newest first, for the agent-portal dashboard."
+  },
+  {
+    "operationId": "listAllInspectorServiceAreas",
+    "method": "GET",
+    "pathTemplate": "/api/admin/service-areas/all",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List every declared inspector territory in the tenant",
+    "description": "Returns every inspector that has declared at least one ZIP prefix. Inspectors absent from the list serve every area."
   },
   {
     "operationId": "listAllTenantMcpGrants",
@@ -10907,6 +10936,35 @@
     },
     "summary": "List the signed-in inspector's credentials",
     "description": "Lists the signed-in inspector self-asserted credentials (label, member number, badge image)."
+  },
+  {
+    "operationId": "listInspectorServiceAreas",
+    "method": "GET",
+    "pathTemplate": "/api/admin/service-areas",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "userId",
+          "in": "query",
+          "required": true,
+          "description": "The inspector whose service areas are being read.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "The inspector whose service areas are being read."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the ZIP prefixes one inspector serves",
+    "description": "Returns the ZIP prefixes this inspector will travel to. An empty list means they serve every area."
   },
   {
     "operationId": "listIntegrationStatus",
@@ -16306,6 +16364,24 @@
     },
     "summary": "Replace inspection request for current tenant",
     "description": "Auto-generated placeholder for replaceInspectionRequest (PUT /{id}, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "replaceInspectorServiceAreas",
+    "method": "PUT",
+    "pathTemplate": "/api/admin/service-areas",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/ReplaceServiceAreas"
+      }
+    },
+    "summary": "Replace one inspector ZIP list",
+    "description": "Replaces the inspector ZIP list wholesale. Sending an empty array clears the territory, which means they serve every area again."
   },
   {
     "operationId": "replaceMarketplace",

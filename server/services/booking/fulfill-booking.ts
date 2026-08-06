@@ -5,6 +5,7 @@ import { inspections, inspectionRequests, tenantConfigs, services as servicesTab
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../../lib/tz';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
+import { writeAuditLogWithSlug } from '../../lib/audit';
 import { fireAutomation } from '../inspection/shared';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
@@ -52,7 +53,7 @@ export async function fulfillBooking(
     const service = c.var.services.booking;
     const db = drizzle(c.env.DB);
 
-    const { inspectorId, requestedTime, isWidgetSubmit, originHeader } =
+    const { inspectorId, requestedTime, isWidgetSubmit, originHeader, place, routing } =
         await admitBooking(c, db, deps.d1, tenantId, body);
 
     const resolvedAgentContactId = await resolveBookingAgentReferral(db, tenantId, body.agentRefSlug);
@@ -124,6 +125,11 @@ export async function fulfillBooking(
             clientName:      body.clientName,
             clientEmail:     body.clientEmail,
             propertyAddress: body.address,
+            // The request row has carried property_zip since it was created and
+            // the public form never filled it. It does now.
+            propertyCity:    place?.city ?? null,
+            propertyState:   place?.state ?? null,
+            propertyZip:     place?.zip ?? body.addressZip ?? null,
             scheduledAt:     new Date(startIso),
             status:          'pending',
             totalAmount:     0,
@@ -173,6 +179,65 @@ export async function fulfillBooking(
     if (verdict === 'lose') {
         await service.revokeBooking(tenantId, createdRequestId);
         throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
+    }
+
+    // Stamp the resolved address on every inspection this booking created.
+    //
+    // These columns existed and were populated ONLY by the dashboard wizard;
+    // a public booking wrote free text and nothing else, which is why the
+    // geographic half of routing had no input and "no geocode" was 100% of
+    // traffic rather than an edge case. Written for both branches at once
+    // rather than inside the two inserts, since the multi-service path creates
+    // its rows through InspectionRequestService.
+    //
+    // Non-fatal, like the stamp below: the rows are committed and an
+    // enrichment failure must not 500 an anonymous booker.
+    if (place) {
+        try {
+            await db.update(inspections)
+                .set({
+                    addressPlaceId:    place.placeId,
+                    addressStreet:     place.street,
+                    addressCity:       place.city,
+                    addressState:      place.state,
+                    addressZip:        place.zip,
+                    addressCounty:     place.county,
+                    addressLat:        place.lat,
+                    addressLng:        place.lng,
+                    addressGeocodedAt: new Date(),
+                })
+                .where(and(
+                    inArray(inspections.id, allInspectionIds),
+                    eq(inspections.tenantId, tenantId),
+                ));
+        } catch (e) {
+            logger.warn('booking.geocode.stamp.failed', {
+                inspectionIds: allInspectionIds,
+                error: e instanceof Error ? e.message : String(e),
+            });
+        }
+    }
+
+    // What routing actually did, on the durable record. The decision is
+    // written whether or not it degraded — an audit row that appears only on
+    // failure teaches nobody what normal looks like — but a substitution
+    // carries the reason that explains why the workspace's chosen strategy is
+    // not the one that ran. `closest` on a workspace that never geocoded its
+    // address would otherwise be silently indistinguishable from working.
+    if (routing) {
+        c.executionCtx.waitUntil(writeAuditLogWithSlug(c.env.DB, {
+            tenantId,
+            action: 'booking.routing.applied',
+            entityType: 'inspection',
+            entityId: inspectionId,
+            metadata: {
+                requested: routing.requested,
+                applied: routing.applied,
+                reason: routing.reason,
+                candidateCount: routing.candidateCount,
+                inspectorId,
+            },
+        }));
     }
 
     // A-polish 9b — stamp the precise scheduled instant on every inspection

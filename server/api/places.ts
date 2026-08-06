@@ -3,6 +3,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { fetchPlaceDetails, placeDetailsCacheKey, type ResolvedPlace } from '../lib/places/geocode';
 
 /**
  * Spec 5D — Address Autofill (Phase 1) — server-side proxy for the
@@ -161,68 +162,20 @@ const placesRoutes = createApiRouter()
     if (!apiKey) throw Errors.BadRequest('Address details unavailable: GOOGLE_PLACES_API_KEY not configured');
 
     const { placeId, session } = c.req.valid('query');
-    const cacheKey = `places:detail:${placeId}`;
+    const cacheKey = placeDetailsCacheKey(placeId);
 
     if (c.env.TENANT_CACHE) {
-        const cached = await c.env.TENANT_CACHE.get(cacheKey, 'json') as {
-            placeId: string; formatted: string;
-            street: string | null; city: string | null; state: string | null;
-            zip: string | null; county: string | null;
-            lat: number; lng: number;
-        } | null;
+        const cached = await c.env.TENANT_CACHE.get(cacheKey, 'json') as ResolvedPlace | null;
         if (cached) {
             return c.json({ success: true, data: cached, meta: { cached: true } }, 200);
         }
     }
 
-    const url = new URL(`${GOOGLE_BASE}/details/json`);
-    url.searchParams.set('place_id', placeId);
-    url.searchParams.set('sessiontoken', session);
-    // Tight field mask — billed per-field-per-call.
-    url.searchParams.set('fields', 'place_id,formatted_address,address_components,geometry/location');
-    url.searchParams.set('key', apiKey);
-
-    const res = await fetch(url.toString());
-    if (!res.ok) {
-        logger.error('[places.details] google api error', { status: res.status });
-        throw Errors.BadRequest('Address details temporarily unavailable');
-    }
-    const data = await res.json() as {
-        status: string;
-        result?: {
-            place_id: string;
-            formatted_address: string;
-            address_components: Array<{ long_name: string; short_name: string; types: string[] }>;
-            geometry: { location: { lat: number; lng: number } };
-        };
-    };
-
-    if (data.status !== 'OK' || !data.result) {
-        logger.error('[places.details] google api status', { status: data.status });
-        throw Errors.BadRequest('Address details failed');
-    }
-
-    const r = data.result;
-    const partOf = (type: string, useShort = false): string | null => {
-        const c = r.address_components.find(x => x.types.includes(type));
-        return c ? (useShort ? c.short_name : c.long_name) : null;
-    };
-
-    const streetNumber = partOf('street_number');
-    const route = partOf('route');
-    const street = streetNumber && route ? `${streetNumber} ${route}` : (route || null);
-
-    const payload = {
-        placeId: r.place_id,
-        formatted: r.formatted_address,
-        street,
-        city: partOf('locality') || partOf('sublocality') || partOf('administrative_area_level_3'),
-        state: partOf('administrative_area_level_1', true),
-        zip: partOf('postal_code'),
-        county: partOf('administrative_area_level_2'),
-        lat: r.geometry.location.lat,
-        lng: r.geometry.location.lng,
-    };
+    // The fetch + field mask + component mapping live in lib/places/geocode.ts
+    // so booking fulfilment and Settings can geocode too — this route was the
+    // only way to reach that logic, which is exactly why nothing else did.
+    const payload = await fetchPlaceDetails(apiKey, placeId, session);
+    if (!payload) throw Errors.BadRequest('Address details temporarily unavailable');
 
     if (c.env.TENANT_CACHE) {
         await c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(payload), { expirationTtl: 60 * 24 * 60 * 60 });
