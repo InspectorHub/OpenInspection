@@ -93,3 +93,6 @@ export type { NotificationPreference, NewNotificationPreference } from './notifi
 // Generic idempotency ledger (portal #107) — one row per (tenant, key).
 export { idempotencyKeys } from './idempotency';
 export type { IdempotencyKey, NewIdempotencyKey } from './idempotency';
+// Pay splits (#278) — per-service-line inspector earnings, recorded not derived.
+export { servicePayRules, inspectionServicePaySplits } from './pay-split';
+export type { ServicePayRule, InspectionServicePaySplit } from './pay-split';

@@ -254,4 +254,15 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
       reason: 'payment-processor reference on the retained financial row, not personal data' },
     { table: 'tenant_legal_versions', column: 'body_snapshot',            reason: 'company-authored policy text, not personal data of any data subject' },
     { table: 'tenant_legal_versions', column: 'published_by_user_id',     reason: 'staff author reference — not consumer-DSAR scope' },
+    // Pay splits (#278). A split is a payroll record about a STAFF member, held
+    // under accounting and employment obligations. A client's erasure request
+    // never reaches it — the client is not the data subject here. Declared
+    // rather than left silent: the PII heuristic flags none of these columns,
+    // and silence is not the same as a decision.
+    { table: 'inspection_service_pay_splits', column: 'user_id',
+      reason: 'payroll record for a staff member, retained under accounting and employment obligations; not client data, so a client erasure request does not reach it' },
+    { table: 'inspection_service_pay_splits', column: 'reason',
+      reason: 'free text a manager writes about a payout adjustment to a staff member — payroll audit trail, not consumer-DSAR scope' },
+    { table: 'service_pay_rules',             column: 'user_id',
+      reason: 'staff compensation rule — not consumer-DSAR scope' },
 ];

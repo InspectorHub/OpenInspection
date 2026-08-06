@@ -281,6 +281,13 @@
       "when": 1785901808286,
       "tag": "0039_nasty_random",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1785978827419,
+      "tag": "0040_lovely_rockslide",
+      "breakpoints": true
     }
   ]
 }
