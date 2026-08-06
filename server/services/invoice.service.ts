@@ -11,6 +11,8 @@ import type { AppendedPayment } from './payment-ledger.service';
 import { syncInspectionPaymentGate } from './invoice-payment-gate';
 import * as ledger from './invoice-payments.service';
 import type { OfflinePaymentInput, PaymentCorrectionInput } from './invoice-payments.service';
+import * as refunds from './invoice/refund';
+import type { PartialRefundInput } from './invoice/refund';
 
 function getStatus(inv: { sentAt: Date | null; paidAt: Date | null; partialPaidAt?: Date | null; voidedAt?: Date | null }): 'draft' | 'sent' | 'paid' | 'partial' | 'void' {
     if (inv.voidedAt) return 'void';
@@ -172,9 +174,14 @@ export class InvoiceService {
         return ledger.markPartial(this.getDrizzle(), id, tenantId, source, amountPaidCents);
     }
 
-    /** @see ledger.markRefunded — reverses everything received. */
+    /** @see refunds.markRefunded — reverses everything received. */
     async markRefunded(id: string, tenantId: string): Promise<void> {
-        return ledger.markRefunded(this.getDrizzle(), id, tenantId);
+        return refunds.markRefunded(this.getDrizzle(), id, tenantId);
+    }
+
+    /** @see refunds.refundPartial — returns the appended row; keys the QBO memo. */
+    async refundPartial(tenantId: string, id: string, input: PartialRefundInput): Promise<AppendedPayment> {
+        return refunds.refundPartial(this.getDrizzle(), tenantId, id, input);
     }
 
     async setQboSyncStatus(id: string, tenantId: string, status: 'synced' | 'pending' | 'failed'): Promise<void> {

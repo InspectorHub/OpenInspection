@@ -326,34 +326,8 @@ export async function markPartial(
     });
 }
 
-/**
- * Refund an invoice: appends a `refund` row reversing everything received,
- * rather than nulling the columns. A fully refunded invoice therefore reads
- * as "45000 received, 45000 refunded, 0 outstanding received" instead of a
- * blank slate — more truthful, and the only version a reconciliation can
- * check. An invoice paid before the ledger existed is seeded from its own
- * record first, so there is something to reverse.
- */
-export async function markRefunded(
-    db: DrizzleD1Database,
-    id: string,
-    tenantId: string,
-): Promise<void> {
-    const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
-    if (!existing) throw Errors.NotFound('Invoice not found');
-
-    await seedLedgerFromInvoiceRecord(db, tenantId, id);
-    const received = await getNetReceivedCents(db, tenantId, id);
-    if (received > 0) {
-        await recordPayment(db, tenantId, {
-            invoiceId: id,
-            inspectionId: existing.inspectionId,
-            kind: 'refund',
-            amountCents: received,
-            method: existing.paymentMethod ?? 'other',
-        });
-    } else {
-        await recomputeInvoicePaymentState(db, tenantId, id);
-    }
-    await syncInspectionPaymentGate(db, tenantId, existing.inspectionId);
-}
+// `markRefunded` MOVED to `./invoice/refund.ts`, which now holds both refund
+// writers. The partial refund the cancellation ladder needs did not fit here
+// (this file is near its size ceiling), and putting the two refund writers in
+// different files is the arrangement where one of them gets the next fix.
+// This module still owns every other read and write of `order_payments`.
