@@ -21,16 +21,28 @@
 
 import { describe, it, expect } from 'vitest';
 
+// The top bar and the FAB moved into the co-located <ReportHeader> and
+// <ReportExportBar>; ReportView keeps the URL construction and the handler.
+// Concatenate the three so the markers are found wherever they now live —
+// ReportView FIRST, so the `const downloadPdf` window slice below stays inside
+// it. (Same fileset approach as report-view.image-robustness.spec.ts.)
+async function source(): Promise<string> {
+  const mods = await Promise.all([
+    import('~/components/portal/sections/ReportView?raw'),
+    import('~/components/portal/sections/report/ReportHeader?raw'),
+    import('~/components/portal/sections/report/ReportExportBar?raw'),
+  ]);
+  return mods.map((m) => (m as unknown as { default: string }).default).join('\n');
+}
+
 describe('report-card-stack buttons (Task 9)', () => {
   it('loads the module source', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+    const text = await source();
     expect(text.length).toBeGreaterThan(0);
   });
 
   it('top-bar toolbar button reads "Print" (not "PDF")', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+    const text = await source();
 
     // The top-bar toolbar sits inside the `flex items-center gap-2 print:hidden`
     // container. Confirm the "Print" label is rendered via the i18n message
@@ -39,8 +51,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('top-bar toolbar button no longer reads ">PDF<"', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+    const text = await source();
 
     // The label "PDF" as a JSX text node (between tags) must be gone from the
     // top-bar button. Note: "Export PDF" (repair panel) and "Download PDF"
@@ -50,8 +61,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('FAB button still reads "Download PDF" as the default label', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+    const text = await source();
 
     expect(text).toContain('Download PDF');
   });
@@ -61,7 +71,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   // identically). ReportView now delegates to it; the impl assertions follow the
   // logic into the hook, while ReportView keeps the URL construction + wiring.
   it('FAB label is produced by the shared hook ("Generating…" / "Retry in Ns")', async () => {
-    const view = ((await import('~/components/portal/sections/ReportView?raw')) as unknown as { default: string }).default;
+    const view = await source();
     const hook = ((await import('~/hooks/usePdfExport?raw')) as unknown as { default: string }).default;
 
     expect(view).toContain('pdfActionLabel(pdf, m.report_view_download_pdf())');
@@ -72,7 +82,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('generating state lives in the shared usePdfExport hook', async () => {
-    const view = ((await import('~/components/portal/sections/ReportView?raw')) as unknown as { default: string }).default;
+    const view = await source();
     const hook = ((await import('~/hooks/usePdfExport?raw')) as unknown as { default: string }).default;
 
     expect(view).toContain('usePdfExport()');
@@ -81,7 +91,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('downloadPdf delegates to the hook, which uses fetch (not window.print)', async () => {
-    const view = ((await import('~/components/portal/sections/ReportView?raw')) as unknown as { default: string }).default;
+    const view = await source();
     const hook = ((await import('~/hooks/usePdfExport?raw')) as unknown as { default: string }).default;
 
     expect(view).toContain('downloadPdf');
@@ -98,33 +108,32 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('owner URL path: /api/inspections/:id/pdf', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+    const text = await source();
 
     expect(text).toContain('/api/inspections/');
     expect(text).toContain('/pdf?type=full');
   });
 
   it('client URL path: /api/public/report/:tenant/:id/pdf with token', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+    const text = await source();
 
     expect(text).toContain('/api/public/report/');
     expect(text).toContain('token');
   });
 
   it('FAB onClick is downloadPdf (not window.print)', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+    const text = await source();
 
-    // The fixed bottom-6 right-6 FAB must reference downloadPdf in its onClick.
-    // We check that "onClick={downloadPdf}" appears in the source.
-    expect(text).toContain('onClick={downloadPdf}');
+    // Post-split the wiring has two ends: ReportView hands its fetch→blob
+    // handler to the bar, and the bar's button calls exactly that prop. Both
+    // are asserted, the same way the image-robustness spec verifies
+    // onPhotoFailed across the ReportView/ReportMediaTile boundary.
+    expect(text).toContain('onDownload={downloadPdf}');
+    expect(text).toContain('onClick={onDownload}');
   });
 
   it('no native alert/confirm/prompt in downloadPdf handler', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+    const text = await source();
 
     // Extract the downloadPdf function body to check for native dialogs.
     const fnStart = text.indexOf('const downloadPdf');
@@ -137,8 +146,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('top-bar print button still calls window.print()', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+    const text = await source();
 
     // window.print() must still appear (for the top-bar Print button and
     // the repair-panel "Export PDF" button).

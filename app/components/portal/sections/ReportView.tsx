@@ -19,16 +19,18 @@
  */
 import { useState } from "react";
 import { m } from "~/paraglide/messages";
-import { usePdfExport, pdfActionLabel, pdfBusyHint } from "~/hooks/usePdfExport";
-import { brandFormat, brandTokens } from "~/lib/brand";
+import { usePdfExport } from "~/hooks/usePdfExport";
+import { brandTokens } from "~/lib/brand";
 import { presetTokens } from "~/lib/report-style/preset-tokens";
-import { formatInspectionDateTime } from "~/lib/format-date";
 import { ErrorState } from "~/components/ErrorState";
 import { itemDrivesSummary } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
-import { CredentialBadges } from "./report/CredentialBadges";
 import { badgeUrl } from "../../../../server/lib/media/badge-variant";
 import { primaryBadgeOf } from "../../../../server/lib/credentials/primary";
+import { ReportExportBar } from "./report/ReportExportBar";
+import { ReportHeader } from "./report/ReportHeader";
+import { ReportCoverPhoto } from "./report/ReportCoverPhoto";
+import { ReportSummaryStats } from "./report/ReportSummaryStats";
 import { ReportSectionBlock } from "./report/ReportSectionBlock";
 import { PhotoAppendix } from "./report/PhotoAppendix";
 import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
@@ -39,14 +41,10 @@ import { PcaSkeleton } from "./report/PcaSkeleton";
 import { ReportToc } from "./report/ReportToc";
 import { PerUnitReportBlock } from "./report/PerUnitReportBlock";
 import { CostTables } from "./report/CostTables";
-import { WordExportButton } from "./report/WordExportButton";
-import { CostExportButtons } from "~/components/CostExportButtons";
-import {
-  PRINT_CARD_CLASS,
-  REPORT_HEADING_STYLE,
-  type ReportPhoto,
-  type FilterKey,
-  type ReportLoaderResult,
+import type {
+  ReportPhoto,
+  FilterKey,
+  ReportLoaderResult,
 } from "./report/types";
 
 /* ------------------------------------------------------------------ */
@@ -172,27 +170,6 @@ export function reportViewProps(
   };
 }
 
-/* ------------------------------------------------------------------ */
-/* Image fallbacks (Plan 1 / N1)                                       */
-/* ------------------------------------------------------------------ */
-
-/**
- * Restrained fallback shown in place of the report cover photo when the
- * underlying image fails to load (e.g. the photo was removed after the
- * report was published). We render a calm panel rather than hiding the
- * cover section, so the report never looks half-broken to the client.
- */
-function CoverPhotoPlaceholder() {
-  return (
-    <div className="w-full h-44 sm:h-56 rounded-xl border border-ih-border bg-ih-bg-muted flex flex-col items-center justify-center gap-2 text-ih-fg-4">
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-      <span className="text-xs font-medium tracking-wide">{m.report_view_cover_unavailable()}</span>
-    </div>
-  );
-}
-
 /**
  * React key for a media tile. Videos key on their stream/media id (stable across
  * reorders); photos key on their storage key. Pulled out of the JSX because the
@@ -234,7 +211,6 @@ export function ReportView(props: ReportViewProps) {
   const [repairItems, setRepairItems] = useState<Record<string, boolean>>({});
   // Browser Rendering rate-limit UX (shared across every BR-backed PDF surface).
   const pdf = usePdfExport();
-  const [coverFailed, setCoverFailed] = useState(false);
 
   // Photo keys whose thumbnail failed to load. A failed thumbnail is collapsed
   // (rendered as null) rather than showing the browser's broken-image glyph,
@@ -266,26 +242,6 @@ export function ReportView(props: ReportViewProps) {
 
   /** A media entry is "visible" when it is a video OR a photo whose thumb hasn't failed. */
   const mediaVisible = (p: ReportPhoto) => p.media?.kind === "video-player" || p.media?.kind === "video-poster" || p.media?.kind === "r2-video-player" || p.media?.kind === "r2-video-poster" || !failedPhotos.has(p.key);
-
-  // Dynamic rating summary — derived from THIS inspection's own rating system
-  // (Spectora-style) instead of fixed Satisfactory/Monitor/Defects buckets.
-  // Tally items by their rating level and render one card per level present,
-  // using the level's own label + color, ordered good→bad by severity bucket.
-  const BUCKET_RANK: Record<string, number> = { satisfactory: 0, monitor: 1, defect: 2, other: 3 };
-  const ratingTally = new Map<string, { label: string; color: string; bucket: string; count: number; seen: number }>();
-  let seenOrder = 0;
-  for (const it of data.sections.flatMap((s) => s.items)) {
-    if (!it.rating) continue;
-    const ex = ratingTally.get(it.rating);
-    if (ex) ex.count++;
-    else ratingTally.set(it.rating, { label: it.ratingLabel ?? it.rating, color: it.ratingColor, bucket: it.severityBucket, count: 1, seen: seenOrder++ });
-  }
-  const summaryCards: Array<{ label: string; value: number; color: string | null }> = [
-    { label: m.report_view_stat_total(), value: data.stats.total, color: null },
-    ...[...ratingTally.values()]
-      .sort((a, b) => (BUCKET_RANK[a.bucket] ?? 9) - (BUCKET_RANK[b.bucket] ?? 9) || a.seen - b.seen)
-      .map((l) => ({ label: l.label, value: l.count, color: l.color })),
-  ];
 
   const downloadPdf = () => {
     const url = urlToken
@@ -365,154 +321,35 @@ export function ReportView(props: ReportViewProps) {
 
   return (
     <div className={standalone ? "min-h-screen bg-ih-bg-card" : undefined} data-report-profile={data.styleProfile?.id || undefined} style={{ ...brandTokens(data.brand.primaryColor), ...presetTokens(data.styleProfile?.tokens) }}>
-      {/* Download PDF FAB + Export to Word (Commercial PCA Phase W Task 6 —
-          owner-only, commercial reports only; the public token viewer never
-          has ownerPreview true, and `<ReportView>` is rendered standalone in
-          plenty of router-less unit tests, so <WordExportButton> — which
-          calls useFetcher() and therefore requires a data-router context —
-          is only mounted into the tree at all when the gate is satisfied,
-          rather than always-mounted-but-internally-hidden. */}
-      <div className="print:hidden fixed bottom-6 right-6 z-50 flex flex-wrap items-center justify-end gap-2 max-w-[calc(100vw-3rem)]">
-        {/* Cost export (Commercial PCA) — owner-preview only, commercial reports
-            with at least one cost table row. Public token viewers never have
-            ownerPreview, residential reports have no reportTier, and reports
-            with zero cost items have no costTables — so all three are hidden. */}
-        {Boolean(data.ownerPreview) && Boolean(data.reportTier) && data.costTables ? (
-          <CostExportButtons inspectionId={data.inspectionId} variant="fab" />
-        ) : null}
-        {Boolean(data.ownerPreview) && Boolean(data.reportTier) ? (
-          <WordExportButton inspectionId={data.inspectionId} />
-        ) : null}
-        <div className="flex flex-col items-end gap-2">
-          {pdf.error || pdf.generating ? (
-            <div
-              role="status"
-              className="max-w-[15rem] rounded-lg bg-ih-bg-inverse px-3 py-2 text-[11px] font-medium leading-snug text-ih-fg-inverse shadow-ih-popover"
-            >
-              {pdf.error ?? pdfBusyHint()}
-            </div>
-          ) : null}
-          <button
-            type="button"
-            onClick={downloadPdf}
-            disabled={pdf.busy}
-            className="px-5 py-3 rounded-full bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest shadow-ih-popover hover:bg-ih-primary transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-            </svg>
-            {pdfActionLabel(pdf, m.report_view_download_pdf())}
-          </button>
-        </div>
-      </div>
+      <ReportExportBar
+        inspectionId={data.inspectionId}
+        ownerPreview={data.ownerPreview}
+        reportTier={data.reportTier}
+        hasCostTables={Boolean(data.costTables)}
+        pdf={pdf}
+        onDownload={downloadPdf}
+      />
 
-      {/* Header */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 pb-6">
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex items-center gap-3">
-            {data.brand.logoUrl ? (
-              <img src={data.brand.logoUrl} alt={data.brand.companyName ?? m.report_view_logo_alt()} className="h-10 w-auto" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-ih-ok/10 flex items-center justify-center">
-                <svg className="w-5 h-5 text-ih-ok" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            )}
-            <span className="text-xs font-semibold tracking-widest uppercase text-ih-fg-4">
-              {data.brand.companyName ? m.report_view_cert_with_company({ company: data.brand.companyName }) : m.report_view_cert()}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 print:hidden">
-            {/* IA-68 — the "View Repair List" button pointed at
-                /inspections/:id/repair-list, a page route that does not exist
-                (only the API route does), so it 404'd. The "Build repair
-                request" button below already reaches the real repair capability;
-                the dead affordance is removed rather than pointed somewhere new. */}
-            {!data.hideClientActions && data.enableCustomerRepairExport && (
-              <a
-                href={`/repair-builder/${tenant}/${id}${urlToken ? `?token=${encodeURIComponent(urlToken)}` : ""}`}
-                className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
-              >
-                {m.report_view_build_repair()}
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
-            >
-              {m.report_view_print()}
-            </button>
-            {!data.hideClientActions && (
-              <button
-                type="button"
-                onClick={() => setRepairPanel(!repairPanel)}
-                className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-ih-primary-fg flex items-center gap-2"
-              >
-                {m.portal_hub_nav_repair()}
-              </button>
-            )}
-          </div>
-        </div>
-        {/* Big property-ADDRESS title — standalone only. Inline in the Hub the
-            page header already shows the address + date, so rendering it again
-            here would duplicate the address. The inspector/date cert line below
-            stays in both modes (functional, not chrome). */}
-        {standalone && (
-          <h1 className="text-2xl sm:text-3xl leading-tight mb-2 text-ih-fg-1" style={REPORT_HEADING_STYLE}>
-            {data.address}
-          </h1>
-        )}
-        <p className="text-sm text-ih-fg-3">
-          {data.date ? `${formatInspectionDateTime(data.date, undefined, data.reportTimeZone, brandFormat(data.brand))} · ` : ""}
-          {m.report_view_inspector({ name: data.inspectorName || m.report_view_na() })}
-        </p>
-        {data.inspectorCredentials && data.inspectorCredentials.length > 0 && (
-          <CredentialBadges credentials={data.inspectorCredentials} layout={data.styleProfile?.badgeLayout ?? "strip"} />
-        )}
-      </div>
+      <ReportHeader
+        brand={data.brand}
+        tenant={tenant}
+        reportId={id}
+        token={urlToken}
+        standalone={standalone}
+        address={data.address}
+        date={data.date}
+        reportTimeZone={data.reportTimeZone}
+        inspectorName={data.inspectorName}
+        inspectorCredentials={data.inspectorCredentials}
+        badgeLayout={data.styleProfile?.badgeLayout}
+        hideClientActions={data.hideClientActions}
+        enableCustomerRepairExport={data.enableCustomerRepairExport}
+        onToggleRepairPanel={() => setRepairPanel(!repairPanel)}
+      />
 
-      {/* Cover photo (DB-16) — the inspector-chosen report cover image. On load
-          failure (e.g. the photo was removed after publish) we swap in a restrained
-          placeholder rather than hiding the section, so the report never looks
-          broken to the client (Plan 1 / N1). */}
-      {data.coverPhotoUrl && (
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
-          {coverFailed ? (
-            <CoverPhotoPlaceholder />
-          ) : (
-            <img
-              src={`${data.coverPhotoUrl}&w=1600`}
-              alt={`Cover photo — ${data.address}`}
-              // Fixed height (matching CoverPhotoPlaceholder) reserves the banner
-              // box before the image loads, so it never reflows content downward
-              // on load (no CLS) and the loaded/error states share one layout.
-              className="h-44 w-full sm:h-56 object-cover rounded-xl border border-ih-border"
-              loading={data.printMode ? "eager" : "lazy"}
-              onError={() => setCoverFailed(true)}
-            />
-          )}
-        </div>
-      )}
+      <ReportCoverPhoto coverPhotoUrl={data.coverPhotoUrl} address={data.address} printMode={data.printMode} />
 
-      {/* Stats — Commercial PCA Phase O: this at-a-glance block is the report's
-          "PCA Summary" front-matter page (registry id `pca-summary`), so it
-          carries that anchor for the TOC / PDF bookmarks. It renders
-          unconditionally (data.stats always present), so the anchor is never
-          dangling regardless of tier. */}
-      <div id="pca-summary" className="max-w-4xl mx-auto px-4 sm:px-6 mb-6 scroll-mt-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {summaryCards.map((s) => (
-            <div key={s.label} className={`bg-ih-bg-card border border-ih-border rounded-lg p-4 text-center ${PRINT_CARD_CLASS}`}>
-              <div className={`text-2xl font-bold ${s.color ? "" : "text-ih-fg-1"}`} style={s.color ? { color: s.color } : undefined}>{s.value}</div>
-              <div className="text-[11px] text-ih-fg-4 uppercase tracking-widest mt-1">
-                {s.label}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <ReportSummaryStats sections={data.sections} total={data.stats.total} />
 
       {/* Building Profile — Commercial PCA Phase F */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
