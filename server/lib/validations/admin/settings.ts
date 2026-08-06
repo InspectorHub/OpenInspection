@@ -5,6 +5,38 @@ import { isValidLocale } from '../../locale';
 import { DATE_FORMATS, TIME_FORMATS } from '../../session/display-prefs';
 
 /**
+ * One rung of the cancellation ladder.
+ *
+ * A discriminated union, not `{ type, value }`: a bare `value` on a money field
+ * carries no unit, so the same 50 is half the price in one arm and fifty cents
+ * in the other and nothing objects. Split, "a percent above 100" is a range on
+ * a field that only exists in the percent arm — the schema rejects it, and a
+ * caller cannot even construct the nonsense in a typed client.
+ */
+const CancellationFeeSchema = z.discriminatedUnion('type', [
+    z.object({
+        type: z.literal('percent').describe('Fee expressed as a share of the inspection price.'),
+        percent: z.number().min(0).max(100).describe('0-100. Of the PRICE; the resolver caps the charge at what was collected.'),
+    }),
+    z.object({
+        type: z.literal('fixed').describe('Fee expressed as a fixed amount.'),
+        amountCents: z.number().int().min(0).describe('Integer cents.'),
+    }),
+]).openapi('CancellationFee');
+
+/**
+ * The ladder itself. Hours only in v1 — see the column comment for why
+ * "2 business days" is deferred rather than approximated.
+ */
+export const CancellationPolicySchema = z.object({
+    noticeHours: z.number().int().min(0).max(720).openapi({ example: 24 })
+        .describe('Notice threshold in hours. Cancelling with at least this much notice is free.'),
+    lateFee: CancellationFeeSchema.describe('Charged when the client cancels inside the notice window.'),
+    noShowFee: CancellationFeeSchema.describe('Charged when the client does not show. Commonly 100%.'),
+    remedy: z.literal('refund').describe("Cash refund. 'credit' toward a future inspection is deferred."),
+}).openapi('CancellationPolicy');
+
+/**
  * Validation schema for the branding configuration update.
  */
 export const UpdateBrandingSchema = z.object({
@@ -71,6 +103,23 @@ export const UpdateBrandingSchema = z.object({
     // save is blocked (409 CURRENCY_CHANGE_NEEDS_CONFIRM); existing invoices keep
     // their snapshot currency, new ones use the new tenant currency.
     confirmCurrencyChange: z.boolean().optional().openapi({ example: true }).describe('Acknowledge changing tenant currency with invoices present.'),
+    // The cancellation ladder. `null` clears it back to "no policy configured",
+    // which is where every workspace starts and where nothing is ever charged.
+    // `.optional()` with NO `.default()`: a default here would make a save that
+    // never mentions the policy silently overwrite a configured one.
+    //
+    // A fee-bearing policy is REFUSED unless the attestation below is on file
+    // and still matches. That check reads DB state, so it is not expressible
+    // here — it lives in `BrandingService.updateBranding`.
+    cancellationPolicy: CancellationPolicySchema.nullable().optional()
+        .describe('Cancellation ladder; null clears it. Fees require an attested agreement clause.'),
+    // Transient (NOT a column): the id of the agreement template the tenant
+    // confirms contains their cancellation clause. Sending it stamps the
+    // attestation at that template's CURRENT version; sending null withdraws it.
+    // Applied BEFORE the policy in the same request, so enabling fees and
+    // attesting can be one save.
+    attestCancellationClause: z.string().min(1).nullable().optional()
+        .describe("Agreement template id the tenant attests contains their cancellation clause; null withdraws it."),
 }).openapi('UpdateBranding');
 
 /**
