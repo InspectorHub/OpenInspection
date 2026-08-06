@@ -43,7 +43,6 @@
   "app/components/settings/ManagedComplianceWizard.tsx": 514,
   "server/api/repair-builder.ts": 504,
   "app/routes/inspection-edit/action.server.ts": 501,
-  "app/routes/settings-workspace.tsx": 499,
   "server/services/report-export-consumer.ts": 499,
   "app/components/collab/VersionHistoryPanel.tsx": 497,
   "server/api/bookings.ts": 477,
