@@ -42,7 +42,6 @@
   "server/api/inspections/publish.ts": 521,
   "server/api/bookings/agreement.ts": 519,
   "app/components/settings/ManagedComplianceWizard.tsx": 514,
-  "app/routes/invoices.tsx": 510,
   "server/api/repair-builder.ts": 504,
   "app/routes/inspection-edit/action.server.ts": 501,
   "server/services/inspection-request.service.ts": 501,
