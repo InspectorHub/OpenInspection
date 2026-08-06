@@ -12,7 +12,7 @@
  * that runs on the V8-isolate runtime.
  */
 import Stripe from 'stripe';
-import { buildPaymentIntentParams, type PayableInvoice } from '../lib/stripe-helpers';
+import { buildPaymentIntentParams, buildDepositIntentParams, type PayableInvoice } from '../lib/stripe-helpers';
 
 export class StripeService {
     private stripe: Stripe;
@@ -42,6 +42,45 @@ export class StripeService {
             automatic_payment_methods: { enabled: true },
             description: params.description,
             metadata: params.metadata,
+        });
+        if (!intent.client_secret) {
+            throw new Error('Stripe did not return a client secret');
+        }
+        return { id: intent.id, clientSecret: intent.client_secret };
+    }
+
+    /**
+     * Creates a PaymentIntent for a booking DEPOSIT — money against an order
+     * with no invoice behind it. Throws DepositNotPayableError when nothing is
+     * outstanding, so a double-submit or a race with the webhook cannot charge
+     * a second deposit.
+     *
+     * RETRY SAFETY LIVES HERE, not in the middleware. The route that calls this
+     * is public and its caller is a payment panel that sends no
+     * `Idempotency-Key`, so `idempotencyGuard` never engages — and the route
+     * writes no row of ours, which means the thing a retry could duplicate is
+     * a PAYMENT INTENT. Two live intents for one deposit is two chargeable
+     * client secrets. Stripe's own idempotency key removes that: the same key
+     * returns the SAME intent for 24 hours.
+     *
+     * The key includes the OUTSTANDING amount deliberately. Once a partial
+     * deposit lands, the remainder is a different charge and must get a
+     * different intent — pinning the key to the order alone would replay a stale
+     * intent for money already collected.
+     */
+    async createDepositPaymentIntent(
+        order: { inspectionId: string; outstandingCents: number },
+        ctx: { tenantId: string; currency?: string; descriptionPrefix?: string },
+    ): Promise<{ id: string; clientSecret: string }> {
+        const params = buildDepositIntentParams(order, ctx);
+        const intent = await this.stripe.paymentIntents.create({
+            amount: params.amount,
+            currency: params.currency,
+            automatic_payment_methods: { enabled: true },
+            description: params.description,
+            metadata: params.metadata,
+        }, {
+            idempotencyKey: `oi-deposit:${ctx.tenantId}:${order.inspectionId}:${order.outstandingCents}`,
         });
         if (!intent.client_secret) {
             throw new Error('Stripe did not return a client secret');

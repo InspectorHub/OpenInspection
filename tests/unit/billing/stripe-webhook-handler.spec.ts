@@ -6,6 +6,15 @@ vi.mock('../../../server/services/stripe.service', () => ({
     StripeService: class { constructor(_k: string) { void _k; } verifyWebhook = verifyWebhook; },
 }));
 
+// The ledger is exercised for real in tests/unit/bookings/deposit-collection.spec.ts.
+// Here the question is only whether the handler ROUTES a deposit there at all —
+// which it did not before `metadata.kind` existed, and no test noticed.
+// `vi.hoisted` because vi.mock factories are lifted above every const in the
+// file, and a plain `const` referenced inside one is a TDZ error at import time.
+const { recordPayment } = vi.hoisted(() => ({ recordPayment: vi.fn() }));
+vi.mock('../../../server/services/payment-ledger.service', () => ({ recordPayment }));
+vi.mock('../../../server/lib/route-helpers', () => ({ getDrizzle: () => ({}) }));
+
 import stripeWebhookApi from '../../../server/api/stripe-webhook';
 
 function makeApp(opts: {
@@ -43,7 +52,7 @@ const KEYS = { STRIPE_SECRET_KEY: 'sk_test_1', STRIPE_WEBHOOK_SECRET: 'whsec_1' 
 // implicitly returns the mock, which Vitest 4 then surfaces a later thrown/
 // rejected result from as a spurious test error even when the handler catches
 // it. Returning undefined avoids that false failure; semantics are unchanged.
-beforeEach(() => { verifyWebhook.mockReset(); });
+beforeEach(() => { verifyWebhook.mockReset(); recordPayment.mockReset(); recordPayment.mockResolvedValue({ id: 'op1' }); });
 
 describe('stripe webhook handler', () => {
     it('no tenant / no keys → 200 ACK no-op', async () => {
@@ -106,5 +115,86 @@ describe('stripe webhook handler', () => {
         const markPaid = vi.fn().mockRejectedValue(Errors.NotFound('Invoice not found'));
         const res = await makeApp({ tenantId: 'tA', env: KEYS, markPaid }).request('/', { method: 'POST', headers: SIG, body: '{}' });
         expect(res.status).toBe(200);
+    });
+
+    /* ---------------------------------------------------------------- *
+     *  Booking deposits — money against an ORDER, with no invoice.      *
+     * ---------------------------------------------------------------- */
+
+    it('writes a deposit ledger row instead of ACKing it as nothing to do', async () => {
+        // The regression: `extractSettledPayment` used to return null for any
+        // intent without `metadata.invoiceId`, so a settled deposit logged
+        // "received" and vanished. Money in Stripe, no row, no surface.
+        verifyWebhook.mockResolvedValue({
+            type: 'payment_intent.succeeded',
+            data: { object: { id: 'pi_dep_1', amount_received: 9000, metadata: { kind: 'deposit', inspectionId: 'insp1', tenantId: 'tA' } } },
+        });
+        const markPaid = vi.fn(); const markPaymentReceived = vi.fn(); const kvPut = vi.fn();
+        const res = await makeApp({ tenantId: 'tA', env: KEYS, markPaid, markPaymentReceived, kvPut })
+            .request('/', { method: 'POST', headers: SIG, body: '{}' });
+
+        expect(res.status).toBe(200);
+        expect(recordPayment).toHaveBeenCalledWith({}, 'tA', {
+            inspectionId: 'insp1',
+            invoiceId:    null,
+            kind:         'deposit',
+            amountCents:  9000,
+            method:       'card',
+            provider:     'stripe',
+            providerRef:  'pi_dep_1',
+        });
+        expect(String(kvPut.mock.calls[0][1])).toContain('"processed"');
+    });
+
+    it('a deposit does not mark any invoice paid and does not unlock the report', async () => {
+        // $90 of a $450 job is not payment in full, and `markPaymentReceived`
+        // is the gate the public report reads. Calling either here would
+        // release a report for a fifth of the money.
+        verifyWebhook.mockResolvedValue({
+            type: 'payment_intent.succeeded',
+            data: { object: { id: 'pi_dep_2', amount_received: 9000, metadata: { kind: 'deposit', inspectionId: 'insp1', tenantId: 'tA' } } },
+        });
+        const markPaid = vi.fn(); const markPaymentReceived = vi.fn();
+        await makeApp({ tenantId: 'tA', env: KEYS, markPaid, markPaymentReceived })
+            .request('/', { method: 'POST', headers: SIG, body: '{}' });
+        expect(markPaid).not.toHaveBeenCalled();
+        expect(markPaymentReceived).not.toHaveBeenCalled();
+    });
+
+    it('a deposit for another tenant is discarded before any write', async () => {
+        verifyWebhook.mockResolvedValue({
+            type: 'payment_intent.succeeded',
+            data: { object: { id: 'pi_dep_3', amount_received: 9000, metadata: { kind: 'deposit', inspectionId: 'insp1', tenantId: 'tB' } } },
+        });
+        const kvPut = vi.fn();
+        const res = await makeApp({ tenantId: 'tA', env: KEYS, kvPut }).request('/', { method: 'POST', headers: SIG, body: '{}' });
+        expect(res.status).toBe(200);
+        expect(recordPayment).not.toHaveBeenCalled();
+        expect(String(kvPut.mock.calls[0][1])).toContain('tenant_mismatch');
+    });
+
+    it('a deposit write failure is a 500, so Stripe retries rather than losing it', async () => {
+        verifyWebhook.mockResolvedValue({
+            type: 'payment_intent.succeeded',
+            data: { object: { id: 'pi_dep_4', amount_received: 9000, metadata: { kind: 'deposit', inspectionId: 'insp1', tenantId: 'tA' } } },
+        });
+        recordPayment.mockRejectedValue(new Error('D1 down'));
+        const kvPut = vi.fn();
+        const res = await makeApp({ tenantId: 'tA', env: KEYS, kvPut }).request('/', { method: 'POST', headers: SIG, body: '{}' });
+        expect(res.status).toBe(500);
+        expect(kvPut.mock.calls.map(c2 => String(c2[1])).some(p => p.includes('"processed"'))).toBe(false);
+    });
+
+    it('a redelivered deposit is a no-op, not an error', async () => {
+        // recordPayment answers null when the provider ref is already on file.
+        verifyWebhook.mockResolvedValue({
+            type: 'payment_intent.succeeded',
+            data: { object: { id: 'pi_dep_1', amount_received: 9000, metadata: { kind: 'deposit', inspectionId: 'insp1', tenantId: 'tA' } } },
+        });
+        recordPayment.mockResolvedValue(null);
+        const kvPut = vi.fn();
+        const res = await makeApp({ tenantId: 'tA', env: KEYS, kvPut }).request('/', { method: 'POST', headers: SIG, body: '{}' });
+        expect(res.status).toBe(200);
+        expect(String(kvPut.mock.calls[0][1])).toContain('"processed"');
     });
 });

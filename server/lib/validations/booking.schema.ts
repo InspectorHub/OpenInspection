@@ -103,6 +103,11 @@ export const BookingResponseSchema = createApiResponseSchema(z.object({
     // Sprint 2 S2-2 — request grouping is always present, even for single-service bookings.
     requestId: z.string().optional().openapi({ example: 'req-abc12345' }).describe('TODO describe requestId field for the OpenInspection MCP integration'),
     inspectionIds: z.array(z.string().trim().min(1)).optional().openapi({ description: 'All inspection ids in the request' }),
+    // What the booking OWES up front, frozen at this moment. 0 (the default for
+    // every workspace) means no payment step is shown. Never what was paid —
+    // nothing has been at this point, and only the Stripe webhook says otherwise.
+    depositRequiredCents: z.number().int().optional().openapi({ example: 9000 })
+        .describe('Deposit owed on this booking in integer cents; 0 when the workspace asks for none.'),
 })).openapi('BookingResponse');
 
 export const AvailabilityListResponseSchema = createApiResponseSchema(z.array(z.object({

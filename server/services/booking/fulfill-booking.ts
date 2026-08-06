@@ -11,6 +11,7 @@ import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { admitBooking } from './booking-admission';
 import { resolveBookingAgentReferral, attachBookingPeople } from './booking-people';
 import { dispatchBookingConfirmation } from './booking-confirmation';
+import { resolveBookingDepositCents, snapshotOrderDeposit } from './deposit';
 import type { HonoConfig } from '../../types/hono';
 import type { PublicBookingSchema } from '../../lib/validations/booking.schema';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
@@ -210,6 +211,30 @@ export async function fulfillBooking(
         });
     }
 
+    // The deposit is resolved and FROZEN here, after the booking has survived
+    // arbitration and before anyone is asked for a card. Nothing is charged in
+    // this request: the amount comes back in the response, the client pays it
+    // on the confirmation step, and the ledger row is written by the Stripe
+    // webhook. A declined card therefore leaves a real appointment with an
+    // unpaid deposit the tenant can see and chase — which is the whole point,
+    // because a decline that also loses the booking is worse than no deposit
+    // feature at all.
+    //
+    // Non-fatal, deliberately. The inspection rows are committed; a failure to
+    // stamp a number must not 500 an anonymous booker.
+    let depositRequiredCents = 0;
+    try {
+        depositRequiredCents = await resolveBookingDepositCents(
+            db, tenantId, (body.services ?? []).map(s => s.serviceId),
+        );
+        if (depositRequiredCents > 0) {
+            await snapshotOrderDeposit(db, tenantId, inspectionId, allInspectionIds, depositRequiredCents);
+        }
+    } catch (e) {
+        depositRequiredCents = 0;
+        logger.error('booking.deposit.snapshot.failed', { inspectionId }, e instanceof Error ? e : undefined);
+    }
+
     const bookingClientContactId = await attachBookingPeople(c, db, tenantId, body, {
         allInspectionIds,
         directInsertInspectionId,
@@ -248,6 +273,10 @@ export async function fulfillBooking(
             inspectionId,
             requestId: createdRequestId,
             inspectionIds: allInspectionIds,
+            // What is OWED, not what has been collected — nothing has, at this
+            // point. The confirmation step reads this to decide whether to ask
+            // for a card at all; 0 means no payment step is rendered.
+            depositRequiredCents,
         }
     }, 200);
 }

@@ -16,8 +16,8 @@
 // `/api/public` unchanged.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { eq, and, inArray } from 'drizzle-orm';
-import { users, services as servicesTable, tenants, availability, tenantConfigs } from '../lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { services as servicesTable, tenants } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { checkRateLimit } from '../lib/rate-limit';
 import { logger } from '../lib/logger';
@@ -27,6 +27,11 @@ import {
 } from '../lib/validations/booking.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import createBookingRoutes from './bookings/create';
+import bookingProfileRoutes from './bookings/profile';
+// Mounted here rather than in server/index.ts: the deposit is part of the
+// public booking surface, and `/api/public` is where this aggregator already
+// lands, so the external path is identical either way.
+import depositIntentRoutes from './public/deposit-intent';
 import agreementRoutes from './bookings/agreement';
 import { getDrizzle } from '../lib/route-helpers';
 
@@ -212,6 +217,8 @@ const getTenantSlotsRoute = createRoute(withMcpMetadata({
 }, { scopes: ['read'], tier: 'extended' }));
 
 export const bookingsRoutes = createApiRouter()
+    .route('/', bookingProfileRoutes)
+    .route('/', depositIntentRoutes)
     .openapi(listInspectorsRoute, async (c) => {
         const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
         if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
@@ -352,125 +359,6 @@ export const bookingsRoutes = createApiRouter()
                 ...(all.holidayAdvisory ? { holidayAdvisory: all.holidayAdvisory } : {}),
             },
         }, 200);
-    })
-    /**
-     * GET /api/public/book/:tenant — company-level booking profile (IA-26).
-     * The canonical public entry. bookingOpen is company-wide: true iff ANY
-     * qualified staff member has configured recurring hours. The inspectors
-     * list is only exposed when the tenant enabled allowInspectorChoice.
-     *
-     * Round-trip budget: tenant lookup (1) + 3 parallel (services, config,
-     * getQualifiedInspectorIds) + 1 availability scan shared by bookingOpen
-     * and the choice list + 1 conditional inspector fetch = 5 max.
-     * The previous implementation ran up to 6 serial round-trips by calling
-     * hasAnyHours (which itself called getQualifiedInspectorIds + availability)
-     * and then re-running both calls inside the allowChoice branch.
-     */
-    .get('/book/:tenant', async (c) => {
-        await checkRateLimit(c, 'availability');
-        const { tenant } = c.req.param();
-        const db = getDrizzle(c);
-
-        const tenantRow = await db.select({ id: tenants.id, name: tenants.name })
-            .from(tenants).where(eq(tenants.slug, tenant)).get();
-        if (!tenantRow) return c.json({ success: false, error: { code: 'not_found', message: 'Tenant not found' } }, 404);
-
-        const booking = c.var.services.booking;
-        const [svcRows, config, qualified] = await Promise.all([
-            db.select({
-                id: servicesTable.id, name: servicesTable.name, price: servicesTable.price,
-                durationMinutes: servicesTable.durationMinutes, templateId: servicesTable.templateId,
-                active: servicesTable.active,
-            }).from(servicesTable).where(eq(servicesTable.tenantId, tenantRow.id)).all(),
-            db.select({
-                allowInspectorChoice: tenantConfigs.allowInspectorChoice,
-                conciergeReviewRequired: tenantConfigs.conciergeReviewRequired,
-            })
-                .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantRow.id)).get(),
-            booking.getQualifiedInspectorIds(tenantRow.id, []),
-        ]);
-        const visible = svcRows.filter(s => s.active && s.templateId);
-        const allowChoice = !!config?.allowInspectorChoice;
-
-        // One availability scan serves BOTH bookingOpen and the choice list.
-        const withHours = qualified.length > 0
-            ? await db.selectDistinct({ inspectorId: availability.inspectorId })
-                .from(availability)
-                .where(and(eq(availability.tenantId, tenantRow.id), inArray(availability.inspectorId, qualified)))
-                .all()
-            : [];
-        const hourIds = withHours.map(r => r.inspectorId);
-        const bookingOpen = hourIds.length > 0;
-
-        let inspectors: Array<{ id: string; name: string | null; photoUrl: string | null }> = [];
-        if (allowChoice && hourIds.length > 0) {
-            inspectors = await db.select({ id: users.id, name: users.name, photoUrl: users.photoUrl })
-                .from(users).where(and(eq(users.tenantId, tenantRow.id), inArray(users.id, hourIds))).all();
-            inspectors.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
-        }
-
-        return c.json({
-            success: true,
-            data: {
-                company: tenantRow.name,
-                turnstileSiteKey: c.env.TURNSTILE_SITE_KEY || null,
-                bookingOpen,
-                allowInspectorChoice: allowChoice,
-                conciergeReviewRequired: !!config?.conciergeReviewRequired,
-                inspectors,
-                services: visible.map(s => ({
-                    id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),
-                })),
-            },
-        });
-    })
-    /**
-     * GET /api/public/book/:tenant/:slug — public booking profile
-     * Returns inspector name, services, and availability for the booking page.
-     */
-    .get('/book/:tenant/:slug', async (c) => {
-        await checkRateLimit(c, 'availability');
-        const { tenant, slug } = c.req.param();
-        const db = getDrizzle(c);
-
-        // Resolve tenant by slug
-        const tenantRow = await db.select({ id: tenants.id, name: tenants.name })
-            .from(tenants).where(eq(tenants.slug, tenant)).get();
-        if (!tenantRow) return c.json({ success: false, error: { code: 'not_found', message: 'Tenant not found' } }, 404);
-
-        // Find inspector by slug within tenant
-        const inspector = await db.select({
-            id: users.id, name: users.name, slug: users.slug, photoUrl: users.photoUrl,
-        }).from(users).where(and(eq(users.tenantId, tenantRow.id), eq(users.slug, slug))).get();
-        if (!inspector) return c.json({ success: false, error: { code: 'not_found', message: 'Inspector not found' } }, 404);
-
-        // Get active services
-        const svcRows = await db.select({
-            id: servicesTable.id, name: servicesTable.name, price: servicesTable.price,
-            durationMinutes: servicesTable.durationMinutes,
-        }).from(servicesTable).where(and(eq(servicesTable.tenantId, tenantRow.id), eq(servicesTable.active, true))).all();
-
-        // B-16 — online booking is "open" only once the inspector has working
-        // hours configured; the page renders an honest not-open state otherwise.
-        const hasHours = await db.select({ id: availability.id }).from(availability)
-            .where(and(eq(availability.tenantId, tenantRow.id), eq(availability.inspectorId, inspector.id)))
-            .limit(1)
-            .get();
-
-        return c.json({
-            success: true,
-            data: {
-                inspectorId: inspector.id,
-                name: inspector.name,
-                company: tenantRow.name,
-                avatar: inspector.photoUrl,
-                turnstileSiteKey: c.env.TURNSTILE_SITE_KEY || null,
-                bookingOpen: !!hasHours,
-                services: svcRows.map(s => ({
-                    id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),
-                })),
-            },
-        });
     });
 
 export type BookingsApi = typeof bookingsRoutes;

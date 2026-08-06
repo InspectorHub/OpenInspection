@@ -1403,6 +1403,31 @@
     "description": "Auto-generated placeholder for createBookingBook (POST /book, bookings domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "createBookingDepositIntent",
+    "method": "POST",
+    "pathTemplate": "/api/public/inspections/{id}/deposit-intent",
+    "scopes": [],
+    "tag": "bookings",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id returned by the booking submission.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id returned by the booking submission."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Start a card payment for a booking deposit",
+    "description": "Mints a Stripe PaymentIntent for the deposit still outstanding on a booking, using the tenant's own Stripe keys. Public and unauthenticated: the inspection id returned by the booking submission is the capability. Records nothing — the ledger row is written when Stripe confirms the payment."
+  },
+  {
     "operationId": "createCalendarBlock",
     "method": "POST",
     "pathTemplate": "/api/calendar/blocks",
