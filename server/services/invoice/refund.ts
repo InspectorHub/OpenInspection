@@ -32,6 +32,7 @@ import {
     recordPayment,
     recomputeInvoicePaymentState,
     getNetReceivedCents,
+    getHeldDepositCents,
     seedLedgerFromInvoiceRecord,
 } from '../payment-ledger.service';
 import type { AppendedPayment } from '../payment-ledger.service';
@@ -109,6 +110,70 @@ export async function refundPartial(
     if (!appended) throw Errors.Conflict('This refund was already recorded.');
 
     await syncInspectionPaymentGate(db, tenantId, existing.inspectionId);
+    return appended;
+}
+
+/**
+ * Send back money held against an ORDER that has no invoice — a booking
+ * deposit, cancelled before anyone was billed.
+ *
+ * A THIRD writer, and the reason it is not a flag on `refundPartial`: that
+ * function's body is "load the invoice, seed its ledger from its own record,
+ * check what IT received, append against it, recompute ITS cache". Four of
+ * those five steps have no meaning without an invoice. Passing `invoiceId:
+ * null` through it would put two different functions behind one name, and the
+ * one that skipped the guards would be the one handling money nobody has
+ * billed for yet.
+ *
+ * WHAT IS ABSENT HERE, deliberately:
+ *
+ *  - No `recomputeInvoicePaymentState`. There is no invoice cache to refresh;
+ *    the held total is derived from the rows every time it is read.
+ *  - No `seedLedgerFromInvoiceRecord`. A held deposit exists only as ledger
+ *    rows — there is no older column-shaped record it could be reconstructed
+ *    from, so there is nothing to seed.
+ *
+ * The gate re-sync IS kept, even though a held deposit never set the gate:
+ * `payment_status = 'paid'` flips only on a paid invoice, so this cannot
+ * falsify it. Keeping the call means the house rule at the top of this file
+ * holds for every writer without exception, which is cheaper to trust than an
+ * exception someone has to re-derive.
+ */
+export async function refundHeldDeposit(
+    db: DrizzleD1Database,
+    tenantId: string,
+    inspectionId: string,
+    input: PartialRefundInput,
+): Promise<AppendedPayment> {
+    if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) {
+        throw Errors.UnprocessableEntity('A refund must be a positive whole number of cents.');
+    }
+
+    const held = await getHeldDepositCents(db, tenantId, inspectionId);
+    if (input.amountCents > held) {
+        throw Errors.UnprocessableEntity(
+            'This refund is larger than the deposit still held on this booking.',
+        );
+    }
+
+    const appended = await recordPayment(db, tenantId, {
+        inspectionId,
+        // NULL, and it must stay null. Attaching this row to an invoice is what
+        // `applyHeldDepositsToInvoice` does when one is raised; doing it here
+        // would make a refund look like an invoice payment.
+        invoiceId: null,
+        kind: 'refund',
+        amountCents: input.amountCents,
+        method: 'card',
+        provider: null,
+        providerRef: null,
+        recordedBy: input.recordedBy ?? null,
+        note: input.reason,
+        ...(input.occurredAt ? { occurredAt: input.occurredAt } : {}),
+    });
+    if (!appended) throw Errors.Conflict('This refund was already recorded.');
+
+    await syncInspectionPaymentGate(db, tenantId, inspectionId);
     return appended;
 }
 
