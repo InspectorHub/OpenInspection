@@ -11090,7 +11090,7 @@
       "body": null
     },
     "summary": "List metrics for current tenant",
-    "description": "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, top referring agents, per-inspector productivity, service mix, and paid/unpaid split. Omitting both bounds returns the trailing three months."
+    "description": "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the financial capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months."
   },
   {
     "operationId": "listNotifications",

@@ -16,13 +16,30 @@ export function meta() {
 
 interface MetricsData {
   totalInspections: number;
-  totalRevenue: number;
-  avgOrderValue: number;
+  // Null, not zero, for a reader without the `financial` capability: zero would
+  // be a claim about the business. `scope: 'self'` says why they are null.
+  totalRevenue: number | null;
+  avgOrderValue: number | null;
+  scope: "all" | "self";
   // Field names mirror the server's response exactly (server/api/metrics.ts):
   // the monthly series is `monthly[]` with `{ month, count, revenue }`.
   monthly: { month: string; count: number; revenue: number }[];
-  topAgents: { agentName: string; count: number; revenue: number }[];
-  byInspector: { inspectorId: string | null; inspectorName: string; count: number; revenue: number; avgTurnaroundDays: number | null }[];
+  topAgents: { agentName: string; kind: "contact" | "source"; count: number; revenue: number }[];
+  // Two money columns with two labels. `payCents` is what the inspector earns;
+  // `attributedRevenueCents` is what the business billed for the lines they
+  // worked. Never merged into one column called "revenue" — they differ by
+  // margin and the difference is the business. Never called "cost": unlike the
+  // competitor's equivalent report, an inspector reads this page.
+  byInspector: {
+    inspectorId: string;
+    inspectorName: string;
+    ledCount: number;
+    assistedCount: number;
+    payCents: number;
+    attributedRevenueCents: number | null;
+    medianTurnaroundDays: number | null;
+    turnaroundBasis: "field_complete_to_report_published" | "no_data";
+  }[];
   // IA-82 — the endpoint has always computed and returned this; nothing rendered
   // it, so the aggregation ran for no reader.
   serviceBreakdown: { serviceName: string; count: number; revenue: number }[];
@@ -98,11 +115,19 @@ export default function MetricsPage() {
     navigate(`/metrics?from=${next.from}&to=${next.to}`, { replace: true });
   };
 
+  /** Null money is "not yours to see", and renders as a dash, never as $0. */
+  const fmtOrDash = (n: number | null | undefined) => (n == null ? "—" : fmt(n));
+
   const kpis = [
-    { label: m.metrics_kpi_revenue(), value: data ? fmt(data.totalRevenue) : "—" },
+    { label: m.metrics_kpi_revenue(), value: fmtOrDash(data?.totalRevenue) },
     { label: m.metrics_kpi_inspections(), value: data ? String(data.totalInspections) : "—" },
-    { label: m.metrics_kpi_aov(), value: data ? fmt(data.avgOrderValue) : "—" },
+    { label: m.metrics_kpi_aov(), value: fmtOrDash(data?.avgOrderValue) },
   ];
+
+  // A reader without the `financial` capability gets their own row and nothing
+  // else. Rendering the company cards as a wall of dashes would be worse than
+  // not rendering them: it advertises figures they cannot have.
+  const companyView = data?.scope !== "self";
 
   return (
     <div className="space-y-ih-list">
@@ -115,16 +140,23 @@ export default function MetricsPage() {
       />
 
       {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {kpis.map((kpi) => (
-          <Card key={kpi.label} className="p-5">
-            <p className="text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{kpi.label}</p>
-            <p className="text-xl font-bold text-ih-fg-1">{kpi.value}</p>
-          </Card>
-        ))}
-      </div>
+      {companyView ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {kpis.map((kpi) => (
+            <Card key={kpi.label} className="p-5">
+              <p className="text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{kpi.label}</p>
+              <p className="text-xl font-bold text-ih-fg-1">{kpi.value}</p>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card className="p-5">
+          <p className="text-[13px] text-ih-fg-2">{m.metrics_self_scope_notice()}</p>
+        </Card>
+      )}
 
       {/* Inspections per month chart placeholder */}
+      {companyView && (
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_chart_inspections()}</p>
         {data && data.monthly?.length > 0 ? (
@@ -148,8 +180,10 @@ export default function MetricsPage() {
           <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.metrics_no_data()}</p>
         )}
       </Card>
+      )}
 
       {/* Revenue per month bar chart */}
+      {companyView && (
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_chart_revenue()}</p>
         {data && data.monthly?.length > 0 ? (
@@ -173,21 +207,32 @@ export default function MetricsPage() {
           <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.metrics_no_revenue()}</p>
         )}
       </Card>
+      )}
 
-      {/* By inspector — team productivity: count, revenue, turnaround */}
+      {/* Per inspector. Two money columns, two labels: Pay is the worker's,
+          Attributed revenue is the company's. The turnaround basis is stated
+          under the title rather than hidden in a tooltip — a duration with an
+          unstated start is not a measurement. */}
       <Card className="p-5">
-        <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_by_inspector()}</p>
+        <p className="text-sm font-bold text-ih-fg-1">{m.metrics_by_inspector()}</p>
+        <p className="text-[12px] text-ih-fg-4 mb-4">
+          {data?.byInspector?.some((r) => r.turnaroundBasis !== "no_data")
+            ? m.metrics_turnaround_basis()
+            : m.metrics_turnaround_no_basis()}
+        </p>
         {data && data.byInspector?.length > 0 ? (
           <div className="overflow-x-auto">
             <Table<MetricsData["byInspector"][number]>
               rows={data.byInspector}
-              getRowKey={(row) => row.inspectorId ?? row.inspectorName}
+              getRowKey={(row) => row.inspectorId}
               columns={[
                 { label: m.metrics_col_inspector(), cell: (row) => <span className="font-medium text-ih-fg-1">{row.inspectorName}</span> },
-                { label: m.metrics_col_inspections(), align: "center", cell: (row) => <span className="text-ih-fg-2">{row.count}</span> },
-                { label: m.metrics_col_revenue(), align: "right", cell: (row) => <span className="text-ih-fg-2">{fmt(row.revenue)}</span> },
+                { label: m.metrics_col_led(), align: "center", cell: (row) => <span className="text-ih-fg-2">{row.ledCount}</span> },
+                { label: m.metrics_col_assisted(), align: "center", cell: (row) => <span className="text-ih-fg-2">{row.assistedCount}</span> },
+                { label: m.metrics_col_pay(), align: "right", cell: (row) => <span className="text-ih-fg-2">{fmt(row.payCents)}</span> },
+                { label: m.metrics_col_attributed_revenue(), align: "right", cell: (row) => <span className="text-ih-fg-2">{fmtOrDash(row.attributedRevenueCents)}</span> },
                 { label: m.metrics_col_turnaround(), align: "right", cell: (row) => (
-                  <span className="text-ih-fg-2">{row.avgTurnaroundDays == null ? m.metrics_turnaround_na() : m.metrics_turnaround_days({ days: row.avgTurnaroundDays })}</span>
+                  <span className="text-ih-fg-2">{row.medianTurnaroundDays == null ? m.metrics_turnaround_na() : m.metrics_turnaround_days({ days: row.medianTurnaroundDays })}</span>
                 ) },
               ]}
             />
@@ -200,6 +245,7 @@ export default function MetricsPage() {
       <FindingsBySection findings={findings} />
 
       {/* Service mix */}
+      {companyView && (
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_services_title()}</p>
         {data && data.serviceBreakdown?.length > 0 ? (
@@ -218,15 +264,26 @@ export default function MetricsPage() {
           <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.metrics_no_services()}</p>
         )}
       </Card>
+      )}
 
-      {/* Top agents */}
+      {/* Referrers. Contact-keyed rows come first and free-text sources follow,
+          tagged — they are different kinds of answer and merging them into one
+          list without saying which is which invents precision. */}
+      {companyView && (
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1 mb-3">{m.metrics_top_agents()}</p>
         {data && data.topAgents?.length > 0 ? (
           <div className="space-y-2">
-            {data.topAgents.slice(0, 5).map((agent, i) => (
+            {data.topAgents.slice(0, 8).map((agent, i) => (
               <div key={i} className="flex items-center justify-between text-[13px]">
-                <span className="font-medium text-ih-fg-1">{agent.agentName}</span>
+                <span className="font-medium text-ih-fg-1">
+                  {agent.agentName}
+                  {agent.kind === "source" && (
+                    <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
+                      {m.metrics_referrer_source_tag()}
+                    </span>
+                  )}
+                </span>
                 <div className="text-right">
                   <span className="font-bold text-ih-fg-1">{m.metrics_agent_count({ count: agent.count })}</span>
                   <span className="text-ih-fg-4 ml-2 text-[12px]">{fmt(agent.revenue)}</span>
@@ -238,6 +295,7 @@ export default function MetricsPage() {
           <p className="text-[13px] text-ih-fg-3">{m.metrics_no_agents()}</p>
         )}
       </Card>
+      )}
     </div>
   );
 }
