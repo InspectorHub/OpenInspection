@@ -181,7 +181,6 @@
         "POST /api/inspections/templates",
         "POST /api/inspections/templates/import-spectora",
         "POST /api/inspections/wizard",
-        "POST /api/inspections/{id}/agreement-requests",
         "POST /api/inspections/{id}/clone",
         "POST /api/inspections/{id}/complete",
         "POST /api/inspections/{id}/compliance/doc-review/seed",
