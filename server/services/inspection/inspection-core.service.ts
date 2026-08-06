@@ -1,5 +1,5 @@
 import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, agreementRequests, reportVersions, contactRoleProfiles, inspectionPeople } from '../../lib/db/schema';
+import { inspections, inspectionResults, templates, users, inspectionServices, tenantConfigs, agreementRequests, reportVersions, contactRoleProfiles, inspectionPeople } from '../../lib/db/schema';
 import { resolveAgentRepairAccess, type AgentRepairAccess } from '../../lib/people/agent-repair-access';
 import { contacts } from '../../lib/db/schema/contact';
 import { PeopleService } from '../people.service';
@@ -11,6 +11,7 @@ import { escapeLikePattern } from '../../lib/db/like-escape';
 import { safeISODate, safeTimestamp } from '../../lib/date';
 import { logger } from '../../lib/logger';
 import { createPrimaryReport } from '../../lib/inspection/reports';
+import { writeInspectionServiceSnapshots, type ServiceSelection } from '../../lib/inspection/service-snapshot';
 import { computePreflightFromData } from '../../lib/preflight';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { getInspectionRoster } from '../../lib/inspection/roster';
@@ -537,33 +538,12 @@ export class InspectionCoreService extends InspectionSubService {
             logger.error('inspection-people write from inspection create failed', { inspectionId: id }, err instanceof Error ? err : undefined);
         }
 
-        // Link selected services.
-        // serviceSelections (IA-1 superset) takes precedence when present; otherwise
-        // fall back to the legacy flat serviceIds list. The two may coexist — the
-        // handler already merges them so only one branch fires here.
-        const serviceSelectionsInput = (data as { serviceSelections?: Array<{ serviceId: string; priceOverrideCents?: number }> }).serviceSelections;
-        const effectiveServiceIds: string[] = serviceSelectionsInput && serviceSelectionsInput.length > 0
-            ? serviceSelectionsInput.map(s => s.serviceId)
-            : (data.serviceIds ?? []);
-        if (effectiveServiceIds.length > 0) {
-            const svcRows = await db.select().from(services)
-                .where(and(eq(services.tenantId, tenantId), inArray(services.id, effectiveServiceIds)));
-            if (svcRows.length > 0) {
-                // Build a map from serviceId → priceOverrideCents for fast lookup.
-                const overrideMap = new Map<string, number | undefined>(
-                    (serviceSelectionsInput ?? []).map(s => [s.serviceId, s.priceOverrideCents]),
-                );
-                await db.insert(inspectionServices).values(svcRows.map(s => ({
-                    id:            crypto.randomUUID(),
-                    tenantId,
-                    inspectionId:  id,
-                    serviceId:     s.id,
-                    priceOverride: overrideMap.get(s.id) ?? null,
-                    nameSnapshot:  s.name,
-                    priceSnapshot: s.price,
-                })));
-            }
-        }
+        // Link selected services — the tier-2 money authority. Shared with any
+        // other path that must produce the same rows; see the module doc.
+        await writeInspectionServiceSnapshots(db, tenantId, id, {
+            serviceSelections: (data as { serviceSelections?: ServiceSelection[] }).serviceSelections,
+            serviceIds:        data.serviceIds,
+        });
 
         return {
             ...newInspection,
