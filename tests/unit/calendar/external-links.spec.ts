@@ -4,7 +4,6 @@ import {
     getLink,
     deleteLink,
     listOwnExternalIds,
-    getLinksByEntityIds,
 } from '../../../server/lib/calendar/external-links';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -103,18 +102,5 @@ describe('calendar_external_links store', () => {
             tenantId: TENANT, userId: USER, provider: 'google',
         });
         expect([...ids]).toEqual(['mine-1']);
-    });
-
-    it('batches entity lookups into one map', async () => {
-        await upsertLink(db as AnyDb, { ...key, userId: USER, externalId: 'g1' });
-        await upsertLink(db as AnyDb, { ...key, entityId: 'insp-2', userId: USER, externalId: 'g2' });
-
-        const map = await getLinksByEntityIds(db as AnyDb, {
-            tenantId: TENANT, provider: 'google', entityType: 'inspection',
-            entityIds: ['insp-1', 'insp-2', 'insp-missing'],
-        });
-        expect(map.get('insp-1')?.externalId).toBe('g1');
-        expect(map.get('insp-2')?.externalId).toBe('g2');
-        expect(map.has('insp-missing')).toBe(false);
     });
 });

@@ -6,7 +6,7 @@
  * is keyed on exactly that tuple, which is what makes a second push an UPDATE
  * of the same remote event rather than a second event on someone's calendar.
  */
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { calendarExternalLinks } from '../db/schema';
 import type { CalendarProviderId } from './provider';
@@ -110,28 +110,4 @@ export async function listOwnExternalIds(
         ))
         .all();
     return new Set(rows.map((r) => r.externalId));
-}
-
-/** Links for many entities of one type, keyed by entity id. */
-export async function getLinksByEntityIds(
-    db: DrizzleD1Database,
-    params: {
-        tenantId: string;
-        provider: CalendarProviderId;
-        entityType: CalendarLinkEntityType;
-        entityIds: string[];
-    },
-): Promise<Map<string, CalendarExternalLinkRow>> {
-    const out = new Map<string, CalendarExternalLinkRow>();
-    if (params.entityIds.length === 0) return out;
-    const rows = await db.select().from(calendarExternalLinks)
-        .where(and(
-            eq(calendarExternalLinks.tenantId, params.tenantId),
-            eq(calendarExternalLinks.provider, params.provider),
-            eq(calendarExternalLinks.entityType, params.entityType),
-            inArray(calendarExternalLinks.entityId, params.entityIds),
-        ))
-        .all();
-    for (const r of rows) out.set(r.entityId, r);
-    return out;
 }

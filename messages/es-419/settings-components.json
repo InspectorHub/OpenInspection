@@ -586,15 +586,15 @@
   "settings_deposit_type_fixed": "Monto fijo",
   "settings_deposit_error_save": "No se pudo guardar el depósito.",
   "settings_icsfeeds_heading": "Suscripciones de calendario",
-  "settings_icsfeeds_intro": "Suscribe cualquier aplicación de calendario a estos enlaces y se mantendrá actualizada sola. Cada fuente muestra un nivel de detalle distinto: elige la que corresponda a quién la verá.",
-  "settings_icsfeeds_none": "Tus enlaces de suscripción aparecerán cuando se configuren los identificadores de tu empresa y tu usuario.",
+  "settings_icsfeeds_intro": "Suscriba cualquier aplicación de calendario a estos enlaces y se mantendrá actualizada sola. Cada fuente muestra un nivel de detalle distinto: elija la que corresponda a quién la verá.",
+  "settings_icsfeeds_none": "Sus enlaces de suscripción aparecen cuando estén configurados los identificadores de su empresa y de su usuario.",
   "settings_icsfeeds_private_badge": "Enlace privado",
-  "settings_icsfeeds_privacy_note": "Cualquier persona que tenga un enlace marcado como privado puede ver ese calendario sin iniciar sesión. Compártelos solo con quienes ya tienen permiso para ver el trabajo.",
+  "settings_icsfeeds_privacy_note": "Cualquier persona que tenga un enlace marcado como privado puede ver ese calendario sin iniciar sesión. Compártalos solo con quienes ya tienen permiso para ver el trabajo.",
   "settings_icsfeeds_company_label": "Inspecciones de la empresa",
   "settings_icsfeeds_company_desc": "Todas las inspecciones de la empresa, con direcciones. Para el calendario de la oficina.",
   "settings_icsfeeds_busy_label": "Mi tiempo ocupado",
   "settings_icsfeeds_schedule_label": "Mi agenda",
-  "settings_icsfeeds_busy_desc": "Cuándo estás ocupado y nada más: sin direcciones, nombres ni correos. Se puede compartir con agentes y socios.",
-  "settings_icsfeeds_schedule_desc": "Tus propios trabajos con la dirección de la propiedad, para tu teléfono.",
-  "settings_calconnect_sync_error": "La última sincronización con Google Calendar falló: {reason} Vuelve a conectar abajo si esto continúa."
+  "settings_icsfeeds_busy_desc": "Cuándo está ocupado y nada más: sin direcciones, nombres ni correos. Se puede compartir con agentes y socios.",
+  "settings_icsfeeds_schedule_desc": "Sus propios trabajos con la dirección de la propiedad, para su teléfono.",
+  "settings_calconnect_sync_error": "La última sincronización con Google Calendar falló: {reason} Vuelva a conectar abajo si esto continúa."
 }

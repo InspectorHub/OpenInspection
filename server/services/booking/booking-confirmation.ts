@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users, inspections, tenantConfigs } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
@@ -85,7 +85,9 @@ export async function dispatchBookingConfirmation(
     const booked = await db.select({
         scheduledStartMs: inspections.scheduledStartMs,
         scheduledEndMs: inspections.scheduledEndMs,
-    }).from(inspections).where(eq(inspections.id, inspectionId)).get();
+    }).from(inspections)
+        .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+        .get();
 
     const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
         .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();

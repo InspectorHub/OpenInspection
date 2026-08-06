@@ -28,6 +28,7 @@ import { inspections, calendarBlocks, tenantConfigs } from '../db/schema';
 import { getInspectionRoster } from '../inspection/roster';
 import { resolveTenantTimeZone, wallClockToEpochMs } from '../tz';
 import { logger } from '../logger';
+import { INSPECTION_STATUS } from '../status/inspection-status';
 import { canPushEvents, ExternalEventGoneError } from './provider';
 import { getCalendarProvider } from './registry';
 import { loadOpenGoogleConnection } from './connection';
@@ -50,7 +51,7 @@ export interface CalendarExportEnv {
  * Why a push did not happen. Every one of these is a state a user can be in
  * and can act on, which is why they are named rather than logged as a boolean.
  */
-export type PushSkipReason =
+type PushSkipReason =
     | 'NOT_CONNECTED'
     | 'NO_WRITE_CAPABILITY'
     | 'OAUTH_NOT_CONFIGURED'
@@ -226,9 +227,10 @@ export async function pushInspectionToGoogle(
     const lead = roster.lead;
 
     // Cancelled or unassigned: the entry should not be on anyone's calendar.
-    if (row.status === 'cancelled' || !lead) {
+    const cancelled = row.status === INSPECTION_STATUS.CANCELLED;
+    if (cancelled || !lead) {
         await deleteExternalForEntity(env, tenantId, 'inspection', inspectionId);
-        return { pushed: false, reason: row.status === 'cancelled' ? 'CANCELLED' : 'NO_ASSIGNEE' };
+        return { pushed: false, reason: cancelled ? 'CANCELLED' : 'NO_ASSIGNEE' };
     }
 
     const resolved = await resolveWriteHandle(env, tenantId, lead.id);
