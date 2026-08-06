@@ -276,4 +276,11 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
       reason: 'free text a manager writes about a payout adjustment to a staff member — payroll audit trail, not consumer-DSAR scope' },
     { table: 'service_pay_rules',             column: 'user_id',
       reason: 'staff compensation rule — not consumer-DSAR scope' },
+    // The portal->core dead-letter queue (#276). Registered although the PII
+    // heuristic flags neither column, because silence here is exactly how this
+    // one hid: `envelope` and `reason` look like nothing.
+    { table: 'parked_cmd_events', column: 'envelope',
+      reason: 'Fingerprint only (type/dataschema/id/seq/size/digest) — the command payload is never written, so no subject PII reaches this table. It WAS payload-bearing before #276, when a cmd.tenant.update that failed to parse wrote an admin password hash here. Naming that history is deliberate: an out-of-scope entry that only says "no PII" invites restoring raw parking as a debugging convenience.' },
+    { table: 'parked_cmd_events', column: 'reason',
+      reason: 'Fixed diagnostic enum (parse-failed / unknown-type-or-version), not personal data.' },
 ];

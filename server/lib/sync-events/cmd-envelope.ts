@@ -104,6 +104,29 @@ export function parseCmdEnvelope(json: unknown): CmdEnvelope | null {
     return result.success ? result.data : null;
 }
 
+/**
+ * Which ENVELOPE fields a message failed validation on — names only, so the
+ * dead-letter row can say WHY a message could not be read without holding the
+ * message. Two things make that safe structurally rather than by promise:
+ * values never leave this function, and the returned names are intersected with
+ * this schema's own top-level keys, so nothing from inside `data` (a
+ * `z.record(z.unknown())`, which never produces an issue of its own) can appear.
+ */
+export function cmdEnvelopeIssueFields(json: unknown): string[] {
+    let candidate: unknown = json;
+    if (typeof candidate === 'string') {
+        try { candidate = JSON.parse(candidate); } catch { return ['<not-json>']; }
+    }
+    if (candidate === null || typeof candidate !== 'object') return ['<not-an-object>'];
+    const result = cmdEnvelopeSchema.safeParse(candidate);
+    if (result.success) return [];
+    const known = new Set(Object.keys(cmdEnvelopeSchema.shape));
+    const fields = result.error.issues
+        .map((issue) => String(issue.path[0] ?? ''))
+        .filter((name) => known.has(name));
+    return [...new Set(fields)].sort();
+}
+
 export function isKnownCmd(type: string, dataschema: string): boolean {
     const versions = KNOWN_CMD_TYPES[type];
     return versions !== undefined && versions.includes(dataschema);
