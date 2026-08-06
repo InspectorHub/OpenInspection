@@ -21,7 +21,7 @@ import { PortalService } from '../../services/portal.service';
 import { TeamService } from '../../services/team.service';
 import { TemplateService } from '../../services/template.service';
 import { AgreementService } from '../../services/agreement.service';
-import { AvailabilityService } from '../../services/booking.service';
+import { AvailabilityService } from '../../services/availability.service';
 import { ContactService } from '../../services/contact.service';
 import { InvoiceService } from '../../services/invoice.service';
 import { PortalAccessService } from '../../services/portal-access.service';
