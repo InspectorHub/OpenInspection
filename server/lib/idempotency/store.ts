@@ -9,7 +9,7 @@
  * Kept free of Hono and of anything outside `server/lib/` so portal can vendor
  * it byte-for-byte.
  */
-import { and, eq } from 'drizzle-orm';
+import { and, eq, lt } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { idempotencyKeys } from '../db/schema/idempotency';
 
@@ -63,6 +63,40 @@ export async function claimKey(db: DrizzleD1Database, args: ClaimArgs): Promise<
     if (row.state === 'done') {
         return { state: 'done', status: row.responseStatus ?? 200, body: row.responseBody ?? '' };
     }
+
+    // An `in_flight` row whose TTL has passed is a claim nobody is honouring:
+    // the holder died without unwinding. `releaseKey` only runs from a caught
+    // exception, so a CPU-limit kill, an eviction or a mid-request deploy all
+    // leave the row exactly like this — and nothing sweeps `expires_at`, so it
+    // would sit here forever.
+    //
+    // Refusing such a row is NOT the safe direction. For a webhook it means the
+    // caller ACKs, the provider stops retrying, and the event is lost with no
+    // signal at all. Taking the claim over risks running twice only in the case
+    // where the original holder is somehow still alive past its own deadline —
+    // which is the failure the TTL is there to bound.
+    //
+    // The steal is one conditional UPDATE, so concurrent stealers cannot both
+    // win: the second no longer matches `expires_at < now`.
+    if (row.expiresAt && row.expiresAt.getTime() <= now) {
+        const stolen = await db
+            .update(idempotencyKeys)
+            .set({
+                fingerprint: args.fingerprint,
+                state:       'in_flight',
+                createdAt:   new Date(now),
+                expiresAt:   new Date(now + args.ttlMs),
+            })
+            .where(and(
+                eq(idempotencyKeys.tenantId, args.tenantId),
+                eq(idempotencyKeys.key, args.key),
+                eq(idempotencyKeys.state, 'in_flight'),
+                lt(idempotencyKeys.expiresAt, new Date(now + 1)),
+            ))
+            .returning({ key: idempotencyKeys.key });
+        if (stolen.length > 0) return 'claimed';
+    }
+
     return { state: 'in_flight' };
 }
 
