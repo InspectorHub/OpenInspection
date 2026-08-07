@@ -111,7 +111,13 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "save-ai") {
     const geminiApiKey = fd.get("GEMINI_API_KEY");
-    if (!geminiApiKey || typeof geminiApiKey !== "string" || !geminiApiKey.trim()) {
+    const newKey = typeof geminiApiKey === "string" ? geminiApiKey.trim() : "";
+    // A key already on file may be CONFIRMED without being re-entered. The
+    // SecretField submits an empty value when it was never focused, so a
+    // workspace whose key predates the confirmation requirement would otherwise
+    // have to re-paste a credential it already has just to lift the pause.
+    const keyConfigured = fd.get("keyConfigured") === "1";
+    if (!newKey && !keyConfigured) {
       return { intent, success: false, error: m.settings_advanced_api_key_required(), field: "GEMINI_API_KEY", test: null };
     }
     // The three statements the workspace confirms about its own AI provider
@@ -127,7 +133,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (Object.values(aiKeyAttestation).some((confirmed) => !confirmed)) {
       return { intent, success: false, error: m.settings_ai_attest_required(), field: "GEMINI_API_KEY", test: null };
     }
-    const res = await api.secrets.secrets.$put({ json: { GEMINI_API_KEY: geminiApiKey, aiKeyAttestation } });
+    const res = await api.secrets.secrets.$put({
+      json: newKey ? { GEMINI_API_KEY: newKey, aiKeyAttestation } : { aiKeyAttestation },
+    });
     if (!res.ok) {
       const errBody = (await res.json().catch(() => null)) as
         | { error?: { message?: string; field?: string } }

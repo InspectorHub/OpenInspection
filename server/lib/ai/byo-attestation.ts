@@ -91,6 +91,49 @@ export interface AiKeyAttestationRecord {
     policyVersion: string;
 }
 
+/**
+ * The six stored columns, as they come back from `tenant_configs` — every one
+ * nullable, because "no confirmation on file" is the state the columns are in
+ * for every workspace that has never been through the confirm step.
+ */
+export interface StoredAiKeyAttestation {
+    provider: string | null;
+    mode: string | null;
+    accountOwner: string | null;
+    termsVersion: string | null;
+    attestedAt: Date | null;
+    policyVersion: string | null;
+}
+
+/**
+ * Whether a COMPLETE confirmation is on file. The runtime gate reads this.
+ *
+ * All six are checked, not one. They are written in a single statement, so in
+ * practice they move together — but "in practice" is the assumption every
+ * partially-written row was allowed by, and a gate that inspects one column
+ * while claiming to check the record is the kind that reports green about
+ * something it never looked at.
+ *
+ * Deliberately NOT invalidated by a `termsVersion` that no longer equals
+ * `AI_PROVIDER_TERMS_VERSION`. Bumping that constant should be a decision to
+ * ask people to re-confirm, carried out on purpose; wiring it to this check
+ * would turn a one-character edit into an immediate outage for every workspace
+ * on its own key. The stored revision stays visible to whoever runs that pass.
+ */
+export function isAiKeyAttestationOnFile(
+    stored: StoredAiKeyAttestation | null | undefined,
+): boolean {
+    if (!stored) return false;
+    return (
+        !!stored.provider &&
+        !!stored.mode &&
+        !!stored.accountOwner &&
+        !!stored.termsVersion &&
+        !!stored.attestedAt &&
+        !!stored.policyVersion
+    );
+}
+
 /** Builds the record for a tenant-supplied Gemini key confirmed at `attestedAt`. */
 export function buildAiKeyAttestationRecord(attestedAt: Date): AiKeyAttestationRecord {
     return {

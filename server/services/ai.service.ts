@@ -3,13 +3,12 @@ import { eq, and } from 'drizzle-orm';
 import { inspections, inspectionResults } from '../lib/db/schema';
 import { AppError, ErrorCode, Errors } from '../lib/errors';
 import { GeminiProvider } from '../lib/ai/providers/gemini';
-import { checkAiCapability } from '../lib/ai/capability-policy';
+import { checkAiCapability, type AiCredentialPicture } from '../lib/ai/capability-policy';
 import {
     AI_PROMPTS,
     type RewriteCommentPromptArgs,
     type SuggestCommentPromptArgs,
 } from '../lib/ai/prompts';
-import type { AiCredentialSource } from '../lib/ai/resolve-provider';
 import type { AiUsageKind } from '../lib/usage/period';
 
 /**
@@ -66,13 +65,17 @@ export class AIService {
          *  counter at a route or a hook is how two numbers that have to agree
          *  stop agreeing. Undefined when there is no tenant to attribute to. */
         private meter?: { record(kind: AiUsageKind): Promise<void> },
-        /** Whose credentials a call from this service would run on, taken from
+        /** Whose credentials a call from this service would run on, and whether
+         *  a confirmation is on file for them. `source` comes from
          *  `resolveRuntimeAiSource` — the SAME resolver that tags the meter, so
          *  the source the gate judges and the source the usage row records can
          *  never be two different answers. Never re-derived inside this class.
-         *  Defaults to the tenant's own key, which is the only source that
-         *  reaches the service today. */
-        private credentialSource: AiCredentialSource = 'byo',
+         *
+         *  The default is FAIL-CLOSED on the confirmation: a construction that
+         *  says nothing about it has not established one, and must not read as
+         *  though it had. Callers that mean "the tenant's own, confirmed key"
+         *  say so. */
+        private credentials: AiCredentialPicture = { source: 'byo', tenantKeyAttested: false },
     ) {}
 
     private isDevMode(): boolean {
@@ -130,7 +133,7 @@ export class AIService {
         // it for the feature-off case, and every client already routes that to
         // "set up AI". A second 4xx/5xx shape here would mean two failure paths
         // for one situation.
-        const decision = checkAiCapability(kind, this.credentialSource);
+        const decision = checkAiCapability(kind, this.credentials);
         if (!decision.allowed) throw Errors.AINotConfigured(decision.message);
 
         const provider = new GeminiProvider({ apiKey: this.apiKey, model: this.model });

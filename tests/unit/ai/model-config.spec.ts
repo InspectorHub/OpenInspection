@@ -13,6 +13,10 @@ import { AIService } from '../../../server/services/ai.service';
  * the configured path passes just as happily against a hardcoded default, which
  * is exactly the bug this file exists to prevent.
  */
+/** The tenant's own key with a confirmation on file — the capability gate
+ *  refuses anything else, and the service defaults to fail-closed. */
+const OWN_CONFIRMED_KEY = { source: 'byo', tenantKeyAttested: true } as const;
+
 describe('AIService — model configuration', () => {
     const fetchMock = vi.fn();
     let originalFetch: typeof globalThis.fetch;
@@ -37,7 +41,7 @@ describe('AIService — model configuration', () => {
     };
 
     it('sends the configured model in the request URL', async () => {
-        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'gemini-3.1-flash-lite');
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'gemini-3.1-flash-lite', undefined, OWN_CONFIRMED_KEY);
         await svc.rewriteComment(REWRITE_INPUT);
         expect(String(fetchMock.mock.calls[0]![0])).toContain('gemini-3.1-flash-lite');
     });
@@ -46,7 +50,7 @@ describe('AIService — model configuration', () => {
         // Asserting the ABSENCE of the stale pin rather than the presence of a
         // specific model: pinning this to today's choice would make this test
         // the thing that has to be edited on every model upgrade.
-        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'some-other-model');
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'some-other-model', undefined, OWN_CONFIRMED_KEY);
         await svc.rewriteComment(REWRITE_INPUT);
         expect(String(fetchMock.mock.calls[0]![0])).not.toContain('gemini-1.5-flash');
     });
@@ -76,7 +80,12 @@ describe('AIService — model configuration', () => {
     });
 
     it('fails closed on the unguarded summary path as well', async () => {
-        const svc = new AIService({} as D1Database, 'test-key', 'saas', '');
+        // Confirmed key on purpose. This path has no pre-check, so it reaches
+        // the chokepoint where the capability gate runs BEFORE the adapter
+        // validates the model — leaving the credential picture unconfirmed here
+        // would make the case pass on the attestation refusal and stop saying
+        // anything about a missing model.
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', '', undefined, OWN_CONFIRMED_KEY);
         await expect(svc.generateProfessionalComment('rough note'))
             .rejects.toThrow(/no AI model is configured/i);
         expect(fetchMock).not.toHaveBeenCalled();

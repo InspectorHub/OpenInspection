@@ -276,7 +276,18 @@ export async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: SecretsSa
     //    clears the record: an attestation about a key that is gone attests to
     //    nothing, and leaving it behind would later read as cover for whatever
     //    key is stored next.
-    const record = settingAiKey ? buildAiKeyAttestationRecord(new Date()) : null;
+    //
+    //    Written whenever a confirmation arrives AND a key will exist afterwards
+    //    — not only when the key itself is new. A workspace whose key predates
+    //    this rule has a working credential and nothing on file for it; without
+    //    this, confirming would mean re-pasting a key they already have, and the
+    //    runtime refusal would be a dead end. A save carrying NO confirmation
+    //    still leaves an existing record untouched, so the masked-resubmit path
+    //    neither demands re-confirmation nor re-stamps one nobody made.
+    const keyPresentAfterSave = !!cleaned.GEMINI_API_KEY;
+    const record = keyPresentAfterSave && isAiKeyAttested(attestation)
+        ? buildAiKeyAttestationRecord(new Date())
+        : null;
     const attestationColumns = record
         ? {
             aiKeyAttestationProvider: record.provider,
@@ -286,7 +297,7 @@ export async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: SecretsSa
             aiKeyAttestationAttestedAt: record.attestedAt,
             aiKeyAttestationPolicyVersion: record.policyVersion,
         }
-        : cleaned.GEMINI_API_KEY
+        : keyPresentAfterSave
             ? {}
             : {
                 aiKeyAttestationProvider: null,

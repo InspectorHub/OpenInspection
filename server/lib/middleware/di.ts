@@ -160,8 +160,8 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     }
                     break;
                 case 'ai': {
-                    // ONE credential picture, read by both the meter and the capability
-                    // gate — the source a usage row is tagged with can never disagree.
+                    // ONE credential picture — the meter's tag, the gate's source and the key's
+                    // confirmation all come from this single read, so they cannot disagree.
                     const aiCreds = { profile: c.var.profile, tenantKey: emailCfg.dbSecrets.geminiApiKey || null, managedKey: c.env.AI_MANAGED_API_KEY ?? null, model: c.env.AI_MODEL ?? '' };
                     target.ai = new AIService(
                         c.env.DB,
@@ -178,7 +178,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         // closed at the service rather than picking a model.
                         c.env.AI_MODEL ?? '',
                         buildAiMeter({ db: c.env.DB, tenantId, ...aiCreds }),
-                        resolveRuntimeAiSource(aiCreds) ?? 'byo', // same resolver the meter tags with; null (off) → 'byo'
+                        { source: resolveRuntimeAiSource(aiCreds) ?? 'byo', tenantKeyAttested: emailCfg.aiKeyAttested === true }, // null (off) → 'byo'; unloaded config → NOT confirmed
                     );
                     break;
                 }

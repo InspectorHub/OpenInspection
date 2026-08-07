@@ -40,6 +40,9 @@ export function AiFeaturesPanel({ geminiConfigured, value, fieldError, saving, g
       </p>
       <Form method="post" className="space-y-3 max-w-xl">
         <input type="hidden" name="intent" value="save-ai" />
+        {/* Lets the action accept a confirmation for a key that is already
+            stored, without the workspace re-entering the credential. */}
+        <input type="hidden" name="keyConfigured" value={geminiConfigured ? "1" : ""} />
         <SecretField
           name="GEMINI_API_KEY"
           label={m.settings_ai_key_label()}

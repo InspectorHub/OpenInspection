@@ -25,6 +25,8 @@ import { openSecrets } from '../../../server/lib/config-crypto';
 import {
     AI_PROVIDER_TERMS_VERSION,
     AI_KEY_ATTESTATION_POLICY_VERSION,
+    isAiKeyAttestationOnFile,
+    type StoredAiKeyAttestation,
 } from '../../../server/lib/ai/byo-attestation';
 import type { HonoConfig } from '../../../server/types/hono';
 
@@ -193,6 +195,44 @@ describe('BYO AI key attestation — POST/PUT /api/admin/secrets', () => {
         expect((await config())?.aiKeyAttestationAttestedAt).toEqual(attestedAt);
     });
 
+    it('records a confirmation for a key that is ALREADY stored, without re-entry', async () => {
+        // The upgrade path. A workspace whose key predates the confirmation
+        // requirement has a valid credential and nothing on file, and the
+        // runtime gate now refuses it. If the only way to confirm were to save a
+        // NEW key, the refusal would be asking them to re-paste a credential
+        // they already have — so a body carrying only the confirmation records
+        // it against the stored key.
+        const seeded = await save({ GEMINI_API_KEY: KEY, aiKeyAttestation: FULL_ATTESTATION });
+        expect(seeded.status).toBe(200);
+        // Wipe the record to reproduce a key stored before the rule existed.
+        await testDb.update(schema.tenantConfigs).set({
+            aiKeyAttestationProvider: null, aiKeyAttestationMode: null,
+            aiKeyAttestationAccountOwner: null, aiKeyAttestationTermsVersion: null,
+            aiKeyAttestationAttestedAt: null, aiKeyAttestationPolicyVersion: null,
+        }).where(eq(schema.tenantConfigs.tenantId, TENANT));
+        expect(await config()).toMatchObject({ aiKeyAttestationTermsVersion: null });
+        probe.mockClear(); // the seeding save verified the key; measure only what follows
+
+        const res = await save({ aiKeyAttestation: FULL_ATTESTATION });
+
+        expect(res.status).toBe(200);
+        const row = await config();
+        expect(row?.aiKeyAttestationProvider).toBe('gemini');
+        expect(row?.aiKeyAttestationTermsVersion).toBe(AI_PROVIDER_TERMS_VERSION);
+        expect(row?.aiKeyAttestationAttestedAt).toBeInstanceOf(Date);
+        // The stored credential is untouched — this path confirms, it does not
+        // re-key, and it must not have needed the plaintext to do so.
+        expect((await storedSecrets()).GEMINI_API_KEY).toBe(KEY);
+        // And no provider round trip: there is no new key to verify.
+        expect(probe).not.toHaveBeenCalled();
+    });
+
+    it('confirms nothing when there is no key to confirm', async () => {
+        const res = await save({ aiKeyAttestation: FULL_ATTESTATION });
+        expect(res.status).toBe(200);
+        expect((await config())?.aiKeyAttestationProvider ?? null).toBeNull();
+    });
+
     it('re-stamps the record when a different key is saved', async () => {
         await save({ GEMINI_API_KEY: KEY, aiKeyAttestation: FULL_ATTESTATION });
         const first = (await config())?.aiKeyAttestationAttestedAt;
@@ -205,5 +245,51 @@ describe('BYO AI key attestation — POST/PUT /api/admin/secrets', () => {
         expect((await storedSecrets()).GEMINI_API_KEY).toBe('AIzaSyADifferentKeyEntirely');
         expect(row!.aiKeyAttestationAttestedAt!.getTime()).toBeGreaterThan(first!.getTime());
         vi.useRealTimers();
+    });
+});
+
+/**
+ * The read side. `isAiKeyAttestationOnFile` is what the runtime gate consults on
+ * every AI call, so "a record exists" has to mean all six columns and not the
+ * first one somebody thought to check.
+ */
+describe('isAiKeyAttestationOnFile', () => {
+    const COMPLETE: StoredAiKeyAttestation = {
+        provider: 'gemini',
+        mode: 'tenant_key',
+        accountOwner: 'tenant',
+        termsVersion: AI_PROVIDER_TERMS_VERSION,
+        attestedAt: new Date(),
+        policyVersion: AI_KEY_ATTESTATION_POLICY_VERSION,
+    };
+
+    it('accepts a complete record', () => {
+        expect(isAiKeyAttestationOnFile(COMPLETE)).toBe(true);
+    });
+
+    it('rejects a record missing ANY single column', () => {
+        // Every column, not a sample. A gate that reads five of six reports
+        // green about a field it never looked at.
+        for (const column of Object.keys(COMPLETE) as Array<keyof StoredAiKeyAttestation>) {
+            expect(isAiKeyAttestationOnFile({ ...COMPLETE, [column]: null }), column).toBe(false);
+        }
+    });
+
+    it('rejects the never-confirmed row and the absent row alike', () => {
+        // A workspace with no config row and one whose columns are all NULL are
+        // the same answer: nothing has been confirmed.
+        expect(isAiKeyAttestationOnFile(null)).toBe(false);
+        expect(isAiKeyAttestationOnFile(undefined)).toBe(false);
+        expect(isAiKeyAttestationOnFile({
+            provider: null, mode: null, accountOwner: null,
+            termsVersion: null, attestedAt: null, policyVersion: null,
+        })).toBe(false);
+    });
+
+    it('does not invalidate a record stamped against an older terms revision', () => {
+        // Deliberate: bumping AI_PROVIDER_TERMS_VERSION must be a decision to
+        // run a re-confirmation pass, not an instant outage caused by editing a
+        // constant. The stale revision stays readable in the row.
+        expect(isAiKeyAttestationOnFile({ ...COMPLETE, termsVersion: '2019-01' })).toBe(true);
     });
 });
