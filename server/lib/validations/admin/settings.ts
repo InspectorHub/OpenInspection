@@ -47,7 +47,8 @@ export const UpdateBrandingSchema = z.object({
     billingUrl: z.string().url('Invalid URL').or(z.literal('')).optional().openapi({ example: 'https://example.com/billing' }).describe('TODO describe billingUrl field for the OpenInspection MCP integration'),
     defaultProfileId: z.string().optional().openapi({ example: 'signature' }).describe('Default report appearance profile id (built-in: signature|meridian|terra)'),
     // Sprint 2 S2-4 — gate the per-defect "Estimated cost: $X – $Y" badge.
-    showEstimates: z.boolean().optional().openapi({ example: true }).describe('TODO describe showEstimates field for the OpenInspection MCP integration'),
+    // Currently a one-way switch; the refusal lives in BrandingService.updateBranding.
+    showEstimates: z.boolean().optional().openapi({ example: false }).describe('Per-defect "Estimated cost" badge on the published report. Cannot currently be enabled: sending true is rejected with 422 because embedded estimates are being redesigned as a separate deliverable rather than a section of the signed report. Sending false (turning the badge off) is always accepted.'),
     // Track E1 (ITB §11) — gate the "Repair List" tab on the published report.
     enableRepairList: z.boolean().optional().openapi({ example: true }).describe('TODO describe enableRepairList field for the OpenInspection MCP integration'),
     // Sprint 3 S3-2 — gate the customer-driven "Generate repair request"

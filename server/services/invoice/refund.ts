@@ -16,13 +16,24 @@
  *    CACHE of "some unvoided invoice on this inspection is paid", and a refund
  *    can falsify it. Skipping the re-sync leaves a report publicly readable
  *    with no backing payment, and no test that ignores `inspections` notices.
- *  - **Return the row.** `refundPartial` answers with the appended row rather
+ *  - **Return the row.** All three writers answer with the appended row rather
  *    than void, because an external book of record has to key its credit memo
  *    on the ROW id: `qbo_entity_map` is uniquely indexed on
  *    (tenant, type, oiId) and can hold exactly one credit memo per invoice
  *    forever, so keying on the invoice makes a second refund throw INSIDE the
  *    push — the memo lands in QuickBooks and the map row is lost. Per-row
  *    identity is the only shape that survives a second refund.
+ *  - **Push from the SEAM, never from here.** This module is pure DB: no QBO
+ *    service, no `env`, no `executionCtx` — the same reason the payment push
+ *    does not live in `payment-ledger.service`. Firing a QuickBooks call from a
+ *    writer would mean injecting a callback into every caller AND awaiting an
+ *    outbound HTTP request inside the refund's own path, where a QuickBooks
+ *    outage could fail a refund the tenant already granted. The push belongs
+ *    where `executionCtx.waitUntil` exists, which is the route: today that is
+ *    `POST /api/inspections/{id}/cancel`, the single production entry to all of
+ *    this via `applyCancellationRefund`. A new writer therefore has to be given
+ *    a seam before it can move money, and that is the point — it is a visible
+ *    step, not a silently missing one.
  */
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
@@ -188,19 +199,30 @@ export async function refundHeldDeposit(
  * Signature unchanged from when this lived in `invoice-payments.service`
  * (`(db, id, tenantId)`, tenant SECOND) — both are strings and reordering them
  * during a move is how the two get swapped in silence.
+ *
+ * Returns the appended row, like its two siblings, and null when there was
+ * nothing to reverse. It returned void until the QuickBooks refund push landed,
+ * which is when "return the row" stopped being a style rule: NOT returning it
+ * is what forces the next person to key a credit memo on the invoice id, and
+ * that is a memo QuickBooks accepts and `qbo_entity_map` then refuses to
+ * record. This function has no production caller today, so it pushes NOTHING —
+ * a push wired to no seam is dead code. Whoever gives it one wires the push
+ * there, exactly as `POST /{id}/cancel` does, and this return value is what
+ * they key it on.
  */
 export async function markRefunded(
     db: DrizzleD1Database,
     id: string,
     tenantId: string,
-): Promise<void> {
+): Promise<AppendedPayment | null> {
     const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
     if (!existing) throw Errors.NotFound('Invoice not found');
 
     await seedLedgerFromInvoiceRecord(db, tenantId, id);
     const received = await getNetReceivedCents(db, tenantId, id);
+    let appended: AppendedPayment | null = null;
     if (received > 0) {
-        await recordPayment(db, tenantId, {
+        appended = await recordPayment(db, tenantId, {
             invoiceId: id,
             inspectionId: existing.inspectionId,
             kind: 'refund',
@@ -211,4 +233,5 @@ export async function markRefunded(
         await recomputeInvoicePaymentState(db, tenantId, id);
     }
     await syncInspectionPaymentGate(db, tenantId, existing.inspectionId);
+    return appended;
 }

@@ -7,7 +7,13 @@ export const repairRequests = sqliteTable('repair_requests', {
   tenantId: text('tenant_id').notNull(),
   inspectionId: text('inspection_id').notNull(),
   createdByKind: text('created_by_kind', { enum: ['client', 'agent', 'inspector'] }).notNull(),
-  createdByRef: text('created_by_ref').notNull(), // recipient id (client token) / userId (agent,inspector)
+  // WHO built this list, as resolved by `repair-access.ts`. NOT an opaque id:
+  // on the portal-token path (how a client always arrives, and most agents) it
+  // is the recipient's EMAIL ADDRESS. It is a userId only for the owner-preview
+  // inspector and for an agent on a logged-in agent-portal session, and the raw
+  // token string for the legacy KV agent link. Personal data in the common
+  // case, which is why it carries an erasure rule (erasure-manifest.ts).
+  createdByRef: text('created_by_ref').notNull(),
   customIntro: text('custom_intro'),
   shareToken: text('share_token').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),

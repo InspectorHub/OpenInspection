@@ -27,3 +27,24 @@
 export function qboPaymentKey(paymentRowId: string): string {
     return `pay-${paymentRowId}`;
 }
+
+/**
+ * The same rule for money going the other way: a CreditMemo push is keyed on
+ * the `refund`-kind ledger row, never on the invoice.
+ *
+ * This is not a second convention — it is `qboPaymentKey` with a different
+ * prefix, deliberately in the same file so the two cannot drift. The prefix
+ * exists because `requestid` is unique per COMPANY and these keys end up side
+ * by side in one namespace: distinct prefixes make a memo legible as a memo
+ * when someone is reading Intuit's request log to explain a figure.
+ *
+ * Keying on the invoice would be worse here than for a payment. `qbo_entity_map`
+ * is uniquely indexed on (tenant, oi_type, oi_id), so a memo stored under
+ * `oiId: invoiceId` allows exactly ONE credit memo per invoice forever: a second
+ * refund on the same invoice — a cancellation fee refunded, then the retained
+ * part released — creates the memo in QuickBooks and then throws on the map
+ * insert, leaving the memo live with nothing recording it.
+ */
+export function qboRefundKey(refundRowId: string): string {
+    return `refund-${refundRowId}`;
+}

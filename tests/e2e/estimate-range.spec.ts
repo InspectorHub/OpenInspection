@@ -4,8 +4,8 @@
  * Drives the JSON API directly (no browser) against the local dev worker
  * (http://127.0.0.1:8789) to confirm:
  *
- *   - PATCH /api/admin/branding accepts the new `showEstimates` boolean
- *     field; subsequent GET reflects the persisted value.
+ *   - POST /api/admin/branding refuses to turn `showEstimates` on and still
+ *     accepts turning it off.
  *   - The recommendation enum is exposed (sanity check shared with S2-3).
  *
  * The inspection-results JSON sanitizer (sanitizeDefectStates) is covered
@@ -50,14 +50,19 @@ test.describe.serial('Sprint 2 S2-4 — Repair estimate range', () => {
         adminToken = await loginApi(request, ADMIN_EMAIL, ADMIN_PASSWORD);
     });
 
-    test('E-01: POST /api/admin/branding persists showEstimates=true', async ({ request }) => {
+    test('E-01: POST /api/admin/branding REFUSES showEstimates=true', async ({ request }) => {
+        // Inverted deliberately. This test used to assert 200 and persistence,
+        // from when the field was writable. Estimates are being redesigned as a
+        // separate deliverable rather than a section of the signed report, so
+        // the service now refuses to turn the in-report form on. Turning it off
+        // stays permitted — see E-03, which is the control that keeps this
+        // assertion honest: without it, a route that rejected EVERY branding
+        // write would satisfy E-01 just as well.
         const res = await request.post(`${BASE_URL}/api/admin/branding`, {
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
             data: { showEstimates: true },
         });
-        expect(res.status(), await res.text()).toBe(200);
-        const body = await res.json();
-        expect(body.success).toBe(true);
+        expect(res.status(), await res.text()).toBe(422);
     });
 
     test('E-02: subsequent GET /api/admin/branding round-trips showEstimates', async ({ request }) => {
@@ -66,10 +71,10 @@ test.describe.serial('Sprint 2 S2-4 — Repair estimate range', () => {
         });
         expect(res.status()).toBe(200);
         const body = await res.json();
-        // The branding response intentionally omits showEstimates from its
-        // typed shape (it only powers the report renderer); we verify
-        // persistence indirectly by toggling it back off + asserting the
-        // next round-trip is a clean 200.
+        // The typed branding response omits showEstimates; the raw column does
+        // travel in the payload, and that is deliberate — the setting must stay
+        // readable so it can be audited and turned off. What must not happen is
+        // a successful write of `true`, which E-01 covers.
         expect(body.success).toBe(true);
     });
 

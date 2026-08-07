@@ -45,6 +45,7 @@ import {
     ANONYMIZE_SIGNER_PII,
     ANONYMIZE_REQUEST_PII,
 } from './anonymize-pii';
+import { changeCount, toMs, subtractYearsMs } from './db-row-utils';
 
 // Accept either the D1 drizzle type (prod) or the better-sqlite3 test db.
 type AnyDb = DrizzleD1Database<Record<string, unknown>> | { [k: string]: unknown };
@@ -56,28 +57,6 @@ export interface RetentionSweepSummary {
     purgedEnvelopes: number;
     /** Number of signer rows whose signatures were destroyed this run. */
     purgedSigners: number;
-}
-
-/** Driver-tolerant row-count extraction (D1: meta.changes; better-sqlite3: changes). */
-function changeCount(res: unknown): number {
-    const r = res as { meta?: { changes?: number }; changes?: number } | undefined;
-    return r?.meta?.changes ?? r?.changes ?? 0;
-}
-
-/** Subtract whole years from a Unix-MS timestamp, returning a Unix-MS integer. */
-function subtractYearsMs(ms: number, years: number): number {
-    const d = new Date(ms);
-    d.setUTCFullYear(d.getUTCFullYear() - years);
-    return d.getTime();
-}
-
-/** Coerce a timestamp column value (Date | number | null) to Unix-MS or null. */
-function toMs(v: unknown): number | null {
-    if (v == null) return null;
-    if (v instanceof Date) return v.getTime();
-    if (typeof v === 'number') return v;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
 }
 
 /**

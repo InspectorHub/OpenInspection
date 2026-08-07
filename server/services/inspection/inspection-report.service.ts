@@ -512,9 +512,11 @@ export class InspectionReportService extends InspectionSubService {
             inspectorLicense = primaryLicenseOf(credentialSnapshot);
         }
 
-        // Sprint 2 S2-4 — per-tenant flag controls whether the published
-        // report renders "Estimated cost: $X – $Y" badges on defect cards.
-        let showEstimates = false;
+        // OFF for every tenant, unconditionally: costs are being rebuilt as a
+        // standalone deliverable rather than a section of the signed report, so
+        // NOTHING assigns this from tenantConfigs.showEstimates — that column
+        // survives for audit and for turning off, never for rendering.
+        const showEstimates = false;
         // Report Style Presets — tenant's default appearance profile id (resolved below).
         let tenantDefaultProfileId: string | null = null;
         // Per-tenant report-feature flags surfaced to the published report so the
@@ -532,7 +534,6 @@ export class InspectionReportService extends InspectionSubService {
         let reportTimeZone = 'UTC';
         try {
             const cfg = await db.select({
-                showEstimates: tenantConfigs.showEstimates,
                 defaultProfileId: tenantConfigs.defaultProfileId,
                 enableRepairList: tenantConfigs.enableRepairList,
                 enableCustomerRepairExport: tenantConfigs.enableCustomerRepairExport,
@@ -545,7 +546,6 @@ export class InspectionReportService extends InspectionSubService {
                 .where(eq(tenantConfigs.tenantId, tenantId))
                 .get();
             if (cfg) {
-                showEstimates = Boolean(cfg.showEstimates);
                 enableRepairList = Boolean(cfg.enableRepairList);
                 enableCustomerRepairExport = Boolean(cfg.enableCustomerRepairExport);
                 reserveScheduleEnabled = Boolean(cfg.reserveScheduleEnabled);

@@ -2,10 +2,12 @@
 
 `scripts/check-erasure-manifest.mjs` is a CI gate. It walks every Drizzle
 schema file, matches column names against a regex, and fails if a matching
-column has neither a rule in `ERASURE_MANIFEST` nor a reasoned entry in
-`ERASURE_OUT_OF_SCOPE`.
+column has neither a rule in `ERASURE_MANIFEST` (`erasure-manifest.ts`) nor a
+reasoned entry in `ERASURE_OUT_OF_SCOPE` (`erasure-out-of-scope.ts`, split out
+when the manifest hit its line cap). The gate concatenates both sources before
+parsing either, so the split cannot halve what it sees.
 
-It is green today: `31 rules, 48 out-of-scope declarations`, exit 0.
+It is green today: `44 rules, 57 out-of-scope declarations`, exit 0.
 
 This document exists because that sentence is easy to read as "erasure covers
 the schema", and it does not mean that. It means no column *whose name the
@@ -20,12 +22,11 @@ not the reason for the next one.
 ## The mechanism, exactly
 
 ```js
-// scripts/check-erasure-manifest.mjs:52
-const PII_HEURISTIC = /(email|phone|ip_address|user_agent|signature|client_name|full_name|recipient)/;
+const PII_HEURISTIC = /(email|phone|ip_address|user_agent|signature|client_name|full_name|recipient|address)/;
 const isPiiColumn = (col) => PII_HEURISTIC.test(col) || col === "ip";
 ```
 
-Eight substrings and one exact match. That is the entire model of "this column
+Nine substrings and one exact match. That is the entire model of "this column
 might hold personal data".
 
 The gate is honest about what it does — it never claims to find PII, only to
@@ -34,53 +35,99 @@ does and what a green run gets read as.
 
 ---
 
-## The worked example: `inspections.property_address`
+## The worked example: `inspections.property_address` — closed
 
-`address` is not in the regex.
+**This example is now resolved.** It is kept because how it hid is the general
+lesson, and because the shape of the fix is the behaviour to copy.
 
-Follow that one omission:
+`address` was not in the regex. Follow that one omission as it stood:
 
 - `inspections.property_address` is `text('property_address').notNull()`
-  (`server/lib/db/schema/inspection/core.ts:13`), with nine geocoded siblings
-  beneath it (`:15`-`:24`: place id, street, city, state, zip, county, lat,
-  lng, geocoded-at). For a residential inspection ordered by the buyer or the
+  (`server/lib/db/schema/inspection/core.ts`), with nine geocoded siblings
+  beneath it (place id, street, city, state, zip, county, lat, lng,
+  geocoded-at). For a residential inspection ordered by the buyer or the
   homeowner, that is a person's home address, held against a named client
   through `inspection_people`.
-- The gate never asks about it, because the name does not match.
-- `inspections` therefore has **zero** entries in the manifest: no column rule
-  (`grep "table: 'inspections'"` in `server/lib/compliance/` returns nothing),
-  no out-of-scope entry, and no row rule.
-- `runErasure` has fourteen hand-written per-table steps
-  (`server/lib/compliance/erasure-orchestrator.ts:232`, `:250`, `:270`,
-  `:276`, `:310`, `:324`, `:336`, `:345`, `:354`, `:372`, `:392`, `:417`,
-  `:433`, `:445`). None of them is `inspections`.
-- Two tables away, `reports.title` **is** declared — `category: 'user.address'`,
-  `action: 'anonymize'`, `legalBasis: 'art_17_3_e'`, `retention: 'P6Y'`
-  (`erasure-manifest.ts:168`) — and executed, overwritten with
-  `'Inspection Report (details removed)'` (`erasure-orchestrator.ts:68`,
-  step at `:372`).
+- The gate never asked about it, because the name did not match.
+- `inspections` therefore had **zero** entries in the manifest: no column rule,
+  no out-of-scope entry, no row rule.
+- Two tables away, `reports.title` **was** declared — `category: 'user.address'`,
+  `action: 'anonymize'`, `legalBasis: 'art_17_3_e'`, `retention: 'P6Y'` — and
+  executed, overwritten with `'Inspection Report (details removed)'`.
 
-So a consumer erasure today clears the report title and leaves the address.
+So a consumer erasure cleared the report title and left the address, and
+nothing anywhere said so.
 
-### The failure mode is not an under-report
+### The failure mode was not an under-report
 
 If the gate merely missed a column, the cost would be a smaller number in a
-coverage report. The actual cost is different and worse.
+coverage report. The actual cost was different and worse.
 
-`runErasure` sets `status: 'completed'` whenever no step threw
-(`erasure-orchestrator.ts:453`) and writes that status into the append-only
-`erasure_log` row (`:461`). Nothing in that path can know about a table it was
-never told to visit, so the absence of `inspections` produces no warning, no
-partial status, and no decision entry. The only caller
-(`server/services/admin.service.ts:227`) spreads that summary straight through
-to whatever operator surface invoked it, so a DSAR console records a completed
-erasure over a record that still holds the subject's home address — and the
-accountability log now says so in writing.
+`runErasure` sets `status: 'completed'` whenever no step threw, and writes that
+status into the append-only `erasure_log` row. Nothing in that path can know
+about a table it was never told to visit, so the absence of `inspections`
+produced no warning, no partial status, and no decision entry. The only caller
+(`server/services/admin.service.ts`) spreads that summary straight through to
+whatever operator surface invoked it, so a DSAR console recorded a completed
+erasure over a record that still held the subject's home address — and the
+accountability log said so in writing.
 
 A silent gap and a gap recorded as "completed" are not the same defect. The
 second one manufactures evidence that the first one was handled.
 
-### One correction while we are here
+### How it was closed
+
+The address family now carries `action: 'retain'` rules with
+`legalBasis: 'art_17_3_e'` and a `retention: 'P6Y'` hint — one entry per column,
+in `ERASURE_MANIFEST`. Declaring the family out of scope as "property data" was
+the other option and was rejected: it was the cheapest way back to green, and a
+red gate would have pushed a hurried reader straight at it.
+
+Two things about that fix are easy to misread, so both are stated at the rules
+themselves:
+
+1. **The window is not a new number.** It is the tenant's existing
+   `tenant_configs.agreement_retention_years` (default 6). A second per-tenant
+   retention column would be two clocks answering the same question and drifting.
+2. **Nothing enforces the window yet.** `retention-sweep.ts` reaches
+   `agreement_requests` and `agreement_signers` only. Until it learns about
+   `inspections`, a `retain` rule here is a recorded decision that no code acts
+   on — and a retain nothing ever expires is the rejected exclusion under a
+   different name.
+
+   Three mechanisms hold that open rather than letting it settle:
+
+   - Every one of those rules carries `enforcementStatus: 'pending'`, so the
+     manifest — and anything rendering from it — states that the *decision* is
+     recorded while the *expiry* is not built. A `retain` that reads as
+     implemented is the failure mode.
+   - Every one carries `enforcementDeadline: '2027-02-01'`, and **the gate fails
+     once that date passes.** A deadline that cannot act is how "pending"
+     becomes permanent. The date is two quarters, set by review discipline: the
+     sweep needs a purge marker on `inspections` (the agreement pass keys on
+     `signedAt` + `purged_at IS NULL`; there is no equivalent here) and a
+     decision about which column starts an inspection's clock — a schema change
+     and a migration, not a patch. It is deliberately *not* derived from when
+     the first address falls due, which is not computable until that clock
+     column exists.
+   - `PENDING_ENFORCEMENT` in the gate is a checked-in list of the rules allowed
+     to be pending. A new one fails; so does a stale entry whose rule is gone.
+     For a bounded `retain`, the default is refusal — a rule that declares a
+     `retention` and no `enforcementStatus` fails, so "unenforced" cannot be the
+     thing that happens when nobody says anything.
+
+   A tripwire in `tests/unit/privacy/erasure-manifest-coverage.spec.ts` also
+   fails the day the sweep gains an `inspections` reference, so the "not yet
+   enforced" notice cannot quietly become false in the other direction either.
+
+One more thing worth knowing before reading a retain rule as an audit artefact:
+a `retain` produces **no per-run entry** in `erasure_log`. The orchestrator's
+`step()` records actions it executed, and a retain executes nothing; that is
+true of all six retain rules that predate this one. The manifest, with its
+stated basis and period, is the record of the decision. The run log is the
+record of the writes.
+
+### One correction carried over from when this was open
 
 The manifest's own comment above the `reports.title` rule
 (`erasure-manifest.ts:162`-`:167`) says `title` is "the one free-text column a
@@ -120,9 +167,15 @@ them was prompted by the gate.
 
 ### 2. Addresses, and location generally
 
-Covered above. `street`, `city`, `zip`, `lat`, `lng`, `place_id` — none match.
+`address` is in the pattern now, so `property_address`, `address_street`,
+`address_city` and their siblings are reached. `street`, `city`, `zip`, `lat`,
+`lng`, `place_id` as bare names still are not — `company_lat` and
+`service_origin_lat` are declared because somebody wrote them down, not because
+anything asked.
 
-**Compensator: none.** See "Open and unowned" below.
+**Compensator: partial.** The pattern catches the `address_`-prefixed family
+this codebase happens to use. A coordinate or locality column named without
+that prefix is invisible again.
 
 ### 3. Sensitivity that is contextual rather than lexical
 
@@ -153,9 +206,8 @@ person, or that a column is a locator rather than content.
 **Compensator:** the manifest's row-delete convention — `action: 'delete'`
 with the `column` naming the locator, documented at `erasure-manifest.ts:47`-`:54`
 — plus explicit out-of-scope entries for columns that ride along, e.g.
-`contacts.phone`, "rides with the contacts row delete (locator = email)"
-(`:207`). This one works, because the convention is written down where the
-rules are.
+`contacts.phone`, "rides with the contacts row delete (locator = email)". This
+one works, because the convention is written down where the rules are.
 
 ### 6. A rule that exists but never runs
 
@@ -167,6 +219,19 @@ against the executor.
 **Compensator:** `tests/unit/privacy/erasure-manifest-coverage.spec.ts`, a
 drift guard that fails when a rule has no orchestrator wiring. This is the one
 blind spot with a real mechanical answer.
+
+It scans more than the orchestrator file — `anonymize-pii.ts` holds the shared
+column SETs, and `erase-repair-requests.ts` is a step the orchestrator
+delegates because it had run out of line budget. Widening what a guard reads is
+how a guard gets weaker, so a companion assertion checks that the orchestrator
+still *calls* the delegated step. Without it, a rule whose executor had been
+unhooked would satisfy the scan while running nothing — the same failure this
+section is about, with the drift guard helping it hide.
+
+Note also what the guard does **not** cover: `retain` rules. They are exempt by
+construction, because a retain executes nothing there is anything to bind to.
+Whether a retain is honoured is a question about the retention sweep, not the
+orchestrator, and today the sweep only reaches the agreement tables.
 
 ### 7. False positives
 
@@ -181,8 +246,8 @@ that cost in written reasons is the intended trade.
 
 ## The behaviour to copy
 
-`users.service_origin_address` is declared out of scope
-(`erasure-manifest.ts:221`) with the reason "staff routing origin (may be a
+`users.service_origin_address` is declared out of scope in
+`ERASURE_OUT_OF_SCOPE` with the reason "staff routing origin (may be a
 home address) — staff offboarding lifecycle, not consumer-DSAR scope", and the
 comment above it says explicitly that it is "declared here so the decision is
 recorded rather than inferred from the PII heuristic not matching
@@ -194,10 +259,13 @@ home address, so it is personal data — it is simply not a *consumer* data
 subject's, which is a decision, not an oversight.
 
 Several other entries do the same thing and say so in the same words — the
-`reports` column sweep (`:252`-`:262`), the payment ledger (`:273`-`:278`),
-`tenant_legal_versions` (`:279`-`:280`), the pay-split rows (`:286`-`:291`),
-and `parked_cmd_events` (`:295`-`:298`), which notes that "silence here is
-exactly how this one hid: `envelope` and `reason` look like nothing".
+`reports` column sweep, the `order_payments` ledger, `tenant_legal_versions`,
+the `inspection_service_pay_splits` rows, the `repair_request_items` report
+snapshots, and `parked_cmd_events`, which notes that "silence here is exactly
+how this one hid: `envelope` and `reason` look like nothing".
+
+(Line numbers are deliberately absent here. The earlier drafts of this page
+carried them and every one went stale the first time a rule was added above.)
 
 **That is the discipline the heuristic cannot produce.** Ruling on a column
 the gate did not flag is the only thing that closes the categories above, and
@@ -209,47 +277,68 @@ the entry for each one.
 
 ---
 
-## Open and unowned
+## The order the address family was closed in, and why it matters
 
-The address gap described above is **not fixed, and nobody owns it.** This
-document makes it legible; it does not close it.
+Widening the regex is not a neutral first step, and doing it last is the part
+worth copying.
 
-Two reasons it is left open deliberately rather than patched here:
+Adding `address` to `PII_HEURISTIC` turns the gate red on **twelve** columns
+(measured 2026-08-07, before the ruling existed):
 
-1. **It is a compliance decision, not an engineering one.** Mirroring the
-   `reports.title` treatment — anonymise with an Art. 17(3)(e) basis and a
-   bounded retention period — is the obvious call, and it changes what erasure
-   does to production data on every future request. A property address may be
-   personal data of the client where it is linked to the client relationship,
-   and it may also be the thing a professional record has to keep in order to
-   identify which property a report describes. Which of those wins, and for
-   how long, is a question for a human with authority to answer it.
+```
+inspections.property_address        inspections.address_county
+inspections.address_place_id        inspections.address_lat
+inspections.address_street          inspections.address_lng
+inspections.address_city            inspections.address_geocoded_at
+inspections.address_state           inspection_requests.property_address
+inspections.address_zip             tenant_configs.company_address
+```
 
-2. **Widening the regex is not a neutral first step.** Adding `address` to
-   `PII_HEURISTIC` today turns the gate red on **twelve** columns, measured
-   2026-08-07:
+A red gate on twelve columns invites the cheapest way back to green, which is
+twelve out-of-scope entries. An out-of-scope entry without a real reason is
+worse than a missing rule: it converts an open question into a recorded
+decision nobody will revisit. So the ruling came first and the widening came
+second, in the same commit as the twelve declarations — a widening that lands
+without them turns the gate red for everyone else in flight.
 
-   ```
-   inspections.property_address        inspections.address_county
-   inspections.address_place_id        inspections.address_lat
-   inspections.address_street          inspections.address_lng
-   inspections.address_city            inspections.address_geocoded_at
-   inspections.address_state           inspection_requests.property_address
-   inspections.address_zip             tenant_configs.company_address
-   ```
+Not all twelve were the same question, and they did not get the same answer:
 
-   A red gate on twelve columns invites the cheapest way back to green, which
-   is twelve out-of-scope entries. An out-of-scope entry without a real reason
-   is worse than a missing rule: it converts an open question into a recorded
-   decision nobody will revisit. Widening the pattern is the *last* step, once
-   the ruling exists — not the first.
+- **Ten are retained** — the nine `inspections` address columns and
+  `inspection_requests.property_address`. On a residential inspection this is
+  where a person lives, and the booking request the inspection converted from
+  has already had its name, email and phone cleared in place, which left the
+  address as the last part of that record standing. Same question, same answer.
+- **`tenant_configs.company_address` is out of scope.** It is a business's own
+  published location — the controller's identity, not a data subject's — so it
+  follows the `company_lat` / `company_lng` entries beside it, not the
+  `inspections` rules. It looks identical to a name-matching gate and is not the
+  same question, which is the whole reason a gate cannot make this call.
+- **`inspections.address_geocoded_at` is out of scope.** It records when the
+  geocode ran, not where the property is.
 
-Not all twelve are the same question. `tenant_configs.company_address` is the
-controller's own business address and mirrors the `company_lat`/`company_lng`
-entries already at `erasure-manifest.ts:233`-`:234`.
-`inspection_requests.property_address` sits on a table whose identity columns
-already carry rules (`:135`-`:137`), so it is the odd one out on a table that
-was otherwise ruled on. The `inspections` family is the substantive one.
+Read the gate's green output as it is written: *no column whose name suggests
+PII is unruled*. Not *no PII is unruled*.
 
-Until that decision is made, read the gate's green output as it is written:
-*no column whose name suggests PII is unruled*. Not *no PII is unruled*.
+## Still open
+
+The retention **window is declared but not enforced**, deadline **2027-02-01** —
+see "How it was closed" above. Nothing expires an inspection address today. That
+is the live gap; it is marked on every affected rule, dated, held by a
+checked-in list, and the gate turns red if the date passes without the sweep.
+
+The blockers are a purge marker on `inspections` and a decision about which
+column starts its retention clock. Both are schema work.
+
+## What this file's prose is worth
+
+On 2026-08-07 two justifications in the manifest were checked against the code
+and found false — `reports.title` ("the one free-text column a human writes";
+it is machine-written) and `repair_requests.created_by_ref` (documented as an
+opaque id; it stores an email address, and a compliance classification was
+resting on that). Both rules had survived review because the reasoning read
+well.
+
+The general form is worth more than either instance: **the manifest may be
+assumption-driven rather than data-driven.** A rule can be correct and still
+unprovable, because nobody checked the premise its comment asserts. Before
+relying on a paragraph in that file, read what writes the column.

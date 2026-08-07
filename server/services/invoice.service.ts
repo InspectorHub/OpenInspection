@@ -202,8 +202,13 @@ export class InvoiceService {
         return ledger.markPartial(this.getDrizzle(), id, tenantId, source, amountPaidCents);
     }
 
-    /** @see refunds.markRefunded — reverses everything received. */
-    async markRefunded(id: string, tenantId: string): Promise<void> {
+    /**
+     * @see refunds.markRefunded — reverses everything received. Returns the
+     * appended row (null when there was nothing to reverse) so whoever gives
+     * this its first production caller can key a QuickBooks credit memo on the
+     * ROW; it has none today and pushes nothing.
+     */
+    async markRefunded(id: string, tenantId: string): Promise<AppendedPayment | null> {
         return refunds.markRefunded(this.getDrizzle(), id, tenantId);
     }
 
