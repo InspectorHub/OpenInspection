@@ -92,31 +92,31 @@ export type Constructor<T = object> = new (...args: any[]) => T;
 
 export class QBOServiceBase {
     constructor(
-        protected db: D1Database,
-        protected clientId: string,
-        protected clientSecret: string,
-        protected webhookSecret: string,
-        protected jwtSecret: string,
+        public db: D1Database,
+        public clientId: string,
+        public clientSecret: string,
+        public webhookSecret: string,
+        public jwtSecret: string,
         /**
          * `QBO_ENV` verbatim, resolved lazily rather than in the constructor:
          * the service is built for every request that touches an invoice, and
          * a deployment with no QuickBooks connection at all should not fail on
          * construction for a setting it never uses.
          */
-        protected qboEnv?: string,
+        public qboEnv?: string,
     ) {}
 
     /** Throws when `QBO_ENV` is unset or unknown — no host is guessed. */
-    protected get apiBase(): string { return resolveQboApiBase(this.qboEnv); }
+    public get apiBase(): string { return resolveQboApiBase(this.qboEnv); }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    protected getDrizzle() { return drizzle(this.db as any); }
+    public getDrizzle() { return drizzle(this.db as any); }
 
-    protected buildBasicAuth(): string {
+    public buildBasicAuth(): string {
         return 'Basic ' + btoa(`${this.clientId}:${this.clientSecret}`);
     }
 
-    protected async getToken(tenantId: string): Promise<QBOToken> {
+    public async getToken(tenantId: string): Promise<QBOToken> {
         const db = this.getDrizzle();
         const row = await db.select().from(qboConnections)
             .where(eq(qboConnections.tenantId, tenantId)).get();
@@ -129,7 +129,7 @@ export class QBOServiceBase {
         return { accessToken, realmId: row.realmId, tenantId };
     }
 
-    protected async refreshToken(tenantId: string): Promise<QBOToken> {
+    public async refreshToken(tenantId: string): Promise<QBOToken> {
         const db = this.getDrizzle();
         const row = await db.select().from(qboConnections)
             .where(eq(qboConnections.tenantId, tenantId)).get();
@@ -188,7 +188,7 @@ export class QBOServiceBase {
         return { accessToken: data.access_token, realmId: row.realmId, tenantId };
     }
 
-    protected async apiCall<T>(
+    public async apiCall<T>(
         tenantId: string,
         method: 'GET' | 'POST' | 'PUT',
         path: string,
@@ -231,11 +231,11 @@ export class QBOServiceBase {
         throw lastError ?? new Error('QBO API call failed after retries');
     }
 
-    protected async qboQuery<T>(tenantId: string, query: string): Promise<T> {
+    public async qboQuery<T>(tenantId: string, query: string): Promise<T> {
         return this.apiCall<T>(tenantId, 'GET', `query?query=${encodeURIComponent(query)}`);
     }
 
-    protected async logSyncError(tenantId: string, oiType: string, oiId: string, error: unknown): Promise<void> {
+    public async logSyncError(tenantId: string, oiType: string, oiId: string, error: unknown): Promise<void> {
         const msg = error instanceof Error ? error.message : String(error);
         await this.upsertSyncFlag(tenantId, oiType, oiId, 'SYNC_ERROR', msg);
     }
@@ -246,7 +246,7 @@ export class QBOServiceBase {
      * performed, and a human reconciles money. Re-detecting the same
      * disagreement refreshes the figures instead of stacking rows.
      */
-    protected async recordPaymentDiscrepancy(
+    public async recordPaymentDiscrepancy(
         tenantId: string, invoiceId: string, ledgerCents: number, qboCents: number,
     ): Promise<void> {
         await this.upsertSyncFlag(
@@ -256,7 +256,7 @@ export class QBOServiceBase {
     }
 
     /** The two sides agree again — whoever reconciled it does not have to also tick it off. */
-    protected async clearPaymentDiscrepancy(tenantId: string, invoiceId: string): Promise<void> {
+    public async clearPaymentDiscrepancy(tenantId: string, invoiceId: string): Promise<void> {
         const db = this.getDrizzle();
         await db.update(qboSyncErrors).set({ resolved: true, updatedAt: new Date() })
             .where(and(
@@ -274,7 +274,7 @@ export class QBOServiceBase {
      * different things to look at, and collapsing them would overwrite one
      * with the other.
      */
-    private async upsertSyncFlag(
+    public async upsertSyncFlag(
         tenantId: string, oiType: string, oiId: string, errorCode: string, errorMsg: string,
     ): Promise<void> {
         const db = this.getDrizzle();

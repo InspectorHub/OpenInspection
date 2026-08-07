@@ -47,6 +47,21 @@ import type {
 } from '../../lib/collab/results-doc.types';
 
 /**
+ * Spec 5B — v2 template-schema comment shapes. Moved here from inside
+ * `getReportData` (shapes unchanged).
+ *
+ * @declarationEmit Exported so the emitted `.d.ts` can NAME them: they surface
+ * in that method's inferred return type, and a composite project cannot
+ * reference a function-local interface (TS4053/TS4055). No module imports them
+ * by name — hence the tag for knip.
+ */
+export interface CannedInfoComment { id: string; title: string; comment: string; default: boolean }
+/** @declarationEmit see CannedInfoComment. */
+export interface CannedDefect      { id: string; title: string; category: string; location: string; comment: string; photos: string[]; default: boolean }
+/** @declarationEmit see CannedInfoComment. */
+export interface ItemTabs          { information: CannedInfoComment[]; limitations: CannedInfoComment[]; defects: CannedDefect[] }
+
+/**
  * Authoring unification Plan-4 module K — pure decision of whether a defect's
  * category counts toward the report Summary rollup. Resolves `category`
  * (a `defect_categories.id` OR a legacy seed name, e.g. seed template JSON
@@ -152,9 +167,10 @@ export class InspectionReportService extends InspectionSubService {
 
         // Spec 5B — v2 schema is the authoritative shape. Items are 'rich'
         // (rating + 3 tabs of canned comments) or 'text' (free-text notes).
-        interface CannedInfoComment { id: string; title: string; comment: string; default: boolean }
-        interface CannedDefect      { id: string; title: string; category: string; location: string; comment: string; photos: string[]; default: boolean }
-        interface ItemTabs          { information: CannedInfoComment[]; limitations: CannedInfoComment[]; defects: CannedDefect[] }
+        // CannedInfoComment / CannedDefect / ItemTabs are declared at module
+        // scope (top of this file) — they surface in getReportData's inferred
+        // return type, which a declaration-emitting project cannot name from a
+        // function-local declaration (TS4053/TS4055).
         interface SchemaItem        { id: string; label: string; icon?: string; type?: string; ratingOptions?: string[]; tabs?: ItemTabs; number?: string }
         // Track E2 (Spectora App.A) — per-section disclaimer + force-page-break
         // are stored on the schema's section node so the editor can author

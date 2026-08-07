@@ -1,11 +1,27 @@
 {
+  // The server/API program. Also the DECLARATION PRODUCER for the app program:
+  // it is a composite project (`tsc -b`) that emits `.d.ts` into `.types/`, and
+  // tsconfig.json references it. That reference is why `type-check:app` is
+  // affordable — see the note at the top of tsconfig.json.
+  //
+  // Emitting is close to free: it rides on the check this program was already
+  // doing, and adds ~0.2% type instantiations.
+  //
+  // `.types/` is BUILD OUTPUT and is gitignored. Do not commit it. A stale
+  // committed `.d.ts` produces errors that make no sense at the boundary
+  // (observed: a TS2352 with no matching source); `tsc -b` rebuilding from
+  // input timestamps is what prevents that, and a committed artifact defeats it.
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "noEmit": true,
-    "sourceMap": true,
+    "composite": true,
+    "rootDir": ".",
+    "outDir": "./.types",
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -21,12 +37,27 @@
     "types": ["@types/node", "@cloudflare/vitest-pool-workers"],
     "skipLibCheck": true,
     "incremental": true,
-    "tsBuildInfoFile": "./.tsbuildinfo.api",
+    // Deliberately INSIDE outDir. The build-info and the .d.ts it describes
+    // must live or die together: with the build-info at the repo root, deleting
+    // just `.types/` left it claiming the project was up to date, `tsc -b`
+    // re-emitted only 73 of 803 files, and the app program failed with ~700
+    // TS6305 "output file has not been built from source file". Co-located, a
+    // deleted output dir is simply a cold project.
+    // (Backing this up before a cold run means `.types/.tsbuildinfo.api`.)
+    "tsBuildInfoFile": "./.types/.tsbuildinfo.api",
     "paths": {
       "@core/api-types": ["./packages/api-types/index.ts"],
       "~/*": ["./app/*"]
     }
   },
-  "include": ["server/**/*.ts", "server/**/*.tsx", "worker-configuration.d.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "server/**/*.ts",
+    "server/**/*.tsx",
+    // `resolveJsonModule` pulls these in as program inputs. A composite project
+    // must list every input explicitly, so leaving them out is 10 x TS6307.
+    "server/**/*.json",
+    "packages/api-types/**/*.ts",
+    "worker-configuration.d.ts"
+  ],
+  "exclude": ["node_modules", "dist", ".types"]
 }

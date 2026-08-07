@@ -70,8 +70,14 @@ import { eraseRepairRequests } from './erase-repair-requests';
  */
 const ANONYMIZED_TITLE = 'Inspection Report (details removed)';
 
-/** A single recorded erasure decision (serialized into `decisions_json`). */
-interface ErasureDecision {
+/**
+ * A single recorded erasure decision (serialized into `decisions_json`).
+ *
+ * @declarationEmit Exported so the emitted `.d.ts` can NAME it: it surfaces in
+ * an `AdminService` member's inferred return type, and a composite project
+ * cannot reference an unexported alias there (TS4053).
+ */
+export interface ErasureDecision {
     table: string;
     action: 'delete' | 'null' | 'anonymize';
     count: number;

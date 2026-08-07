@@ -47,10 +47,8 @@
     "**/*.d.ts"
   ],
   "tags": [
-    "-gateConsumed"
-  ],
-  "ignoreBinaries": [
-    "tsgo"
+    "-gateConsumed",
+    "-declarationEmit"
   ],
   "ignoreDependencies": [
     "@fontsource/.+",

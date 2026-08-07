@@ -23,9 +23,9 @@ interface SignerStateDeps {
  */
 export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBase & SignerStateDeps>>(Base: TBase) {
     return class EnvelopeLegacy extends Base {
-        protected declare db: D1Database;
-        protected declare secrets?: { jwtSecret: string; jwtSecretPrevious?: string };
-        protected declare getDrizzle: AgreementServiceBase['getDrizzle'];
+        public declare db: D1Database;
+        public declare secrets?: { jwtSecret: string; jwtSecretPrevious?: string };
+        public declare getDrizzle: AgreementServiceBase['getDrizzle'];
 
         /**
          * iter-2 production bug #9 — given an inspection id, return the most recent
@@ -234,7 +234,7 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
          * signed — so a partially-signed envelope keeps the policy it was sent
          * under and the new signer simply joins it.
          */
-        protected async mergeSignersIntoEnvelope(
+        public async mergeSignersIntoEnvelope(
             envelope: typeof agreementRequests.$inferSelect,
             signers: SignerInput[],
             completionPolicy?: 'all' | 'one',

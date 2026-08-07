@@ -13,7 +13,7 @@ import { withInvoiceSync } from './invoice-sync';
 
 export function withCdc<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends withInvoiceSync(Base) {
-        protected toIso8601(when: Date): string {
+        public toIso8601(when: Date): string {
             return when.toISOString();
         }
 

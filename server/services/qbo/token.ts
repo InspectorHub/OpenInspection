@@ -6,7 +6,7 @@ import { QBO_REVOKE_URL, type Constructor, type QBOServiceBase } from './api-bas
 
 export function withToken<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends Base {
-        protected async revokeToken(tenantId: string): Promise<void> {
+        public async revokeToken(tenantId: string): Promise<void> {
             try {
                 const db = this.getDrizzle();
                 const row = await db.select().from(qboConnections)

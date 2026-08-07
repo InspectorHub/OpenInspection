@@ -72,7 +72,11 @@ export default tseslint.config(
         // and they carry no product code. Ignoring them here preserves the
         // pre-move state: they lived under `tests/**` (also ignored below) and
         // were never linted.
-        ignores: ['dist/**', 'dist-check/**', 'build/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'app/paraglide/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'app/**/*.test.ts', 'app/**/*.test.tsx', 'packages/shared-ui/src/**/*.test.ts', 'packages/shared-ui/src/**/*.test.tsx', 'scripts/**'],
+        // `.types/**` is tsc project-reference output (the .d.ts tsconfig.api.json
+        // emits for the app program). Generated, gitignored, and in no lintable
+        // TS project — leaving it in produced 803 "file not found in any of the
+        // provided project(s)" parse errors.
+        ignores: ['dist/**', 'dist-check/**', 'build/**', '.types/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'app/paraglide/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'app/**/*.test.ts', 'app/**/*.test.tsx', 'packages/shared-ui/src/**/*.test.ts', 'packages/shared-ui/src/**/*.test.tsx', 'scripts/**'],
     },
     {
         files: ['**/*.ts', '**/*.tsx'],

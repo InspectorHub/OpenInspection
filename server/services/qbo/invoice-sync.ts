@@ -16,7 +16,7 @@ import type {
 
 export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends Base {
-        protected buildDocNumber(invoiceNumber: string): string {
+        public buildDocNumber(invoiceNumber: string): string {
             return invoiceNumber.slice(0, 21);
         }
 
@@ -36,7 +36,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
          * quietly grow a fourth date path. `new Date()` is not an acceptable
          * fallback here: it is exactly the bug this replaced.
          */
-        protected async txnDateFor(tenantId: string, occurredAt: Date): Promise<string> {
+        public async txnDateFor(tenantId: string, occurredAt: Date): Promise<string> {
             const db = this.getDrizzle();
             const cfg = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
                 .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
@@ -46,7 +46,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
         }
 
         /** Invoice → contact → mapped QBO Customer id (same join the old raw SQL did). */
-        protected async getQBOCustomerIdForInvoice(tenantId: string, invoiceId: string): Promise<string | null> {
+        public async getQBOCustomerIdForInvoice(tenantId: string, invoiceId: string): Promise<string | null> {
             const db = this.getDrizzle();
             const row = await db
                 .select({ qboCustomerId: qboEntityMap.qboId })
@@ -65,7 +65,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
             return row?.qboCustomerId ?? null;
         }
 
-        protected async applyInvoiceStatusFromQBO(
+        public async applyInvoiceStatusFromQBO(
             tenantId: string,
             inv: InvoiceSummary,
             markPaid: MarkPaidFn,

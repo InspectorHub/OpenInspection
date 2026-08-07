@@ -29,6 +29,12 @@
  *     `@gateConsumed` (wired via `tags: ["-gateConsumed"]`); this is per-export,
  *     so the rest of the file stays under the gate. Example:
  *     `ERASURE_OUT_OF_SCOPE`, read by `scripts/check-erasure-manifest.mjs`.
+ *   - an export that exists so the TYPE can be NAMED in emitted `.d.ts`.
+ *     tsconfig.api.json is a composite project: an unexported alias that shows
+ *     up in an exported member's inferred type is TS4053/TS4055, so the alias
+ *     has to be exported even though no module imports it by name. Tag it
+ *     `@declarationEmit` (wired via `tags: ["-declarationEmit"]`). Example:
+ *     `RepairListEntry` in inspection-analytics.service.ts.
  *   - a dependency knip cannot resolve -> `ignoreDependencies`
  * `--update` is a last resort and needs review of every entry it adds.
  *

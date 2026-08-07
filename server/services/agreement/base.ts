@@ -54,11 +54,11 @@ export type Constructor<T = object> = new (...args: any[]) => T;
  */
 export class AgreementServiceBase {
     constructor(
-        protected db: D1Database,
-        protected secrets?: { jwtSecret: string; jwtSecretPrevious?: string },
+        public db: D1Database,
+        public secrets?: { jwtSecret: string; jwtSecretPrevious?: string },
     ) {}
 
-    protected getDrizzle() {
+    public getDrizzle() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return drizzle(this.db as any);
     }
