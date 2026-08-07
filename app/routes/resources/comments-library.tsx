@@ -79,10 +79,6 @@ export async function action({ request, context }: Route.ActionArgs) {
             const section = String(form.get("section") ?? "");
             const category = String(form.get("category") ?? "");
             const itemLabel = String(form.get("itemLabel") ?? "");
-            const numOrNull = (k: string) => {
-                const v = String(form.get(k) ?? "");
-                return v ? Number(v) : null;
-            };
             const json = {
                 text,
                 severity,
@@ -90,8 +86,6 @@ export async function action({ request, context }: Route.ActionArgs) {
                 category: category || null,
                 itemLabel: itemLabel || null,
                 repairSummary: String(form.get("repairSummary") ?? "") || null,
-                estimateMinCents: numOrNull("estimateMinCents"),
-                estimateMaxCents: numOrNull("estimateMaxCents"),
                 recommendedContractorTypeId: String(form.get("recommendedContractorTypeId") ?? "") || null,
             };
             const res = intent === "edit"

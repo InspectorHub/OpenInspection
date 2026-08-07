@@ -217,8 +217,6 @@ export interface TemplateItemSeed {
   defaultRecommendation?: string | null;
 }
 export interface CannedCommentSeed {
-  estimateMinCents?: number | null;
-  estimateMaxCents?: number | null;
   repairSummary?: string | null;
 }
 export interface CostSeed {
@@ -249,8 +247,11 @@ export function seedCostFromFinding(
   cannedComment?: CannedCommentSeed | null,
 ): CostSeed {
   const rec = finding?.recommendations?.[0];
+  // The canned-comment library carries no price to seed from: a repair item is
+  // scope, not a figure. What remains is the finding's own legacy snapshot (a
+  // key nothing writes any more — see FindingSeedInput) and the template item's
+  // declared default, and the assessor edits both before they mean anything.
   const lumpSumCents =
-    estimateMidpoint(cannedComment?.estimateMinCents, cannedComment?.estimateMaxCents) ??
     estimateMidpoint(rec?.estimateSnapshotMin, rec?.estimateSnapshotMax) ??
     estimateMidpoint(templateItem?.defaultEstimateMin, templateItem?.defaultEstimateMax);
   const suggestedRemedy =

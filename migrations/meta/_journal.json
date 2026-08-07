@@ -351,6 +351,13 @@
       "when": 1786100519522,
       "tag": "0049_thankful_red_wolf",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "6",
+      "when": 1786107182084,
+      "tag": "0050_damp_rawhide_kid",
+      "breakpoints": true
     }
   ]
 }
