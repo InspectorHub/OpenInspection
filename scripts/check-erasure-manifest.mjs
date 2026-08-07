@@ -7,9 +7,19 @@
  * column appears anywhere in the Drizzle schema without either a covering
  * manifest rule or an explicit ERASURE_OUT_OF_SCOPE entry.
  *
+ * ⚠️ READ `docs/compliance/erasure-heuristic-limits.md` BEFORE TRUSTING A GREEN
+ * RUN. "PII column" here means a column matching PII_HEURISTIC below, and that
+ * pattern is a list of shapes someone thought of — every column it was not told
+ * about is invisible to this gate and reads as correct. The document names what
+ * is structurally out of reach (free prose, addresses, anything whose
+ * sensitivity is contextual rather than lexical) and carries a worked example
+ * that is currently open. A limits document nobody finds next to the gate is
+ * exactly the failure mode it describes, which is why this pointer is here.
+ *
  * This guard is COMPLEMENTARY to:
- *   - tests/unit/erasure-manifest-coverage.spec.ts (manifest <-> orchestrator
- *     binding drift) — that proves every rule is realized by the executor.
+ *   - tests/unit/privacy/erasure-manifest-coverage.spec.ts (manifest <->
+ *     orchestrator binding drift) — that proves every rule is realized by the
+ *     executor.
  *   - This lint proves every rule is well-formed AND that NO schema table
  *     grows an un-cataloged PII column unnoticed.
  *
