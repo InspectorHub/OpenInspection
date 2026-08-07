@@ -163,6 +163,30 @@ export async function quoteCancellation(
 }
 
 /**
+ * What `applyCancellationRefund` did, in the shape its caller has to push.
+ * Not exported: the only consumer is the cancel route, which reaches it through
+ * the function's return type and never needs to name it.
+ */
+interface AppliedCancellationRefund {
+    /** The ledger row an external book of record keys its credit memo on. */
+    row: AppendedPayment;
+    /**
+     * The invoice `row` reverses — or NULL when the money came back off a held
+     * deposit, which has no invoice.
+     *
+     * Null is an instruction, not a missing field: do not post this to
+     * QuickBooks. An unapplied deposit was never pushed there in the first
+     * place (no invoice, so no QBO Invoice and no Payment), so a credit memo
+     * would credit the customer for revenue QuickBooks never recorded and
+     * understate the tenant's income by the refund. The right instrument is a
+     * refund receipt against a customer-deposit LIABILITY account, which is a
+     * choice in the tenant's chart of accounts and not ours to invent. The gap
+     * is disclosed as a count in the Books health card instead.
+     */
+    invoiceId: string | null;
+}
+
+/**
  * Append the refund a quote calls for. Returns the ledger row so the caller can
  * hand its id to an external book of record; null when there is nothing to
  * refund, which is the common case.
@@ -180,17 +204,18 @@ export async function quoteCancellation(
  * held pool is the "cash in one place and not the other" failure this task
  * exists to avoid.
  *
- * Returns the invoice row when both fire. An external book of record keys its
- * credit memo on a row id, and a held-deposit refund is one it cannot post
- * anyway — an unapplied deposit was never pushed to QuickBooks in the first
- * place, which is what the Books health card says out loud.
+ * Returns the invoice row when both fire, and says which invoice it belongs to
+ * so the caller does not have to re-derive the split to know whether the row is
+ * postable. A held-deposit refund comes back with a null `invoiceId` rather
+ * than being withheld: the cancel response still has to name the row it
+ * appended, and only the push is off-limits.
  */
 export async function applyCancellationRefund(
     db: DrizzleD1Database,
     tenantId: string,
     quote: CancellationQuote,
     recordedBy: string | null,
-): Promise<AppendedPayment | null> {
+): Promise<AppliedCancellationRefund | null> {
     const owed = quote.outcome.refundCents;
     if (owed <= 0) return null;
 
@@ -206,5 +231,7 @@ export async function applyCancellationRefund(
         ? await refundHeldDeposit(db, tenantId, quote.inspectionId, { amountCents: fromHeld, reason, recordedBy })
         : null;
 
-    return invoiceRow ?? heldRow;
+    if (invoiceRow) return { row: invoiceRow, invoiceId: quote.invoiceId };
+    if (heldRow) return { row: heldRow, invoiceId: null };
+    return null;
 }

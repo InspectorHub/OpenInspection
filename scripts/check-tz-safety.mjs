@@ -10,11 +10,13 @@
  *
  * SCOPED to the calendar surface on purpose: every real bug lives here, while
  * legitimate `.toISOString().slice(0,10)` uses (server UTC-today, report year,
- * QBO document-creation dates) live elsewhere. QBO *payment* TxnDate is NOT on
- * that list any more: it books an accounting period, so it derives from the
- * ledger row's occurred_at in the tenant zone via epochMsToWallClockYmd (see
- * recordPayment in server/services/qbo/invoice-sync.ts). A line opts out with a
- * trailing — or immediately preceding — `// tz-lint-ok: <reason>` comment.
+ * QBO document-creation dates) live elsewhere. QBO *money-movement* TxnDate is
+ * NOT on that list any more — neither the payment nor the credit memo: both
+ * book an accounting period, so both derive from the ledger row's occurred_at
+ * in the tenant zone via epochMsToWallClockYmd (see txnDateFor in
+ * server/services/qbo/invoice-sync.ts, which is the one date path they share).
+ * A line opts out with a trailing — or immediately preceding —
+ * `// tz-lint-ok: <reason>` comment.
  *
  * Flags:
  *   P1  hardcoded-Z instant composed from a civil date + wall-clock time

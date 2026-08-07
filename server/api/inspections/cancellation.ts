@@ -134,9 +134,35 @@ const cancellationRoutes = createApiRouter()
         const userId = (c.get('user') as { sub?: string } | undefined)?.sub ?? null;
         const refund = await applyCancellationRefund(db, tenantId, quote, userId);
 
+        // THE SEAM. All three refund writers reach money through
+        // `applyCancellationRefund`, and this is the only production entry to
+        // it, so one push here covers every refund that exists — rather than a
+        // push inside each writer, where `server/services/invoice/refund.ts` has
+        // no QBO service, no `env` and no `executionCtx`, and where an outbound
+        // HTTP call would sit inside the refund's own path.
+        //
+        // `waitUntil` is what makes the non-negotiable structural: the refund
+        // row is already committed above, and QuickBooks being down can only
+        // lose the memo, never the refund. `createCreditMemo` catches and files
+        // a sync error besides, so the tenant is told rather than the failure
+        // vanishing.
+        //
+        // `invoiceId` null means a held deposit — see AppliedCancellationRefund
+        // for why that one is not postable, and is not silently postable either.
+        if (c.env.QBO_CLIENT_ID && refund?.invoiceId) {
+            c.executionCtx.waitUntil(
+                c.var.services.qbo.createCreditMemo(
+                    tenantId, refund.invoiceId,
+                    // DOLLARS. The QBO payload puts this straight on Line[0].Amount.
+                    refund.row.amountCents / 100,
+                    refund.row.id, refund.row.occurredAt,
+                ),
+            );
+        }
+
         return c.json({
             success: true as const,
-            data: { outcome: flatten(quote), refundPaymentId: refund?.id ?? null },
+            data: { outcome: flatten(quote), refundPaymentId: refund?.row.id ?? null },
         }, 200);
     });
 

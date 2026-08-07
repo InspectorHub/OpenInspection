@@ -3,6 +3,7 @@ import { qboConnections, qboEntityMap } from '../../lib/db/schema/qbo';
 import { invoices } from '../../lib/db/schema/invoice';
 import { tenantConfigs } from '../../lib/db/schema/tenant';
 import { epochMsToWallClockYmd, resolveTenantTimeZone } from '../../lib/tz';
+import { qboRefundKey } from '../../lib/qbo-payment-key';
 import { logger } from '../../lib/logger';
 import { getLedgerOpinion } from '../payment-ledger.service';
 import type {
@@ -17,6 +18,31 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
     return class extends Base {
         protected buildDocNumber(invoiceNumber: string): string {
             return invoiceNumber.slice(0, 21);
+        }
+
+        /**
+         * The accounting date for a transaction, from the instant the money
+         * moved.
+         *
+         * `TxnDate` is a calendar date with no timezone: QuickBooks books it
+         * into an accounting period as-is. It must be the day the money MOVED
+         * (the ledger row's `occurred_at` — the ledger separates it from
+         * `created_at` because Tuesday's cash gets recorded Thursday), in the
+         * TENANT's zone: money taken at 6pm Pacific is the same civil day
+         * locally and the next day in UTC, a real one-day period error at month
+         * end.
+         *
+         * Shared by every outbound transaction so a second push site cannot
+         * quietly grow a fourth date path. `new Date()` is not an acceptable
+         * fallback here: it is exactly the bug this replaced.
+         */
+        protected async txnDateFor(tenantId: string, occurredAt: Date): Promise<string> {
+            const db = this.getDrizzle();
+            const cfg = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+                .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+            return epochMsToWallClockYmd(
+                occurredAt.getTime(), resolveTenantTimeZone(cfg?.defaultTimezone),
+            );
         }
 
         /** Invoice → contact → mapped QBO Customer id (same join the old raw SQL did). */
@@ -253,18 +279,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                 return;
             }
 
-            // TxnDate is a calendar date with no timezone: QuickBooks books it
-            // into an accounting period as-is. It must be the day the money
-            // MOVED (the ledger row's occurred_at — the ledger separates it
-            // from created_at because Tuesday's cash gets recorded Thursday),
-            // in the TENANT's zone: a payment taken at 6pm Pacific is the same
-            // civil day locally and the next day in UTC, a real one-day period
-            // error at month end.
-            const cfg = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
-                .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
-            const txnDate = epochMsToWallClockYmd(
-                occurredAt.getTime(), resolveTenantTimeZone(cfg?.defaultTimezone),
-            );
+            const txnDate = await this.txnDateFor(tenantId, occurredAt);
 
             try {
                 await this.apiCall(tenantId, 'POST', `payment?requestid=${encodeURIComponent(idempotencyKey)}`, {
@@ -279,19 +294,50 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
             }
         }
 
-        async createCreditMemo(tenantId: string, invoiceId: string, refundAmount: number): Promise<void> {
+        /**
+         * Money going back out, as a QuickBooks CreditMemo.
+         *
+         * `refundAmount` is in DOLLARS, like `recordPayment`'s `amountPaid` —
+         * it goes straight onto `Line[0].Amount`. Callers hold cents and divide.
+         * Handing this cents would post a hundred times the refund to a
+         * customer's books.
+         *
+         * `refundRowId` is the `refund`-kind payment-ledger row. It is the unit
+         * of BOTH the idempotency key and the `qbo_entity_map` identity, and it
+         * is taken rather than a pre-built key precisely so those two cannot
+         * disagree: the map is uniquely indexed on (tenant, oi_type, oi_id), so
+         * storing the memo under the INVOICE would allow one credit memo per
+         * invoice forever and make a second refund throw after the memo already
+         * existed in QuickBooks. (`recordPayment` takes a ready-made key instead
+         * because it writes no map row and so has nothing to keep in sync.)
+         *
+         * A held deposit is deliberately NOT refundable through here — it has no
+         * invoice, so it has no QBO Invoice and no Payment either, and a credit
+         * memo would credit a customer for revenue QuickBooks never recorded.
+         * That gap is disclosed as a count in the Books health card rather than
+         * papered over; see `QBOConnectionStatus.heldDepositCount`.
+         */
+        async createCreditMemo(
+            tenantId: string, invoiceId: string, refundAmount: number,
+            refundRowId: string, occurredAt: Date,
+        ): Promise<void> {
             const db = this.getDrizzle();
             const conn = await db.select().from(qboConnections).where(eq(qboConnections.tenantId, tenantId)).get();
             if (!conn) return;
 
             const qboCustomerId = await this.getQBOCustomerIdForInvoice(tenantId, invoiceId);
-            if (!qboCustomerId) return;
+            if (!qboCustomerId) {
+                logger.info('QBO createCreditMemo: no customer mapping — skipping', { tenantId, invoiceId });
+                return;
+            }
+
+            const txnDate = await this.txnDateFor(tenantId, occurredAt);
 
             try {
                 const created = await this.apiCall<{ CreditMemo: { Id: string; SyncToken: string } }>(
-                    tenantId, 'POST', 'creditmemo', {
+                    tenantId, 'POST', `creditmemo?requestid=${encodeURIComponent(qboRefundKey(refundRowId))}`, {
                         CustomerRef: { value: qboCustomerId },
-                        TxnDate:     new Date().toISOString().slice(0, 10),
+                        TxnDate:     txnDate,
                         Line:        [{
                             DetailType: 'SalesItemLineDetail',
                             Amount:     refundAmount,
@@ -304,19 +350,32 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                     },
                 );
                 const now = new Date();
+                // `onConflictDoNothing` because the only way to arrive here twice
+                // for one row is a re-push of the same refund, and `requestid`
+                // means QuickBooks answered that with the ORIGINAL memo rather
+                // than a second one. Recording the same fact again is not an
+                // error, and raising one would put a false failure in front of a
+                // tenant whose books are correct.
                 await db.insert(qboEntityMap).values({
                     id:           crypto.randomUUID(),
                     tenantId,
                     oiType:       'refund',
-                    oiId:         invoiceId,
+                    oiId:         refundRowId,
                     qboType:      'CreditMemo',
                     qboId:        created.CreditMemo.Id,
                     qboSyncToken: created.CreditMemo.SyncToken,
                     syncedAt:     now,
-                });
+                }).onConflictDoNothing();
             } catch (e) {
-                logger.error('QBO createCreditMemo failed', { tenantId, invoiceId }, e instanceof Error ? e : undefined);
-                await this.logSyncError(tenantId, 'refund', invoiceId, e);
+                logger.error(
+                    'QBO createCreditMemo failed',
+                    { tenantId, invoiceId, refundRowId },
+                    e instanceof Error ? e : undefined,
+                );
+                // Scoped to the ROW, not the invoice, for the same reason the
+                // map row is: two refunds on one invoice that both fail are two
+                // things to fix, and an invoice-keyed flag would show one.
+                await this.logSyncError(tenantId, 'refund', refundRowId, e);
             }
         }
     };

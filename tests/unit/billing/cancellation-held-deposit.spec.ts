@@ -145,8 +145,12 @@ describe('the refund is actually written, with no invoice to write it against', 
         const row = await applyCancellationRefund(db, TENANT, quote, 'user-1');
 
         expect(row).not.toBeNull();
-        expect(row!.kind).toBe('refund');
-        expect(row!.amountCents).toBe(9000);
+        expect(row!.row.kind).toBe('refund');
+        expect(row!.row.amountCents).toBe(9000);
+        // NULL, and the cancel route reads it as "do not post this to
+        // QuickBooks": the deposit was never pushed there, so a credit memo
+        // would credit the customer for revenue QuickBooks never recorded.
+        expect(row!.invoiceId).toBeNull();
 
         const refunds = await heldRefundRows();
         expect(refunds).toHaveLength(1);
