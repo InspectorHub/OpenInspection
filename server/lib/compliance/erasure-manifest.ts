@@ -11,8 +11,9 @@
  *
  * ⚠️ HOW MUCH WEIGHT THIS FILE'S PROSE CAN CARRY. On 2026-08-07 two separate
  * justifications in here were checked against the code and found FALSE: the
- * `reports.title` rule describes a column "a human writes" that is in fact
- * machine-written with no API that can edit it, and `repair_requests.
+ * `reports.title` rule claimed a column "a human writes" that is in fact
+ * system-written with no API that can edit it (corrected below, with an
+ * amendment history rather than a silent overwrite), and `repair_requests.
  * created_by_ref` was documented as an opaque id while the code stores an email
  * address in it — a compliance classification resting on a comment that had been
  * wrong for as long as the feature existed. Both rules survived review because
@@ -190,11 +191,34 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     { table: 'esign_audit_logs',   column: 'signature',        category: 'system.integrity',         action: 'retain', legalBasis: 'art_17_3_e' },
 
     // ── reports ───────────────────────────────────────────────────────────────
-    // A report is findings about a named person's property, and `title` is the
-    // one free-text column a human writes — it routinely carries the address
-    // ("123 Oak St — Radon"). Anonymised rather than deleted: the row is the
-    // spine of a signed, delivered document, and removing it would strand the
-    // version chain that proves what was delivered.
+    // A report is findings about a named person's property. `title` is written
+    // by the system, never by a person composing free text about this client:
+    // it is either the literal 'Inspection Report' (`inspection/reports.ts`) or
+    // a snapshot of a service line's name taken from the tenant's own catalogue
+    // (`inspection/report-generation.ts`, both the insert and the adoption
+    // update). No route writes it — the only other writer is the erasure
+    // executor performing this very rule.
+    //
+    // Anonymised rather than deleted: the row is the spine of a signed,
+    // delivered document, and removing it would strand the version chain that
+    // proves what was delivered. A catalogue service name is tenant-authored,
+    // so it cannot be assumed free of identifiers, and anonymising a title
+    // costs nothing.
+    //
+    // AMENDMENT HISTORY
+    //   Previous rationale: "`title` is the one free-text column a human writes
+    //     — it routinely carries the address ("123 Oak St — Radon")."
+    //   Correction date:    2026-08-07
+    //   Why:                factually wrong about this codebase, in both halves.
+    //     No human writes it and no API can edit it, so it cannot routinely
+    //     carry a per-property address. Evidence: the two writers named above,
+    //     read 2026-08-07 (E2 — verified in source, not inferred from a plan).
+    //   Impact:             NONE on the processing decision. The action stays
+    //     `anonymize`, the basis and the period are unchanged. What changes is
+    //     the reason recorded for it.
+    //   Kept rather than overwritten: an accountability record under Art. 5(2)
+    //     that quietly deletes a mistake is worth less than one that shows the
+    //     mistake was found and corrected.
     { table: 'reports', column: 'title', category: 'user.address', action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y' },
 
     // ── audit_logs (#276) ─────────────────────────────────────────────────────
