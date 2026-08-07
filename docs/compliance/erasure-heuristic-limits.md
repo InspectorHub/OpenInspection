@@ -2,8 +2,10 @@
 
 `scripts/check-erasure-manifest.mjs` is a CI gate. It walks every Drizzle
 schema file, matches column names against a regex, and fails if a matching
-column has neither a rule in `ERASURE_MANIFEST` nor a reasoned entry in
-`ERASURE_OUT_OF_SCOPE`.
+column has neither a rule in `ERASURE_MANIFEST` (`erasure-manifest.ts`) nor a
+reasoned entry in `ERASURE_OUT_OF_SCOPE` (`erasure-out-of-scope.ts`, split out
+when the manifest hit its line cap). The gate concatenates both sources before
+parsing either, so the split cannot halve what it sees.
 
 It is green today: `44 rules, 57 out-of-scope declarations`, exit 0.
 
@@ -91,10 +93,32 @@ themselves:
    `agreement_requests` and `agreement_signers` only. Until it learns about
    `inspections`, a `retain` rule here is a recorded decision that no code acts
    on — and a retain nothing ever expires is the rejected exclusion under a
-   different name. A tripwire in
-   `tests/unit/privacy/erasure-manifest-coverage.spec.ts` fails the day the sweep
-   gains an `inspections` reference, so the "not yet enforced" notice in the
-   manifest cannot quietly become false.
+   different name.
+
+   Three mechanisms hold that open rather than letting it settle:
+
+   - Every one of those rules carries `enforcementStatus: 'pending'`, so the
+     manifest — and anything rendering from it — states that the *decision* is
+     recorded while the *expiry* is not built. A `retain` that reads as
+     implemented is the failure mode.
+   - Every one carries `enforcementDeadline: '2027-02-01'`, and **the gate fails
+     once that date passes.** A deadline that cannot act is how "pending"
+     becomes permanent. The date is two quarters, set by review discipline: the
+     sweep needs a purge marker on `inspections` (the agreement pass keys on
+     `signedAt` + `purged_at IS NULL`; there is no equivalent here) and a
+     decision about which column starts an inspection's clock — a schema change
+     and a migration, not a patch. It is deliberately *not* derived from when
+     the first address falls due, which is not computable until that clock
+     column exists.
+   - `PENDING_ENFORCEMENT` in the gate is a checked-in list of the rules allowed
+     to be pending. A new one fails; so does a stale entry whose rule is gone.
+     For a bounded `retain`, the default is refusal — a rule that declares a
+     `retention` and no `enforcementStatus` fails, so "unenforced" cannot be the
+     thing that happens when nobody says anything.
+
+   A tripwire in `tests/unit/privacy/erasure-manifest-coverage.spec.ts` also
+   fails the day the sweep gains an `inspections` reference, so the "not yet
+   enforced" notice cannot quietly become false in the other direction either.
 
 One more thing worth knowing before reading a retain rule as an audit artefact:
 a `retain` produces **no per-run entry** in `erasure_log`. The orchestrator's
@@ -297,7 +321,24 @@ PII is unruled*. Not *no PII is unruled*.
 
 ## Still open
 
-The retention **window is declared but not enforced** — see "How it was closed"
-above. Nothing expires an inspection address today. That is the live gap, it is
-named at the rules themselves, and a test fails the moment it closes so the
-notice cannot go stale silently.
+The retention **window is declared but not enforced**, deadline **2027-02-01** —
+see "How it was closed" above. Nothing expires an inspection address today. That
+is the live gap; it is marked on every affected rule, dated, held by a
+checked-in list, and the gate turns red if the date passes without the sweep.
+
+The blockers are a purge marker on `inspections` and a decision about which
+column starts its retention clock. Both are schema work.
+
+## What this file's prose is worth
+
+On 2026-08-07 two justifications in the manifest were checked against the code
+and found false — `reports.title` ("the one free-text column a human writes";
+it is machine-written) and `repair_requests.created_by_ref` (documented as an
+opaque id; it stores an email address, and a compliance classification was
+resting on that). Both rules had survived review because the reasoning read
+well.
+
+The general form is worth more than either instance: **the manifest may be
+assumption-driven rather than data-driven.** A rule can be correct and still
+unprovable, because nobody checked the premise its comment asserts. Before
+relying on a paragraph in that file, read what writes the column.

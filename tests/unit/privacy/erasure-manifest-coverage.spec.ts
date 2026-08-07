@@ -17,10 +17,8 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import {
-    ERASURE_MANIFEST,
-    ERASURE_OUT_OF_SCOPE,
-} from '../../../server/lib/compliance/erasure-manifest';
+import { ERASURE_MANIFEST } from '../../../server/lib/compliance/erasure-manifest';
+import { ERASURE_OUT_OF_SCOPE } from '../../../server/lib/compliance/erasure-out-of-scope';
 
 /** snake_case -> camelCase (single underscore groups; does not handle acronyms). */
 function toCamelCase(snake: string): string {
@@ -195,6 +193,21 @@ describe('the property address family', () => {
             `${key} is retained with no period. "Retained" means for a period; an unbounded ` +
             'retain is the exclusion this ruling rejected, wearing a different label.',
         ).toMatch(/^P\d+Y$/);
+    });
+
+    it.each(RETAINED_ADDRESS_COLUMNS)('%s does not read as implemented', (key) => {
+        // The rule is a recorded decision, not a shipped behaviour. Anything
+        // rendering the manifest — a DSAR console, an audit export — has to be
+        // able to tell those apart, and a `retain` that looks enforced while
+        // nothing expires it is exactly the unbounded retain this ruling
+        // refused. The gate enforces the same thing; this fails faster.
+        const [table, column] = key.split('.');
+        const rule = ERASURE_MANIFEST.find((r) => r.table === table && r.column === column);
+        expect(rule!.enforcementStatus).toBe('pending');
+        expect(
+            rule!.enforcementDeadline,
+            `${key} is pending with no deadline. Without a date, "pending" becomes permanent.`,
+        ).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
 
     // A TRIPWIRE, not a requirement. Nothing expires an inspection address
