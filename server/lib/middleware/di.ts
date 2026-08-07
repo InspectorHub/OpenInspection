@@ -6,7 +6,7 @@ import { UnitService } from '../../services/unit.service';
 import { UnitSwitchService } from '../../services/unit-switch.service';
 import { ReportVersionService } from '../../services/report-version.service';
 import { AIService } from '../../services/ai.service';
-import { buildAiMeter } from '../ai/metering';
+import { buildAiMeter, resolveRuntimeAiSource } from '../ai/metering';
 import { AuthService } from '../../services/auth.service';
 import { OutboxService } from '../../portal/outbox.service';
 import { publishRow } from '../../portal/outbox.service';
@@ -159,7 +159,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         target.admin = new AdminService(c.env.DB, provider);
                     }
                     break;
-                case 'ai':
+                case 'ai': {
+                    // ONE credential picture, read by both the meter and the capability
+                    // gate — the source a usage row is tagged with can never disagree.
+                    const aiCreds = { profile: c.var.profile, tenantKey: emailCfg.dbSecrets.geminiApiKey || null, managedKey: c.env.AI_MANAGED_API_KEY ?? null, model: c.env.AI_MODEL ?? '' };
                     target.ai = new AIService(
                         c.env.DB,
                         // The tenant's own bound key (Settings → Advanced → AI) —
@@ -174,14 +177,11 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         // No default here on purpose: an unset AI_MODEL fails
                         // closed at the service rather than picking a model.
                         c.env.AI_MODEL ?? '',
-                        buildAiMeter({
-                            db: c.env.DB, profile: c.var.profile, tenantId,
-                            tenantKey: emailCfg.dbSecrets.geminiApiKey || null,
-                            managedKey: c.env.AI_MANAGED_API_KEY ?? null,
-                            model: c.env.AI_MODEL ?? '',
-                        }),
+                        buildAiMeter({ db: c.env.DB, tenantId, ...aiCreds }),
+                        resolveRuntimeAiSource(aiCreds) ?? 'byo', // same resolver the meter tags with; null (off) → 'byo'
                     );
                     break;
+                }
                 case 'auth':
                     // Outbox forwarding to portal is SaaS-only: buildOutbox
                     // returns undefined when SYNC_QUEUE is absent (standalone)

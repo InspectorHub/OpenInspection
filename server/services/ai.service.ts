@@ -1,8 +1,15 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { inspections, inspectionResults } from '../lib/db/schema';
-import { Errors } from '../lib/errors';
+import { AppError, ErrorCode, Errors } from '../lib/errors';
 import { GeminiProvider } from '../lib/ai/providers/gemini';
+import { checkAiCapability } from '../lib/ai/capability-policy';
+import {
+    AI_PROMPTS,
+    type RewriteCommentPromptArgs,
+    type SuggestCommentPromptArgs,
+} from '../lib/ai/prompts';
+import type { AiCredentialSource } from '../lib/ai/resolve-provider';
 import type { AiUsageKind } from '../lib/usage/period';
 
 /**
@@ -20,6 +27,19 @@ import type { AiUsageKind } from '../lib/usage/period';
  * This paragraph replaces a "strictly bring-your-own-key" statement that the
  * managed path contradicts; without the correction the next reader treats that
  * path as a regression and deletes it.
+ *
+ * HAVING credentials is not the same as the product OFFERING the capability
+ * they would fund. `lib/ai/capability-policy.ts` holds that second answer and
+ * `callGemini` asks it on every call. Until it existed, the managed path was
+ * merely starved — no deployment had provisioned a platform key — and one
+ * `wrangler secret put` by whoever provisions infrastructure would have turned
+ * it on without anyone deciding to ship it. The gate changes nothing today and
+ * that is the point: an accident becomes a stated refusal that survives the
+ * key being configured.
+ *
+ * The PROMPTS live in `lib/ai/prompts.ts`, each under a stable version token,
+ * so the largest input to a model's output is nameable rather than an inline
+ * literal that can be reworded in passing.
  *
  * Sprint 1 A-4: when running in `standalone` mode without a Gemini API key,
  * `suggestComment` returns dev-mock suggestions so local development can
@@ -46,6 +66,13 @@ export class AIService {
          *  counter at a route or a hook is how two numbers that have to agree
          *  stop agreeing. Undefined when there is no tenant to attribute to. */
         private meter?: { record(kind: AiUsageKind): Promise<void> },
+        /** Whose credentials a call from this service would run on, taken from
+         *  `resolveRuntimeAiSource` — the SAME resolver that tags the meter, so
+         *  the source the gate judges and the source the usage row records can
+         *  never be two different answers. Never re-derived inside this class.
+         *  Defaults to the tenant's own key, which is the only source that
+         *  reaches the service today. */
+        private credentialSource: AiCredentialSource = 'byo',
     ) {}
 
     private isDevMode(): boolean {
@@ -88,6 +115,24 @@ export class AIService {
      * pre-check are still covered.
      */
     private async callGemini(prompt: string, kind: AiUsageKind = 'assist') {
+        // The capability gate, placed AFTER credential resolution (the source
+        // was resolved upstream and handed to the constructor) and BEFORE any
+        // content leaves the process. Every AI feature funnels through here, so
+        // this one call covers all of them — the same reason the meter lives at
+        // this method and nowhere else.
+        //
+        // Refusal is an explicit throw, never a silent skip or an empty string:
+        // a capability the product does not offer must read as a refusal to the
+        // caller, not as the model having nothing to say.
+        //
+        // It reuses AINotConfigured because "this call cannot run" already has
+        // exactly one shape in this codebase — `resolveAi` returning null uses
+        // it for the feature-off case, and every client already routes that to
+        // "set up AI". A second 4xx/5xx shape here would mean two failure paths
+        // for one situation.
+        const decision = checkAiCapability(kind, this.credentialSource);
+        if (!decision.allowed) throw Errors.AINotConfigured(decision.message);
+
         const provider = new GeminiProvider({ apiKey: this.apiKey, model: this.model });
         const { text } = await provider.complete({ prompt });
         // Meter AFTER success, never before — a model call that failed must not
@@ -102,13 +147,7 @@ export class AIService {
      * Rewrites a rough note into a professional report comment.
      */
     async generateProfessionalComment(text: string, context?: string) {
-        const prompt = `You are a professional home inspector. Rewrite the following rough observation into a professional, clear, and objective report comment. 
-Keep it concise but informative. 
-Context: ${context || 'General inspection'}
-Rough Note: "${text}"
-Professional Comment:`;
-
-        return this.callGemini(prompt);
+        return this.callGemini(AI_PROMPTS.professionalComment.render({ text, context }));
     }
 
     /**
@@ -135,12 +174,7 @@ Professional Comment:`;
 
         if (!defects) return 'No significant defects observed during this inspection.';
 
-        const prompt = `You are a professional home inspector. Analyze the following list of defects found during an inspection and provide a high-level summary (2-3 sentences) focusing on the most critical issues for the home buyer.
-Defects:
-${defects}
-Summary:`;
-
-        return this.callGemini(prompt);
+        return this.callGemini(AI_PROMPTS.inspectionSummary.render({ defects }));
     }
 
     /**
@@ -153,15 +187,7 @@ Summary:`;
      *    failure, throws so the UI can show an error toast (no silent
      *    overwrite of the inspector's existing text).
      */
-    async rewriteComment(input: {
-        itemLabel:       string;
-        sectionTitle:    string;
-        tab:             'information' | 'limitations' | 'defects';
-        originalComment: string;
-        instruction:     string;
-        category?:       'safety' | 'recommendation' | 'maintenance';
-        location?:       string;
-    }): Promise<string> {
+    async rewriteComment(input: RewriteCommentPromptArgs): Promise<string> {
         if (!this.hasApiKey()) {
             // Sprint 1 A-4: dev-mock instead of throwing in standalone mode.
             if (this.isDevMode()) {
@@ -173,28 +199,7 @@ Summary:`;
         }
         this.assertModelConfigured();
 
-        const ctxLines = [
-            `Item: "${input.itemLabel}"`,
-            `Section: "${input.sectionTitle}"`,
-            `Tab: ${input.tab}`,
-            input.tab === 'defects' && input.category ? `Defect category: ${input.category}` : null,
-            input.tab === 'defects' && input.location ? `Location: ${input.location}` : null,
-        ].filter(Boolean).join('\n');
-
-        const prompt = `You are a certified home inspector revising a single inspection report comment.
-Context:
-${ctxLines}
-
-Original comment:
-"""${input.originalComment}"""
-
-Instruction from the inspector:
-"""${input.instruction}"""
-
-Rewrite the comment to satisfy the instruction while keeping a professional, concise inspection-report tone.
-Return only the rewritten comment text — no preamble, no quotes, no markdown.`;
-
-        const text = await this.callGemini(prompt);
+        const text = await this.callGemini(AI_PROMPTS.rewriteComment.render(input));
         // Strip wrapping quotes / markdown the model sometimes adds.
         return text.replace(/^["'`]+|["'`]+$/g, '').trim();
     }
@@ -205,13 +210,8 @@ Return only the rewritten comment text — no preamble, no quotes, no markdown.`
      * UI can surface a clear "set up your API key" message instead of a silent
      * empty popover. Runtime Gemini failures still degrade to an empty array.
      */
-    async suggestComment(params: {
-        itemName:         string;
-        sectionName:      string;
-        rating?:          string;
+    async suggestComment(params: SuggestCommentPromptArgs & {
         propertyAddress?: string;
-        yearBuilt?:       number | null;
-        sqft?:            number | null;
     }): Promise<string[]> {
         if (!this.hasApiKey()) {
             // Sprint 1 A-4: dev-mode mock so local development can exercise
@@ -233,24 +233,19 @@ Return only the rewritten comment text — no preamble, no quotes, no markdown.`
         // must not disappear into "no suggestions today".
         this.assertModelConfigured();
 
-        const context = [
-            params.rating    ? `Rating: ${params.rating}` : null,
-            params.yearBuilt ? `Year Built: ${params.yearBuilt}` : null,
-            params.sqft      ? `Sq Ft: ${params.sqft}` : null,
-        ].filter(Boolean).join(', ');
-
-        const prompt = `You are a certified home inspector writing a professional inspection report.
-Item: "${params.itemName}" in section "${params.sectionName}"${context ? ` (${context})` : ''}.
-Write exactly 3 short, professional inspection comments for this item.
-Each comment must be 1-2 sentences, factual, and in standard inspection report style.
-Return only a JSON array of 3 strings, no other text. Example: ["Comment 1.", "Comment 2.", "Comment 3."]`;
-
         try {
-            const text = await this.callGemini(prompt);
+            const text = await this.callGemini(AI_PROMPTS.suggestComment.render(params));
             const match = text.match(/\[[\s\S]*\]/);
             if (!match) return [];
             return JSON.parse(match[0]) as string[];
-        } catch {
+        } catch (err) {
+            // Same rule as `assertModelConfigured` above, applied to the one
+            // refusal that can only be raised from INSIDE this try: the
+            // capability gate in `callGemini`. A runtime model failure degrades
+            // to "no suggestions"; a capability the product does not offer must
+            // reach the inspector as a refusal, not as an empty popover that
+            // looks like the model had nothing to say.
+            if (err instanceof AppError && err.code === ErrorCode.AI_NOT_CONFIGURED) throw err;
             return [];
         }
     }
