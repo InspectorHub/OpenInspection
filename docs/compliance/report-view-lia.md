@@ -331,23 +331,56 @@ the assessment has to be redone rather than cited.
 8. **The counters are used for the delivery question only.** No export into
    analytics, no segmentation, no ranking of recipients.
 
-**Condition 3 is not satisfied by the current design.** Until the report
+9. **An objection can be honoured without losing access.** A per-recipient
+   suppression marker stops the counter while the link keeps working, and it
+   does not clear counters already recorded. Added 2026-08-07; see the amendment
+   history under *Rights that follow from this basis*. This condition is
+   currently **unmet** — the marker does not exist.
+
+**Conditions 3 and 9 are not satisfied by the current design.** Until the report
 identity question is resolved in the direction of section 3.4 option 1 or
-option 3, the feature is not covered by this assessment. That is the intended
-outcome of writing the assessment first: it is allowed to say no to part of
-the proposal.
+option 3, and the suppression marker exists, the feature is not covered by this
+assessment. That is the intended outcome of writing the assessment first: it is
+allowed to say no to part of the proposal.
+
+⚠️ **Condition 9 is not a follow-up to conditions 1–8.** The objection path
+cannot ship after the collection it objects to — a counter that runs for a
+release with no way to stop it is processing this assessment does not cover.
 
 ### Rights that follow from this basis
 
-Processing on legitimate interests carries the Art. 21 right to object, and
-this design does not currently provide a way to exercise it. A recipient who
-objects has, in practice, only the erasure path (condition 7), which is a
-larger action than they asked for. This is a **residual weakness**, recorded
-rather than resolved: the mitigation is that the data is minimal, that it dies
-with the access token, and that revoking the token removes the recipient's
-link and their counters together. A controller who receives an objection
-should expect to honour it by revoking the token rather than by a mechanism
-this software provides.
+Processing on legitimate interests carries the Art. 21 right to object, and the
+design provides a mechanism for it: a **per-recipient measurement-suppression
+marker** on the recipient's own access-token row. When set, the counter stops
+incrementing; the link keeps working and the report stays readable.
+
+**Token revocation is not the mechanism.** An objection to *measurement*
+answered by withdrawing *access* is a larger action than the one requested, and
+it penalises the exercise of the right — the recipient would lose the document
+in order to stop being counted. Minimal data lowers the risk; it does not remove
+the right.
+
+**Nor does an objection erase what is already recorded.** Art. 21 is not
+Art. 17. Future collection stops; historical counters are governed by the
+retention rules, and the controller may hold a lawful basis for delivery
+evidence already collected. Suppression and erasure are separate requests,
+honoured separately — and the erasure rule for these rows (`delete`, keyed on
+the access token) must not be reached for by anyone implementing the objection
+path.
+
+> **AMENDMENT HISTORY**
+> **Previous position:** *"This is a residual weakness, recorded rather than
+> resolved … A controller who receives an objection should expect to honour it
+> by revoking the token rather than by a mechanism this software provides."*
+> **Correction date:** 2026-08-07.
+> **Why:** the previous position assigned the obligation to the controller and
+> supplied no instrument beyond a general-purpose one, and the instrument it
+> named answers an objection about measurement by removing access. Reviewed
+> externally and rejected as an adequate default.
+> **Impact:** the condition set below changes. What was recorded as a residual
+> weakness is now an **unmet condition** — the feature is not covered by this
+> assessment until the suppression marker exists. The lawful basis, the data
+> minimisation analysis and the balancing test are unchanged.
 
 ---
 
