@@ -30,7 +30,7 @@ import type { AiCredentialSource } from './resolve-provider';
 
 /** The per-call facts. Deliberately closed: there is no `prompt` field, and
  *  adding one is a compliance decision (schema comment on the table). */
-export interface AiProvenanceEntry {
+interface AiProvenanceEntry {
     capability: AiUsageKind;
     /** `AI_PROMPTS[…].version` — the whole reason those tokens are stable. */
     promptVersion: string;

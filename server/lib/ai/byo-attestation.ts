@@ -57,7 +57,7 @@ export interface AiKeyAttestation {
  * the completeness check, so a fourth statement cannot be added to the form and
  * left out of the gate.
  */
-export const AI_KEY_ATTESTATION_STATEMENTS = [
+const AI_KEY_ATTESTATION_STATEMENTS = [
     'reviewedProviderTerms',
     'tierPermitsIntendedUse',
     'understandsProviderProcessing',
