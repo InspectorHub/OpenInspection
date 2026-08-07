@@ -28,8 +28,6 @@ const DEFECT: Defect = {
   category: "safety",
   severityBucket: "defect",
   trade: "licensed roofer",
-  estimateLow: null,
-  estimateHigh: null,
 };
 
 describe("builder → action seam", () => {

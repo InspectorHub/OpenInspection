@@ -244,8 +244,6 @@
   "repair_defect_note_label": "Note",
   "repair_defect_note_placeholder": "Optional — describe the repair or credit rationale",
   "repair_defect_location_prefix": "Location:",
-  "repair_defect_estimate_hint": "Report estimate: ${low}–${high}",
-  "repair_defect_use_estimate": "Use estimate",
   "repair_quick_phrase_default_repair": "Repair requested",
   "repair_quick_phrase_default_replace": "Replacement requested",
   "repair_intro_heading": "Custom Introduction",

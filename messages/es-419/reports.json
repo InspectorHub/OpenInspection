@@ -244,8 +244,6 @@
   "repair_defect_note_label": "Nota",
   "repair_defect_note_placeholder": "Opcional — describa el motivo de la reparación o del crédito",
   "repair_defect_location_prefix": "Ubicación:",
-  "repair_defect_estimate_hint": "Presupuesto del informe: ${low}–${high}",
-  "repair_defect_use_estimate": "Usar el presupuesto",
   "repair_quick_phrase_default_repair": "Se solicita reparación",
   "repair_quick_phrase_default_replace": "Se solicita reemplazo",
   "repair_intro_heading": "Introducción personalizada",

@@ -51,9 +51,9 @@ export interface Defect {
   // IA-57 — the recommended trade as a resolved label ("licensed roofer"),
   // snapshotted onto the item so the shared list names the trade to send.
   trade: string | null;
-  // IA-56 — the report's Est. Cost, shown only as a credit-input hint.
-  estimateLow: number | null;
-  estimateHigh: number | null;
+  // No estimate fields, deliberately. The builder's only money field is the
+  // client's own credit request; a supplied cost figure rendered beside it
+  // reads as the inspection company's price for the repair.
 }
 
 export interface RepairRequestItem {

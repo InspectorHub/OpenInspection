@@ -28,8 +28,6 @@ const DEFECT = {
   category: "safety",
   severityBucket: "defect",
   trade: null,
-  estimateLow: null,
-  estimateHigh: null,
 } as Defect;
 
 function renderRow(opts: { phrases?: string[]; note?: string; onUpdateNote?: () => void }) {
@@ -108,5 +106,65 @@ describe("<RepairDefectRow> quick phrases", () => {
 
     expect(container.querySelector("textarea")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /requested/i })).toBeNull();
+  });
+});
+
+describe("<RepairDefectRow> credit field carries no supplied number", () => {
+  /**
+   * The credit is the CLIENT's ask. A number the platform or the inspector put
+   * on the page next to that field — as a hint, or one click away in a button —
+   * becomes the client's ask the moment they accept it, and then travels into a
+   * document with the inspection company's name on it as if the company had
+   * priced the repair.
+   *
+   * The fixture below MUST carry a non-null estimate. A defect with no estimate
+   * data renders no money under the old component either, so an "assert no
+   * price" test built on an empty fixture is green against the very code it is
+   * supposed to catch. The values are cast on because the field is gone from
+   * the `Defect` type — which is the point: even if a payload still ships one,
+   * the row must not read it.
+   */
+  const PRICED = {
+    ...DEFECT,
+    estimateLow: 100000,
+    estimateHigh: 250000,
+  } as unknown as Defect;
+
+  function renderPriced() {
+    return render(
+      <RepairDefectRow
+        defect={PRICED}
+        isSelected
+        draft={{ requestedCreditCents: null, note: "" }}
+        creditCents={null}
+        onToggle={() => {}}
+        onUpdateCredit={() => {}}
+        onUpdateNote={() => {}}
+      />,
+    );
+  }
+
+  it("offers no one-click way to adopt a supplied estimate as the credit", () => {
+    renderPriced();
+
+    // The credit input must still be on screen — otherwise this assertion
+    // would pass simply because the expanded block never rendered.
+    expect(screen.getByLabelText(/Shingles/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /estimate/i })).toBeNull();
+  });
+
+  it("prints no supplied estimate anywhere in the row", () => {
+    const { container } = renderPriced();
+
+    const text = container.textContent ?? "";
+    // Both the raw cents and the dollars-rendered forms of the same numbers:
+    // the old hint printed `estimateHigh.toLocaleString()`. Not asserting on a
+    // bare "$" — the credit field's own label is "Credit Request ($)", so that
+    // check would fail for the wrong reason and get deleted by the next reader.
+    for (const shown of ["250,000", "100,000", "2,500", "1,000"]) {
+      expect(text).not.toContain(shown);
+    }
+    // No digits at all beyond what the defect prose carries.
+    expect(text).not.toMatch(/\d[\d,]{2,}/);
   });
 });

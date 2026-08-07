@@ -102,26 +102,15 @@ export function RepairDefectRow({
                 ariaLabel={m.repair_defect_credit_aria({ label: defect.itemLabel })}
                 className="w-full h-8 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:outline-none focus:border-ih-primary"
               />
-              {/* IA-56 — surface the report's Est. Cost as a credit hint so the
-                  client doesn't submit a blank/$0 request. "Use estimate" fills
-                  the field (dollars → cents) but never auto-submits a value. */}
-              {defect.estimateHigh != null && (
-                <div className="mt-1 flex items-center gap-2 text-[11px] text-ih-fg-4">
-                  <span>
-                    {m.repair_defect_estimate_hint({
-                      low: (defect.estimateLow ?? defect.estimateHigh).toLocaleString(),
-                      high: defect.estimateHigh.toLocaleString(),
-                    })}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onUpdateCredit(defect, Math.round((defect.estimateHigh ?? 0) * 100))}
-                    className="font-bold text-ih-primary hover:underline"
-                  >
-                    {m.repair_defect_use_estimate()}
-                  </button>
-                </div>
-              )}
+              {/* The credit is the client's own number and nothing else feeds
+                  it. There used to be a "report estimate" hint here with a
+                  one-click "Use estimate" button; both are gone. A figure the
+                  platform or the inspector supplied becomes the client's ask the
+                  instant they accept it, and then travels into a document
+                  carrying the inspection company's name as though the company
+                  had priced the repair. Telling a seeded number apart from one
+                  the tenant typed would need provenance on the estimate, and
+                  there is none — so neither is offered. */}
             </div>
           </div>
           <div>
@@ -135,9 +124,11 @@ export function RepairDefectRow({
               onChange={(e) => onUpdateNote(defect, e.target.value)}
               className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 resize-none focus:outline-none focus:border-ih-primary"
             />
-            {/* #275 — one-click fill for the adjacent field, same shape and
-                classes as "Use estimate" above so the row keeps one visual
-                vocabulary and the buttons read as secondary to the textarea. */}
+            {/* #275 — one-click fill for the adjacent field. Styled as inline
+                text links rather than buttons so they read as secondary to the
+                textarea. These insert the tenant's own wording into the client's
+                note; they are the only quick-fill left on this row, and they put
+                no money anywhere. */}
             {phrases && phrases.length > 0 && (
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                 {phrases.map((phrase) => (
