@@ -246,6 +246,8 @@
   "repair_defect_location_prefix": "Ubicación:",
   "repair_defect_estimate_hint": "Presupuesto del informe: ${low}–${high}",
   "repair_defect_use_estimate": "Usar el presupuesto",
+  "repair_quick_phrase_default_repair": "Se solicita reparación",
+  "repair_quick_phrase_default_replace": "Se solicita reemplazo",
   "repair_intro_heading": "Introducción personalizada",
   "repair_intro_placeholder": "Agregue un mensaje personal para que aparezca al inicio de la solicitud de reparación compartida…",
   "repair_share_heading": "Compartir",

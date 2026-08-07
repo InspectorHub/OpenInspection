@@ -60,4 +60,28 @@ describe("brandingUpdateBody", () => {
   it("omits customReferralSources entirely when the field was absent", () => {
     expect(Object.hasOwn(brandingUpdateBody(values({ companyName: "Acme" })), "customReferralSources")).toBe(false);
   });
+
+  it("splits repair quick phrases one per line, keeping the tenant's order", () => {
+    // Order is the whole reason this is a textarea: line order is button order.
+    const body = brandingUpdateBody(
+      values({ companyName: "Acme", repairQuickPhrasesPresent: "1", repairQuickPhrases: "Replacement requested\n\n  Repair requested  \n" }),
+    );
+    expect(body.repairQuickPhrases).toEqual(["Replacement requested", "Repair requested"]);
+  });
+
+  it("sends [] when the panel was on the page and the tenant emptied it", () => {
+    // The off switch. If this arrived as an omitted key instead, clearing the
+    // list would silently do nothing and the defaults would look intentional.
+    const body = brandingUpdateBody(values({ companyName: "Acme", repairQuickPhrasesPresent: "1", repairQuickPhrases: "" }));
+    expect(Object.hasOwn(body, "repairQuickPhrases")).toBe(true);
+    expect(body.repairQuickPhrases).toEqual([]);
+  });
+
+  it("omits repairQuickPhrases entirely when the panel was not on the page", () => {
+    // The other half: a save from a form without the editor must never clear a
+    // configured list. Assert the ABSENCE OF THE KEY, not the resulting value —
+    // a `[]` here reads as "the tenant turned the buttons off".
+    const body = brandingUpdateBody(values({ companyName: "Acme" }));
+    expect(Object.hasOwn(body, "repairQuickPhrases")).toBe(false);
+  });
 });

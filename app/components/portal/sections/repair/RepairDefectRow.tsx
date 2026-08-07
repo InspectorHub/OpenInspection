@@ -22,6 +22,13 @@ interface RepairDefectRowProps {
   isSelected: boolean;
   draft: ItemDraft | undefined;
   creditCents: number | null;
+  /**
+   * #275 — tenant-configured quick-insert phrases for the note field, already
+   * resolved (see app/lib/repair-quick-phrases.ts). OPTIONAL because this row
+   * is the one component both portals render and the agent surface has no note
+   * field to serve — see app/components/agent/cross-portal-reuse.test.tsx.
+   */
+  phrases?: string[];
   onToggle: (defect: Defect) => void;
   onUpdateCredit: (defect: Defect, cents: number | null) => void;
   onUpdateNote: (defect: Defect, note: string) => void;
@@ -32,10 +39,20 @@ export function RepairDefectRow({
   isSelected,
   draft,
   creditCents,
+  phrases,
   onToggle,
   onUpdateCredit,
   onUpdateNote,
 }: RepairDefectRowProps) {
+  // Append, never replace: the button is a convenience, and a convenience that
+  // eats two typed sentences is worse than no button. Idempotent for the same
+  // reason — a second click on the same phrase must be a no-op, not a repeat.
+  const appendPhrase = (phrase: string) => {
+    const current = (draft?.note ?? "").trim();
+    if (current.includes(phrase)) return;
+    onUpdateNote(defect, current ? `${current} ${phrase}` : phrase);
+  };
+
   return (
     <div
       className={`bg-ih-bg-card border rounded-xl transition-colors ${
@@ -118,6 +135,23 @@ export function RepairDefectRow({
               onChange={(e) => onUpdateNote(defect, e.target.value)}
               className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 resize-none focus:outline-none focus:border-ih-primary"
             />
+            {/* #275 — one-click fill for the adjacent field, same shape and
+                classes as "Use estimate" above so the row keeps one visual
+                vocabulary and the buttons read as secondary to the textarea. */}
+            {phrases && phrases.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                {phrases.map((phrase) => (
+                  <button
+                    key={phrase}
+                    type="button"
+                    onClick={() => appendPhrase(phrase)}
+                    className="text-[11px] font-bold text-ih-primary hover:underline"
+                  >
+                    {phrase}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

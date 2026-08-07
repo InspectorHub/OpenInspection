@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { makeWorkspaceSchema } from "~/lib/forms/settings.schema";
+import { parseQuickPhraseLines } from "~/lib/repair-quick-phrases";
 
 type WorkspaceFormValues = z.output<ReturnType<typeof makeWorkspaceSchema>>;
 
@@ -32,6 +33,17 @@ export function brandingUpdateBody(v: WorkspaceFormValues): Record<string, unkno
       .split("\n")
       .map((s) => s.trim())
       .filter(Boolean);
+  }
+
+  // #275 — repair-note quick phrases: one per line, order preserved (line order
+  // IS button order). Keyed off the panel's hidden sentinel, NOT off the
+  // textarea's own value: an empty textarea arrives as `undefined`, exactly like
+  // a form that never rendered the panel, and those two must do opposite things
+  // — clear the list ([]) versus leave it alone (key absent). This is the
+  // off switch; `[]` means "show no quick buttons" while a missing key means
+  // "never configured", and the API keeps them apart all the way to the column.
+  if (v.repairQuickPhrasesPresent) {
+    body.repairQuickPhrases = parseQuickPhraseLines(v.repairQuickPhrases ?? "");
   }
 
   // Boolean feature flags — conform-native checkboxes coerce to boolean in

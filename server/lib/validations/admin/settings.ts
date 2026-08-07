@@ -68,6 +68,13 @@ export const UpdateBrandingSchema = z.object({
     // seven values (Realtor / Past Client / …) is hardcoded; this array
     // appends to it. Trimmed entries; max 32 to keep the dropdown usable.
     customReferralSources: z.array(z.string().min(1).max(50)).max(32).optional().openapi({ example: ['Magazine ad', 'Trade show'] }).describe('TODO describe customReferralSources field for the OpenInspection MCP integration'),
+    // #275 — quick-insert phrases the client can tap into a repair-request note.
+    // The caps are LAYOUT constraints, not policy: these render as a wrapping row
+    // of inline buttons directly under a 2-row textarea, so a paragraph-length
+    // phrase or a twentieth button breaks the row rather than helping anyone.
+    // An empty array is valid and meaningful — it is how a tenant turns the
+    // buttons off (NULL means "never configured", which shows the defaults).
+    repairQuickPhrases: z.array(z.string().min(1).max(40)).max(8).optional().openapi({ example: ['Repair requested', 'Replacement requested'] }).describe('Quick-insert phrases offered under the repair-request note field. Empty array = show no buttons; omit the field to leave the stored list unchanged.'),
     // Workers Paid PDF pipeline opt-in. Default OFF.
     enablePdfPipeline: z.boolean().optional().openapi({ example: false }).describe('TODO describe enablePdfPipeline field for the OpenInspection MCP integration'),
     // Report PDF print-layout settings. companyAddress is shown

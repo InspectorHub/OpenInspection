@@ -73,7 +73,9 @@ export async function loader({
       return { kind: "error" };
     }
 
-    const body = (await res.json()) as { data?: { defects: Defect[]; mine: RepairRequest[] } };
+    const body = (await res.json()) as {
+      data?: { defects: Defect[]; mine: RepairRequest[]; quickPhrases: string[] | null };
+    };
     const data = body.data;
     if (!data) return { kind: "error" };
 
@@ -83,6 +85,9 @@ export async function loader({
       mine: data.mine,
       tenant,
       id,
+      // #275 — mirrored in loadRepairSection (the Hub's entry point). Both, or
+      // the feature exists on one URL and not the other.
+      quickPhrases: data.quickPhrases ?? null,
       token: parsedUrl.searchParams.get("token"),
     };
   } catch {

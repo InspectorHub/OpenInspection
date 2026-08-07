@@ -368,6 +368,13 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     aiKeyAttestationTermsVersion: text('ai_key_attestation_terms_version'),
     aiKeyAttestationAttestedAt: integer('ai_key_attestation_attested_at', { mode: 'timestamp_ms' }),
     aiKeyAttestationPolicyVersion: text('ai_key_attestation_policy_version'),
+    // #275 — quick-insert phrases for repair-request notes, maintained by the
+    // tenant. Same shape and storage idiom as `custom_referral_sources` above.
+    // NULL = never configured (seeded defaults shown); [] = the tenant removed
+    // them all and wants no buttons. Collapsing the two with `?? DEFAULTS` takes
+    // away the only off switch, and the defaults look intentional, so nobody
+    // notices. Appended at END per the D1 add-column-at-end rule.
+    repairQuickPhrases: text('repair_quick_phrases', { mode: 'json' }).$type<string[]>(),
 });
 
 /**

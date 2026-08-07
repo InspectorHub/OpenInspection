@@ -47,6 +47,7 @@ describe("builder → action seam", () => {
               tenant: "t1",
               id: "insp1",
               token: "tok",
+              quickPhrases: null,
             }}
             actionPath="/repair-builder/t1/insp1"
           />
