@@ -8,6 +8,7 @@ import { r2Keys } from '../lib/r2-keys';
 import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
 import { resolveLocale } from '../lib/locale';
 import { resolveDisplayPrefs, type DateFormat, type TimeFormat } from '../lib/session/display-prefs';
+import { assertWritableTenantConfig } from '../lib/tenant-config-write-policy';
 
 export interface IntegrationConfig {
     appBaseUrl?: string;
@@ -271,8 +272,19 @@ export class BrandingService {
         return this.writeConfig(tenantId, data);
     }
 
-    /** Upsert of the tenant config row. NOT a gate — see `updateBranding`. */
+    /**
+     * Upsert of the tenant config row.
+     *
+     * Not the gate for `cancellation_policy` / `is_estimates_shown` — those are
+     * value rules and live in `updateBranding`. It IS the gate for WHICH columns
+     * a write may touch at all: `POST /api/admin/branding` spreads its whole
+     * body in here, so without an allowlist every column on the table was
+     * reachable in one owner/manager call. See `tenant-config-write-policy.ts`
+     * for where the allowlist comes from and why an unlisted key is refused
+     * rather than dropped.
+     */
     private async writeConfig(tenantId: string, data: Partial<typeof tenantConfigs.$inferInsert>) {
+        assertWritableTenantConfig(data);
         const db = this.getDrizzle();
         const existing = await db.select().from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
 

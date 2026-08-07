@@ -139,6 +139,70 @@ export const UpdateBrandingSchema = z.object({
 }).openapi('UpdateBranding');
 
 /**
+ * Body schema for PATCH /api/admin/tenant-config — the settings surfaces that
+ * write `tenant_configs` columns directly rather than through branding.
+ *
+ * Lives here rather than inline in the route (CLAUDE.md "Schema location") for
+ * a second reason since #292: `lib/tenant-config-write-policy.ts` derives the
+ * writable-column allowlist from this shape, and a service may not import a
+ * router module. The schema is the fact; the allowlist is a projection of it.
+ */
+export const TenantConfigPatchSchema = z.object({
+    conciergeReviewRequired: z.boolean().optional().describe('Whether agent-submitted bookings require owner/admin approval before the client receives a confirmation link.'),
+    blockUnsignedAgreement: z.boolean().optional().describe('Whether clients must sign the inspection agreement before a booking is confirmed.'),
+    allowInspectorChoice: z.boolean().optional().describe('Toggle the public inspector-choice dropdown (IA-26)'),
+    agreementRetentionYears: z.number().int().min(1).max(99).optional().describe('How many years signed agreements / signatures are retained before the GDPR retention sweep destroys them (Track I-a). Integer 1–99; default 6 ≈ UK simple-contract limitation period.'),
+    reviewUrl: z.string().url().max(500).nullish().describe('Track J (#122) — company review link (Google/Yelp/Facebook). null/empty clears it.'),
+    smsMode: z.enum(['own', 'managed_shared', 'managed_dedicated']).optional().describe('Track L (D3) — Tenant SMS sender mode. "platform" is reserved for first-party use and is rejected when submitted by a tenant.'),
+    companyPhone: z.string().max(40).nullish().describe('Track L — call-back number shown in SMS copy ({{company_phone}}). null/empty clears it.'),
+    videoMode: z.enum(['r2', 'stream']).optional().describe('Self-host video backend: r2 (default, free) or stream (requires STREAM binding + customer subdomain).'),
+    smsByoProvider: z.enum(['twilio', 'telnyx']).optional().describe('BYO SMS provider selection — which provider adapter to use when smsMode is "own".'),
+    managedProvider: z.enum(['twilio', 'telnyx']).optional().describe('Managed-compliance carrier — which ISV provider runs managed provisioning/sweep/webhook when smsMode is "managed_shared"/"managed_dedicated". Separate from smsByoProvider.'),
+    emailByoProvider: z.enum(['resend', 'sendgrid', 'postmark', 'mailgun']).optional().describe('BYO email provider — which adapter to use when email mode is "own".'),
+    bookingSlotMode: z.enum(['open', 'fixed']).optional().describe('Public booking slot grid mode: open (clock-aligned) or fixed (window-aligned).'),
+    bookingSlotIntervalMin: z.union([z.literal(15), z.literal(30), z.literal(60)]).optional().describe('Slot grid step in minutes.'),
+    holidayRegion: z.union([
+        z.literal('US'),
+        z.string().regex(/^US-[A-Z]{2}$/),
+        z.null(),
+    ]).optional().describe('Holiday catalog region. null disables the catalog.'),
+    holidayPublicPolicy: z.enum(['open', 'block', 'advisory']).optional().describe('Public booking holiday policy.'),
+    holidayInternalPolicy: z.enum(['advisory', 'block']).optional().describe('Internal scheduling holiday policy.'),
+    bookingConflictPolicy: z.enum(['advisory', 'block']).optional().describe('Double-booking policy for internal scheduling: advisory warns, block refuses the write.'),
+    legalMode: z.enum(['hosted', 'custom']).optional().describe('Privacy/Terms source.'),
+    customPrivacyUrl: z.string().url().max(500).nullish().describe('Custom Privacy URL; required with customTermsUrl when legalMode=custom. null clears.'),
+    customTermsUrl: z.string().url().max(500).nullish().describe('Custom Terms URL; required with customPrivacyUrl when legalMode=custom. null clears.'),
+    privacyBody: z.string().max(50_000).nullish().describe('Hosted Privacy body override; null/empty clears to template.'),
+    termsBody: z.string().max(50_000).nullish().describe('Hosted Terms body override; null/empty clears to template.'),
+}).openapi('TenantConfigPatch');
+
+/**
+ * Body schema for PATCH /api/admin/communication.
+ *
+ * `googleOAuthMode` is NOT a `tenant_configs` column — it is merged into the
+ * `integration_config` JSON by a separate service call. It stays in the schema
+ * because the endpoint accepts it; the write allowlist filters it out on the
+ * only ground that matters (it is not a column).
+ */
+export const CommunicationPatchSchema = z.object({
+    senderEmail:          z.string().nullable().describe('From: address, or null to clear.'),
+    replyTo:              z.string().nullable().describe('Reply-To: address, or null to clear.'),
+    emailMode:            z.enum(['platform', 'own']),
+    senderDisplayName:    z.string().nullable(),
+    pointOfContact:       z.enum(['inspector', 'company']),
+    googleOAuthMode:      z.enum(['platform', 'own']).optional(),
+}).openapi('CommunicationPatch');
+
+/**
+ * Body schema for PUT /api/team/defaults (Design System 0520 subsystem C P10.2).
+ * Deliberately NOT `.openapi()`-registered: it was an inline, unnamed schema
+ * before it moved here, and naming it now would change the published document.
+ */
+export const TeamDefaultsSchema = z.object({
+    teamModeDefault:          z.boolean().optional().describe('TODO describe teamModeDefault field for the OpenInspection MCP integration'),
+});
+
+/**
  * Body schema for inspector-facing PUT /api/admin/stripe-connect.
  * Validates the account ID matches Stripe's `acct_*` format.
  */
