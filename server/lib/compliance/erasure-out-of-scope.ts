@@ -80,10 +80,15 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'sms_consent_log',       column: 'recipient_type',           reason: 'role-kind enum, not personal data' },
     { table: 'report_versions',       column: 'signature',                reason: 'report-content integrity seal, not personal data' },
     // ── reports ───────────────────────────────────────────────────────────────
-    // A report is findings about a named person's property. Only `title` is
-    // free text a human writes, and it routinely carries the address ("123 Oak
-    // St — Radon"). The rest of the row is ids, enums and a timestamp, declared
-    // out of scope below.
+    // A report is findings about a named person's property. `title` is the only
+    // non-id column, and it is system-written — a literal or a snapshot of a
+    // tenant catalogue service name — so it has its own `anonymize` rule rather
+    // than an entry here. The rest of the row is ids, enums and a timestamp,
+    // declared out of scope below.
+    //
+    // (Corrected 2026-08-07 — this said `title` is "free text a human writes"
+    // that "routinely carries the address". False in both halves; the rule did
+    // not change. Amendment history is in `erasure-manifest.ts`.)
     { table: 'reports',               column: 'inspection_id',            reason: 'opaque id; the inspection row carries its own rules' },
     { table: 'reports',               column: 'tenant_id',                reason: 'tenant scope key, not personal data' },
     { table: 'reports',               column: 'id',                       reason: 'opaque primary key' },

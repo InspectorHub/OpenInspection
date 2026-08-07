@@ -341,10 +341,17 @@ export async function runErasure(
         return c;
     });
 
-    // A report TITLE is written by a human and routinely carries the property
-    // address ("123 Oak St — Radon"). The row itself survives: it is the spine
-    // of a signed, delivered document, and deleting it would strand the version
-    // chain that proves what was delivered. Only the title is cleared.
+    // A report TITLE is system-written — the literal 'Inspection Report' or a
+    // snapshot of a service line's name from the tenant's own catalogue — and no
+    // route can edit it. A catalogue name is still tenant-authored, so it cannot
+    // be assumed free of identifiers, and clearing it costs nothing. The row
+    // itself survives: it is the spine of a signed, delivered document, and
+    // deleting it would strand the version chain that proves what was delivered.
+    //
+    // (Corrected 2026-08-07. This comment previously said the title is "written
+    // by a human" and "routinely carries the property address" — false in both
+    // halves. The rule did not change; see the amendment history in
+    // `erasure-manifest.ts`.)
     //
     // Scoped through the subject's inspections rather than by matching the
     // title text — an address can be spelled several ways, and a title that
