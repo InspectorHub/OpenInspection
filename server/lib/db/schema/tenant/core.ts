@@ -102,6 +102,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
         .$type<{ cloneDefault: 'rating' | 'rating_notes' | 'all'; autoAdvanceDelayMs: number; pinnedTagIds: string[]; agentRepairAccess?: 'off' | 'read' | 'readwrite'; reportLinkTtl?: ReportLinkTtl }>(),
     // Sprint 2 S2-4 — when true, published reports render the per-defect
     // "Estimated cost: $X – $Y" badge.
+    // ⚠️ This column cannot currently be set to true: `BrandingService.updateBranding`
+    // refuses an enable (422) and accepts only a disable. Estimates are being reshaped
+    // into a deliverable of their own instead of a section of the signed report, so any
+    // new writer of this column must carry the same refusal or it is bypassed silently.
     showEstimates: integer('is_estimates_shown', { mode: 'boolean' }).notNull().default(false),
     // Track E1 (ITB §11, UC-ITB-07) — when true, the published report sub-nav
     // exposes a "Repair List" tab. Default OFF — opt-in for realtors who want

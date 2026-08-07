@@ -93,10 +93,29 @@ const ENV = (kv: ReturnType<typeof makeKv>) => ({
 
 const CTX = { waitUntil: vi.fn(), passThroughOnException: vi.fn() } as never;
 
+const INTUIT_TOKEN_HOST = 'oauth.platform.intuit.com';
+
+/**
+ * Match the token endpoint by EXACT host, never by substring.
+ *
+ * `String(u).includes('oauth.platform.intuit.com')` also matches
+ * `https://evil.example/?next=oauth.platform.intuit.com`, so as a router it can
+ * route the wrong call and as a finder it can find one. CodeQL flags the shape
+ * (`js/incomplete-url-substring-sanitization`) and it is right to: the test is
+ * weaker than it reads. Returns '' for an unparseable input so a malformed URL
+ * simply does not match.
+ */
+function hostOf(u: unknown): string {
+    try {
+        return new URL(String(u)).hostname;
+    } catch {
+        return '';
+    }
+}
+
 function tokenExchangeOk() {
     return vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.includes('oauth.platform.intuit.com')) {
+        if (hostOf(input) === INTUIT_TOKEN_HOST) {
             return new Response(JSON.stringify({
                 access_token:               'at',
                 refresh_token:              'rt',
@@ -155,7 +174,7 @@ describe('QBO OAuth callback authorization', () => {
         );
 
         const call = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
-            .find(([u]: [unknown]) => String(u).includes('oauth.platform.intuit.com'));
+            .find(([u]: [unknown]) => hostOf(u) === INTUIT_TOKEN_HOST);
         const body = new URLSearchParams(String((call![1] as RequestInit).body));
         expect(body.get('redirect_uri')).toBe(qboRedirectUri(APP_BASE_URL));
         expect(body.get('redirect_uri')).toBe(`${APP_BASE_URL}/api/integrations/qbo/callback`);

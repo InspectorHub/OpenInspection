@@ -239,12 +239,27 @@ export class BrandingService {
     /**
      * Updates the branding configuration for a tenant.
      *
-     * ⚠️ This is the gate for `cancellation_policy`. The refusal cannot be a Zod
-     * rule — it compares the submitted policy against DB state — so it lives
-     * here, in the writer, and a second writer of that column would bypass it
-     * without failing anything. See the column comment in the tenant schema.
+     * ⚠️ This is the gate for `cancellation_policy` and for `is_estimates_shown`.
+     * Neither refusal can be a Zod rule — one compares the submitted policy
+     * against DB state, the other must stay asymmetric (refuse `true`, accept
+     * `false`) — so both live here, in the writer, and a second writer of those
+     * columns would bypass them without failing anything. See the column
+     * comments in the tenant schema.
      */
     async updateBranding(tenantId: string, data: Partial<typeof tenantConfigs.$inferInsert>) {
+        // Estimates embedded in the signed report are switched off as a product
+        // decision, not because the rendering is broken: a cost figure printed
+        // inside the report reads as the inspector's own quote for the work.
+        // The capability returns as a SEPARATE deliverable, which is a redesign
+        // this boolean does not describe. Only `true` is refused — a tenant who
+        // already has estimates showing must always be able to turn them off.
+        if (data.showEstimates === true) {
+            throw Errors.UnprocessableEntity(
+                'Repair estimates cannot be shown inside the inspection report. '
+                + 'Estimates are being redesigned as a separate deliverable rather than a '
+                + 'section of the signed report, so this setting can only be turned off.',
+            );
+        }
         if (data.cancellationPolicy !== undefined && policyChargesFees(data.cancellationPolicy)) {
             if (!(await this.getCancellationAttestation(tenantId))) {
                 throw Errors.UnprocessableEntity(

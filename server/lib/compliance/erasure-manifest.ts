@@ -9,9 +9,20 @@
  *
  * G2 fills `ERASURE_MANIFEST`; this scaffold (G1) ships the type + an empty array.
  *
+ * ⚠️ HOW MUCH WEIGHT THIS FILE'S PROSE CAN CARRY. On 2026-08-07 two separate
+ * justifications in here were checked against the code and found FALSE: the
+ * `reports.title` rule claimed a column "a human writes" that is in fact
+ * system-written with no API that can edit it (corrected below, with an
+ * amendment history rather than a silent overwrite), and `repair_requests.
+ * created_by_ref` was documented as an opaque id while the code stores an email
+ * address in it — a compliance classification resting on a comment that had been
+ * wrong for as long as the feature existed. Both rules survived review because
+ * their reasoning read well. A premise stated in a comment is not evidence:
+ * before you rely on one of these paragraphs, go read what writes the column.
+ *
  * Executor: `erasure-orchestrator.ts` — the concrete Drizzle executor that
  * realizes these rules. Binding verified by
- * `tests/unit/erasure-manifest-coverage.spec.ts` (drift guard).
+ * `tests/unit/privacy/erasure-manifest-coverage.spec.ts` (drift guard).
  */
 
 /**
@@ -39,6 +50,26 @@ export interface ErasureRule {
     retention?: string;
     /** Row-state predicate restricting which rows this rule applies to. */
     condition?: 'signed_only' | 'draft_only';
+    /**
+     * Whether anything ACTUALLY expires this data, for rules that promise a
+     * bounded `retention`. Required on every `retain` rule that declares one,
+     * with no default: a retain nobody enforces is an unbounded retain, which is
+     * the blanket exclusion this manifest exists to avoid, and silence is how it
+     * would get there. 'enforced' = a sweep acts when the window elapses;
+     * 'pending' = the decision is recorded, the expiry is not built yet.
+     *
+     * `pending` is not self-service. `scripts/check-erasure-manifest.mjs` holds
+     * a checked-in list of the rules allowed to be pending and refuses any
+     * other, so adding one is a reviewed diff rather than a keyword.
+     */
+    enforcementStatus?: 'enforced' | 'pending';
+    /**
+     * ISO date (YYYY-MM-DD) by which a `pending` rule must become enforced.
+     * Required when `enforcementStatus` is 'pending', and the gate FAILS once it
+     * passes — a deadline that cannot act is how "pending" becomes permanent.
+     * Moving it is allowed; moving it silently is what this prevents.
+     */
+    enforcementDeadline?: string;
 }
 
 /**
@@ -155,16 +186,39 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     { table: 'erasure_log', column: 'subject_email', category: 'user.contact.email', action: 'retain', legalBasis: 'art_17_3_b' },
     // Signature evidence kept on a DSAR (the retention sweep destroys it past
     // the window); the esign audit chain is NEVER touched.
-    { table: 'agreement_signers',  column: 'signature_base64', category: 'user.biometric.signature', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
-    { table: 'agreement_requests', column: 'signature_base64', category: 'user.biometric.signature', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'agreement_signers',  column: 'signature_base64', category: 'user.biometric.signature', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'enforced' },
+    { table: 'agreement_requests', column: 'signature_base64', category: 'user.biometric.signature', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'enforced' },
     { table: 'esign_audit_logs',   column: 'signature',        category: 'system.integrity',         action: 'retain', legalBasis: 'art_17_3_e' },
 
     // ── reports ───────────────────────────────────────────────────────────────
-    // A report is findings about a named person's property, and `title` is the
-    // one free-text column a human writes — it routinely carries the address
-    // ("123 Oak St — Radon"). Anonymised rather than deleted: the row is the
-    // spine of a signed, delivered document, and removing it would strand the
-    // version chain that proves what was delivered.
+    // A report is findings about a named person's property. `title` is written
+    // by the system, never by a person composing free text about this client:
+    // it is either the literal 'Inspection Report' (`inspection/reports.ts`) or
+    // a snapshot of a service line's name taken from the tenant's own catalogue
+    // (`inspection/report-generation.ts`, both the insert and the adoption
+    // update). No route writes it — the only other writer is the erasure
+    // executor performing this very rule.
+    //
+    // Anonymised rather than deleted: the row is the spine of a signed,
+    // delivered document, and removing it would strand the version chain that
+    // proves what was delivered. A catalogue service name is tenant-authored,
+    // so it cannot be assumed free of identifiers, and anonymising a title
+    // costs nothing.
+    //
+    // AMENDMENT HISTORY
+    //   Previous rationale: "`title` is the one free-text column a human writes
+    //     — it routinely carries the address ("123 Oak St — Radon")."
+    //   Correction date:    2026-08-07
+    //   Why:                factually wrong about this codebase, in both halves.
+    //     No human writes it and no API can edit it, so it cannot routinely
+    //     carry a per-property address. Evidence: the two writers named above,
+    //     read 2026-08-07 (E2 — verified in source, not inferred from a plan).
+    //   Impact:             NONE on the processing decision. The action stays
+    //     `anonymize`, the basis and the period are unchanged. What changes is
+    //     the reason recorded for it.
+    //   Kept rather than overwritten: an accountability record under Art. 5(2)
+    //     that quietly deletes a mistake is worth less than one that shows the
+    //     mistake was found and corrected.
     { table: 'reports', column: 'title', category: 'user.address', action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y' },
 
     // ── audit_logs (#276) ─────────────────────────────────────────────────────
@@ -179,121 +233,81 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // `ip_address` stays too — staff-action security trail, declared out of
     // scope below.
     { table: 'audit_logs', column: 'metadata', category: 'user.freetext', action: 'anonymize', legalBasis: 'art_17_3_b' },
-];
 
-/**
- * A PII-heuristic column the manifest DELIBERATELY does not act on. Every entry
- * must say why — the reason is what a DSAR audit reads, and the CI gate
- * (`scripts/check-erasure-manifest.mjs`) hard-fails an entry without one.
- *
- * @gateConsumed `scripts/check-erasure-manifest.mjs` reads this declaration out
- * of the SOURCE TEXT (`arrayBody(src, 'ERASURE_OUT_OF_SCOPE')`) rather than
- * importing it — the gate is a plain .mjs script and the manifest is TypeScript.
- * That consumption is invisible to a module-graph analyzer, so knip would report
- * both symbols as dead. The tag (knip `tags: ["-gateConsumed"]`) says "a tool
- * consumes this", which is true; a dead-code baseline entry would have said
- * "this is dead and we tolerate it", which is not.
- */
-export interface ErasureOutOfScopeEntry {
-    table: string;
-    column: string;
-    reason: string;
-}
+    // ── repair requests (#88) ─────────────────────────────────────────────────
+    // The one surface where the CLIENT types prose rather than the tenant. None
+    // of these column names looks like PII, which is exactly why the gate never
+    // asked about them; they are ruled on because somebody read the table, not
+    // because anything went red.
+    //
+    // `created_by_ref` is NOT NULL and, on the portal-token path, holds the
+    // actor's EMAIL — a plain identifier, despite a schema comment that called
+    // it an id for years. So it is both the subject PII on this table and the
+    // locator for it: the ROWS the subject authored are deleted (no
+    // legal-evidence basis for a client's own wish-list, and the delete revokes
+    // the still-live `share_token`). `custom_intro` / `note` are cleared in
+    // place on lists OTHER people built for the subject's inspections, which
+    // survive as that person's record. Executor: `erase-repair-requests.ts`.
+    { table: 'repair_requests',      column: 'created_by_ref', category: 'user.contact.email', action: 'delete' },
+    { table: 'repair_requests',      column: 'custom_intro',   category: 'user.freetext',      action: 'null' },
+    { table: 'repair_request_items', column: 'note',           category: 'user.freetext',      action: 'null' },
 
-/** @gateConsumed read as source text by `scripts/check-erasure-manifest.mjs`. */
-export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
-    // Columns that ride with a row-delete rule above (per-column scan cannot
-    // see row semantics).
-    { table: 'contacts',            column: 'phone',        reason: 'rides with the contacts row delete (locator = email)' },
-
-    // Staff, not data subjects. Consumer-DSAR erasure never touches employee
-    // accounts; staff offboarding is a separate lifecycle.
-    { table: 'users',               column: 'email',                     reason: 'staff account — not consumer-DSAR scope' },
-    { table: 'users',               column: 'phone',                     reason: 'staff account — not consumer-DSAR scope' },
-    { table: 'users',               column: 'default_signature_base64',  reason: 'inspector (staff) signature asset' },
-    { table: 'users',               column: 'is_signature_enabled',      reason: 'boolean flag, not personal data' },
-    // An inspector's routing origin can be their home address, so it IS personal
-    // data — it is simply not a CONSUMER data subject's. Same posture as
-    // users.email/phone above: consumer-DSAR erasure never touches it and there
-    // is deliberately no DSAR-export path for it. Declared here so the decision
-    // is recorded rather than inferred from the PII heuristic not matching
-    // 'service_origin_address'.
-    { table: 'users',               column: 'service_origin_address',    reason: 'staff routing origin (may be a home address) — staff offboarding lifecycle, not consumer-DSAR scope' },
-    { table: 'users',               column: 'service_origin_lat',        reason: 'staff routing origin coordinate — not consumer-DSAR scope' },
-    { table: 'users',               column: 'service_origin_lng',        reason: 'staff routing origin coordinate — not consumer-DSAR scope' },
-    { table: 'tenant_invites',      column: 'email',                     reason: 'staff invite — not consumer-DSAR scope' },
-    { table: 'audit_logs',          column: 'ip_address',                reason: 'staff-action security audit trail' },
-    { table: 'report_signoff',      column: 'signature_ref',             reason: 'inspector (staff) signoff reference' },
-    { table: 'agreement_requests',  column: 'inspector_signature_base64', reason: 'inspector (staff) countersignature' },
-
-    // The controller's own business identity, not a data subject's.
-    { table: 'tenant_configs',      column: 'support_email',    reason: 'company-owned support address' },
-    { table: 'tenant_configs',      column: 'sender_email',     reason: 'company-owned sending address' },
-    { table: 'tenant_configs',      column: 'company_phone',    reason: 'company-owned phone' },
-    { table: 'tenant_configs',      column: 'company_lat',      reason: 'company office coordinate — controller business identity' },
-    { table: 'tenant_configs',      column: 'company_lng',      reason: 'company office coordinate — controller business identity' },
-
-    // Heuristic false positives — config values and references, not PII.
-    { table: 'tenant_configs',        column: 'email_mode',               reason: 'config enum, not personal data' },
-    { table: 'tenant_configs',        column: 'email_byo_provider',       reason: 'config enum, not personal data' },
-    { table: 'automations',           column: 'recipient_kind',           reason: 'config enum, not personal data' },
-    { table: 'automations',           column: 'recipient_role_profile_id', reason: 'role-profile reference, not personal data' },
-    { table: 'automations',           column: 'email_template_id',        reason: 'template reference, not personal data' },
-    { table: 'automation_logs',       column: 'recipient_role_key',       reason: 'role key, not personal data' },
-    { table: 'automation_logs',       column: 'recipient_contact_id',     reason: 'opaque id on the retained evidence ledger (see the automation_logs.recipient retain rule)' },
-    { table: 'contact_role_profiles', column: 'email_template_id',        reason: 'template reference, not personal data' },
-    { table: 'sms_consent_log',       column: 'recipient_type',           reason: 'role-kind enum, not personal data' },
-    { table: 'report_versions',       column: 'signature',                reason: 'report-content integrity seal, not personal data' },
-    // ── reports ───────────────────────────────────────────────────────────────
-    // A report is findings about a named person's property. Only `title` is
-    // free text a human writes, and it routinely carries the address ("123 Oak
-    // St — Radon"). The rest of the row is ids, enums and a timestamp, declared
-    // out of scope below.
-    { table: 'reports',               column: 'inspection_id',            reason: 'opaque id; the inspection row carries its own rules' },
-    { table: 'reports',               column: 'tenant_id',                reason: 'tenant scope key, not personal data' },
-    { table: 'reports',               column: 'id',                       reason: 'opaque primary key' },
-    { table: 'reports',               column: 'kind',                     reason: 'primary/ancillary enum, not personal data' },
-    { table: 'reports',               column: 'inspection_service_id',    reason: 'billing-line reference, not personal data' },
-    { table: 'reports',               column: 'template_id',              reason: 'template reference, not personal data' },
-    { table: 'reports',               column: 'status',                   reason: 'workflow enum, not personal data' },
-    { table: 'reports',               column: 'created_at',               reason: 'record timestamp, not personal data' },
-    { table: 'reports',               column: 'published_at',             reason: 'record timestamp, not personal data' },
-    { table: 'reports',               column: 'notified_at',              reason: 'record timestamp, not personal data' },
-    { table: 'reports',               column: 'sort_order',               reason: 'presentation ordering integer, not personal data' },
-    // The tenant's own published Privacy / Terms. `body_snapshot` is the
-    // company's prose, not a data subject's data, and the row's whole purpose is
-    // to be immutable — erasing it would destroy the record of what a document
-    // said at a date, which is the one thing it exists to answer. Listed rather
-    // than left silent because the PII heuristic does not flag any column here,
-    // and silence is not the same as a decision.
-    // The payment ledger. The `note` column has its own anonymize rule above;
-    // everything that carries a figure or an actor reference is declared here
-    // rather than left silent, because the heuristic flags none of it and
-    // silence is not the same as a decision.
-    { table: 'order_payments',        column: 'amount_cents',
-      reason: 'financial record retained under accounting/tax obligation; carries no subject identifier on its own' },
-    { table: 'order_payments',        column: 'recorded_by',
-      reason: 'staff user id (who keyed the payment) — not consumer-DSAR scope' },
-    { table: 'order_payments',        column: 'provider_ref',
-      reason: 'payment-processor reference on the retained financial row, not personal data' },
-    { table: 'tenant_legal_versions', column: 'body_snapshot',            reason: 'company-authored policy text, not personal data of any data subject' },
-    { table: 'tenant_legal_versions', column: 'published_by_user_id',     reason: 'staff author reference — not consumer-DSAR scope' },
-    // Pay splits (#278). A split is a payroll record about a STAFF member, held
-    // under accounting and employment obligations. A client's erasure request
-    // never reaches it — the client is not the data subject here. Declared
-    // rather than left silent: the PII heuristic flags none of these columns,
-    // and silence is not the same as a decision.
-    { table: 'inspection_service_pay_splits', column: 'user_id',
-      reason: 'payroll record for a staff member, retained under accounting and employment obligations; not client data, so a client erasure request does not reach it' },
-    { table: 'inspection_service_pay_splits', column: 'reason',
-      reason: 'free text a manager writes about a payout adjustment to a staff member — payroll audit trail, not consumer-DSAR scope' },
-    { table: 'service_pay_rules',             column: 'user_id',
-      reason: 'staff compensation rule — not consumer-DSAR scope' },
-    // The portal->core dead-letter queue (#276). Registered although the PII
-    // heuristic flags neither column, because silence here is exactly how this
-    // one hid: `envelope` and `reason` look like nothing.
-    { table: 'parked_cmd_events', column: 'envelope',
-      reason: 'Fingerprint only (type/dataschema/id/seq/size/digest) — the command payload is never written, so no subject PII reaches this table. It WAS payload-bearing before #276, when a cmd.tenant.update that failed to parse wrote an admin password hash here. Naming that history is deliberate: an out-of-scope entry that only says "no PII" invites restoring raw parking as a debugging convenience.' },
-    { table: 'parked_cmd_events', column: 'reason',
-      reason: 'Fixed diagnostic enum (parse-failed / unknown-type-or-version), not personal data.' },
+    // ── the property address family ───────────────────────────────────────────
+    // A property address is not automatically non-personal data: on a
+    // residential inspection ordered by the buyer or the homeowner it is where a
+    // person lives, held against a named client through `inspection_people`.
+    // Declaring the family out of scope as "property data" was considered and
+    // REJECTED — it was the cheapest way back to green and the one a red gate
+    // pushes you toward, which is why it was not ours to decide alone.
+    //
+    // RETAINED under Art. 17(3)(e) instead: the address identifies which
+    // property a report describes, and the report is the inspector's defence
+    // against a negligence claim. One entry per column, no wildcard — an auditor
+    // reads this file, and a wildcard hides what was actually considered.
+    //
+    // Retained means FOR A PERIOD. The bound is the tenant's existing
+    // `tenant_configs.agreement_retention_years` (default 6, hence 'P6Y'), NOT a
+    // second retention column: both windows answer the same question — how long
+    // a professional record must survive — for the same tenant under the same
+    // state rules and the same E&O cover, and two clocks that start equal drift.
+    //
+    // ⚠️ NOT YET ENFORCED — deadline 2027-02-01, carried on every rule below as
+    // `enforcementStatus: 'pending'` so nothing can read them as implemented.
+    // `retention-sweep.ts` reaches `agreement_requests` and `agreement_signers`
+    // only; nothing expires an inspection address today, so these rules record a
+    // decision no code acts on yet. That gap is the distance between the rule as
+    // written and the rule as honoured — NOT a licence to read 'retain' as
+    // 'forever', which is the rejected exclusion under another name.
+    //
+    // Why that date, so the next reader can argue with it rather than inherit
+    // it. The sweep is not a patch: `inspections` has no purge marker (the
+    // agreement pass keys on `signedAt` + `purged_at IS NULL`, and there is no
+    // equivalent here), so an idempotent sweep needs a schema change and a
+    // migration first; and nobody has yet chosen which column starts the clock
+    // for an inspection. Two quarters covers that work with review, and is short
+    // enough to land on someone who still holds the context. It is NOT derived
+    // from when the first address actually falls due — that is not computable
+    // until the clock column exists, which is precisely why the date has to come
+    // from review discipline instead.
+    //
+    // Two mechanisms keep this honest. The gate refuses any pending rule that is
+    // not on its checked-in list, and FAILS outright once the deadline passes.
+    // The tripwire in `tests/unit/privacy/erasure-manifest-coverage.spec.ts`
+    // fails the day the sweep learns about `inspections`, so this notice cannot
+    // outlive its gap either.
+    { table: 'inspections', column: 'property_address',  category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
+    { table: 'inspections', column: 'address_place_id',  category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
+    { table: 'inspections', column: 'address_street',    category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
+    { table: 'inspections', column: 'address_city',      category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
+    { table: 'inspections', column: 'address_state',     category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
+    { table: 'inspections', column: 'address_zip',       category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
+    { table: 'inspections', column: 'address_county',    category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
+    { table: 'inspections', column: 'address_lat',       category: 'user.location', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
+    { table: 'inspections', column: 'address_lng',       category: 'user.location', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
+    // The booking request the inspection was converted from. Its client_name /
+    // client_email / client_phone are already cleared in place above while the
+    // ROW survives, so the address is the one part of that record still
+    // standing — the same question, answered the same way rather than
+    // differently by omission.
+    { table: 'inspection_requests', column: 'property_address', category: 'user.address', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
 ];
