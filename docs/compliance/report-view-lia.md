@@ -4,11 +4,22 @@
 recipient who presented a valid portal access token.
 
 **Status:** written **before** the code (OI #271, Task 1 of the delivery
-confirmation plan). Nothing described here is implemented yet — there is no
-`report_views` table in the schema and no counter anywhere in `server/` or
-`app/` as of 2026-08-07. This document is therefore an assessment of a
-*proposal*, and it reaches a **split conclusion**: one shape of the feature
-passes the balancing test and one does not.
+confirmation plan), and **partially caught up to it on 2026-08-07**. It reaches
+a **split conclusion**: one shape of the feature passes the balancing test and
+one does not.
+
+What now exists in the code: the counter (`report_views`), keyed per section 3.4
+**option 3**, and the Art. 21 suppression marker
+(`inspection_access_tokens.view_tracking_objected_at`) with a recipient-facing
+route that accepts either portal entry path. Conditions 3 and 9 are therefore
+**met**.
+
+⚠️ What does NOT yet exist: the Art. 13 disclosure on the report page and in the
+message carrying the link (conditions **4** and **5**), and the inspector-facing
+surface that pairs "opened" with delivery status (condition **6**). Until those
+ship, **the counter is running outside this assessment** — section 3.2 says
+plainly that the balancing holds *only if the recipient is told*, and that is
+load-bearing inside the test rather than alongside it. See section 4.
 
 **Why this lives in the open-source repo.** Every deployment of
 OpenInspection — hosted or self-hosted — runs the same code and performs the
@@ -24,13 +35,20 @@ controller can adopt, adapt, or reject.
 
 ## 0. What is actually proposed
 
-A bounded counter table. Per (recipient, deliverable): whether it has ever been
-opened, when it was first opened, when it was last opened, and how many times.
-Three integers and a foreign-key-free pair of scope columns. No row per view.
+A bounded counter table. Per (recipient, **order** — see section 3.4(b) for why
+not per deliverable): whether it has ever been opened, when it was first opened,
+when it was last opened, and how many times. Three integers and a
+foreign-key-free pair of scope columns. No row per view.
 
-The counter is written on the server, in the loader that renders the public
-report page (`app/routes.ts:49` -> `app/routes/public/report-card-stack.tsx`),
-when a request arrives carrying a valid per-recipient portal token.
+The counter is written on the server, when a request carrying a valid
+per-recipient portal token renders the public report page (`app/routes.ts:49` ->
+`app/routes/public/report-card-stack.tsx`). As built, the write happens one
+level in from that loader, in the data route the loader calls
+(`server/api/public-report.ts`, via `server/lib/report-views.ts`), because that
+is where the grant, the headless-render flag and the owner-preview flag are
+*resolved* rather than relayed. The loader forwards the outer request's method
+and its `Purpose`/`Sec-Purpose` hints, which exist nowhere else, and derives
+nothing.
 
 Deliberately absent: IP address, user agent, referrer, device or browser
 fingerprint, per-section dwell time, scroll depth, and any record of *which
@@ -250,7 +268,7 @@ statements recorded about them is not outweighed by the controller's
 convenience in shipping sooner.
 
 There is a third option, and it is the honest one if the renderer is not going
-to change first:
+to change first. **It is the one that was built** (2026-08-07):
 
 3. **Record what the system actually observed.** The observation is "this
    recipient rendered the report page for this order". Key the row on
@@ -294,8 +312,12 @@ the assessment has to be redone rather than cited.
 
 3. **The row records only what was observed.** Either the renderer genuinely
    knows which deliverable it is showing, or the row is scoped to the order
-   and says so. See section 3.4(b). This condition is currently **unmet** —
-   the design choice is open.
+   and says so. See section 3.4(b). **MET (2026-08-07)** — option 3. The
+   `report_views` row is keyed `(tenant_id, inspection_id, access_token_id)`
+   and carries no `report_id` at all; the schema comment
+   (`server/lib/db/schema/portal-access.ts`) states why, so the next reader
+   cannot add one by guessing. When the renderer gains per-report identity the
+   column can be appended and the older rows stay honestly order-scoped.
 
 4. **The recipient is told, before the first open is counted.** The first
    render is the one that creates the record, so a disclosure that appears
@@ -334,18 +356,31 @@ the assessment has to be redone rather than cited.
 9. **An objection can be honoured without losing access.** A per-recipient
    suppression marker stops the counter while the link keeps working, and it
    does not clear counters already recorded. Added 2026-08-07; see the amendment
-   history under *Rights that follow from this basis*. This condition is
-   currently **unmet** — the marker does not exist.
+   history under *Rights that follow from this basis*. **MET (2026-08-07)** —
+   `inspection_access_tokens.view_tracking_objected_at`, a timestamp rather than
+   a boolean because an objection has a date. It is read at the increment
+   (`server/lib/report-views.ts`) and by nothing else; no access guard consults
+   it. The recipient reaches it at `POST /api/public/inspections/{id}/
+   view-tracking-objection`, over **either** the emailed `?token=` link or the
+   `__Host-portal_session` cookie — a session-only control would leave the right
+   unreachable for the recipients who only ever click the link, and a right most
+   of its holders cannot reach is not one. Any live recipient role may object,
+   not only client/co_client: section 3.1 identifies the agents and one-off
+   shares as having the weakest expectation, so they are the last population to
+   lock out.
 
-**Conditions 3 and 9 are not satisfied by the current design.** Until the report
-identity question is resolved in the direction of section 3.4 option 1 or
-option 3, and the suppression marker exists, the feature is not covered by this
-assessment. That is the intended outcome of writing the assessment first: it is
-allowed to say no to part of the proposal.
+**Conditions 3 and 9 are now met. Conditions 4, 5 and 6 are NOT.** The counter
+exists and can be stopped; the recipient is still not told it exists, and the
+inspector's surface that must not present "opened" as proof has not been built.
+Section 3.2 makes the disclosure load-bearing *inside* the balancing test, so
+**the feature as currently shipped is not covered by this assessment** — the
+remaining gap is transparency, not lawful basis or minimisation. Closing it is
+Tasks 3 and 4 of the delivery-confirmation plan.
 
 ⚠️ **Condition 9 is not a follow-up to conditions 1–8.** The objection path
 cannot ship after the collection it objects to — a counter that runs for a
 release with no way to stop it is processing this assessment does not cover.
+This is why the marker landed in the same change as the counter.
 
 ### Rights that follow from this basis
 
@@ -381,6 +416,14 @@ path.
 > weakness is now an **unmet condition** — the feature is not covered by this
 > assessment until the suppression marker exists. The lawful basis, the data
 > minimisation analysis and the balancing test are unchanged.
+>
+> **AMENDMENT 2 — 2026-08-07 (later the same day).** Conditions 3 and 9 moved
+> from *unmet* to *met*: the counter shipped keyed on (tenant, inspection,
+> access token) per section 3.4 option 3, and the suppression marker shipped in
+> the same change rather than after it. Nothing in sections 1–3 changed — this
+> records that the code caught up with the assessment, not that the assessment
+> moved. Conditions 4, 5 and 6 remain unmet, and section 4 now says so where a
+> reader looking for the go/no-go will see it.
 
 ---
 
@@ -436,6 +479,8 @@ not.
 
 ---
 
-**Assessment date:** 2026-08-07
-**Reassess when:** any item in section 5 is proposed, condition 3 is resolved,
-or the report renderer gains per-report identity.
+**Assessment date:** 2026-08-07 (amended twice the same day — see the amendment
+history in section 4)
+**Reassess when:** any item in section 5 is proposed, conditions 4/5/6 are
+closed (to confirm the feature is back inside this assessment), or the report
+renderer gains per-report identity.

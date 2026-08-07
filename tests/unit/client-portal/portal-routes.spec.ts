@@ -67,6 +67,7 @@ describe('portal API', () => {
                 const row = rows.find((r) => r.token === token);
                 if (!row) return null;
                 return {
+                    id: row.id,
                     inspectionId: row.inspectionId,
                     tenantId: row.tenantId,
                     role: row.role as 'client' | 'co_client' | 'agent',

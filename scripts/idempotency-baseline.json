@@ -31,7 +31,8 @@
         "POST /api/auth/setup": "One-time first-run bootstrap gated on the SETUP_CODE secret; there is no tenant yet to key on.",
         "POST /setup": "Same handler as POST /api/auth/setup (dual mount).",
         "POST /api/__test__/calendar-connection": "E2E-only hook, fail-closed behind E2E_EMAIL_SINK (404 in every real deploy) — not a production surface.",
-        "POST /api/services/discount/validate": "A POST that writes nothing: validateDiscountCode() only reads discount_codes and computes an amount — it does not increment uses_count or reserve the code — so a replay recomputes the same answer over unchanged state."
+        "POST /api/services/discount/validate": "A POST that writes nothing: validateDiscountCode() only reads discount_codes and computes an amount — it does not increment uses_count or reserve the code — so a replay recomputes the same answer over unchanged state.",
+        "POST /api/public/inspections/{id}/view-tracking-objection": "GDPR Art. 21 objection marker. No tenant on the context (portal-token/session gated), and the write is a no-op on replay: objecting again keeps the original date, withdrawing is an unconditional clear. See server/lib/report-views.ts writeViewTrackingObjection."
     },
     "pending": [
         "DELETE /api/admin/agreements/{id}",

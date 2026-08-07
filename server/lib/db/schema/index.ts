@@ -65,7 +65,7 @@ export { tenantCustomHolidays } from './holidays';
 export { inspectionUnits } from './units';
 // Design System 0520 subsystem D — ReportVersions (snapshot-on-publish)
 export { reportVersions } from './report-versions';
-export { inspectionAccessTokens } from './portal-access';
+export { inspectionAccessTokens, reportViews } from './portal-access';
 export { contactRoleProfiles, inspectionPeople } from './inspection/role-profiles';
 
 // Track I-a GDPR (spec §4) — append-only DSAR erasure decision log.

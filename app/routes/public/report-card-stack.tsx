@@ -89,11 +89,23 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  // the data route resolves the tenant from it (see public-report.ts). Without
  // forwarding it here the headless render gets "Report not found".
  const render = parsedUrl.searchParams.get("render") ?? undefined;
+ // OI #271 — RELAY, not judgement. The data route decides whether this render
+ // counts as a human opening the report (server/lib/report-views.ts), and the
+ // two signals that say "no human has seen this" — the method, and the
+ // prefetch/prerender hints — exist only on the OUTER request. The in-process
+ // API call is always a GET built by hono/client, so without this the filter
+ // would be green in tests and blind in production. Nothing is derived here;
+ // these are the inbound values verbatim.
+ const requestShape: Record<string, string> = { "x-oi-client-method": request.method };
+ for (const h of ["purpose", "sec-purpose"]) {
+   const v = request.headers.get(h);
+   if (v) requestShape[h] = v;
+ }
  const [res, brand] = await Promise.all([
  api.publicReport.report[":tenant"][":id"].$get({
  param: { tenant: params.tenant ?? "", id: params.id ?? "" },
  query: { token, render },
- }),
+ }, { headers: requestShape }),
  resolveTenantBrand(context, params.tenant, request),
  ]);
  const body = res.ok ? await res.json() : {};

@@ -8395,6 +8395,41 @@
     "description": "Public, no-login signature-chain verification for a signed agreement envelope. Returns chain validity + key fingerprint for independent verification."
   },
   {
+    "operationId": "getPublicViewTracking",
+    "method": "GET",
+    "pathTemplate": "/api/public/inspections/{id}/view-tracking",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the report link belongs to.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id the report link belongs to."
+          }
+        },
+        {
+          "name": "token",
+          "in": "query",
+          "required": false,
+          "description": "Persistent per-recipient portal access token (or present the __Host-portal_session cookie instead).",
+          "schema": {
+            "type": "string",
+            "description": "Persistent per-recipient portal access token (or present the __Host-portal_session cookie instead)."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Whether this recipient has objected to report-view measurement",
+    "description": "Reads the recipient's GDPR Art. 21 objection to report-view measurement. Gated by the recipient's own portal token (?token=) or the unified-portal session cookie."
+  },
+  {
     "operationId": "getRatingSystem",
     "method": "GET",
     "pathTemplate": "/api/rating-systems/{id}",
@@ -17773,6 +17808,52 @@
     },
     "summary": "Set a video poster frame (Stream-only: thumbnailTimestampPct as a 0..1 fraction)",
     "description": "Set the Cloudflare Stream poster frame and persist posterPct on the pool row. Stream-only — R2 videos use the r2-upload-poster route."
+  },
+  {
+    "operationId": "setPublicViewTrackingObjection",
+    "method": "POST",
+    "pathTemplate": "/api/public/inspections/{id}/view-tracking-objection",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the report link belongs to.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id the report link belongs to."
+          }
+        },
+        {
+          "name": "token",
+          "in": "query",
+          "required": false,
+          "description": "Persistent per-recipient portal access token (or present the __Host-portal_session cookie instead).",
+          "schema": {
+            "type": "string",
+            "description": "Persistent per-recipient portal access token (or present the __Host-portal_session cookie instead)."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "objected": {
+            "type": "boolean",
+            "description": "true records an objection (the counter stops); false withdraws it."
+          }
+        },
+        "required": [
+          "objected"
+        ]
+      }
+    },
+    "summary": "Object to (or withdraw an objection to) report-view measurement",
+    "description": "Records or withdraws the recipient's GDPR Art. 21 objection to report-view measurement. The report link is unaffected in both directions, and counters already recorded are not cleared (Art. 21 is not Art. 17)."
   },
   {
     "operationId": "setRepairIntro",
