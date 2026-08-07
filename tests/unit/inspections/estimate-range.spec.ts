@@ -218,7 +218,10 @@ describe('Sprint 2 S2-4 — repair estimate range', () => {
         expect(report.coverPhotoUrl).toBe(`https://cdn.example/${COVER_KEY}`);
     });
 
-    it('getReportData reflects tenant_configs.show_estimates=true', async () => {
+    it('getReportData forces showEstimates=false even when tenant_configs.show_estimates=1', async () => {
+        // A tenant that opted in before embedded estimates were withdrawn. The
+        // stored intent is deliberately left intact (the column is still there
+        // and still readable); what must not happen is the report rendering it.
         await testDb.insert(schema.tenantConfigs).values({
             tenantId: TENANT,
             showEstimates: true,
@@ -227,7 +230,20 @@ describe('Sprint 2 S2-4 — repair estimate range', () => {
         await svc.updateResults(INSPECTION_ID, TENANT, {
             'roof-shingles': { rating: 'Satisfactory' },
         });
+
         const report = await svc.getReportData(INSPECTION_ID, TENANT);
-        expect(report.showEstimates).toBe(true);
+        expect(report.showEstimates).toBe(false);
+
+        // The two numbers that must disagree: what the tenant asked for vs what
+        // the renderer is handed. Printing both makes the guard's job visible —
+        // if the stored value ever reads false the assertion above would pass
+        // for the wrong reason (nothing was pinned; there was nothing to pin).
+        const stored = await testDb
+            .select({ v: schema.tenantConfigs.showEstimates })
+            .from(schema.tenantConfigs)
+            .where(eq(schema.tenantConfigs.tenantId, TENANT))
+            .get();
+        expect(stored?.v).toBe(true);
+        expect(report.showEstimates).not.toBe(stored?.v);
     });
 });
