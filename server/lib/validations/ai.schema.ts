@@ -32,12 +32,23 @@ export const AutoSummaryResponseSchema = createApiResponseSchema(z.object({
 
 /**
  * Input for the AI comment suggestion request.
+ *
+ * NO PROPERTY ADDRESS, AND NOT BY OMISSION. The schema used to accept
+ * `propertyAddress`; the prompt never referenced it, so the address was
+ * validated and then dropped — a good outcome that rested entirely on a comment
+ * in `lib/ai/prompts.ts` saying the prompt "names what it uses". One rewording
+ * of that prompt would have started sending client addresses to a third-party
+ * model with no change here, no change at the route, and nothing for a reviewer
+ * to catch. The field is deleted rather than guarded: what does not exist
+ * cannot be interpolated by accident. This object is the complete list of facts
+ * the suggestion feature may send to a provider — adding an identifier of the
+ * property or the client to it is a privacy decision, not a prompt tweak.
+ * Guarded by `tests/unit/ai/prompt-address-boundary.spec.ts`.
  */
 export const SuggestCommentSchema = z.object({
     itemName:        z.string().min(1).max(200).openapi({ example: 'Roof Covering' }).describe('TODO describe itemName field for the OpenInspection MCP integration'),
     sectionName:     z.string().min(1).max(200).openapi({ example: 'Roof' }).describe('TODO describe sectionName field for the OpenInspection MCP integration'),
     rating:          z.string().optional().openapi({ example: 'Defect' }).describe('TODO describe rating field for the OpenInspection MCP integration'),
-    propertyAddress: z.string().optional().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
     yearBuilt:       z.number().int().nullable().optional().describe('TODO describe yearBuilt field for the OpenInspection MCP integration'),
     sqft:            z.number().int().nullable().optional().describe('TODO describe sqft field for the OpenInspection MCP integration'),
 }).openapi('SuggestCommentRequest');

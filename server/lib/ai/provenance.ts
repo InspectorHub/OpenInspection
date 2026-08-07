@@ -1,0 +1,81 @@
+/**
+ * The AI provenance sink, built once per request and injected into AIService.
+ *
+ * Shaped exactly like `metering.ts` and for the same reason: there is ONE
+ * chokepoint (`AIService.callGemini`) and everything that must happen on every
+ * AI call is wired there, as an injected seam rather than as a call the service
+ * makes for itself. A second write site somewhere else would be a second answer
+ * to "what ran", and two records of one call eventually disagree.
+ *
+ * WHERE THE FACTS COME FROM, AND WHY THEY ARE SPLIT THE WAY THEY ARE.
+ *   - tenant / mode / model are REQUEST-scoped and arrive here already
+ *     resolved, from the same single credential read in `di.ts` that tags the
+ *     meter and answers the capability gate. Re-resolving them here would
+ *     create a third opinion about whose key a call runs on, and the whole
+ *     point of the injected picture is that there is only one.
+ *   - capability / promptVersion / provider are CALL-scoped and come from the
+ *     chokepoint: the workload it is running, the version token of the prompt
+ *     it rendered, and the id of the adapter instance it is about to call. The
+ *     provider id is read off the adapter rather than off configuration so the
+ *     row names the backend that actually ran.
+ *
+ * WHAT IS NOT HERE: the prompt. Not truncated, not hashed, not "just the first
+ * line". See the schema comment on `ai_call_provenance` — the entry type below
+ * has no field that could carry it, which is the enforcement.
+ */
+import { drizzle } from 'drizzle-orm/d1';
+import { aiCallProvenance } from '../db/schema';
+import type { AiUsageKind } from '../usage/period';
+import type { AiCredentialSource } from './resolve-provider';
+
+/** The per-call facts. Deliberately closed: there is no `prompt` field, and
+ *  adding one is a compliance decision (schema comment on the table). */
+export interface AiProvenanceEntry {
+    capability: AiUsageKind;
+    /** `AI_PROMPTS[…].version` — the whole reason those tokens are stable. */
+    promptVersion: string;
+    /** `AiProvider.id` of the adapter that is about to be called. */
+    provider: string;
+}
+
+export interface AiProvenanceSink {
+    record(entry: AiProvenanceEntry): Promise<void>;
+}
+
+/**
+ * Build the sink for one request, or `undefined` when there is no tenant to
+ * attribute a call to.
+ *
+ * `undefined` is not "skip the record": `tenant_id` is NOT NULL and a row that
+ * belongs to no workspace could not be scoped, exported or explained, so the
+ * chokepoint treats a missing sink as a refusal to run the call at all. Every
+ * AI route is role-gated and therefore always has a tenant; the undefined arm
+ * exists so that stops being true LOUDLY if a public path ever reaches the
+ * service.
+ */
+export function buildAiProvenanceSink(args: {
+    db: D1Database;
+    tenantId: string | null;
+    /** Resolved credential source — the meter's tag and the gate's source. */
+    source: AiCredentialSource;
+    /** Model id in force for this deployment (`AI_MODEL`). */
+    model: string;
+}): AiProvenanceSink | undefined {
+    const { db, tenantId, source, model } = args;
+    if (!tenantId) return undefined;
+
+    return {
+        record: async (entry) => {
+            await drizzle(db).insert(aiCallProvenance).values({
+                id: crypto.randomUUID(),
+                tenantId,
+                capability: entry.capability,
+                provider: entry.provider,
+                mode: source,
+                model,
+                promptVersion: entry.promptVersion,
+                createdAt: new Date(),
+            });
+        },
+    };
+}

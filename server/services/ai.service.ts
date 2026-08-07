@@ -8,7 +8,9 @@ import {
     AI_PROMPTS,
     type RewriteCommentPromptArgs,
     type SuggestCommentPromptArgs,
+    type VersionedPrompt,
 } from '../lib/ai/prompts';
+import type { AiProvenanceSink } from '../lib/ai/provenance';
 import type { AiUsageKind } from '../lib/usage/period';
 
 /**
@@ -38,7 +40,11 @@ import type { AiUsageKind } from '../lib/usage/period';
  *
  * The PROMPTS live in `lib/ai/prompts.ts`, each under a stable version token,
  * so the largest input to a model's output is nameable rather than an inline
- * literal that can be reworded in passing.
+ * literal that can be reworded in passing. Those tokens are now WRITTEN DOWN:
+ * `callGemini` records provider / mode / model / prompt version / timestamp to
+ * `ai_call_provenance` before anything leaves the process. Until it did, the
+ * versioning was a naming convention that produced no evidence for any output
+ * this product has ever generated.
  *
  * Sprint 1 A-4: when running in `standalone` mode without a Gemini API key,
  * `suggestComment` returns dev-mock suggestions so local development can
@@ -76,6 +82,16 @@ export class AIService {
          *  though it had. Callers that mean "the tenant's own, confirmed key"
          *  say so. */
         private credentials: AiCredentialPicture = { source: 'byo', tenantKeyAttested: false },
+        /** Where the record of each call is written. Built in `di.ts` from the
+         *  SAME credential picture as the meter and the gate above, so the mode
+         *  a provenance row states and the mode the usage row is tagged with
+         *  cannot be two different answers.
+         *
+         *  Optional in the TYPE, refused at RUNTIME: an object that says
+         *  nothing about provenance has not established one, and a service
+         *  constructed without a sink must not inherit a silent bypass. The
+         *  same fail-closed reading as the confirmation above. */
+        private provenance?: AiProvenanceSink,
     ) {}
 
     private isDevMode(): boolean {
@@ -113,11 +129,23 @@ export class AIService {
      * The Gemini HTTP shape lives in `lib/ai/providers/gemini.ts` and nowhere
      * else. Keeping a second copy here would mean every future backend gets
      * written twice, which is the exact cost the abstraction exists to avoid.
-     * Credential and model validation (including the fail-closed empty-model
-     * case) is the adapter's, so the two entry points below that do not
-     * pre-check are still covered.
+     * Credential validation stays the adapter's, so the two entry points below
+     * that do not pre-check are still covered. The empty-model case is asked
+     * HERE as well as in the adapter — see below for why the earlier of the two
+     * matters now.
+     *
+     * It takes a VERSIONED PROMPT plus its arguments, not a rendered string.
+     * That is the difference between a prompt version that exists and one that
+     * is recorded: while callers rendered the text themselves, the version
+     * token was in scope at every call site and reached this method at none of
+     * them. There is no overload accepting bare text, so no feature can send a
+     * prompt this method cannot name.
      */
-    private async callGemini(prompt: string, kind: AiUsageKind = 'assist') {
+    private async callGemini<A>(
+        prompt: VersionedPrompt<A>,
+        args: A,
+        kind: AiUsageKind = 'assist',
+    ) {
         // The capability gate, placed AFTER credential resolution (the source
         // was resolved upstream and handed to the constructor) and BEFORE any
         // content leaves the process. Every AI feature funnels through here, so
@@ -136,8 +164,39 @@ export class AIService {
         const decision = checkAiCapability(kind, this.credentials);
         if (!decision.allowed) throw Errors.AINotConfigured(decision.message);
 
+        // Hoisted from the adapter so a call that cannot possibly run does not
+        // first write a provenance row claiming it was made. Same error, same
+        // message — the adapter still checks, for callers that reach it another
+        // way — asked one step earlier so the ledger only holds real sends.
+        this.assertModelConfigured();
+
+        // FAIL CLOSED on a missing sink. The alternative — record when a sink
+        // happens to be present — is the failure this whole change is about: a
+        // capability that produces output while leaving no evidence, with
+        // nothing red to show for it. Reusing AINotConfigured keeps one
+        // failure shape for "this call cannot run" (see the gate above), and it
+        // is the one code `suggestComment` re-throws instead of degrading to an
+        // empty list.
+        const provenance = this.provenance;
+        if (!provenance) {
+            throw Errors.AINotConfigured(
+                'AI is unavailable: this request cannot record AI call provenance.',
+            );
+        }
+
         const provider = new GeminiProvider({ apiKey: this.apiKey, model: this.model });
-        const { text } = await provider.complete({ prompt });
+        // BEFORE the send, and awaited. The meter runs after success because a
+        // failed call consumed no allowance; provenance is the opposite
+        // question — the prompt leaves the process either way, so the record of
+        // it has to exist first. A sink that cannot write therefore stops the
+        // send rather than letting inspection content reach a third party
+        // untracked.
+        await provenance.record({
+            capability: kind,
+            promptVersion: prompt.version,
+            provider: provider.id,
+        });
+        const { text } = await provider.complete({ prompt: prompt.render(args) });
         // Meter AFTER success, never before — a model call that failed must not
         // consume an allowance it did not spend. The swallowed rejection
         // matches the send sites: a metering failure must never fail the
@@ -150,7 +209,7 @@ export class AIService {
      * Rewrites a rough note into a professional report comment.
      */
     async generateProfessionalComment(text: string, context?: string) {
-        return this.callGemini(AI_PROMPTS.professionalComment.render({ text, context }));
+        return this.callGemini(AI_PROMPTS.professionalComment, { text, context });
     }
 
     /**
@@ -177,7 +236,7 @@ export class AIService {
 
         if (!defects) return 'No significant defects observed during this inspection.';
 
-        return this.callGemini(AI_PROMPTS.inspectionSummary.render({ defects }));
+        return this.callGemini(AI_PROMPTS.inspectionSummary, { defects });
     }
 
     /**
@@ -202,7 +261,7 @@ export class AIService {
         }
         this.assertModelConfigured();
 
-        const text = await this.callGemini(AI_PROMPTS.rewriteComment.render(input));
+        const text = await this.callGemini(AI_PROMPTS.rewriteComment, input);
         // Strip wrapping quotes / markdown the model sometimes adds.
         return text.replace(/^["'`]+|["'`]+$/g, '').trim();
     }
@@ -213,9 +272,7 @@ export class AIService {
      * UI can surface a clear "set up your API key" message instead of a silent
      * empty popover. Runtime Gemini failures still degrade to an empty array.
      */
-    async suggestComment(params: SuggestCommentPromptArgs & {
-        propertyAddress?: string;
-    }): Promise<string[]> {
+    async suggestComment(params: SuggestCommentPromptArgs): Promise<string[]> {
         if (!this.hasApiKey()) {
             // Sprint 1 A-4: dev-mode mock so local development can exercise
             // the full Suggest flow without burning Gemini quota.
@@ -237,7 +294,7 @@ export class AIService {
         this.assertModelConfigured();
 
         try {
-            const text = await this.callGemini(AI_PROMPTS.suggestComment.render(params));
+            const text = await this.callGemini(AI_PROMPTS.suggestComment, params);
             const match = text.match(/\[[\s\S]*\]/);
             if (!match) return [];
             return JSON.parse(match[0]) as string[];

@@ -98,11 +98,17 @@ describe('the gate at the AI chokepoint', () => {
     });
     afterEach(() => { globalThis.fetch = originalFetch; });
 
+    /** The provenance sink every construction gets. Its own behaviour is
+     *  covered in `provenance.spec.ts`; here it exists because the chokepoint
+     *  refuses to run without one, so a case that omitted it would pass on the
+     *  wrong refusal. */
+    const provenance = { record: async () => {} };
+
     function service(
         credentials: { source: 'byo' | 'managed'; tenantKeyAttested: boolean },
         record: () => Promise<void>,
     ) {
-        return new AIService({} as D1Database, 'a-key', 'saas', 'a-model', { record }, credentials);
+        return new AIService({} as D1Database, 'a-key', 'saas', 'a-model', { record }, credentials, provenance);
     }
 
     it('a refused call records NO usage and sends nothing', async () => {

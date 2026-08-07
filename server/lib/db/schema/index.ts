@@ -97,3 +97,7 @@ export type { IdempotencyKey, NewIdempotencyKey } from './idempotency';
 // Pay splits (#278) — per-service-line inspector earnings, recorded not derived.
 export { servicePayRules, inspectionServicePaySplits } from './pay-split';
 export type { ServicePayRule, InspectionServicePaySplit } from './pay-split';
+// AI call provenance — provider/mode/model/prompt-version per call. Metadata
+// only; the prompt text is never stored (see the file for why that is a rule).
+export { aiCallProvenance } from './ai';
+export type { AiCallProvenance, NewAiCallProvenance } from './ai';
