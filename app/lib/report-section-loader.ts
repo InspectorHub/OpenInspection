@@ -14,6 +14,7 @@
 import { createApi } from "~/lib/api-client.server";
 import { m } from "~/paraglide/messages";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { readViewTrackingObjected } from "~/lib/view-tracking.server";
 import { EMPTY_BRAND } from "~/lib/brand";
 import type {
   ReportLoaderResult,
@@ -36,12 +37,21 @@ export async function loadReportSection(
   // there is no `?tocpages=` param to resolve here (mirrors printMode = false).
   try {
     const api = createApi(context);
-    const [res, brand] = await Promise.all([
+    // OI #271 — resolved with the report, for the same reason the standalone
+    // route does it: the Art. 21 control has to render with the right label
+    // server-side. Both portal entry paths are relayed (the hub reader has a
+    // session cookie, the emailed-link reader has `?token=`).
+    const [res, brand, viewTrackingObjected] = await Promise.all([
       api.publicReport.report[":tenant"][":id"].$get({
         param: { tenant, id: inspectionId },
         query: { token: token || undefined },
       }),
       resolveTenantBrand(context, tenant, request),
+      readViewTrackingObjected(context, {
+        inspectionId,
+        token: token || undefined,
+        cookie: request.headers.get("cookie") ?? undefined,
+      }),
     ]);
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as unknown as ReportLoaderResult | undefined;
@@ -65,6 +75,7 @@ export async function loadReportSection(
       enableCustomerRepairExport: d?.enableCustomerRepairExport ?? false,
       reportTimeZone: d?.reportTimeZone ?? "UTC",
       isDelivered: d?.isDelivered ?? false,
+      viewTrackingObjected,
       brand,
       error: res.ok ? null : m.helper_section_report_not_found(),
       notPublished: (res.status as number) === 403,

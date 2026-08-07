@@ -89,9 +89,10 @@ interface ItemAttribute {
     required?: boolean;
     isSafety?: boolean;
     isDefect?: boolean;
+    /** WHAT to do about the attribute reading badly — never what it costs. The
+     *  former `estimateMin` / `estimateMax` pair is rejected by the template
+     *  write schema; see the TemplateItem note below. */
     recommendation?: string | null;
-    estimateMin?: number | null;
-    estimateMax?: number | null;
 }
 
 /** Per-item sub-properties — only meaningful on non-rich types. */
@@ -128,9 +129,18 @@ export interface TemplateItem {
     number?: string;
     required?: boolean;
     isSafety?: boolean;
+    /**
+     * The remedy this item usually calls for, as prose. Scope, not a figure.
+     *
+     * The `defaultEstimateMin` / `defaultEstimateMax` pair that sat beside it is
+     * gone, and the template write schema now REJECTS both (the item schemas are
+     * `.strict()`). A template is reused across every property a company
+     * inspects, so a repair price declared here is a number that knows nothing
+     * about the property it ends up printed against — the same reason the
+     * canned-comment estimate columns were dropped. See
+     * `scripts/check-price-capability.mjs`.
+     */
     defaultRecommendation?: string;
-    defaultEstimateMin?: number | null;
-    defaultEstimateMax?: number | null;
     attributes?: ItemAttribute[];
     source?: ItemSource | null;
 }

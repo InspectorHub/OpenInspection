@@ -350,11 +350,12 @@ export class InspectionReportService extends InspectionSubService {
                         effectiveTimeframe: mustacheVars.timeframe,
                         // #181 PR-G: pending uploads have no R2 object yet — skip them.
                         defectPhotos: (st?.photos ?? []).filter(p => !p.pendingUpload).map(mapReportPhoto),
-                        // Sprint 2 S2-3 / S2-4 — per-defect contractor recommendation +
-                        // repair estimate range. Null when the inspector left them blank.
+                        // Sprint 2 S2-3 — per-defect contractor recommendation.
+                        // Null when the inspector left it blank. There is no
+                        // estimateLow / estimateHigh beside it: a stored finding
+                        // may still hold the pair, and this is one of the reads
+                        // that used to publish it.
                         recommendationId: st?.recommendationId ?? null,
-                        estimateLow:      typeof st?.estimateLow  === 'number' ? st.estimateLow  : null,
-                        estimateHigh:     typeof st?.estimateHigh === 'number' ? st.estimateHigh : null,
                     };
                 });
 
@@ -370,31 +371,21 @@ export class InspectionReportService extends InspectionSubService {
                     drivesSummary: defectDrivesSummary(cd.effectiveCategory, defectCategories),
                 }));
 
-                // Sprint 2 S2-3 / S2-4 — when the inspector left the legacy
-                // top-level recommendation / estimate empty but tagged the
-                // included canned defects with per-defect values, surface
-                // those at the item level so the report card stack can
-                // render the badge without extending its data contract.
-                //   - estimateMin = min(defects[].estimateLow)
-                //   - estimateMax = max(defects[].estimateHigh)
+                // Sprint 2 S2-3 — when the inspector left the legacy top-level
+                // recommendation empty but tagged the included canned defects,
+                // surface the label at the item level so the report card stack
+                // can render the badge without extending its data contract.
                 //   - recommendation = the most-recent included defect's
                 //     human-readable label (joined with " · " when several)
-                let itemEstimateMin: number | null = res.estimateMin ?? null;
-                let itemEstimateMax: number | null = res.estimateMax ?? null;
+                //
+                // The estimateMin / estimateMax pair that used to be computed
+                // here — min(defects[].estimateLow) / max(defects[].estimateHigh),
+                // rendered as an "Estimated cost" badge — is gone. It was the
+                // only reader that turned per-defect cents into a figure printed
+                // under the inspection company's letterhead, and the company
+                // never chose it.
                 let itemRecommendation: string | null = res.recommendation ?? null;
                 const includedDefects = defects.filter(d => d.included);
-                if (itemEstimateMin == null) {
-                    const lows = includedDefects
-                        .map(d => d.estimateLow)
-                        .filter((n): n is number => typeof n === 'number');
-                    if (lows.length > 0) itemEstimateMin = Math.round(Math.min(...lows) / 100);
-                }
-                if (itemEstimateMax == null) {
-                    const highs = includedDefects
-                        .map(d => d.estimateHigh)
-                        .filter((n): n is number => typeof n === 'number');
-                    if (highs.length > 0) itemEstimateMax = Math.round(Math.max(...highs) / 100);
-                }
                 if (itemRecommendation == null) {
                     const slugs = Array.from(new Set(
                         includedDefects
@@ -431,8 +422,6 @@ export class InspectionReportService extends InspectionSubService {
                     notes: res.notes ?? null,
                     photos,
                     recommendation: itemRecommendation,
-                    estimateMin: itemEstimateMin,
-                    estimateMax: itemEstimateMax,
                     repairItems: mapRepairItems(res),
                     // Non-rich item types persist the captured value on
                     // res.value; surface it to the report viewer plus the

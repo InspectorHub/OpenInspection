@@ -17,6 +17,13 @@
  * Outbox auto-expands when needsAttention > 0 — a failure must never hide
  * behind a disclosure.
  *
+ * The Outbox opens with <ReportDeliveryList> (OI #271): the per-recipient
+ * answer to "did the report reach them, and did they open it", above the ledger
+ * rather than merged into it. LIA condition 6 wants "opened" paired with
+ * delivery status, and the rows below are where the reason for a failure
+ * lives — see `docs/compliance/report-view-lia.md` §3.4(a) before making that
+ * list look like a dashboard.
+ *
  * Polling (design §3.14): one payload reload every 45s while the tab is
  * visible, stopped on visibilitychange, plus an immediate revalidate after a
  * send. Every poll is a Worker request and a D1 read and Workers Free meters
@@ -26,8 +33,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useFetcher } from "react-router";
 import { Card } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { BlockHeading } from "./BlockHeading";
 import { OutboxList } from "./OutboxList";
+import { ReportDeliveryList } from "./ReportDeliveryList";
 import { MessageThread, type ThreadMessage } from "~/components/messaging/MessageThread";
 import { groupDeliveries, type DeliveryRow } from "~/lib/communication-view";
 import type { CommunicationPayload } from "~/routes/resources/inspection-communication";
@@ -63,6 +72,8 @@ export function CommunicationSection({
     threadOptions: ThreadOption[];
     onGetConsent?: () => void;
 }) {
+    const timeZone = useDisplayTimeZone();
+    const locale = useDisplayLocale();
     const [messagesOpen, setMessagesOpen] = useState(false);
     // A failure must never hide behind a disclosure.
     const [outboxOpen, setOutboxOpen] = useState(counts.needsAttention > 0);
@@ -265,10 +276,26 @@ export function CommunicationSection({
                 {outboxOpen && (
                     payload.state === "loading" && !loaded ? (
                         <p className="text-[12px] text-ih-fg-4 py-4 text-center">{m.comm_loading()}</p>
-                    ) : groups.length > 0 ? (
-                        <OutboxList groups={groups} onGetConsent={onGetConsent} onResend={handleResend} />
                     ) : (
-                        <p className="text-[12px] text-ih-fg-4 py-4 text-center">{outboxEmpty}</p>
+                        <>
+                            {/* OI #271 — "did the report reach them, and did they
+                                open it?", at the head of the block an inspector
+                                opens to ask it. Deliberately ABOVE the ledger and
+                                not merged into it: LIA condition 6 wants "opened"
+                                paired with delivery status, and the rows below are
+                                where the reason for a failure lives. It rides this
+                                payload, so the answer costs no extra round trip. */}
+                            <ReportDeliveryList
+                                rows={payload.data?.reportLinks ?? []}
+                                timeZone={timeZone}
+                                locale={locale}
+                            />
+                            {groups.length > 0 ? (
+                                <OutboxList groups={groups} onGetConsent={onGetConsent} onResend={handleResend} />
+                            ) : (
+                                <p className="text-[12px] text-ih-fg-4 py-4 text-center">{outboxEmpty}</p>
+                            )}
+                        </>
                     )
                 )}
             </div>

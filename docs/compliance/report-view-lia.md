@@ -4,22 +4,22 @@
 recipient who presented a valid portal access token.
 
 **Status:** written **before** the code (OI #271, Task 1 of the delivery
-confirmation plan), and **partially caught up to it on 2026-08-07**. It reaches
-a **split conclusion**: one shape of the feature passes the balancing test and
-one does not.
+confirmation plan), and **caught up to it on 2026-08-07**. It reaches a **split
+conclusion**: one shape of the feature passes the balancing test and one does
+not.
 
-What now exists in the code: the counter (`report_views`), keyed per section 3.4
-**option 3**, and the Art. 21 suppression marker
+What exists in the code: the counter (`report_views`), keyed per section 3.4
+**option 3**; the Art. 21 suppression marker
 (`inspection_access_tokens.view_tracking_objected_at`) with a recipient-facing
-route that accepts either portal entry path. Conditions 3 and 9 are therefore
-**met**.
-
-⚠️ What does NOT yet exist: the Art. 13 disclosure on the report page and in the
-message carrying the link (conditions **4** and **5**), and the inspector-facing
-surface that pairs "opened" with delivery status (condition **6**). Until those
-ship, **the counter is running outside this assessment** — section 3.2 says
-plainly that the balancing holds *only if the recipient is told*, and that is
-load-bearing inside the test rather than alongside it. See section 4.
+route that accepts either portal entry path; the Art. 13 disclosure, as a
+platform-rendered block in every message that carries a report link and on the
+report page itself; and the inspector-facing surface that pairs "opened" with
+delivery status in three states. **All nine conditions in section 4 are now
+met**, and the compile-time switch that had been holding the counter shut
+(`server/lib/report-views.gate.ts`) was deleted in the change that closed
+conditions 4, 5 and 6 — the same change, deliberately, because section 3.2 makes
+the disclosure load-bearing *inside* the balancing test rather than alongside
+it.
 
 **Why this lives in the open-source repo.** Every deployment of
 OpenInspection — hosted or self-hosted — runs the same code and performs the
@@ -327,19 +327,50 @@ the assessment has to be redone rather than cited.
    (`server/lib/notifications/classes.ts:118`, `:119`, `:149`, `:157`,
    `:185`-`:188`), which bounds the problem to the email path — but a link an
    inspector copies out and sends by hand is outside that system, and the
-   disclosure cannot reach it.
+   disclosure cannot reach it. **MET (2026-08-07)** — the notice rides all
+   **four** descriptors that hand over a report link (`report-ready`,
+   `report-ready-pdf`, `agent-share-link` in
+   `server/lib/email-templates/catalog/client.ts`, `agent-report-ready` in
+   `catalog/agent.ts`), and it also renders on the report page for the
+   copied-out link that no message system can reach. The copy is three
+   sentences in a fixed order — the fact, the limit, then the exit
+   (`server/lib/legal/report-view-disclosure.ts`). The **limit** sentence is
+   load-bearing: sections 2 and 3.3 pass *because* the IP address, the device
+   signal and the per-finding trail are absent, so a notice stating only the
+   fact understates the design.
 
 5. **The disclosure cannot be edited away.** The delivery copy is
    tenant-editable, and an editable default only seeds a per-tenant row — it
    cannot carry a guarantee. The notice must be a system-rendered block (the
    mechanism exists: `SystemBlockKind` in
-   `server/lib/email-templates/types.ts:17`, currently `'auditMetadata' |
-   'attachmentManifest' | 'icsHint'`), not template text a tenant can delete.
-   A disclosure a tenant can remove is a disclosure this assessment cannot
-   rely on.
+   `server/lib/email-templates/types.ts`), not template text a tenant can
+   delete. A disclosure a tenant can remove is a disclosure this assessment
+   cannot rely on. **MET (2026-08-07)** — `'viewDisclosure'`, a fourth
+   `SystemBlockKind` beside `'auditMetadata' | 'attachmentManifest' |
+   'icsHint'`, rendered by the platform from a versioned constant and
+   unreachable from the template editor. `tests/unit/email/report-view-
+   disclosure.spec.ts` renders with a tenant override that blanks every
+   editable block and asserts the notice survives it. The version is stamped
+   onto each rendered instance (`data-disclosure-version`) so a later rewording
+   cannot retroactively re-caption a document already delivered — there is no
+   archive of superseded copy, which is the same reason
+   `lib/legal/agreement-language-disclosure.ts` carries a version.
 
 6. **The inspector-facing surface pairs "opened" with delivery status** and
-   presents neither as proof. See section 3.4(a).
+   presents neither as proof. See section 3.4(a). **MET (2026-08-07)** —
+   `server/lib/report-view-status.ts` resolves one row per report-link
+   recipient in **three** states, and the third is the one that matters:
+   `queued` (a notice with a future `send_at`, which the automation ledger
+   hides and which genuinely has not been sent) carries no open status at all,
+   because none is possible. Folding it into "delivered, not opened" is what
+   sends an inspector chasing a client about a report that never left the
+   building. A recipient who has objected is marked as such, so a zero is never
+   read as "they did not open it" when it means "we stopped counting". The
+   surface carries the "signal, not proof" caveat whenever it shows an open,
+   and it draws **no chart** — the purpose test (section 1) passes for the
+   delivery question and for nothing else, and a visualisation is a different
+   purpose needing its own assessment. It is rendered per RECIPIENT and never
+   per deliverable, for the reason in 3.4(b).
 
 7. **The row is catalogued for erasure in the same change that creates it,**
    and the erasure orchestrator is wired to it. The manifest alone is not
@@ -369,13 +400,15 @@ the assessment has to be redone rather than cited.
    shares as having the weakest expectation, so they are the last population to
    lock out.
 
-**Conditions 3 and 9 are now met. Conditions 4, 5 and 6 are NOT.** The counter
-exists and can be stopped; the recipient is still not told it exists, and the
-inspector's surface that must not present "opened" as proof has not been built.
-Section 3.2 makes the disclosure load-bearing *inside* the balancing test, so
-**the feature as currently shipped is not covered by this assessment** — the
-remaining gap is transparency, not lawful basis or minimisation. Closing it is
-Tasks 3 and 4 of the delivery-confirmation plan.
+**All nine conditions are now met (2026-08-07).** The counter exists, records
+only what it observed, can be stopped by the person it observes, tells that
+person it exists before the first open, does so in words no tenant can delete,
+and is surfaced to the inspector in a form that cannot be mistaken for proof.
+**The feature as shipped is covered by this assessment.**
+
+⚠️ That sentence is only as true as the code. Section 5 lists what makes this
+document inapplicable; the conditions above are not a checklist that was passed
+once, and removing any of them is not a UI change.
 
 ⚠️ **Condition 9 is not a follow-up to conditions 1–8.** The objection path
 cannot ship after the collection it objects to — a counter that runs for a
@@ -424,6 +457,16 @@ path.
 > records that the code caught up with the assessment, not that the assessment
 > moved. Conditions 4, 5 and 6 remain unmet, and section 4 now says so where a
 > reader looking for the go/no-go will see it.
+>
+> **AMENDMENT 3 — 2026-08-07 (later still).** Conditions **4**, **5** and **6**
+> moved from *unmet* to *met*, and the counter's compile-time kill switch
+> (`server/lib/report-views.gate.ts`) was deleted in the same change. Those two
+> facts are one decision: section 3.2 makes the disclosure load-bearing INSIDE
+> the balancing test, so the release that lands the disclosure is precisely the
+> release in which the counter may run. Shipping them apart in either direction
+> would have been the defect — a counter without the notice runs outside this
+> assessment, and a flag kept past its reason becomes a second definition of
+> whether the feature exists. Nothing in sections 1–3 changed.
 
 ---
 
@@ -479,8 +522,9 @@ not.
 
 ---
 
-**Assessment date:** 2026-08-07 (amended twice the same day — see the amendment
-history in section 4)
-**Reassess when:** any item in section 5 is proposed, conditions 4/5/6 are
-closed (to confirm the feature is back inside this assessment), or the report
-renderer gains per-report identity.
+**Assessment date:** 2026-08-07 (amended three times the same day — see the
+amendment history in section 4)
+**Reassess when:** any item in section 5 is proposed, or the report renderer
+gains per-report identity (at which point section 3.4(b)'s option 3 can become
+option 1, and `report_views` can append a `report_id` while the older rows stay
+honestly order-scoped).

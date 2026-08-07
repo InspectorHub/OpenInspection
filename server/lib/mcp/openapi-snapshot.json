@@ -2183,16 +2183,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -2247,16 +2237,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -2502,16 +2482,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -2566,16 +2536,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -2709,16 +2669,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -2773,16 +2723,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -2869,16 +2809,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -2933,16 +2863,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -3076,16 +2996,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -3140,16 +3050,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -3283,16 +3183,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -3347,16 +3237,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -3490,16 +3370,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -3554,16 +3424,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -3697,16 +3557,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -3761,16 +3611,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -3857,16 +3697,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -3921,16 +3751,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -12956,16 +12776,6 @@
                                 "type": "string",
                                 "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                               },
-                              "defaultEstimateMin": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                              },
-                              "defaultEstimateMax": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                              },
                               "attributes": {
                                 "type": "array",
                                 "items": {
@@ -13020,16 +12830,6 @@
                                       "type": "string",
                                       "nullable": true,
                                       "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMin": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMax": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                     }
                                   },
                                   "required": [
@@ -13275,16 +13075,6 @@
                                 "type": "string",
                                 "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                               },
-                              "defaultEstimateMin": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                              },
-                              "defaultEstimateMax": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                              },
                               "attributes": {
                                 "type": "array",
                                 "items": {
@@ -13339,16 +13129,6 @@
                                       "type": "string",
                                       "nullable": true,
                                       "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMin": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMax": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                     }
                                   },
                                   "required": [
@@ -13482,16 +13262,6 @@
                                 "type": "string",
                                 "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                               },
-                              "defaultEstimateMin": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                              },
-                              "defaultEstimateMax": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                              },
                               "attributes": {
                                 "type": "array",
                                 "items": {
@@ -13546,16 +13316,6 @@
                                       "type": "string",
                                       "nullable": true,
                                       "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMin": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMax": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                     }
                                   },
                                   "required": [
@@ -13642,16 +13402,6 @@
                                 "type": "string",
                                 "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                               },
-                              "defaultEstimateMin": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                              },
-                              "defaultEstimateMax": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                              },
                               "attributes": {
                                 "type": "array",
                                 "items": {
@@ -13706,16 +13456,6 @@
                                       "type": "string",
                                       "nullable": true,
                                       "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMin": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMax": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                     }
                                   },
                                   "required": [
@@ -13849,16 +13589,6 @@
                                 "type": "string",
                                 "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                               },
-                              "defaultEstimateMin": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                              },
-                              "defaultEstimateMax": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                              },
                               "attributes": {
                                 "type": "array",
                                 "items": {
@@ -13913,16 +13643,6 @@
                                       "type": "string",
                                       "nullable": true,
                                       "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMin": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMax": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                     }
                                   },
                                   "required": [
@@ -14056,16 +13776,6 @@
                                 "type": "string",
                                 "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                               },
-                              "defaultEstimateMin": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                              },
-                              "defaultEstimateMax": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                              },
                               "attributes": {
                                 "type": "array",
                                 "items": {
@@ -14120,16 +13830,6 @@
                                       "type": "string",
                                       "nullable": true,
                                       "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMin": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMax": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                     }
                                   },
                                   "required": [
@@ -14263,16 +13963,6 @@
                                 "type": "string",
                                 "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                               },
-                              "defaultEstimateMin": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                              },
-                              "defaultEstimateMax": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                              },
                               "attributes": {
                                 "type": "array",
                                 "items": {
@@ -14327,16 +14017,6 @@
                                       "type": "string",
                                       "nullable": true,
                                       "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMin": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMax": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                     }
                                   },
                                   "required": [
@@ -14470,16 +14150,6 @@
                                 "type": "string",
                                 "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                               },
-                              "defaultEstimateMin": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                              },
-                              "defaultEstimateMax": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                              },
                               "attributes": {
                                 "type": "array",
                                 "items": {
@@ -14534,16 +14204,6 @@
                                       "type": "string",
                                       "nullable": true,
                                       "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMin": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMax": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                     }
                                   },
                                   "required": [
@@ -14630,16 +14290,6 @@
                                 "type": "string",
                                 "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                               },
-                              "defaultEstimateMin": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                              },
-                              "defaultEstimateMax": {
-                                "type": "number",
-                                "nullable": true,
-                                "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                              },
                               "attributes": {
                                 "type": "array",
                                 "items": {
@@ -14694,16 +14344,6 @@
                                       "type": "string",
                                       "nullable": true,
                                       "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMin": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                    },
-                                    "estimateMax": {
-                                      "type": "number",
-                                      "nullable": true,
-                                      "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                     }
                                   },
                                   "required": [
@@ -19039,16 +18679,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -19103,16 +18733,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -19358,16 +18978,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -19422,16 +19032,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -19565,16 +19165,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -19629,16 +19219,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -19725,16 +19305,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -19789,16 +19359,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -19932,16 +19492,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -19996,16 +19546,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -20139,16 +19679,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -20203,16 +19733,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -20346,16 +19866,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -20410,16 +19920,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -20553,16 +20053,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -20617,16 +20107,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -20713,16 +20193,6 @@
                                     "type": "string",
                                     "description": "TODO describe defaultRecommendation field for the OpenInspection MCP integration"
                                   },
-                                  "defaultEstimateMin": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMin field for the OpenInspection MCP integration"
-                                  },
-                                  "defaultEstimateMax": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe defaultEstimateMax field for the OpenInspection MCP integration"
-                                  },
                                   "attributes": {
                                     "type": "array",
                                     "items": {
@@ -20777,16 +20247,6 @@
                                           "type": "string",
                                           "nullable": true,
                                           "description": "TODO describe recommendation field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMin": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMin field for the OpenInspection MCP integration"
-                                        },
-                                        "estimateMax": {
-                                          "type": "number",
-                                          "nullable": true,
-                                          "description": "TODO describe estimateMax field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [

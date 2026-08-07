@@ -105,6 +105,11 @@ export default [
   route("resources/contact-access", "routes/resources/contact-access.tsx"),
   route("resources/template-search", "routes/resources/template-search.tsx"),
   route("resources/inspection-search", "routes/resources/inspection-search.tsx"),
+  // OI #271 — the report RECIPIENT's Art. 21 control. The only resource route
+  // with no staff-token gate, because its caller has no account: the API
+  // authenticates the `?token=` link or the portal-session cookie. See the
+  // route module's header before adding a gate here.
+  route("resources/view-tracking", "routes/resources/view-tracking.tsx"),
   layout("routes/auth-layout.tsx", [
     // IA-6 — BFF resource route for advisory schedule-conflict detection.
     // Loaded via useFetcher; no UI rendered; must be inside the auth layout so

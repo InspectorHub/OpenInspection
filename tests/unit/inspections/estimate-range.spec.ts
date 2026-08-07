@@ -1,16 +1,20 @@
 /**
- * Sprint 2 S2-4 — Repair estimate range invariants.
+ * A finding carries no repair price — at the results write boundary, and again
+ * at every read that used to publish one.
  *
- * Covers:
- *   - sanitizeDefectStates (via the public updateResults boundary):
- *       drops unknown recommendation slugs, clamps negative cents to null,
- *       coerces non-finite numbers to null, accepts the legal happy path.
- *   - getReportData aggregates defects[].estimateLow / estimateHigh into
- *       item-level estimateMin / estimateMax when the legacy top-level
- *       fields are absent.
- *   - getReportData reflects the per-tenant `showEstimates` toggle stored
- *       in tenant_configs.
- *   - getReportData resolves recommendation slugs to human-readable labels.
+ * The platform does not produce repair prices (see
+ * scripts/check-price-capability.mjs for why). Three keys survived the removal
+ * of the authoring UI and stayed writable by hand:
+ *   - `tabs.defects[].estimateLow` / `estimateHigh` (per-defect range)
+ *   - `estimateMin` / `estimateMax` (item level)
+ * and two reads still published them: the report item's "Estimated cost" badge
+ * and the repair list's `estimateLowSum` / `estimateHighSum`, the latter over
+ * an API that is exposed on the MCP `extended` tier.
+ *
+ * Every fixture here carries a NON-ZERO amount and every test first proves the
+ * amount was really in the input. An "absent from the output" assertion is
+ * vacuously green against an input that never had the field, which is exactly
+ * how a stripped-out capability comes back unnoticed.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
@@ -65,9 +69,30 @@ async function seedFixture(testDb: BetterSQLite3Database<typeof schema>) {
     });
 }
 
-describe('Sprint 2 S2-4 — repair estimate range', () => {
+describe('repair estimates are neither stored nor published', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
     let svc: InspectionService;
+
+    /**
+     * Write `inspection_results.data` straight to D1, past the service.
+     *
+     * The read-side guarantees have to hold for rows that ALREADY contain a
+     * price — every finding written before the capability was withdrawn. Going
+     * through updateResults would let the write-side strip do the read-side's
+     * work, and the read tests would pass with no reader change at all.
+     */
+    async function seedRawResults(data: Record<string, unknown>) {
+        await testDb.insert(schema.inspectionResults).values({
+            id: crypto.randomUUID(),
+            inspectionId: INSPECTION_ID,
+            tenantId: TENANT,
+            data,
+            lastSyncedAt: new Date(),
+        });
+        const row = await testDb.select().from(schema.inspectionResults).get();
+        // The row really holds the money we are about to assert is unpublished.
+        expect(JSON.stringify(row!.data)).toMatch(/\d{4,}/);
+    }
 
     beforeEach(async () => {
         const fixture = createTestDb();
@@ -79,7 +104,9 @@ describe('Sprint 2 S2-4 — repair estimate range', () => {
         await seedFixture(testDb);
     });
 
-    it('sanitizeDefectStates accepts the happy-path defect payload', async () => {
+    // ── Write boundary ───────────────────────────────────────────────────────
+
+    it('updateResults refuses to store a per-defect estimate range', async () => {
         await svc.updateResults(INSPECTION_ID, TENANT, {
             'roof-shingles': {
                 rating: 'Defect',
@@ -94,12 +121,34 @@ describe('Sprint 2 S2-4 — repair estimate range', () => {
         const row = await testDb.select().from(schema.inspectionResults).get();
         const data = row!.data as Record<string, unknown>;
         const defects = ((data['roof-shingles'] as { tabs: { defects: Array<Record<string, unknown>> } }).tabs.defects);
+        const keys = Object.keys(defects[0]!);
+        expect(keys).not.toContain('estimateLow');
+        expect(keys).not.toContain('estimateHigh');
+        // The rest of the defect row is untouched — the price is dropped, not
+        // the write.
         expect(defects[0]!.recommendationId).toBe('roof-leak');
-        expect(defects[0]!.estimateLow).toBe(50000);
-        expect(defects[0]!.estimateHigh).toBe(150000);
+        expect(defects[0]!.included).toBe(true);
     });
 
-    it('sanitizeDefectStates drops unknown recommendation slugs', async () => {
+    it('updateResults refuses to store an item-level estimate', async () => {
+        await svc.updateResults(INSPECTION_ID, TENANT, {
+            'roof-shingles': {
+                rating: 'Defect',
+                notes: 'two tabs lifted',
+                estimateMin: 250000,
+                estimateMax: 900000,
+            },
+        });
+
+        const row = await testDb.select().from(schema.inspectionResults).get();
+        const entry = (row!.data as Record<string, Record<string, unknown>>)['roof-shingles']!;
+        expect(Object.keys(entry)).not.toContain('estimateMin');
+        expect(Object.keys(entry)).not.toContain('estimateMax');
+        expect(entry.rating).toBe('Defect');
+        expect(entry.notes).toBe('two tabs lifted');
+    });
+
+    it('updateResults still drops unknown recommendation slugs', async () => {
         await svc.updateResults(INSPECTION_ID, TENANT, {
             'roof-shingles': {
                 tabs: {
@@ -116,26 +165,10 @@ describe('Sprint 2 S2-4 — repair estimate range', () => {
         expect(defects[0]!.recommendationId).toBeNull();
     });
 
-    it('sanitizeDefectStates clamps negative + non-finite cents to null', async () => {
-        await svc.updateResults(INSPECTION_ID, TENANT, {
-            'roof-shingles': {
-                tabs: {
-                    defects: [
-                        { cannedId: 'def-1', included: true, estimateLow: -1, estimateHigh: Number.POSITIVE_INFINITY },
-                    ],
-                },
-            },
-        });
+    // ── Read boundary — a row that already holds a price ─────────────────────
 
-        const row = await testDb.select().from(schema.inspectionResults).get();
-        const data = row!.data as Record<string, unknown>;
-        const defects = ((data['roof-shingles'] as { tabs: { defects: Array<Record<string, unknown>> } }).tabs.defects);
-        expect(defects[0]!.estimateLow).toBeNull();
-        expect(defects[0]!.estimateHigh).toBeNull();
-    });
-
-    it('getReportData aggregates defects[].estimateLow/High to item level', async () => {
-        await svc.updateResults(INSPECTION_ID, TENANT, {
+    it('getReportData publishes no estimate on an item whose defects carry one', async () => {
+        await seedRawResults({
             'roof-shingles': {
                 rating: 'Defect',
                 tabs: {
@@ -149,29 +182,28 @@ describe('Sprint 2 S2-4 — repair estimate range', () => {
 
         const report = await svc.getReportData(INSPECTION_ID, TENANT);
         const item = report.sections[0]!.items[0]!;
-        // Lowest low + highest high, both expressed in dollars on the
-        // report item (cents → dollars conversion happens in service).
-        expect(item.estimateMin).toBe(500);
-        expect(item.estimateMax).toBe(4000);
+        expect(Object.keys(item)).not.toContain('estimateMin');
+        expect(Object.keys(item)).not.toContain('estimateMax');
+
+        // …and not on the resolved defect rows the renderers walk either.
+        const defects = item.resolvedTabs!.defects!;
+        expect(defects.length).toBeGreaterThan(0);
+        for (const d of defects) {
+            expect(Object.keys(d)).not.toContain('estimateLow');
+            expect(Object.keys(d)).not.toContain('estimateHigh');
+        }
     });
 
-    it('getReportData ignores excluded defects when aggregating', async () => {
-        await svc.updateResults(INSPECTION_ID, TENANT, {
-            'roof-shingles': {
-                rating: 'Defect',
-                tabs: {
-                    defects: [
-                        { cannedId: 'def-1', included: true,  estimateLow: 50000,  estimateHigh: 150000 },
-                        { cannedId: 'def-2', included: false, estimateLow: 999900, estimateHigh: 999900 },
-                    ],
-                },
-            },
+    it('getReportData publishes no estimate on an item that stores one directly', async () => {
+        await seedRawResults({
+            'roof-shingles': { rating: 'Defect', estimateMin: 250000, estimateMax: 900000 },
         });
 
         const report = await svc.getReportData(INSPECTION_ID, TENANT);
         const item = report.sections[0]!.items[0]!;
-        expect(item.estimateMin).toBe(500);
-        expect(item.estimateMax).toBe(1500);
+        expect(Object.keys(item)).not.toContain('estimateMin');
+        expect(Object.keys(item)).not.toContain('estimateMax');
+        expect(item.rating).toBe('Defect');
     });
 
     it('getReportData resolves recommendation slug to its label', async () => {

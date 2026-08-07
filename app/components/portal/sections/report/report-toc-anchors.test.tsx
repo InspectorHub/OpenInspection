@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
+import { createRoutesStub } from 'react-router';
 import { ReportView, reportViewProps } from '~/components/portal/sections/ReportView';
 import { EMPTY_BRAND } from '~/lib/brand';
 import type { ReportOutlineEntry, PcaReportData, ReportLoaderResult } from '~/components/portal/sections/report/types';
@@ -73,9 +74,20 @@ function baseProps(overrides: Partial<ReportLoaderResult> = {}) {
   } as ReportLoaderResult & { tenant?: string });
 }
 
+/**
+ * <ReportView> now needs a data-router context: the Art. 13 view-tracking
+ * disclosure it renders (OI #271) carries the recipient's Art. 21 control,
+ * which posts through a fetcher rather than a browser fetch. Wrapping is the
+ * honest fix — the component is only ever mounted from a route.
+ */
+function renderReport(props: ReturnType<typeof baseProps>) {
+  const Stub = createRoutesStub([{ path: '/', Component: () => <ReportView {...props} /> }]);
+  return render(<Stub initialEntries={['/']} />);
+}
+
 describe('ReportView TOC anchors (Commercial PCA Phase O5)', () => {
   it('renders no dangling anchors — every #report-toc href resolves to a real target id', () => {
-    const { container } = render(<ReportView {...baseProps()} />);
+    const { container } = renderReport(baseProps());
     const hrefs = [...container.querySelectorAll('#report-toc a[href^="#"]')]
       .map((a) => a.getAttribute('href')!.slice(1))
       .filter((id) => id.length > 0);
@@ -86,13 +98,13 @@ describe('ReportView TOC anchors (Commercial PCA Phase O5)', () => {
   });
 
   it('stamps every rendered inspection-template section with its own anchor id', () => {
-    const { container } = render(<ReportView {...baseProps()} />);
+    const { container } = renderReport(baseProps());
     expect(container.querySelector('#roofing')).toBeTruthy();
     expect(container.querySelector('#electrical')).toBeTruthy();
   });
 
   it('omits the TOC when outline is empty', () => {
-    const { container } = render(<ReportView {...baseProps({ outline: [] })} />);
+    const { container } = renderReport(baseProps({ outline: [] }));
     expect(container.querySelector('#report-toc')).toBeNull();
   });
 });

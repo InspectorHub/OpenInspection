@@ -57,9 +57,10 @@ export interface TemplateItem {
   icon?: string;
   required?: boolean;
   isSafety?: boolean;
+  /** Prose remedy. No defaultEstimateMin / defaultEstimateMax beside it — the
+   *  template write schema rejects a repair price (see
+   *  `server/types/template-schema.ts`). */
   defaultRecommendation?: string;
-  defaultEstimateMin?: number | null;
-  defaultEstimateMax?: number | null;
   ratingOptions?: string[];
   tabs?: {
     information: CannedComment[];

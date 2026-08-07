@@ -11,14 +11,16 @@
 import type { Route } from "./+types/inspection-communication";
 import { getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import type { DeliveryRow, MessageRow } from "~/lib/communication-view";
+import type { DeliveryRow, MessageRow, ReportLinkRow } from "~/lib/communication-view";
 
 export interface CommunicationPayload {
     messages: MessageRow[];
     deliveries: DeliveryRow[];
+    /** OI #271 — report delivery per recipient; see <ReportDeliveryList>. */
+    reportLinks: ReportLinkRow[];
 }
 
-const EMPTY: CommunicationPayload = { messages: [], deliveries: [] };
+const EMPTY: CommunicationPayload = { messages: [], deliveries: [], reportLinks: [] };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
     const token = await getToken(context, request);

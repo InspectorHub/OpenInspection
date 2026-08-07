@@ -117,6 +117,11 @@ const FIELD_FILES = [
     "server/lib/collab/results-doc.types.ts",
     "app/hooks/findings/shared.ts",
     "server/types/template-schema.ts",
+    // The template's TS type and its Zod schema are two declarations of one
+    // authoring surface, and only the second one decides what the API accepts.
+    // Scanning the type alone let a money key be added back to the write
+    // schema — with no type beside it — and read as clean.
+    "server/lib/validations/template.schema.ts",
     "server/lib/validations/comment.schema.ts",
     "server/lib/validations/recommendation.schema.ts",
     "server/lib/report-repair-items.ts",
@@ -200,28 +205,15 @@ const INVENTORY = [
             + "never written; declared so an older finding still parses." },
     { kind: "field", id: "server/lib/collab/results-doc.types.ts#estimateSnapshotMax", disposition: "legacy-read",
       reason: "Upper bound of the same retired repair-item snapshot range; same terms as the min." },
-    { kind: "field", id: "server/lib/collab/results-doc.types.ts#estimateLow", disposition: "legacy-read",
-      reason: "Per-defect estimate on a canned defect state. No screen offers it; the results "
-            + "writer still sanitizes the key so an old client cannot store garbage in it." },
-    { kind: "field", id: "server/lib/collab/results-doc.types.ts#estimateHigh", disposition: "legacy-read",
-      reason: "Upper bound of the same per-defect estimate range; same terms as the low." },
-    { kind: "field", id: "server/lib/collab/results-doc.types.ts#estimateMin", disposition: "legacy-read",
-      reason: "Item-level estimate on a result entry. No screen offers it; readers tolerate it "
-            + "on findings that already have it." },
-    { kind: "field", id: "server/lib/collab/results-doc.types.ts#estimateMax", disposition: "legacy-read",
-      reason: "Upper bound of the same item-level estimate range; same terms as the min." },
-    { kind: "field", id: "server/types/template-schema.ts#estimateMin", disposition: "legacy-read",
-      reason: "Item-result estimate carried through the template's result shape; mirrors the "
-            + "results-doc projection above." },
-    { kind: "field", id: "server/types/template-schema.ts#estimateMax", disposition: "legacy-read",
-      reason: "Upper bound of the same item-result estimate range; same terms as the min." },
-    { kind: "field", id: "server/types/template-schema.ts#defaultEstimateMin", disposition: "legacy-read",
-      reason: "A template item may declare a default repair estimate. Nothing in the template "
-            + "editor writes one and no shipped template carries one; the PCA cost seeder is "
-            + "the only reader. Left declared rather than removed because a tenant's stored "
-            + "template JSON may still contain it." },
-    { kind: "field", id: "server/types/template-schema.ts#defaultEstimateMax", disposition: "legacy-read",
-      reason: "Upper bound of the same template-item default range; same terms as the min." },
+    // The four keys that used to sit here — `estimateLow` / `estimateHigh` on a
+    // canned defect state and `estimateMin` / `estimateMax` on a result entry —
+    // are GONE from the shape, not merely unwritten. They had no UI but were
+    // still reachable by hand, and `projectResults` now drops them on the way
+    // to D1 (there is no request boundary on the collab transport to refuse at).
+    // The same is true of the template item's `defaultEstimateMin` /
+    // `defaultEstimateMax` and an item attribute's `estimateMin` /
+    // `estimateMax`: those had a request boundary, and it now REJECTS them —
+    // `template.schema.ts` is `.strict()` and is scanned below.
     { kind: "field", id: "server/lib/validations/recommendation.schema.ts#estimateSnapshotMin", disposition: "legacy-read",
       reason: "Response shape of the aggregate repair-items read; mirrors the persisted key." },
     { kind: "field", id: "server/lib/validations/recommendation.schema.ts#estimateSnapshotMax", disposition: "legacy-read",

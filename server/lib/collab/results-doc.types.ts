@@ -104,7 +104,15 @@ export interface CustomCommentEntry {
     photos?:   PhotoEntry[];
 }
 
-/** Toggle-state for a single canned defect, with per-defect overrides. */
+/**
+ * Toggle-state for a single canned defect, with per-defect overrides.
+ *
+ * A defect states WHAT is wrong and WHO should look at it — category, trade,
+ * deadline, timeframe. It carries no repair price: `estimateLow` /
+ * `estimateHigh` were removed, `projectResults` drops them on the way to D1,
+ * and `sanitizeDefectStates` drops them on the way in. Nothing here is a figure
+ * (`scripts/check-price-capability.mjs` holds the line).
+ */
 export interface DefectState {
     cannedId:          string;
     included:          boolean;
@@ -115,8 +123,6 @@ export interface DefectState {
     location?:         string | null;
     photos?:           PhotoEntry[];
     recommendationId?: string | null;
-    estimateLow?:      number | null;
-    estimateHigh?:     number | null;
     trade?:            string | null;
     deadline?:         string | null;
     timeframe?:        string | null;
@@ -146,9 +152,9 @@ export interface ItemEntry {
     rating?:         string;
     notes?:          string;
     photos?:         PhotoEntry[];
+    /** WHAT should be done (a repair-item slug or label) — never what it costs.
+     *  The former `estimateMin` / `estimateMax` pair is gone; see DefectState. */
     recommendation?: string;
-    estimateMin?:    number;
-    estimateMax?:    number;
     attributes?:     Record<string, unknown>;
     value?:          unknown;
     tabs?: {

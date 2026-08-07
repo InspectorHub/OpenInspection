@@ -102,5 +102,13 @@
   "comm_notice_title_generic": "{event} — {address}",
   "notice_empty_body_staff": "When a booking comes in, an agreement is signed, or a payment lands, it shows up here.",
   "comm_reason_sms_opt_out": "Skipped — this person replied STOP. They can text START to opt back in.",
-  "notice_reason_sms_opt_out": "You asked us to stop texting you. Text START to any of our messages to turn texts back on."
+  "notice_reason_sms_opt_out": "You asked us to stop texting you. Text START to any of our messages to turn texts back on.",
+  "comm_report_delivery_heading": "Report delivery",
+  "comm_report_delivery_queued": "Scheduled to send {when}",
+  "comm_report_delivery_unopened": "Delivered {when} · not yet opened",
+  "comm_report_delivery_opened_one": "Opened once · {first}",
+  "comm_report_delivery_opened_many": "Opened {count} times · first {first} · last {last}",
+  "comm_report_delivery_objected": "This recipient asked not to be counted, so opens are no longer recorded for them.",
+  "comm_report_delivery_caveat": "Opens are recorded on our side when the report page loads. A mail-security scanner can trip one, so treat this as a signal, not proof of reading.",
+  "comm_report_delivery_norole": "Recipient"
 }

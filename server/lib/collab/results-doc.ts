@@ -24,6 +24,7 @@ import type {
     RepairItemSnapshot,
     CustomCommentEntry,
 } from './results-doc.types';
+import { withoutRepairPriceRows } from '../repair-price-keys';
 
 type CannedTab = 'information' | 'limitations' | 'defects';
 
@@ -97,6 +98,16 @@ function getOrCreateMap(parent: Y.Map<unknown>, key: string): Y.Map<unknown> {
     parent.set(key, map);
     return map;
 }
+
+/**
+ * Copy of `rows` with every repair-price key removed.
+ *
+ * The editor is a CRDT — a binary `Y.applyUpdate` the DO merges — so there is
+ * no request to validate and no 400 to return: any key a caller invents lands
+ * in the doc. `projectResults` is the boundary that decides what a finding IS,
+ * because what it emits is the row every downstream reader trusts. Prices do
+ * not cross it. See `scripts/check-price-capability.mjs`.
+ */
 
 /**
  * Core primitive: find a Y.Map element inside `arr` whose `identityField`
@@ -218,8 +229,6 @@ export function applyItemPatch(
         | 'notes'
         | 'value'
         | 'recommendation'
-        | 'estimateMin'
-        | 'estimateMax'
         | 'followupStatus'
         | 'followupNotes',
     value: unknown,
@@ -621,12 +630,8 @@ export function loadResultsProjection(doc: Y.Doc, projection: ResultsProjection)
             if (typeof entry.recommendation === 'string' && entry.recommendation.length > 0) {
                 applyItemPatch(doc, findingKey, 'recommendation', entry.recommendation);
             }
-            if (typeof entry.estimateMin === 'number') {
-                applyItemPatch(doc, findingKey, 'estimateMin', entry.estimateMin);
-            }
-            if (typeof entry.estimateMax === 'number') {
-                applyItemPatch(doc, findingKey, 'estimateMax', entry.estimateMax);
-            }
+            // No estimateMin / estimateMax: re-hydrating them from an old blob
+            // is how a retired capability quietly resumes.
             if (entry.followupStatus !== undefined) {
                 applyItemPatch(doc, findingKey, 'followupStatus', entry.followupStatus);
             }
@@ -656,7 +661,7 @@ export function loadResultsProjection(doc: Y.Doc, projection: ResultsProjection)
                 for (const e of entry.tabs.limitations ?? []) {
                     upsertCanned(doc, findingKey, 'limitations', e);
                 }
-                for (const e of entry.tabs.defects ?? []) {
+                for (const e of withoutRepairPriceRows(entry.tabs.defects ?? [])) {
                     upsertCanned(doc, findingKey, 'defects', e);
                 }
             }
@@ -669,7 +674,7 @@ export function loadResultsProjection(doc: Y.Doc, projection: ResultsProjection)
                 for (const e of entry.customComments.limitations ?? []) {
                     upsertCustomComment(doc, findingKey, 'limitations', e);
                 }
-                for (const e of entry.customComments.defects ?? []) {
+                for (const e of withoutRepairPriceRows(entry.customComments.defects ?? [])) {
                     upsertCustomComment(doc, findingKey, 'defects', e);
                 }
             }
@@ -748,15 +753,8 @@ export function projectResults(doc: Y.Doc): ResultsProjection {
             entry.recommendation = recommendation;
         }
 
-        const estimateMin = rawItem.get('estimateMin');
-        if (typeof estimateMin === 'number') {
-            entry.estimateMin = estimateMin;
-        }
-
-        const estimateMax = rawItem.get('estimateMax');
-        if (typeof estimateMax === 'number') {
-            entry.estimateMax = estimateMax;
-        }
+        // No estimateMin / estimateMax read-back: a raw Y.applyUpdate can set
+        // anything; not reading it is what keeps it out of the stored row.
 
         // ── attributes ───────────────────────────────────────────────────────
 
@@ -779,8 +777,10 @@ export function projectResults(doc: Y.Doc): ResultsProjection {
             const limArr  = limitations instanceof Y.Array
                 ? (limitations.toJSON() as CannedState[])
                 : [];
+            // `toJSON()` is wholesale — whatever a client put on the element
+            // comes out. The defect tab is the one that used to carry money.
             const defArr  = defects instanceof Y.Array
-                ? (defects.toJSON() as DefectState[])
+                ? withoutRepairPriceRows(defects.toJSON() as DefectState[])
                 : [];
 
             const tabsEntry: ItemEntry['tabs'] = {};
@@ -827,7 +827,7 @@ export function projectResults(doc: Y.Doc): ResultsProjection {
                 ? (ccLim.toJSON() as CustomCommentEntry[])
                 : [];
             const ccDefArr  = ccDef instanceof Y.Array
-                ? (ccDef.toJSON() as CustomCommentEntry[])
+                ? withoutRepairPriceRows(ccDef.toJSON() as CustomCommentEntry[])
                 : [];
 
             if (ccInfoArr.length > 0 || ccLimArr.length > 0 || ccDefArr.length > 0) {

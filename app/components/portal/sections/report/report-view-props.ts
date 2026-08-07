@@ -94,6 +94,9 @@ export function reportViewProps(
     units: data.units ?? [],
     unitConditionMatrix: data.unitConditionMatrix ?? [],
     defectCountsByUnit: data.defectCountsByUnit ?? {},
+    // OI #271 — false when the loader could not resolve it; see the field's
+    // note on `ReportLoaderResult` for why that default is the safe one.
+    viewTrackingObjected: data.viewTrackingObjected ?? false,
     tenant: data.tenant ?? "",
     reportId,
     token: data.token,

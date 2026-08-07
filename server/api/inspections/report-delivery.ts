@@ -103,8 +103,9 @@ const RepairListEntrySchema = z.object({
     category:            z.enum(['safety', 'recommendation', 'maintenance']).describe('TODO describe category field for the OpenInspection MCP integration'),
     recommendationId:    z.string().nullable().describe('TODO describe recommendationId field for the OpenInspection MCP integration'),
     recommendationLabel: z.string().nullable().describe('TODO describe recommendationLabel field for the OpenInspection MCP integration'),
-    estimateLow:         z.number().nullable().describe('TODO describe estimateLow field for the OpenInspection MCP integration'),
-    estimateHigh:        z.number().nullable().describe('TODO describe estimateHigh field for the OpenInspection MCP integration'),
+    // No estimateLow / estimateHigh: the platform publishes no repair price,
+    // and this response is on the MCP `extended` tier (see
+    // scripts/check-price-capability.mjs).
     photos:              z.array(z.object({ key: z.string().describe('TODO describe key field for the OpenInspection MCP integration'), url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') })).describe('TODO describe photos field for the OpenInspection MCP integration'),
     source:              z.enum(['canned', 'custom']).describe('TODO describe source field for the OpenInspection MCP integration'),
 });
@@ -121,8 +122,7 @@ const RepairListResponseSchema = z.object({
         safety:          z.number().describe('TODO describe safety field for the OpenInspection MCP integration'),
         recommendation:  z.number().describe('TODO describe recommendation field for the OpenInspection MCP integration'),
         maintenance:     z.number().describe('TODO describe maintenance field for the OpenInspection MCP integration'),
-        estimateLowSum:  z.number().describe('TODO describe estimateLowSum field for the OpenInspection MCP integration'),
-        estimateHighSum: z.number().describe('TODO describe estimateHighSum field for the OpenInspection MCP integration'),
+        // Counts, not money — `estimateLowSum` / `estimateHighSum` are gone.
     }).describe('TODO describe totals field for the OpenInspection MCP integration'),
     showEstimates: z.boolean().describe('TODO describe showEstimates field for the OpenInspection MCP integration'),
 });
