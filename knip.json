@@ -42,6 +42,7 @@
     "node_modules/**",
     ".worktrees/**",
     "server/generated/**",
+    "scripts/fixtures/**",
     "worker-configuration.d.ts",
     "**/*.d.ts"
   ],

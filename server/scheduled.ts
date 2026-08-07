@@ -348,6 +348,33 @@ export async function scheduled(
         logger.error('[cron] retention sweep failed', {}, e instanceof Error ? e : undefined);
     }
 
+    // 6b. OI #276 — log-table retention (RETENTION_MANIFEST). Separate from
+    //     block 6 because that one is the per-tenant AGREEMENT clock keyed on a
+    //     purged_at marker; this one is fixed platform windows over log tables.
+    //     One block cannot hold two definitions of "due".
+    //     Once-daily at 04:00, not every tick: a clock in days and months gains
+    //     nothing from 288 passes a day, and 04:00 keeps this full-table scan
+    //     off the same 5-minute budget as the 03:00 one below (block 7's
+    //     pattern). Always-on in both modes — storage limitation is not a
+    //     topology question. Idempotent and wrapped.
+    {
+        const at = new Date();
+        if (at.getUTCHours() === 4 && at.getUTCMinutes() < 5) {
+            try {
+                const { runLogRetentionSweep } = await import('./lib/compliance/retention-logs');
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const logSummary = await runLogRetentionSweep(drizzle(env.DB) as any, Date.now());
+                // Counts only — the summary carries table names and integers,
+                // never a row. Silent on a no-op run, which is the steady state.
+                if (logSummary.total > 0) {
+                    logger.info('[cron] log retention sweep', logSummary);
+                }
+            } catch (e) {
+                logger.error('[cron] log retention sweep failed', {}, e instanceof Error ? e : undefined);
+            }
+        }
+    }
+
     // 7. Daily R2 usage measurement (03:00–03:05 UTC window fires once/day on the
     //    */5 cron). Writes r2_bytes gauge per tenant via MeteringService. Runs in
     //    every mode — standalone simply has one tenant in the table, so it records a
