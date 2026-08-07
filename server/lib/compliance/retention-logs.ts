@@ -35,15 +35,18 @@
  * will eventually chart it. Summaries carry counts and table names only — never
  * a row, never a value.
  */
-import { and, isNotNull, lt, or } from 'drizzle-orm';
+import { and, isNotNull, lt, ne, or } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { SQL } from 'drizzle-orm';
 import {
     auditLogs,
+    idempotencyKeys,
     parkedCmdEvents,
     processedCmdEvents,
     processedWebhookEvents,
+    syncOutbox,
 } from '../db/schema';
+import { SYNC_OUTBOX_STATUS } from '../status/sync-outbox-status';
 import { ANONYMIZE_AUDIT_PII } from './anonymize-pii';
 import { changeCount, subtractMonthsMs } from './db-row-utils';
 import { RETENTION_MANIFEST, type RetentionWindow } from './retention-manifest';
@@ -139,6 +142,42 @@ const EXECUTORS: Record<string, Executor> = {
         const db = rawDb as any;
         const res = await db.delete(parkedCmdEvents)
             .where(lt(parkedCmdEvents.receivedAt, cutoff))
+            .run();
+        return changeCount(res);
+    },
+
+    // TERMINAL rows only. `ne(status, 'pending')` rather than an IN-list of the
+    // terminal values on purpose: it also catches the LEGACY `done` rows that
+    // `SYNC_OUTBOX_STATUSES` deliberately omits (nothing may write it, but rows
+    // holding it exist), which an allow-list would silently leave behind
+    // forever. Excluding `pending` is the rule, not an optimization — a pending
+    // row is unpublished work the cron sweeper is still retrying, so deleting
+    // one destroys an account change portal never saw instead of retiring a
+    // record of one.
+    sync_outbox: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const res = await db.delete(syncOutbox)
+            .where(and(
+                lt(syncOutbox.createdAt, cutoff),
+                ne(syncOutbox.status, SYNC_OUTBOX_STATUS.PENDING),
+            ))
+            .run();
+        return changeCount(res);
+    },
+
+    // `created_at`, NOT `expires_at`. The latter decides whether a later caller
+    // may steal a dead claim and is never consulted once the row is `done`, so
+    // a completed row sits past its own expiry indefinitely holding
+    // `response_body`. Keying the sweep on it would delete a different set of
+    // rows and look exactly as correct. No state predicate: an aged `in_flight`
+    // row is a claim whose holder died without unwinding, and removing it is
+    // strictly better than leaving it to block the key.
+    idempotency_keys: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const res = await db.delete(idempotencyKeys)
+            .where(lt(idempotencyKeys.createdAt, cutoff))
             .run();
         return changeCount(res);
     },

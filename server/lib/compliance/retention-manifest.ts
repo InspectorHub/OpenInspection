@@ -66,6 +66,52 @@ export const DEDUP_LOG_RETENTION_DAYS = 90;
 export const DEAD_LETTER_RETENTION_DAYS = 30;
 
 /**
+ * Deletion window for TERMINAL rows of the core to portal user-sync outbox
+ * (`sync_outbox`).
+ *
+ * Sixty days, and deliberately neither of its neighbours' numbers.
+ *
+ * SHORTER than the dedup ledgers' ninety. Those rows are an event id and a
+ * timestamp; an outbox row carries a serialized user-sync CloudEvent — staff
+ * email and name, and for `user.password_changed` the password HASH. A window
+ * over identifier-bearing rows should not be copied from a window over rows
+ * that hold none.
+ *
+ * LONGER than the dead-letter queue's thirty. A parked row can only be READ: it
+ * is an unparseable command, and diagnosis is all it will ever support. A
+ * terminal outbox row is still ACTIONABLE — `retryFailed()` republishes it, and
+ * doing so repairs real divergence between portal and core. Deleting it removes
+ * the fix, not just the evidence.
+ *
+ * Why sixty specifically: a portal/core user divergence is not noticed by a
+ * monitor, it is noticed by a human reading a seat count or a stale member on a
+ * monthly cycle. The row has to survive long enough that a divergence spotted
+ * in one cycle can still be re-driven during the next — two cycles, so ~60 days.
+ */
+export const SYNC_OUTBOX_RETENTION_DAYS = 60;
+
+/**
+ * Deletion window for the idempotent-replay store (`idempotency_keys`).
+ *
+ * ── This is NOT `expires_at`, and the difference is the point ───────────────
+ * `expires_at` answers a CONCURRENCY question: may a later caller steal a claim
+ * whose holder died? `claimKey` consults it only on an `in_flight` row — the
+ * `done` branch returns the stored response ABOVE that check — so a completed
+ * row replays forever, years past its own `expires_at`, still holding
+ * `response_body`. Two different questions, and only one of them was answered.
+ *
+ * ── Why seven days ──────────────────────────────────────────────────────────
+ * Derived from the horizon the feature itself declares rather than picked. The
+ * store's TTL is 24 hours and its schema says a retry older than that "is a
+ * different problem". Deleting a `done` row means a later replay of the same
+ * key RE-EXECUTES the mutation, so the window must clear any legitimate retry:
+ * a week is seven full TTLs of margin, enough for a client re-driving a queued
+ * intent after a weekend outage, and short enough that a verbatim API response
+ * body — whatever PII that endpoint returned — is not kept for a quarter.
+ */
+export const IDEMPOTENCY_REPLAY_RETENTION_DAYS = 7;
+
+/**
  * A retention period, carrying its unit.
  *
  * Months are not days. A 24-month window expressed as 730 days drifts against
@@ -127,6 +173,24 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         action: 'delete',
         purpose: 'Dead-letter queue, not a log. Its whole job is telling a human that portal and core disagree about a command shape, which is a days-to-weeks activity.',
     },
+    {
+        // TERMINAL ROWS ONLY. The executor excludes `pending`, and that
+        // exclusion is part of the rule rather than an implementation detail: a
+        // pending row is unpublished WORK, not a record of work. See the
+        // executor and `retention-logs.spec.ts` for the assertion that keeps it.
+        table: 'sync_outbox',
+        timestampColumn: 'created_at',
+        window: { unit: 'days', value: SYNC_OUTBOX_RETENTION_DAYS },
+        action: 'delete',
+        purpose: 'Published/failed user-sync events whose payload carries staff email, name and — for user.password_changed — the password hash. Once published the row is a receipt; the only remaining reader is a human re-driving a portal/core divergence, which surfaces on a monthly reconciliation, so two cycles. PENDING rows are excluded: they are unpublished work the sweeper is still retrying, and expiring one would destroy an account change that never reached portal rather than retire a record of one.',
+    },
+    {
+        table: 'idempotency_keys',
+        timestampColumn: 'created_at',
+        window: { unit: 'days', value: IDEMPOTENCY_REPLAY_RETENTION_DAYS },
+        action: 'delete',
+        purpose: 'response_body is the verbatim success payload of a mutating API call, so it holds whatever PII that endpoint returned. Measured from created_at, NOT expires_at: that column decides whether a later caller may steal a dead claim and is never read once the row is done, so a completed row outlives it indefinitely. Seven days is seven times the store own declared 24h TTL — margin for a client re-driving a queued intent after a weekend, well inside the horizon past which the store itself says a retry is a different problem.',
+    },
 ];
 
 /**
@@ -174,8 +238,23 @@ export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
 
     // ── Bounded by construction, so a clock would add nothing ────────────────
     {
+        // CORRECTED 2026-08-07 (external counsel P1). The previous reason said
+        // `detail` is "documented and ENFORCED as a non-sensitive summary" and
+        // that the table "cannot grow with time". Both halves were checked
+        // against the code and both overstated it:
+        //   - Enforcement does not exist. `clampDetail` trims whitespace and
+        //     truncates at 300 characters. Nothing inspects the CONTENT, so a
+        //     caller that passes a provider response body stores its first 297
+        //     characters verbatim. Documented, yes; enforced, no.
+        //   - The prune bounds COUNT, not AGE, and storage limitation asks about
+        //     age. A target probed once and never again keeps that row forever —
+        //     the sixth write that would displace it never happens.
+        // The exclusion still stands, on the narrower ground stated below. What
+        // changed is that it no longer rests on a guarantee the code does not
+        // make. Same species as the two erasure-manifest justifications
+        // corrected the same day: the reasoning read well and was not true.
         table: 'integration_test_results',
-        reason: 'Self-bounded: appendTestResult in server/lib/integration-test-results.ts prunes to the newest KEEP_PER_TARGET rows per (tenant, target) on every write, so the table cannot grow with time. `detail` is documented and enforced as a non-sensitive summary — never a key, token or response body.',
+        reason: 'Bounded to KEEP_PER_TARGET rows per (tenant, target) by an unconditional prune on every write (recordIntegrationTest, server/lib/integration-test-results.ts), so volume cannot grow with usage. The residual is AGE not volume — a target probed once keeps that row indefinitely — and it is accepted because what a retained row holds is a staff user id, a target enum and a provider message clamped to 300 characters about the tenant own integration, not a record of a data subject. Note the clamp is a LENGTH limit: the non-sensitivity of detail is a caller convention, not something this module can enforce.',
     },
     {
         table: 'sms_delivery_status',
@@ -207,16 +286,19 @@ export interface RetentionOpenEntry {
 
 /** @gateConsumed read as source text by `scripts/check-retention-manifest.mjs`. */
 export const RETENTION_OPEN: RetentionOpenEntry[] = [
-    {
-        table: 'idempotency_keys',
-        reason: 'response_body holds the serialized success response of a mutating API call, replayed verbatim on retry — so it holds whatever PII that endpoint returns. expires_at is NOT a delete clock: it only lets a later claim STEAL the row in place (server/lib/idempotency/store.ts), and releaseKey deletes only on handler failure. A key never re-claimed therefore keeps its response body forever. Found while cataloguing for #276; the window is a decision, not a bug fix, so it is parked rather than guessed.',
-        decideBy: '2027-02-06',
-    },
-    {
-        table: 'sync_outbox',
-        reason: 'payload is the serialized user-sync CloudEvent, which carries staff email and name. Rows are transitioned to sent or failed and never deleted — the sweeper republishes pending rows and nothing prunes the rest. Structurally the same exposure parked_cmd_events had before #276, one table over.',
-        decideBy: '2027-02-06',
-    },
+    // `idempotency_keys` and `sync_outbox` were parked here on 2026-08-06 with a
+    // 2027-02-06 date. Both were DECIDED on 2026-08-07 and moved to
+    // RETENTION_MANIFEST above, each with a window derived from its own
+    // mechanics rather than borrowed from a neighbour. Two corrections came out
+    // of building them, recorded because both were plausible and both were wrong:
+    //   - The 08-06 audit stated `idempotency_keys` "has its own TTL delete at
+    //     store.ts:92". It does not. That line is inside the claim-STEAL UPDATE;
+    //     the only DELETE in the module is `releaseKey`, which runs solely from a
+    //     caught handler exception. Verified in source 2026-08-07.
+    //   - The parked reason above said outbox rows go to "sent or failed". The
+    //     terminal happy-path status is `published` (`SYNC_OUTBOX_STATUSES`);
+    //     `sent` is not a value this column can hold. A predicate written from
+    //     that sentence would have matched nothing and read as a working rule.
     {
         table: 'notifications',
         reason: 'The notice header: per-recipient title and body composed about an inspection, addressed to a contact or a staff user. inspection_id is a soft reference with no cascade, so Track A (a row dies with its inspection) does not actually reach it, and read_at / archived_at retire a row from the inbox without removing it. Deciding this needs the notice lifetime answered, not a number picked here.',

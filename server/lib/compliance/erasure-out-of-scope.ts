@@ -34,6 +34,33 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // Columns that ride with a row-delete rule above (per-column scan cannot
     // see row semantics).
     { table: 'contacts',            column: 'phone',        reason: 'rides with the contacts row delete (locator = email)' },
+    // The rest of the CRM row. `phone` sat here alone for as long as the rule
+    // existed, which read as a claim that phone was the only other personal
+    // column on the table — it is not, and `name` is NOT NULL. The row is
+    // deleted whole, so the answer for all of them is the same; the reason it is
+    // written out per column is that a register listing one sibling and not the
+    // others is the shape a reader trusts and should not.
+    { table: 'contacts',            column: 'name',         reason: 'rides with the contacts row delete (locator = email); NOT NULL, which is why the rule deletes the row rather than nulling in place' },
+    { table: 'contacts',            column: 'agency',       reason: 'the agent brokerage this contact works for — rides with the contacts row delete (locator = email)' },
+    { table: 'contacts',            column: 'notes',        reason: 'free text staff write about this contact — rides with the contacts row delete (locator = email)' },
+    { table: 'contacts',            column: 'locale',       reason: 'the language this contact asked to be addressed in, a stated preference of the data subject — rides with the contacts row delete (locator = email)' },
+    { table: 'contacts',            column: 'type',         reason: 'client/agent/other classification OF the data subject — rides with the contacts row delete (locator = email)' },
+    { table: 'contacts',            column: 'agent_user_id', reason: 'binding to the global agent account this contact is — rides with the contacts row delete (locator = email)' },
+
+    // ── report_views (#271) ───────────────────────────────────────────────────
+    // Every column here is behavioural data about an identified recipient, and
+    // the PII heuristic matches none of them. They are excused only because the
+    // `access_token_id` rule above deletes the whole ROW; without that rule this
+    // block would be four unanswered questions rather than four references.
+    { table: 'report_views', column: 'first_viewed_at', reason: 'when this recipient first opened the report — rides with the report_views row delete (locator = access_token_id)' },
+    { table: 'report_views', column: 'last_viewed_at',  reason: 'when this recipient last opened the report — rides with the report_views row delete (locator = access_token_id)' },
+    { table: 'report_views', column: 'view_count',      reason: 'how many times this recipient opened the report — rides with the report_views row delete (locator = access_token_id)' },
+    { table: 'report_views', column: 'inspection_id',   reason: 'which order was opened; meaningful only paired with the recipient, and rides with the report_views row delete' },
+    // The Art. 21 objection marker. It records that this recipient exercised a
+    // right and on what date, so it is the subject data — but it lives on the
+    // token row the manifest already deletes by `recipient_email`, and an
+    // objection cannot outlive the access it objects to being measured on.
+    { table: 'inspection_access_tokens', column: 'view_tracking_objected_at', reason: 'records that this recipient objected to view measurement, and when — rides with the inspection_access_tokens row delete (locator = recipient_email)' },
 
     // Staff, not data subjects. Consumer-DSAR erasure never touches employee
     // accounts; staff offboarding is a separate lifecycle.
@@ -54,6 +81,46 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'audit_logs',          column: 'ip_address',                reason: 'staff-action security audit trail' },
     { table: 'report_signoff',      column: 'signature_ref',             reason: 'inspector (staff) signoff reference' },
     { table: 'agreement_requests',  column: 'inspector_signature_base64', reason: 'inspector (staff) countersignature' },
+    // The staff identity columns the heuristic never asked about. Each one sits
+    // beside a column that WAS declared, which is the tell: `users.email` and
+    // `users.phone` were ruled on while `users.name` was not, and
+    // `report_signoff.signature_ref` was ruled on while the signer NAME and
+    // LICENCE NUMBER on the same row were not. The answer is the same for all of
+    // them and always was; nobody had been asked, because the pattern only
+    // matched the neighbours.
+    { table: 'users',               column: 'name',                      reason: 'staff account — not consumer-DSAR scope; the sibling of users.email above, which the PII pattern happened to match' },
+    { table: 'users',               column: 'photo_url',                 reason: 'staff profile photo shown on reports — not consumer-DSAR scope' },
+    { table: 'users',               column: 'slug',                      reason: 'inspector public URL slug, derived from the staff name — not consumer-DSAR scope' },
+    { table: 'users',               column: 'password_hash',             reason: 'staff authentication credential; destroyed by account deletion, never by a consumer erasure request' },
+    { table: 'users',               column: 'totp_secret',               reason: 'staff second-factor seed — authentication credential, not consumer-DSAR scope' },
+    { table: 'users',               column: 'totp_recovery_codes',       reason: 'staff second-factor recovery codes — authentication credential, not consumer-DSAR scope' },
+    { table: 'users',               column: 'last_active_at',            reason: 'staff activity timestamp used for seat accounting — not consumer-DSAR scope' },
+    { table: 'report_signoff',      column: 'name',                      reason: 'the STAFF signer name on a professional attestation; the signature it attests is retained, so the identity of who signed cannot be removed without voiding it. Not consumer-DSAR scope' },
+    { table: 'report_signoff',      column: 'license',                   reason: 'the staff signer professional licence number as printed in the Appendix D qualifications — part of the attestation, not consumer-DSAR scope' },
+    { table: 'report_signoff',      column: 'person_id',                 reason: 'staff identity sub of the signer (accountability) — not consumer-DSAR scope' },
+    { table: 'report_signoff',      column: 'qualifications_ref',        reason: 'pointer to the staff qualifications exhibit — not consumer-DSAR scope' },
+    { table: 'inspector_credentials', column: 'member_number',           reason: 'staff association membership or licence number displayed on reports — not consumer-DSAR scope' },
+    { table: 'inspector_credentials', column: 'label',                   reason: 'staff credential label (the issuing body) — not consumer-DSAR scope' },
+    { table: 'inspector_credentials', column: 'image_r2_key',            reason: 'staff credential badge image — not consumer-DSAR scope' },
+    { table: 'calendar_blocks',     column: 'title',                     reason: 'staff personal calendar block title — not consumer-DSAR scope' },
+    { table: 'calendar_blocks',     column: 'notes',                     reason: 'free text a staff member writes on their own calendar block — not consumer-DSAR scope' },
+    // A Google/Microsoft calendar id is normally the staff account ADDRESS, so
+    // this is an email column whose name says nothing of the kind.
+    { table: 'calendar_connections', column: 'calendar_id',              reason: 'the connected calendar identifier, which for Google and Microsoft is the staff account email address — staff offboarding lifecycle, not consumer-DSAR scope' },
+    { table: 'calendar_connections', column: 'credentials_enc',          reason: 'encrypted staff OAuth tokens for their own calendar account — revoked at offboarding, not by a consumer erasure request' },
+    { table: 'calendar_connection_read_calendars', column: 'external_calendar_id', reason: 'a secondary calendar id on the staff connection, again usually an account address — not consumer-DSAR scope' },
+    { table: 'calendar_connection_read_calendars', column: 'summary',    reason: 'display name of the staff calendar as the provider reports it — not consumer-DSAR scope' },
+    { table: 'integration_test_results', column: 'tested_by_user_id',    reason: 'staff user who ran the Test connection probe — not consumer-DSAR scope' },
+    { table: 'tenant_marketplace_import_history', column: 'created_by',  reason: 'staff user who performed the template import — not consumer-DSAR scope' },
+    // The core->portal user-sync outbox. The heuristic flags neither column, and
+    // `payload` is the heaviest staff-PII blob in the schema: a serialized
+    // CloudEvent carrying email, name and — for user.password_changed — the
+    // password HASH. Declared here for the DSAR question; the separate storage
+    // question it also raises is answered by the sync_outbox rule in
+    // RETENTION_MANIFEST, which now expires terminal rows at 60 days.
+    { table: 'sync_outbox',         column: 'payload',                   reason: 'serialized user-sync CloudEvent about a STAFF account (email, name, and for user.password_changed the password hash) — staff offboarding lifecycle, not consumer-DSAR scope. Bounded separately by the sync_outbox retention rule' },
+    { table: 'erasure_log',         column: 'requested_by',              reason: 'the staff admin sub who RAN the erasure, recorded for accountability — the operator, not the data subject' },
+    { table: 'erasure_log',         column: 'decisions_json',            reason: 'the per-table decision array (table name, action, count, legal basis, expiry) written by the orchestrator — counts and identifiers of TABLES, never a row value or a subject identifier' },
 
     // The controller's own business identity, not a data subject's.
     { table: 'tenant_configs',      column: 'support_email',    reason: 'company-owned support address' },
@@ -67,6 +134,23 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // `inspections` rules, where the address is somebody's home. The two look
     // alike to a name-matching gate and are not the same question.
     { table: 'tenant_configs',      column: 'company_address',  reason: 'company office address — controller business identity, published on reports and invoices' },
+    // `reply_to` is an EMAIL ADDRESS column whose name contains neither "email"
+    // nor "mail", so the pattern that caught `sender_email` and `support_email`
+    // two lines up walked straight past it. Same answer, and it had to be asked
+    // for separately.
+    { table: 'tenant_configs',      column: 'reply_to',         reason: 'the Reply-To header address on the tenant outbound mail — company-owned, the sibling of sender_email above' },
+    { table: 'tenant_configs',      column: 'sender_display_name', reason: 'the From display name on tenant outbound mail — the company sending identity as published to recipients' },
+    { table: 'tenant_configs',      column: 'privacy_body',     reason: 'the tenant own hosted Privacy policy text — company-authored prose, the same answer as tenant_legal_versions.body_snapshot below' },
+    { table: 'tenant_configs',      column: 'terms_body',       reason: 'the tenant own hosted Terms text — company-authored prose, the same answer as tenant_legal_versions.body_snapshot below' },
+    { table: 'tenant_configs',      column: 'ics_token',        reason: 'opaque bearer token for the company calendar feed — a credential, not an identifier of any person' },
+    { table: 'messaging_compliance', column: 'provisioned_number', reason: 'the E.164 number provisioned TO the tenant for outbound SMS — the company sending identity, never a recipient number' },
+    { table: 'qbo_connections',     column: 'company_name',     reason: 'the tenant own QuickBooks company name as Intuit reports it — controller business identity' },
+    // Reads like PII, is not. Checked in source rather than inferred from the
+    // name, because both of these would otherwise be waved through in the
+    // opposite direction — declared as personal data that does not exist.
+    { table: 'tenant_configs',      column: 'point_of_contact', reason: 'a two-value enum (inspector or company) choosing WHOSE identity client mail comes from — a setting, not a person. The name reads like a contact record and holds no name' },
+    { table: 'tenant_configs',      column: 'ai_key_attestation_account_owner', reason: 'a single-value enum (tenant) recording who owns the AI provider account — an attestation answer, not an account holder name' },
+    { table: 'tenant_configs',      column: 'repair_quick_phrases', reason: 'a tenant-maintained list of quick-insert phrases for repair notes (JSON string array) — reusable template text authored by the company, never composed about a client' },
 
     // Heuristic false positives — config values and references, not PII.
     { table: 'tenant_configs',        column: 'email_mode',               reason: 'config enum, not personal data' },
@@ -78,6 +162,13 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'automation_logs',       column: 'recipient_contact_id',     reason: 'opaque id on the retained evidence ledger (see the automation_logs.recipient retain rule)' },
     { table: 'contact_role_profiles', column: 'email_template_id',        reason: 'template reference, not personal data' },
     { table: 'sms_consent_log',       column: 'recipient_type',           reason: 'role-kind enum, not personal data' },
+    // The subject POINTERS on the consent ledger. Same answer and same shape as
+    // automation_logs.recipient_contact_id two lines up: the ledger itself is
+    // retained under Art. 17(3)(b) (see the sms_consent_log.ip retain rule), and
+    // the record is worthless as consent evidence if it cannot say whose consent
+    // it was. Declared because the heuristic flags neither.
+    { table: 'sms_consent_log',       column: 'contact_id',               reason: 'opaque id naming whose consent this is, on the retained TCPA evidence ledger (see the sms_consent_log.ip retain rule)' },
+    { table: 'sms_consent_log',       column: 'subject_id',               reason: 'opaque id of the contact or staff user the consent attaches to, on the retained TCPA evidence ledger' },
     { table: 'report_versions',       column: 'signature',                reason: 'report-content integrity seal, not personal data' },
     // ── reports ───────────────────────────────────────────────────────────────
     // A report is findings about a named person's property. `title` is the only

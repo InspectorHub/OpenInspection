@@ -49,6 +49,7 @@ import {
     conciergeConfirmTokens,
     inspectionAccessTokens,
     inspectionRequests,
+    reportViews,
     reports,
     auditLogs,
     erasureLog,
@@ -319,6 +320,17 @@ export async function runErasure(
             .run();
         return changeCount(res);
     });
+
+    // Delivery counters (#271), keyed on the access token. MUST precede the
+    // token delete below: `access_token_id` is the only locator back to the
+    // subject, so dropping the tokens first strands these rows permanently, for
+    // this pass and every later one. LIA condition 7.
+    const tokIds = (await db.select({ id: inspectionAccessTokens.id }).from(inspectionAccessTokens)
+        .where(and(eq(inspectionAccessTokens.tenantId, tenantId), eq(inspectionAccessTokens.recipientEmail, subjectEmail)))
+        .all() as Array<{ id: string }>).map((t) => t.id);
+    await step('report_views', 'delete', {}, async () => tokIds.length === 0 ? 0 : changeCount(
+        await db.delete(reportViews)
+            .where(and(eq(reportViews.tenantId, tenantId), inArray(reportViews.accessTokenId, tokIds))).run()));
 
     // Persistent portal links — deleting them deliberately REVOKES portal
     // access: an erased subject's magic links must stop working.

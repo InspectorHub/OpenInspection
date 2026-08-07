@@ -17,10 +17,12 @@ import * as schema from '../../../server/lib/db/schema';
 import {
     auditLogs,
     esignAuditLogs,
+    idempotencyKeys,
     parkedCmdEvents,
     processedCmdEvents,
     processedWebhookEvents,
     smsConsentLog,
+    syncOutbox,
     tenants,
 } from '../../../server/lib/db/schema';
 import { runLogRetentionSweep, RETENTION_EXECUTOR_TABLES } from '../../../server/lib/compliance/retention-logs';
@@ -28,6 +30,8 @@ import {
     AUDIT_LOG_ANONYMIZE_MONTHS,
     DEAD_LETTER_RETENTION_DAYS,
     DEDUP_LOG_RETENTION_DAYS,
+    IDEMPOTENCY_REPLAY_RETENTION_DAYS,
+    SYNC_OUTBOX_RETENTION_DAYS,
     RETENTION_MANIFEST,
 } from '../../../server/lib/compliance/retention-manifest';
 
@@ -173,6 +177,133 @@ describe('runLogRetentionSweep', () => {
 
         const parked = await db.select().from(parkedCmdEvents).all();
         expect(parked.map((r) => r.id)).toEqual(['p-new']);
+    });
+
+    // ── sync_outbox ──────────────────────────────────────────────────────────
+    // The outbox `payload` is a serialized user-sync CloudEvent: staff email and
+    // name, and for `user.password_changed` the password HASH. The structural
+    // twin of what `parked_cmd_events` held before OI #276, one table over.
+
+    /** Seed one outbox row. `status` is the whole point of these cases. */
+    async function seedOutbox(id: string, status: 'pending' | 'published' | 'failed', createdAt: Date) {
+        await db.insert(syncOutbox).values({
+            id,
+            eventType: 'user.password_changed',
+            payload: JSON.stringify({ tenantId: 't1', email: 'staff@example.com', passwordHash: 'pbkdf2$deadbeef' }),
+            status,
+            attempts: 1,
+            createdAt,
+        });
+    }
+
+    it('deletes TERMINAL outbox rows past the window and keeps the ones inside it', async () => {
+        await seedOutbox('o-pub-old', 'published', daysAgo(SYNC_OUTBOX_RETENTION_DAYS + 1));
+        await seedOutbox('o-fail-old', 'failed', daysAgo(SYNC_OUTBOX_RETENTION_DAYS + 1));
+        await seedOutbox('o-pub-new', 'published', daysAgo(SYNC_OUTBOX_RETENTION_DAYS - 1));
+
+        const summary = await runLogRetentionSweep(db, NOW);
+        expect(summary.perTable.sync_outbox).toBe(2);
+
+        const rows = await db.select().from(syncOutbox).all();
+        expect(rows.map((r) => r.id)).toEqual(['o-pub-new']);
+    });
+
+    it('never deletes a PENDING outbox row, however old', async () => {
+        // The one assertion that separates a log clock from a data-loss bug. A
+        // `pending` row is UNPUBLISHED WORK: the cron sweeper is still trying to
+        // republish it, and portal has never seen the event. Expiring it does not
+        // retire a record of something that happened — it destroys a user-account
+        // change that never reached the other side, permanently and silently.
+        // A pending row this old is an incident, and the row is its evidence.
+        await seedOutbox('o-pending-ancient', 'pending', daysAgo(SYNC_OUTBOX_RETENTION_DAYS * 10));
+
+        await runLogRetentionSweep(db, NOW);
+
+        const rows = await db.select().from(syncOutbox).all();
+        expect(rows.map((r) => r.id)).toEqual(['o-pending-ancient']);
+        expect(rows[0]!.payload).toContain('staff@example.com');
+    });
+
+    it('the outbox window is its own number, not a neighbour reused', async () => {
+        // A row older than the dead-letter clock but younger than the outbox one
+        // must SURVIVE, and a row older than the outbox clock but younger than
+        // the dedup one must GO. Together they pin the value between its two
+        // neighbours, so silently collapsing it onto either constant goes red.
+        expect(SYNC_OUTBOX_RETENTION_DAYS).toBeGreaterThan(DEAD_LETTER_RETENTION_DAYS);
+        expect(SYNC_OUTBOX_RETENTION_DAYS).toBeLessThan(DEDUP_LOG_RETENTION_DAYS);
+        await seedOutbox('o-above-deadletter', 'published', daysAgo(DEAD_LETTER_RETENTION_DAYS + 1));
+        await seedOutbox('o-below-dedup', 'published', daysAgo(DEDUP_LOG_RETENTION_DAYS - 1));
+
+        await runLogRetentionSweep(db, NOW);
+
+        const rows = await db.select().from(syncOutbox).all();
+        expect(rows.map((r) => r.id)).toEqual(['o-above-deadletter']);
+    });
+
+    // ── idempotency_keys ─────────────────────────────────────────────────────
+    // `response_body` is the verbatim success payload of a mutating API call,
+    // replayed on retry — so it holds whatever PII that endpoint returns.
+
+    /** Seed one replay row. `expiresAt` is deliberately independent of `createdAt`. */
+    async function seedIdemKey(key: string, createdAt: Date, expiresAt: Date, state: 'in_flight' | 'done' = 'done') {
+        await db.insert(idempotencyKeys).values({
+            tenantId: 't1',
+            key,
+            fingerprint: 'fp',
+            state,
+            responseStatus: state === 'done' ? 200 : null,
+            responseBody: state === 'done' ? '{"client":{"email":"jane@example.com","name":"Jane Doe"}}' : null,
+            createdAt,
+            expiresAt,
+        });
+    }
+
+    it('deletes replay rows past the window and keeps the ones inside it', async () => {
+        const ttl = (d: Date) => new Date(d.getTime() + 24 * 60 * 60 * 1000);
+        const old = daysAgo(IDEMPOTENCY_REPLAY_RETENTION_DAYS + 1);
+        const fresh = daysAgo(IDEMPOTENCY_REPLAY_RETENTION_DAYS - 1);
+        await seedIdemKey('k-old', old, ttl(old));
+        await seedIdemKey('k-new', fresh, ttl(fresh));
+        // A dead claim nobody ever unwound: `releaseKey` runs only from a caught
+        // exception, so a CPU kill or a mid-request deploy leaves this forever.
+        await seedIdemKey('k-stuck', old, ttl(old), 'in_flight');
+
+        const summary = await runLogRetentionSweep(db, NOW);
+        expect(summary.perTable.idempotency_keys).toBe(2);
+
+        const rows = await db.select().from(idempotencyKeys).all();
+        expect(rows.map((r) => r.key)).toEqual(['k-new']);
+    });
+
+    it('measures the replay window from created_at, NOT from expires_at', async () => {
+        // The distinction the whole rule rests on. `expires_at` answers a
+        // CONCURRENCY question — may another caller steal this claim — and
+        // `claimKey` never even reads it once the row is `done` (the `done`
+        // branch returns above the expiry check). So a row can sit years past
+        // its own `expires_at` still holding the response body, which is exactly
+        // how this exposure was missed. A rule keyed on `expires_at` would look
+        // identical and would delete the wrong rows.
+        //
+        // Row A: created long ago, expiry pushed far into the future.
+        // Row B: created today, expiry already in the past.
+        // Storage limitation deletes A and keeps B. An `expires_at` rule flips it.
+        await seedIdemKey('k-old-created', daysAgo(IDEMPOTENCY_REPLAY_RETENTION_DAYS + 1), daysAgo(-3650));
+        await seedIdemKey('k-expired-yesterday', daysAgo(0), daysAgo(1));
+
+        await runLogRetentionSweep(db, NOW);
+
+        const rows = await db.select().from(idempotencyKeys).all();
+        expect(rows.map((r) => r.key)).toEqual(['k-expired-yesterday']);
+    });
+
+    it('the replay window is a multiple of the feature\'s own declared TTL', async () => {
+        // The number is derived, not picked: the store documents a 24h TTL and
+        // says a retry older than that "is a different problem". Seven days is a
+        // week of margin over the horizon the feature itself declares. Asserted
+        // so shortening it below one full TTL — which would start losing
+        // legitimate replays and duplicating mutations — cannot pass quietly.
+        expect(IDEMPOTENCY_REPLAY_RETENTION_DAYS).toBeGreaterThanOrEqual(1);
+        expect(IDEMPOTENCY_REPLAY_RETENTION_DAYS).toBe(7);
     });
 
     it('never touches an out-of-scope table', async () => {
