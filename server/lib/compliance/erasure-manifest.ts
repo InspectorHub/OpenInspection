@@ -179,6 +179,24 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // `ip_address` stays too — staff-action security trail, declared out of
     // scope below.
     { table: 'audit_logs', column: 'metadata', category: 'user.freetext', action: 'anonymize', legalBasis: 'art_17_3_b' },
+
+    // ── repair requests (#88) ─────────────────────────────────────────────────
+    // The one surface where the CLIENT types prose rather than the tenant. None
+    // of these column names looks like PII, which is exactly why the gate never
+    // asked about them; they are ruled on because somebody read the table, not
+    // because anything went red.
+    //
+    // `created_by_ref` is NOT NULL and, on the portal-token path, holds the
+    // actor's EMAIL — a plain identifier, despite a schema comment that called
+    // it an id for years. So it is both the subject PII on this table and the
+    // locator for it: the ROWS the subject authored are deleted (no
+    // legal-evidence basis for a client's own wish-list, and the delete revokes
+    // the still-live `share_token`). `custom_intro` / `note` are cleared in
+    // place on lists OTHER people built for the subject's inspections, which
+    // survive as that person's record. Executor: `erase-repair-requests.ts`.
+    { table: 'repair_requests',      column: 'created_by_ref', category: 'user.contact.email', action: 'delete' },
+    { table: 'repair_requests',      column: 'custom_intro',   category: 'user.freetext',      action: 'null' },
+    { table: 'repair_request_items', column: 'note',           category: 'user.freetext',      action: 'null' },
 ];
 
 /**
@@ -296,4 +314,29 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
       reason: 'Fingerprint only (type/dataschema/id/seq/size/digest) — the command payload is never written, so no subject PII reaches this table. It WAS payload-bearing before #276, when a cmd.tenant.update that failed to parse wrote an admin password hash here. Naming that history is deliberate: an out-of-scope entry that only says "no PII" invites restoring raw parking as a debugging convenience.' },
     { table: 'parked_cmd_events', column: 'reason',
       reason: 'Fixed diagnostic enum (parse-failed / unknown-type-or-version), not personal data.' },
+    // Repair-request line items (#88) — the report-derived snapshot columns.
+    // These are machine-copied off the published report card at add time, not
+    // typed by anyone on this table: defect prose the INSPECTOR wrote about the
+    // property, frozen so the shared list stays readable after the report
+    // changes. They are declared as a group because they are one question, and
+    // declared at all because `comment_snapshot` was on #88's list and the
+    // honest answer needs saying out loud: the report content these copy from
+    // carries NO manifest rule of its own, so this is not a decision inherited
+    // from a ruled source. It is the same call, made here for the first time.
+    // The subject's OWN lists never reach this reasoning — those rows are
+    // deleted whole by the `created_by_ref` rule above.
+    { table: 'repair_request_items', column: 'comment_snapshot',
+      reason: 'frozen copy of the inspector-authored defect comment on the published report — professional content about the property, not prose about or by the data subject' },
+    { table: 'repair_request_items', column: 'defect_title_snapshot',
+      reason: 'frozen copy of the report defect title — inspector-authored content about the property' },
+    { table: 'repair_request_items', column: 'location_snapshot',
+      reason: 'frozen copy of the defect location WITHIN the property ("primary bathroom"), not a postal address' },
+    { table: 'repair_request_items', column: 'category_snapshot',
+      reason: 'frozen copy of the report defect category — tenant taxonomy value, not personal data' },
+    { table: 'repair_request_items', column: 'trade_snapshot',
+      reason: 'resolved trade label ("licensed roofer") snapshotted at add time — tenant taxonomy value, not personal data' },
+    { table: 'repair_request_items', column: 'section_title',
+      reason: 'frozen copy of the report section heading — template structure, not personal data' },
+    { table: 'repair_request_items', column: 'item_label',
+      reason: 'frozen copy of the report item label — template structure, not personal data' },
 ];

@@ -59,6 +59,8 @@ import {
     ANONYMIZE_BOOKING_REQUEST_PII,
     ANONYMIZE_AUDIT_PII,
 } from './anonymize-pii';
+import { changeCount, toMs, addYearsMs } from './db-row-utils';
+import { eraseRepairRequests } from './erase-repair-requests';
 
 /**
  * What a report title becomes. Not blank: a reader of the version chain needs
@@ -99,28 +101,6 @@ export interface ErasureSummary {
 // Accept either the D1 drizzle type (prod) or the better-sqlite3 test db.
 // Both expose the same query-builder surface used here.
 type AnyDb = DrizzleD1Database<Record<string, unknown>> | { [k: string]: unknown };
-
-/** Driver-tolerant row-count extraction (D1: meta.changes; better-sqlite3: changes). */
-function changeCount(res: unknown): number {
-    const r = res as { meta?: { changes?: number }; changes?: number } | undefined;
-    return r?.meta?.changes ?? r?.changes ?? 0;
-}
-
-/** Add whole years to a Unix-MS timestamp, returning a Unix-MS integer. */
-function addYearsMs(ms: number, years: number): number {
-    const d = new Date(ms);
-    d.setUTCFullYear(d.getUTCFullYear() + years);
-    return d.getTime();
-}
-
-/** Coerce a timestamp column value (Date | number | null) to Unix-MS or null. */
-function toMs(v: unknown): number | null {
-    if (v == null) return null;
-    if (v instanceof Date) return v.getTime();
-    if (typeof v === 'number') return v;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-}
 
 /**
  * Run a data-subject erasure for `subjectEmail` within `tenantId`. The caller
@@ -380,6 +360,11 @@ export async function runErasure(
         retainedCount += c; // rows retained with identity cleared under Art. 17(3)(e)
         return c;
     });
+
+    // Repair-request lists built from the published report — the one surface
+    // where the CLIENT types prose. Two passes (own lists deleted, other
+    // people's prose cleared); see `erase-repair-requests.ts` for why.
+    await eraseRepairRequests(db, { tenantId, subjectEmail, inspectionIds: await subjectInspectionIds(), step });
 
     // The payment ledger is append-only and financial — the ROWS stay, retained
     // under the accounting/tax obligation. `note` is the one column a human
