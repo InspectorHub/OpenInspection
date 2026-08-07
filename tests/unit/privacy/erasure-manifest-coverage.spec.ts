@@ -143,3 +143,75 @@ describe('portal #88 — the repair-request columns', () => {
         expect(rule?.action).toBe('delete');
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The property address family.
+//
+// The columns a widened PII heuristic flags. Two of them are a different
+// question from the other ten and are settled by exclusion; the rest are
+// RETAINED under Art. 17(3)(e) with a bounded window. Classifying the family as
+// out of scope was considered and rejected — these tests are what stops that
+// decision from being quietly re-made later, because the exclusion is cheaper
+// to write and looks identical in a green gate.
+// ─────────────────────────────────────────────────────────────────────────────
+const INSPECTION_ADDRESS_COLUMNS = [
+    'property_address', 'address_place_id', 'address_street', 'address_city',
+    'address_state', 'address_zip', 'address_county', 'address_lat', 'address_lng',
+];
+const RETAINED_ADDRESS_COLUMNS = [
+    ...INSPECTION_ADDRESS_COLUMNS.map((c) => `inspections.${c}`),
+    'inspection_requests.property_address',
+];
+const ADDRESS_FAMILY = [
+    ...RETAINED_ADDRESS_COLUMNS,
+    'inspections.address_geocoded_at',
+    'tenant_configs.company_address',
+];
+
+describe('the property address family', () => {
+    it.each(ADDRESS_FAMILY)('%s is decided', (key) => {
+        expect(DECIDED.has(key)).toBe(true);
+    });
+
+    it.each(RETAINED_ADDRESS_COLUMNS)('%s is retained, not excluded', (key) => {
+        const [table, column] = key.split('.');
+        const rule = ERASURE_MANIFEST.find((r) => r.table === table && r.column === column);
+        expect(rule, `${key} has no manifest rule`).toBeTruthy();
+        expect(rule!.action).toBe('retain');
+        expect(rule!.legalBasis).toBe('art_17_3_e');
+        expect(
+            ERASURE_OUT_OF_SCOPE.some((e) => `${e.table}.${e.column}` === key),
+            `${key} is declared out of scope. That option was rejected: a property address on a ` +
+            'residential inspection can be where a person lives, so it is retained with a stated ' +
+            'basis and a bounded window, never waved through as property data.',
+        ).toBe(false);
+    });
+
+    it.each(RETAINED_ADDRESS_COLUMNS)('%s states a bounded period', (key) => {
+        const [table, column] = key.split('.');
+        const rule = ERASURE_MANIFEST.find((r) => r.table === table && r.column === column);
+        expect(
+            rule!.retention,
+            `${key} is retained with no period. "Retained" means for a period; an unbounded ` +
+            'retain is the exclusion this ruling rejected, wearing a different label.',
+        ).toMatch(/^P\d+Y$/);
+    });
+
+    // A TRIPWIRE, not a requirement. Nothing expires an inspection address
+    // today, so the rules above record a decision no code acts on, and the
+    // manifest says so where the rules are. The day the sweep learns about
+    // `inspections`, that notice becomes false — and a false "not yet enforced"
+    // is worse than none, because it tells a reader to go looking for a gap
+    // that has been closed. This fails then, so the notice cannot outlive it.
+    it('the retention sweep does not yet enforce the inspection-record window', () => {
+        const sweep = stripComments(fs.readFileSync(retentionSweepPath, 'utf8'));
+        expect(
+            /\binspections\b/.test(sweep),
+            'retention-sweep.ts now references `inspections`. If the sweep expires the property ' +
+            'address family, delete the "NOT YET ENFORCED" notice above those rules in ' +
+            'erasure-manifest.ts and delete this test. If it references inspections for some ' +
+            'other reason, narrow this check rather than removing it — the notice is only ' +
+            'honest while nothing acts on the window.',
+        ).toBe(false);
+    });
+});

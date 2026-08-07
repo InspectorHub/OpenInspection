@@ -11,7 +11,7 @@
  *
  * Executor: `erasure-orchestrator.ts` — the concrete Drizzle executor that
  * realizes these rules. Binding verified by
- * `tests/unit/erasure-manifest-coverage.spec.ts` (drift guard).
+ * `tests/unit/privacy/erasure-manifest-coverage.spec.ts` (drift guard).
  */
 
 /**
@@ -197,6 +197,49 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     { table: 'repair_requests',      column: 'created_by_ref', category: 'user.contact.email', action: 'delete' },
     { table: 'repair_requests',      column: 'custom_intro',   category: 'user.freetext',      action: 'null' },
     { table: 'repair_request_items', column: 'note',           category: 'user.freetext',      action: 'null' },
+
+    // ── the property address family ───────────────────────────────────────────
+    // A property address is not automatically non-personal data: on a
+    // residential inspection ordered by the buyer or the homeowner it is where a
+    // person lives, held against a named client through `inspection_people`.
+    // Declaring the family out of scope as "property data" was considered and
+    // REJECTED — it was the cheapest way back to green and the one a red gate
+    // pushes you toward, which is why it was not ours to decide alone.
+    //
+    // RETAINED under Art. 17(3)(e) instead: the address identifies which
+    // property a report describes, and the report is the inspector's defence
+    // against a negligence claim. One entry per column, no wildcard — an auditor
+    // reads this file, and a wildcard hides what was actually considered.
+    //
+    // Retained means FOR A PERIOD. The bound is the tenant's existing
+    // `tenant_configs.agreement_retention_years` (default 6, hence 'P6Y'), NOT a
+    // second retention column: both windows answer the same question — how long
+    // a professional record must survive — for the same tenant under the same
+    // state rules and the same E&O cover, and two clocks that start equal drift.
+    //
+    // ⚠️ NOT YET ENFORCED, and read nothing else into that. `retention-sweep.ts`
+    // reaches `agreement_requests` and `agreement_signers` only; nothing expires
+    // an inspection address today, so these rules record a decision no code acts
+    // on yet. That gap is the distance between the rule as written and the rule
+    // as honoured — NOT a licence to read 'retain' as 'forever', which is the
+    // rejected exclusion under another name. The tripwire in
+    // `tests/unit/privacy/erasure-manifest-coverage.spec.ts` fails the day the
+    // sweep learns about `inspections`, so this notice cannot outlive its gap.
+    { table: 'inspections', column: 'property_address',  category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'inspections', column: 'address_place_id',  category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'inspections', column: 'address_street',    category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'inspections', column: 'address_city',      category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'inspections', column: 'address_state',     category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'inspections', column: 'address_zip',       category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'inspections', column: 'address_county',    category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'inspections', column: 'address_lat',       category: 'user.location', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'inspections', column: 'address_lng',       category: 'user.location', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    // The booking request the inspection was converted from. Its client_name /
+    // client_email / client_phone are already cleared in place above while the
+    // ROW survives, so the address is the one part of that record still
+    // standing — the same question, answered the same way rather than
+    // differently by omission.
+    { table: 'inspection_requests', column: 'property_address', category: 'user.address', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y' },
 ];
 
 /**
@@ -250,6 +293,12 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'tenant_configs',      column: 'company_phone',    reason: 'company-owned phone' },
     { table: 'tenant_configs',      column: 'company_lat',      reason: 'company office coordinate — controller business identity' },
     { table: 'tenant_configs',      column: 'company_lng',      reason: 'company office coordinate — controller business identity' },
+    // The address family's other half. `company_address` is a business's own
+    // published location — the controller's identity, not a data subject's —
+    // so it follows its `company_lat`/`company_lng` siblings above and NOT the
+    // `inspections` rules, where the address is somebody's home. The two look
+    // alike to a name-matching gate and are not the same question.
+    { table: 'tenant_configs',      column: 'company_address',  reason: 'company office address — controller business identity, published on reports and invoices' },
 
     // Heuristic false positives — config values and references, not PII.
     { table: 'tenant_configs',        column: 'email_mode',               reason: 'config enum, not personal data' },
@@ -325,18 +374,16 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // from a ruled source. It is the same call, made here for the first time.
     // The subject's OWN lists never reach this reasoning — those rows are
     // deleted whole by the `created_by_ref` rule above.
-    { table: 'repair_request_items', column: 'comment_snapshot',
-      reason: 'frozen copy of the inspector-authored defect comment on the published report — professional content about the property, not prose about or by the data subject' },
-    { table: 'repair_request_items', column: 'defect_title_snapshot',
-      reason: 'frozen copy of the report defect title — inspector-authored content about the property' },
-    { table: 'repair_request_items', column: 'location_snapshot',
-      reason: 'frozen copy of the defect location WITHIN the property ("primary bathroom"), not a postal address' },
-    { table: 'repair_request_items', column: 'category_snapshot',
-      reason: 'frozen copy of the report defect category — tenant taxonomy value, not personal data' },
-    { table: 'repair_request_items', column: 'trade_snapshot',
-      reason: 'resolved trade label ("licensed roofer") snapshotted at add time — tenant taxonomy value, not personal data' },
-    { table: 'repair_request_items', column: 'section_title',
-      reason: 'frozen copy of the report section heading — template structure, not personal data' },
-    { table: 'repair_request_items', column: 'item_label',
-      reason: 'frozen copy of the report item label — template structure, not personal data' },
+    { table: 'repair_request_items', column: 'comment_snapshot', reason: 'frozen copy of the inspector-authored defect comment on the published report — professional content about the property, not prose about or by the data subject' },
+    { table: 'repair_request_items', column: 'defect_title_snapshot', reason: 'frozen copy of the report defect title — inspector-authored content about the property' },
+    { table: 'repair_request_items', column: 'location_snapshot', reason: 'frozen copy of the defect location WITHIN the property ("primary bathroom"), not a postal address' },
+    { table: 'repair_request_items', column: 'category_snapshot', reason: 'frozen copy of the report defect category — tenant taxonomy value, not personal data' },
+    { table: 'repair_request_items', column: 'trade_snapshot', reason: 'resolved trade label ("licensed roofer") snapshotted at add time — tenant taxonomy value, not personal data' },
+    { table: 'repair_request_items', column: 'section_title', reason: 'frozen copy of the report section heading — template structure, not personal data' },
+    { table: 'repair_request_items', column: 'item_label', reason: 'frozen copy of the report item label — template structure, not personal data' },
+    // Sits inside the address family by name and outside it by substance: it
+    // records WHEN the geocode ran, not where the property is. Excluded rather
+    // than retained so the retain rules above stay a list of columns that
+    // actually hold the address.
+    { table: 'inspections', column: 'address_geocoded_at', reason: 'timestamp recording when the address was geocoded — a processing record, not the address itself' },
 ];

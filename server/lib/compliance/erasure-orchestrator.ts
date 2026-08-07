@@ -32,7 +32,7 @@
  * source of truth; this orchestrator is the concrete Drizzle executor that
  * realizes those rules with tenant-scoped, row-state-aware SQL.
  *
- * Binding: `tests/unit/erasure-manifest-coverage.spec.ts` asserts every
+ * Binding: `tests/unit/privacy/erasure-manifest-coverage.spec.ts` asserts every
  * manifest anonymize/delete/null rule is referenced in this file, preventing
  * silent manifest↔orchestrator drift.
  */

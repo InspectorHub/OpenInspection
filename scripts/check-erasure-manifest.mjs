@@ -39,6 +39,15 @@
  * The heuristic deliberately includes `recipient` (automation_logs.recipient
  * holds emails and E.164 numbers — renamed from recipient_email, which is how
  * it escaped the original pattern) and bare `ip`.
+ *
+ * `address` was added only AFTER the address family was ruled on, and the order
+ * was the point. Widening the pattern first would have turned the gate red on
+ * twelve columns at once and made twelve out-of-scope entries the cheapest way
+ * back to green — converting an open question into a recorded decision nobody
+ * would revisit. `docs/compliance/erasure-heuristic-limits.md` says the same
+ * thing at more length, and names what this gate still cannot see: read it
+ * before treating a green run as coverage. Whatever the next widening is, rule
+ * on the columns first, then widen.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -49,7 +58,7 @@ const SCHEMA_DIR = join(ROOT, "server", "lib", "db", "schema");
 
 const VALID_ACTIONS = new Set(["delete", "null", "hash", "retain", "anonymize"]);
 const REQUIRES_BASIS = new Set(["anonymize", "retain"]);
-const PII_HEURISTIC = /(email|phone|ip_address|user_agent|signature|client_name|full_name|recipient)/;
+const PII_HEURISTIC = /(email|phone|ip_address|user_agent|signature|client_name|full_name|recipient|address)/;
 const isPiiColumn = (col) => PII_HEURISTIC.test(col) || col === "ip";
 
 const errors = [];
