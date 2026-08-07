@@ -11,6 +11,10 @@
  * The gate compares DB state, so it is not expressible in the Zod schema and
  * lives in `BrandingService.updateBranding`. These specs exercise that method,
  * which is what `POST /api/admin/branding` funnels into.
+ *
+ * The last block covers the OTHER refusal in that same writer — embedded report
+ * estimates — for the same reason: the writer is the single chokepoint every
+ * caller (dashboard, MCP, API client) goes through.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
@@ -175,5 +179,29 @@ describe('BrandingService — cancellation policy attestation gate', () => {
         });
         const foreign = await agreementSvc.createAgreement('other', 'Theirs', '<p>x</p>');
         await expect(branding.attestCancellationClause(TENANT, foreign.id)).rejects.toThrow(/not found/i);
+    });
+
+    // ─── Embedded repair estimates ───────────────────────────────────────────
+    // The other refusal in the same writer. `showEstimates` stays open in the
+    // Zod schema (it is a real column with a real off-switch), so the service
+    // is the only place that can be asymmetric about which value it accepts.
+
+    async function storedShowEstimates(): Promise<boolean | null> {
+        const row = await testDb.select({ v: schema.tenantConfigs.showEstimates })
+            .from(schema.tenantConfigs).where(eq(schema.tenantConfigs.tenantId, TENANT)).get();
+        return row?.v ?? null;
+    }
+
+    it('refuses to turn embedded report estimates on', async () => {
+        await expect(branding.updateBranding(TENANT, { showEstimates: true }))
+            .rejects.toThrow(/estimates cannot be shown inside the inspection report/i);
+        expect(await storedShowEstimates()).toBeNull();
+    });
+
+    it('still lets a tenant turn embedded report estimates off', async () => {
+        // Asymmetric on purpose: a blanket refusal would strand any tenant the
+        // column is already true for, with no supported way back to false.
+        await branding.updateBranding(TENANT, { showEstimates: false });
+        expect(await storedShowEstimates()).toBe(false);
     });
 });
