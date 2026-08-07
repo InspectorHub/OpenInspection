@@ -17,6 +17,17 @@
  *     against an implementation that revoked the token — which is the remedy
  *     `docs/compliance/report-view-lia.md` explicitly rejects, because it
  *     answers an objection about measurement by taking the document away.
+ *
+ * 🔒 **This suite runs with the counter explicitly ON.** Its subject is the
+ * counting behaviour, and `server/lib/report-views.gate.ts` ships that
+ * behaviour switched OFF until LIA conditions 4, 5 and 6 exist. The mock below
+ * states the precondition rather than letting the suite inherit whatever the
+ * gate currently says — a suite that silently followed the default would go
+ * green by testing nothing on the day the default is shut, which is today.
+ *
+ * The default itself is asserted in `view-confirmation-default-off.spec.ts`,
+ * deliberately in a different file: a default assertion made here would be
+ * reading this mock. Drop the mock when the gate is deleted.
  */
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
@@ -25,6 +36,9 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+
+// The precondition for everything below. Delete with the gate.
+vi.mock('../../../server/lib/report-views.gate', () => ({ REPORT_VIEW_COUNTING_ENABLED: true }));
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { HonoConfig } from '../../../server/types/hono';

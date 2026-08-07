@@ -21,6 +21,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { inspectionAccessTokens, reportViews } from './db/schema';
 import type { AppDrizzle } from './route-helpers';
 import { logger } from './logger';
+import { REPORT_VIEW_COUNTING_ENABLED } from './report-views.gate';
 
 /**
  * Everything that decides whether a request is a HUMAN READING THE REPORT.
@@ -165,11 +166,11 @@ export async function writeViewTrackingObjection(
     return at ? at.getTime() : null;
 }
 
-export type RecordOutcome = 'counted' | 'suppressed' | 'skipped';
+export type RecordOutcome = 'counted' | 'suppressed' | 'skipped' | 'disabled';
 
 /**
- * Count one view, unless the request is non-human or the recipient has
- * objected.
+ * Count one view, unless the counter is switched off, the request is non-human,
+ * or the recipient has objected.
  *
  * Never throws: a delivery-confirmation counter must not be able to fail a
  * recipient's report. A write that fails is a missing observation, which the
@@ -181,6 +182,17 @@ export async function recordReportView(
     signals: ReportViewSignals,
     now: number = Date.now(),
 ): Promise<RecordOutcome> {
+    // 🔒 First, before ANY read. The assessment this counter runs under is
+    // incomplete until LIA conditions 4, 5 and 6 exist, so while the gate is
+    // shut the feature must not merely decline to increment — it must not touch
+    // the database at all. An objection lookup is itself a read about an
+    // identified recipient, performed for a purpose that is not yet covered.
+    // See `report-views.gate.ts`, which also names the change that deletes it.
+    //
+    // `'disabled'` is a distinct outcome from `'skipped'` on purpose: they mean
+    // "we are not allowed to look" and "we looked and this was not a human",
+    // and a test that cannot tell them apart cannot prove which one fired.
+    if (!REPORT_VIEW_COUNTING_ENABLED) return 'disabled';
     if (!shouldCountReportView(signals)) return 'skipped';
     const accessTokenId = signals.accessTokenId as string;
     try {
