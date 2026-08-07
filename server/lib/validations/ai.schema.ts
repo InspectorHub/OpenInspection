@@ -70,3 +70,23 @@ export const CommentEditSchema = z.object({
 export const CommentEditResponseSchema = createApiResponseSchema(z.object({
     rewritten: z.string().openapi({ example: 'Major cracking observed at the NW corner of the roof field; recommend evaluation by a licensed roofer.' }).describe('TODO describe rewritten field for the OpenInspection MCP integration'),
 })).openapi('CommentEditResponse');
+
+/**
+ * Transient (NOT stored as sent) confirmation that rides along with a save of
+ * the workspace's OWN AI provider key on `PUT/POST /api/admin/secrets`.
+ *
+ * Every field is REQUIRED and has NO default: a missing statement must read as
+ * "not confirmed", and a `.default(false)` would make that indistinguishable
+ * from a caller who deliberately said no. The save is refused unless all three
+ * are true; the route then turns them into the provider / mode / owner /
+ * terms-version / timestamp / policy-version record on `tenant_configs`. The
+ * statements and both version constants live in `server/lib/ai/byo-attestation.ts`.
+ */
+export const AiKeyAttestationSchema = z.object({
+    reviewedProviderTerms: z.boolean().openapi({ example: true })
+        .describe('The workspace has reviewed its AI provider terms.'),
+    tierPermitsIntendedUse: z.boolean().openapi({ example: true })
+        .describe('The service tier on their provider account permits their intended use.'),
+    understandsProviderProcessing: z.boolean().openapi({ example: true })
+        .describe('They understand inspection content is processed by that provider.'),
+}).openapi('AiKeyAttestation');

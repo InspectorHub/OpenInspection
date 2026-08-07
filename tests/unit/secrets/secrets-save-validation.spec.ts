@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateStripeKeyFormats } from '../../../server/api/secrets';
+import { validateStripeKeyFormats } from '../../../server/lib/secrets-catalog';
 
 describe('validateStripeKeyFormats', () => {
     it('accepts well-formed keys and ignores absent ones', () => {

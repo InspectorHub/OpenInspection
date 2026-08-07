@@ -1,4 +1,5 @@
 import { Form, type useFetcher } from "react-router";
+import { Checkbox } from "@core/shared-ui";
 import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
@@ -46,6 +47,31 @@ export function AiFeaturesPanel({ geminiConfigured, value, fieldError, saving, g
           error={fieldError("GEMINI_API_KEY")}
           hint={m.settings_ai_key_hint()}
         />
+
+        {/*
+          Disclosure, then attestation — two different things on purpose. The
+          paragraph states a fact about how provider terms work; it gives no
+          advice and disclaims nothing. The checkboxes below are the workspace
+          asserting what only it can know: the service tier lives in the billing
+          project behind the key, where this application cannot look. All three
+          are `required`, so the browser blocks the submit and the server refuses
+          the save (422) — the key is not stored either way.
+        */}
+        <p className="text-[12px] text-ih-fg-3 leading-relaxed">
+          {m.settings_ai_terms_disclosure()}
+        </p>
+        <fieldset className="space-y-2">
+          <legend className="text-[11px] font-semibold text-ih-fg-2 mb-1">
+            {m.settings_ai_attest_heading()}
+          </legend>
+          <Checkbox name="attestReviewedProviderTerms" value="on" required
+            label={m.settings_ai_attest_reviewed()} />
+          <Checkbox name="attestTierPermitsIntendedUse" value="on" required
+            label={m.settings_ai_attest_tier()} />
+          <Checkbox name="attestUnderstandsProviderProcessing" value="on" required
+            label={m.settings_ai_attest_processing()} />
+        </fieldset>
+
         <div className="flex justify-end pt-2 border-t border-ih-border">
           <button type="submit" disabled={saving}
             className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">

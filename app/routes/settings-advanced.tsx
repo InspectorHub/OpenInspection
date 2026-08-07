@@ -114,7 +114,20 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!geminiApiKey || typeof geminiApiKey !== "string" || !geminiApiKey.trim()) {
       return { intent, success: false, error: m.settings_advanced_api_key_required(), field: "GEMINI_API_KEY", test: null };
     }
-    const res = await api.secrets.secrets.$put({ json: { GEMINI_API_KEY: geminiApiKey } });
+    // The three statements the workspace confirms about its own AI provider
+    // account. Read as present/absent — an unchecked box sends nothing at all,
+    // which is why the API field has no default: "absent" must mean "not
+    // confirmed", never "false by default". The API refuses the save without
+    // all three, so this is a faithful relay, not the enforcement point.
+    const aiKeyAttestation = {
+      reviewedProviderTerms: fd.get("attestReviewedProviderTerms") === "on",
+      tierPermitsIntendedUse: fd.get("attestTierPermitsIntendedUse") === "on",
+      understandsProviderProcessing: fd.get("attestUnderstandsProviderProcessing") === "on",
+    };
+    if (Object.values(aiKeyAttestation).some((confirmed) => !confirmed)) {
+      return { intent, success: false, error: m.settings_ai_attest_required(), field: "GEMINI_API_KEY", test: null };
+    }
+    const res = await api.secrets.secrets.$put({ json: { GEMINI_API_KEY: geminiApiKey, aiKeyAttestation } });
     if (!res.ok) {
       const errBody = (await res.json().catch(() => null)) as
         | { error?: { message?: string; field?: string } }
