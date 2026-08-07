@@ -49,22 +49,74 @@
  * The heuristic deliberately includes `recipient` (automation_logs.recipient
  * holds emails and E.164 numbers — renamed from recipient_email, which is how
  * it escaped the original pattern) and bare `ip`.
+ *
+ * `address` was added only AFTER the address family was ruled on, and the order
+ * was the point. Widening the pattern first would have turned the gate red on
+ * twelve columns at once and made twelve out-of-scope entries the cheapest way
+ * back to green — converting an open question into a recorded decision nobody
+ * would revisit. `docs/compliance/erasure-heuristic-limits.md` says the same
+ * thing at more length, and names what this gate still cannot see: read it
+ * before treating a green run as coverage. Whatever the next widening is, rule
+ * on the columns first, then widen.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+// The manifest and its out-of-scope register are two files and one document:
+// a column is covered by a rule in the first or excused by an entry in the
+// second, and neither array means anything without the other. They are read as
+// one concatenated source so `arrayBody` finds whichever it is asked for, and
+// so splitting the register out for line-count reasons could not quietly halve
+// what this gate sees. A missing file throws here rather than parsing as empty.
 const MANIFEST = join(ROOT, "server", "lib", "compliance", "erasure-manifest.ts");
+const OUT_OF_SCOPE = join(ROOT, "server", "lib", "compliance", "erasure-out-of-scope.ts");
 const SCHEMA_DIR = join(ROOT, "server", "lib", "db", "schema");
 
 const VALID_ACTIONS = new Set(["delete", "null", "hash", "retain", "anonymize"]);
 const REQUIRES_BASIS = new Set(["anonymize", "retain"]);
-const PII_HEURISTIC = /(email|phone|ip_address|user_agent|signature|client_name|full_name|recipient)/;
+const VALID_ENFORCEMENT = new Set(["enforced", "pending"]);
+
+/**
+ * The ONLY rules allowed to say `enforcementStatus: 'pending'`.
+ *
+ * A `retain` rule that promises a bounded `retention` and has nothing to expire
+ * it is not a bounded retain — it is a permanent one that reads as temporary,
+ * which is the blanket exclusion this manifest exists to avoid. Existing
+ * remediation is allowed to be in flight; ADDING another one is not a thing a
+ * developer should be able to do by typing a keyword. Landing here is a diff
+ * somebody has to approve.
+ *
+ * The check runs BOTH ways: a pending rule missing from this list fails, and a
+ * list entry with no matching pending rule also fails. The second direction is
+ * what stops the list decaying into a blanket permit after the rules it named
+ * are gone.
+ *
+ * To remove an entry: build the enforcement, flip the rule to
+ * `enforcementStatus: 'enforced'`, delete the line here.
+ */
+const PENDING_ENFORCEMENT = new Set([
+  // The property address family. Retained under Art. 17(3)(e) for the tenant's
+  // record window; `retention-sweep.ts` does not reach `inspections` yet, so
+  // nothing expires them. See the NOT YET ENFORCED block in the manifest for
+  // the two blockers and why the deadline is where it is.
+  "inspections.property_address",
+  "inspections.address_place_id",
+  "inspections.address_street",
+  "inspections.address_city",
+  "inspections.address_state",
+  "inspections.address_zip",
+  "inspections.address_county",
+  "inspections.address_lat",
+  "inspections.address_lng",
+  "inspection_requests.property_address",
+]);
+const PII_HEURISTIC = /(email|phone|ip_address|user_agent|signature|client_name|full_name|recipient|address)/;
 const isPiiColumn = (col) => PII_HEURISTIC.test(col) || col === "ip";
 
 const errors = [];
 
-const src = readFileSync(MANIFEST, "utf8");
+const src = `${readFileSync(MANIFEST, "utf8")}\n${readFileSync(OUT_OF_SCOPE, "utf8")}`;
 
 /** Extract the body of a top-level `export const NAME = [ ... ];` array. */
 function arrayBody(text, name) {
@@ -150,6 +202,78 @@ rules.forEach((rule, i) => {
     errors.push(`${label}: action '${rule.action}' requires a 'legalBasis' (Art. 17(3) exemption).`);
   }
 });
+
+// ── Enforcement of bounded retention ─────────────────────────────────────────
+// A `retain` rule that names a period is a promise the data goes away when the
+// period elapses. Nothing in this repo can prove a sweep actually runs, so what
+// is checked instead is that somebody SAID which it is, and that "not yet" is
+// bounded by a list and a date rather than by nobody looking.
+const seenPending = new Set();
+rules.forEach((rule, i) => {
+  const key = `${rule.table}.${rule.column}`;
+  const label = `rule #${i + 1} (${key})`;
+
+  if (rule.enforcementStatus && !VALID_ENFORCEMENT.has(rule.enforcementStatus)) {
+    errors.push(
+      `${label}: invalid enforcementStatus '${rule.enforcementStatus}' (allowed: ${[...VALID_ENFORCEMENT].join(", ")}).`,
+    );
+    return;
+  }
+
+  // The default is REFUSAL, not "enforced". A new bounded retain has to declare
+  // what expires it; that is the whole point of this block.
+  if (rule.action === "retain" && rule.retention && !rule.enforcementStatus) {
+    errors.push(
+      `${label}: 'retain' with retention '${rule.retention}' must declare enforcementStatus ` +
+        `('enforced' if a sweep expires it, 'pending' if that is not built yet). A bounded ` +
+        `retain nothing enforces is an unbounded retain.`,
+    );
+  }
+
+  if (rule.enforcementStatus !== "pending") return;
+  seenPending.add(key);
+
+  if (!PENDING_ENFORCEMENT.has(key)) {
+    errors.push(
+      `${label}: NEW unenforced retain rule. '${key}' is marked pending but is not in ` +
+        `PENDING_ENFORCEMENT in this script. Existing remediation may be in flight; adding ` +
+        `another one is a reviewed decision, so put it on that list in the same change or ` +
+        `build the enforcement instead.`,
+    );
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(rule.enforcementDeadline ?? "")) {
+    errors.push(
+      `${label}: pending rules require an 'enforcementDeadline' as YYYY-MM-DD. Without a date, ` +
+        `'pending' becomes permanent.`,
+    );
+    return;
+  }
+  // Deadline in the past → FAIL. A deadline that cannot act is not a deadline;
+  // this is the same "expiry acts" principle the rule itself is about, applied
+  // to our own promise about it. Moving the date is allowed and visible.
+  const due = Date.parse(`${rule.enforcementDeadline}T23:59:59Z`);
+  if (Number.isNaN(due)) {
+    errors.push(`${label}: enforcementDeadline '${rule.enforcementDeadline}' is not a real date.`);
+  } else if (Date.now() > due) {
+    errors.push(
+      `${label}: enforcement deadline ${rule.enforcementDeadline} has PASSED and the retention ` +
+        `is still not enforced. Build it, or move the date deliberately and say why — an ` +
+        `expired "pending" is the unbounded retain this check exists to prevent.`,
+    );
+  }
+});
+
+// The list must not outlive the rules it names, or it quietly becomes a blanket
+// permit for whatever lands on it next.
+for (const key of PENDING_ENFORCEMENT) {
+  if (!seenPending.has(key)) {
+    errors.push(
+      `PENDING_ENFORCEMENT lists '${key}', but no manifest rule is marked pending for it. ` +
+        `If the enforcement shipped, delete the line; if the rule moved, update it.`,
+    );
+  }
+}
 
 // ── Out-of-scope set (table.column the manifest deliberately skips) ───────────
 // Every entry MUST carry a reason — an out-of-scope declaration without one is

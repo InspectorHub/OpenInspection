@@ -537,3 +537,122 @@ describe('runErasure — the residences the original manifest missed (#88)', () 
         expect(summary.status).toBe('completed');
     });
 });
+
+/**
+ * Portal #88, the remaining half — the repair-request lists. These four columns
+ * survived every earlier pass because the gate matches column NAMES, and
+ * `created_by_ref` / `custom_intro` / `note` / `comment_snapshot` do not look
+ * like PII while being exactly where a client types someone's name.
+ */
+describe('runErasure — repair-request lists (#88)', () => {
+    let db: BetterSQLite3Database<typeof schema>;
+
+    const INSP = 'insp-rr';
+
+    beforeEach(async () => {
+        const fixture = createTestDb();
+        db = fixture.db;
+        await setupSchema(fixture.sqlite);
+        await seedTenants(db);
+        await seedRoleProfiles(db, TENANT_A, new Date(1));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (mockDrizzle as any).mockReturnValue(db);
+        await db.insert(schema.inspections).values({
+            id: INSP, tenantId: TENANT_A, propertyAddress: '4 Elm St',
+            date: '2026-06-04', status: 'completed', paymentStatus: 'unpaid', price: 40000, createdAt: new Date(),
+        });
+        await db.insert(schema.contacts).values({
+            id: 'contact-rr', tenantId: TENANT_A, type: 'client',
+            name: 'Jane Subject', email: SUBJECT_EMAIL, phone: '555-1111', createdAt: new Date(),
+        });
+        // The live client link — pass 2 reaches other people's lists THROUGH it.
+        await db.insert(schema.inspectionPeople).values({
+            id: 'ip-rr', tenantId: TENANT_A, inspectionId: INSP,
+            contactId: 'contact-rr', roleProfileId: `crp_${TENANT_A}_client`, createdAt: new Date(),
+        });
+    });
+
+    const run = () => runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
+
+    /** A list, with one item. `createdByRef` is an EMAIL on the portal-token path. */
+    async function seedList(id: string, createdByRef: string, kind: 'client' | 'agent' | 'inspector') {
+        await db.insert(schema.repairRequests).values({
+            id, tenantId: TENANT_A, inspectionId: INSP, createdByKind: kind,
+            createdByRef, customIntro: 'Jane Subject asks for these repairs before closing.',
+            shareToken: `share-${id}`, createdAt: new Date(), updatedAt: new Date(),
+        });
+        await db.insert(schema.repairRequestItems).values({
+            id: `${id}-item`, tenantId: TENANT_A, repairRequestId: id,
+            findingKey: 'f1', sectionTitle: 'Roof', itemLabel: 'Shingles',
+            commentSnapshot: 'Shingles are cupping at the south slope.',
+            note: 'Call Jane on 555-1111 to arrange access.',
+            createdAt: new Date(),
+        });
+    }
+
+    it("the subject's own list is deleted whole, items included, share token gone", async () => {
+        await seedList('rr-own', SUBJECT_EMAIL, 'client');
+
+        const summary = await run();
+
+        expect(await db.select().from(schema.repairRequests).all()).toHaveLength(0);
+        expect(await db.select().from(schema.repairRequestItems).all()).toHaveLength(0);
+        // The share link is a persistent URL a contractor may still hold; the
+        // row going is what stops it resolving.
+        const decisions = summary.decisions.filter((d) => d.table.startsWith('repair_request'));
+        expect(decisions.map((d) => `${d.table}:${d.action}`)).toEqual([
+            'repair_request_items:delete', 'repair_requests:delete',
+        ]);
+    });
+
+    it("another person's list survives, but its prose about the subject does not", async () => {
+        await seedList('rr-agent', 'agent@other.com', 'agent');
+
+        await run();
+
+        const row = await db.select().from(schema.repairRequests)
+            .where(eq(schema.repairRequests.id, 'rr-agent')).get();
+        expect(row, 'the agent\'s own record must survive').toBeTruthy();
+        expect(row!.createdByRef).toBe('agent@other.com');
+        expect(row!.customIntro).toBeNull();
+
+        const item = await db.select().from(schema.repairRequestItems)
+            .where(eq(schema.repairRequestItems.id, 'rr-agent-item')).get();
+        expect(item!.note).toBeNull();
+        // The inspector's defect prose is professional content about the
+        // property; it is declared out of scope, not cleared.
+        expect(item!.commentSnapshot).toBe('Shingles are cupping at the south slope.');
+    });
+
+    it('a list on somebody else\'s inspection is not touched at all', async () => {
+        await db.insert(schema.inspections).values({
+            id: 'insp-other', tenantId: TENANT_A, propertyAddress: '9 Oak St',
+            date: '2026-06-05', status: 'completed', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
+        });
+        await db.insert(schema.repairRequests).values({
+            id: 'rr-elsewhere', tenantId: TENANT_A, inspectionId: 'insp-other',
+            createdByKind: 'client', createdByRef: OTHER_EMAIL, customIntro: 'Untouched.',
+            shareToken: 'share-elsewhere', createdAt: new Date(), updatedAt: new Date(),
+        });
+
+        await run();
+
+        const row = await db.select().from(schema.repairRequests)
+            .where(eq(schema.repairRequests.id, 'rr-elsewhere')).get();
+        expect(row!.customIntro).toBe('Untouched.');
+    });
+
+    it('records nothing when there was nothing to clear', async () => {
+        // A decision log that reports work it did not do is worse than a quiet
+        // one: it is the same artefact an auditor reads as proof.
+        await db.insert(schema.repairRequests).values({
+            id: 'rr-blank', tenantId: TENANT_A, inspectionId: INSP,
+            createdByKind: 'agent', createdByRef: 'agent@other.com', customIntro: null,
+            shareToken: 'share-blank', createdAt: new Date(), updatedAt: new Date(),
+        });
+
+        const summary = await run();
+
+        expect(summary.decisions.filter((d) => d.table.startsWith('repair_request'))).toHaveLength(0);
+    });
+});
