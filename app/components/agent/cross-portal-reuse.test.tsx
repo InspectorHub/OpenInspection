@@ -47,9 +47,17 @@ describe("one defect, two portals", () => {
         isSelected={false}
         draft={undefined}
         creditCents={null}
+        // #275 — supplied but null, and the guard is deliberately NOT extended to
+        // compare the tag. This case renders with isSelected={false}, so the
+        // expanded region holding the tag control never renders; a tag absent from
+        // both portals would compare equal and the assertion would pass for the
+        // wrong reason. Extending it needs isSelected={true} AND a tag on the agent
+        // side, which has no join key to resolve one (plan Task 3a).
+        actionTag={null}
         onToggle={() => {}}
         onUpdateCredit={() => {}}
         onUpdateNote={() => {}}
+        onUpdateTag={() => {}}
       />,
     );
 

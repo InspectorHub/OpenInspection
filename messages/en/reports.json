@@ -266,5 +266,9 @@
   "report_view_disclosure_turn_on": "Turn open tracking back on",
   "report_view_disclosure_off_state": "Open tracking is off for you. Your report stays available, and opens recorded before now are unchanged.",
   "report_view_disclosure_busy": "Saving…",
-  "report_view_disclosure_error": "That did not save. Please try again."
+  "report_view_disclosure_error": "That did not save. Please try again.",
+  "repair_defect_action_label": "Requested action",
+  "repair_defect_action_none": "No preference",
+  "repair_defect_action_aria": "Requested action for {label}",
+  "repair_defect_credit_hint": "The credit you are asking for. Only you can set this figure."
 }

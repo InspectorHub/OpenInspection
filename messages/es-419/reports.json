@@ -266,5 +266,9 @@
   "report_view_disclosure_turn_on": "Volver a activar el registro de aperturas",
   "report_view_disclosure_off_state": "El registro de aperturas está desactivado para usted. Su informe sigue disponible y las aperturas registradas hasta ahora no cambian.",
   "report_view_disclosure_busy": "Guardando…",
-  "report_view_disclosure_error": "No se pudo guardar. Inténtelo de nuevo."
+  "report_view_disclosure_error": "No se pudo guardar. Inténtelo de nuevo.",
+  "repair_defect_action_label": "Acción solicitada",
+  "repair_defect_action_none": "Sin preferencia",
+  "repair_defect_action_aria": "Acción solicitada para {label}",
+  "repair_defect_credit_hint": "El crédito que usted solicita. Solo usted puede fijar esta cifra."
 }
