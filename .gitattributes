@@ -1,0 +1,7 @@
+# Git hooks and shell scripts must be stored and checked out with LF endings.
+# A CRLF shebang makes the kernel look for an interpreter named `sh\r`, so the
+# hook dies with "bad interpreter" on Linux and macOS while working fine on the
+# Windows machine that committed it. The blobs happen to be LF today because of
+# how this machine is configured; this states it instead of relying on that.
+.githooks/** text eol=lf
+*.sh text eol=lf

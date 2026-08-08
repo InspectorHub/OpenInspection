@@ -1,38 +1,50 @@
 {
-  // Dedicated program for the `*.spec-d.ts` type-only test project
-  // (tests-reorg Task 6a, Decision 1). `tests/**` is not part of either
-  // app (tsconfig.json) or api (tsconfig.api.json) tsc program, so
-  // expectTypeOf(...) assertions in tests/ were a runtime no-op under
-  // `vitest run` — nothing ever type-checked them, and this program is
-  // what finally does.
+  // Program for `vitest --typecheck` (the `*.spec-d.ts` assertions). It exists
+  // only to type-check FOUR files.
   //
-  // Extends the API config: audit-actions.spec-d.ts checks a server-only
-  // type (server/lib/audit) and the hc<...> client-shape specs check types
-  // re-exported from server/api/* via packages/api-types — both are
-  // API-surface concerns. Files reached via relative import (e.g.
-  // packages/api-types/index.ts, which itself pulls in most of server/**)
-  // are pulled into the program even though they aren't listed in
-  // `include` — same as any node_modules import.
+  // It used to `extends` tsconfig.api.json AND re-list `server/**/*`, so it
+  // recompiled the entire server program to check those four — measured at 238s
+  // of typecheck time. It now REFERENCES the api project and consumes the
+  // `.d.ts` that project already emits, the same change that took the app pass
+  // from 46.6s to 19.8s. Missing it here was an oversight when the references
+  // landed: the app config was converted and this one was only stopped from
+  // fighting over the output directory.
   //
-  // It inherits the api config's compilerOptions but NOT its emit role: the api
-  // project is composite and writes `.d.ts` into `.types/`, and two projects
-  // must not claim the same output. This one only checks, from source, exactly
-  // as it did before project references were introduced.
-  "extends": "./tsconfig.api.json",
+  // ⚠️ `references` is NOT inherited through `extends`, and `tsc -p` does not
+  // build referenced projects — it expects their outputs to exist and fails with
+  // TS6305 when they do not. `npm run test:types` therefore runs
+  // `tsc -b tsconfig.api.json` first. Do not invoke this config directly.
+  "references": [{ "path": "./tsconfig.api.json" }],
   "compilerOptions": {
-    "composite": false,
-    "declaration": false,
-    "declarationMap": false,
-    "emitDeclarationOnly": false,
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
     "noEmit": true,
-    "tsBuildInfoFile": "./.tsbuildinfo.tests-typecheck"
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["@types/node", "@cloudflare/vitest-pool-workers"],
+    "skipLibCheck": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./.tsbuildinfo.tests-typecheck",
+    "paths": {
+      "@core/api-types": ["./packages/api-types/index.ts"],
+      "~/*": ["./app/*"]
+    }
   },
   "include": [
-    "server/**/*.ts",
-    "server/**/*.tsx",
     "worker-configuration.d.ts",
-    "packages/api-types/**/*.ts",
     "tests/**/*.spec-d.ts"
   ],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", ".types"]
 }

@@ -29,6 +29,27 @@ step() { printf '\n  →  %b\n' "$1"; }
 
 printf '%b\n' "${BOLD}── OpenInspection (Pre-push Checks) ─────────────────────────────${NC}"
 
+ZERO=0000000000000000000000000000000000000000
+
+# stdin can only be read ONCE, and two steps below need it, so slurp it here.
+REFS=$(cat)
+
+# A push that only DELETES refs ships no code. It used to pay for everything
+# anyway: the loop below `continue`s past a deletion, which leaves CHANGED empty,
+# and the skip condition requires a non-empty CHANGED — so "no evidence" fell
+# through to the fail-safe and ran a full worker build. Cleaning up four merged
+# branches meant four builds plus four network audits, which is how a routine
+# tidy-up timed out. Deleting a branch is positive evidence that nothing ships,
+# not an absence of evidence.
+if [ -n "$REFS" ]; then
+    NON_DELETE=$(printf '%s\n' "$REFS" | awk -v z="$ZERO" 'NF && $2 != z')
+    if [ -z "$NON_DELETE" ]; then
+        pass "Skipped — this push only deletes refs, so nothing ships"
+        printf '\n%b\n' "${GREEN}Pre-push checks passed.${NC}"
+        exit 0
+    fi
+fi
+
 # Dependency advisories. Runs on EVERY push, deliberately NOT gated on whether
 # package-lock.json moved: an advisory is published against code that is already
 # sitting in the lockfile, so "nothing changed" is exactly the case it has to
@@ -61,7 +82,7 @@ fi
 BUNDLE_PATHS='^(server|app|workers|packages|public|scripts)/|^(package\.json|package-lock\.json|vite\.config|react-router\.config|wrangler|tsconfig)'
 CHANGED=""
 FORCE_CHECK=0
-ZERO=0000000000000000000000000000000000000000
+# Reads the slurped $REFS, not stdin: stdin was consumed at the top of this file.
 while read -r _local_ref local_sha _remote_ref remote_sha; do
     [ -z "$local_sha" ] && continue
     [ "$local_sha" = "$ZERO" ] && continue          # branch deletion — nothing to build
@@ -75,7 +96,9 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
     FILES=$(git diff --name-only "$RANGE" 2>/dev/null) || { FORCE_CHECK=1; break; }
     CHANGED="$CHANGED
 $FILES"
-done
+done <<REFS_EOF
+$REFS
+REFS_EOF
 
 if [ "$FORCE_CHECK" -eq 0 ] && [ -n "$CHANGED" ] &&    ! printf '%s
 ' "$CHANGED" | grep -qE "$BUNDLE_PATHS"; then

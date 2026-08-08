@@ -30,6 +30,15 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // ⚠️ Do NOT turn on `clearMocks` / `mockReset` / `restoreMocks` here without
+    // re-reading docs/superpowers/plans/2026-08-08-test-isolation-debt.md.
+    // `clearMocks: true` was tried on 2026-08-08 as the first step toward
+    // relaxing isolation and MEASURED WORSE: the isolated suite stayed green,
+    // but under `--no-isolate` the failure count went 1218 -> 1235 and
+    // `this.client.prepare is not a function` went 20 -> 213, because the fake
+    // D1 client that `tests/unit/db.ts` hands to drizzle is built from mock
+    // functions and gets wiped out from under it. The leakage this suite has is
+    // shared MODULE STATE, not spy call history.
     // The suite is IMPORT-bound, not assertion-bound. A full run reported
     // `import 1977s` against `tests 1246s`: with the default forks pool and
     // isolation, each of the 600+ spec files gets a fresh process that rebuilds
