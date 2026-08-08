@@ -241,10 +241,31 @@ jobs:
         run: npm run db:check
 
   # ── Tests ────────────────────────────────────────────────────────────────
+  # Sharded across four runners. This job was the longest in the workflow at
+  # 7m22s, and the suite is import-bound rather than assertion-bound: `import`
+  # dominates `tests` because 723 spec files each rebuild the module graph in
+  # their own process.
+  #
+  # Sharding buys the wall-clock back WITHOUT touching a single test. Each shard
+  # is an ordinary, fully isolated run of a subset — no shared state, no new
+  # failure mode. Measured locally: shard 1/4 is 181 files / 1448 tests in 148s
+  # against 422s for the whole suite.
+  #
+  # ⚠️ The other way to attack the same term — relaxing vitest's per-file process
+  # isolation — was investigated and REJECTED, not merely skipped. 348 specs mock
+  # `drizzle-orm/d1` at module scope and share one `vi.fn()` once the registry is
+  # shared; vitest offers no per-file isolation override. See
+  # docs/superpowers/plans/2026-08-08-test-isolation-debt.md (superproject).
+  #
+  # `fail-fast: false` so one red shard does not hide the others' results.
   test-unit:
-    name: API unit tests
+    name: API unit tests (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
@@ -252,7 +273,7 @@ jobs:
         with: { node-version: 22.22.x, cache: npm }
       - run: npm ci
       - run: npm run gen-version
-      - run: npm run test:unit
+      - run: npm run test:unit -- --shard=${{ matrix.shard }}/4
 
   test-workers:
     name: worker-runtime tests
