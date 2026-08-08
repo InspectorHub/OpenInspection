@@ -42,6 +42,14 @@ const SCRIPT_GATES = [
     // money input on a new screen. By the time CI sees one it is written and
     // argued for. ~0.1s inside this shared process.
     { key: 'price', label: 'Price capability inventory', script: 'check-price-capability.mjs', fix: 'npm run lint:price-capability' },
+    // Here for the same reason as the price gate: what it catches is a
+    // CAPABILITY arriving -- a beacon, an analytics global, a pixel. By the time
+    // CI sees one it is written and argued for, and "we already ship no
+    // tracking" is much easier to hold than "please remove the tracking you
+    // added". Costs ~0.8s (it reads ~976 client files), against ~0.1s for the
+    // price gate -- the most expensive entry in this set, and still small next
+    // to the eslint and tsc steps around it.
+    { key: 'zerotrack', label: 'Zero client-side tracking', script: 'check-zero-tracking.mjs', fix: 'npm run lint:zero-tracking' },
 ];
 
 const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup' };
