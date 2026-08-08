@@ -49,10 +49,12 @@ permissions:
 
 jobs:
   # ── Type checking ────────────────────────────────────────────────────────
-  # Split app/api because they are two independent tsc programs; together they
-  # were the longest step in the old chain. The app side needs the generators
-  # first (paraglide messages + route types); the api side includes only
-  # server/** and has never needed either.
+  # ONE job, not two. This was split when app and api were two independent tsc
+  # programs and together formed the longest step in the old chain. They are no
+  # longer independent: tsconfig.api.json is a composite project that
+  # tsconfig.json references, so `type-check:app` builds api first and reports
+  # its errors. A second job was re-compiling the same project for the same
+  # answer — see the note below where it used to be.
   typecheck-app:
     name: type-check (app)
     runs-on: ubuntu-latest
@@ -89,18 +91,18 @@ jobs:
       - run: npx react-router typegen
       - run: npm run type-check:app
 
-  typecheck-api:
-    name: type-check (api)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-node@v5
-        with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
-      - run: npm run gen-version
-      - run: npm run type-check:api
+  # There is deliberately NO separate `type-check (api)` job. Since the two
+  # programs became TypeScript project references, `type-check:app` IS
+  # `tsc -b tsconfig.json`, which builds tsconfig.api.json first and reports its
+  # errors — so a second job re-compiled the same project for the same answer.
+  #
+  # Verified rather than reasoned: a type error planted in `server/api/admin.ts`,
+  # a file the app program does not import, is reported by `type-check:app` as
+  # `server/api/admin.ts(53,7): error TS2322` with exit 2.
+  #
+  # `npm run type-check:api` still exists and is still the right local loop for
+  # server-only work — pre-commit's api tier uses it. What was removed is the
+  # duplicate CI runner, not the check.
 
   # Type-only test project: expectTypeOf(...) assertions in tests/**/*.spec-d.ts
   # are a runtime no-op under plain vitest run — this is the only thing that
@@ -362,7 +364,6 @@ jobs:
     if: always()
     needs:
       - typecheck-app
-      - typecheck-api
       - test-types
       - lint-eslint
       - lint-gates
