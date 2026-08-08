@@ -76,8 +76,9 @@ const ItemAttributeSchema = z.object({
     isSafety:       z.boolean().optional().describe('TODO describe isSafety field for the OpenInspection MCP integration'),
     isDefect:       z.boolean().optional().describe('TODO describe isDefect field for the OpenInspection MCP integration'),
     recommendation: z.string().nullable().optional().describe('TODO describe recommendation field for the OpenInspection MCP integration'),
-    estimateMin:    z.number().nullable().optional().describe('TODO describe estimateMin field for the OpenInspection MCP integration'),
-    estimateMax:    z.number().nullable().optional().describe('TODO describe estimateMax field for the OpenInspection MCP integration'),
+    // No estimateMin / estimateMax. `.strict()` turns a caller that sends one
+    // into a 400 naming the key — see BaseItemFields below for why the refusal
+    // is loud here and a silent strip elsewhere.
 }).strict();
 
 /** Provenance for templates imported from upstream platforms. */
@@ -96,8 +97,16 @@ const BaseItemFields = {
     required:              z.boolean().optional().describe('TODO describe required field for the OpenInspection MCP integration'),
     isSafety:              z.boolean().optional().describe('TODO describe isSafety field for the OpenInspection MCP integration'),
     defaultRecommendation: z.string().optional().describe('TODO describe defaultRecommendation field for the OpenInspection MCP integration'),
-    defaultEstimateMin:    z.number().nullable().optional().describe('TODO describe defaultEstimateMin field for the OpenInspection MCP integration'),
-    defaultEstimateMax:    z.number().nullable().optional().describe('TODO describe defaultEstimateMax field for the OpenInspection MCP integration'),
+    // No defaultEstimateMin / defaultEstimateMax.
+    //
+    // This is the one write in the repair-price family with a request boundary,
+    // so it REFUSES rather than discards: every item schema below is `.strict()`,
+    // so a payload carrying either key fails validation and names it. A write
+    // that is accepted and then silently dropped leaves the caller with no
+    // evidence, and an API that still accepts the field is still advertising the
+    // capability. The results-write path has no such boundary — it arrives as a
+    // CRDT update — and strips instead; see
+    // `server/services/inspection/shared.ts`.
     attributes:            z.array(ItemAttributeSchema).optional().describe('TODO describe attributes field for the OpenInspection MCP integration'),
     source:                ItemSourceSchema.nullable().optional().describe('TODO describe source field for the OpenInspection MCP integration'),
 } as const;

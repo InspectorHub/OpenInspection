@@ -105,7 +105,7 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
 
         // Track L (D7) — seed the default TCPA disclosure (version 1) once. Guarded by
         // a max-version check so re-running ensureSeeds never creates a duplicate.
-        protected async ensureSmsDisclosureV1(): Promise<void> {
+        public async ensureSmsDisclosureV1(): Promise<void> {
             const db = this.getDrizzle();
             const cur = await db.select({ v: max(smsDisclosureVersions.version) })
                 .from(smsDisclosureVersions).get();
@@ -131,7 +131,7 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
          * JSON `channels` column to a `string[]`. Keeps the typed response honest
          * (AutomationSchema.channels is `string[]`) without changing the DB column.
          */
-        protected serializeRow<T extends { channels: string | null }>(row: T): Omit<T, 'channels'> & { channels: AutomationChannel[] } {
+        public serializeRow<T extends { channels: string | null }>(row: T): Omit<T, 'channels'> & { channels: AutomationChannel[] } {
             const { channels, ...rest } = row;
             return { ...rest, channels: this.parseChannels(channels) };
         }

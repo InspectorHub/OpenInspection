@@ -26,8 +26,6 @@ export interface LibraryComment {
   section?: string | null;
   itemLabel?: string | null;
   repairSummary?: string | null;
-  estimateMinCents?: number | null;
-  estimateMaxCents?: number | null;
   recommendedContractorTypeId?: string | null;
 }
 

@@ -5,15 +5,7 @@ import { m } from "~/paraglide/messages";
 
 interface RepairItemOption {
   id: string; name: string; category: string | null;
-  defaultEstimateMin: number | null; defaultEstimateMax: number | null;
   defaultRepairSummary: string; contractorTypeName: string | null;
-}
-
-function estimateText(min: number | null, max: number | null): string {
-  return [
-    min != null ? `$${(min / 100).toLocaleString()}` : null,
-    max != null ? `$${(max / 100).toLocaleString()}` : null,
-  ].filter(Boolean).join(" – ");
 }
 
 export function RepairItemsPanel({
@@ -39,11 +31,15 @@ export function RepairItemsPanel({
   const attachedIds = new Set(attached.map((a) => a.recommendationId));
   const filtered = catalog.filter((o) => !attachedIds.has(o.id) && (q.trim() === "" || o.name.toLowerCase().includes(q.toLowerCase())));
 
+  // Attaching snapshots the SCOPE of the work — what needs doing and which
+  // trade does it — so a later catalogue edit never rewrites a published
+  // finding. It snapshots no price: a figure carried onto the report reads as
+  // this company's figure, and a catalogue default knows nothing about the
+  // property or the local trade market. Money on an inspection is written by
+  // the buyer or their agent, in the repair request.
   function attach(o: RepairItemOption) {
     onAttach({
       recommendationId: o.id,
-      estimateSnapshotMin: o.defaultEstimateMin,
-      estimateSnapshotMax: o.defaultEstimateMax,
       summarySnapshot: o.defaultRepairSummary,
       contractorTypeSnapshot: o.contractorTypeName,
       attachedAt: Date.now(),
@@ -70,15 +66,11 @@ export function RepairItemsPanel({
       {attached.length > 0 && (
         <ul className="mt-2 space-y-1.5">
           {attached.map((a) => {
-            const est = estimateText(a.estimateSnapshotMin, a.estimateSnapshotMax);
             return (
               <li key={a.recommendationId} className="flex items-start justify-between gap-2 text-[12px]">
                 <div>
                   <p className="text-ih-fg-2">{a.summarySnapshot}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    {est && (
-                      <span className="text-[11px] tabular-nums text-ih-ok-fg">{est}</span>
-                    )}
                     {a.contractorTypeSnapshot && <span className="text-[11px] text-ih-info-fg">{a.contractorTypeSnapshot}</span>}
                   </div>
                 </div>

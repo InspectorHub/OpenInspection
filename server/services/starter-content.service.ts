@@ -262,8 +262,6 @@ export async function seedStarterContent(
                 category:          r.category,
                 severity:          r.severity,
                 repairSummary:     r.defaultRepairSummary,
-                estimateMinCents:  r.defaultEstimateMin,
-                estimateMaxCents:  r.defaultEstimateMax,
                 createdAt:         new Date(),
             }));
         await batchInsert(d, comments, rows);

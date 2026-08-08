@@ -3,7 +3,6 @@ import { useFetcher } from "react-router";
 import { Modal, Button } from "@core/shared-ui";
 import type { Severity } from "~/lib/severity";
 import { SEVERITIES, SEVERITY_LABEL } from "~/lib/severity";
-import { MoneyInput } from "~/components/MoneyInput";
 import { m } from "~/paraglide/messages";
 
 export interface CommentEditorProps {
@@ -13,7 +12,6 @@ export interface CommentEditorProps {
   comment?: {
     id: string; text: string; section?: string | null; itemLabel?: string | null;
     severity?: Severity | null; repairSummary?: string | null;
-    estimateMinCents?: number | null; estimateMaxCents?: number | null;
     recommendedContractorTypeId?: string | null;
   } | null;
   contractorTypes?: Array<{ id: string; name: string }>;
@@ -23,8 +21,13 @@ export interface CommentEditorProps {
  * Add/Edit modal for a canned-comment library entry (module D). Submits
  * through the `comments-library` BFF resource route (`save` for create,
  * `edit` for update — both relay to the existing admin comments API).
- * The repair fields (summary/estimate/contractor type) only make sense for a
+ * The repair fields (summary + contractor type) only make sense for a
  * defect-severity comment, so they stay hidden until `severity === 'significant'`.
+ *
+ * They describe the SCOPE of the work and never its price. A cost printed on a
+ * report is read as the inspection company's number, and a library entry reused
+ * across every property cannot be that number. Money on an inspection is written
+ * by the buyer or their agent, in the repair request.
  */
 export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: CommentEditorProps) {
   const fetcher = useFetcher<{ ok?: boolean }>();
@@ -34,8 +37,6 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
   const [itemLabel, setItemLabel] = useState("");
   const [severity, setSeverity] = useState<Severity | "">("");
   const [repairSummary, setRepairSummary] = useState("");
-  const [estimateMin, setEstimateMin] = useState("");
-  const [estimateMax, setEstimateMax] = useState("");
   const [contractorTypeId, setContractorTypeId] = useState("");
 
   useEffect(() => {
@@ -45,8 +46,6 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
     setItemLabel(comment?.itemLabel ?? "");
     setSeverity((comment?.severity as Severity) ?? "");
     setRepairSummary(comment?.repairSummary ?? "");
-    setEstimateMin(comment?.estimateMinCents != null ? String(comment.estimateMinCents / 100) : "");
-    setEstimateMax(comment?.estimateMaxCents != null ? String(comment.estimateMaxCents / 100) : "");
     setContractorTypeId(comment?.recommendedContractorTypeId ?? "");
   }, [open, comment]);
 
@@ -65,7 +64,6 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
   function save() {
     if (error) return;
     submittedRef.current = true;
-    const toCents = (v: string) => (v.trim() ? String(Math.round(parseFloat(v) * 100)) : "");
     fetcher.submit(
       {
         intent: editing ? "edit" : "save",
@@ -75,8 +73,6 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
         itemLabel: itemLabel.trim(),
         severity: severity || "",
         repairSummary: isDefect ? repairSummary.trim() : "",
-        estimateMinCents: isDefect ? toCents(estimateMin) : "",
-        estimateMaxCents: isDefect ? toCents(estimateMax) : "",
         recommendedContractorTypeId: isDefect ? contractorTypeId : "",
       },
       { method: "post", action: "/resources/comments-library" },
@@ -127,19 +123,7 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
               <label htmlFor="ce-repair" className={labelCls}>{m.comment_editor_repair_label()}</label>
               <input id="ce-repair" value={repairSummary} onChange={(e) => setRepairSummary(e.target.value)} placeholder={m.comment_editor_repair_placeholder()} className={inputCls} />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label htmlFor="ce-min" className={labelCls}>{m.comment_editor_est_low()}</label>
-                <MoneyInput id="ce-min" ariaLabel={m.comment_editor_est_low()}
-                  cents={estimateMin === "" ? null : Math.round(Number(estimateMin) * 100)}
-                  onChange={(c) => setEstimateMin(c == null ? "" : String(c / 100))} className={inputCls} />
-              </div>
-              <div>
-                <label htmlFor="ce-max" className={labelCls}>{m.comment_editor_est_high()}</label>
-                <MoneyInput id="ce-max" ariaLabel={m.comment_editor_est_high()}
-                  cents={estimateMax === "" ? null : Math.round(Number(estimateMax) * 100)}
-                  onChange={(c) => setEstimateMax(c == null ? "" : String(c / 100))} className={inputCls} />
-              </div>
+            <div className="grid grid-cols-1 gap-3">
               <div>
                 <label htmlFor="ce-ct" className={labelCls}>{m.comment_editor_contractor_label()}</label>
                 <select id="ce-ct" value={contractorTypeId} onChange={(e) => setContractorTypeId(e.target.value)} className={inputCls + " appearance-none"}>

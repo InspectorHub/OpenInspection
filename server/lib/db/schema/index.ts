@@ -65,7 +65,7 @@ export { tenantCustomHolidays } from './holidays';
 export { inspectionUnits } from './units';
 // Design System 0520 subsystem D — ReportVersions (snapshot-on-publish)
 export { reportVersions } from './report-versions';
-export { inspectionAccessTokens } from './portal-access';
+export { inspectionAccessTokens, reportViews } from './portal-access';
 export { contactRoleProfiles, inspectionPeople } from './inspection/role-profiles';
 
 // Track I-a GDPR (spec §4) — append-only DSAR erasure decision log.
@@ -97,3 +97,7 @@ export type { IdempotencyKey, NewIdempotencyKey } from './idempotency';
 // Pay splits (#278) — per-service-line inspector earnings, recorded not derived.
 export { servicePayRules, inspectionServicePaySplits } from './pay-split';
 export type { ServicePayRule, InspectionServicePaySplit } from './pay-split';
+// AI call provenance — provider/mode/model/prompt-version per call. Metadata
+// only; the prompt text is never stored (see the file for why that is a rule).
+export { aiCallProvenance } from './ai';
+export type { AiCallProvenance, NewAiCallProvenance } from './ai';

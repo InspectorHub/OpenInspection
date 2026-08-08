@@ -13,8 +13,18 @@
   // packages/api-types/index.ts, which itself pulls in most of server/**)
   // are pulled into the program even though they aren't listed in
   // `include` — same as any node_modules import.
+  //
+  // It inherits the api config's compilerOptions but NOT its emit role: the api
+  // project is composite and writes `.d.ts` into `.types/`, and two projects
+  // must not claim the same output. This one only checks, from source, exactly
+  // as it did before project references were introduced.
   "extends": "./tsconfig.api.json",
   "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "noEmit": true,
     "tsBuildInfoFile": "./.tsbuildinfo.tests-typecheck"
   },
   "include": [

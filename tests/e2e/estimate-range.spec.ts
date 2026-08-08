@@ -116,10 +116,13 @@ test.describe.serial('Sprint 2 S2-4 — Repair estimate range', () => {
 
         // A bulk "Save" writes through POST /:id/results/batch with an
         // array of { itemId, sectionId, field, value } patches -- there is NO
-        // PATCH /:id/results route (that 404s). The defect-estimate sanitizer
-        // itself (sanitizeDefectStates: negative low, unknown recommendation
-        // slug) is covered by tests/unit/estimate-range.spec.ts; the e2e leg only
-        // asserts the live write route folds a defectFields patch without erroring.
+        // PUT or PATCH /:id/results route (both 404). This leg only asserts the
+        // live write route folds a defectFields patch without erroring; the
+        // estimate keys in the payload below are dropped rather than rejected,
+        // so a 200 is the expected answer. That the price does NOT persist is
+        // asserted at the unit level, where the stored row can be read back —
+        // tests/unit/inspections/inspection-results-batch.spec.ts and
+        // tests/unit/inspections/estimate-range.spec.ts.
         const res = await request.post(`${BASE_URL}/api/inspections/${inspectionId}/results/batch`, {
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
             data: {

@@ -2,6 +2,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspections, inspectionResults } from '../lib/db/schema';
 import { findingKey, DEFAULT_UNIT } from '../lib/finding-key';
+import { withoutRepairPriceDeep } from '../lib/repair-price-keys';
 
 /**
  * Typed-Hono dead-routes cleanup Task 10 — vectorised result patches.
@@ -72,7 +73,14 @@ export async function applyResultsBatch(
         if (data[p.itemId] && key !== p.itemId) delete data[p.itemId];
 
         const next: Record<string, unknown> = { ...cur };
-        next[p.field] = p.value;
+        // `value` is `z.any()` and is folded onto the entry verbatim, which
+        // makes this the widest hand-writable door into a finding: an MCP
+        // `extended` tool with `write` scope, no shape validation, and no UI
+        // between the caller and D1. The product stores no repair price on a
+        // finding (scripts/check-price-capability.mjs), so the price keys are
+        // stripped at any depth — the payload's shape is not known, so
+        // stripping only the level we expect would miss one nested deeper.
+        next[p.field] = withoutRepairPriceDeep(p.value);
         // Lightweight provenance — mirrors InspectionService.patchItem's
         // applyFieldWrite output enough for downstream consumers (audit, diff)
         // to see who last touched the field.

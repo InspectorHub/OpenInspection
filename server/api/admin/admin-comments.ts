@@ -210,8 +210,6 @@ const adminCommentsRoutes = createApiRouter()
             libraryId:      comments.libraryId,
             severity:       comments.severity,
             repairSummary:               comments.repairSummary,
-            estimateMinCents:            comments.estimateMinCents,
-            estimateMaxCents:            comments.estimateMaxCents,
             recommendedContractorTypeId: comments.recommendedContractorTypeId,
             createdAt:      comments.createdAt,
             useCount:       commentUsage.useCount,
@@ -253,7 +251,7 @@ const adminCommentsRoutes = createApiRouter()
     })
     .openapi(createCommentRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const { text, category, severity, section, repairSummary, estimateMinCents, estimateMaxCents, recommendedContractorTypeId } = c.req.valid('json');
+        const { text, category, severity, section, repairSummary, recommendedContractorTypeId } = c.req.valid('json');
         const db = getDrizzle(c);
         const row = {
             id: crypto.randomUUID(),
@@ -270,8 +268,6 @@ const adminCommentsRoutes = createApiRouter()
             itemLabel: null as string | null,
             severity: severity ?? null,
             repairSummary: repairSummary ?? null,
-            estimateMinCents: estimateMinCents ?? null,
-            estimateMaxCents: estimateMaxCents ?? null,
             recommendedContractorTypeId: recommendedContractorTypeId ?? null,
             createdAt: new Date(),
         };
@@ -299,7 +295,7 @@ const adminCommentsRoutes = createApiRouter()
     .openapi(updateCommentRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        const { text, category, severity, section, repairSummary, estimateMinCents, estimateMaxCents, recommendedContractorTypeId } = c.req.valid('json');
+        const { text, category, severity, section, repairSummary, recommendedContractorTypeId } = c.req.valid('json');
         const db = getDrizzle(c);
         const existing = await db.select().from(comments)
             .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
@@ -311,8 +307,6 @@ const adminCommentsRoutes = createApiRouter()
             section: section ?? null,
         };
         if (repairSummary !== undefined) patch.repairSummary = repairSummary ?? null;
-        if (estimateMinCents !== undefined) patch.estimateMinCents = estimateMinCents ?? null;
-        if (estimateMaxCents !== undefined) patch.estimateMaxCents = estimateMaxCents ?? null;
         if (recommendedContractorTypeId !== undefined) patch.recommendedContractorTypeId = recommendedContractorTypeId ?? null;
         await db.update(comments)
             .set(patch)

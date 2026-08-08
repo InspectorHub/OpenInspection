@@ -7,6 +7,7 @@ import { UnitSwitchService } from '../../services/unit-switch.service';
 import { ReportVersionService } from '../../services/report-version.service';
 import { AIService } from '../../services/ai.service';
 import { buildAiMeter, resolveRuntimeAiSource } from '../ai/metering';
+import { buildAiProvenanceSink } from '../ai/provenance';
 import { AuthService } from '../../services/auth.service';
 import { OutboxService } from '../../portal/outbox.service';
 import { publishRow } from '../../portal/outbox.service';
@@ -160,25 +161,24 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     }
                     break;
                 case 'ai': {
-                    // ONE credential picture, read by both the meter and the capability
-                    // gate — the source a usage row is tagged with can never disagree.
+                    // ONE credential picture: meter tag, gate source, key confirmation and
+                    // provenance mode all read from it, resolved ONCE — a second resolve is
+                    // a second answer to whose key funded the call. No sink ⇒ the chokepoint
+                    // refuses rather than producing output nothing recorded.
                     const aiCreds = { profile: c.var.profile, tenantKey: emailCfg.dbSecrets.geminiApiKey || null, managedKey: c.env.AI_MANAGED_API_KEY ?? null, model: c.env.AI_MODEL ?? '' };
+                    const aiSource = resolveRuntimeAiSource(aiCreds) ?? 'byo'; // null (off) → 'byo'
                     target.ai = new AIService(
                         c.env.DB,
-                        // The tenant's own bound key (Settings → Advanced → AI) —
-                        // always wins, and still the ONLY credential reaching the
-                        // service until managed access is granted (see buildAiMeter).
-                        emailCfg.dbSecrets.geminiApiKey || '',
-                        // Sprint 1 A-4: pass effective deployment mode so the
-                        // service can return dev-mock suggestions when the
-                        // active profile permits it (standalone) and
-                        // no API key is configured, instead of throwing 503.
+                        // The tenant's own bound key — always wins, and still the ONLY
+                        // credential reaching the service until managed access is granted.
+                        aiCreds.tenantKey ?? '',
+                        // A-4: standalone with no key returns dev-mock, not a 503.
                         c.var.profile.aiDevMockFallback ? 'standalone' : 'saas',
-                        // No default here on purpose: an unset AI_MODEL fails
-                        // closed at the service rather than picking a model.
-                        c.env.AI_MODEL ?? '',
+                        // No default: an unset AI_MODEL fails closed at the service.
+                        aiCreds.model,
                         buildAiMeter({ db: c.env.DB, tenantId, ...aiCreds }),
-                        resolveRuntimeAiSource(aiCreds) ?? 'byo', // same resolver the meter tags with; null (off) → 'byo'
+                        { source: aiSource, tenantKeyAttested: emailCfg.aiKeyAttested === true }, // unloaded config → NOT confirmed
+                        buildAiProvenanceSink({ db: c.env.DB, tenantId, source: aiSource, model: aiCreds.model }),
                     );
                     break;
                 }

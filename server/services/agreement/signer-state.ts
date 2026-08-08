@@ -21,12 +21,12 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
     return class SignerState extends Base {
         // Re-declare the protected base members so this separately-compiled
         // mixin class can reference them with full typing.
-        protected declare db: D1Database;
-        protected declare secrets?: { jwtSecret: string; jwtSecretPrevious?: string };
-        protected declare getDrizzle: AgreementServiceBase['getDrizzle'];
+        public declare db: D1Database;
+        public declare secrets?: { jwtSecret: string; jwtSecretPrevious?: string };
+        public declare getDrizzle: AgreementServiceBase['getDrizzle'];
 
         /** Reload all signers of an envelope ordered by creation. */
-        protected async loadSigners(requestId: string) {
+        public async loadSigners(requestId: string) {
             return this.getDrizzle().select().from(agreementSigners)
                 .where(eq(agreementSigners.requestId, requestId))
                 .orderBy(asc(agreementSigners.createdAt))
@@ -388,7 +388,7 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
         }
 
         /** Recompute + persist the envelope aggregate (never downgrades a terminal envelope). */
-        protected async recomputeEnvelope(envelope: typeof agreementRequests.$inferSelect): Promise<string> {
+        public async recomputeEnvelope(envelope: typeof agreementRequests.$inferSelect): Promise<string> {
             const db = this.getDrizzle();
             if (['signed', 'declined', 'expired'].includes(envelope.status)) return envelope.status;
             const signers = await this.loadSigners(envelope.id);

@@ -330,6 +330,34 @@
       "when": 1786051480599,
       "tag": "0046_clear_parked_cmd_payloads",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1786082853180,
+      "tag": "0047_cold_blacklash",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1786087934370,
+      "tag": "0048_luxuriant_omega_flight",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1786100519522,
+      "tag": "0049_thankful_red_wolf",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "6",
+      "when": 1786107182084,
+      "tag": "0050_damp_rawhide_kid",
+      "breakpoints": true
     }
   ]
 }

@@ -44,8 +44,12 @@ function makeEntry(
         severityBucket: overrides.severityBucket ?? ('defect' as const),
         // IA-57 — resolved trade label ("licensed roofer"), null when unset.
         trade:        overrides.trade ?? null,
-        estimateLow:  null,
-        estimateHigh: null,
+        // The upstream repair list DOES carry cost estimates (the report side
+        // uses them). Non-null on purpose: the flatten must drop them, and a
+        // fixture of nulls would let a flatten that copies them straight through
+        // pass this file unchanged.
+        estimateLow:  100000,
+        estimateHigh: 250000,
         source,
         recommendationId,
     };
@@ -173,5 +177,23 @@ describe('flattenReportDefects — findingKey uniqueness', () => {
 
         expect(result[0].trade).toBe('licensed roofer');
         expect(result[1].trade).toBeNull();
+    });
+
+    // The RRB is pure-credit: the only money on that surface is the number the
+    // client types. The report's cost estimate reaches this helper (see
+    // makeEntry) and must stop here — one layer further and the builder can put
+    // a figure the inspection company appears to stand behind next to the credit
+    // field, which is how it ends up in the client's ask.
+    it('drops the report cost estimate instead of forwarding it to the builder', async () => {
+        const svc = fakeSvc([makeEntry('s7', 'item8', 'canned', 'roof')]);
+
+        const [defect] = await flattenReportDefects(svc, 'insp1', 't1');
+
+        expect(defect).not.toHaveProperty('estimateLow');
+        expect(defect).not.toHaveProperty('estimateHigh');
+        // Belt and braces: no key on the flattened shape holds either number,
+        // whatever it might get renamed to.
+        expect(Object.values(defect)).not.toContain(100000);
+        expect(Object.values(defect)).not.toContain(250000);
     });
 });

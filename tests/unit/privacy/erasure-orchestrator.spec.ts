@@ -480,6 +480,36 @@ describe('runErasure — the residences the original manifest missed (#88)', () 
         expect(rows.map((r) => r.id)).toEqual(['iat-other']);
     });
 
+    it('report_views: the subject delivery counters are deleted with their token', async () => {
+        // OI #271 condition 7 of docs/compliance/report-view-lia.md: the counter
+        // rows are catalogued for erasure AND the orchestrator is wired to them.
+        // A row here is a factual assertion about an identified person — that
+        // this recipient opened this report, and how many times. Zeroing the
+        // counters would not help: an all-zero row still records that the person
+        // was sent the document.
+        //
+        // ORDERING IS THE WHOLE DEFECT. `access_token_id` is the ONLY locator
+        // back to the subject; `report_views` carries no email. Delete the
+        // tokens first and the counters are not merely missed, they become
+        // permanently unreachable — no later DSAR, and no repair pass, can ever
+        // find them again.
+        await db.insert(schema.inspectionAccessTokens).values([
+            { id: 'iat-subject', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: SUBJECT_EMAIL, token: 'tok-s', createdAt: new Date() },
+            { id: 'iat-other', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: OTHER_EMAIL, token: 'tok-o', createdAt: new Date() },
+        ]);
+        await db.insert(schema.reportViews).values([
+            { id: 'rv-subject', tenantId: TENANT_A, inspectionId: INSP, accessTokenId: 'iat-subject', firstViewedAt: new Date(), lastViewedAt: new Date(), viewCount: 4 },
+            { id: 'rv-other', tenantId: TENANT_A, inspectionId: INSP, accessTokenId: 'iat-other', firstViewedAt: new Date(), lastViewedAt: new Date(), viewCount: 2 },
+        ]);
+
+        await run();
+
+        const rows = await db.select().from(schema.reportViews).all();
+        expect(rows.map((r) => r.id)).toEqual(['rv-other']);
+        // And the counter is gone, not zeroed — see above.
+        expect(rows.every((r) => r.accessTokenId !== 'iat-subject')).toBe(true);
+    });
+
     it('inspection_requests: identity cleared in place (row kept — inspections.request_id references it)', async () => {
         await db.insert(schema.inspectionRequests).values([
             { id: 'ir-subject', tenantId: TENANT_A, clientName: 'Jane Subject', clientEmail: SUBJECT_EMAIL, clientPhone: '555-1111', propertyAddress: '2 Elm St', scheduledAt: new Date(), createdAt: new Date(), updatedAt: new Date() },

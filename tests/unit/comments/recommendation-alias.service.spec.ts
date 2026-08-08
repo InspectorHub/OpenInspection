@@ -26,7 +26,7 @@ describe('RecommendationService (alias over comments)', () => {
     // `created_at` is NOT NULL (no default) on the comments table — supply it.
     await testDb.insert(schema.comments).values({ id: 'c-plain', tenantId: T, text: 'Just a note', severity: 'good', createdAt: new Date() });
 
-    const rec = await svc.create(T, { name: 'Fix gutter', severity: 'significant', defaultEstimateMin: 10000, defaultEstimateMax: 30000, defaultRepairSummary: 'Reattach gutter' });
+    const rec = await svc.create(T, { name: 'Fix gutter', severity: 'significant', defaultRepairSummary: 'Reattach gutter' });
     expect(rec.name).toBe('Fix gutter');
 
     const list = await svc.listByTenant(T);

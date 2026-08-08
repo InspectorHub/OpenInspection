@@ -2,12 +2,23 @@ import { describe, it, expect } from 'vitest';
 import { seedCostFromFinding } from '../../../server/lib/pca-costs';
 
 describe('seedCostFromFinding', () => {
-  it('seeds lump sum from the canned-comment estimate midpoint + repairSummary', () => {
-    const seed = seedCostFromFinding({}, null, {
-      estimateMinCents: 80000, estimateMaxCents: 120000, repairSummary: 'Reseal flashing',
-    });
-    expect(seed.lumpSumCents).toBe(100000); // midpoint of 80000..120000
+  it('takes the remedy text from the canned comment and no money with it', () => {
+    // The canned-comment library holds repair SCOPE, not a price — the
+    // estimate columns it used to carry are gone. The remedy text still seeds;
+    // the cost stays empty for the assessor to enter.
+    const seed = seedCostFromFinding({}, null, { repairSummary: 'Reseal flashing' });
+    expect(seed.suggestedRemedy).toBe('Reseal flashing');
+    expect(seed.lumpSumCents).toBeNull();
     expect(seed.unitCostCents).toBeNull();
+  });
+
+  it('a canned comment cannot smuggle a price back in through an extra key', () => {
+    const seed = seedCostFromFinding({}, null, {
+      repairSummary: 'Reseal flashing',
+      // Not part of CannedCommentSeed any more; a stale caller may still send it.
+      ...({ estimateMinCents: 80000, estimateMaxCents: 120000 } as object),
+    });
+    expect(seed.lumpSumCents).toBeNull();
     expect(seed.suggestedRemedy).toBe('Reseal flashing');
   });
 

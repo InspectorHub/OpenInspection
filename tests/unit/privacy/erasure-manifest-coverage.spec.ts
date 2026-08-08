@@ -143,6 +143,74 @@ describe('portal #88 — the repair-request columns', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// The columns PII_HEURISTIC cannot see (external review P1, 2026-08-07).
+//
+// Every key below was found by walking the Drizzle schema table by table, NOT
+// by anything going red: `scripts/check-erasure-manifest.mjs` matches none of
+// these names, so the gate was green over all of them for as long as they
+// existed. Pinning them here is the part a widened regex would not give us — a
+// pattern only protects the shapes somebody already thought of, while a listed
+// key stays covered even after the next person narrows the pattern.
+//
+// A new entry belongs here when it was found by READING rather than by a red
+// gate. That is the population this file exists to defend.
+// ─────────────────────────────────────────────────────────────────────────────
+const HEURISTIC_BLIND_SPOTS = [
+    // Behavioural counters about an identified recipient. Nothing in the name of
+    // any of these says "person", and the table was absent from the manifest
+    // entirely — invisible to every check that starts from the manifest.
+    'report_views.access_token_id',
+    'report_views.view_count',
+    'report_views.first_viewed_at',
+    'report_views.last_viewed_at',
+    'inspection_access_tokens.view_tracking_objected_at',
+    // The CRM row. `contacts.phone` was declared and its neighbours were not,
+    // which reads as a claim that phone was the only other personal column.
+    'contacts.name',
+    'contacts.agency',
+    'contacts.notes',
+    'contacts.locale',
+    // An email-address column with neither "email" nor "mail" in its name,
+    // sitting two lines from two declared address columns.
+    'tenant_configs.reply_to',
+    // Tenant-authored free text the pattern has no way to recognise.
+    'tenant_configs.repair_quick_phrases',
+    // Staff identity beside already-declared staff columns.
+    'users.name',
+    'report_signoff.name',
+    'report_signoff.license',
+    'calendar_connections.calendar_id',
+    // The heaviest staff-PII blob in the schema, under a column called payload.
+    'sync_outbox.payload',
+    // Free text on the accountability ledger whose email sibling WAS declared.
+    'erasure_log.identity_basis',
+    'erasure_log.response_note',
+];
+
+describe('columns the PII heuristic cannot see', () => {
+    it.each(HEURISTIC_BLIND_SPOTS)('%s has a rule or a reasoned exclusion', (key) => {
+        expect(DECIDED.has(key)).toBe(true);
+    });
+
+    it('none of them would be caught by the gate pattern if the declaration went away', () => {
+        // The assertion that keeps the list honest. If a key here starts
+        // matching PII_HEURISTIC, the gate covers it and it no longer needs a
+        // hand-written line — but silently leaving it would grow this file into
+        // a duplicate of the gate. Kept in sync with
+        // scripts/check-erasure-manifest.mjs on purpose: a copy that drifts is
+        // how a test stops testing what its name says.
+        const PII_HEURISTIC = /(email|phone|ip_address|user_agent|signature|client_name|full_name|recipient|address)/;
+        const stillCovered = HEURISTIC_BLIND_SPOTS
+            .map((k) => k.split('.')[1]!)
+            .filter((col) => PII_HEURISTIC.test(col) || col === 'ip');
+        expect(
+            stillCovered,
+            `these columns now MATCH the gate pattern, so listing them here is a duplicate: ${stillCovered.join(', ')}`,
+        ).toHaveLength(0);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // The property address family.
 //
 // The columns a widened PII heuristic flags. Two of them are a different

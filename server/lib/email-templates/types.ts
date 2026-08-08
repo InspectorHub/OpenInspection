@@ -13,8 +13,19 @@ interface Variable {
   desc: string;           // editor help text
 }
 
-/** System (non-editable, data-driven) block kinds the layout can render. */
-type SystemBlockKind = 'auditMetadata' | 'attachmentManifest' | 'icsHint';
+/**
+ * System (non-editable, data-driven) block kinds the layout can render.
+ *
+ * The point of the mechanism is that these are rendered by the PLATFORM and are
+ * unreachable from tenant template copy — a tenant can empty every editable
+ * block and a system block still goes out. `'viewDisclosure'` (OI #271) exists
+ * because that guarantee is a legal condition rather than a nicety: an
+ * `editable: true` default only seeds a per-tenant row, so the Art. 13 notice
+ * for the report-view counter could not have been template text. See
+ * `server/lib/legal/report-view-disclosure.ts` and
+ * `docs/compliance/report-view-lia.md` condition 5.
+ */
+type SystemBlockKind = 'auditMetadata' | 'attachmentManifest' | 'icsHint' | 'viewDisclosure';
 
 export interface EmailTemplateDescriptor {
   trigger: string;

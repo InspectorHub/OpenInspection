@@ -102,19 +102,15 @@ export function ReportItemCard({
           showPhotos={showPhotos}
         />
 
+        {/* The recommendation is WHAT to do. The "Estimated cost" badge that
+            used to sit beside it is gone: the server no longer emits an
+            item-level estimate at all, so there is nothing left for
+            `showEstimates` to gate here. */}
         {item.recommendation && (
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-ih-info-bg text-ih-info-fg uppercase">
               {m.report_view_recommend({ value: item.recommendation })}
             </span>
-            {showEstimates &&
-              (item.estimateMin != null || item.estimateMax != null) && (
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-ih-ok-bg text-ih-ok-fg tabular-nums">
-                  {m.report_view_estimated_cost_label()} $
-                  {item.estimateMin?.toLocaleString() ?? "?"} - $
-                  {item.estimateMax?.toLocaleString() ?? "?"}
-                </span>
-              )}
           </div>
         )}
 

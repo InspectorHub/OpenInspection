@@ -26,6 +26,8 @@ import {
     ATTENTION_THRESHOLDS_DEFAULTS,
     DashboardColumnPrefsSchema,
     DashboardColumnPrefsResponseSchema,
+    TenantConfigPatchSchema,
+    CommunicationPatchSchema,
 } from '../../lib/validations/admin.schema';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import { tenantConfigs } from '../../lib/db/schema';
@@ -174,36 +176,9 @@ const tenantConfigGetRoute = createRoute(withMcpMetadata({
 // Agent Accounts A3 — concierge review-mode toggle (PATCH /api/admin/tenant-config)
 // -----------------------------------------------------------------------------
 // Generic patch endpoint scoped to a small allowlist of tenant_configs columns
-// the settings UI surfaces directly. Currently only `conciergeReviewRequired`.
-// Adding more keys here in the future stays a one-line allowlist change.
-const TenantConfigPatchSchema = z.object({
-    conciergeReviewRequired: z.boolean().optional().describe('Whether agent-submitted bookings require owner/admin approval before the client receives a confirmation link.'),
-    blockUnsignedAgreement: z.boolean().optional().describe('Whether clients must sign the inspection agreement before a booking is confirmed.'),
-    allowInspectorChoice: z.boolean().optional().describe('Toggle the public inspector-choice dropdown (IA-26)'),
-    agreementRetentionYears: z.number().int().min(1).max(99).optional().describe('How many years signed agreements / signatures are retained before the GDPR retention sweep destroys them (Track I-a). Integer 1–99; default 6 ≈ UK simple-contract limitation period.'),
-    reviewUrl: z.string().url().max(500).nullish().describe('Track J (#122) — company review link (Google/Yelp/Facebook). null/empty clears it.'),
-    smsMode: z.enum(['own', 'managed_shared', 'managed_dedicated']).optional().describe('Track L (D3) — Tenant SMS sender mode. "platform" is reserved for first-party use and is rejected when submitted by a tenant.'),
-    companyPhone: z.string().max(40).nullish().describe('Track L — call-back number shown in SMS copy ({{company_phone}}). null/empty clears it.'),
-    videoMode: z.enum(['r2', 'stream']).optional().describe('Self-host video backend: r2 (default, free) or stream (requires STREAM binding + customer subdomain).'),
-    smsByoProvider: z.enum(['twilio', 'telnyx']).optional().describe('BYO SMS provider selection — which provider adapter to use when smsMode is "own".'),
-    managedProvider: z.enum(['twilio', 'telnyx']).optional().describe('Managed-compliance carrier — which ISV provider runs managed provisioning/sweep/webhook when smsMode is "managed_shared"/"managed_dedicated". Separate from smsByoProvider.'),
-    emailByoProvider: z.enum(['resend', 'sendgrid', 'postmark', 'mailgun']).optional().describe('BYO email provider — which adapter to use when email mode is "own".'),
-    bookingSlotMode: z.enum(['open', 'fixed']).optional().describe('Public booking slot grid mode: open (clock-aligned) or fixed (window-aligned).'),
-    bookingSlotIntervalMin: z.union([z.literal(15), z.literal(30), z.literal(60)]).optional().describe('Slot grid step in minutes.'),
-    holidayRegion: z.union([
-        z.literal('US'),
-        z.string().regex(/^US-[A-Z]{2}$/),
-        z.null(),
-    ]).optional().describe('Holiday catalog region. null disables the catalog.'),
-    holidayPublicPolicy: z.enum(['open', 'block', 'advisory']).optional().describe('Public booking holiday policy.'),
-    holidayInternalPolicy: z.enum(['advisory', 'block']).optional().describe('Internal scheduling holiday policy.'),
-    bookingConflictPolicy: z.enum(['advisory', 'block']).optional().describe('Double-booking policy for internal scheduling: advisory warns, block refuses the write.'),
-    legalMode: z.enum(['hosted', 'custom']).optional().describe('Privacy/Terms source.'),
-    customPrivacyUrl: z.string().url().max(500).nullish().describe('Custom Privacy URL; required with customTermsUrl when legalMode=custom. null clears.'),
-    customTermsUrl: z.string().url().max(500).nullish().describe('Custom Terms URL; required with customPrivacyUrl when legalMode=custom. null clears.'),
-    privacyBody: z.string().max(50_000).nullish().describe('Hosted Privacy body override; null/empty clears to template.'),
-    termsBody: z.string().max(50_000).nullish().describe('Hosted Terms body override; null/empty clears to template.'),
-}).openapi('TenantConfigPatch');
+// the settings UI surfaces directly. `TenantConfigPatchSchema` moved to
+// lib/validations/admin/settings.ts — the tenant-config write allowlist derives
+// from its shape, and a service cannot import a router module.
 
 const TenantConfigPatchResponseSchema = z.object({
     success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
@@ -341,14 +316,8 @@ const CommunicationResponseSchema = z.object({
     googleOAuthConfigured: z.boolean().describe('Whether Google OAuth client credentials exist (Worker env or tenant secrets).'),
     googleOAuthMode:       z.enum(['platform', 'own']).describe('platform = shared Worker OAuth app; own = tenant Google OAuth app.'),
 });
-const CommunicationPatchSchema = z.object({
-    senderEmail:          z.string().nullable().describe('From: address, or null to clear.'),
-    replyTo:              z.string().nullable().describe('Reply-To: address, or null to clear.'),
-    emailMode:            z.enum(['platform', 'own']),
-    senderDisplayName:    z.string().nullable(),
-    pointOfContact:       z.enum(['inspector', 'company']),
-    googleOAuthMode:      z.enum(['platform', 'own']).optional(),
-}).openapi('CommunicationPatch');
+// `CommunicationPatchSchema` moved to lib/validations/admin/settings.ts for the
+// same reason as TenantConfigPatchSchema above.
 
 /** Shared (testable) rule: reply-to is mandatory when emails come from the company,
  *  otherwise replies would fall back to a possibly-unmonitored From address. */

@@ -36,6 +36,47 @@ function countCustomDefects(
 }
 
 /**
+ * Track E1 (ITB §11) — one contractor punch-list row returned by
+ * `getRepairList`. Moved here from inside that method (shape unchanged).
+ *
+ * @declarationEmit Exported so the emitted `.d.ts` can NAME it: it is the
+ * method's element type, and a composite project cannot reference a
+ * function-local interface (TS4053/TS4055). No module imports it by name —
+ * hence the tag for knip.
+ */
+export interface RepairListEntry {
+    sectionId:           string;
+    sectionTitle:        string;
+    itemId:              string;
+    itemLabel:           string;
+    // IA-55 — the defect's own title, distinct from the item label.
+    defectTitle:         string;
+    comment:             string;
+    location:            string | null;
+    category:            'safety' | 'recommendation' | 'maintenance';
+    // IA-42 — the parent item's rating-axis severity, distinct from the
+    // safety/recommendation/maintenance category. Lets the repair builder
+    // offer a real "worst first" sort.
+    severityBucket:      'satisfactory' | 'monitor' | 'defect' | 'other';
+    // IA-57 — the resolved trade label ("licensed roofer"). Same
+    // resolution the report card renders, so the repair surfaces and
+    // the report surface never disagree about who should fix this.
+    trade:               string | null;
+    recommendationId:    string | null;
+    recommendationLabel: string | null;
+    // No estimateLow / estimateHigh. This list is served over
+    // `GET /api/inspections/{id}/repair-list` — an endpoint on the MCP
+    // `extended` tier — and it had no equivalent of the report's
+    // pinned-off `showEstimates` gate, so a price on a stored finding
+    // walked straight out of it. A punch list says what needs doing and
+    // which trade does it; what the work costs belongs to whoever bids.
+    photos:              Array<{ key: string; url: string }>;
+    // Source — distinguishes canned (template-driven) vs custom
+    // (per-inspection ad-hoc) defects so realtors can see the mix.
+    source:              'canned' | 'custom';
+}
+
+/**
  * Dashboard + report analytics aggregation. Defect stats, repair list,
  * counts, dashboard buckets, section progress. Extracted verbatim from
  * InspectionService. Methods that need the full resolved report call back
@@ -85,8 +126,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
      * stay aligned with the rating-system snapshot resolution + photo
      * surfacing logic) and returns a flat list of defect-rated items only.
      * Each row is a contractor punch-list entry: section breadcrumb + item
-     * label + the effective comment + contractor recommendation tag +
-     * estimate range + photo URLs.
+     * label + the effective comment + contractor recommendation tag + photo
+     * URLs. No money: see the RepairListEntry declaration below.
      *
      * Custom (per-inspection) defects added by the inspector are also
      * surfaced — they live under inspection_results.data[itemId].customComments
@@ -105,8 +146,6 @@ export class InspectionAnalyticsService extends InspectionSubService {
             category?:  'safety' | 'recommendation' | 'maintenance';
             location?:  string | null;
             recommendationId?: string | null;
-            estimateLow?:      number | null;
-            estimateHigh?:     number | null;
         }
         const resultsRow = await this.getDrizzle()
             .select({ data: inspectionResults.data })
@@ -134,33 +173,9 @@ export class InspectionAnalyticsService extends InspectionSubService {
             RECOMMENDATION_CATEGORIES.map(c => [c.id, c.label]),
         );
 
-        interface RepairListEntry {
-            sectionId:           string;
-            sectionTitle:        string;
-            itemId:              string;
-            itemLabel:           string;
-            // IA-55 — the defect's own title, distinct from the item label.
-            defectTitle:         string;
-            comment:             string;
-            location:            string | null;
-            category:            'safety' | 'recommendation' | 'maintenance';
-            // IA-42 — the parent item's rating-axis severity, distinct from the
-            // safety/recommendation/maintenance category. Lets the repair builder
-            // offer a real "worst first" sort.
-            severityBucket:      'satisfactory' | 'monitor' | 'defect' | 'other';
-            // IA-57 — the resolved trade label ("licensed roofer"). Same
-            // resolution the report card renders, so the repair surfaces and
-            // the report surface never disagree about who should fix this.
-            trade:               string | null;
-            recommendationId:    string | null;
-            recommendationLabel: string | null;
-            estimateLow:         number | null;
-            estimateHigh:        number | null;
-            photos:              Array<{ key: string; url: string }>;
-            // Source — distinguishes canned (template-driven) vs custom
-            // (per-inspection ad-hoc) defects so realtors can see the mix.
-            source:              'canned' | 'custom';
-        }
+        // RepairListEntry is declared at module scope (top of this file) — it is
+        // this method's element type, so a declaration-emitting project cannot
+        // name it from a function-local declaration (TS4053/TS4055).
         const entries: RepairListEntry[] = [];
 
         for (const section of report.sections) {
@@ -190,8 +205,6 @@ export class InspectionAnalyticsService extends InspectionSubService {
                         trade:               ('effectiveTrade' in d ? d.effectiveTrade : null) ?? null,
                         recommendationId:    slug,
                         recommendationLabel: slug ? (labelBySlug.get(slug) ?? slug) : null,
-                        estimateLow:         d.estimateLow ?? null,
-                        estimateHigh:        d.estimateHigh ?? null,
                         photos:              (d.defectPhotos ?? []).map(p => ({ key: p.key, url: p.url })),
                         source:              'canned',
                     });
@@ -219,8 +232,6 @@ export class InspectionAnalyticsService extends InspectionSubService {
                         trade:               null,
                         recommendationId:    slug,
                         recommendationLabel: slug ? (labelBySlug.get(slug) ?? slug) : null,
-                        estimateLow:         c.estimateLow ?? null,
-                        estimateHigh:        c.estimateHigh ?? null,
                         // Custom defect photos are not currently aggregated by
                         // getReportData — the canned defect photo path stays
                         // authoritative for now. A future iteration may pull
@@ -241,11 +252,11 @@ export class InspectionAnalyticsService extends InspectionSubService {
                 if (e.category === 'safety' || e.category === 'recommendation' || e.category === 'maintenance') {
                     acc[e.category]++;
                 }
-                if (typeof e.estimateLow  === 'number') acc.estimateLowSum  += e.estimateLow;
-                if (typeof e.estimateHigh === 'number') acc.estimateHighSum += e.estimateHigh;
                 return acc;
             },
-            { count: 0, safety: 0, recommendation: 0, maintenance: 0, estimateLowSum: 0, estimateHighSum: 0 },
+            // Counts, not money. `estimateLowSum` / `estimateHighSum` were
+            // summed here and published by the repair-list API.
+            { count: 0, safety: 0, recommendation: 0, maintenance: 0 },
         );
 
         return {

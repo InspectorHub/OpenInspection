@@ -435,8 +435,8 @@ export function attachRepairItem(
     unitId: string | null = null,
 ): void {
     // The editor's AttachedRepairItem is structurally a RepairItemSnapshot
-    // (recommendationId + the five estimate/summary/contractor/attachedAt
-    // fields), so the call boundary is fully typed — no cast.
+    // (recommendationId + summary / contractor / attachedAt) so the boundary is
+    // typed — no cast. The legacy estimate keys are optional and it sets none.
     upsertRecommendation(doc, findingKey(unitId, sectionId, itemId), rec);
 }
 

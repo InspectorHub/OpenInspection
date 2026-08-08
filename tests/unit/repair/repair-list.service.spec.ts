@@ -109,11 +109,11 @@ describe('Track E1 — InspectionService.getRepairList', () => {
         expect(result.defects[0]!.category).toBe('maintenance');
         expect(result.defects[0]!.location).toBe('Front slope');
         expect(result.defects[0]!.source).toBe('canned');
-        // No estimate / recommendation supplied, so totals stay zero.
         expect(result.totals.maintenance).toBe(1);
         expect(result.totals.safety).toBe(0);
-        expect(result.totals.estimateLowSum).toBe(0);
-        expect(result.totals.estimateHighSum).toBe(0);
+        // The repair list totals no money. It counts defects.
+        expect(Object.keys(result.totals)).not.toContain('estimateLowSum');
+        expect(Object.keys(result.totals)).not.toContain('estimateHighSum');
     });
 
     it('drops a default-on defect when the inspector toggled it off', async () => {
@@ -136,7 +136,7 @@ describe('Track E1 — InspectionService.getRepairList', () => {
             'roof-shingles': {
                 tabs: {
                     defects: [
-                        { cannedId: 'def-default-off', included: true, recommendationId: 'roof-leak', estimateLow: 50000, estimateHigh: 150000 },
+                        { cannedId: 'def-default-off', included: true, recommendationId: 'roof-leak' },
                     ],
                 },
             },
@@ -148,11 +148,57 @@ describe('Track E1 — InspectionService.getRepairList', () => {
         expect(leak).toBeDefined();
         expect(leak!.recommendationId).toBe('roof-leak');
         expect(leak!.recommendationLabel).not.toBe('roof-leak'); // resolved to human-readable label
-        expect(leak!.estimateLow).toBe(50000);
-        expect(leak!.estimateHigh).toBe(150000);
         expect(result.totals.safety).toBe(1);
-        expect(result.totals.estimateLowSum).toBe(50000);
-        expect(result.totals.estimateHighSum).toBe(150000);
+    });
+
+    /**
+     * The repair list is the punch list a contractor or realtor is handed, and
+     * it is served over `GET /api/inspections/{id}/repair-list` — an endpoint on
+     * the MCP `extended` tier, which is ON in production. The report badge was
+     * pinned off (`showEstimates = false`), but this exit never had a gate: a
+     * price on a stored finding walked straight out of it.
+     *
+     * The fixture is written past the service on purpose, with amounts, so this
+     * proves the READ drops them rather than the write never having stored them.
+     */
+    it('publishes no money for a stored finding that still carries estimates', async () => {
+        await testDb.insert(schema.inspectionResults).values({
+            id: 'res-legacy-price',
+            inspectionId: INSPECTION_ID,
+            tenantId: TENANT,
+            data: {
+                'roof-shingles': {
+                    tabs: {
+                        defects: [
+                            { cannedId: 'def-default-on', included: true, estimateLow: 50000, estimateHigh: 150000 },
+                        ],
+                    },
+                    customComments: {
+                        defects: [
+                            { id: 'cust-1', title: 'Loose flashing', comment: 'x', included: true, category: 'safety', estimateLow: 700000, estimateHigh: 900000 },
+                        ],
+                    },
+                },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any,
+            lastSyncedAt: new Date(),
+        });
+
+        // The row really holds the amounts.
+        const stored = await testDb.select().from(schema.inspectionResults).get();
+        expect(JSON.stringify(stored!.data)).toContain('150000');
+        expect(JSON.stringify(stored!.data)).toContain('900000');
+
+        const result = await svc.getRepairList(INSPECTION_ID, TENANT);
+        expect(result.defects.length).toBe(2);
+        for (const d of result.defects) {
+            expect(Object.keys(d)).not.toContain('estimateLow');
+            expect(Object.keys(d)).not.toContain('estimateHigh');
+        }
+        expect(Object.keys(result.totals)).not.toContain('estimateLowSum');
+        expect(Object.keys(result.totals)).not.toContain('estimateHighSum');
+        expect(JSON.stringify(result)).not.toContain('150000');
+        expect(JSON.stringify(result)).not.toContain('900000');
     });
 
     it('aggregates defects across multiple sections + items', async () => {

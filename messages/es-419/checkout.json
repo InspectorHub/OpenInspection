@@ -110,6 +110,7 @@
   "repair_request_col_note": "Nota",
   "repair_request_col_credit": "Crédito",
   "repair_request_total_label": "Crédito total solicitado",
+  "repair_request_amount_attribution": "Los montos de esta página fueron ingresados por el cliente o su representante. La empresa de inspección no los proporciona, verifica ni respalda.",
   "repair_request_footer_1": "Generado por",
   "repair_request_footer_2": ". Esta lista refleja las solicitudes de reparación y de crédito del comprador y no constituye un acuerdo legalmente vinculante.",
   "repair_builder_meta_title": "Crear una solicitud de reparación - OpenInspection",

@@ -11,6 +11,7 @@ import { AutomationService } from '../automation.service';
 import { reportVersions } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
 import { RECOMMENDATION_CATEGORIES, RECOMMENDATION_CATEGORY_IDS } from '../../lib/recommendation-categories';
+import { deleteRepairPriceKeys } from '../../lib/repair-price-keys';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../../types/defect-fields';
 import { listUnresolved } from '../../lib/mustache';
 import type { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema } from '../../lib/validations/inspection.schema';
@@ -38,24 +39,46 @@ export const RECOMMENDATION_CATEGORY_LABELS = new Map<string, string>(
 );
 
 /**
- * Sprint 2 S2-3 / S2-4 — sanitize the new per-defect fields on every
- * inspection-results write. Mutates the supplied `data` record in place.
+ * Sprint 2 S2-3 — sanitize the per-defect fields on every inspection-results
+ * write. Mutates the supplied `data` record in place.
  *
  *   - `recommendationId` must be one of {@link RECOMMENDATION_CATEGORY_IDS};
  *     unknown slugs are dropped (set to null) so an outdated client doesn't
  *     poison the JSON payload.
- *   - `estimateLow` / `estimateHigh` must be non-negative finite integers
- *     (cents). Anything else collapses to null.
+ *   - repair-price keys are removed outright, on the item entry and on every
+ *     defect row, canned or custom (`server/lib/repair-price-keys.ts`).
+ *
+ * The price keys are DELETED, not normalized. Normalizing one is the sanitizer
+ * saying the key belongs here and only its value was wrong — the shape of an
+ * accepted capability — and there is no legal repair price to normalize toward.
  *
  * The sanitizer is intentionally lossy + per-row: a single malformed defect
- * does not reject the whole patch. Mirrors the canned-comment + photo merge
- * strategy used elsewhere in updateResults().
+ * does not reject the whole patch. Rejecting the write outright was considered
+ * and refused — the entry also carries the rating, the notes and the photos,
+ * and an offline client replaying a queued payload that still holds a stale
+ * price would lose the inspector's whole entry over a field no screen offers.
+ * The surface that DOES have a request boundary (the template write) rejects
+ * loudly instead; see `server/lib/validations/template.schema.ts`.
  */
 export function sanitizeDefectStates(data: Record<string, unknown>): void {
     const validSlugs = new Set<string>(RECOMMENDATION_CATEGORY_IDS);
     for (const key of Object.keys(data)) {
-        const entry = data[key] as { tabs?: { defects?: unknown } } | null | undefined;
+        const entry = data[key] as {
+            tabs?: { defects?: unknown };
+            customComments?: { defects?: unknown };
+        } | null | undefined;
         if (!entry || typeof entry !== 'object') continue;
+        // Item-level estimate — no defect tab required to reach it.
+        deleteRepairPriceKeys(entry);
+        // A field-authored custom defect is a defect row too, and the repair
+        // list read it by the same key names.
+        const customDefects = entry.customComments?.defects;
+        if (Array.isArray(customDefects)) {
+            for (const c of customDefects as Array<Record<string, unknown>>) {
+                if (!c || typeof c !== 'object') continue;
+                deleteRepairPriceKeys(c);
+            }
+        }
         const defects = entry.tabs?.defects;
         if (!Array.isArray(defects)) continue;
         for (const d of defects as Array<Record<string, unknown>>) {
@@ -65,17 +88,7 @@ export function sanitizeDefectStates(data: Record<string, unknown>): void {
                 const v = d.recommendationId;
                 d.recommendationId = (typeof v === 'string' && validSlugs.has(v)) ? v : null;
             }
-            // estimateLow / estimateHigh — non-negative integers (cents) or null
-            for (const side of ['estimateLow', 'estimateHigh'] as const) {
-                if (side in d) {
-                    const v = d[side];
-                    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
-                        d[side] = Math.round(v);
-                    } else {
-                        d[side] = null;
-                    }
-                }
-            }
+            deleteRepairPriceKeys(d);
             // trade / deadline / timeframe — enum or null (drop unknown values)
             if ('trade' in d) {
                 d.trade = isDefectTrade(d.trade) ? d.trade : null;

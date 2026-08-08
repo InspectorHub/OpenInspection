@@ -2,9 +2,11 @@
  * <ReportRepairPanel> — the bottom-sheet repair-request panel listing the items
  * the client checked "Add to repair request" on.
  *
- * Extracted from <ReportView>'s former inline JSX. Behavior-preserving: the
- * markup is byte-identical; the selected-item list, the estimate flag and the
- * close handler are threaded in as props so the panel stays presentational.
+ * Extracted from <ReportView>'s former inline JSX; the selected-item list and
+ * the close handler are threaded in as props so the panel stays presentational.
+ *
+ * There is no `showEstimates` prop any more: the panel used it to print a price
+ * per row, and the server emits no item-level estimate to print.
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
@@ -14,11 +16,10 @@ import type { ReportItem } from "./types";
 
 export interface ReportRepairPanelProps {
   selectedRepairList: ReportItem[];
-  showEstimates: boolean;
   onClose: () => void;
 }
 
-export function ReportRepairPanel({ selectedRepairList, showEstimates, onClose }: ReportRepairPanelProps) {
+export function ReportRepairPanel({ selectedRepairList, onClose }: ReportRepairPanelProps) {
   return (
     <div className="print:hidden fixed bottom-0 left-0 right-0 z-50 bg-ih-bg-card border-t border-ih-border max-h-[60vh] overflow-y-auto rounded-t-xl">
       <div className="max-w-4xl mx-auto p-6">
@@ -55,12 +56,7 @@ export function ReportRepairPanel({ selectedRepairList, showEstimates, onClose }
                     </span>
                   )}
                 </div>
-                {showEstimates &&
-                  (item.estimateMin || item.estimateMax) && (
-                    <span className="text-xs font-mono text-ih-fg-4">
-                      ${item.estimateMin || "?"} - ${item.estimateMax || "?"}
-                    </span>
-                  )}
+                {/* No price column: the server emits no item-level estimate. */}
               </div>
             ))}
             <div className="mt-4 flex items-center justify-between">

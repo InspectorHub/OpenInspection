@@ -47,15 +47,15 @@ function arrayBufferToBase64(buf: ArrayBuffer): string {
  * Centralizes all email logic and formatting across the application.
  */
 export class EmailBaseService {
-    protected provider: EmailProvider;
+    public provider: EmailProvider;
 
     constructor(
-        protected apiKey: string,
-        protected senderEmail: string,
-        protected appName: string,
-        protected identity?: EmailIdentityConfig,
-        protected renderer?: EmailTemplateRenderer,
-        protected meter?: { record: () => Promise<void> },
+        public apiKey: string,
+        public senderEmail: string,
+        public appName: string,
+        public identity?: EmailIdentityConfig,
+        public renderer?: EmailTemplateRenderer,
+        public meter?: { record: () => Promise<void> },
         provider?: EmailProvider,
         /**
          * WH-3 — optional send-path suppression gate. When injected, `sendEmail`
@@ -64,7 +64,7 @@ export class EmailBaseService {
          * (standalone/legacy callers) ⇒ no gate, behavior unchanged. Wired in
          * `assembleTenantEmailService` the same way `meter` is.
          */
-        protected suppression?: { isSuppressed(email: string): Promise<boolean> },
+        public suppression?: { isSuppressed(email: string): Promise<boolean> },
         /**
          * Free-tier usage-quota pre-flight (2026-07 spec). When injected,
          * `sendEmail` awaits `quota.preflight()` BEFORE building or sending any
@@ -74,7 +74,7 @@ export class EmailBaseService {
          * behavior unchanged. Wired in `assembleTenantEmailService` the same way
          * `meter` is.
          */
-        protected quota?: { preflight: () => Promise<void> },
+        public quota?: { preflight: () => Promise<void> },
         /**
          * The recipient's own kill switch. When injected, `sendEmail` drops any
          * recipient who switched this notification CLASS off — which is only
@@ -88,7 +88,7 @@ export class EmailBaseService {
          * suppression is about an ADDRESS being undeliverable, a preference is
          * about one KIND of message being unwanted.
          */
-        protected preferences?: { isMuted(classId: string, email: string): Promise<boolean> },
+        public preferences?: { isMuted(classId: string, email: string): Promise<boolean> },
         /**
          * M1 of the idempotency programme (portal #107). When injected AND the
          * caller names an `idempotencyKey`, a repeat of the same send is
@@ -97,14 +97,14 @@ export class EmailBaseService {
          * unchanged. Wired in `assembleTenantEmailService` the same way
          * `meter` is.
          */
-        protected dedupe?: EmailDedupePort,
+        public dedupe?: EmailDedupePort,
     ) {
         this.provider = provider ?? new ResendProvider({ apiKey: this.apiKey });
     }
 
     /** Render `trigger` via the template registry when a renderer is injected;
      *  otherwise use the provided fallback (keeps no-renderer unit tests working). */
-    protected renderOr(trigger: string, data: Record<string, unknown>, fallback: { subject: string; html: string }, opts?: { signatureHtml?: string }): RenderResult {
+    public renderOr(trigger: string, data: Record<string, unknown>, fallback: { subject: string; html: string }, opts?: { signatureHtml?: string }): RenderResult {
         if (this.renderer) return this.renderer.render(trigger, data, opts);
         return { trigger, subject: fallback.subject, html: fallback.html, enabled: true };
     }
@@ -123,7 +123,7 @@ export class EmailBaseService {
      * `booking-confirmation` and declare `report-ready`, and no test would see
      * it. With one source there is nothing to keep in sync.
      */
-    protected async sendRendered(
+    public async sendRendered(
         rendered: RenderResult,
         to: string[],
         attachments?: Array<{ filename: string; content: ArrayBuffer | string; contentType?: string }>,
@@ -138,7 +138,7 @@ export class EmailBaseService {
     /** Single gate for the email footer signature: requires inspector + host,
      *  honours the per-inspector toggle (default on), and suppresses a block
      *  that would have no name (avoids a half-empty footer). */
-    protected signatureFor(inspector?: SignatureUser, host?: string): string | undefined {
+    public signatureFor(inspector?: SignatureUser, host?: string): string | undefined {
         if (!inspector || !host) return undefined;
         if (inspector.signatureEnabled === false) return undefined;
         if (!(inspector.name ?? '').trim()) return undefined;
@@ -155,7 +155,7 @@ export class EmailBaseService {
      *   this.renderOr(trigger, data, { subject, html: appendSignature(fallbackBody, inspector, host) },
      *     signatureHtml ? { signatureHtml } : undefined);
      */
-    protected renderWithSignature(
+    public renderWithSignature(
         trigger: string,
         data: Record<string, unknown>,
         subject: string,
@@ -241,7 +241,7 @@ export class EmailBaseService {
      * idempotency claim can wrap the WHOLE of it — including the meter, which
      * a replayed send must not touch.
      */
-    protected async performSend(
+    public async performSend(
         to: string[],
         subject: string,
         html: string,

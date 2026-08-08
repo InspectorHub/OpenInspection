@@ -77,3 +77,24 @@ export async function verifyRenderToken(
     ...(typeof payload.v === 'number' ? { versionNumber: payload.v } : {}),
   };
 }
+
+/**
+ * Render-token access path for headless PDF generation. The Cloudflare Browser
+ * Rendering headless browser cannot carry a session cookie or portal token, so
+ * trusted server flows mint a short-TTL render token (above) and pass it as
+ * `?render=`. Returns the token's inspectionId only when it is valid AND
+ * matches the requested inspection; null otherwise (caller falls through to the
+ * other auth paths / 404).
+ *
+ * Lives here rather than in `server/api/public-report.ts` (which re-exports it
+ * for existing importers) because that file is at its size cap and this is
+ * render-token logic, not routing.
+ */
+export async function resolveRenderAccess(
+  render: string | undefined, requestedId: string, secret: string,
+): Promise<{ inspectionId: string; versionNumber?: number } | null> {
+  if (!render) return null;
+  const v = await verifyRenderToken(render, secret);
+  if (!v || v.inspectionId !== requestedId) return null;
+  return v;
+}

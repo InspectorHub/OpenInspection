@@ -157,6 +157,28 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // subject's magic links must stop working.
     { table: 'inspection_access_tokens', column: 'recipient_email', category: 'user.contact.email', action: 'delete' },
 
+    // ── report_views (#271) ───────────────────────────────────────────────────
+    // Delivery-confirmation counters: this recipient rendered this order's
+    // report page, first/last, this many times. A behavioural fact about an
+    // identified person, and the PII heuristic matches NOTHING here — not
+    // `view_count`, not `first_viewed_at`, not `access_token_id`. The gate was
+    // green over this table the entire time it existed.
+    //
+    // DELETE the ROWS. Zeroing the counters is not an option: an all-zero row
+    // still asserts that this person was sent this document. Locator =
+    // `access_token_id`, the only route back to the subject (there is no email
+    // on this table), which is why the orchestrator resolves the token ids and
+    // deletes here BEFORE deleting `inspection_access_tokens`.
+    //
+    // The action is not a new judgement. `docs/compliance/report-view-lia.md`
+    // condition 7 already required it ("the row is catalogued for erasure in the
+    // same change that creates it, and the erasure orchestrator is wired to
+    // it... the subject's rows must be removed before their access tokens are"),
+    // and the schema comment on `reportViews` states the same. What was missing
+    // was any code or catalogue entry that did it — the condition read as met
+    // because two documents said so and nothing checked.
+    { table: 'report_views', column: 'access_token_id', category: 'user.behavior', action: 'delete' },
+
     // ── inspection_requests (#88) ─────────────────────────────────────────────
     // Public booking requests. The ROW must survive — `inspections.request_id`
     // carries a frozen legacy FK to it — so identity is cleared in place:
@@ -184,6 +206,15 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // The erasure decision record itself (Art. 5(2)/30 accountability — you
     // cannot prove you honored a request if you delete the record of it).
     { table: 'erasure_log', column: 'subject_email', category: 'user.contact.email', action: 'retain', legalBasis: 'art_17_3_b' },
+    // The two free-text columns on the SAME row, which carry the subject data
+    // the accountability record is made of and which the heuristic does not
+    // match. `identity_basis` is documented as free text ("how the identity was
+    // verified"), so it can hold whatever document a human named; `response_note`
+    // is literally what was said back to the subject. Retaining `subject_email`
+    // and leaving these two undeclared claimed a narrower record than the row
+    // actually holds. Same basis, same row, no new judgement.
+    { table: 'erasure_log', column: 'identity_basis', category: 'user.freetext', action: 'retain', legalBasis: 'art_17_3_b' },
+    { table: 'erasure_log', column: 'response_note',  category: 'user.freetext', action: 'retain', legalBasis: 'art_17_3_b' },
     // Signature evidence kept on a DSAR (the retention sweep destroys it past
     // the window); the esign audit chain is NEVER touched.
     { table: 'agreement_signers',  column: 'signature_base64', category: 'user.biometric.signature', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'enforced' },
@@ -310,4 +341,53 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // standing — the same question, answered the same way rather than
     // differently by omission.
     { table: 'inspection_requests', column: 'property_address', category: 'user.address', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
+
+    // ── ai_call_provenance (AI governance ledger) ─────────────────────────────
+    // One row per prompt sent to a model provider: which capability ran, which
+    // adapter, on whose credentials, against which model, under which prompt
+    // version, when. Written at the single AI chokepoint
+    // (`AIService.callGemini`) so no AI feature can produce output without one.
+    //
+    // EVERY COLUMN IS LISTED, INCLUDING THE ONES THAT OBVIOUSLY HOLD NO PII.
+    // Not one of these names matches `PII_HEURISTIC` in
+    // `scripts/check-erasure-manifest.mjs`, so this whole table could have been
+    // added and `lint:erasure` would have stayed green — the exact failure
+    // `docs/compliance/erasure-heuristic-limits.md` describes, where silence
+    // reads as coverage. The table is ruled on because somebody read it, not
+    // because anything went red.
+    //
+    // WHY `retain` AND NOT A DELETION. There is nothing here to locate a data
+    // subject BY and nothing to erase: the row records that a workspace made an
+    // AI call, and it is scoped to the tenant, not to a person. That is a
+    // design constraint, not a coincidence — the prompt text is deliberately
+    // never stored (see the schema comment on `ai_call_provenance`) precisely
+    // so this ledger cannot become a second copy of the client PII an
+    // inspector's defect note carries. A DSAR over this table has no rows to
+    // find. Basis art_17_3_b: it is the record that shows what an automated
+    // system did on the tenant's behalf, and a governance log you can delete on
+    // request cannot serve as one.
+    //
+    // NO `retention` PERIOD IS DECLARED, deliberately. A period here would be a
+    // promise about expiring PERSONAL data, and these columns are not personal
+    // data; declaring one would also require an `enforcementStatus`, and there
+    // is no sweep — the shape this manifest calls an unbounded retain wearing a
+    // temporary label. If a future column makes a row subject-linkable, that
+    // column changes this reasoning and needs a period AND something to enforce
+    // it.
+    //
+    // ⚠️ REVIEWER NOTE. Columns that carry no personal data would normally be
+    // declared in `ERASURE_OUT_OF_SCOPE` (`erasure-out-of-scope.ts`) with a
+    // reason, which is arguably where these eight belong. They are recorded
+    // here instead because a separate erasure-coverage audit was in flight over
+    // that file when this landed and a concurrent edit to it would have been a
+    // collision, not a decision. Moving them is a mechanical change and loses
+    // nothing: the reasoning above travels with them.
+    { table: 'ai_call_provenance', column: 'id',             category: 'system.operations', action: 'retain', legalBasis: 'art_17_3_b' },
+    { table: 'ai_call_provenance', column: 'tenant_id',      category: 'system.operations', action: 'retain', legalBasis: 'art_17_3_b' },
+    { table: 'ai_call_provenance', column: 'capability',     category: 'system.operations', action: 'retain', legalBasis: 'art_17_3_b' },
+    { table: 'ai_call_provenance', column: 'provider',       category: 'system.operations', action: 'retain', legalBasis: 'art_17_3_b' },
+    { table: 'ai_call_provenance', column: 'mode',           category: 'system.operations', action: 'retain', legalBasis: 'art_17_3_b' },
+    { table: 'ai_call_provenance', column: 'model',          category: 'system.operations', action: 'retain', legalBasis: 'art_17_3_b' },
+    { table: 'ai_call_provenance', column: 'prompt_version', category: 'system.operations', action: 'retain', legalBasis: 'art_17_3_b' },
+    { table: 'ai_call_provenance', column: 'created_at',     category: 'system.operations', action: 'retain', legalBasis: 'art_17_3_b' },
 ];

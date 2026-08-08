@@ -1,10 +1,15 @@
 /**
  * Secrets UI — GET/PUT /api/admin/secrets
  *
- * Manages all 14 integration API keys stored as AES-256-GCM encrypted JSON
+ * Reads and writes the integration API keys stored as AES-256-GCM encrypted JSON
  * in `tenant_configs.secrets_enc`. Worker env vars always take precedence
  * (backwards compatibility); DB secrets are the fallback for self-hosted
- * tenants who configure keys via the Settings UI.
+ * tenants who configure keys via the Settings UI. Which keys exist and what a
+ * well-formed value looks like lives in `server/lib/secrets-catalog.ts`.
+ *
+ * This is also the ONLY route that writes a workspace's own AI provider key, so
+ * the bring-your-own-key attestation gate lives here rather than beside the AI
+ * features that later consume the credential.
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
@@ -18,106 +23,32 @@ import { secretsCacheKey } from '../lib/secrets-cache';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import type { HonoConfig } from '../types/hono';
 import { getDrizzle } from '../lib/route-helpers';
-
-/**
- * Canonical list of all integration secrets configurable via UI.
- * Keys match the Worker env binding names exactly so the middleware can
- * merge them into c.env transparently.
- */
-export const INTEGRATION_SECRET_KEYS = [
-    'RESEND_API_KEY',
-    // SENDER_EMAIL removed (B-14): the From address is not a secret — it lives
-    // in the plaintext `tenant_configs.sender_email` column set via the
-    // Communication settings form, never in the encrypted secrets store.
-    'GEMINI_API_KEY',
-    'TURNSTILE_SECRET_KEY',
-    'GOOGLE_CLIENT_ID',
-    'GOOGLE_CLIENT_SECRET',
-    'GOOGLE_PLACES_API_KEY',
-    'ESTATED_API_KEY',
-    'QBO_CLIENT_ID',
-    'QBO_CLIENT_SECRET',
-    'QBO_WEBHOOK_SECRET',
-    'STRIPE_SECRET_KEY',
-    'STRIPE_PUBLISHABLE_KEY',
-    'STRIPE_WEBHOOK_SECRET',
-    // Track L — Twilio SMS credentials (BYO; platform-default in SaaS via env).
-    'TWILIO_ACCOUNT_SID',
-    'TWILIO_AUTH_TOKEN',
-    'TWILIO_FROM_NUMBER',
-    // Task 8 (#196) — Telnyx BYO provider credentials.
-    'TELNYX_API_KEY',
-    'TELNYX_FROM_NUMBER',
-    // #wh1 — Telnyx base64 Ed25519 PUBLIC key for inbound webhook verification.
-    // No format gate (Ed25519 base64 keys have no stable public prefix, like
-    // TELNYX_API_KEY). Encrypted at rest exactly like every other key here.
-    'TELNYX_PUBLIC_KEY',
-    // #195 — email BYO provider credentials (SendGrid / Postmark / Mailgun).
-    // RESEND_API_KEY above covers the Resend path.
-    'SENDGRID_API_KEY',
-    'POSTMARK_SERVER_TOKEN',
-    'MAILGUN_API_KEY',
-    'MAILGUN_DOMAIN',
-    // #wh3 — per-provider email webhook verification secrets (inbound bounce /
-    // complaint receiver POST /api/public/email/:provider/:tenant). No format
-    // gate — none of these has a stable public prefix (Svix whsec_ is the secret
-    // body for HMAC, the SendGrid value is a base64 P-256 SPKI key, the Postmark
-    // token and Mailgun signing key are opaque). Encrypted at rest by membership.
-    'RESEND_WEBHOOK_SECRET',
-    'SENDGRID_WEBHOOK_PUBLIC_KEY',
-    'POSTMARK_WEBHOOK_TOKEN',
-    'MAILGUN_SIGNING_KEY',
-    'APP_BASE_URL',
-] as const;
-
-type IntegrationSecretKey = (typeof INTEGRATION_SECRET_KEYS)[number];
-
-/**
- * Key format rules — the slot a value lands in is inferred from its prefix so
- * a paste into the wrong field is rejected before we attempt a live call.
- * Only keys with a recognizable, STABLE vendor prefix are validated; OAuth
- * client ids/secrets (QBO, Google) and vendor keys without a format guarantee
- * (Places, Estated) are not.
- */
-const KEY_FORMATS: Array<{ key: IntegrationSecretKey; re: RegExp; hint: string }> = [
-    { key: 'STRIPE_PUBLISHABLE_KEY', re: /^pk_(test|live)_/, hint: 'must start with pk_test_ or pk_live_' },
-    { key: 'STRIPE_SECRET_KEY', re: /^(sk|rk)_(test|live)_/, hint: 'must start with sk_test_ / sk_live_ (or a restricted rk_ key)' },
-    { key: 'STRIPE_WEBHOOK_SECRET', re: /^whsec_/, hint: 'must start with whsec_' },
-    { key: 'RESEND_API_KEY', re: /^re_/, hint: 'must start with re_' },
-    { key: 'GEMINI_API_KEY', re: /^AIza/, hint: 'must start with AIza (a Google API key)' },
-    // Cloudflare Turnstile secrets: 0x = real, 1x/2x/3x = documented test secrets.
-    { key: 'TURNSTILE_SECRET_KEY', re: /^[0-3]x/, hint: 'must start with 0x (or a 1x/2x/3x test secret)' },
-    { key: 'APP_BASE_URL', re: /^https?:\/\//, hint: 'must be an http(s):// URL' },
-    { key: 'TWILIO_ACCOUNT_SID', re: /^AC[0-9a-fA-F]{32}$/, hint: 'must be an Account SID (starts with AC, 34 chars)' },
-    { key: 'TWILIO_FROM_NUMBER', re: /^\+[1-9]\d{6,14}$/, hint: 'must be an E.164 number (e.g. +15551234567)' },
-    // TWILIO_AUTH_TOKEN has no stable public prefix — not format-gated.
-    { key: 'TELNYX_FROM_NUMBER', re: /^\+[1-9]\d{6,14}$/, hint: 'must be an E.164 number (e.g. +15551234567)' },
-    // TELNYX_API_KEY has no stable public prefix — not format-gated.
-    { key: 'SENDGRID_API_KEY', re: /^SG\./, hint: 'must start with SG.' },
-    { key: 'MAILGUN_DOMAIN', re: /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/, hint: 'must be a domain, e.g. mg.yourdomain.com' },
-    // POSTMARK_SERVER_TOKEN and MAILGUN_API_KEY have no stable public prefix — not format-gated.
-];
-
-/** Returns the first format violation among NEW (non-masked) values, or null. */
-export function validateStripeKeyFormats(
-    incoming: Record<string, string | undefined>,
-): { field: string; message: string } | null {
-    for (const { key, re, hint } of KEY_FORMATS) {
-        const v = incoming[key];
-        if (v && !isMasked(v) && v.trim() !== '' && !re.test(v.trim())) {
-            return { field: key, message: `${key} ${hint}.` };
-        }
-    }
-    return null;
-}
+import { CAMEL_TO_ENV, INTEGRATION_SECRET_KEYS, validateStripeKeyFormats } from '../lib/secrets-catalog';
+import { AiKeyAttestationSchema } from '../lib/validations/ai.schema';
+import {
+    buildAiKeyAttestationRecord,
+    isAiKeyAttested,
+    type AiKeyAttestation,
+} from '../lib/ai/byo-attestation';
 
 const SecretsResponseSchema = z.object({
     success: z.literal(true),
     data: z.record(z.string(), z.string()),
 }).openapi('SecretsResponse');
 
-const SecretsInputSchema = z.record(z.string(), z.string().optional())
-    .openapi('SecretsInput');
+/**
+ * Secret values keyed by env name, plus the one non-secret member: the transient
+ * `aiKeyAttestation` object that must accompany a NEW tenant-supplied AI key.
+ * It is stripped in `saveSecretsImpl` before the merge, never sealed, and never
+ * stored in the shape it arrives in.
+ */
+const SecretsInputSchema = z.record(
+    z.string(),
+    z.union([z.string(), AiKeyAttestationSchema]).optional(),
+).openapi('SecretsInput');
+
+/** Body shape shared by PUT and POST — string secrets plus the transient field. */
+type SecretsSaveBody = Record<string, string | AiKeyAttestation | undefined>;
 
 // ─── GET /secrets ──────────────────────────────────────────────────────────
 const getSecretsRoute = createRoute(withMcpMetadata({
@@ -179,40 +110,24 @@ const postSecretsRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 /**
- * camelCase aliases the legacy settings-advanced page sends. Normalized to the
- * canonical ENV-name keys before validation / merge so the POST alias and PUT
- * share one code path.
- */
-const CAMEL_TO_ENV: Record<string, IntegrationSecretKey> = {
-    resendApiKey: 'RESEND_API_KEY',
-    geminiApiKey: 'GEMINI_API_KEY',
-    turnstileSecretKey: 'TURNSTILE_SECRET_KEY',
-    googleClientId: 'GOOGLE_CLIENT_ID',
-    googleClientSecret: 'GOOGLE_CLIENT_SECRET',
-    googlePlacesApiKey: 'GOOGLE_PLACES_API_KEY',
-    estatedApiKey: 'ESTATED_API_KEY',
-    qboClientId: 'QBO_CLIENT_ID',
-    qboClientSecret: 'QBO_CLIENT_SECRET',
-    qboWebhookSecret: 'QBO_WEBHOOK_SECRET',
-    stripeSecretKey: 'STRIPE_SECRET_KEY',
-    stripePublishableKey: 'STRIPE_PUBLISHABLE_KEY',
-    stripeWebhookSecret: 'STRIPE_WEBHOOK_SECRET',
-    appBaseUrl: 'APP_BASE_URL',
-};
-
-/**
  * Shared save implementation behind both PUT and POST. Normalizes camelCase
  * aliases, format-gates + live-verifies Stripe keys (fail-closed 422), then
  * seals the merged set under the tenant's envelope DEK and persists.
  */
-async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, string | undefined>) {
+export async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: SecretsSaveBody) {
     const tenantId = c.get('tenantId');
     const db = getDrizzle(c);
     const allowedKeys = new Set<string>(INTEGRATION_SECRET_KEYS);
 
+    // The attestation is transient: it is read here, converted into the record
+    // written alongside the sealed blob, and never merged into the secret set.
+    // Pulling it out first also keeps the merge loop free of non-string values.
+    const { aiKeyAttestation, ...rawSecrets } = rawBody;
+
     // Normalize incoming body to canonical ENV-name keys (drop unknowns).
     const body: Record<string, string | undefined> = {};
-    for (const [key, value] of Object.entries(rawBody)) {
+    for (const [key, value] of Object.entries(rawSecrets)) {
+        if (typeof value !== 'string' && value !== undefined) continue;
         const envKey = CAMEL_TO_ENV[key] ?? key;
         if (!allowedKeys.has(envKey)) continue;
         body[envKey] = value;
@@ -224,6 +139,29 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
         return c.json({
             success: false as const,
             error: { code: 'INVALID_KEY_FORMAT', message: formatErr.message, field: formatErr.field },
+        }, 422);
+    }
+
+    // 0b. BYO AI key — a NEW tenant-supplied key needs the tenant's confirmation
+    //     in the SAME request. The provider's terms turn on the service tier of
+    //     the billing project behind the key, which is neither carried on the key
+    //     nor reported by anything this client calls, so the confirmation is the
+    //     only signal available. Refused before the vendor probe below: a save
+    //     that will not be stored should not spend a round trip proving the key
+    //     works. Fail-closed and no default — a body that says nothing about the
+    //     attestation has not attested.
+    const incomingGemini = body.GEMINI_API_KEY;
+    const newAiKey = incomingGemini && !isMasked(incomingGemini) ? incomingGemini.trim() : '';
+    const settingAiKey = newAiKey !== '';
+    const attestation = typeof aiKeyAttestation === 'object' ? aiKeyAttestation : undefined;
+    if (settingAiKey && !isAiKeyAttested(attestation)) {
+        return c.json({
+            success: false as const,
+            error: {
+                code: 'AI_ATTESTATION_REQUIRED',
+                message: 'Confirm all three statements about your AI provider account before saving this key.',
+                field: 'GEMINI_API_KEY',
+            },
         }, 422);
     }
 
@@ -300,10 +238,9 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
         }
     }
 
-    const newGemini = body.GEMINI_API_KEY;
-    if (newGemini && !isMasked(newGemini) && newGemini.trim() !== '') {
+    if (settingAiKey) {
         const probe = await fetch(
-            `https://generativelanguage.googleapis.com/v1/models?pageSize=1&key=${encodeURIComponent(newGemini.trim())}`,
+            `https://generativelanguage.googleapis.com/v1/models?pageSize=1&key=${encodeURIComponent(newAiKey)}`,
         ).catch(() => null);
         if (probe && (probe.status === 400 || probe.status === 401 || probe.status === 403)) {
             return c.json({
@@ -317,8 +254,8 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
         }
     }
 
-    // 4. Seal & store. Reuse the existing DEK (rotation converges on write);
-    //    no secrets left → clear both columns.
+    // 4. Seal. Reuse the existing DEK (rotation converges on write); no secrets
+    //    left → clear both columns.
     const cleaned = Object.fromEntries(
         Object.entries(existing).filter(([, v]) => v && v.trim() !== '')
     );
@@ -333,9 +270,47 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
         dekEnc = sealed.dekEnc;
     }
 
+    // 5. Store. The attestation record moves with the key, in the same write. Storing
+    //    it separately would allow a state where the key is live and the record
+    //    is not — the exact state the record exists to rule out. Clearing the key
+    //    clears the record: an attestation about a key that is gone attests to
+    //    nothing, and leaving it behind would later read as cover for whatever
+    //    key is stored next.
+    //
+    //    Written whenever a confirmation arrives AND a key will exist afterwards
+    //    — not only when the key itself is new. A workspace whose key predates
+    //    this rule has a working credential and nothing on file for it; without
+    //    this, confirming would mean re-pasting a key they already have, and the
+    //    runtime refusal would be a dead end. A save carrying NO confirmation
+    //    still leaves an existing record untouched, so the masked-resubmit path
+    //    neither demands re-confirmation nor re-stamps one nobody made.
+    const keyPresentAfterSave = !!cleaned.GEMINI_API_KEY;
+    const record = keyPresentAfterSave && isAiKeyAttested(attestation)
+        ? buildAiKeyAttestationRecord(new Date())
+        : null;
+    const attestationColumns = record
+        ? {
+            aiKeyAttestationProvider: record.provider,
+            aiKeyAttestationMode: record.mode,
+            aiKeyAttestationAccountOwner: record.accountOwner,
+            aiKeyAttestationTermsVersion: record.termsVersion,
+            aiKeyAttestationAttestedAt: record.attestedAt,
+            aiKeyAttestationPolicyVersion: record.policyVersion,
+        }
+        : keyPresentAfterSave
+            ? {}
+            : {
+                aiKeyAttestationProvider: null,
+                aiKeyAttestationMode: null,
+                aiKeyAttestationAccountOwner: null,
+                aiKeyAttestationTermsVersion: null,
+                aiKeyAttestationAttestedAt: null,
+                aiKeyAttestationPolicyVersion: null,
+            };
+
     if (row) {
         await db.update(tenantConfigs)
-            .set({ secretsEnc: encrypted, dekEnc, updatedAt: new Date() })
+            .set({ secretsEnc: encrypted, dekEnc, updatedAt: new Date(), ...attestationColumns })
             .where(eq(tenantConfigs.tenantId, tenantId));
     } else {
         await db.insert(tenantConfigs).values({
@@ -343,6 +318,7 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
             secretsEnc: encrypted,
             dekEnc,
             updatedAt: new Date(),
+            ...attestationColumns,
         });
     }
 
@@ -350,7 +326,12 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
     await c.env.TENANT_CACHE?.delete(secretsCacheKey(tenantId)).catch(() => {});
 
     auditFromContext(c, 'config.secrets.update', 'tenant_config', {
-        metadata: { keysUpdated: Object.keys(body).filter(k => body[k] && !isMasked(body[k])) },
+        metadata: {
+            keysUpdated: Object.keys(body).filter(k => body[k] && !isMasked(body[k])),
+            // Versions only — the tenant_configs row is the record; this is the
+            // timeline entry that says when it was written and against what.
+            ...(record ? { aiKeyAttestation: { termsVersion: record.termsVersion, policyVersion: record.policyVersion } } : {}),
+        },
     });
 
     return c.json({ success: true as const }, 200);

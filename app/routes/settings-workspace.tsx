@@ -15,6 +15,8 @@ import { ReportStylePreview } from "~/components/settings/ReportStylePreview";
 import { makeWorkspaceSchema } from "~/lib/forms/settings.schema";
 import { brandingUpdateBody } from "~/lib/forms/branding-body";
 import { ReportFeaturesPanel } from "~/components/settings/ReportFeaturesPanel";
+import { ReferralSourcesPanel } from "~/components/settings/ReferralSourcesPanel";
+import { RepairQuickPhrasesPanel } from "~/components/settings/RepairQuickPhrasesPanel";
 import { ReportPdfPanel } from "~/components/settings/ReportPdfPanel";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
@@ -34,6 +36,7 @@ interface Branding {
   defaultProfileId?: string | null;
   logoUrl?: string | null;
   customReferralSources?: string[];
+  repairQuickPhrases?: string[] | null;
   enableRepairList?: boolean | null;
   enableCustomerRepairExport?: boolean | null;
   companyAddress?: string | null;
@@ -181,6 +184,7 @@ export default function SettingsWorkspacePage() {
     { id: "datetime-format", label: m.settings_workspace_datetime_format_heading() },
     { id: "report-style", label: m.settings_workspace_report_style_heading() },
     { id: "referral", label: m.settings_workspace_referral_heading() },
+    { id: "quick-phrases", label: m.settings_workspace_quick_phrases_heading() },
     { id: "report-features", label: m.settings_workspace_report_features_heading() },
     { id: "report-pdf", label: m.settings_workspace_report_pdf_heading() },
   ];
@@ -325,26 +329,17 @@ export default function SettingsWorkspacePage() {
           </div>
         </section>
 
-        {/* Referral sources */}
-        <section id="referral" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_referral_heading()}</h3>
-          <div className="space-y-3">
-            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-ih-fg-2">{m.settings_workspace_referral_builtin_label()}</div>
-            <div className="flex flex-wrap gap-2">
-              {["Realtor", "Past Client", "Google Search", "Facebook", "Yelp", "Walk-in", "Other"].map((s) => (
-                <span key={s} className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-ih-bg-muted text-ih-fg-2">{s}</span>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label htmlFor={fields.customReferralSources.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_referral_custom_label()}</label>
-            <textarea id={fields.customReferralSources.id} name={fields.customReferralSources.name} rows={6}
-              defaultValue={(branding.customReferralSources ?? []).join("\n")}
-              placeholder={m.settings_workspace_referral_custom_placeholder()}
-              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
-            <p className="text-[11px] text-ih-fg-3">{m.settings_workspace_referral_custom_hint()}</p>
-          </div>
-        </section>
+        <ReferralSourcesPanel
+          fieldId={fields.customReferralSources.id}
+          fieldName={fields.customReferralSources.name}
+          customReferralSources={branding.customReferralSources}
+        />
+
+        <RepairQuickPhrasesPanel
+          fieldId={fields.repairQuickPhrases.id}
+          fieldName={fields.repairQuickPhrases.name}
+          repairQuickPhrases={branding.repairQuickPhrases}
+        />
 
         <ReportFeaturesPanel
           enableRepairList={branding.enableRepairList}

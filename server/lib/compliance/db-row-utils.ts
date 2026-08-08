@@ -41,3 +41,26 @@ export function subtractYearsMs(ms: number, years: number): number {
     d.setUTCFullYear(d.getUTCFullYear() - years);
     return d.getTime();
 }
+
+/**
+ * Subtract whole months from a Unix-MS timestamp, returning a Unix-MS integer.
+ *
+ * Not `months * 30 * DAY_MS`. A retention window stated in months is a calendar
+ * period — it is the number published in a privacy policy — and multiplying
+ * turns "24 months" into 720 days, which is ten days short of the promise.
+ *
+ * `setUTCMonth` overflows rather than clamping (31 March minus one month lands
+ * on 3 March), so the day-of-month is clamped explicitly first. UTC throughout,
+ * for the same reason as the year helper above: a record-keeping obligation is
+ * not a local-calendar event, and no boundary should be able to shift by a day
+ * because of a DST change.
+ */
+export function subtractMonthsMs(ms: number, months: number): number {
+    const d = new Date(ms);
+    const day = d.getUTCDate();
+    d.setUTCDate(1);
+    d.setUTCMonth(d.getUTCMonth() - months);
+    const lastDayOfTargetMonth = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+    d.setUTCDate(Math.min(day, lastDayOfTargetMonth));
+    return d.getTime();
+}

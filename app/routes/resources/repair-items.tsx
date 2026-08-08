@@ -17,8 +17,6 @@ export interface RepairItemOption {
   id: string;
   name: string;
   category: string | null;
-  defaultEstimateMin: number | null;
-  defaultEstimateMax: number | null;
   defaultRepairSummary: string;
   contractorTypeName: string | null;
 }
@@ -33,13 +31,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       api.contractorTypes.index.$get({}, { headers: { "x-token-relay": "1" } }),
     ]);
     if (!recRes.ok) return { items: [] as RepairItemOption[] };
-    const recs = ((await recRes.json()) as { data?: Array<{ id: string; name: string; category: string | null; defaultEstimateMin: number | null; defaultEstimateMax: number | null; defaultRepairSummary: string; recommendedContractorTypeId: string | null }> }).data ?? [];
+    const recs = ((await recRes.json()) as { data?: Array<{ id: string; name: string; category: string | null; defaultRepairSummary: string; recommendedContractorTypeId: string | null }> }).data ?? [];
     const cts = ctRes.ok ? (((await ctRes.json()) as { data?: Array<{ id: string; name: string }> }).data ?? []) : [];
     const ctName = new Map(cts.map((c) => [c.id, c.name]));
     return {
       items: recs.map((r) => ({
         id: r.id, name: r.name, category: r.category,
-        defaultEstimateMin: r.defaultEstimateMin, defaultEstimateMax: r.defaultEstimateMax,
         defaultRepairSummary: r.defaultRepairSummary,
         contractorTypeName: r.recommendedContractorTypeId ? (ctName.get(r.recommendedContractorTypeId) ?? null) : null,
       })),

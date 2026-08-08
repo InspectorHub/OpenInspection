@@ -39,6 +39,12 @@ wrangler.*.toml
 .tsbuildinfo*
 .eslintcache
 
+# tsc project-reference output: the .d.ts tsconfig.api.json emits for the app
+# program to consume. Build output — NEVER commit it. `tsc -b` rebuilds it from
+# input timestamps, which is the only thing keeping it honest; a committed copy
+# goes stale and produces cross-boundary errors with no matching source.
+.types/
+
 # drizzle-kit schema-first: generated/temp artifacts (db:check regenerates drizzle-tmp)
 drizzle-tmp/
 drizzle-introspect/

@@ -60,8 +60,9 @@ const ITEM_KEYS = new Set<string>([
     'required',
     'isSafety',
     'defaultRecommendation',
-    'defaultEstimateMin',
-    'defaultEstimateMax',
+    // No defaultEstimateMin / defaultEstimateMax — the template write schema
+    // rejects them. Keeping them here would have the editor faithfully re-send
+    // a price it found in an older stored template and get a 400 for it.
     'attributes',
     'source',
 ]);

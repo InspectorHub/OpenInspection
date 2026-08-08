@@ -28,8 +28,6 @@ const DEFECT: Defect = {
   category: "safety",
   severityBucket: "defect",
   trade: "licensed roofer",
-  estimateLow: null,
-  estimateHigh: null,
 };
 
 describe("builder → action seam", () => {
@@ -47,6 +45,7 @@ describe("builder → action seam", () => {
               tenant: "t1",
               id: "insp1",
               token: "tok",
+              quickPhrases: null,
             }}
             actionPath="/repair-builder/t1/insp1"
           />

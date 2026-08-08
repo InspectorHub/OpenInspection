@@ -1,6 +1,7 @@
 import { getDescriptor } from './registry';
 import { interpolate, escapeHtml } from './interpolate';
 import { EmailLayout } from './layout';
+import { REPORT_VIEW_DISCLOSURE, reportViewObjectionUrl } from '../legal/report-view-disclosure';
 import type { TemplateBrand, RenderResult, EmailTemplateDescriptor, TemplateOverride } from './types';
 
 export interface RendererConfig {
@@ -73,10 +74,36 @@ export class EmailTemplateRenderer {
       } else if (kind === 'icsHint') {
         if (!data.icsAttached) continue;
         parts.push(`<p style="margin:8px 0;font-size:13px;color:#64748b;">A calendar invite (<strong>inspection.ics</strong>) is attached — open it to add this to your calendar.</p>`);
+      } else if (kind === 'viewDisclosure') {
+        parts.push(viewDisclosureHtml(data.reportUrl));
       }
     }
     return parts.join('\n');
   }
+}
+
+/**
+ * The Art. 13 notice for the report-view counter — OI #271, LIA conditions 4
+ * and 5. The words, the order, and why each sentence is mandatory live in
+ * `server/lib/legal/report-view-disclosure.ts`; this function only paints them.
+ *
+ * The exit degrades to plain words when the message carries no report URL,
+ * rather than disappearing. A disclosure that silently loses its objection
+ * route is one the assessment does not cover, and "no URL" is a template
+ * configuration accident, not a decision to withhold the right.
+ */
+function viewDisclosureHtml(reportUrl: unknown): string {
+  const d = REPORT_VIEW_DISCLOSURE;
+  const href = reportViewObjectionUrl(reportUrl);
+  const exitTail = href
+    ? `<a href="${escapeHtml(href)}" style="color:#334155;">${d.exitLabel}</a>.`
+    : `${d.exitLabel}, from the link at the foot of your report.`;
+  // `data-disclosure-version` travels with the delivered message so a later
+  // rewording cannot re-caption what this recipient actually read.
+  return `<div data-disclosure-version="${d.version}" style="margin:16px 0 0 0;padding:12px 16px;border-top:1px solid #e2e8f0;font-size:12px;line-height:1.6;color:#64748b;">`
+    + `<strong style="display:block;color:#475569;margin-bottom:4px;">${d.heading}</strong>`
+    + `<span>${d.fact} ${d.limit} ${d.exit} ${exitTail}</span>`
+    + `</div>`;
 }
 
 /**

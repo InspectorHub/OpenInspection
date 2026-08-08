@@ -23,21 +23,41 @@ describe('diffProjections — scalar changes', () => {
     });
 
     it('emits one FieldChange per differing scalar, in the fixed field order', () => {
+        // `recommendation` stands where `estimateMin` used to: the diffed
+        // fields are exactly those "Recover" is allowed to write back, and a
+        // repair price is not one of them.
         const from: ResultsProjection = {
-            '_default:s1:i1': { notes: 'old note', estimateMin: 100, followupNotes: 'a' },
+            '_default:s1:i1': { notes: 'old note', recommendation: 'monitor', followupNotes: 'a' },
         };
         const to: ResultsProjection = {
-            '_default:s1:i1': { notes: 'new note', estimateMin: 200, followupNotes: 'b' },
+            '_default:s1:i1': { notes: 'new note', recommendation: 'replace', followupNotes: 'b' },
         };
 
         const diffs = diffProjections(from, to);
         expect(diffs[0].scalarChanges.map((c) => c.field)).toEqual([
             'notes',
-            'estimateMin',
+            'recommendation',
             'followupNotes',
         ]);
         expect(diffs[0].scalarChanges[0]).toEqual({ field: 'notes', from: 'old note', to: 'new note' });
-        expect(diffs[0].scalarChanges[1]).toEqual({ field: 'estimateMin', from: 100, to: 200 });
+        expect(diffs[0].scalarChanges[1]).toEqual({ field: 'recommendation', from: 'monitor', to: 'replace' });
+    });
+
+    it('never diffs a repair-price field, even when both sides carry one', () => {
+        // A legacy pair of snapshots both holding an item-level estimate. The
+        // diff must not offer it as a recoverable change — "Recover" writes the
+        // old value back through applyItemPatch, which would be the retired
+        // capability returning through the version history.
+        const from = {
+            '_default:s1:i1': { notes: 'a', estimateMin: 100, estimateMax: 500 },
+        } as unknown as ResultsProjection;
+        const to = {
+            '_default:s1:i1': { notes: 'b', estimateMin: 200, estimateMax: 900 },
+        } as unknown as ResultsProjection;
+        expect(JSON.stringify(from)).toContain('100');
+
+        const diffs = diffProjections(from, to);
+        expect(diffs[0].scalarChanges.map((c) => c.field)).toEqual(['notes']);
     });
 
     it('does NOT report a scalar that is unchanged', () => {

@@ -32,12 +32,23 @@ export const AutoSummaryResponseSchema = createApiResponseSchema(z.object({
 
 /**
  * Input for the AI comment suggestion request.
+ *
+ * NO PROPERTY ADDRESS, AND NOT BY OMISSION. The schema used to accept
+ * `propertyAddress`; the prompt never referenced it, so the address was
+ * validated and then dropped — a good outcome that rested entirely on a comment
+ * in `lib/ai/prompts.ts` saying the prompt "names what it uses". One rewording
+ * of that prompt would have started sending client addresses to a third-party
+ * model with no change here, no change at the route, and nothing for a reviewer
+ * to catch. The field is deleted rather than guarded: what does not exist
+ * cannot be interpolated by accident. This object is the complete list of facts
+ * the suggestion feature may send to a provider — adding an identifier of the
+ * property or the client to it is a privacy decision, not a prompt tweak.
+ * Guarded by `tests/unit/ai/prompt-address-boundary.spec.ts`.
  */
 export const SuggestCommentSchema = z.object({
     itemName:        z.string().min(1).max(200).openapi({ example: 'Roof Covering' }).describe('TODO describe itemName field for the OpenInspection MCP integration'),
     sectionName:     z.string().min(1).max(200).openapi({ example: 'Roof' }).describe('TODO describe sectionName field for the OpenInspection MCP integration'),
     rating:          z.string().optional().openapi({ example: 'Defect' }).describe('TODO describe rating field for the OpenInspection MCP integration'),
-    propertyAddress: z.string().optional().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
     yearBuilt:       z.number().int().nullable().optional().describe('TODO describe yearBuilt field for the OpenInspection MCP integration'),
     sqft:            z.number().int().nullable().optional().describe('TODO describe sqft field for the OpenInspection MCP integration'),
 }).openapi('SuggestCommentRequest');
@@ -70,3 +81,23 @@ export const CommentEditSchema = z.object({
 export const CommentEditResponseSchema = createApiResponseSchema(z.object({
     rewritten: z.string().openapi({ example: 'Major cracking observed at the NW corner of the roof field; recommend evaluation by a licensed roofer.' }).describe('TODO describe rewritten field for the OpenInspection MCP integration'),
 })).openapi('CommentEditResponse');
+
+/**
+ * Transient (NOT stored as sent) confirmation that rides along with a save of
+ * the workspace's OWN AI provider key on `PUT/POST /api/admin/secrets`.
+ *
+ * Every field is REQUIRED and has NO default: a missing statement must read as
+ * "not confirmed", and a `.default(false)` would make that indistinguishable
+ * from a caller who deliberately said no. The save is refused unless all three
+ * are true; the route then turns them into the provider / mode / owner /
+ * terms-version / timestamp / policy-version record on `tenant_configs`. The
+ * statements and both version constants live in `server/lib/ai/byo-attestation.ts`.
+ */
+export const AiKeyAttestationSchema = z.object({
+    reviewedProviderTerms: z.boolean().openapi({ example: true })
+        .describe('The workspace has reviewed its AI provider terms.'),
+    tierPermitsIntendedUse: z.boolean().openapi({ example: true })
+        .describe('The service tier on their provider account permits their intended use.'),
+    understandsProviderProcessing: z.boolean().openapi({ example: true })
+        .describe('They understand inspection content is processed by that provider.'),
+}).openapi('AiKeyAttestation');

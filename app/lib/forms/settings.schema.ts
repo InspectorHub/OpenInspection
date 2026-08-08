@@ -125,6 +125,14 @@ export function makeWorkspaceSchema() {
       .optional(),
     defaultProfileId: z.enum(["signature", "meridian", "terra"]).optional(),
     customReferralSources: z.string().optional(),
+    // #275 — newline-separated quick phrases, plus a sentinel saying the editor
+    // was on the page. Conform coerces an empty textarea to `undefined`, so
+    // without the sentinel "the tenant cleared the list" and "this form never
+    // carried the field" are the same value — and one of them must clear the
+    // stored list while the other must never touch it. NOT a `.default("")`:
+    // that would make every save without the panel wipe a configured list.
+    repairQuickPhrases: z.string().optional(),
+    repairQuickPhrasesPresent: z.string().optional(),
     // Report-feature flags. Rendered as conform-native checkboxes (single input,
     // value "on", NO hidden "false" sibling) so a checked box submits ONE value that
     // conform coerces to a boolean — read from submission.value in the action. (An

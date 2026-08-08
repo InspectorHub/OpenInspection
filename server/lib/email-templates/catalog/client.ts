@@ -80,6 +80,10 @@ export const CLIENT_TEMPLATES: EmailTemplateDescriptor[] = [
       { name: 'reportUrl', desc: 'Link to the report' },
     ],
     cta: { labelBlockKey: 'ctaLabel', urlVar: 'reportUrl' },
+    // OI #271 — the recipient must be told the counter exists BEFORE they open
+    // the report, and in words this tenant cannot edit away (LIA conditions 4
+    // and 5). Every descriptor that hands over a report link carries it.
+    systemBlocks: ['viewDisclosure'],
   },
 
   {
@@ -100,6 +104,8 @@ export const CLIENT_TEMPLATES: EmailTemplateDescriptor[] = [
       { name: 'reportUrl', desc: 'Link to the interactive report' },
     ],
     cta: { labelBlockKey: 'ctaLabel', urlVar: 'reportUrl' },
+    // OI #271 — see `agent-share-link` above (LIA conditions 4 and 5).
+    systemBlocks: ['viewDisclosure'],
   },
 
   {
@@ -120,7 +126,9 @@ export const CLIENT_TEMPLATES: EmailTemplateDescriptor[] = [
       { name: 'reportUrl', desc: 'Link to the interactive report' },
     ],
     cta: { labelBlockKey: 'ctaLabel', urlVar: 'reportUrl' },
-    systemBlocks: ['attachmentManifest'],
+    // The PDF is attached AND the interactive report is linked, so this message
+    // hands over a report link like the others and carries the notice too.
+    systemBlocks: ['attachmentManifest', 'viewDisclosure'],
   },
 
   {

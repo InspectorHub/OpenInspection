@@ -19,10 +19,12 @@
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useFetcher } from "react-router";
 import { m } from "~/paraglide/messages";
 import { RepairDefectRow } from "./repair/RepairDefectRow";
+import { useRepairOpQueue } from "./repair/useRepairOpQueue";
+import { resolveQuickPhrases, seedQuickPhrases } from "~/lib/repair-quick-phrases";
 import { RepairIntroPanel } from "./repair/RepairIntroPanel";
 import { RepairSharePanel } from "./repair/RepairSharePanel";
 import { formatCents } from "~/lib/money";
@@ -49,9 +51,9 @@ export interface Defect {
   // IA-57 — the recommended trade as a resolved label ("licensed roofer"),
   // snapshotted onto the item so the shared list names the trade to send.
   trade: string | null;
-  // IA-56 — the report's Est. Cost, shown only as a credit-input hint.
-  estimateLow: number | null;
-  estimateHigh: number | null;
+  // No estimate fields, deliberately. The builder's only money field is the
+  // client's own credit request; a supplied cost figure rendered beside it
+  // reads as the inspection company's price for the repair.
 }
 
 export interface RepairRequestItem {
@@ -75,7 +77,11 @@ export interface RepairRequest {
 }
 
 export type LoaderResult =
-  | { kind: "ok"; defects: Defect[]; mine: RepairRequest[]; tenant: string; id: string; token: string | null }
+  // #275 — `quickPhrases` is the tenant's stored list, VERBATIM: null means
+  // "never configured" (show the seeded defaults) and [] means "the tenant
+  // turned the buttons off". Both client entry points must carry it or the
+  // buttons appear on /repair-builder/… and vanish inside the Hub.
+  | { kind: "ok"; defects: Defect[]; mine: RepairRequest[]; tenant: string; id: string; token: string | null; quickPhrases: string[] | null }
   | { kind: "no_access" }
   | { kind: "not_published" }
   | { kind: "forbidden" }
@@ -206,6 +212,7 @@ export function RepairBuilderSection({
       defects={result.defects}
       mine={result.mine}
       token={result.token}
+      quickPhrases={result.quickPhrases}
       actionPath={actionPath}
     />
   );
@@ -219,13 +226,14 @@ interface RepairBuilderUIProps {
   defects: Defect[];
   mine: RepairRequest[];
   token: string | null;
+  /** Stored tenant list; null = never configured. See resolveQuickPhrases. */
+  quickPhrases: string[] | null;
   actionPath: string;
 }
 
-function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIProps) {
+function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: RepairBuilderUIProps) {
   // Derive existing list from loader data
   const existingList = mine[0] ?? null;
-  const [rrId, setRrId] = useState<string | null>(existingList?.id ?? null);
 
   // Build initial selection + drafts + item-id lookup from the existing list.
   // (item-id lookup maps findingKey → server item id, used for PATCH/DELETE.)
@@ -244,121 +252,23 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
   const [sortKey, setSortKey] = useState<SortKey>("section");
   const [selected, setSelected] = useState<Set<string>>(initialSelected);
   const [drafts, setDrafts] = useState<Record<string, ItemDraft>>(initialDrafts);
-  // findingKey → server item id. Kept in a ref (not state) because reads must see
-  // the freshest map synchronously inside queued ops, and updates from add-item
-  // responses must not depend on a stale render closure.
-  const itemIdsRef = useRef<Record<string, string>>(initialItemIds);
+  const { rrId, enqueueOp, mutationError } = useRepairOpQueue({
+    initialRrId: existingList?.id ?? null,
+    initialItemIds,
+    token,
+    actionPath,
+  });
   const [customIntro, setCustomIntro] = useState<string>(existingList?.customIntro ?? "");
   const [copyLabel, setCopyLabel] = useState(m.portal_repair_copy_share());
   const [emailTo, setEmailTo] = useState("");
   const [emailMsg, setEmailMsg] = useState("");
   const [emailSent, setEmailSent] = useState(false);
 
-  const createFetcher = useFetcher<{ ok?: boolean; error?: string; data?: unknown }>();
-  const mutationFetcher = useFetcher<{ ok?: boolean; error?: string; data?: unknown }>();
   const introFetcher = useFetcher<{ ok?: boolean; error?: string }>();
   const emailFetcher = useFetcher<{ ok?: boolean; error?: string }>();
 
   const sorted = sortDefects(defects, sortKey);
-
-  // -----------------------------------------------------------------------
-  // Persistence queue
-  //
-  // Item operations (add / remove / update) are serialized through ONE
-  // mutationFetcher so concurrent rapid clicks don't clobber each other's
-  // in-flight submission (useFetcher is single-flight). Each queued op is a
-  // plain FormData; we drain the queue head whenever the fetcher is idle AND a
-  // list id exists. List creation is lazy but GUARDED so rapid toggles before
-  // the round-trip returns create exactly one list (no double-create race).
-  // -----------------------------------------------------------------------
-  const rrIdRef = useRef<string | null>(existingList?.id ?? null);
-  rrIdRef.current = rrId;
-  const opQueueRef = useRef<FormData[]>([]);
-  const creatingRef = useRef(false);
-  // Tracks the findingKey of an in-flight add-item so we can record its server
-  // id from the response (the response also echoes findingKey, used as backup).
-  const inFlightAddKeyRef = useRef<string | null>(null);
-
-  const drainQueue = useCallback(() => {
-    if (mutationFetcher.state !== "idle") return;
-    if (!rrIdRef.current) return;
-    let next = opQueueRef.current.shift();
-    while (next) {
-      const intent = next.get("_intent");
-      // For ops keyed by findingKey (remove / update), resolve the server item id
-      // at DRAIN time so an add that completed earlier in the queue is visible.
-      if (intent === "remove-item" || intent === "update-item") {
-        const fk = String(next.get("_findingKey") ?? "");
-        const itemId = fk ? itemIdsRef.current[fk] : (next.get("itemId") as string | null);
-        if (!itemId) {
-          // Item not on the server (e.g. added+removed before its add resolved,
-          // or never persisted) — nothing to do; skip and continue draining.
-          next = opQueueRef.current.shift();
-          continue;
-        }
-        next.set("itemId", itemId);
-      }
-      // Stamp the resolved rrId at submit time (it may not have existed when the
-      // op was enqueued).
-      next.set("rrId", rrIdRef.current);
-      inFlightAddKeyRef.current =
-        intent === "add-item" ? String(next.get("findingKey") ?? "") : null;
-      mutationFetcher.submit(next, { method: "post", action: actionPath });
-      return;
-    }
-  }, [mutationFetcher, actionPath]);
-
-  const enqueueOp = useCallback(
-    (fd: FormData) => {
-      opQueueRef.current.push(fd);
-      // Lazily create the list once if it doesn't exist yet. Guarded so a burst
-      // of selections fires a single create-list, not one per click.
-      if (!rrIdRef.current && !creatingRef.current) {
-        creatingRef.current = true;
-        const createFd = new FormData();
-        createFd.append("_token", token ?? "");
-        createFd.append("_intent", "create-list");
-        createFetcher.submit(createFd, { method: "post", action: actionPath });
-      }
-      drainQueue();
-    },
-    [token, createFetcher, drainQueue, actionPath],
-  );
-
-  // Capture the new rrId from create-list, then drain any queued ops.
-  useEffect(() => {
-    if (
-      createFetcher.state === "idle" &&
-      createFetcher.data?.ok &&
-      createFetcher.data?.data
-    ) {
-      const newRr = createFetcher.data.data as { id?: string };
-      creatingRef.current = false;
-      if (newRr?.id && !rrIdRef.current) {
-        rrIdRef.current = newRr.id;
-        setRrId(newRr.id);
-      }
-      drainQueue();
-    } else if (createFetcher.state === "idle" && createFetcher.data && !createFetcher.data.ok) {
-      // Create failed — release the guard so a later toggle can retry.
-      creatingRef.current = false;
-    }
-  }, [createFetcher.state, createFetcher.data, drainQueue]);
-
-  // After each item op settles: record add-item ids, then drain the next op.
-  useEffect(() => {
-    if (mutationFetcher.state !== "idle") return;
-    const data = mutationFetcher.data;
-    if (data?.ok && inFlightAddKeyRef.current && data.data) {
-      const item = data.data as { id?: string; findingKey?: string };
-      const key = item.findingKey ?? inFlightAddKeyRef.current;
-      if (item.id && key) {
-        itemIdsRef.current = { ...itemIdsRef.current, [key]: item.id };
-      }
-    }
-    inFlightAddKeyRef.current = null;
-    drainQueue();
-  }, [mutationFetcher.state, mutationFetcher.data, drainQueue]);
+  const phrases = resolveQuickPhrases(quickPhrases, seedQuickPhrases());
 
   // Track email sent
   useEffect(() => {
@@ -555,6 +465,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
                 isSelected={isSelected}
                 draft={draft}
                 creditCents={draft?.requestedCreditCents ?? null}
+                phrases={phrases}
                 onToggle={toggleDefect}
                 onUpdateCredit={updateCredit}
                 onUpdateNote={updateNote}
@@ -605,9 +516,9 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
       )}
 
       {/* Mutation error */}
-      {mutationFetcher.data?.error && (
+      {mutationError && (
         <div className="bg-ih-bad-bg border border-ih-bad-fg/20 text-ih-bad-fg rounded-lg px-4 py-3 text-[13px]">
-          {mutationFetcher.data.error}
+          {mutationError}
         </div>
       )}
     </div>
