@@ -288,10 +288,22 @@ jobs:
       - run: npm run gen-version
       - run: npm run test:workers
 
+  # Sharded like the api suite, and for the same reason: import-bound, so a
+  # subset costs far less than its share of the whole. Measured locally,
+  # `--shard=1/4` is 84 files / 586 tests in 55s against 159-181s for all 335.
+  #
+  # ⚠️ The trade, stated rather than buried: `transform` (40s) and `setup` (26s)
+  # are per-shard fixed costs, so four shards spend roughly 40% MORE total CPU to
+  # take ~65% off the wall clock. That is the right trade for a CI gate people
+  # wait on, and the wrong one if these minutes are ever billed by the second.
   test-web:
-    name: web unit tests
+    name: web unit tests (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
@@ -320,7 +332,7 @@ jobs:
           path: .react-router/types
           key: rr-typegen-${{ hashFiles('app/routes.ts', 'app/routes/**', 'react-router.config.ts', 'package-lock.json') }}
       - run: npx react-router typegen
-      - run: npm run test:web
+      - run: npm run test:web -- --shard=${{ matrix.shard }}/4
 
   # ── Build + bundle ceiling ───────────────────────────────────────────────
   build:
