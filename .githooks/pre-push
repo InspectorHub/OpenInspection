@@ -29,6 +29,27 @@ step() { printf '\n  →  %b\n' "$1"; }
 
 printf '%b\n' "${BOLD}── OpenInspection (Pre-push Checks) ─────────────────────────────${NC}"
 
+# Dependency advisories. Runs on EVERY push, deliberately NOT gated on whether
+# package-lock.json moved: an advisory is published against code that is already
+# sitting in the lockfile, so "nothing changed" is exactly the case it has to
+# catch. The nanoid advisory this gate was written for sat in three repositories
+# for ten days without a single dependency edit.
+#
+# It asks the registry directly rather than trusting Dependabot's alert count,
+# because that count lags the advisory (measured: 8.5 hours and 10 days).
+# Offline / registry down: SKIP_ADVISORY_AUDIT=1 git push — it says so loudly.
+step "Dependency advisories"
+ADV_OUT=$(node scripts/check-advisories.mjs --level=high 2>&1)
+ADV_RC=$?
+if [ "$ADV_RC" -eq 0 ]; then
+    pass "$(printf '%s' "$ADV_OUT" | tail -1)"
+else
+    printf '%s\n' "$ADV_OUT"
+    fail "Dependency-advisory gate failed"
+    printf '\n%b\n' "${RED}Pre-push checks failed. Fix the errors before pushing.${NC}"
+    exit 1
+fi
+
 # The gate runs a REAL build (~1-2 min). Nothing that cannot reach the worker
 # bundle can change its size, so a push touching only .github/, docs/ or tests/
 # should not pay for one. Work out what is actually being pushed from the refs
