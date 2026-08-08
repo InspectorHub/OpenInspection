@@ -6,9 +6,6 @@ import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
-import { MoneyInput } from "~/components/MoneyInput";
-import { formatDollars } from "~/lib/money";
-import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
@@ -21,8 +18,10 @@ interface RepairItem {
   name: string;
   category: string | null;
   severity: "good" | "marginal" | "significant" | "minor";
-  defaultEstimateMin: number | null;
-  defaultEstimateMax: number | null;
+  // Scope of work only. A repair item carries no price: a figure printed on a
+  // report is read as this company's figure, and a catalogue default knows
+  // nothing about the property, the trade market, or the week. Money on an
+  // inspection is written by the buyer or their agent, in the repair request.
   defaultRepairSummary: string;
   recommendedContractorTypeId: string | null;
 }
@@ -55,17 +54,11 @@ export async function action({ request, context }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = String(form.get("intent"));
 
-  const num = (k: string) => {
-    const v = String(form.get(k) ?? "").trim();
-    return v === "" ? null : Math.round(Number(v) * 100);
-  };
   const buildJson = () => ({
     name: String(form.get("name") ?? ""),
     category: (String(form.get("category") ?? "").trim() || null),
     severity: (String(form.get("severity") ?? "significant")) as RepairItem["severity"],
     defaultRepairSummary: String(form.get("defaultRepairSummary") ?? ""),
-    defaultEstimateMin: num("estimateMinDollars"),
-    defaultEstimateMax: num("estimateMaxDollars"),
     recommendedContractorTypeId: (String(form.get("recommendedContractorTypeId") ?? "").trim() || null),
   });
 
@@ -96,7 +89,7 @@ const SEVERITY_TONE: Record<string, "sat" | "monitor" | "defect"> = {
 
 const EMPTY = {
   id: "", name: "", category: "", severity: "significant" as RepairItem["severity"],
-  estimateMinDollars: "", estimateMaxDollars: "", defaultRepairSummary: "", recommendedContractorTypeId: "",
+  defaultRepairSummary: "", recommendedContractorTypeId: "",
 };
 
 export default function RepairItemsPage() {
@@ -106,16 +99,12 @@ export default function RepairItemsPage() {
   const [pendingDelete, setPendingDelete] = useState<RepairItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
-  const locale = useDisplayLocale();
-  const currency = useDisplayCurrency();
   const ctName = (id: string | null) => contractorTypes.find((c) => c.id === id)?.name ?? null;
 
   function openCreate() { setForm(EMPTY); setModalOpen(true); }
   function openEdit(it: RepairItem) {
     setForm({
       id: it.id, name: it.name, category: it.category ?? "", severity: it.severity,
-      estimateMinDollars: it.defaultEstimateMin != null ? String(it.defaultEstimateMin / 100) : "",
-      estimateMaxDollars: it.defaultEstimateMax != null ? String(it.defaultEstimateMax / 100) : "",
       defaultRepairSummary: it.defaultRepairSummary, recommendedContractorTypeId: it.recommendedContractorTypeId ?? "",
     });
     setModalOpen(true);
@@ -154,14 +143,6 @@ export default function RepairItemsPage() {
               )}
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 {it.category && <Pill tone="gen">{it.category}</Pill>}
-                {(it.defaultEstimateMin != null || it.defaultEstimateMax != null) && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-ih-ok-bg text-ih-ok-fg tabular-nums">
-                    {[
-                      it.defaultEstimateMin != null ? formatDollars(it.defaultEstimateMin, { locale, currency }) : null,
-                      it.defaultEstimateMax != null ? formatDollars(it.defaultEstimateMax, { locale, currency }) : null,
-                    ].filter(Boolean).join(" – ")}
-                  </span>
-                )}
                 {ctName(it.recommendedContractorTypeId) && (
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-ih-info-bg text-ih-info-fg">{ctName(it.recommendedContractorTypeId)}</span>
                 )}
@@ -193,10 +174,6 @@ export default function RepairItemsPage() {
                 </Field>
               </div>
               <Field label={m.repair_items_field_summary()}><textarea value={form.defaultRepairSummary} onChange={(e) => setForm((f) => ({ ...f, defaultRepairSummary: e.target.value }))} rows={3} className={INPUT} /></Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label={m.repair_items_field_est_min()}><MoneyInput ariaLabel={m.repair_items_field_est_min()} cents={form.estimateMinDollars === "" ? null : Math.round(Number(form.estimateMinDollars) * 100)} onChange={(c) => setForm((f) => ({ ...f, estimateMinDollars: c == null ? "" : String(c / 100) }))} className={INPUT} /></Field>
-                <Field label={m.repair_items_field_est_max()}><MoneyInput ariaLabel={m.repair_items_field_est_max()} cents={form.estimateMaxDollars === "" ? null : Math.round(Number(form.estimateMaxDollars) * 100)} onChange={(c) => setForm((f) => ({ ...f, estimateMaxDollars: c == null ? "" : String(c / 100) }))} className={INPUT} /></Field>
-              </div>
               <Field label={m.repair_items_field_contractor()}>
                 <select value={form.recommendedContractorTypeId} onChange={(e) => setForm((f) => ({ ...f, recommendedContractorTypeId: e.target.value }))} className={INPUT}>
                   <option value="">{m.repair_items_contractor_none()}</option>

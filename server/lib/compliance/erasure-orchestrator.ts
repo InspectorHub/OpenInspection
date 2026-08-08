@@ -49,6 +49,7 @@ import {
     conciergeConfirmTokens,
     inspectionAccessTokens,
     inspectionRequests,
+    reportViews,
     reports,
     auditLogs,
     erasureLog,
@@ -69,8 +70,14 @@ import { eraseRepairRequests } from './erase-repair-requests';
  */
 const ANONYMIZED_TITLE = 'Inspection Report (details removed)';
 
-/** A single recorded erasure decision (serialized into `decisions_json`). */
-interface ErasureDecision {
+/**
+ * A single recorded erasure decision (serialized into `decisions_json`).
+ *
+ * @declarationEmit Exported so the emitted `.d.ts` can NAME it: it surfaces in
+ * an `AdminService` member's inferred return type, and a composite project
+ * cannot reference an unexported alias there (TS4053).
+ */
+export interface ErasureDecision {
     table: string;
     action: 'delete' | 'null' | 'anonymize';
     count: number;
@@ -320,6 +327,17 @@ export async function runErasure(
         return changeCount(res);
     });
 
+    // Delivery counters (#271), keyed on the access token. MUST precede the
+    // token delete below: `access_token_id` is the only locator back to the
+    // subject, so dropping the tokens first strands these rows permanently, for
+    // this pass and every later one. LIA condition 7.
+    const tokIds = (await db.select({ id: inspectionAccessTokens.id }).from(inspectionAccessTokens)
+        .where(and(eq(inspectionAccessTokens.tenantId, tenantId), eq(inspectionAccessTokens.recipientEmail, subjectEmail)))
+        .all() as Array<{ id: string }>).map((t) => t.id);
+    await step('report_views', 'delete', {}, async () => tokIds.length === 0 ? 0 : changeCount(
+        await db.delete(reportViews)
+            .where(and(eq(reportViews.tenantId, tenantId), inArray(reportViews.accessTokenId, tokIds))).run()));
+
     // Persistent portal links — deleting them deliberately REVOKES portal
     // access: an erased subject's magic links must stop working.
     await step('inspection_access_tokens', 'delete', {}, async () => {
@@ -341,10 +359,17 @@ export async function runErasure(
         return c;
     });
 
-    // A report TITLE is written by a human and routinely carries the property
-    // address ("123 Oak St — Radon"). The row itself survives: it is the spine
-    // of a signed, delivered document, and deleting it would strand the version
-    // chain that proves what was delivered. Only the title is cleared.
+    // A report TITLE is system-written — the literal 'Inspection Report' or a
+    // snapshot of a service line's name from the tenant's own catalogue — and no
+    // route can edit it. A catalogue name is still tenant-authored, so it cannot
+    // be assumed free of identifiers, and clearing it costs nothing. The row
+    // itself survives: it is the spine of a signed, delivered document, and
+    // deleting it would strand the version chain that proves what was delivered.
+    //
+    // (Corrected 2026-08-07. This comment previously said the title is "written
+    // by a human" and "routinely carries the property address" — false in both
+    // halves. The rule did not change; see the amendment history in
+    // `erasure-manifest.ts`.)
     //
     // Scoped through the subject's inspections rather than by matching the
     // title text — an address can be spelled several ways, and a title that

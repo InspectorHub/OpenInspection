@@ -29,13 +29,17 @@ export interface CustomCommentEntry {
  * A repair item (Recommendation) snapshotted onto a finding. Stored under
  * `result.recommendations[]`. The aggregate read endpoint
  * (`GET /api/inspections/:id/recommendations`) keys on `recommendationId`.
- * Estimate/summary/contractor are snapshotted at attach time so later catalog
+ * Summary and contractor type are snapshotted at attach time so later catalog
  * edits never silently rewrite a published finding.
+ *
+ * There is no estimate here, and that is the point: this type is what the
+ * editor is ABLE to write onto an inspection, and a repair price is not
+ * something the product produces. `RepairItemSnapshot` (the persisted shape, in
+ * server/lib/collab/results-doc.types.ts) still tolerates the estimate keys on
+ * findings written before they were removed; nothing writes them now.
  */
 export interface AttachedRepairItem {
   recommendationId: string;
-  estimateSnapshotMin: number | null;
-  estimateSnapshotMax: number | null;
   summarySnapshot: string;
   contractorTypeSnapshot: string | null;
   attachedAt: number;

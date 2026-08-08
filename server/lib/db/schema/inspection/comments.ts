@@ -32,9 +32,15 @@ export const comments = sqliteTable('comments', {
     severity: text('severity'),
     // Comments-repair fold (2026-06-12): deficiency comments carry repair fields.
     // Intended for severity='significant'; enforced in UI/validation, not DDL.
+    //
+    // Scope only — no price. A repair estimate carried here reached the report
+    // as the inspection company's number, and the product cannot know this
+    // property, this trade market, or this week. Money on an inspection is
+    // written by the buyer or their agent (see `repair_requests`), never
+    // produced by the platform. The former `estimate_min_cents` /
+    // `estimate_max_cents` columns were DROPPED for that reason and must not
+    // come back; `scripts/check-price-capability.mjs` fails if they do.
     repairSummary:     text('repair_summary'),
-    estimateMinCents:  integer('estimate_min_cents'),
-    estimateMaxCents:  integer('estimate_max_cents'),
     // Soft ref → contractor_types.id (no DB FK per schema rules). Stale ref acceptable.
     recommendedContractorTypeId: text('recommended_contractor_type_id'),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),

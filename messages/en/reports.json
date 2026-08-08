@@ -244,8 +244,8 @@
   "repair_defect_note_label": "Note",
   "repair_defect_note_placeholder": "Optional — describe the repair or credit rationale",
   "repair_defect_location_prefix": "Location:",
-  "repair_defect_estimate_hint": "Report estimate: ${low}–${high}",
-  "repair_defect_use_estimate": "Use estimate",
+  "repair_quick_phrase_default_repair": "Repair requested",
+  "repair_quick_phrase_default_replace": "Replacement requested",
   "repair_intro_heading": "Custom Introduction",
   "repair_intro_placeholder": "Add a personal message to appear at the top of the shared repair request…",
   "repair_share_heading": "Share",
@@ -257,5 +257,14 @@
   "repair_share_email_sent": "Email sent.",
   "report_link_inactive_title": "This report link isn't working",
   "report_link_inactive_message": "Double-check the web address you opened. If it is correct, the link may have expired or been replaced with a newer one — your inspector can send you a fresh link.",
-  "report_link_inactive_message_company": "Double-check the web address you opened. If it is correct, the link may have expired or been replaced with a newer one — {company} can send you a fresh link."
+  "report_link_inactive_message_company": "Double-check the web address you opened. If it is correct, the link may have expired or been replaced with a newer one — {company} can send you a fresh link.",
+  "report_view_disclosure_heading": "How your inspector knows this reached you",
+  "report_view_disclosure_fact": "When you open this report we record that it was opened, when, and how many times, so your inspector knows it reached you.",
+  "report_view_disclosure_limit": "Nothing else is recorded — no IP address, no device information, and no record of which findings you read.",
+  "report_view_disclosure_exit": "You can turn this off and keep your report.",
+  "report_view_disclosure_turn_off": "Turn off open tracking",
+  "report_view_disclosure_turn_on": "Turn open tracking back on",
+  "report_view_disclosure_off_state": "Open tracking is off for you. Your report stays available, and opens recorded before now are unchanged.",
+  "report_view_disclosure_busy": "Saving…",
+  "report_view_disclosure_error": "That did not save. Please try again."
 }

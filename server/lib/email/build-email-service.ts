@@ -17,6 +17,7 @@ import { RecordingEmailProvider } from './providers/recording';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../db/schema';
+import { isAiKeyAttestationOnFile } from '../ai/byo-attestation';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 
 /**
@@ -71,6 +72,18 @@ export interface LoadedEmailConfig {
     emailOverrides?: Map<string, TemplateOverride> | undefined;
     /** Which email provider the tenant has selected for own-mode sends (see #195). Default 'resend'. */
     emailByoProvider?: EmailByoProvider | undefined;
+    /**
+     * Whether a complete confirmation record is on file for the tenant's OWN AI
+     * key. Loaded here — not in a loader of its own — because `dbSecrets.geminiApiKey`
+     * above is the key it is about, and the AI capability gate has to judge both
+     * from the same read. Undefined only for the platform-defaults construction
+     * that has no tenant at all, which never resolves a tenant key either.
+     *
+     * The name of this interface is now narrower than what it carries; it is in
+     * practice the per-request tenant-config load. Renaming it is a separate
+     * pass, not something to fold into a behavior change.
+     */
+    aiKeyAttested?: boolean;
 }
 
 /**
@@ -251,10 +264,24 @@ async function loadEmailSecrets(env: EmailServiceEnv, tenantId: string): Promise
  */
 export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: string): Promise<LoadedEmailConfig> {
     const branding = new BrandingService(env.DB, env.TENANT_CACHE);
-    const byoProviderReadPromise = (async () => {
+    // One `tenant_configs` row read per request, projected. The AI confirmation
+    // columns ride along because the AI CREDENTIAL is already loaded by this same
+    // function (`dbSecrets.geminiApiKey`), and the two must describe the same
+    // moment: a key read here and a confirmation read somewhere else could
+    // disagree, which is the one thing the confirmation exists to prevent.
+    // Widening the projection costs nothing — the row is already being fetched.
+    const configReadPromise = (async () => {
         try {
             return await drizzle(env.DB)
-                .select({ emailByoProvider: tenantConfigs.emailByoProvider })
+                .select({
+                    emailByoProvider: tenantConfigs.emailByoProvider,
+                    provider: tenantConfigs.aiKeyAttestationProvider,
+                    mode: tenantConfigs.aiKeyAttestationMode,
+                    accountOwner: tenantConfigs.aiKeyAttestationAccountOwner,
+                    termsVersion: tenantConfigs.aiKeyAttestationTermsVersion,
+                    attestedAt: tenantConfigs.aiKeyAttestationAttestedAt,
+                    policyVersion: tenantConfigs.aiKeyAttestationPolicyVersion,
+                })
                 .from(tenantConfigs)
                 .where(eq(tenantConfigs.tenantId, tenantId))
                 .get();
@@ -263,19 +290,23 @@ export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: stri
         }
     })();
 
-    const [emailIdentity, emailBrand, dbSecrets, overrides, byoProviderRow] = await Promise.all([
+    const [emailIdentity, emailBrand, dbSecrets, overrides, configRow] = await Promise.all([
         branding.getEmailIdentity(tenantId).catch(() => undefined),
         branding.getEmailBrand(tenantId).catch(() => undefined),
         loadEmailSecrets(env, tenantId).catch(() => ({} as LoadedEmailConfig['dbSecrets'])),
         new EmailTemplateService(env.DB).listForTenant(tenantId).catch(() => []),
-        byoProviderReadPromise,
+        configReadPromise,
     ]);
     const emailOverrides = overrides.length ? new Map(overrides.map(o => [o.trigger, o])) : undefined;
     // emailByoProvider defaults to 'resend' when the row is absent (new tenant,
     // no config row yet) or carries an unrecognized value — drizzle's `{ enum }`
     // is the only write path, but it is not DB-enforced, so guard the read.
-    const emailByoProvider: EmailByoProvider = coerceEmailByoProvider(byoProviderRow?.emailByoProvider);
-    return { emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider };
+    const emailByoProvider: EmailByoProvider = coerceEmailByoProvider(configRow?.emailByoProvider);
+    // A failed or absent read resolves to `false`, which is the same answer as
+    // "never confirmed" — the AI gate stays closed rather than opening on an
+    // error it could not read.
+    const aiKeyAttested = isAiKeyAttestationOnFile(configRow);
+    return { emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider, aiKeyAttested };
 }
 
 /**

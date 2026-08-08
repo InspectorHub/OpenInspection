@@ -37,6 +37,11 @@ const SCRIPT_GATES = [
     { key: 'filesize', label: 'Large-file ratchet', script: 'check-file-size.mjs', fix: 'npm run lint:filesize' },
     { key: 'tz', label: 'Calendar timezone-safety', script: 'check-tz-safety.mjs', fix: 'npm run lint:tz' },
     { key: 'idempotency', label: 'Mutating-route retry safety', script: 'check-idempotency-coverage.mjs', fix: 'npm run lint:idempotency' },
+    // Belongs at pre-commit rather than CI: what it catches is a CAPABILITY
+    // being added -- a money column, a money field on the inspection record, a
+    // money input on a new screen. By the time CI sees one it is written and
+    // argued for. ~0.1s inside this shared process.
+    { key: 'price', label: 'Price capability inventory', script: 'check-price-capability.mjs', fix: 'npm run lint:price-capability' },
 ];
 
 const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup' };

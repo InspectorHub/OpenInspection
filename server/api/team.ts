@@ -13,7 +13,8 @@ import {
     InviteMemberSchema,
     UpdateMemberSchema,
     InviteResponseSchema,
-    TeamMembersResponseSchema
+    TeamMembersResponseSchema,
+    TeamDefaultsSchema
 } from '../lib/validations/admin.schema';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -213,10 +214,9 @@ const resendInviteRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 
 // ─── Design System 0520 subsystem C P10.2 — team defaults ──
-
-const DefaultsSchema = z.object({
-    teamModeDefault:          z.boolean().optional().describe('TODO describe teamModeDefault field for the OpenInspection MCP integration'),
-});
+// `TeamDefaultsSchema` lives in lib/validations/admin/settings.ts: this endpoint
+// writes `tenant_configs`, and the write allowlist in
+// lib/tenant-config-write-policy.ts derives the column from that shape.
 
 const teamRoutes = createApiRouter()
     .openapi(listTeamMembersRoute, async (c) => {
@@ -335,7 +335,7 @@ const teamRoutes = createApiRouter()
         summary: "Update tenant team-page default toggles",
         description: "Patches any subset of the team-page toggles (teamModeDefault). Missing keys leave existing values unchanged.",
         middleware: [requireRole('owner', 'manager')] as const,
-        request: { body: { content: { 'application/json': { schema: DefaultsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+        request: { body: { content: { 'application/json': { schema: TeamDefaultsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
         responses: { 200: { description: 'ok' } },
     }, { scopes: ['admin'], tier: 'extended' }), async (c) => {
         const tenantId = c.get('tenantId');

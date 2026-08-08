@@ -42,14 +42,13 @@
     "node_modules/**",
     ".worktrees/**",
     "server/generated/**",
+    "scripts/fixtures/**",
     "worker-configuration.d.ts",
     "**/*.d.ts"
   ],
   "tags": [
-    "-gateConsumed"
-  ],
-  "ignoreBinaries": [
-    "tsgo"
+    "-gateConsumed",
+    "-declarationEmit"
   ],
   "ignoreDependencies": [
     "@fontsource/.+",

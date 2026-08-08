@@ -42,6 +42,44 @@ describe('applyResultsBatch', () => {
         sqlite.close();
     });
 
+    /**
+     * `POST /api/inspections/{id}/results/batch` takes `value: z.any()` and
+     * folds it onto the finding verbatim. It is an MCP `extended` tool with
+     * `write` scope, so it is the widest hand-writable door into a finding —
+     * no UI, no shape validation, straight to D1. The product stores no repair
+     * price on a finding, and this endpoint had nothing stopping one.
+     *
+     * The nesting is deliberate: the price sits one object below the level a
+     * naive strip would look at, which is the shape a real `defectFields`
+     * patch has.
+     */
+    it('refuses to fold a repair price into a finding, at any depth', async () => {
+        const value = {
+            defects: [
+                { cannedId: 'def-1', included: true, estimateLow: 50000, estimateHigh: 150000 },
+            ],
+            estimateMin: 250000,
+        };
+        // The payload really carries the money.
+        expect(JSON.stringify(value)).toContain('150000');
+        expect(JSON.stringify(value)).toContain('250000');
+
+        const result = await applyResultsBatch(db, 'i-1', [
+            { itemId: 'item-a', sectionId: 'sec-1', field: 'defectFields', value },
+        ], { tenantId: 't-1' });
+        expect(result.applied).toBe(1);
+
+        const row = await db.select().from(inspectionResults).get();
+        const stored = JSON.stringify(row!.data);
+        expect(stored).not.toContain('50000');
+        expect(stored).not.toContain('150000');
+        expect(stored).not.toContain('250000');
+        expect(stored).not.toContain('estimateLow');
+        expect(stored).not.toContain('estimateMin');
+        // The rest of the patch landed — the price is dropped, not the write.
+        expect(stored).toContain('def-1');
+    });
+
     it('inserts a new results row when none exists', async () => {
         const result = await applyResultsBatch(db, 'i-1', [
             { itemId: 'item-a', sectionId: 'sec-1', field: 'rating', value: 'good' },

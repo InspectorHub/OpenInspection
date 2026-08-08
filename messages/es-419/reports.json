@@ -244,8 +244,8 @@
   "repair_defect_note_label": "Nota",
   "repair_defect_note_placeholder": "Opcional — describa el motivo de la reparación o del crédito",
   "repair_defect_location_prefix": "Ubicación:",
-  "repair_defect_estimate_hint": "Presupuesto del informe: ${low}–${high}",
-  "repair_defect_use_estimate": "Usar el presupuesto",
+  "repair_quick_phrase_default_repair": "Se solicita reparación",
+  "repair_quick_phrase_default_replace": "Se solicita reemplazo",
   "repair_intro_heading": "Introducción personalizada",
   "repair_intro_placeholder": "Agregue un mensaje personal para que aparezca al inicio de la solicitud de reparación compartida…",
   "repair_share_heading": "Compartir",
@@ -257,5 +257,14 @@
   "repair_share_email_sent": "Correo enviado.",
   "report_link_inactive_title": "Este enlace del informe no funciona",
   "report_link_inactive_message": "Verifique la dirección web que abrió. Si es correcta, es posible que el enlace haya vencido o que se haya reemplazado por uno más nuevo — su inspector puede enviarle un enlace nuevo.",
-  "report_link_inactive_message_company": "Verifique la dirección web que abrió. Si es correcta, es posible que el enlace haya vencido o que se haya reemplazado por uno más nuevo — {company} puede enviarle un enlace nuevo."
+  "report_link_inactive_message_company": "Verifique la dirección web que abrió. Si es correcta, es posible que el enlace haya vencido o que se haya reemplazado por uno más nuevo — {company} puede enviarle un enlace nuevo.",
+  "report_view_disclosure_heading": "Cómo sabe su inspector que esto le llegó",
+  "report_view_disclosure_fact": "Cuando abre este informe registramos que fue abierto, cuándo y cuántas veces, para que su inspector sepa que le llegó.",
+  "report_view_disclosure_limit": "No se registra nada más: ni dirección IP, ni información del dispositivo, ni qué hallazgos leyó.",
+  "report_view_disclosure_exit": "Puede desactivarlo y conservar su informe.",
+  "report_view_disclosure_turn_off": "Desactivar el registro de aperturas",
+  "report_view_disclosure_turn_on": "Volver a activar el registro de aperturas",
+  "report_view_disclosure_off_state": "El registro de aperturas está desactivado para usted. Su informe sigue disponible y las aperturas registradas hasta ahora no cambian.",
+  "report_view_disclosure_busy": "Guardando…",
+  "report_view_disclosure_error": "No se pudo guardar. Inténtelo de nuevo."
 }

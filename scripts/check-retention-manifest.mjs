@@ -1,0 +1,325 @@
+#!/usr/bin/env node
+/**
+ * OI #276 — retention-manifest CI lint gate.
+ *
+ * Asserts the internal validity of `server/lib/compliance/retention-manifest.ts`
+ * and HARD-FAILS when a LEDGER-SHAPED table appears in the Drizzle schema
+ * without a retention rule, a reasoned exclusion, or a dated open entry.
+ *
+ * ── Why the in-scope set is a NAME pattern, not a column heuristic ──────────
+ * The obvious predicate is structural: "has a created_at / received_at and no
+ * updated_at, therefore append-only". It was measured before being written, and
+ * it fails in both directions at once. Of the 93 tables in the schema it flags
+ * 50 — 43 of them tables no one intends to expire, which guarantees the gate
+ * gets loosened within a release. And it is blind to half the surface this gate
+ * exists for: `processed_cmd_events` (`processed_at`), `automation_logs`
+ * (`send_at`), `integration_test_results` (`tested_at`) all carry a differently
+ * named timestamp and read as "not append-only". A gate that fires on 43
+ * correct tables while staying silent on the dead-letter queue is worse than no
+ * gate: the 43 are the pressure to relax it, and relaxing it makes the silence
+ * permanent.
+ *
+ * So the in-scope set is a NARROW NAME pattern plus a short explicit list. It
+ * is a smaller claim, and unlike the heuristic it is a claim that is true: a
+ * table named `*_log`, `*_logs`, `*_events`, `processed_*` or `parked_*` is a
+ * ledger, and the named exceptions are ledgers whose names do not say so.
+ *
+ * ── Where the scope line is drawn ───────────────────────────────────────────
+ * This gate governs the PLATFORM-OPERATIONAL record surface. Product data — a
+ * report, a message to a counterparty, a marketplace import history — is a
+ * business record whose lifetime is answered by the erasure manifest and by the
+ * inspection record window, not by an operational log window. `reports`,
+ * `inspection_messages` and `tenant_marketplace_import_history` are therefore
+ * deliberately NOT in scope here. That is a scope statement, not an oversight;
+ * if the inspection record window later needs them, they join THAT rule, not
+ * this catalogue.
+ *
+ * HARD failures (exit 1):
+ *   - a rule missing a non-empty table / timestampColumn / action / purpose
+ *   - an action outside {delete, anonymize}
+ *   - a rule whose `window` declares no unit
+ *   - an out-of-scope entry with no reason
+ *   - an open entry with no reason, or with a `decideBy` that is not a real
+ *     YYYY-MM-DD date, or whose `decideBy` has passed
+ *   - a table declared in more than one of the three arrays
+ *   - an EXPLICIT_LEDGER_TABLES entry that no longer exists in the schema
+ *   - a ledger-shaped schema table in none of the three arrays
+ *
+ * Usage:
+ *   node scripts/check-retention-manifest.mjs
+ *   node scripts/check-retention-manifest.mjs --schema-dir <path>
+ *
+ * `--schema-dir` exists so the gate can be proven against a FIXTURE
+ * (`scripts/fixtures/retention-gate-probe/`) rather than by appending a
+ * throwaway table to a tracked schema file and reverting it. A probe that
+ * mutates tracked source is one interrupted run away from being committed.
+ *
+ * console.* is intentional — this is a build script, not server code.
+ */
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { join } from "node:path";
+
+const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+const MANIFEST = join(ROOT, "server", "lib", "compliance", "retention-manifest.ts");
+
+const argv = process.argv.slice(2);
+const schemaDirArg = argv.indexOf("--schema-dir");
+const SCHEMA_DIR = schemaDirArg === -1
+    ? join(ROOT, "server", "lib", "db", "schema")
+    : join(ROOT, argv[schemaDirArg + 1] ?? "");
+
+/**
+ * A table whose NAME says it is a ledger.
+ *
+ * `_events$` also matches `inspection_events`, which is not a log — that is
+ * fine and slightly useful: it is in the manifest's out-of-scope list with the
+ * reason, so the one table the issue got wrong is the one table the gate keeps
+ * saying out loud.
+ */
+const LEDGER_NAME = /_log(s)?$|^processed_|^parked_|_events$/;
+
+/**
+ * Ledgers whose names do not say so. Each line is a claim that this table
+ * accumulates one row per event on the platform-operational surface, so the
+ * storage-limitation question applies to it and somebody has to answer.
+ *
+ * Keep this list short and keep the reason in the manifest, not here.
+ */
+const EXPLICIT_LEDGER_TABLES = [
+    // Replay store: one row per (tenant, idempotency key), holding the verbatim
+    // success response of the call it replays.
+    "idempotency_keys",
+    // Notice headers: one row per recipient per notice.
+    "notifications",
+    // QuickBooks sync failures: one row per (entity, error code).
+    "qbo_sync_errors",
+    // Provider delivery states: one row per outbound message.
+    "sms_delivery_status",
+    // Settings "Test connection" history: one row per probe.
+    "integration_test_results",
+    // The portal user-sync outbox: one row per published CloudEvent.
+    "sync_outbox",
+];
+
+const VALID_ACTIONS = new Set(["delete", "anonymize"]);
+
+const errors = [];
+const src = readFileSync(MANIFEST, "utf8");
+
+/** Extract the body of a top-level `export const NAME = [ ... ];` array. */
+function arrayBody(text, name) {
+    const decl = text.indexOf(`export const ${name}`);
+    if (decl === -1) return null;
+    // Skip past the `=` so a type annotation like `: RetentionRule[]` (whose
+    // `[]` would otherwise be mistaken for the array) is not matched.
+    const eq = text.indexOf("=", decl);
+    if (eq === -1) return null;
+    const open = text.indexOf("[", eq);
+    if (open === -1) return null;
+    let depth = 0;
+    for (let i = open; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === "[") depth++;
+        else if (ch === "]") {
+            depth--;
+            if (depth === 0) return text.slice(open + 1, i);
+        }
+    }
+    return null;
+}
+
+/** Split an array body into its top-level `{ ... }` object literals. */
+function objectLiterals(body) {
+    const out = [];
+    let depth = 0;
+    let buf = "";
+    for (const ch of body) {
+        if (ch === "{") {
+            depth++;
+            buf += ch;
+        } else if (ch === "}") {
+            depth--;
+            buf += ch;
+            if (depth === 0) {
+                out.push(buf);
+                buf = "";
+            }
+        } else if (depth > 0) {
+            buf += ch;
+        }
+    }
+    return out;
+}
+
+/**
+ * Pull `key: 'value'` string-literal pairs out of one object literal, ignoring
+ * anything inside a NESTED literal so a rule's `window: { unit: 'days' }` does
+ * not overwrite a top-level key of the same name.
+ */
+function parseEntry(literal) {
+    const inner = literal.replace(/\{[^{}]*\}/g, (m, offset) => (offset === 0 ? m : " "));
+    const entry = {};
+    const re = /(\w+)\s*:\s*'((?:[^'\\]|\\.)*)'/g;
+    let m;
+    while ((m = re.exec(inner)) !== null) entry[m[1]] = m[2];
+    // The window's unit lives one level down; read it separately.
+    const unit = /window\s*:\s*\{[^{}]*unit\s*:\s*'(\w+)'/.exec(literal);
+    if (unit) entry.__windowUnit = unit[1];
+    return entry;
+}
+
+function readArray(name) {
+    const body = arrayBody(src, name);
+    if (body === null) {
+        console.error(`retention-manifest lint: could not locate ${name} array (must be exported).`);
+        process.exit(1);
+    }
+    return objectLiterals(body).map(parseEntry);
+}
+
+const rules = readArray("RETENTION_MANIFEST");
+const outOfScope = readArray("RETENTION_OUT_OF_SCOPE");
+const open = readArray("RETENTION_OPEN");
+
+if (rules.length === 0) {
+    console.error("retention-manifest lint: parsed ZERO rules — parser drift or empty manifest.");
+    process.exit(1);
+}
+
+// ── Structural validity ──────────────────────────────────────────────────────
+rules.forEach((rule, i) => {
+    const label = `rule #${i + 1} (${rule.table ?? "?"})`;
+    for (const field of ["table", "timestampColumn", "action", "purpose"]) {
+        if (!rule[field] || rule[field].trim() === "") {
+            errors.push(`${label}: missing/empty '${field}'.`);
+        }
+    }
+    if (rule.action && !VALID_ACTIONS.has(rule.action)) {
+        errors.push(`${label}: invalid action '${rule.action}' (allowed: ${[...VALID_ACTIONS].join(", ")}).`);
+    }
+    if (!rule.__windowUnit) {
+        errors.push(
+            `${label}: no 'window: { unit, value }'. A period with no unit is a number somebody ` +
+            `multiplied — months and days are not interchangeable here.`,
+        );
+    }
+});
+
+outOfScope.forEach((e, i) => {
+    if (!e.table) errors.push(`RETENTION_OUT_OF_SCOPE #${i + 1}: missing 'table'.`);
+    if (!e.reason || e.reason.trim() === "") {
+        errors.push(
+            `RETENTION_OUT_OF_SCOPE #${i + 1} (${e.table ?? "?"}): missing/empty 'reason'. An ` +
+            `exclusion without one is a shrug that reads like a decision.`,
+        );
+    }
+});
+
+// ── Open entries: bounded by a date, or 'open' becomes 'never' ───────────────
+open.forEach((e, i) => {
+    const label = `RETENTION_OPEN #${i + 1} (${e.table ?? "?"})`;
+    if (!e.table) errors.push(`${label}: missing 'table'.`);
+    if (!e.reason || e.reason.trim() === "") {
+        errors.push(`${label}: missing/empty 'reason' — say what accumulates and why the answer is not obvious.`);
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(e.decideBy ?? "")) {
+        errors.push(`${label}: 'decideBy' must be YYYY-MM-DD. Without a date, 'open' becomes permanent.`);
+        return;
+    }
+    const due = Date.parse(`${e.decideBy}T23:59:59Z`);
+    if (Number.isNaN(due)) {
+        errors.push(`${label}: decideBy '${e.decideBy}' is not a real date.`);
+    } else if (Date.now() > due) {
+        errors.push(
+            `${label}: decideBy ${e.decideBy} has PASSED and the table still has no retention ` +
+            `decision. Decide it, or move the date deliberately and say why.`,
+        );
+    }
+});
+
+// ── A table belongs to exactly one array ─────────────────────────────────────
+const seen = new Map();
+for (const [arrName, entries] of [
+    ["RETENTION_MANIFEST", rules],
+    ["RETENTION_OUT_OF_SCOPE", outOfScope],
+    ["RETENTION_OPEN", open],
+]) {
+    for (const e of entries) {
+        if (!e.table) continue;
+        if (seen.has(e.table)) {
+            errors.push(
+                `'${e.table}' appears in both ${seen.get(e.table)} and ${arrName}. A table has one ` +
+                `answer; two answers means a reader picks whichever they found first.`,
+            );
+        } else {
+            seen.set(e.table, arrName);
+        }
+    }
+}
+
+// ── Schema coverage ──────────────────────────────────────────────────────────
+function* schemaFiles(dir) {
+    for (const entry of readdirSync(dir)) {
+        const p = join(dir, entry);
+        if (statSync(p).isDirectory()) yield* schemaFiles(p);
+        else if (/\.ts$/.test(entry)) yield p;
+    }
+}
+
+if (!existsSync(SCHEMA_DIR)) {
+    console.error(`retention-manifest lint: schema dir not found: ${SCHEMA_DIR}`);
+    process.exit(1);
+}
+
+const schemaTables = new Set();
+const tableRe = /sqliteTable\(\s*'([^']+)'/g;
+for (const file of schemaFiles(SCHEMA_DIR)) {
+    const text = readFileSync(file, "utf8");
+    let m;
+    while ((m = tableRe.exec(text)) !== null) schemaTables.add(m[1]);
+}
+
+const explicit = new Set(EXPLICIT_LEDGER_TABLES);
+const inScope = [...schemaTables].filter((t) => LEDGER_NAME.test(t) || explicit.has(t)).sort();
+
+for (const table of inScope) {
+    if (seen.has(table)) continue;
+    errors.push(
+        `'${table}' is a ledger-shaped table with no retention decision. Add a rule to ` +
+        `RETENTION_MANIFEST, an exclusion to RETENTION_OUT_OF_SCOPE, or a dated entry to ` +
+        `RETENTION_OPEN in server/lib/compliance/retention-manifest.ts.`,
+    );
+}
+
+// An explicit inclusion that no longer exists is a line nobody will ever remove
+// otherwise, and it quietly shrinks what the gate covers.
+if (schemaDirArg === -1) {
+    for (const table of EXPLICIT_LEDGER_TABLES) {
+        if (!schemaTables.has(table)) {
+            errors.push(
+                `EXPLICIT_LEDGER_TABLES names '${table}', which is not in the schema. If the table ` +
+                `was renamed or dropped, update this list in the same change.`,
+            );
+        }
+    }
+    // A declared table that vanished from the schema leaves a rule acting on
+    // nothing, which reads exactly like a rule that works.
+    for (const [table, arrName] of seen) {
+        if (!schemaTables.has(table)) {
+            errors.push(`${arrName} names '${table}', which is not in the schema. Stale entry.`);
+        }
+    }
+}
+
+// ── Report ───────────────────────────────────────────────────────────────────
+if (errors.length > 0) {
+    console.error("\nRetention manifest lint FAILED:\n");
+    for (const e of errors) console.error("  " + e);
+    console.error(`\n${errors.length} error(s).`);
+    process.exit(1);
+}
+
+console.log(
+    `retention-manifest lint: OK (${rules.length} rules, ${outOfScope.length} out-of-scope, ` +
+    `${open.length} open; ${inScope.length} ledger tables in scope of ${schemaTables.size} total).`,
+);

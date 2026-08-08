@@ -23,14 +23,15 @@
 
 import type { ItemEntry, ResultsProjection } from '../../../server/lib/collab/results-doc.types';
 
-/** The 8 precisely-diffed scalar fields of an `ItemEntry`. */
+/** The precisely-diffed scalar fields of an `ItemEntry`. Mirrors the field
+ *  union of `applyItemPatch` — a version "Recover" writes each one back, so a
+ *  field listed here must be one the doc is allowed to hold. `estimateMin` /
+ *  `estimateMax` are absent for exactly that reason. */
 export type ScalarField =
     | 'rating'
     | 'notes'
     | 'value'
     | 'recommendation'
-    | 'estimateMin'
-    | 'estimateMax'
     | 'followupStatus'
     | 'followupNotes';
 
@@ -40,8 +41,6 @@ const SCALAR_FIELDS: readonly ScalarField[] = [
     'notes',
     'value',
     'recommendation',
-    'estimateMin',
-    'estimateMax',
     'followupStatus',
     'followupNotes',
 ] as const;

@@ -5,7 +5,7 @@ import type { Constructor, QBOServiceBase } from './api-base';
 
 export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends Base {
-        protected buildDisplayName(
+        public buildDisplayName(
             firstName: string,
             lastName: string,
             email: string | null,

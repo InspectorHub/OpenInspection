@@ -192,8 +192,9 @@ describe('results-doc', () => {
         notes: 'cracked',
         value: 'some value',
         recommendation: 'replace',
-        estimateMin: 100,
-        estimateMax: 500,
+        // No estimateMin / estimateMax: they are not part of the projected
+        // shape any more, so a round-trip that included them would be
+        // asserting the doc can still carry a repair price.
         followupStatus: 'repaired',
         followupNotes: 'fixed on re-inspection',
         attributes: { yearBuilt: 1998, material: 'brick' },

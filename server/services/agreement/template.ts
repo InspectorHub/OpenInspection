@@ -11,7 +11,7 @@ import type { AgreementServiceBase } from './base';
  */
 export function TemplateMixin<TBase extends Constructor<AgreementServiceBase>>(Base: TBase) {
     return class Template extends Base {
-        protected declare getDrizzle: AgreementServiceBase['getDrizzle'];
+        public declare getDrizzle: AgreementServiceBase['getDrizzle'];
 
         /**
          * Lists all agreement templates for a tenant.

@@ -10,13 +10,29 @@
  * Each entry carries a `version` that is a NAME, not a hash and not a
  * timestamp: it is written down once and changed only when the wording
  * changes. Bump the suffix (`.v1` → `.v2`) in the same commit that edits the
- * text, never separately. Nothing persists these tokens yet; making them exist
- * and be stable is the prerequisite for a future `prompt_version` on stored AI
- * output, and that step is a schema change that does not belong here.
+ * text, never separately. These tokens are now PERSISTED: every call writes one
+ * into `ai_call_provenance.prompt_version` at the AI chokepoint, so a stored
+ * output can be traced back to the wording that produced it. Bumping a suffix
+ * without editing the text, or editing the text without bumping, corrupts that
+ * record for every row written afterwards.
  *
- * The text below is a verbatim move. Rewording a prompt changes model output,
- * and no test in this repository would notice.
+ * Rewording a prompt changes model output, and no test in this repository would
+ * notice.
  */
+
+/**
+ * A prompt that knows its own version.
+ *
+ * The chokepoint takes one of THESE plus its arguments, never a pre-rendered
+ * string: rendering at the call site is how a prompt reached the model with no
+ * version attached, which is the state this whole module was introduced to end.
+ * There is no way to send text to a provider without naming the prompt it came
+ * from, because there is no overload that accepts bare text.
+ */
+export interface VersionedPrompt<A> {
+    readonly version: string;
+    readonly render: (args: A) => string;
+}
 
 /** Context the rewrite prompt renders above the comment being revised. */
 export interface RewriteCommentPromptArgs {
@@ -29,8 +45,19 @@ export interface RewriteCommentPromptArgs {
     location?:       string;
 }
 
-/** Item context the suggestion prompt renders. Extra caller fields (e.g. the
- *  property address) are accepted and ignored — the prompt names what it uses. */
+/**
+ * Item context the suggestion prompt renders.
+ *
+ * This is the WHOLE set of facts the suggestion feature may send to a model,
+ * and it is a closed list on purpose. It used to be open in practice: the
+ * request schema also accepted the property address, the prompt never named it,
+ * and the only thing recording that state of affairs was a comment here. A
+ * routine rewording of the prompt would have started shipping client addresses
+ * to a third-party provider with no change to the route and nothing to review.
+ * The field is gone from the schema; adding an identifier of the property or
+ * the client back into this interface re-opens that hole, and
+ * `tests/unit/ai/prompt-address-boundary.spec.ts` is what notices.
+ */
 export interface SuggestCommentPromptArgs {
     itemName:    string;
     sectionName: string;

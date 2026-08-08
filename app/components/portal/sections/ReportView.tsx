@@ -42,6 +42,7 @@ import { ReportSectionBlock } from "./report/ReportSectionBlock";
 import { PhotoAppendix } from "./report/PhotoAppendix";
 import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
 import { ReportVerificationBlock } from "./report/ReportVerificationBlock";
+import { ReportViewDisclosure } from "./report/ReportViewDisclosure";
 import { ReportRepairPanel } from "./report/ReportRepairPanel";
 import { BuildingProfile } from "./report/BuildingProfile";
 import { PcaSkeleton } from "./report/PcaSkeleton";
@@ -324,11 +325,25 @@ export function ReportView(props: ReportViewProps) {
       {/* ── Verification block ───────────────────────────────────────── */}
       <ReportVerificationBlock verification={data.verification} baseUrl={data.baseUrl} timeZone={data.reportTimeZone} />
 
+      {/* ── Art. 13 notice for the delivery-view counter (OI #271) ──────
+          Rendered on BOTH of this component's route homes, which is the point
+          of putting it here rather than in either wrapper: the standalone
+          report page and the inline Hub mount both increment the counter, so
+          both owe the recipient the notice. Last block on the page, after the
+          report's own content — it is about the page, not part of the report.
+          Conditions 4 and 5 of docs/compliance/report-view-lia.md; see the
+          component header before changing the copy or collapsing it. */}
+      <ReportViewDisclosure
+        inspectionId={id}
+        token={urlToken}
+        objected={data.viewTrackingObjected ?? false}
+        printMode={data.printMode}
+      />
+
       {/* Repair Request Panel */}
       {repairPanel && (
         <ReportRepairPanel
           selectedRepairList={selectedRepairList}
-          showEstimates={data.showEstimates}
           onClose={() => setRepairPanel(false)}
         />
       )}

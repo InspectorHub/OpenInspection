@@ -83,9 +83,10 @@ export interface ReportItem {
   notes: string | null;
   photos: ReportPhoto[];
   recommendation?: string | null;
-  estimateMin?: number | null;
-  estimateMax?: number | null;
-  /** Task 8 — attached repair items snapshotted on this finding (dollars). */
+  /** Task 8 — attached repair items snapshotted on this finding (dollars).
+   *  The estimate pair here is a LEGACY READ (null on every finding written
+   *  since repair pricing was withdrawn); there is deliberately no item-level
+   *  estimateMin / estimateMax any more. */
   repairItems?: {
     summary: string;
     estimateMin: number | null;
@@ -324,6 +325,15 @@ export interface ReportLoaderResult {
   notPublished: boolean;
   /** IA-36 ⑨ — the link was real but has expired or been revoked (API 410). */
   linkInactive?: boolean;
+  /**
+   * OI #271 — this recipient has exercised their Art. 21 objection, so the
+   * delivery-view counter is suppressed for them. Optional and defaulting to
+   * false: an unknown answer must render the disclosure's ordinary "you can
+   * turn this off" state, which is true for everyone who has not objected and
+   * harmless for one who has (the control is idempotent, and the counter is
+   * gated on the STORED marker, never on what this page believes).
+   */
+  viewTrackingObjected?: boolean;
   styleProfile?: StyleProfileClient;
   inspectorCredentials?: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }>;
   initialFilter: FilterKey;

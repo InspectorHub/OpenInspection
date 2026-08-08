@@ -24,6 +24,31 @@ export interface DeliveryRow {
   deliveredAt: number | null;
 }
 
+/**
+ * OI #271 — one report-link recipient's delivery state. Mirrors
+ * `ReportLinkSchema` in `server/api/inspections/communication.ts`.
+ *
+ * THREE states, and the third is the point: `queued` means a notice exists with
+ * a future `send_at`, so nothing has been sent and no open status is possible.
+ * Collapsing it into "delivered, not opened" is what makes an inspector chase a
+ * client about a report that never left the building — the failure LIA
+ * condition 6 exists to prevent.
+ */
+export interface ReportLinkRow {
+  accessTokenId: string;
+  recipient: string;
+  roleKey: string | null;
+  roleLabel: string | null;
+  state: "queued" | "delivered" | "opened";
+  scheduledAt: number | null;
+  sentAt: number | null;
+  viewCount: number;
+  firstViewedAt: number | null;
+  lastViewedAt: number | null;
+  /** Art. 21 — a zero count here means "we stopped counting", not "nothing happened". */
+  trackingObjected: boolean;
+}
+
 export interface MessageRow {
   id: string;
   direction: "in" | "out";

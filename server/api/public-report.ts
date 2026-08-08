@@ -3,16 +3,18 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { eq, and } from 'drizzle-orm';
 import type { HonoConfig } from '../types/hono';
 import { inspections, tenants } from '../lib/db/schema';
-import { verifyRenderToken } from '../lib/render-token';
+import { resolveRenderAccess } from '../lib/render-token';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { ReportDataResponseSchema } from '../lib/validations/inspection.schema';
 import { resolvePortalAccess, resolveOwnerPreview, classifyPortalAccess } from '../lib/public-access';
 import { resolveClientActor } from '../lib/portal-client-actor';
-// Re-export so existing callers that import resolveOwnerPreviewToken from this
-// module (e.g. tests) continue to work without changes.
+import { recordReportView } from '../lib/report-views';
+import publicViewTrackingRoutes from './public/view-tracking';
+// Re-exported for existing importers (tests); both now live in lib/.
 export { resolveOwnerPreviewToken } from '../lib/public-access';
+export { resolveRenderAccess } from '../lib/render-token';
 import { servePhotoObject, imagesBinding } from '../lib/media/serve-photo';
 import { InvoiceNotPayableError } from '../lib/stripe-helpers';
 import { logger } from '../lib/logger';
@@ -25,40 +27,27 @@ import { PublicInvoiceBodySchema } from '../lib/validations/invoice.schema';
 import { getDrizzle } from '../lib/route-helpers';
 
 /**
- * Render-token access path for headless PDF generation. The Cloudflare Browser
- * Rendering headless browser cannot carry a session cookie or portal token, so
- * trusted server flows mint a short-TTL render token (see lib/render-token.ts)
- * and pass it as `?render=`. Returns the token's inspectionId only when it is
- * valid AND matches the requested inspection; null otherwise (caller falls
- * through to the other auth paths / 404).
- */
-export async function resolveRenderAccess(
-    render: string | undefined, requestedId: string, secret: string,
-): Promise<{ inspectionId: string; versionNumber?: number } | null> {
-    if (!render) return null;
-    const v = await verifyRenderToken(render, secret);
-    if (!v || v.inspectionId !== requestedId) return null;
-    return v;
-}
-
-/**
  * Shared client-facing tenant resolution for the public report endpoints:
  * the persistent per-(recipient, order) portal token, falling back to the
  * legacy KV agent-view-token bridge (`?view=agent&token=`). Returns the
  * AUTHORITATIVE tenantId from whichever token resolves to THIS inspection, or
  * null. Identical across the report-data, report-photo, and report-PDF routes.
+ * `accessTokenId` is the per-recipient token row's id, or null on the legacy
+ * KV bridge (no row) — so a bridge view is never counted, which is right: it
+ * names no recipient. It is the identity delivery confirmation counts against.
  */
 async function resolveClientTenant(
     c: Context<HonoConfig>, token: string | undefined, id: string,
-): Promise<string | null> {
-    const tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
-    if (tenantId || !token) return tenantId;
+): Promise<{ tenantId: string; accessTokenId: string | null } | null> {
+    const grant = await resolvePortalAccess(c.var.services.portalAccess, token, id);
+    if (grant) return { tenantId: grant.tenantId, accessTokenId: grant.accessTokenId };
+    if (!token) return null;
     // Bridge: existing customer share links carry the KV agent-view-token until
     // persistent per-recipient token issuance is wired (see plan
     // 2026-06-01-core-esign-redesign). Validate it the same way: token must
     // resolve to THIS inspection; tenantId from the token.
     const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
-    if (legacy && legacy.inspectionId === id) return legacy.tenantId;
+    if (legacy && legacy.inspectionId === id) return { tenantId: legacy.tenantId, accessTokenId: null };
     return null;
 }
 
@@ -260,10 +249,12 @@ const reportGateRoute = createRoute(withMcpMetadata({
 
 const publicReportRoutes = createApiRouter()
     .route('/', publicVerifyRoutes)
+    .route('/', publicViewTrackingRoutes)
     .openapi(reportRoute, async (c) => {
         const { tenant, id } = c.req.valid('param');
         const { token, render } = c.req.valid('query');
-        let tenantId = await resolveClientTenant(c, token, id);
+        const clientGrant = await resolveClientTenant(c, token, id);
+        let tenantId = clientGrant?.tenantId ?? null;
         // Render-token path: headless CF Browser Rendering cannot carry a session
         // cookie or portal token; trusted server flows mint a short-TTL render token
         // and pass it as `?render=`. Resolve tenantId from the inspection row so the
@@ -343,6 +334,14 @@ const publicReportRoutes = createApiRouter()
         if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: gateRow?.reportStatus })) {
             return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
         }
+        // OI #271 — delivery confirmation, after the publish gate (a blocked
+        // request is not an open). Grant/renderMode/ownerPreview are resolved
+        // here; only `x-oi-client-method` is relayed. Never throws.
+        await recordReportView(getDrizzle(c), { tenantId, inspectionId: id }, {
+            accessTokenId: clientGrant?.accessTokenId ?? null, renderMode, ownerPreview,
+            method: c.req.header('x-oi-client-method') ?? c.req.method,
+            purpose: c.req.header('purpose'), secPurpose: c.req.header('sec-purpose'),
+        });
         // Photo URLs: render mode carries the render token so the headless browser
         // can load photos without a session cookie. Owner-preview points at the
         // authed editor photo route (cookie authenticates there). Public client
@@ -374,7 +373,7 @@ const publicReportRoutes = createApiRouter()
     .openapi(reportPhotoRoute, async (c) => {
         const { id } = c.req.valid('param');
         const { key, token, download, render, w } = c.req.valid('query');
-        let tenantId = await resolveClientTenant(c, token, id);
+        let tenantId = (await resolveClientTenant(c, token, id))?.tenantId ?? null;
         let renderMode = false;
         let ownerPreview = false;
         if (!tenantId && render) {
@@ -417,7 +416,7 @@ const publicReportRoutes = createApiRouter()
         // No owner-preview, no render-token acceptance — this is a public
         // client-facing endpoint; the handler mints its own render token for
         // the headless renderer below.
-        const tenantId = await resolveClientTenant(c, token, id);
+        const tenantId = (await resolveClientTenant(c, token, id))?.tenantId ?? null;
         if (!tenantId) return c.notFound();
 
         if (!c.env.BROWSER || !c.env.PHOTOS) {

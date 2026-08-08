@@ -20,9 +20,7 @@ export const CommentSchema = z.object({
     section: z.string().max(64).optional().nullable().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
     // Comments Library Upgrade — canonical single item label drives sort/filter.
     itemLabel: z.string().max(120).optional().nullable().openapi({ example: 'Roof Covering' }),
-    repairSummary: z.string().max(2000).optional().nullable().describe('Repair recommendation summary (defect comments only).'),
-    estimateMinCents: z.number().int().nonnegative().optional().nullable().describe('Low cost estimate in cents.'),
-    estimateMaxCents: z.number().int().nonnegative().optional().nullable().describe('High cost estimate in cents.'),
+    repairSummary: z.string().max(2000).optional().nullable().describe('Repair recommendation summary (defect comments only). Scope of work, never a price.'),
     recommendedContractorTypeId: z.string().optional().nullable().describe('Soft ref to contractor_types.id.'),
 }).openapi('Comment');
 
@@ -32,9 +30,7 @@ export const UpdateCommentSchema = z.object({
     severity: SeverityFieldSchema.nullable().optional().openapi({ example: 'significant' }).describe('The single severity vocabulary shared with rating levels.'),
     section: z.string().max(64).nullable().optional().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
     itemLabel: z.string().max(120).optional().nullable(),
-    repairSummary: z.string().max(2000).optional().nullable().describe('Repair recommendation summary (defect comments only).'),
-    estimateMinCents: z.number().int().nonnegative().optional().nullable().describe('Low cost estimate in cents.'),
-    estimateMaxCents: z.number().int().nonnegative().optional().nullable().describe('High cost estimate in cents.'),
+    repairSummary: z.string().max(2000).optional().nullable().describe('Repair recommendation summary (defect comments only). Scope of work, never a price.'),
     recommendedContractorTypeId: z.string().optional().nullable().describe('Soft ref to contractor_types.id.'),
 }).openapi('UpdateComment');
 
@@ -47,8 +43,6 @@ export const CommentResponseSchema = z.object({
     section: z.string().nullable().describe('TODO describe section field for the OpenInspection MCP integration'),
     itemLabel: z.string().nullable().optional(),
     repairSummary: z.string().nullable().optional(),
-    estimateMinCents: z.number().int().nullable().optional(),
-    estimateMaxCents: z.number().int().nullable().optional(),
     recommendedContractorTypeId: z.string().nullable().optional(),
     useCount: z.number().int().optional(),
     lastUsedAt: z.string().nullable().optional(),

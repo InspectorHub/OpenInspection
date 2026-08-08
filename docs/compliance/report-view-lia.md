@@ -4,11 +4,22 @@
 recipient who presented a valid portal access token.
 
 **Status:** written **before** the code (OI #271, Task 1 of the delivery
-confirmation plan). Nothing described here is implemented yet — there is no
-`report_views` table in the schema and no counter anywhere in `server/` or
-`app/` as of 2026-08-07. This document is therefore an assessment of a
-*proposal*, and it reaches a **split conclusion**: one shape of the feature
-passes the balancing test and one does not.
+confirmation plan), and **caught up to it on 2026-08-07**. It reaches a **split
+conclusion**: one shape of the feature passes the balancing test and one does
+not.
+
+What exists in the code: the counter (`report_views`), keyed per section 3.4
+**option 3**; the Art. 21 suppression marker
+(`inspection_access_tokens.view_tracking_objected_at`) with a recipient-facing
+route that accepts either portal entry path; the Art. 13 disclosure, as a
+platform-rendered block in every message that carries a report link and on the
+report page itself; and the inspector-facing surface that pairs "opened" with
+delivery status in three states. **All nine conditions in section 4 are now
+met**, and the compile-time switch that had been holding the counter shut
+(`server/lib/report-views.gate.ts`) was deleted in the change that closed
+conditions 4, 5 and 6 — the same change, deliberately, because section 3.2 makes
+the disclosure load-bearing *inside* the balancing test rather than alongside
+it.
 
 **Why this lives in the open-source repo.** Every deployment of
 OpenInspection — hosted or self-hosted — runs the same code and performs the
@@ -24,13 +35,20 @@ controller can adopt, adapt, or reject.
 
 ## 0. What is actually proposed
 
-A bounded counter table. Per (recipient, deliverable): whether it has ever been
-opened, when it was first opened, when it was last opened, and how many times.
-Three integers and a foreign-key-free pair of scope columns. No row per view.
+A bounded counter table. Per (recipient, **order** — see section 3.4(b) for why
+not per deliverable): whether it has ever been opened, when it was first opened,
+when it was last opened, and how many times. Three integers and a
+foreign-key-free pair of scope columns. No row per view.
 
-The counter is written on the server, in the loader that renders the public
-report page (`app/routes.ts:49` -> `app/routes/public/report-card-stack.tsx`),
-when a request arrives carrying a valid per-recipient portal token.
+The counter is written on the server, when a request carrying a valid
+per-recipient portal token renders the public report page (`app/routes.ts:49` ->
+`app/routes/public/report-card-stack.tsx`). As built, the write happens one
+level in from that loader, in the data route the loader calls
+(`server/api/public-report.ts`, via `server/lib/report-views.ts`), because that
+is where the grant, the headless-render flag and the owner-preview flag are
+*resolved* rather than relayed. The loader forwards the outer request's method
+and its `Purpose`/`Sec-Purpose` hints, which exist nowhere else, and derives
+nothing.
 
 Deliberately absent: IP address, user agent, referrer, device or browser
 fingerprint, per-section dwell time, scroll depth, and any record of *which
@@ -250,7 +268,7 @@ statements recorded about them is not outweighed by the controller's
 convenience in shipping sooner.
 
 There is a third option, and it is the honest one if the renderer is not going
-to change first:
+to change first. **It is the one that was built** (2026-08-07):
 
 3. **Record what the system actually observed.** The observation is "this
    recipient rendered the report page for this order". Key the row on
@@ -294,8 +312,12 @@ the assessment has to be redone rather than cited.
 
 3. **The row records only what was observed.** Either the renderer genuinely
    knows which deliverable it is showing, or the row is scoped to the order
-   and says so. See section 3.4(b). This condition is currently **unmet** —
-   the design choice is open.
+   and says so. See section 3.4(b). **MET (2026-08-07)** — option 3. The
+   `report_views` row is keyed `(tenant_id, inspection_id, access_token_id)`
+   and carries no `report_id` at all; the schema comment
+   (`server/lib/db/schema/portal-access.ts`) states why, so the next reader
+   cannot add one by guessing. When the renderer gains per-report identity the
+   column can be appended and the older rows stay honestly order-scoped.
 
 4. **The recipient is told, before the first open is counted.** The first
    render is the one that creates the record, so a disclosure that appears
@@ -305,19 +327,50 @@ the assessment has to be redone rather than cited.
    (`server/lib/notifications/classes.ts:118`, `:119`, `:149`, `:157`,
    `:185`-`:188`), which bounds the problem to the email path — but a link an
    inspector copies out and sends by hand is outside that system, and the
-   disclosure cannot reach it.
+   disclosure cannot reach it. **MET (2026-08-07)** — the notice rides all
+   **four** descriptors that hand over a report link (`report-ready`,
+   `report-ready-pdf`, `agent-share-link` in
+   `server/lib/email-templates/catalog/client.ts`, `agent-report-ready` in
+   `catalog/agent.ts`), and it also renders on the report page for the
+   copied-out link that no message system can reach. The copy is three
+   sentences in a fixed order — the fact, the limit, then the exit
+   (`server/lib/legal/report-view-disclosure.ts`). The **limit** sentence is
+   load-bearing: sections 2 and 3.3 pass *because* the IP address, the device
+   signal and the per-finding trail are absent, so a notice stating only the
+   fact understates the design.
 
 5. **The disclosure cannot be edited away.** The delivery copy is
    tenant-editable, and an editable default only seeds a per-tenant row — it
    cannot carry a guarantee. The notice must be a system-rendered block (the
    mechanism exists: `SystemBlockKind` in
-   `server/lib/email-templates/types.ts:17`, currently `'auditMetadata' |
-   'attachmentManifest' | 'icsHint'`), not template text a tenant can delete.
-   A disclosure a tenant can remove is a disclosure this assessment cannot
-   rely on.
+   `server/lib/email-templates/types.ts`), not template text a tenant can
+   delete. A disclosure a tenant can remove is a disclosure this assessment
+   cannot rely on. **MET (2026-08-07)** — `'viewDisclosure'`, a fourth
+   `SystemBlockKind` beside `'auditMetadata' | 'attachmentManifest' |
+   'icsHint'`, rendered by the platform from a versioned constant and
+   unreachable from the template editor. `tests/unit/email/report-view-
+   disclosure.spec.ts` renders with a tenant override that blanks every
+   editable block and asserts the notice survives it. The version is stamped
+   onto each rendered instance (`data-disclosure-version`) so a later rewording
+   cannot retroactively re-caption a document already delivered — there is no
+   archive of superseded copy, which is the same reason
+   `lib/legal/agreement-language-disclosure.ts` carries a version.
 
 6. **The inspector-facing surface pairs "opened" with delivery status** and
-   presents neither as proof. See section 3.4(a).
+   presents neither as proof. See section 3.4(a). **MET (2026-08-07)** —
+   `server/lib/report-view-status.ts` resolves one row per report-link
+   recipient in **three** states, and the third is the one that matters:
+   `queued` (a notice with a future `send_at`, which the automation ledger
+   hides and which genuinely has not been sent) carries no open status at all,
+   because none is possible. Folding it into "delivered, not opened" is what
+   sends an inspector chasing a client about a report that never left the
+   building. A recipient who has objected is marked as such, so a zero is never
+   read as "they did not open it" when it means "we stopped counting". The
+   surface carries the "signal, not proof" caveat whenever it shows an open,
+   and it draws **no chart** — the purpose test (section 1) passes for the
+   delivery question and for nothing else, and a visualisation is a different
+   purpose needing its own assessment. It is rendered per RECIPIENT and never
+   per deliverable, for the reason in 3.4(b).
 
 7. **The row is catalogued for erasure in the same change that creates it,**
    and the erasure orchestrator is wired to it. The manifest alone is not
@@ -331,23 +384,89 @@ the assessment has to be redone rather than cited.
 8. **The counters are used for the delivery question only.** No export into
    analytics, no segmentation, no ranking of recipients.
 
-**Condition 3 is not satisfied by the current design.** Until the report
-identity question is resolved in the direction of section 3.4 option 1 or
-option 3, the feature is not covered by this assessment. That is the intended
-outcome of writing the assessment first: it is allowed to say no to part of
-the proposal.
+9. **An objection can be honoured without losing access.** A per-recipient
+   suppression marker stops the counter while the link keeps working, and it
+   does not clear counters already recorded. Added 2026-08-07; see the amendment
+   history under *Rights that follow from this basis*. **MET (2026-08-07)** —
+   `inspection_access_tokens.view_tracking_objected_at`, a timestamp rather than
+   a boolean because an objection has a date. It is read at the increment
+   (`server/lib/report-views.ts`) and by nothing else; no access guard consults
+   it. The recipient reaches it at `POST /api/public/inspections/{id}/
+   view-tracking-objection`, over **either** the emailed `?token=` link or the
+   `__Host-portal_session` cookie — a session-only control would leave the right
+   unreachable for the recipients who only ever click the link, and a right most
+   of its holders cannot reach is not one. Any live recipient role may object,
+   not only client/co_client: section 3.1 identifies the agents and one-off
+   shares as having the weakest expectation, so they are the last population to
+   lock out.
+
+**All nine conditions are now met (2026-08-07).** The counter exists, records
+only what it observed, can be stopped by the person it observes, tells that
+person it exists before the first open, does so in words no tenant can delete,
+and is surfaced to the inspector in a form that cannot be mistaken for proof.
+**The feature as shipped is covered by this assessment.**
+
+⚠️ That sentence is only as true as the code. Section 5 lists what makes this
+document inapplicable; the conditions above are not a checklist that was passed
+once, and removing any of them is not a UI change.
+
+⚠️ **Condition 9 is not a follow-up to conditions 1–8.** The objection path
+cannot ship after the collection it objects to — a counter that runs for a
+release with no way to stop it is processing this assessment does not cover.
+This is why the marker landed in the same change as the counter.
 
 ### Rights that follow from this basis
 
-Processing on legitimate interests carries the Art. 21 right to object, and
-this design does not currently provide a way to exercise it. A recipient who
-objects has, in practice, only the erasure path (condition 7), which is a
-larger action than they asked for. This is a **residual weakness**, recorded
-rather than resolved: the mitigation is that the data is minimal, that it dies
-with the access token, and that revoking the token removes the recipient's
-link and their counters together. A controller who receives an objection
-should expect to honour it by revoking the token rather than by a mechanism
-this software provides.
+Processing on legitimate interests carries the Art. 21 right to object, and the
+design provides a mechanism for it: a **per-recipient measurement-suppression
+marker** on the recipient's own access-token row. When set, the counter stops
+incrementing; the link keeps working and the report stays readable.
+
+**Token revocation is not the mechanism.** An objection to *measurement*
+answered by withdrawing *access* is a larger action than the one requested, and
+it penalises the exercise of the right — the recipient would lose the document
+in order to stop being counted. Minimal data lowers the risk; it does not remove
+the right.
+
+**Nor does an objection erase what is already recorded.** Art. 21 is not
+Art. 17. Future collection stops; historical counters are governed by the
+retention rules, and the controller may hold a lawful basis for delivery
+evidence already collected. Suppression and erasure are separate requests,
+honoured separately — and the erasure rule for these rows (`delete`, keyed on
+the access token) must not be reached for by anyone implementing the objection
+path.
+
+> **AMENDMENT HISTORY**
+> **Previous position:** *"This is a residual weakness, recorded rather than
+> resolved … A controller who receives an objection should expect to honour it
+> by revoking the token rather than by a mechanism this software provides."*
+> **Correction date:** 2026-08-07.
+> **Why:** the previous position assigned the obligation to the controller and
+> supplied no instrument beyond a general-purpose one, and the instrument it
+> named answers an objection about measurement by removing access. Reviewed
+> externally and rejected as an adequate default.
+> **Impact:** the condition set below changes. What was recorded as a residual
+> weakness is now an **unmet condition** — the feature is not covered by this
+> assessment until the suppression marker exists. The lawful basis, the data
+> minimisation analysis and the balancing test are unchanged.
+>
+> **AMENDMENT 2 — 2026-08-07 (later the same day).** Conditions 3 and 9 moved
+> from *unmet* to *met*: the counter shipped keyed on (tenant, inspection,
+> access token) per section 3.4 option 3, and the suppression marker shipped in
+> the same change rather than after it. Nothing in sections 1–3 changed — this
+> records that the code caught up with the assessment, not that the assessment
+> moved. Conditions 4, 5 and 6 remain unmet, and section 4 now says so where a
+> reader looking for the go/no-go will see it.
+>
+> **AMENDMENT 3 — 2026-08-07 (later still).** Conditions **4**, **5** and **6**
+> moved from *unmet* to *met*, and the counter's compile-time kill switch
+> (`server/lib/report-views.gate.ts`) was deleted in the same change. Those two
+> facts are one decision: section 3.2 makes the disclosure load-bearing INSIDE
+> the balancing test, so the release that lands the disclosure is precisely the
+> release in which the counter may run. Shipping them apart in either direction
+> would have been the defect — a counter without the notice runs outside this
+> assessment, and a flag kept past its reason becomes a second definition of
+> whether the feature exists. Nothing in sections 1–3 changed.
 
 ---
 
@@ -403,6 +522,9 @@ not.
 
 ---
 
-**Assessment date:** 2026-08-07
-**Reassess when:** any item in section 5 is proposed, condition 3 is resolved,
-or the report renderer gains per-report identity.
+**Assessment date:** 2026-08-07 (amended three times the same day — see the
+amendment history in section 4)
+**Reassess when:** any item in section 5 is proposed, or the report renderer
+gains per-report identity (at which point section 3.4(b)'s option 3 can become
+option 1, and `report_views` can append a `report_id` while the older rows stay
+honestly order-scoped).

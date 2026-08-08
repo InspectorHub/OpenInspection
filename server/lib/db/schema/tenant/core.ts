@@ -342,6 +342,39 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     companyLat: real('company_lat'),
     companyLng: real('company_lng'),
     companyGeocodedAt: integer('company_geocoded_at', { mode: 'timestamp_ms' }),
+    // What the workspace confirmed when it saved its OWN AI provider key.
+    //
+    // The key and the provider account belong to the tenant, but this codebase
+    // ships the client that calls the provider, so the arrangement is worth
+    // recording rather than assuming. The one fact that decides how the provider
+    // may treat inspection content — the SERVICE TIER of the billing project
+    // behind the key — is not carried on the key and is not reported by any
+    // endpoint this client calls, so the tenant's confirmation is the only
+    // signal that exists. `server/lib/ai/byo-attestation.ts` holds the
+    // statements and the two version constants.
+    //
+    // `terms_version` is the load-bearing one: provider terms change, and a
+    // confirmation with no revision stamped on it cannot be read back later. It
+    // is separate from `policy_version` (the revision of OUR statements) because
+    // either can move without the other.
+    //
+    // All six are NULL together — no key has been saved through this path, or
+    // the key was cleared, which withdraws the attestation with it.
+    // Appended at END of the table per the D1 add-column-at-end rule
+    // (tenant_configs is FK-referenced).
+    aiKeyAttestationProvider: text('ai_key_attestation_provider', { enum: ['gemini'] }),
+    aiKeyAttestationMode: text('ai_key_attestation_mode', { enum: ['tenant_key'] }),
+    aiKeyAttestationAccountOwner: text('ai_key_attestation_account_owner', { enum: ['tenant'] }),
+    aiKeyAttestationTermsVersion: text('ai_key_attestation_terms_version'),
+    aiKeyAttestationAttestedAt: integer('ai_key_attestation_attested_at', { mode: 'timestamp_ms' }),
+    aiKeyAttestationPolicyVersion: text('ai_key_attestation_policy_version'),
+    // #275 — quick-insert phrases for repair-request notes, maintained by the
+    // tenant. Same shape and storage idiom as `custom_referral_sources` above.
+    // NULL = never configured (seeded defaults shown); [] = the tenant removed
+    // them all and wants no buttons. Collapsing the two with `?? DEFAULTS` takes
+    // away the only off switch, and the defaults look intentional, so nobody
+    // notices. Appended at END per the D1 add-column-at-end rule.
+    repairQuickPhrases: text('repair_quick_phrases', { mode: 'json' }).$type<string[]>(),
 });
 
 /**

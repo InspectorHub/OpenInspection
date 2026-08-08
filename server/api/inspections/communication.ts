@@ -7,6 +7,13 @@
  * merging server-side only to split again client-side invites the merged
  * rendering back.
  *
+ * A third array joined them for OI #271: **reportLinks**, the per-recipient
+ * answer to "did the report reach them, and did they open it". It is not a
+ * fourth grammar — it is the SUMMARY of the delivery question the Outbox rows
+ * below it answer in detail, which is why it rides this payload rather than
+ * costing the hub loader another round trip. Its shape and the reasoning behind
+ * its three states live in `server/lib/report-view-status.ts`.
+ *
  * This endpoint superseded `GET /api/automations/logs/{inspectionId}` — a fully
  * defined route that never had a caller. Money redaction does not apply (no
  * money in this payload); recipient emails and phones DO go over the wire,
@@ -21,6 +28,7 @@ import { and, eq } from 'drizzle-orm';
 import { inspections } from '../../lib/db/schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
+import { listReportLinkStatus } from '../../lib/report-view-status';
 
 const DeliverySchema = z.object({
     id: z.string().describe('Log row id.'),
@@ -38,6 +46,27 @@ const DeliverySchema = z.object({
     noticeId: z.string().nullable().describe('Notice header this attempt belongs to (C1) — the Outbox grouping key. Null on legacy rows; grouping falls back to (automationId, sendAt).'),
     sendAt: z.number().describe('Epoch-ms the firing was scheduled for. Grouping key component — one firing shares one sendAt.'),
     deliveredAt: z.number().nullable().describe('Epoch-ms of confirmed delivery, when known.'),
+});
+
+/**
+ * OI #271 — one row per report-link recipient, for the surface LIA condition 6
+ * asks for: "opened" paired with delivery status, and neither presented as
+ * proof. It rides THIS payload rather than the hub aggregate because it answers
+ * the same question the Outbox does ("did it get there?") and is read in the
+ * same place, so it costs no extra round trip.
+ */
+const ReportLinkSchema = z.object({
+    accessTokenId: z.string().describe('inspection_access_tokens.id — the recipient, as the view counter keys them.'),
+    recipient: z.string().describe('Email address the report link was issued to.'),
+    roleKey: z.string().nullable().describe("Recipient's role-profile key; raw, survives role deletion."),
+    roleLabel: z.string().nullable().describe('Display label for the role; null when deleted or deactivated.'),
+    state: z.enum(['queued', 'delivered', 'opened']).describe("Three states, not two: a notice with a future send_at is genuinely NOT SENT, and showing it as 'not yet opened' sends the inspector chasing a report that never left."),
+    scheduledAt: z.number().nullable().describe('Epoch-ms the next report notice is due. Only meaningful while queued.'),
+    sentAt: z.number().nullable().describe('Epoch-ms the most recent report notice actually went out.'),
+    viewCount: z.number().describe('Server-side opens. A heuristic, never proof — mail-security scanners can trip it.'),
+    firstViewedAt: z.number().nullable().describe('Epoch-ms of the first recorded open.'),
+    lastViewedAt: z.number().nullable().describe('Epoch-ms of the most recent recorded open.'),
+    trackingObjected: z.boolean().describe('GDPR Art. 21 — this recipient asked not to be measured, so a zero count means "we stopped counting", not "nothing happened".'),
 });
 
 const MessageSchema = z.object({
@@ -73,6 +102,7 @@ const communicationRoute = createRoute(withMcpMetadata({
                 data: z.object({
                     messages: z.array(MessageSchema).describe('Person-written messages, every thread on this inspection, oldest first.'),
                     deliveries: z.array(DeliverySchema).describe('Platform-sent notices, newest firing first. Due rows only (send_at <= now).'),
+                    reportLinks: z.array(ReportLinkSchema).describe('Report delivery per recipient (OI #271): queued / delivered-not-opened / opened. Order-scoped, never per deliverable.'),
                 }),
             }) } },
             description: 'Communication payload',
@@ -96,9 +126,14 @@ const communicationRoutes = createApiRouter()
             .get();
         if (!owner) return c.json({ success: false, error: 'Inspection not found' }, 404);
 
-        const [messages, deliveries] = await Promise.all([
+        const [messages, deliveries, reportLinks] = await Promise.all([
             c.var.services.message.listForInspection(id, tenantId),
             c.var.services.automation.getCommunicationDeliveries(tenantId, id),
+            // Read here rather than inside the automation service: the answer is
+            // assembled from three tables that service does not own (access
+            // tokens, report_views, its own logs), and the reasoning about what
+            // may be said belongs next to the assessment it comes from.
+            listReportLinkStatus(getDrizzle(c), tenantId, id),
         ]);
         // After the read, so the rows still carry their unread state in THIS
         // response and the UI can style them; the next hub load sees zero.
@@ -119,6 +154,7 @@ const communicationRoutes = createApiRouter()
                     createdAt: m.createdAt instanceof Date ? m.createdAt.getTime() : Number(m.createdAt),
                 })),
                 deliveries,
+                reportLinks,
             },
         }, 200);
     });

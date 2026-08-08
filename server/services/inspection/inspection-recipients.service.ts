@@ -4,9 +4,15 @@ import { PeopleService } from '../people.service';
 import { Errors } from '../../lib/errors';
 import { InspectionSubService } from './base';
 
-/** Internal — one Publish-modal recipient row (client or agent). Not exported:
- *  the public `getRecipientList` signature keeps its inline structural type. */
-interface InspectionRecipient {
+/**
+ * One Publish-modal recipient row (client or agent).
+ *
+ * @declarationEmit Exported so the emitted `.d.ts` can NAME it: it is named in
+ * `getRecipientList`'s return type, which propagates to the exported facade,
+ * and a composite project cannot reference an unexported alias from another
+ * module there (TS4053).
+ */
+export interface InspectionRecipient {
     contactId: string | null;
     name:      string;
     role:      'client' | 'agent_buyer' | 'agent_listing';

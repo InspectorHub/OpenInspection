@@ -102,5 +102,13 @@
   "comm_notice_title_generic": "{event} — {address}",
   "notice_empty_body_staff": "Cuando llega una reserva, se firma un acuerdo o entra un pago, aparece aquí.",
   "comm_reason_sms_opt_out": "Omitido: esta persona respondió STOP. Puede enviar START por mensaje de texto para volver a suscribirse.",
-  "notice_reason_sms_opt_out": "Usted nos pidió que dejáramos de enviarle mensajes de texto. Responda START a cualquiera de nuestros mensajes para volver a activarlos."
+  "notice_reason_sms_opt_out": "Usted nos pidió que dejáramos de enviarle mensajes de texto. Responda START a cualquiera de nuestros mensajes para volver a activarlos.",
+  "comm_report_delivery_heading": "Entrega del informe",
+  "comm_report_delivery_queued": "Programado para enviarse {when}",
+  "comm_report_delivery_unopened": "Entregado {when} · aún sin abrir",
+  "comm_report_delivery_opened_one": "Abierto una vez · {first}",
+  "comm_report_delivery_opened_many": "Abierto {count} veces · primera {first} · última {last}",
+  "comm_report_delivery_objected": "Este destinatario pidió no ser contabilizado, por lo que ya no se registran sus aperturas.",
+  "comm_report_delivery_caveat": "Las aperturas se registran de nuestro lado cuando se carga la página del informe. Un escáner de seguridad de correo puede activar una, así que tómelo como un indicio, no como prueba de lectura.",
+  "comm_report_delivery_norole": "Destinatario"
 }

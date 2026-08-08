@@ -183,7 +183,17 @@ describe('AI quota + metering', () => {
         afterEach(() => { globalThis.fetch = originalFetch; });
 
         function service(meter?: { record(kind: 'translate' | 'assist'): Promise<void> }) {
-            return new AIService({} as D1Database, 'a-key', 'saas', 'a-model', meter);
+            // The tenant's own key with a confirmation on file — the only picture
+            // the capability gate lets through, and the service defaults to
+            // fail-closed, so these metering cases must say it. The provenance
+            // sink is supplied for the same reason: the chokepoint refuses a
+            // call it cannot record, and a case that omitted it would stop
+            // saying anything about the METER (see provenance.spec.ts).
+            return new AIService(
+                {} as D1Database, 'a-key', 'saas', 'a-model', meter,
+                { source: 'byo', tenantKeyAttested: true },
+                { record: async () => {} },
+            );
         }
 
         it('records exactly once per successful call, tagged by workload', async () => {

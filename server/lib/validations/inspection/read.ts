@@ -268,8 +268,10 @@ const ReportItemSchema = z.object({
   notes: z.string().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
   photos: z.array(z.object({ key: z.string().describe('TODO describe key field for the OpenInspection MCP integration'), url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') })).describe('TODO describe photos field for the OpenInspection MCP integration'),
   recommendation: z.string().nullable().optional().describe('TODO describe recommendation field for the OpenInspection MCP integration'),
-  estimateMin: z.number().nullable().optional().describe('TODO describe estimateMin field for the OpenInspection MCP integration'),
-  estimateMax: z.number().nullable().optional().describe('TODO describe estimateMax field for the OpenInspection MCP integration'),
+  // No item-level estimateMin / estimateMax: the "Estimated cost" badge they
+  // fed is gone. The `repairItems[]` pair below is a LEGACY READ — findings
+  // written before repair pricing was withdrawn still hold the snapshot, and it
+  // is emitted as null on every finding written since.
   repairItems: z.array(z.object({
     summary: z.string(),
     estimateMin: z.number().nullable(),

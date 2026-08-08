@@ -36,7 +36,6 @@ describe('RecommendationService', () => {
     it('creates a recommendation and returns it', async () => {
         const r = await svc.create(TENANT_A, {
             category: 'Roof', name: 'Active leak', severity: 'defect',
-            defaultEstimateMin: 80000, defaultEstimateMax: 150000,
             defaultRepairSummary: 'Recommend evaluation by licensed roofer.',
             createdByUserId: USER_1,
         });

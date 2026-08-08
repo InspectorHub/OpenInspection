@@ -23,6 +23,15 @@ import { bearerToken } from './auth-helpers';
 export type PortalRole = string;
 
 export interface PortalAccessRow {
+    /**
+     * `inspection_access_tokens.id`. Carried because it is the per-recipient
+     * IDENTITY of the grant, and per-recipient state hangs off it — today the
+     * delivery-confirmation counter (`report_views.access_token_id`) and the
+     * Art. 21 view-tracking objection. Resolving the grant and then having to
+     * re-query for the row that produced it is how the two portal entry paths
+     * (`?token=` and `__Host-portal_session`) drift apart.
+     */
+    id: string;
     inspectionId: string;
     tenantId: string;
     role: PortalRole;
@@ -36,6 +45,8 @@ export interface PortalAccessResolver {
 }
 
 export interface PortalAccessGrant {
+    /** `inspection_access_tokens.id` — see PortalAccessRow.id. */
+    accessTokenId: string;
     tenantId: string;
     role: PortalRole;
     recipientEmail: string;
@@ -52,7 +63,7 @@ export async function resolvePortalAccess(
     if (!row) return null;
     if (row.inspectionId !== requestedInspectionId) return null;
     if (portalLinkState(row, now) !== 'active') return null;
-    return { tenantId: row.tenantId, role: row.role, recipientEmail: row.recipientEmail };
+    return { accessTokenId: row.id, tenantId: row.tenantId, role: row.role, recipientEmail: row.recipientEmail };
 }
 
 /**

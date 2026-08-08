@@ -21,7 +21,7 @@ import type { MiddlewareHandler } from 'hono';
 import { loadTenantSecrets } from '../secrets-cache';
 import type { HonoConfig } from '../../types/hono';
 import { logger } from '../logger';
-import { INTEGRATION_SECRET_KEYS } from '../../api/secrets';
+import { INTEGRATION_SECRET_KEYS } from '../secrets-catalog';
 
 /**
  * Strictly per-tenant keys: the tenant's stored value takes precedence over any

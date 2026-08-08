@@ -199,7 +199,7 @@ export class PortalAccessService {
         });
         if (!row) return null;
         return {
-            inspectionId: row.inspectionId,
+            id: row.id, inspectionId: row.inspectionId,
             tenantId: row.tenantId,
             role: row.role,
             recipientEmail: row.recipientEmail,
@@ -215,13 +215,12 @@ export class PortalAccessService {
      * Resolve the LIVE (non-revoked, non-expired) grant for a (recipientEmail,
      * inspectionId) pair — used by the unified-portal SESSION-cookie path, where
      * there is no URL `?token` to resolve. Returns the authoritative
-     * {tenantId, role, recipientEmail} from the row, or null if no live grant.
+     * {id, tenantId, role, recipientEmail} from the row, or null if no live grant.
+     * `id` is part of the contract on BOTH paths — see PortalAccessRow.id.
      */
     async resolveByEmailAndInspection(
-        email: string,
-        inspectionId: string,
-        now: number = Date.now(),
-    ): Promise<{ tenantId: string; role: PortalRole; recipientEmail: string } | null> {
+        email: string, inspectionId: string, now: number = Date.now(),
+    ): Promise<{ id: string; tenantId: string; role: PortalRole; recipientEmail: string } | null> {
         const db = this.getDrizzle();
         const row = await db.select().from(inspectionAccessTokens)
             .where(and(
@@ -230,7 +229,7 @@ export class PortalAccessService {
             )).get();
         if (!row || row.revokedAt != null) return null;
         if (row.expiresAt != null && row.expiresAt.getTime() <= now) return null;
-        return { tenantId: row.tenantId, role: row.role, recipientEmail: row.recipientEmail };
+        return { id: row.id, tenantId: row.tenantId, role: row.role, recipientEmail: row.recipientEmail };
     }
 
     /** The single (inspection, recipient) row, tenant-scoped, or null. */

@@ -1,4 +1,24 @@
 {
+  // The app/worker program. It does NOT compile server sources: the worker
+  // entry's `typeof import("../server/index")` and the ~30 direct
+  // `app/** -> server/**` imports used to drag ~800 server .ts files into this
+  // program, which is what made a cold `type-check:app` exceed an 8 GB heap.
+  //
+  // The `references` entry below redirects every one of those imports to the
+  // `.d.ts` that tsconfig.api.json already emits: measured with --listFiles,
+  // this program now contains ZERO server .ts files and 328 declaration files.
+  // Cold, at an 8 GB ceiling: 45s / 1,190,402 instantiations / 1.32 GB. The
+  // same pass before the split OOM'd at that ceiling after 281s.
+  //
+  // Consequences worth knowing:
+  //   - Both type-check entry points are `tsc -b`, not `tsc -p`. Build mode is
+  //     what builds/refreshes the referenced project's `.d.ts`; `tsc -p` would
+  //     just report that the outputs are missing.
+  //   - `type-check:app` therefore performs an up-to-date check on the api
+  //     project first. When nothing under server/ changed that is a stat pass;
+  //     when something did, the rebuild is real work this program now depends on.
+  //   - `.types/` is generated and gitignored. Never commit it.
+  "references": [{ "path": "./tsconfig.api.json" }],
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",

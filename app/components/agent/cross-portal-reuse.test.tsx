@@ -32,8 +32,6 @@ const DEFECT = {
   comment: "Replace missing shingles.",
   category: "safety",
   severityBucket: "defect",
-  estimateLow: null,
-  estimateHigh: null,
 } as Defect;
 
 /** Text a reader sees, with whitespace collapsed. */

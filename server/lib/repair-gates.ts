@@ -57,6 +57,28 @@ export async function runBuilderGate(
 }
 
 /**
+ * #275 — the tenant's configured repair-note quick phrases, VERBATIM.
+ *
+ * NULL is returned as null and never substituted here. "Never configured"
+ * (null → the seeded defaults) and "deliberately emptied" ([] → no buttons at
+ * all) are different states, and the defaults are localized product strings the
+ * client owns, not server constants. Collapsing the two on the way out would
+ * take away the tenant's only off switch and nobody would notice, because the
+ * defaults look intentional.
+ */
+export async function loadQuickPhrases(
+    c: Context<HonoConfig>,
+    tenantId: string,
+): Promise<string[] | null> {
+    const cfg = await drizzle(c.env.DB)
+        .select({ repairQuickPhrases: tenantConfigs.repairQuickPhrases })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .get();
+    return cfg?.repairQuickPhrases ?? null;
+}
+
+/**
  * Wraps assertCanEdit: catches Forbidden/NotFound errors thrown by the service
  * and returns an explicit 403/404 json Response so the route handler can
  * `return handleEditGuard(...)` without the error surfacing as a 500.

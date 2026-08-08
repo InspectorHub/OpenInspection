@@ -15,20 +15,22 @@ import type { Severity } from '../lib/validations/rating-system.schema';
 //   name                 → comments.text
 //   category             → comments.category
 //   severity             → comments.severity        (module F canonical vocabulary; rating_bucket is FROZEN)
-//   defaultEstimateMin   → comments.estimateMinCents
-//   defaultEstimateMax   → comments.estimateMaxCents
 //   defaultRepairSummary → comments.repairSummary
+//
+// A repair item carries SCOPE, not a price. The former defaultEstimateMin /
+// defaultEstimateMax pair (comments.estimate_*_cents) is gone: a figure the
+// product puts on a report reads as the inspection company's figure, and no
+// catalogue default knows the property, the trade market, or the week. Money on
+// an inspection is written by the buyer or their agent in the repair request.
 export interface Recommendation {
     id: string; tenantId: string; category: string | null; name: string;
     severity: Severity;
-    defaultEstimateMin: number | null; defaultEstimateMax: number | null;
     defaultRepairSummary: string; createdByUserId: string | null; createdAt: number | null;
     recommendedContractorTypeId: string | null;
 }
 export interface CreateRecommendationInput {
     category?: string | null; name: string;
     severity: Severity;
-    defaultEstimateMin?: number | null; defaultEstimateMax?: number | null;
     defaultRepairSummary: string; createdByUserId?: string | null;
     recommendedContractorTypeId?: string | null;
 }
@@ -41,8 +43,6 @@ function toRec(c: CommentRow): Recommendation {
         id: c.id, tenantId: c.tenantId, category: c.category ?? null,
         name: c.text,
         severity: (c.severity as Recommendation['severity']) ?? 'significant',
-        defaultEstimateMin: c.estimateMinCents ?? null,
-        defaultEstimateMax: c.estimateMaxCents ?? null,
         defaultRepairSummary: c.repairSummary ?? '',
         recommendedContractorTypeId: c.recommendedContractorTypeId ?? null,
         createdByUserId: null,
@@ -62,8 +62,6 @@ export class RecommendationService {
             category: input.category ?? null,
             severity: input.severity,
             repairSummary: input.defaultRepairSummary,
-            estimateMinCents: input.defaultEstimateMin ?? null,
-            estimateMaxCents: input.defaultEstimateMax ?? null,
             recommendedContractorTypeId: input.recommendedContractorTypeId ?? null,
             createdAt: new Date(),
         };
@@ -96,8 +94,6 @@ export class RecommendationService {
         if (patch.category !== undefined)             updates.category = patch.category ?? null;
         if (patch.name !== undefined)                 updates.text = patch.name;
         if (patch.severity !== undefined)             updates.severity = patch.severity;
-        if (patch.defaultEstimateMin !== undefined)   updates.estimateMinCents = patch.defaultEstimateMin ?? null;
-        if (patch.defaultEstimateMax !== undefined)   updates.estimateMaxCents = patch.defaultEstimateMax ?? null;
         if (patch.defaultRepairSummary !== undefined) updates.repairSummary = patch.defaultRepairSummary;
         if (patch.recommendedContractorTypeId !== undefined) updates.recommendedContractorTypeId = patch.recommendedContractorTypeId ?? null;
         await db.update(comments).set(updates).where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
@@ -128,7 +124,6 @@ export class RecommendationService {
             await db.insert(comments).values({
                 id: crypto.randomUUID(), tenantId, text: s.name, category: s.category ?? null,
                 severity: s.severity, repairSummary: s.defaultRepairSummary,
-                estimateMinCents: s.defaultEstimateMin ?? null, estimateMaxCents: s.defaultEstimateMax ?? null,
                 createdAt: new Date(),
             });
             inserted++;

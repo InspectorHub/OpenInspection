@@ -29,9 +29,18 @@ npm run build        # react-router build — bundles server/ (API) + app/ (RR S
 npm run deploy       # standalone: build + wrangler deploy (real ids via wrangler.local.jsonc)
 npm run deploy:saas  # saas: build + wrangler deploy with wrangler.saas.jsonc
 npm run type-check   # react-router typegen, then app + api tsc passes serially (lower peak RAM)
-npm run type-check:app   # tsc app side only (tsconfig.json)
-npm run type-check:api   # tsc api side only (tsconfig.api.json) — fastest loop for server/ work
-npm run type-check:fast  # tsgo (@typescript/native-preview) both passes; tsc stays the CI gate
+npm run type-check:app   # `tsc -b tsconfig.json` — the app/worker program
+npm run type-check:api   # `tsc -b tsconfig.api.json` — the server program; fastest loop for server/ work
+
+# Both are BUILD-mode (`tsc -b`), because the two programs are TypeScript project
+# references: tsconfig.api.json is composite and emits .d.ts into `.types/`, and the
+# app program consumes those instead of recompiling ~800 server sources (that is what
+# made a cold app pass exceed an 8 GB heap). Consequences:
+#   - `type-check:app` first brings the api project up to date. Nothing changed under
+#     server/ ⇒ a stat pass; something did ⇒ a real rebuild the app pass depends on.
+#   - `.types/` is generated and gitignored. Never commit it — a stale .d.ts produces
+#     boundary errors with no matching source. Deleting the directory is always safe;
+#     its build-info lives inside it, so a missing output dir is just a cold project.
 npm run lint
 npm run test:unit    # API unit tests (vitest --config vitest.api.config.ts)
 npm run test:web     # Web unit tests (vitest --config vitest.config.ts)

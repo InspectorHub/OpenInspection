@@ -7,6 +7,13 @@
  *
  * The RRB shape omits estimateLow/estimateHigh (RRB is pure-credit). We add
  * a stable `findingKey` so the builder can key its items against the report.
+ *
+ * "Omits" is literal: the fields are not on `RepairDefect` and are not copied in
+ * `flattenReportDefects` below. They were on both for a while, with this same
+ * sentence sitting above them, and the builder used them to offer the client a
+ * one-click "use the report's estimate" credit — so the comment described an
+ * invariant the file broke two screens later. The only credit figure in the RRB
+ * is one the client typed.
  */
 
 export type RepairDefect = {
@@ -29,11 +36,6 @@ export type RepairDefect = {
     // Snapshotted onto the item when added so the shared list tells a contractor
     // which trade to send; null when the inspector left it blank.
     trade:        string | null;
-    // IA-56 — the report's Est. Cost, carried ONLY as a credit-input hint in the
-    // builder (placeholder / "use estimate"). Never written to the credit value
-    // and never snapshotted to the public share page — RRB stays pure-credit.
-    estimateLow:  number | null;
-    estimateHigh: number | null;
 };
 
 /**
@@ -58,8 +60,6 @@ export interface InspectionSvcForDefects {
             category:         'safety' | 'recommendation' | 'maintenance';
             severityBucket:   'satisfactory' | 'monitor' | 'defect' | 'other';
             trade:            string | null;
-            estimateLow:      number | null;
-            estimateHigh:     number | null;
             source:           'canned' | 'custom';
             recommendationId: string | null;
         }>;
@@ -106,8 +106,6 @@ export async function flattenReportDefects(
             category:     d.category,
             severityBucket: d.severityBucket,
             trade:        d.trade,
-            estimateLow:  d.estimateLow,
-            estimateHigh: d.estimateHigh,
         };
     });
 }

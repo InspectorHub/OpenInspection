@@ -164,13 +164,13 @@ export interface HasDeliverSms {
  */
 export class AutomationBase {
     constructor(
-        protected db: D1Database,
-        protected notification?: import('../notification.service').NotificationService,
-        protected agreementService?: import('../agreement.service').AgreementService,
-        protected metering?: import('../metering.service').MeteringService,
+        public db: D1Database,
+        public notification?: import('../notification.service').NotificationService,
+        public agreementService?: import('../agreement.service').AgreementService,
+        public metering?: import('../metering.service').MeteringService,
     ) {}
 
-    protected getDrizzle() { return drizzle(this.db); }
+    public getDrizzle() { return drizzle(this.db); }
 }
 
 /** OI's real-time Clock for the automation core. Edge-only Date.now() (the core

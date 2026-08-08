@@ -96,6 +96,11 @@ export const AGENT_TEMPLATES: EmailTemplateDescriptor[] = [
       { name: 'reportUrl',       desc: 'Link to the report' },
     ],
     cta: { labelBlockKey: 'ctaLabel', urlVar: 'reportUrl' },
+    // OI #271 — the fourth report-link descriptor, and the one in a different
+    // catalog file: an agent is a recipient like any other, and LIA §3.1 marks
+    // agents as the population with the WEAKEST expectation, so they are the
+    // last people to leave uninformed. Conditions 4 and 5.
+    systemBlocks: ['viewDisclosure'],
   },
 
   {

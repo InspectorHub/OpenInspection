@@ -58,14 +58,14 @@ export interface VersionHistoryPanelProps {
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
-/** The 8 scalar fields written via `applyItemPatch`; guards the recover write. */
+/** The scalar fields written via `applyItemPatch`; guards the recover write.
+ *  No estimateMin / estimateMax: recovering an old version must not be a way to
+ *  put a repair price back into a live document. */
 const SCALAR_FIELD_SET = new Set<ScalarField>([
     "rating",
     "notes",
     "value",
     "recommendation",
-    "estimateMin",
-    "estimateMax",
     "followupStatus",
     "followupNotes",
 ]);

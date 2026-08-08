@@ -13,13 +13,13 @@ import { withInvoiceSync } from './invoice-sync';
 
 export function withWebhook<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends withInvoiceSync(Base) {
-        protected parseCloudEventType(type: string): { entityType: string; operation: string } | null {
+        public parseCloudEventType(type: string): { entityType: string; operation: string } | null {
             const parts = type.split('.');
             if (parts.length < 4 || parts[0] !== 'qbo') return null;
             return { entityType: parts[1]!, operation: parts[2]! };
         }
 
-        protected async verifyWebhookSignature(rawBody: string, headerSig: string): Promise<boolean> {
+        public async verifyWebhookSignature(rawBody: string, headerSig: string): Promise<boolean> {
             try {
                 const encoder = new TextEncoder();
                 const key = await crypto.subtle.importKey(

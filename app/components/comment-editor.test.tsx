@@ -26,3 +26,25 @@ test('edit mode seeds fields from the comment and reveals repair fields for a de
   expect((screen.getByLabelText(/Comment text/i) as HTMLTextAreaElement).value).toBe('Cracked');
   expect((screen.getByLabelText(/Repair summary/i) as HTMLInputElement).value).toBe('Replace');
 });
+
+/**
+ * A canned comment describes what was observed and what it takes to put it
+ * right. It does not carry a price: the number a reader sees on a report is
+ * attributed to the company whose name is on it, and the product has no way to
+ * know this property, this trade market, or this week. Money on an inspection
+ * is written by the buyer or their agent, in the repair request.
+ *
+ * The assertion is on the CONTROL, not on a label string: a renamed label with
+ * the input still there is the same capability. `MoneyInput` is the single
+ * money-entry control in the app (see app/components/MoneyInput.tsx), and it is
+ * the only thing that renders `inputmode="decimal"` here.
+ */
+test('a defect comment offers repair scope but no money entry', () => {
+  const { container } = renderEditor({
+    id: 'c1', text: 'Cracked', section: 'Roof', severity: 'significant', repairSummary: 'Replace',
+  });
+  // The scope field is still there — this is not "the defect panel went away".
+  expect(screen.getByLabelText(/Repair summary/i)).toBeTruthy();
+  expect(container.querySelectorAll('input[inputmode="decimal"]')).toHaveLength(0);
+  expect(screen.queryByLabelText(/Est\./i)).toBeNull();
+});

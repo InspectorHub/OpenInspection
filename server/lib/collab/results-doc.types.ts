@@ -68,11 +68,21 @@ export interface CannedState {
  *
  * Read by `server/lib/aggregate-recommendations.ts`
  * (`aggregateAttachedRecommendations`, the `GET /:id/recommendations` list).
+ *
+ * `estimateSnapshotMin` / `estimateSnapshotMax` are LEGACY and OPTIONAL: they
+ * exist on findings recorded while repair items still carried a catalogue
+ * price. Nothing writes them any more — the editor's authoring type
+ * (`AttachedRepairItem`, app/hooks/findings/shared.ts) has no such field, and a
+ * repair item snapshots scope, not a figure. They stay declared so a document
+ * written before the change still parses; do not reintroduce them as a write
+ * path (`scripts/check-price-capability.mjs` holds the line).
  */
 export interface RepairItemSnapshot {
     recommendationId:       string;
-    estimateSnapshotMin:    number | null;
-    estimateSnapshotMax:    number | null;
+    /** @deprecated legacy read-only; never written. */
+    estimateSnapshotMin?:   number | null;
+    /** @deprecated legacy read-only; never written. */
+    estimateSnapshotMax?:   number | null;
     summarySnapshot:        string;
     contractorTypeSnapshot: string | null;
     attachedAt:             number;
@@ -94,7 +104,15 @@ export interface CustomCommentEntry {
     photos?:   PhotoEntry[];
 }
 
-/** Toggle-state for a single canned defect, with per-defect overrides. */
+/**
+ * Toggle-state for a single canned defect, with per-defect overrides.
+ *
+ * A defect states WHAT is wrong and WHO should look at it — category, trade,
+ * deadline, timeframe. It carries no repair price: `estimateLow` /
+ * `estimateHigh` were removed, `projectResults` drops them on the way to D1,
+ * and `sanitizeDefectStates` drops them on the way in. Nothing here is a figure
+ * (`scripts/check-price-capability.mjs` holds the line).
+ */
 export interface DefectState {
     cannedId:          string;
     included:          boolean;
@@ -105,8 +123,6 @@ export interface DefectState {
     location?:         string | null;
     photos?:           PhotoEntry[];
     recommendationId?: string | null;
-    estimateLow?:      number | null;
-    estimateHigh?:     number | null;
     trade?:            string | null;
     deadline?:         string | null;
     timeframe?:        string | null;
@@ -136,9 +152,9 @@ export interface ItemEntry {
     rating?:         string;
     notes?:          string;
     photos?:         PhotoEntry[];
+    /** WHAT should be done (a repair-item slug or label) — never what it costs.
+     *  The former `estimateMin` / `estimateMax` pair is gone; see DefectState. */
     recommendation?: string;
-    estimateMin?:    number;
-    estimateMax?:    number;
     attributes?:     Record<string, unknown>;
     value?:          unknown;
     tabs?: {

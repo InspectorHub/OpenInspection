@@ -13,6 +13,7 @@ import type { Route } from "./+types/report-card-stack";
 import { createApi } from "~/lib/api-client.server";
 import { getToken } from "~/lib/session.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { readViewTrackingObjected } from "~/lib/view-tracking.server";
 import { EMPTY_BRAND } from "~/lib/brand";
 import { m } from "~/paraglide/messages";
 import {
@@ -89,12 +90,34 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  // the data route resolves the tenant from it (see public-report.ts). Without
  // forwarding it here the headless render gets "Report not found".
  const render = parsedUrl.searchParams.get("render") ?? undefined;
- const [res, brand] = await Promise.all([
+ // OI #271 — RELAY, not judgement. The data route decides whether this render
+ // counts as a human opening the report (server/lib/report-views.ts), and the
+ // two signals that say "no human has seen this" — the method, and the
+ // prefetch/prerender hints — exist only on the OUTER request. The in-process
+ // API call is always a GET built by hono/client, so without this the filter
+ // would be green in tests and blind in production. Nothing is derived here;
+ // these are the inbound values verbatim.
+ const requestShape: Record<string, string> = { "x-oi-client-method": request.method };
+ for (const h of ["purpose", "sec-purpose"]) {
+   const v = request.headers.get(h);
+   if (v) requestShape[h] = v;
+ }
+ // OI #271 — read the recipient's Art. 21 objection alongside the report, not
+ // from the browser after hydration: the disclosure's control must render with
+ // the right label in the SSR HTML, and a second client round trip on a public
+ // report page buys nothing. 401 (owner preview, render token, no grant) is
+ // not an error here — it resolves to false.
+ const [res, brand, viewTrackingObjected] = await Promise.all([
  api.publicReport.report[":tenant"][":id"].$get({
  param: { tenant: params.tenant ?? "", id: params.id ?? "" },
  query: { token, render },
- }),
+ }, { headers: requestShape }),
  resolveTenantBrand(context, params.tenant, request),
+ readViewTrackingObjected(context, {
+ inspectionId: params.id ?? "",
+ token,
+ cookie: request.headers.get("cookie") ?? undefined,
+ }),
  ]);
  const body = res.ok ? await res.json() : {};
  const d = ((body as Record<string, unknown>).data ?? {}) as unknown as LoaderResult | undefined;
@@ -121,6 +144,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  enableCustomerRepairExport: d?.enableCustomerRepairExport ?? false,
  reportTimeZone: d?.reportTimeZone ?? "UTC",
  isDelivered: d?.isDelivered ?? false,
+ viewTrackingObjected,
  brand,
  error: res.ok ? null : "Report not found",
  notPublished: (res.status as number) === 403,
