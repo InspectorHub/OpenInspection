@@ -161,7 +161,11 @@ export class AIService {
         // it for the feature-off case, and every client already routes that to
         // "set up AI". A second 4xx/5xx shape here would mean two failure paths
         // for one situation.
-        const decision = checkAiCapability(kind, this.credentials);
+        // Asked of the PROMPT, not of `kind`. `kind` is the cost split and
+        // defaults to 'assist', so a new capability that forgot to pass one
+        // would be judged as generic assistance; the prompt always carries its
+        // own classification because the type requires it.
+        const decision = checkAiCapability(prompt.classification, this.credentials);
         if (!decision.allowed) throw Errors.AINotConfigured(decision.message);
 
         // Hoisted from the adapter so a call that cannot possibly run does not

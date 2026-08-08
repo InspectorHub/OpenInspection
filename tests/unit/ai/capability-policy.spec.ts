@@ -4,6 +4,7 @@ import {
     type AiCapabilityDecision,
     type AiCapabilityDenialReason,
 } from '../../../server/lib/ai/capability-policy';
+import { posture } from '../../../server/lib/ai/output-classification';
 import { AIService } from '../../../server/services/ai.service';
 
 /**
@@ -34,32 +35,59 @@ const OWN_UNCONFIRMED_KEY = { source: 'byo', tenantKeyAttested: false } as const
 const MANAGED = { source: 'managed', tenantKeyAttested: false } as const;
 
 describe('AI capability policy', () => {
-    it('offers assist on the tenant OWN key', () => {
-        expect(checkAiCapability('assist', OWN_CONFIRMED_KEY)).toEqual({ allowed: true });
+    it('offers writing assistance on the tenant OWN key', () => {
+        expect(checkAiCapability('finding_explanation', OWN_CONFIRMED_KEY)).toEqual({ allowed: true });
     });
 
-    it('does NOT offer assist on platform credentials', () => {
-        const d = checkAiCapability('assist', MANAGED);
-        expect(d).toMatchObject({ allowed: false, capability: 'assist', source: 'managed' });
+    it('does NOT offer writing assistance on platform credentials', () => {
+        const d = checkAiCapability('finding_explanation', MANAGED);
+        expect(d).toMatchObject({
+            allowed: false, classification: 'finding_explanation', source: 'managed',
+        });
         expect(denialReason(d)).toBe('source_not_offered');
     });
 
-    it('does NOT offer translate on ANY credentials — including the tenant own key', () => {
+    it('does NOT offer translation on ANY credentials — including the tenant own key', () => {
         // Asserted on BYO first: if this only covered 'managed' it would pass
         // against a policy that refuses nothing but managed, which is a
         // different rule with the same green.
-        const byo = checkAiCapability('translate', OWN_CONFIRMED_KEY);
+        const byo = checkAiCapability('translation', OWN_CONFIRMED_KEY);
         expect(byo).toMatchObject({ allowed: false, source: 'byo' });
         expect(denialReason(byo)).toBe('capability_not_released');
-        expect(denialReason(checkAiCapability('translate', MANAGED))).toBe('capability_not_released');
+        expect(denialReason(checkAiCapability('translation', MANAGED))).toBe('capability_not_released');
     });
 
-    it('does NOT offer assist on an own key with no confirmation on file', () => {
+    it('summaries are offered separately from writing assistance', () => {
+        // The reason the gate stopped keying on `AiUsageKind`: both of these
+        // meter as 'assist', so a policy keyed on the cost split could not give
+        // them different answers even in principle. Today the answers agree —
+        // the case exists so that stays a decision rather than an accident.
+        expect(checkAiCapability('summary', OWN_CONFIRMED_KEY)).toEqual({ allowed: true });
+        expect(denialReason(checkAiCapability('summary', MANAGED))).toBe('source_not_offered');
+    });
+
+    it.each(['legal_text', 'repair_pricing'] as const)(
+        'never generates %s, on either source, confirmed key or not',
+        (classification) => {
+            // Not a "not yet". These are refused as PROHIBITED, and the
+            // distinct reason is the point: a tenant who confirms their key,
+            // or a deployment that provisions a platform key, must not read
+            // the refusal as something they can clear.
+            for (const creds of [OWN_CONFIRMED_KEY, OWN_UNCONFIRMED_KEY, MANAGED]) {
+                expect(denialReason(checkAiCapability(classification, creds)))
+                    .toBe('capability_prohibited');
+            }
+        },
+    );
+
+    it('does NOT offer writing assistance on an own key with no confirmation on file', () => {
         // The save gate only covers keys stored after it existed. A key that
         // predates it has been confirmed against nothing, and this is the only
         // gate that is true of it.
-        const d = checkAiCapability('assist', OWN_UNCONFIRMED_KEY);
-        expect(d).toMatchObject({ allowed: false, capability: 'assist', source: 'byo' });
+        const d = checkAiCapability('finding_explanation', OWN_UNCONFIRMED_KEY);
+        expect(d).toMatchObject({
+            allowed: false, classification: 'finding_explanation', source: 'byo',
+        });
         expect(denialReason(d)).toBe('tenant_key_not_attested');
     });
 
@@ -67,18 +95,70 @@ describe('AI capability policy', () => {
         // A refusal a workspace cannot act on is an outage with extra steps:
         // their key is present and valid, so "AI is unavailable" explains
         // nothing. The message must name the destination and the action.
-        const d = checkAiCapability('assist', OWN_UNCONFIRMED_KEY);
+        const d = checkAiCapability('finding_explanation', OWN_UNCONFIRMED_KEY);
         if (d.allowed) throw new Error('expected a denial');
         expect(d.message).toContain('Settings → Advanced → AI');
         expect(d.message).toMatch(/confirm/i);
     });
 
     it('keeps the unconfirmed refusal distinct from the not-released one', () => {
-        // Same call, two different reasons depending on the capability. If
-        // translate reported `tenant_key_not_attested`, confirming would look
-        // like it should unlock a feature that does not exist.
-        expect(denialReason(checkAiCapability('translate', OWN_UNCONFIRMED_KEY)))
+        // Same credentials, two different reasons depending on what the output
+        // would be. If translation reported `tenant_key_not_attested`,
+        // confirming would look like it should unlock a feature that does not
+        // exist.
+        expect(denialReason(checkAiCapability('translation', OWN_UNCONFIRMED_KEY)))
             .toBe('capability_not_released');
+    });
+
+    it('names the feature the inspector used, not the internal class', () => {
+        // 'finding_explanation' is a word from this file. Someone who just
+        // clicked a button in the editor has no way to connect it to what they
+        // did, and a refusal they cannot place is a refusal they cannot act on.
+        const d = checkAiCapability('finding_explanation', MANAGED);
+        if (d.allowed) throw new Error('expected a denial');
+        expect(d.message).not.toMatch(/finding_explanation|_/);
+    });
+});
+
+describe('output classification postures', () => {
+    // These assert the DATA, not a code path, and that is the point: the
+    // postures are the product's rules written down, and the one that has no
+    // enforcement yet is the one most easily flipped by accident.
+    const ALL = [
+        'translation', 'summary', 'finding_explanation',
+        'maintenance_suggestion', 'legal_text', 'repair_pricing',
+    ] as const;
+
+    it.each(ALL)('%s requires human review on both sources', (classification) => {
+        // Nothing enforces this field today — there is no review surface and
+        // nowhere to record that a review happened. So the ONLY thing standing
+        // between the rule and a silent `false` is this case. When the review
+        // surface lands, enforcement replaces the honour system; until then
+        // this is the honour system with a witness.
+        for (const source of ['byo', 'managed'] as const) {
+            expect(posture(classification, source).requiresReview).toBe(true);
+        }
+    });
+
+    it('states the extra labelling that maintenance advice carries', () => {
+        // The condition that separates upkeep guidance from a finding. It is
+        // prose because it constrains what a PROMPT may ask for, which is a
+        // review question when the prompt is written, not a runtime assertion —
+        // so the test's job is that the words have not gone missing.
+        const conditions = posture('maintenance_suggestion', 'byo').conditions ?? [];
+        expect(conditions.join(' ')).toMatch(/not an inspection finding/i);
+        expect(conditions.join(' ')).toMatch(/no repair interval/i);
+    });
+
+    it('does not let a restatement class quietly permit new assertions', () => {
+        // summary and finding_explanation both restate content the inspector
+        // already produced. If either dropped these conditions, the class would
+        // still read as allowed and nothing else would notice.
+        for (const c of ['summary', 'finding_explanation'] as const) {
+            const joined = (posture(c, 'byo').conditions ?? []).join(' ');
+            expect(joined).toMatch(/no fact not already in the report/i);
+            expect(joined).toMatch(/severity/i);
+        }
     });
 });
 
