@@ -49,10 +49,12 @@ permissions:
 
 jobs:
   # ── Type checking ────────────────────────────────────────────────────────
-  # Split app/api because they are two independent tsc programs; together they
-  # were the longest step in the old chain. The app side needs the generators
-  # first (paraglide messages + route types); the api side includes only
-  # server/** and has never needed either.
+  # ONE job, not two. This was split when app and api were two independent tsc
+  # programs and together formed the longest step in the old chain. They are no
+  # longer independent: tsconfig.api.json is a composite project that
+  # tsconfig.json references, so `type-check:app` builds api first and reports
+  # its errors. A second job was re-compiling the same project for the same
+  # answer — see the note below where it used to be.
   typecheck-app:
     name: type-check (app)
     runs-on: ubuntu-latest
@@ -88,56 +90,24 @@ jobs:
           key: rr-typegen-${{ hashFiles('app/routes.ts', 'app/routes/**', 'react-router.config.ts', 'package-lock.json') }}
       - run: npx react-router typegen
       - run: npm run type-check:app
-
-  typecheck-api:
-    name: type-check (api)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-node@v5
-        with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
-      - run: npm run gen-version
-      - run: npm run type-check:api
-
-  # Type-only test project: expectTypeOf(...) assertions in tests/**/*.spec-d.ts
-  # are a runtime no-op under plain vitest run — this is the only thing that
-  # actually type-checks them.
-  test-types:
-    name: type-only tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-node@v5
-        with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
-      - run: npm run gen-version
-      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
-      # that those exact inputs produced — unlike a build-info cache, there is no
-      # staleness to reason about. The stamp inside app/paraglide comes back with
-      # it, so the script below sees "unchanged" and skips a ~66s compile.
-      - uses: actions/cache@v4
-        with:
-          path: app/paraglide
-          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
-      - run: npm run i18n:compile:cached
-      # Same shape as the paraglide cache above, and for the same reason: the
-      # output is a pure function of the route TREE, so a key built from those
-      # inputs can only restore what they produced. Five jobs need these types
-      # and every one of them was paying the full ~60s generate — five runner
-      # minutes per CI run for identical output. Hashing the route file bodies
-      # over-invalidates (editing a loader cannot change the generated types)
-      # but never under-invalidates, which is the safe direction for a cache.
-      - uses: actions/cache@v4
-        with:
-          path: .react-router/types
-          key: rr-typegen-${{ hashFiles('app/routes.ts', 'app/routes/**', 'react-router.config.ts', 'package-lock.json') }}
-      - run: npx react-router typegen
+      # Runs HERE rather than in its own job. `test:types` only checks four
+      # `*.spec-d.ts` files, but its tsconfig references the api project, and
+      # `tsc -b` has already built that one line above — so this costs ~6s
+      # instead of the ~4m36s a fresh runner spent rebuilding the same program.
       - run: npm run test:types
+
+  # There is deliberately NO separate `type-check (api)` job. Since the two
+  # programs became TypeScript project references, `type-check:app` IS
+  # `tsc -b tsconfig.json`, which builds tsconfig.api.json first and reports its
+  # errors — so a second job re-compiled the same project for the same answer.
+  #
+  # Verified rather than reasoned: a type error planted in `server/api/admin.ts`,
+  # a file the app program does not import, is reported by `type-check:app` as
+  # `server/api/admin.ts(53,7): error TS2322` with exit 2.
+  #
+  # `npm run type-check:api` still exists and is still the right local loop for
+  # server-only work — pre-commit's api tier uses it. What was removed is the
+  # duplicate CI runner, not the check.
 
   # ── Lint ─────────────────────────────────────────────────────────────────
   # eslint is type-aware here (unlike pre-commit, which sets ESLINT_FAST and
@@ -175,6 +145,29 @@ jobs:
           path: .react-router/types
           key: rr-typegen-${{ hashFiles('app/routes.ts', 'app/routes/**', 'react-router.config.ts', 'package-lock.json') }}
       - run: npx react-router typegen
+      # ESLint's own cache, persisted between runs. Measured on this repo: a cold
+      # eslint is 442s, and a warm one with a single file touched is 6s — the
+      # type-aware program is built lazily for the files actually linted, so a
+      # cache hit skips that too. CI was paying the cold price every run.
+      #
+      # The classic reason this does not work on GitHub Actions is that a fresh
+      # checkout gives every file a new mtime, and ESLint's DEFAULT cache
+      # strategy is metadata — so the cache misses on all files. `lint:eslint`
+      # already passes `--cache-strategy content`, which hashes contents instead;
+      # that flag is what makes persisting this worthwhile at all. Do not remove
+      # it without removing this cache.
+      #
+      # Keyed on the config and the lockfile, so a rule change or a plugin bump
+      # starts a fresh cache rather than silently reusing verdicts computed under
+      # the old rules. The restore-keys prefix CONTAINS that same hash, so a
+      # fallback can only ever come from a run with identical rules — it cannot
+      # under-invalidate. The commit sha suffix keeps a fresh copy saved each run
+      # instead of freezing at the first one.
+      - uses: actions/cache@v4
+        with:
+          path: .eslintcache
+          key: eslint-${{ hashFiles('eslint.config.js', 'package-lock.json') }}-${{ github.sha }}
+          restore-keys: eslint-${{ hashFiles('eslint.config.js', 'package-lock.json') }}-
       - run: npm run lint:eslint
 
   lint-gates:
@@ -218,10 +211,31 @@ jobs:
         run: npm run db:check
 
   # ── Tests ────────────────────────────────────────────────────────────────
+  # Sharded across four runners. This job was the longest in the workflow at
+  # 7m22s, and the suite is import-bound rather than assertion-bound: `import`
+  # dominates `tests` because 723 spec files each rebuild the module graph in
+  # their own process.
+  #
+  # Sharding buys the wall-clock back WITHOUT touching a single test. Each shard
+  # is an ordinary, fully isolated run of a subset — no shared state, no new
+  # failure mode. Measured locally: shard 1/4 is 181 files / 1448 tests in 148s
+  # against 422s for the whole suite.
+  #
+  # ⚠️ The other way to attack the same term — relaxing vitest's per-file process
+  # isolation — was investigated and REJECTED, not merely skipped. 348 specs mock
+  # `drizzle-orm/d1` at module scope and share one `vi.fn()` once the registry is
+  # shared; vitest offers no per-file isolation override. See
+  # [redacted] (superproject).
+  #
+  # `fail-fast: false` so one red shard does not hide the others' results.
   test-unit:
-    name: API unit tests
+    name: API unit tests (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
@@ -229,7 +243,7 @@ jobs:
         with: { node-version: 22.22.x, cache: npm }
       - run: npm ci
       - run: npm run gen-version
-      - run: npm run test:unit
+      - run: npm run test:unit -- --shard=${{ matrix.shard }}/4
 
   test-workers:
     name: worker-runtime tests
@@ -244,10 +258,22 @@ jobs:
       - run: npm run gen-version
       - run: npm run test:workers
 
+  # Sharded like the api suite, and for the same reason: import-bound, so a
+  # subset costs far less than its share of the whole. Measured locally,
+  # `--shard=1/4` is 84 files / 586 tests in 55s against 159-181s for all 335.
+  #
+  # ⚠️ The trade, stated rather than buried: `transform` (40s) and `setup` (26s)
+  # are per-shard fixed costs, so four shards spend roughly 40% MORE total CPU to
+  # take ~65% off the wall clock. That is the right trade for a CI gate people
+  # wait on, and the wrong one if these minutes are ever billed by the second.
   test-web:
-    name: web unit tests
+    name: web unit tests (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
@@ -276,7 +302,7 @@ jobs:
           path: .react-router/types
           key: rr-typegen-${{ hashFiles('app/routes.ts', 'app/routes/**', 'react-router.config.ts', 'package-lock.json') }}
       - run: npx react-router typegen
-      - run: npm run test:web
+      - run: npm run test:web -- --shard=${{ matrix.shard }}/4
 
   # ── Build + bundle ceiling ───────────────────────────────────────────────
   build:
@@ -306,8 +332,6 @@ jobs:
     if: always()
     needs:
       - typecheck-app
-      - typecheck-api
-      - test-types
       - lint-eslint
       - lint-gates
       - test-unit
@@ -349,10 +373,36 @@ jobs:
   # so every spec exercises the actual database. Auth is standalone-mode only
   # (the local login form) — saas login is a portal handoff and is out of scope
   # for this repo's CI.
+  # Two runners, one per Playwright config. They were two steps on one runner:
+  # 72s of shared setup, then 166s and 112s back to back = 357s.
+  #
+  # Measured breakdown of the first step before splitting: 38s build + boot,
+  # 21s globalSetup seed, 104s actually running 205 tests. The second step ran
+  # 9 tests in 10s behind ~102s of its own globalSetup.
+  #
+  # ⚠️ The honest cost: the second config currently REUSES the first's running
+  # worker (`reuseExistingServer`), so on its own runner it must now build and
+  # boot one itself — about 38s it did not previously pay, on top of a second
+  # `npm ci` and browser install. Wall clock ~238s against 357s; total runner
+  # time goes UP. That is the trade, and it is the right way round for a gate
+  # people wait on.
+  #
+  # NOT sharded further. Playwright re-runs a project's `dependencies` in EVERY
+  # shard (microsoft/playwright#21974), and `playwright.config.ts` records that
+  # every project shares one wrangler-dev worker and one D1 seeded once — three
+  # separate causes had to be fixed to get from 1 worker to 3, the third found
+  # only because a run failed. Separate runners sidestep that ceiling; more
+  # shards would multiply the setup that is already most of the second leg.
   e2e:
-    name: e2e
+    name: e2e (${{ matrix.suite.label }})
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - { id: seeded-d1, label: 'seeded D1', script: 'test:e2e' }
+          - { id: multi-user, label: 'multi-user seed', script: 'test:e2e:seeded' }
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -392,21 +442,22 @@ jobs:
       - name: Install Playwright browser (chromium)
         run: npx playwright install --with-deps chromium
 
-      - name: E2E tests (Playwright, seeded D1)
-        run: npm run test:e2e
+      # The two configs cannot share one D1: the multi-user seed writes users
+      # into the standalone tenant, which 409s the other run's fresh-setup
+      # assertion. See playwright.seeded.config.ts for the full reasoning. That
+      # is why they are two runners rather than one run — each gets its own
+      # worker and its own D1 by construction.
+      - name: E2E tests
+        run: npm run ${{ matrix.suite.script }}
 
-      # Second run, second config: the multi-user seed writes users into the
-      # standalone tenant, which 409s the first run's fresh-setup assertion, so
-      # the two cannot share one D1. Same worker (reuseExistingServer), so this
-      # is one extra globalSetup, not one extra boot. See
-      # playwright.seeded.config.ts for the full reasoning.
-      - name: E2E tests (multi-user seed — subsystem D/E)
-        run: npm run test:e2e:seeded
-
+      # ⚠️ Per-leg artifact name. upload-artifact@v4 FAILS on a duplicate name
+      # rather than merging, so a matrix that uploads must key the name on the
+      # matrix value — otherwise the second leg's failure upload kills the job
+      # that was already failing, and the report you wanted is the thing you lose.
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.suite.id }}
           path: playwright-report/
           retention-days: 7
