@@ -50,6 +50,13 @@ const SCRIPT_GATES = [
     // price gate -- the most expensive entry in this set, and still small next
     // to the eslint and tsc steps around it.
     { key: 'zerotrack', label: 'Zero client-side tracking', script: 'check-zero-tracking.mjs', fix: 'npm run lint:zero-tracking' },
+    // Third entry with the same justification, and the clearest case of it: what
+    // it catches is an AI capability arriving with nobody having said what kind
+    // of statement it produces, or reaching a model without going through the
+    // one method that asks. The compiler already refuses an unclassified prompt;
+    // this covers the second route to a provider, which no type can see. 0.4s,
+    // between the price gate and the tracking gate.
+    { key: 'aiclass', label: 'AI output classification', script: 'check-ai-classification.mjs', fix: 'npm run lint:ai-classification' },
 ];
 
 const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup' };
