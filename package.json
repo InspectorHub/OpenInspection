@@ -74,7 +74,7 @@
     "test:web": "vitest run --config vitest.config.ts",
     "test:web:changed": "vitest run --changed --config vitest.config.ts",
     "test:workers": "vitest run --config vitest.workers.config.ts",
-    "test:types": "cross-env NODE_OPTIONS=--max-old-space-size=8192 vitest run --typecheck --config vitest.typecheck.config.ts",
+    "test:types": "cross-env NODE_OPTIONS=--max-old-space-size=8192 tsc -b tsconfig.api.json && cross-env NODE_OPTIONS=--max-old-space-size=8192 vitest run --typecheck --config vitest.typecheck.config.ts",
     "test:e2e": "playwright test",
     "test:e2e:seeded": "playwright test -c playwright.seeded.config.ts",
     "db:migrate": "node scripts/wrangler.mjs d1 migrations apply DB --local",

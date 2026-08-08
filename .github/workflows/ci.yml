@@ -90,6 +90,11 @@ jobs:
           key: rr-typegen-${{ hashFiles('app/routes.ts', 'app/routes/**', 'react-router.config.ts', 'package-lock.json') }}
       - run: npx react-router typegen
       - run: npm run type-check:app
+      # Runs HERE rather than in its own job. `test:types` only checks four
+      # `*.spec-d.ts` files, but its tsconfig references the api project, and
+      # `tsc -b` has already built that one line above — so this costs ~6s
+      # instead of the ~4m36s a fresh runner spent rebuilding the same program.
+      - run: npm run test:types
 
   # There is deliberately NO separate `type-check (api)` job. Since the two
   # programs became TypeScript project references, `type-check:app` IS
@@ -103,43 +108,6 @@ jobs:
   # `npm run type-check:api` still exists and is still the right local loop for
   # server-only work — pre-commit's api tier uses it. What was removed is the
   # duplicate CI runner, not the check.
-
-  # Type-only test project: expectTypeOf(...) assertions in tests/**/*.spec-d.ts
-  # are a runtime no-op under plain vitest run — this is the only thing that
-  # actually type-checks them.
-  test-types:
-    name: type-only tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-node@v5
-        with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
-      - run: npm run gen-version
-      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
-      # that those exact inputs produced — unlike a build-info cache, there is no
-      # staleness to reason about. The stamp inside app/paraglide comes back with
-      # it, so the script below sees "unchanged" and skips a ~66s compile.
-      - uses: actions/cache@v4
-        with:
-          path: app/paraglide
-          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
-      - run: npm run i18n:compile:cached
-      # Same shape as the paraglide cache above, and for the same reason: the
-      # output is a pure function of the route TREE, so a key built from those
-      # inputs can only restore what they produced. Five jobs need these types
-      # and every one of them was paying the full ~60s generate — five runner
-      # minutes per CI run for identical output. Hashing the route file bodies
-      # over-invalidates (editing a loader cannot change the generated types)
-      # but never under-invalidates, which is the safe direction for a cache.
-      - uses: actions/cache@v4
-        with:
-          path: .react-router/types
-          key: rr-typegen-${{ hashFiles('app/routes.ts', 'app/routes/**', 'react-router.config.ts', 'package-lock.json') }}
-      - run: npx react-router typegen
-      - run: npm run test:types
 
   # ── Lint ─────────────────────────────────────────────────────────────────
   # eslint is type-aware here (unlike pre-commit, which sets ESLINT_FAST and
@@ -364,7 +332,6 @@ jobs:
     if: always()
     needs:
       - typecheck-app
-      - test-types
       - lint-eslint
       - lint-gates
       - test-unit
