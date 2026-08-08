@@ -230,7 +230,9 @@ export const StripeConnectAccountSchema = z.object({
  * together the two distinguish "never confirmed" from "confirmed, then the
  * agreement changed" — which need different words in front of a person.
  */
-export const CancellationClauseStateSchema = z.object({
+/* Not exported: only `BrandingResponseSchema` below composes it, and an exported
+   symbol nothing imports is what `lint:deadcode` counts. */
+const CancellationClauseStateSchema = z.object({
     current: z.boolean().describe('The attestation exists AND still matches the agreement version.'),
     everAttested: z.boolean().describe('An attestation was recorded at some point, valid or not.'),
     agreementId: z.string().nullable().describe('Agreement template the attestation names, if any.'),
