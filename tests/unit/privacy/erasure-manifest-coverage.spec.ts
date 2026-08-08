@@ -185,6 +185,11 @@ const HEURISTIC_BLIND_SPOTS = [
     // Free text on the accountability ledger whose email sibling WAS declared.
     'erasure_log.identity_basis',
     'erasure_log.response_note',
+    // #275 — the buyer's requested remedy per line item. Added to the schema and
+    // to `erasure-out-of-scope.ts` in the same change, with nothing red on either
+    // side of that: the gate pattern matches no part of `repair_action_tag`, so
+    // the only thing standing between it and silence is this line.
+    'repair_request_items.repair_action_tag',
 ];
 
 describe('columns the PII heuristic cannot see', () => {

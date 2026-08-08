@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { repairRequests, repairRequestItems } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { SHARE_TOKEN_TTL_MS, isTokenRevokedOrExpired } from '../lib/token-ttl';
+import type { RepairActionTag } from '../lib/repair-action-tag';
 
 export type Creator = { kind: 'client' | 'agent' | 'inspector'; ref: string };
 
@@ -19,6 +20,11 @@ type ItemInput = {
     commentSnapshot?: string | null;
     requestedCreditCents?: number | null;
     note?: string | null;
+    // #275 — what the buyer is asking for on this line. Buyer/agent-authored;
+    // the refusal for an inspector-authored tag lives at the route boundary
+    // (repair-gates.ts), not here, because an inspector adding an UNTAGGED item
+    // is a flow that works today and must keep working.
+    repairActionTag?: RepairActionTag | null;
 };
 
 export class RepairRequestService {
@@ -185,6 +191,11 @@ export class RepairRequestService {
                 commentSnapshot:      input.commentSnapshot ?? null,
                 requestedCreditCents: input.requestedCreditCents ?? null,
                 note:                 input.note ?? null,
+                // #275 — this patch object is written out field by field, so an
+                // omission here silently discards the tag on the IDEMPOTENT
+                // re-add path (toggle a defect off and on, reload the builder)
+                // while the insert below looks perfectly correct.
+                repairActionTag:      input.repairActionTag ?? null,
             };
             await this.d()
                 .update(repairRequestItems)
@@ -214,6 +225,7 @@ export class RepairRequestService {
             requestedCreditCents: input.requestedCreditCents ?? null,
             note: input.note ?? null,
             sortOrder: 0,
+            repairActionTag: input.repairActionTag ?? null,
         };
         await this.d().insert(repairRequestItems).values(item);
         await this.touch(tenantId, repairRequestId);
@@ -231,7 +243,9 @@ export class RepairRequestService {
         inspectionId: string,
         repairRequestId: string,
         itemId: string,
-        patch: Partial<Pick<ItemInput, 'requestedCreditCents' | 'note'>> & { sortOrder?: number },
+        // A CLOSED allow-list: a field not named here cannot be PATCHed however
+        // willing every other layer is. #275 added `repairActionTag`.
+        patch: Partial<Pick<ItemInput, 'requestedCreditCents' | 'note' | 'repairActionTag'>> & { sortOrder?: number },
     ) {
         // Guard: confirm the RR belongs to this (tenant, inspection) before mutating.
         const rr = await this.d()

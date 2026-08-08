@@ -58,3 +58,59 @@ describe("repair-request share page — recommended trade (IA-57)", () => {
     expect(queryByTestId("share-row-trade")).toBeNull();
   });
 });
+
+describe("repair-request share page — requested action tag (#275)", () => {
+  it("shows the buyer's requested action, localized rather than as the raw enum", async () => {
+    const { findByTestId } = renderShare([{ ...BASE, repairActionTag: "replace" }]);
+    const cell = await findByTestId("share-row-action-tag");
+    expect(cell.textContent).toContain("Replace");
+    // The stored value is `replace`; a page rendering that verbatim would look
+    // right in English and be untranslatable everywhere else.
+    expect(cell.textContent).not.toContain("replace");
+  });
+
+  it("resolves every value in the vocabulary", async () => {
+    // Whole-vocabulary rather than one sample: a missing case in the label
+    // switch is exactly the shape that ships one broken word.
+    for (const [tag, label] of [
+      ["repair", "Repair"],
+      ["replace", "Replace"],
+      ["fund", "Fund"],
+      ["other", "Other"],
+    ] as const) {
+      const { findByTestId, unmount } = renderShare([{ ...BASE, repairActionTag: tag }]);
+      expect((await findByTestId("share-row-action-tag")).textContent).toContain(label);
+      unmount();
+    }
+  });
+
+  it("renders no tag line for an untagged item — every pre-#275 row is one", async () => {
+    const { queryByTestId, findByText } = renderShare([{ ...BASE }]);
+    expect(await findByText(/Several shingles are cracked\./)).toBeTruthy();
+    expect(queryByTestId("share-row-action-tag")).toBeNull();
+  });
+
+  it("sits OUTSIDE every print-hidden region, so it reaches the PDF", async () => {
+    // The PDF is this page re-rendered through the print stylesheet
+    // (sharePdfRoute -> generatePdfFromUrl). The footer is `print:hidden` and is
+    // absent from the file the seller receives; that already happened once to
+    // the amount attribution, which is why it carries the same assertion.
+    const { findByTestId } = renderShare([{ ...BASE, repairActionTag: "fund" }]);
+    const el = await findByTestId("share-row-action-tag");
+    for (let node: HTMLElement | null = el; node; node = node.parentElement) {
+      expect(node.className ?? "").not.toContain("print:hidden");
+    }
+  });
+
+  it("keeps the tag out of the inspector-authored Finding cell", async () => {
+    // Authorship, not layout: the Finding cell holds the defect title, comment
+    // and recommended trade, all written by the inspector. A seller reading
+    // "Replace" in there reads it as the inspector's call, not the buyer's ask.
+    const { findByTestId } = renderShare([
+      { ...BASE, repairActionTag: "replace", tradeSnapshot: "licensed roofer" },
+    ]);
+    const tradeCell = await findByTestId("share-row-trade");
+    const tagCell = await findByTestId("share-row-action-tag");
+    expect(tradeCell.parentElement?.contains(tagCell)).toBe(false);
+  });
+});

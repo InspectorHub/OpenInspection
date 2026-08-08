@@ -242,7 +242,10 @@ const INVENTORY = [
       reason: "Booking: the fee for the inspection being scheduled." },
     { kind: "control", id: "app/components/portal/sections/repair/RepairDefectRow.tsx", disposition: "allowed",
       reason: "The buyer's own credit request. This is the buyer typing their own number, which "
-            + "is the only repair-related figure the product accepts." },
+            + "is the only repair-related figure the product accepts. Since #275 the input is "
+            + "REVEALED BY the `fund` action tag rather than always shown — a narrowing of when "
+            + "it is offered, not a change to who authors it, so it stays allowed. Still no "
+            + "prefill, no suggested figure and no report estimate anywhere near it." },
     { kind: "control", id: "app/components/settings/BookingPoliciesPanel.tsx", disposition: "allowed",
       reason: "Booking policy: deposit thresholds against the tenant's own fee." },
     { kind: "control", id: "app/components/settings/services/DepositWidget.tsx", disposition: "allowed",

@@ -3,6 +3,7 @@ import type { Route } from "./+types/repair-request.$shareToken";
 import { createApi } from "~/lib/api-client.server";
 import { PublicNotice } from "~/components/PublicNotice";
 import { formatCents } from "~/lib/money";
+import type { RepairActionTag } from "~/lib/repair-action-tag";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -26,6 +27,9 @@ interface ShareItem {
   commentSnapshot: string | null;
   requestedCreditCents: number | null;
   note: string | null;
+  // #275 — what the buyer asked for on this line. Optional because every item
+  // added before the column existed has none, and an untagged item is valid.
+  repairActionTag?: RepairActionTag | null;
 }
 
 interface ShareApiData {
@@ -46,6 +50,11 @@ export interface ShareViewRow {
   comment: string;
   note: string | null;
   creditDisplay: string;
+  /** #275 — kept as the raw enum value, not a label. `sharePriorityLabel`
+   *  resolves `category` at RENDER time so the paraglide locale scope is the
+   *  request's; baking a string in here would freeze whichever locale the view
+   *  model was built under. */
+  actionTag: RepairActionTag | null;
 }
 
 export interface ShareViewModel {
@@ -74,6 +83,7 @@ export function shareViewModel(data: ShareApiData): ShareViewModel {
       item.requestedCreditCents == null
         ? "—"
         : formatCents(item.requestedCreditCents),
+    actionTag: item.repairActionTag ?? null,
   }));
   return {
     state: "ok",
@@ -93,6 +103,19 @@ function sharePriorityLabel(category: string): string {
     case "recommendation": return m.portal_repair_category_recommendation();
     case "maintenance": return m.portal_repair_category_maintenance();
     default: return category;
+  }
+}
+
+/** #275 — localize the action tag. Resolved at call time for the paraglide
+ *  locale scope, exactly like `sharePriorityLabel` above. The switch is
+ *  exhaustive over `RepairActionTag`, so adding a value to the vocabulary
+ *  fails the type-check here rather than rendering a raw enum word. */
+function shareActionTagLabel(tag: RepairActionTag): string {
+  switch (tag) {
+    case "repair": return m.repair_request_action_tag_repair();
+    case "replace": return m.repair_request_action_tag_replace();
+    case "fund": return m.repair_request_action_tag_fund();
+    case "other": return m.repair_request_action_tag_other();
   }
 }
 
@@ -252,7 +275,29 @@ export default function RepairRequestSharePage() {
                   </span>
                 )}
               </span>
-              <span className="text-ih-fg-3 pr-3 leading-snug">{row.note ?? ""}</span>
+              {/* #275 — the requested action sits in the NOTE cell, beside the
+                  buyer's own prose and one column from their credit, NOT in the
+                  Finding cell with the defect title, comment and recommended
+                  trade. Everything in that cell is inspector-authored; the tag
+                  is the buyer's ask, and a seller reading "Replace" under the
+                  inspector's content would read it as the inspector's call. The
+                  amount attribution below says whose numbers these are — this
+                  keeps the layout saying the same thing.
+
+                  NOT inside any `print:hidden` region: the PDF is this page
+                  re-rendered through the print stylesheet, so a hidden element
+                  is absent from the file the seller actually receives. */}
+              <span className="text-ih-fg-3 pr-3 leading-snug">
+                {row.actionTag && (
+                  <span data-testid="share-row-action-tag" className="block text-[11px] text-ih-fg-4">
+                    <span className="font-bold uppercase tracking-wider">
+                      {m.repair_request_action_tag_prefix()}
+                    </span>{" "}
+                    {shareActionTagLabel(row.actionTag)}
+                  </span>
+                )}
+                {row.note ?? ""}
+              </span>
               <span className="text-right font-mono tabular-nums text-ih-fg-1 min-w-[80px]">
                 {row.creditDisplay}
               </span>

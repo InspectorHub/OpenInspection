@@ -205,6 +205,18 @@
             "type": "string",
             "nullable": true,
             "description": "Buyer note explaining the requested credit."
+          },
+          "repairActionTag": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "repair",
+              "replace",
+              "fund",
+              "other",
+              null
+            ],
+            "description": "What the buyer is asking for on this line: repair / replace / fund / other. Buyer- or agent-authored only; an inspector-authored tag is refused with 403. Null or absent = untagged, which is the pre-#275 state and stays valid."
           }
         },
         "required": [
@@ -215,7 +227,7 @@
       }
     },
     "summary": "Add an item to a repair request list",
-    "description": "Adds a defect item to the caller's repair request. Creator-auth enforced."
+    "description": "Adds a defect item to the caller's repair request. Creator-auth enforced; a non-null repairActionTag from an inspector is refused with 403."
   },
   {
     "operationId": "agentLogin",
@@ -20745,12 +20757,24 @@
           "sortOrder": {
             "type": "integer",
             "description": "Display order of this item in the list."
+          },
+          "repairActionTag": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "repair",
+              "replace",
+              "fund",
+              "other",
+              null
+            ],
+            "description": "What the buyer is asking for on this line: repair / replace / fund / other. Buyer- or agent-authored only; an inspector-authored tag is refused with 403. Null or absent = untagged, which is the pre-#275 state and stays valid."
           }
         }
       }
     },
-    "summary": "Update a repair request item (credit, note, sortOrder)",
-    "description": "Patches requestedCreditCents, note, and/or sortOrder on an item. Creator-auth enforced."
+    "summary": "Update a repair request item (credit, note, sortOrder, action tag)",
+    "description": "Patches requestedCreditCents, note, sortOrder and/or repairActionTag on an item. Creator-auth enforced; a non-null repairActionTag from an inspector is refused with 403."
   },
   {
     "operationId": "updateRoleProfile",

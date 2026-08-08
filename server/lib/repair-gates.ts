@@ -13,6 +13,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { inspections, tenantConfigs } from './db/schema';
 import { isReportPublished } from './status/report-status';
+import { mayAuthorRepairActionTag } from './repair-action-tag';
 import type { HonoConfig } from '../types/hono';
 
 /**
@@ -112,6 +113,38 @@ export async function runAssertCanEdit(
         // Re-throw unexpected errors.
         throw err;
     }
+}
+
+/**
+ * #275 — WHO may author the repair-vs-replace tag, enforced at the boundary.
+ *
+ * Returns a 403 Response when a non-null tag arrives from an inspector, and null
+ * otherwise. Call it AFTER `runAssertCanEdit` so a read-only agent still gets
+ * its 403 for the right reason, and so an unauthorized caller is never told
+ * anything about the field.
+ *
+ * ⚠️ It refuses the FIELD, not the request. `undefined` and `null` both pass:
+ * an inspector on owner-preview creates lists and adds untagged items today
+ * (`repair-access.ts` gives that JWT `kind: 'inspector'`, `readwrite`), and
+ * refusing the write would break a working flow. `runAssertCanEdit` cannot do
+ * this job — it looks only at `accessLevel` and creator identity, never at
+ * `creator.kind` — and `lint:capability-decl` is inert here because these
+ * routes use no `requireCapability(...)`.
+ */
+export function runAssertMayAuthorTag(
+    c: Context<HonoConfig>,
+    creator: import('../services/repair-request.service').Creator,
+    tag: string | null | undefined,
+): Response | null {
+    if (tag == null) return null;
+    if (mayAuthorRepairActionTag(creator.kind)) return null;
+    return c.json({
+        success: false as const,
+        error: {
+            code: 'FORBIDDEN',
+            message: 'The repair-vs-replace tag is authored by the buyer or their agent.',
+        },
+    }, 403);
 }
 
 /**

@@ -27,7 +27,7 @@ import { flattenReportDefects } from '../lib/repair-defects';
 import { generatePdfFromUrl } from '../lib/pdf';
 import { checkRateLimit } from '../lib/rate-limit';
 import { resolveBuilderAccess } from '../lib/repair-access';
-import { runBuilderGate, runAssertCanEdit, runShareGate, getBaseUrl, loadQuickPhrases } from '../lib/repair-gates';
+import { runBuilderGate, runAssertCanEdit, runAssertMayAuthorTag, runShareGate, getBaseUrl, loadQuickPhrases } from '../lib/repair-gates';
 import {
     shareViewRoute,
     sharePdfRoute,
@@ -194,6 +194,11 @@ const repairBuilderRoutes = createApiRouter()
         const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
         if (guardResult) return guardResult;
 
+        // #275 — after the edit guard, so an unauthorized caller never learns
+        // anything about this field. Refuses the TAG, not the write.
+        const tagGuard = runAssertMayAuthorTag(c, creator, body.repairActionTag);
+        if (tagGuard) return tagGuard;
+
         // Map Zod-output (undefined optional) to service ItemInput (null optional)
         // to satisfy exactOptionalPropertyTypes.
         const item = await c.var.services.repairRequest.addItem(tenantId, rrId, {
@@ -207,6 +212,7 @@ const repairBuilderRoutes = createApiRouter()
             commentSnapshot:      body.commentSnapshot ?? null,
             requestedCreditCents: body.requestedCreditCents ?? null,
             note:                 body.note ?? null,
+            repairActionTag:      body.repairActionTag ?? null,
         });
         return c.json({ success: true as const, data: item }, 200);
     })
@@ -227,11 +233,17 @@ const repairBuilderRoutes = createApiRouter()
         const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
         if (guardResult) return guardResult;
 
+        // #275 — same boundary as the POST, same order relative to the edit guard.
+        const tagGuard = runAssertMayAuthorTag(c, creator, body.repairActionTag);
+        if (tagGuard) return tagGuard;
+
         // Map Zod-output optional fields to service patch type (null not undefined).
         const patch: Parameters<typeof c.var.services.repairRequest.updateItem>[4] = {};
         if (body.requestedCreditCents !== undefined) patch.requestedCreditCents = body.requestedCreditCents ?? null;
         if (body.note !== undefined) patch.note = body.note ?? null;
         if (body.sortOrder !== undefined) patch.sortOrder = body.sortOrder;
+        // Absent leaves the stored tag alone; an explicit null clears it.
+        if (body.repairActionTag !== undefined) patch.repairActionTag = body.repairActionTag ?? null;
         // I1: pass inspectionId so the service guards against cross-inspection writes.
         await c.var.services.repairRequest.updateItem(tenantId, id, rrId, itemId, patch);
         return c.json({ success: true as const }, 200);

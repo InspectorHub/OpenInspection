@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { REPAIR_ACTION_TAGS } from '../../repair-action-tag';
 
 /** A buyer/agent/inspector-built repair-request list for a published report.
  * Multiple lists may exist per inspection (one+ per creator) — Spectora parity. */
@@ -53,6 +54,25 @@ export const repairRequestItems = sqliteTable('repair_request_items', {
   // a snapshot must not depend on a lookup table that can change under it.
   // Appended at the table end (reference_d1_add_column_at_end).
   tradeSnapshot: text('trade_snapshot'),
+  // #275 — WHAT THE BUYER IS ASKING FOR on this line: repair it, replace it,
+  // give me the money (`fund`), or something else. NULLABLE, and null is not a
+  // defect: every item added before this column existed has no tag, and an
+  // untagged item stays a valid item forever. Authored by the buyer or their
+  // agent only — never the inspector, whose "replace it" would be a
+  // professional scope recommendation inside a document the buyer negotiates
+  // with (`lib/repair-action-tag.ts` owns both the vocabulary and that rule).
+  // Appended at the table end (reference_d1_add_column_at_end).
+  //
+  // ⚠️ TWO NEIGHBOURING ENUMS LOOK LIKE THIS ONE AND MUST NOT BE MERGED INTO IT:
+  //  (a) `cost_items.action` (`schema/inspection/cost-items.ts`) keeps its own
+  //      ['repair','replace','further_study']. That is the ASSESSOR classifying
+  //      a commercial finding, where `further_study` is a real professional
+  //      outcome; this is the buyer stating what they want, where it is not.
+  //  (b) our severity vocabulary ['good','marginal','significant','minor'] is a
+  //      CONDITION axis. This is the product's first ACTION axis. A condition
+  //      and a requested remedy are different statements about a defect, so the
+  //      two do not line up and neither can be derived from the other.
+  repairActionTag: text('repair_action_tag', { enum: REPAIR_ACTION_TAGS }),
 }, (t) => ({
   idxRr: index('idx_repair_request_items_rr').on(t.repairRequestId),
 }));

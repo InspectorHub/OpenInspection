@@ -120,6 +120,63 @@ describe('RepairRequestService', () => {
         expect(got?.items[0]!.tradeSnapshot).toBe('general contractor');
     });
 
+    // #275 — three separate places write this column (insert, the idempotent
+    // re-add patch, and updateItem's closed allow-list), and each one is written
+    // out field by field, so each is its own chance to silently drop the tag.
+    it('addItem persists the action tag and it reads back off the row', async () => {
+        const rr = await svc.create(TENANT, INSP, { kind: 'client', ref: 'r1' });
+        await svc.addItem(TENANT, rr.id, {
+            findingKey: 'k-tag', sectionTitle: 'Roof', itemLabel: 'Shingles',
+            repairActionTag: 'replace',
+        });
+        const got = await svc.getByShareToken(rr.shareToken);
+        expect(got?.items[0]!.repairActionTag).toBe('replace');
+    });
+
+    it('addItem re-add updates the action tag in place — the idempotent path', async () => {
+        // Toggle a defect off and on, or reload the builder: the second add takes
+        // the UPDATE branch, whose patch object is a hand-written field list.
+        const rr = await svc.create(TENANT, INSP, { kind: 'client', ref: 'r1' });
+        await svc.addItem(TENANT, rr.id, {
+            findingKey: 'k-tag', sectionTitle: 'Roof', itemLabel: 'Shingles',
+            repairActionTag: 'repair',
+        });
+        await svc.addItem(TENANT, rr.id, {
+            findingKey: 'k-tag', sectionTitle: 'Roof', itemLabel: 'Shingles',
+            repairActionTag: 'fund',
+        });
+        const got = await svc.get(TENANT, INSP, rr.id);
+        expect(got?.items).toHaveLength(1);
+        expect(got?.items[0]!.repairActionTag).toBe('fund');
+    });
+
+    /**
+     * ⚠️ This proves updateItem WRITES the tag; it does not prove the allow-list.
+     * Verified by breaking it: narrowing `Partial<Pick<ItemInput, …>>` back to
+     * credit+note leaves this test GREEN — drizzle's `.set()` forwards whatever
+     * the object holds, so the closed allow-list is enforced by `type-check:api`
+     * (which does fail, at the route's patch assignment), not at runtime.
+     */
+    it('updateItem patches the action tag', async () => {
+        const rr = await svc.create(TENANT, INSP, { kind: 'client', ref: 'r1' });
+        const item = await svc.addItem(TENANT, rr.id, {
+            findingKey: 'k-tag', sectionTitle: 'Roof', itemLabel: 'Shingles',
+        });
+        expect(item.repairActionTag ?? null).toBeNull();
+        await svc.updateItem(TENANT, INSP, rr.id, item.id, { repairActionTag: 'other' });
+        const got = await svc.get(TENANT, INSP, rr.id);
+        expect(got?.items[0]!.repairActionTag).toBe('other');
+    });
+
+    it('an untagged item stays valid — null is the pre-#275 state, not a defect', async () => {
+        const rr = await svc.create(TENANT, INSP, { kind: 'inspector', ref: 'u-insp' });
+        await svc.addItem(TENANT, rr.id, {
+            findingKey: 'k-none', sectionTitle: 'Roof', itemLabel: 'Shingles',
+        });
+        const got = await svc.get(TENANT, INSP, rr.id);
+        expect(got?.items[0]!.repairActionTag).toBeNull();
+    });
+
     it('getByShareToken returns null for unknown token', async () => {
         const got = await svc.getByShareToken('nonexistent-token');
         expect(got).toBeNull();

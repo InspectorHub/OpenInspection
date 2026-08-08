@@ -33,6 +33,10 @@ interface SourceDefect {
   location?: string | null;
   category?: string | null;
   comment?: string | null;
+  /** The recommended trade. Present on the source payload since IA-57; this
+   *  interface and the forward below both omitted it, which is why every
+   *  agent-forwarded list has a null `trade_snapshot`. */
+  trade?: string | null;
 }
 
 const FIXED_CATEGORIES = new Set(["safety", "recommendation", "maintenance"]);
@@ -176,7 +180,13 @@ export async function action({ request, context }: Route.ActionArgs) {
 
     // The agent forwards the whole list, so every defect goes on it with no
     // credit — asking for money is the client's decision, made in their own
-    // builder, not the agent's.
+    // builder, not the agent's. Same for the #275 action tag: the agent MAY
+    // author one, but a bulk forward has chosen nothing, so it forwards none.
+    //
+    // ⚠️ This json object is an EXPLICIT field list with no type pressure to be
+    // complete, and it silently dropped `trade` from IA-57 until #275 — every
+    // agent-forwarded list has a null trade_snapshot for that reason. A new
+    // item field must be added here or it is null on this whole path.
     for (const d of defects) {
       const res = await api.repairBuilder["repair-builder"][":tenant"][":id"].lists[":rrId"].items.$post({
         param: { tenant, id: inspectionId, rrId },
@@ -188,9 +198,11 @@ export async function action({ request, context }: Route.ActionArgs) {
           defectTitle: d.defectTitle ?? null,
           location: d.location ?? null,
           category: d.category ?? null,
+          trade: d.trade ?? null,
           commentSnapshot: d.comment ?? null,
           requestedCreditCents: null,
           note: null,
+          repairActionTag: null,
         },
       });
       if (!res.ok) return { ok: false as const, error: m.repair_builder_error_add_item() };

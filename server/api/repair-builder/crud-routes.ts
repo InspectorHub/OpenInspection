@@ -14,6 +14,9 @@
 
 import { createRoute, z } from '@hono/zod-openapi';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+// The two item-body shapes live in lib/validations (house rule); they were
+// inline here until #275 added a field to both.
+import { ItemBodySchema, ItemPatchSchema } from '../../lib/validations/repair-builder.schema';
 
 // ---------------------------------------------------------------------------
 // Param / query / body schemas
@@ -34,29 +37,6 @@ const BuilderItemParamsSchema = BuilderListParamsSchema.extend({
 
 const BuilderQuerySchema = z.object({
     token: z.string().optional().describe('Portal access token.'),
-});
-
-const ItemBodySchema = z.object({
-    findingKey:           z.string().describe('Stable per-defect key from the report source list.'),
-    sectionTitle:         z.string().describe('Report section title snapshot for this defect.'),
-    itemLabel:            z.string().describe('Report item label snapshot for this defect.'),
-    // IA-55 — snapshot the defect title / location / category at add time so the
-    // public share page stays stable even if the report changes later.
-    defectTitle:          z.string().nullable().optional().describe('Defect title snapshot at add time.'),
-    location:             z.string().nullable().optional().describe('Defect location snapshot at add time.'),
-    category:             z.string().nullable().optional().describe('Defect category snapshot at add time.'),
-    // IA-57 — the recommended trade, so the shared list tells a contractor which
-    // trade to send instead of hiding it inside the comment prose.
-    trade:                z.string().nullable().optional().describe('Recommended trade snapshot at add time.'),
-    commentSnapshot:      z.string().nullable().optional().describe('Defect comment text snapshot at add time.'),
-    requestedCreditCents: z.number().int().min(0).nullable().optional().describe('Requested repair credit in integer cents.'),
-    note:                 z.string().nullable().optional().describe('Buyer note explaining the requested credit.'),
-});
-
-const ItemPatchSchema = z.object({
-    requestedCreditCents: z.number().int().min(0).optional().describe('Requested repair credit in integer cents.'),
-    note:                 z.string().optional().describe('Buyer note explaining the requested credit.'),
-    sortOrder:            z.number().int().optional().describe('Display order of this item in the list.'),
 });
 
 const IntroPatchSchema = z.object({
@@ -118,17 +98,17 @@ export const addItemRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.any() }) } }, description: 'Added item' },
         400: { description: 'Validation error' },
         401: { description: 'No valid access credential' },
-        403: { description: 'Not the creator or report not published' },
+        403: { description: 'Not the creator, report not published, or an inspector-authored action tag' },
     },
     operationId: 'addRepairItem',
-    description: 'Adds a defect item to the caller\'s repair request. Creator-auth enforced.',
+    description: 'Adds a defect item to the caller\'s repair request. Creator-auth enforced; a non-null repairActionTag from an inspector is refused with 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 export const updateItemRoute = createRoute(withMcpMetadata({
     method:  'patch',
     path:    '/repair-builder/{tenant}/{id}/lists/{rrId}/items/{itemId}',
     tags:    ['inspections', 'public'],
-    summary: 'Update a repair request item (credit, note, sortOrder)',
+    summary: 'Update a repair request item (credit, note, sortOrder, action tag)',
     request: {
         params: BuilderItemParamsSchema,
         query:  BuilderQuerySchema,
@@ -138,10 +118,10 @@ export const updateItemRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } }, description: 'Updated' },
         400: { description: 'Validation error' },
         401: { description: 'No valid access credential' },
-        403: { description: 'Not the creator or report not published' },
+        403: { description: 'Not the creator, report not published, or an inspector-authored action tag' },
     },
     operationId: 'updateRepairItem',
-    description: 'Patches requestedCreditCents, note, and/or sortOrder on an item. Creator-auth enforced.',
+    description: 'Patches requestedCreditCents, note, sortOrder and/or repairActionTag on an item. Creator-auth enforced; a non-null repairActionTag from an inspector is refused with 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 export const removeItemRoute = createRoute(withMcpMetadata({

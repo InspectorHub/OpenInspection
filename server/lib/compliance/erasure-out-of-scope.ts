@@ -245,6 +245,13 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'repair_request_items', column: 'trade_snapshot', reason: 'resolved trade label ("licensed roofer") snapshotted at add time — tenant taxonomy value, not personal data' },
     { table: 'repair_request_items', column: 'section_title', reason: 'frozen copy of the report section heading — template structure, not personal data' },
     { table: 'repair_request_items', column: 'item_label', reason: 'frozen copy of the report item label — template structure, not personal data' },
+    // Declared here rather than left silent, and the honest note about WHY it
+    // needed declaring: no gate asked for it. `check-erasure-manifest.mjs`
+    // matches a fixed PII name pattern and `repair_action_tag` matches nothing,
+    // so this column was invisible to `lint:erasure` from the moment it existed.
+    // It is pinned in the coverage spec's HEURISTIC_BLIND_SPOTS list for exactly
+    // that reason — that list is the population found by reading.
+    { table: 'repair_request_items', column: 'repair_action_tag', reason: 'the buyer\'s requested remedy on one line (repair / replace / fund / other) — a four-value classification of a defect, chosen from a fixed list, carrying no free text and naming nobody. Not prose about or by the data subject, and unlike `note` it cannot be made to hold any: the enum is enforced at the request boundary' },
     // Sits inside the address family by name and outside it by substance: it
     // records WHEN the geocode ran, not where the property is. Excluded rather
     // than retained so the retain rules above stay a list of columns that
