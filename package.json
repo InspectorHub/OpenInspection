@@ -69,6 +69,7 @@
     "lint:fix": "eslint . --fix --cache",
     "security-scan": "npm audit --audit-level=high",
     "test:unit": "vitest run --config vitest.api.config.ts",
+    "test:unit:isolation-debt": "vitest run --config vitest.api.config.ts --no-isolate",
     "test:unit:changed": "vitest run --changed --config vitest.api.config.ts",
     "test:web": "vitest run --config vitest.config.ts",
     "test:web:changed": "vitest run --changed --config vitest.config.ts",
