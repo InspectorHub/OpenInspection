@@ -247,6 +247,10 @@ const INVENTORY = [
       reason: "Booking policy: deposit thresholds against the tenant's own fee." },
     { kind: "control", id: "app/components/settings/services/DepositWidget.tsx", disposition: "allowed",
       reason: "Booking policy: deposit amount against the tenant's own fee." },
+    { kind: "control", id: "app/components/settings/CancellationFeeRow.tsx", disposition: "allowed",
+      reason: "Cancellation policy: a late-cancellation or no-show fee against the tenant's own "
+            + "fee, published in advance and enforceable only through their agreement clause. Not "
+            + "a repair cost and not a negotiation amount — the same category as the deposit." },
     { kind: "control", id: "app/components/settings/services/ServiceFields.tsx", disposition: "allowed",
       reason: "Service catalogue: the tenant's list price." },
     { kind: "control", id: "app/routes/settings-event-types.tsx", disposition: "allowed",

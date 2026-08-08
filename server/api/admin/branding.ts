@@ -125,8 +125,29 @@ const adminBrandingRoutes = createApiRouter()
             supportEmail: c.env.SENDER_EMAIL || 'support@example.com'
         });
 
+        // The attestation the cancellation-fee gate reads, resolved through the
+        // ONE function that owns the version comparison. Shipped rather than
+        // left for the panel to derive from the raw columns: a second copy of
+        // the invalidation rule is a copy that can be forgotten, and the panel
+        // must never show a state the gate disagrees with.
+        const attestation = await brandingService.getCancellationAttestation(c.get('tenantId'));
+        const cancellationClause = {
+            current: attestation !== null,
+            // Deliberately the RAW column, not `attestation`. An attestation
+            // invalidated by an agreement edit is still one that was made, and
+            // "you confirmed this, then the agreement changed" needs different
+            // words from "you have never confirmed this".
+            everAttested: 'cancellationClauseAttestedAt' in branding
+                && branding.cancellationClauseAttestedAt != null,
+            agreementId: attestation?.agreementId
+                ?? ('cancellationClauseAgreementId' in branding
+                    ? branding.cancellationClauseAgreementId ?? null
+                    : null),
+        };
+
         const formattedBranding = {
             ...branding,
+            cancellationClause,
             companyName: branding.companyName || c.env.APP_NAME || 'OpenInspection',
             primaryColor: branding.primaryColor || c.env.PRIMARY_COLOR || '#4f46e5',
             supportEmail: branding.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
