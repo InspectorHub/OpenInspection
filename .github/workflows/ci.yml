@@ -373,10 +373,36 @@ jobs:
   # so every spec exercises the actual database. Auth is standalone-mode only
   # (the local login form) — saas login is a portal handoff and is out of scope
   # for this repo's CI.
+  # Two runners, one per Playwright config. They were two steps on one runner:
+  # 72s of shared setup, then 166s and 112s back to back = 357s.
+  #
+  # Measured breakdown of the first step before splitting: 38s build + boot,
+  # 21s globalSetup seed, 104s actually running 205 tests. The second step ran
+  # 9 tests in 10s behind ~102s of its own globalSetup.
+  #
+  # ⚠️ The honest cost: the second config currently REUSES the first's running
+  # worker (`reuseExistingServer`), so on its own runner it must now build and
+  # boot one itself — about 38s it did not previously pay, on top of a second
+  # `npm ci` and browser install. Wall clock ~238s against 357s; total runner
+  # time goes UP. That is the trade, and it is the right way round for a gate
+  # people wait on.
+  #
+  # NOT sharded further. Playwright re-runs a project's `dependencies` in EVERY
+  # shard (microsoft/playwright#21974), and `playwright.config.ts` records that
+  # every project shares one wrangler-dev worker and one D1 seeded once — three
+  # separate causes had to be fixed to get from 1 worker to 3, the third found
+  # only because a run failed. Separate runners sidestep that ceiling; more
+  # shards would multiply the setup that is already most of the second leg.
   e2e:
-    name: e2e
+    name: e2e (${{ matrix.suite.label }})
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - { id: seeded-d1, label: 'seeded D1', script: 'test:e2e' }
+          - { id: multi-user, label: 'multi-user seed', script: 'test:e2e:seeded' }
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -416,21 +442,22 @@ jobs:
       - name: Install Playwright browser (chromium)
         run: npx playwright install --with-deps chromium
 
-      - name: E2E tests (Playwright, seeded D1)
-        run: npm run test:e2e
+      # The two configs cannot share one D1: the multi-user seed writes users
+      # into the standalone tenant, which 409s the other run's fresh-setup
+      # assertion. See playwright.seeded.config.ts for the full reasoning. That
+      # is why they are two runners rather than one run — each gets its own
+      # worker and its own D1 by construction.
+      - name: E2E tests
+        run: npm run ${{ matrix.suite.script }}
 
-      # Second run, second config: the multi-user seed writes users into the
-      # standalone tenant, which 409s the first run's fresh-setup assertion, so
-      # the two cannot share one D1. Same worker (reuseExistingServer), so this
-      # is one extra globalSetup, not one extra boot. See
-      # playwright.seeded.config.ts for the full reasoning.
-      - name: E2E tests (multi-user seed — subsystem D/E)
-        run: npm run test:e2e:seeded
-
+      # ⚠️ Per-leg artifact name. upload-artifact@v4 FAILS on a duplicate name
+      # rather than merging, so a matrix that uploads must key the name on the
+      # matrix value — otherwise the second leg's failure upload kills the job
+      # that was already failing, and the report you wanted is the thing you lose.
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.suite.id }}
           path: playwright-report/
           retention-days: 7
