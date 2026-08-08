@@ -9,7 +9,8 @@
  * Idempotent — re-running with the same fixture ids is a no-op.
  */
 import { execSync } from 'child_process';
-import { existsSync } from 'fs';
+import { createHash } from 'crypto';
+import { existsSync, rmSync, writeFileSync } from 'fs';
 import path from 'path';
 
 const ADMIN_EMAIL    = 'admin-seed@seed.test';
@@ -30,6 +31,44 @@ const INSPECTOR_HALF_EMAIL = 'inspector-half@seed.test';
 const ADMIN_FULL_EMAIL = 'admin-full@seed.test';
 const MULTI_EMAIL    = 'multi-tenant-user@seed.test';
 const BRANCH_B_EMAIL = 'branch-b@seed.test';
+
+/**
+ * The CLIENT the delivered report was delivered TO — a recipient, not a user.
+ *
+ * There is no `users` row for this address and there must not be one: the client
+ * portal is a no-login surface reached with a per-(inspection, recipient) token,
+ * so a login account would be a different fixture answering a different
+ * question. It is deliberately absent from SEED_EMAILS for the same reason —
+ * everything in there is loggable.
+ */
+const CLIENT_RECIPIENT_EMAIL = 'seed-client@seed.test';
+
+/**
+ * The plaintext portal token for that recipient, in the clear ON PURPOSE.
+ *
+ * Production never stores plaintext (see PortalAccessService: hash to look up,
+ * `token_enc` to reconstruct, legacy `token` cleared to a sentinel). A fixture
+ * has the opposite requirement — a human has to be able to paste a working URL,
+ * and a spec has to be able to build one — and the seed cannot produce a
+ * `token_enc` anyway: sealing needs the worker's KEK (HKDF over `JWT_SECRET`),
+ * which this Node script does not have.
+ *
+ * So the row is seeded as a LEGACY-shaped-but-hashed one: `token_hash` set (the
+ * column the resolver reads first, so nothing mutates on lookup) AND the
+ * plaintext left in `token`. That second half is what keeps re-issue working:
+ * `PortalAccessService.reconstruct` prefers a non-sentinel plaintext column and
+ * only then opens `token_enc`, so any "resend the report link" path returns THIS
+ * token instead of throwing "cannot be reconstructed".
+ */
+const CLIENT_PORTAL_TOKEN    = 'seed-client-portal-token-delivered';
+const CLIENT_ACCESS_TOKEN_ID = 'seed-access-token-delivered-client';
+
+/**
+ * `token_hash` is a plain SHA-256 hex digest of the UTF-8 token — the same thing
+ * `hashToken()` (server/lib/token-hash.ts) computes with WebCrypto. Derived here
+ * rather than pasted so the two can never drift.
+ */
+const CLIENT_PORTAL_TOKEN_HASH = createHash('sha256').update(CLIENT_PORTAL_TOKEN, 'utf8').digest('hex');
 
 // PBKDF2-SHA256 of 'seedpassword' — pre-computed so this setup script does not
 // have to import the password helper.
@@ -107,6 +146,224 @@ function d1(sql: string, cwd: string): void {
         throw new Error(`d1() failed: ${sql.slice(0, 120)}…\n  ${msg}`);
     }
 }
+
+/**
+ * Run SQL from a temp FILE instead of `--command`.
+ *
+ * `d1()` above collapses whitespace and backslash-escapes every double quote so
+ * the statement survives one line of cmd.exe. That is fine for the rows above,
+ * which contain no double quotes at all — and it is exactly wrong for the JSON
+ * payloads below (a template snapshot, a results projection), where the quotes
+ * ARE the data and the escaping is at the mercy of two shells. A file has no
+ * quoting layer, and `--file` is how global-setup already drives its multi-
+ * statement wipe locally.
+ */
+function d1Script(sql: string, cwd: string, label: string): void {
+    const cfg =
+        process.env.WRANGLER_CONFIG ||
+        (existsSync(path.join(cwd, 'wrangler.local.jsonc')) ? 'wrangler.local.jsonc' : 'wrangler.jsonc');
+    const file = path.join(cwd, `.seed-${label}.sql`);
+    writeFileSync(file, sql, 'utf8');
+    try {
+        execSync(`npx wrangler d1 execute DB --local -c ${cfg} --file "${file}" --yes`, { cwd, stdio: 'pipe' });
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(`d1Script(${label}) failed:\n  ${msg}`);
+    } finally {
+        rmSync(file, { force: true });
+    }
+}
+
+/**
+ * The published content of `seed-delivered-inspection` — the ONE fixture that
+ * makes the client-facing repair-request builder reachable.
+ *
+ * It lives on the INSPECTION as `template_snapshot`, not in a `templates` row,
+ * because that is the shape every reader prefers: `getReportData` takes
+ * `inspections.template_snapshot` over `template.schema` whenever it has
+ * sections, and the snapshot is what an inspection actually carries once it has
+ * been created. One fixture row instead of two, and it exercises the path
+ * production reads.
+ *
+ * Every defect is `default: true`, which is what puts it in the report with no
+ * per-inspection state at all (`resolveTab`: a state row wins, otherwise the
+ * template's `default` flag decides). `inspection_results` below then adds
+ * ratings and a trade on top — those change how a row LOOKS, never whether it
+ * exists, so the builder still has content if that row is ever lost.
+ *
+ * Shape deliberately: 6 defects over 4 items in 2 SECTIONS. One section would
+ * leave the section sort with nothing to sort, and a single defect would hide
+ * the two-defects-on-one-item case (`findingKey` collision ordinals) that this
+ * page has to render distinguishably.
+ */
+const DELIVERED_TEMPLATE_SNAPSHOT = {
+    schemaVersion: 2,
+    // Path 2 of getReportData's rating resolution (the results row leaves
+    // `rating_system_snapshot` NULL on purpose). `severity` is the field that
+    // decides `severityBucket` — good/marginal/significant map to
+    // satisfactory/monitor/defect — so the builder's Severity sort has 3 axes.
+    ratingSystem: {
+        levels: [
+            { id: 'satisfactory', label: 'Satisfactory', abbreviation: 'S', color: '#16a34a', severity: 'good',        isDefect: false },
+            { id: 'monitor',      label: 'Monitor',      abbreviation: 'M', color: '#d97706', severity: 'marginal',    isDefect: false },
+            { id: 'defect',       label: 'Defect',       abbreviation: 'D', color: '#dc2626', severity: 'significant', isDefect: true  },
+        ],
+    },
+    sections: [
+        {
+            id: 'roof',
+            title: 'Roof',
+            items: [
+                {
+                    id: 'roof-covering',
+                    label: 'Roof Covering',
+                    type: 'rich',
+                    ratingOptions: ['satisfactory', 'monitor', 'defect'],
+                    tabs: {
+                        information: [],
+                        limitations: [],
+                        // Two defects on ONE item — the case the row layout
+                        // exists to disambiguate (defect title above the item
+                        // label). Never reduce this to one.
+                        defects: [
+                            {
+                                id: 'roof-d1',
+                                title: 'Cracked shingles at the ridge',
+                                category: 'safety',
+                                location: 'South slope, near the ridge',
+                                comment: 'Several shingles along the ridge line are cracked and lifting. Water entry is likely during wind-driven rain.',
+                                photos: [],
+                                default: true,
+                            },
+                            {
+                                id: 'roof-d2',
+                                title: 'Loose flashing at the chimney',
+                                category: 'maintenance',
+                                location: 'Chimney base, north side',
+                                comment: 'The step flashing at the chimney is loose and the sealant has failed.',
+                                photos: [],
+                                default: true,
+                            },
+                        ],
+                    },
+                },
+                {
+                    id: 'gutters',
+                    label: 'Gutters and Downspouts',
+                    type: 'rich',
+                    ratingOptions: ['satisfactory', 'monitor', 'defect'],
+                    tabs: {
+                        information: [],
+                        limitations: [],
+                        defects: [
+                            {
+                                id: 'gutters-d1',
+                                title: 'Downspout discharges against the foundation',
+                                category: 'recommendation',
+                                location: 'Northeast corner',
+                                comment: 'Extend the downspout so it discharges at least four feet from the foundation wall.',
+                                photos: [],
+                                default: true,
+                            },
+                        ],
+                    },
+                },
+            ],
+        },
+        {
+            id: 'electrical',
+            title: 'Electrical',
+            items: [
+                {
+                    id: 'service-panel',
+                    label: 'Service Panel',
+                    type: 'rich',
+                    ratingOptions: ['satisfactory', 'monitor', 'defect'],
+                    tabs: {
+                        information: [],
+                        limitations: [],
+                        defects: [
+                            {
+                                id: 'panel-d1',
+                                title: 'Double-tapped breaker',
+                                category: 'safety',
+                                location: 'Main panel, breaker 14',
+                                comment: 'Two conductors share a breaker that is rated for one. Separate the circuits.',
+                                photos: [],
+                                default: true,
+                            },
+                            {
+                                id: 'panel-d2',
+                                title: 'Missing panel cover screws',
+                                category: 'maintenance',
+                                location: 'Main panel cover',
+                                comment: 'Two cover screws are missing. Replace with blunt-tip screws.',
+                                photos: [],
+                                default: true,
+                            },
+                        ],
+                    },
+                },
+                {
+                    id: 'receptacles',
+                    label: 'Receptacles and Switches',
+                    type: 'rich',
+                    ratingOptions: ['satisfactory', 'monitor', 'defect'],
+                    tabs: {
+                        information: [],
+                        limitations: [],
+                        defects: [
+                            {
+                                id: 'recept-d1',
+                                title: 'No GFCI protection at the kitchen counter',
+                                category: 'safety',
+                                location: 'Kitchen, counter run left of the sink',
+                                comment: 'Countertop receptacles within six feet of the sink are not GFCI protected.',
+                                photos: [],
+                                default: true,
+                            },
+                        ],
+                    },
+                },
+            ],
+        },
+    ],
+};
+
+/**
+ * Per-item state for the delivered inspection: ratings (so the Severity sort has
+ * three different buckets to order) plus a `trade` on two defects (so the
+ * add-item snapshot carries one, as it does in the field).
+ *
+ * Keys are the composite finding key `_default:{sectionId}:{itemId}` —
+ * `findingKey()` in server/lib/finding-key.ts. A bare itemId still resolves
+ * (readItemEntry falls back to it) but the composite form is what the editor
+ * writes, and a fixture that used the fallback would be testing the fallback.
+ *
+ * `receptacles` is deliberately absent: an unrated item lands in the `other`
+ * bucket, and its defect is still on the list — that is the case a fixture where
+ * everything is rated would never show.
+ */
+const DELIVERED_RESULTS_DATA = {
+    '_default:roof:roof-covering': {
+        rating: 'defect',
+        notes: 'Ridge line examined from a ladder at the eave.',
+        tabs: {
+            defects: [
+                { cannedId: 'roof-d1', included: true, trade: 'licensed-roofer' },
+                { cannedId: 'roof-d2', included: true, trade: 'general-contractor' },
+            ],
+        },
+    },
+    '_default:roof:gutters': {
+        rating: 'monitor',
+        tabs: { defects: [{ cannedId: 'gutters-d1', included: true, trade: 'qualified-handyman' }] },
+    },
+    '_default:electrical:service-panel': {
+        rating: 'defect',
+        tabs: { defects: [{ cannedId: 'panel-d1', included: true, trade: 'licensed-electrician' }] },
+    },
+} as const;
 
 export function seedFixtures(appDir: string): void {
     const cwd = appDir;
@@ -211,7 +468,71 @@ export function seedFixtures(appDir: string): void {
     d1(inspectionRow('seed-republished-inspection',  '6 Republished Ct',  'completed', 'published',
         { propertyType: 'commercial' }), cwd);
 
-    console.info('[seed-fixtures] Seeded tenants + 8 users + 6 inspections.');
+    // ---------------------------------------------------------------------
+    // publish → deliver → client link, for `seed-delivered-inspection`
+    //
+    // The builder page (`/repair-builder/:tenant/:id?token=`) is gated on
+    // exactly three things (runBuilderGate + resolveBuilderAccess), and it was
+    // unreachable locally because the seed supplied none of them:
+    //   1. inspections.report_status = 'published'   — already true above
+    //   2. tenant_configs.is_customer_repair_export_enabled  — added here
+    //   3. a live inspection_access_tokens row       — added here
+    // Plus content: the gate can pass and still render an empty list, which is
+    // why the template snapshot + results go in too.
+    //
+    // NOT seeded, because nothing on this path reads it: a `reports` row. The
+    // publish gate reads `inspections.report_status`, and the share gate
+    // (runShareGate) reads the repair request + that same column. `reports` only
+    // becomes load-bearing for multi-deliverable publish targeting.
+    // ---------------------------------------------------------------------
+
+    // Tenant config — the feature flag is the whole reason this row exists, but
+    // company_name is set alongside it so the row is not a half-configured
+    // workspace (every reader falls back with `||`, so NULL would also work).
+    d1(`INSERT OR REPLACE INTO tenant_configs (tenant_id, company_name, is_customer_repair_export_enabled, updated_at)
+        VALUES ('${TENANT_A_ID}', 'Seed Tenant A', 1, ${nowMs})`, cwd);
+
+    // The `client` role profile. `resolveBuilderAccess` maps the token's role KEY
+    // to a role-profile KIND (`getRoleKind`) and refuses anything that is not
+    // client or agent — so with no profile row the token resolves and is then
+    // rejected, which looks exactly like a bad token. Only the one key this path
+    // needs is seeded; the other seven come from `seedRoleProfiles` at workspace
+    // setup, which the seeded run never performs.
+    d1(`INSERT OR REPLACE INTO contact_role_profiles
+         (id, tenant_id, key, label, kind, is_system, sort_order, is_active, created_at, updated_at)
+         VALUES ('crp_${TENANT_A_ID}_client', '${TENANT_A_ID}', 'client', 'Client', 'client',
+                 1, 10, 1, ${nowMs}, ${nowMs})`, cwd);
+
+    // The live client access token. expires_at NULL = open (the order is active);
+    // revoked_at NULL = live. Both are read numerically by the guard, and NULL is
+    // the only value that means "not set" — a 0 would read as 1970 and revoke it.
+    d1(`INSERT OR REPLACE INTO inspection_access_tokens
+         (id, tenant_id, inspection_id, recipient_email, role, token, created_at,
+          expires_at, revoked_at, token_hash, token_enc, view_tracking_objected_at)
+         VALUES ('${CLIENT_ACCESS_TOKEN_ID}', '${TENANT_A_ID}', '${SEED_INSPECTIONS.delivered}',
+                 '${CLIENT_RECIPIENT_EMAIL}', 'client', '${CLIENT_PORTAL_TOKEN}', ${nowMs},
+                 NULL, NULL, '${CLIENT_PORTAL_TOKEN_HASH}', NULL, NULL)`, cwd);
+
+    // Report content. Both payloads are JSON, so they go through d1Script (see
+    // its comment) rather than the single-line --command path.
+    d1Script(
+        `UPDATE inspections SET template_snapshot = '${JSON.stringify(DELIVERED_TEMPLATE_SNAPSHOT)}'\n` +
+        `WHERE id = '${SEED_INSPECTIONS.delivered}' AND tenant_id = '${TENANT_A_ID}';\n`,
+        cwd, 'delivered-snapshot',
+    );
+    d1Script(
+        `INSERT OR REPLACE INTO inspection_results\n` +
+        `  (id, tenant_id, inspection_id, data, ydoc_state, last_synced_at, rating_system_id, rating_system_snapshot, report_id)\n` +
+        `VALUES ('seed-delivered-results', '${TENANT_A_ID}', '${SEED_INSPECTIONS.delivered}',\n` +
+        `        '${JSON.stringify(DELIVERED_RESULTS_DATA)}', NULL, ${nowMs}, NULL, NULL, NULL);\n`,
+        cwd, 'delivered-results',
+    );
+
+    console.info(
+        `[seed-fixtures] Seeded tenants + 8 users + ${Object.keys(SEED_INSPECTIONS).length} inspections` +
+        ` + the delivered client link (${SEED_REPAIR_DEFECTS.length} defects in` +
+        ` ${new Set(SEED_REPAIR_DEFECTS.map((d) => d.sectionTitle)).size} sections).`,
+    );
 }
 
 export const SEED_PASSWORD = 'seedpassword';
@@ -232,7 +553,63 @@ export const SEED_INSPECTIONS = {
     /** Owned by `inspector-half@seed.test`; fails every publish pre-flight gate. */
     halfDone:    'seed-half-done-inspection',
     published:   'seed-published-inspection',
+    /**
+     * Published AND delivered to a client: it carries the report content
+     * (template snapshot + results), the tenant repair-export flag, and a live
+     * client portal token. It is the only fixture the no-login client surfaces
+     * (`/repair-builder/…`, `/report-view/…?token=`) can be reached with — see
+     * SEED_CLIENT_ACCESS.
+     */
     delivered:   'seed-delivered-inspection',
     /** Commercial, so a unit can be added between two publishes to make a diff. */
     republished: 'seed-republished-inspection',
 };
+
+/**
+ * The client's no-login access to `SEED_INSPECTIONS.delivered`.
+ *
+ * `builderUrl` is paste-ready for a local `npm run dev` (port 8787). Specs use
+ * `builderPath` instead, because Playwright's baseURL is the E2E worker on 8789
+ * and hardcoding a port there is how a spec ends up loading a page nothing
+ * served. Both are derived from the same three values, so they cannot disagree.
+ */
+export const SEED_CLIENT_ACCESS = {
+    /** Recipient of the delivered report. NOT a login account — see the constant. */
+    email: CLIENT_RECIPIENT_EMAIL,
+    /** Plaintext portal token, live and open-ended. */
+    token: CLIENT_PORTAL_TOKEN,
+    inspectionId: SEED_INSPECTIONS.delivered,
+    tenantSlug: TENANT_A_SLUG,
+    /** Root-relative — use this from a spec (Playwright supplies the origin). */
+    builderPath:
+        `/repair-builder/${TENANT_A_SLUG}/${SEED_INSPECTIONS.delivered}?token=${CLIENT_PORTAL_TOKEN}`,
+    /** Absolute, for a human running `npm run dev`. */
+    builderUrl:
+        `http://localhost:8787/repair-builder/${TENANT_A_SLUG}/${SEED_INSPECTIONS.delivered}?token=${CLIENT_PORTAL_TOKEN}`,
+};
+
+/**
+ * The defects the delivered report publishes, flattened the way the builder
+ * receives them — derived from the snapshot rather than restated, so a spec that
+ * counts rows counts what was actually seeded.
+ *
+ * `findingKey` is NOT here on purpose: the server composes it
+ * (`{source}:{sectionId}:{itemId}:{recommendationId|'custom'}`, plus a collision
+ * ordinal) and a fixture that recomputed the format would pass while the real
+ * one changed underneath it.
+ */
+export const SEED_REPAIR_DEFECTS: Array<{
+    sectionTitle: string;
+    itemLabel: string;
+    defectTitle: string;
+    category: string;
+}> = DELIVERED_TEMPLATE_SNAPSHOT.sections.flatMap((section) =>
+    section.items.flatMap((item) =>
+        item.tabs.defects.map((defect) => ({
+            sectionTitle: section.title,
+            itemLabel: item.label,
+            defectTitle: defect.title,
+            category: defect.category,
+        })),
+    ),
+);

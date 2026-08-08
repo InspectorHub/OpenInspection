@@ -9,6 +9,7 @@
  */
 import type { Defect } from "../RepairBuilderSection";
 import { parseRepairActionTag, type RepairActionTag } from "~/lib/repair-action-tag";
+import { Select } from "@core/shared-ui";
 import { MoneyInput } from "~/components/MoneyInput";
 import { RepairDefectRowView } from "./RepairDefectRowView";
 import { m } from "~/paraglide/messages";
@@ -115,29 +116,41 @@ export function RepairDefectRow({
               >
                 {m.repair_defect_action_label()}
               </label>
-              {/* A native select, not the SegmentedControl the settings panels
-                  use. Five choices do not fit this row's width without wrapping,
-                  and this page is used on a phone at a property — a native
-                  picker is the control the device already knows how to present.
-                  The words are the SAME ones the shared list renders, because an
-                  action that changes name between choosing it and reading it
-                  reads as two different things. */}
-              <select
+              {/* The DS `Select`, not a bare `<select>` and not the
+                  SegmentedControl the settings panels use.
+                  - Not SegmentedControl: five choices do not fit this row's width
+                    without wrapping, and this page is used on a phone at a
+                    property.
+                  - ⚠️ Not a bare `<select>`: the native chevron and option list
+                    are UA-rendered, which is the one part design tokens do NOT
+                    reach, so a correct-looking class list can still produce
+                    unreadable options in dark mode. `Select` exists because that
+                    was already solved once — it sets `appearance-none` and draws a
+                    tokenized chevron over `.ih-input`.
+                  `bare` because this row supplies its own micro-label, matching
+                  the credit field beside it. The option words are the SAME ones
+                  the shared list renders: an action that changes name between
+                  being chosen and being read reads as two different things. */}
+              <Select
+                bare
                 id={`action-${defect.findingKey}`}
                 value={actionTag ?? ""}
                 onChange={(e) => onUpdateTag(defect, parseRepairActionTag(e.target.value))}
                 aria-label={m.repair_defect_action_aria({ label: defect.itemLabel })}
-                className="w-full h-8 px-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 focus:outline-none focus:border-ih-primary"
-              >
-                {/* Untagged is an option, not a blank. The buyer may have no
-                    preference, and that is a different statement from not having
-                    reached the question yet. */}
-                <option value="">{m.repair_defect_action_none()}</option>
-                <option value="repair">{m.repair_request_action_tag_repair()}</option>
-                <option value="replace">{m.repair_request_action_tag_replace()}</option>
-                <option value="fund">{m.repair_request_action_tag_fund()}</option>
-                <option value="other">{m.repair_request_action_tag_other()}</option>
-              </select>
+                // `.ih-input` is 36px; this row's controls are 32px. Matching the
+                // neighbour beats matching the default when the two sit in one grid
+                // cell pair — a half-step height difference reads as a mistake.
+                className="!h-8 text-[13px]"
+                options={[
+                  // Untagged is an OPTION, not a blank. Having no preference is a
+                  // different statement from not having reached the question.
+                  { value: "", label: m.repair_defect_action_none() },
+                  { value: "repair", label: m.repair_request_action_tag_repair() },
+                  { value: "replace", label: m.repair_request_action_tag_replace() },
+                  { value: "fund", label: m.repair_request_action_tag_fund() },
+                  { value: "other", label: m.repair_request_action_tag_other() },
+                ]}
+              />
             </div>
 
             {/* #275 Q2b — the amount appears only when the buyer is asking for
