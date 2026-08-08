@@ -175,6 +175,29 @@ jobs:
           path: .react-router/types
           key: rr-typegen-${{ hashFiles('app/routes.ts', 'app/routes/**', 'react-router.config.ts', 'package-lock.json') }}
       - run: npx react-router typegen
+      # ESLint's own cache, persisted between runs. Measured on this repo: a cold
+      # eslint is 442s, and a warm one with a single file touched is 6s — the
+      # type-aware program is built lazily for the files actually linted, so a
+      # cache hit skips that too. CI was paying the cold price every run.
+      #
+      # The classic reason this does not work on GitHub Actions is that a fresh
+      # checkout gives every file a new mtime, and ESLint's DEFAULT cache
+      # strategy is metadata — so the cache misses on all files. `lint:eslint`
+      # already passes `--cache-strategy content`, which hashes contents instead;
+      # that flag is what makes persisting this worthwhile at all. Do not remove
+      # it without removing this cache.
+      #
+      # Keyed on the config and the lockfile, so a rule change or a plugin bump
+      # starts a fresh cache rather than silently reusing verdicts computed under
+      # the old rules. The restore-keys prefix CONTAINS that same hash, so a
+      # fallback can only ever come from a run with identical rules — it cannot
+      # under-invalidate. The commit sha suffix keeps a fresh copy saved each run
+      # instead of freezing at the first one.
+      - uses: actions/cache@v4
+        with:
+          path: .eslintcache
+          key: eslint-${{ hashFiles('eslint.config.js', 'package-lock.json') }}-${{ github.sha }}
+          restore-keys: eslint-${{ hashFiles('eslint.config.js', 'package-lock.json') }}-
       - run: npm run lint:eslint
 
   lint-gates:
