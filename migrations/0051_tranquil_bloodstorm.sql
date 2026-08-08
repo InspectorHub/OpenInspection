@@ -1,0 +1,1 @@
+ALTER TABLE `contractor_types` ADD `trade_slug` text;
