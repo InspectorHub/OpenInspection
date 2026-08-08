@@ -287,6 +287,7 @@ test.describe.serial('Integration: Google Calendar', () => {
         expect([301, 302].includes(connectRes.status())).toBe(true);
         const location = connectRes.headers()['location'] ?? '';
         expect(location).toContain('calendar.freebusy');
+    });
 
     test('POST /api/calendar/sync with pre-obtained refresh token creates blocked dates', async ({ request }) => {
         const refreshToken = env.INTEGRATION_GOOGLE_REFRESH_TOKEN;
