@@ -131,9 +131,11 @@ function markPaid(method = 'check') {
     const req = new Request(`https://acme.example.com/api/invoices/${INV_ID}/mark-paid`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ method }),
     });
-    return app.fetch(req, ENV, {
+    // Promise.resolve normalises `app.fetch`'s `Response | Promise<Response>`
+    // return — the union has no `.then`.
+    return Promise.resolve(app.fetch(req, ENV, {
         waitUntil: (p: Promise<unknown>) => { settled.push(p); }, passThroughOnException: () => {},
-    } as never).then(async (res) => { await Promise.allSettled(settled); return res; });
+    } as never)).then(async (res) => { await Promise.allSettled(settled); return res; });
 }
 
 describe('mark-paid → QuickBooks', () => {
@@ -213,7 +215,7 @@ function deliverWebhook() {
         await next();
     });
     app.route('/', stripeWebhookApi);
-    return app.request('/', { method: 'POST', headers: SIG, body: '{}' })
+    return Promise.resolve(app.request('/', { method: 'POST', headers: SIG, body: '{}' }))
         .then(async (res) => { await Promise.allSettled(settled); return res; });
 }
 

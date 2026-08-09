@@ -22,6 +22,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 import roleProfilesRoutes from '../../../server/api/role-profiles';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT_ID = '00000000-0000-0000-0000-0000000000a1';
 const AUDIT_ACTION = 'role_profile.capabilities_updated';
@@ -59,7 +60,7 @@ describe('role profile capability audit', () => {
             id: TENANT_ID, name: 'T', slug: 't-rpaudit', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT_ID, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT_ID, new Date(1));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(db);
     });

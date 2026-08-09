@@ -20,6 +20,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // eslint-disable-next-line import/order
 import notificationPreferenceRoutes from '../../../server/api/notification-preferences';
+import type { Role } from '../../../server/lib/auth/roles';
 
 const TENANT = 't-prefs-api';
 const ME = 'u-me';
@@ -36,7 +37,7 @@ const MUTABLE = 'concierge-inspector-review';
 let db: BetterSQLite3Database<typeof schema>;
 let sqlite: { close: () => void };
 
-function buildApp(role = 'owner') {
+function buildApp(role: Role = 'owner') {
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => {
         if (err instanceof AppError) {

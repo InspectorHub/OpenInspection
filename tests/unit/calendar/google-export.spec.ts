@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { CalendarProvider } from '../../../server/lib/calendar/provider';
 
 vi.mock('drizzle-orm/d1', async (orig) => ({
     ...(await orig<Record<string, unknown>>()),
@@ -9,9 +10,11 @@ vi.mock('drizzle-orm/d1', async (orig) => ({
 }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
-const pushEvent = vi.fn(async () => 'gcal-new');
-const patchEvent = vi.fn(async () => undefined);
-const deleteEvent = vi.fn(async () => undefined);
+// Typed against the real provider so `.mock.calls[n][0]` is the actual
+// parameter object rather than an empty tuple.
+const pushEvent = vi.fn<CalendarProvider['pushEvent']>(async () => 'gcal-new');
+const patchEvent = vi.fn<CalendarProvider['patchEvent']>(async () => undefined);
+const deleteEvent = vi.fn<CalendarProvider['deleteEvent']>(async () => undefined);
 vi.mock('../../../server/lib/calendar/registry', () => ({
     getCalendarProvider: () => ({ pushEvent, patchEvent, deleteEvent }),
 }));
@@ -68,15 +71,14 @@ describe('pushInspectionToGoogle — link-tracked two-way push', () => {
             { id: OTHER, tenantId: TENANT, email: 'o@t.com', role: 'inspector', passwordHash: 'x', createdAt: new Date() },
         ]);
         await db.insert(schema.inspections).values({
-            id: INSP, tenantId: TENANT, propertyAddress: '1 Main St',
-            clientName: 'S', clientEmail: 's@t.com', date: '2026-06-01',
+            id: INSP, tenantId: TENANT, propertyAddress: '1 Main St', date: '2026-06-01',
             scheduledStartMs: new Date(Date.UTC(2026, 5, 1, 14, 0)),
             durationMin: 120,
             status: 'confirmed', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
         await db.insert(schema.inspectionInspectors).values({
-            id: 'ii-1', tenantId: TENANT, inspectionId: INSP, userId: LEAD, role: 'lead',
+            tenantId: TENANT, inspectionId: INSP, userId: LEAD, role: 'lead',
             createdAt: new Date(),
         });
 

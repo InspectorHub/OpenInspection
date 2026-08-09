@@ -44,6 +44,7 @@ import { PeopleService } from '../../../server/services/people.service';
 import { idempotencyMiddleware } from '../../../server/lib/middleware/idempotency';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT = '00000000-0000-0000-0000-0000000000c1';
 const AGENT = 'ct-sms-agent';
@@ -138,7 +139,7 @@ beforeEach(async () => {
         tenantId: TENANT, companyPhone: '+15550009999',
         reviewUrl: 'https://reviews.example', smsMode: 'platform', updatedAt: new Date(),
     } as never);
-    await seedRoleProfiles(db, TENANT, new Date(1));
+    await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
     // Agents carry implied consent, so the send is not gated on a ledger grant
     // and the duplicate is the only thing under test.
     await db.insert(schema.contacts).values([

@@ -31,6 +31,7 @@ import { PeopleService } from '../../../server/services/people.service';
 import { idempotencyMiddleware } from '../../../server/lib/middleware/idempotency';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const USER_ID = '00000000-0000-0000-0000-000000000300';
@@ -96,12 +97,11 @@ beforeEach(async () => {
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({
-        id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St',
-        clientName: 'Jane', clientEmail: 'jane@example.com', date: '2026-06-01',
+        id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St', date: '2026-06-01',
         status: 'requested', paymentStatus: 'unpaid', price: 50000,
         agreementRequired: false, paymentRequired: false, createdAt: new Date(),
     });
-    await seedRoleProfiles(db, TENANT, new Date(1));
+    await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
     await db.insert(schema.contacts).values({
         id: CLIENT_CONTACT_ID, tenantId: TENANT, type: 'client', name: 'Jane',
         email: 'jane@example.com', createdAt: new Date(),

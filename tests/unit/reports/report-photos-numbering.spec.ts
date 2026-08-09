@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { assignPhotoNumbers } from '../../../server/lib/report-photos';
+import { stampedPhotoNo } from '../helpers/report-photos';
 
 const photo = (key: string, caption: string | null = null) => ({ key, url: `/p/${key}`, caption });
 
@@ -23,8 +24,8 @@ describe('assignPhotoNumbers', () => {
       [1, 'a'], [2, 'b'], [3, 'c'], [4, 'd'], [5, 'e'],
     ]);
     // stamps propagate back onto the section tree
-    expect((numbered[0].items[0].photos as Array<{ photoNo: number }>)[0].photoNo).toBe(1);
-    expect((numbered[0].items[0].resolvedTabs!.defects![0].defectPhotos as Array<{ photoNo: number }>)[0].photoNo).toBe(3);
+    expect(stampedPhotoNo(numbered[0].items[0].photos[0])).toBe(1);
+    expect(stampedPhotoNo(numbered[0].items[0].resolvedTabs!.defects![0].defectPhotos![0])).toBe(3);
   });
 
   it('is gap-free and dedupes a repeated key to one number', () => {

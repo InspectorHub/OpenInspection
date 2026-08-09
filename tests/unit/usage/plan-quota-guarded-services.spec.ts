@@ -22,6 +22,7 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -251,7 +252,7 @@ describe('POST /book consumes the free-tier quota (public self-serve booking)', 
     const MONDAY = '2026-06-08'; // a Monday — mirrors booking-autoassign.spec.ts
 
     const FAKE_ENV: HonoConfig['Bindings'] = { DB: {} as D1Database } as unknown as HonoConfig['Bindings'];
-    const FAKE_EXEC_CTX: ExecutionContext = { waitUntil: vi.fn(), passThroughOnException: vi.fn() };
+    const FAKE_EXEC_CTX: ExecutionContext = makeExecutionContext().ctx;
 
     let testDb: BetterSQLite3Database<typeof schema>;
     let sqlite: any;

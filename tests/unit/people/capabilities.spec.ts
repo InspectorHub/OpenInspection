@@ -21,7 +21,10 @@ describe('capabilitiesForKind', () => {
     });
   });
   it('no longer exposes the never-consumed canSign / canPay capability bits', () => {
-    const caps = capabilitiesForKind('agent') as Record<string, unknown>;
+    // Spread rather than cast: the point of the assertion is that these two
+    // keys are ABSENT from the returned object, and `RoleCapabilities` no
+    // longer declares them — so a direct cast is rejected for non-overlap.
+    const caps: Record<string, unknown> = { ...capabilitiesForKind('agent') };
     expect(caps.canSign).toBeUndefined();
     expect(caps.canPay).toBeUndefined();
   });

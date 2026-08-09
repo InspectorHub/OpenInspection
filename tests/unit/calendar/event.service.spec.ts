@@ -10,6 +10,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT = '00000000-0000-0000-0000-000000000099';
 
@@ -104,7 +105,7 @@ describe('EventService', () => {
         let eventTypeId: string;
 
         beforeEach(async () => {
-            await seedRoleProfiles(testDb, TENANT, new Date(1));
+            await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
             await testDb.insert(schema.contacts).values({
                 id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane Client',
                 email: 'jane@example.com', phone: null, createdAt: new Date(),
@@ -113,7 +114,6 @@ describe('EventService', () => {
             // carries the primary client for this inspection.
             await testDb.insert(schema.inspections).values({
                 id: INSP, tenantId: TENANT, propertyAddress: '1 Main St',
-                clientName: null, clientEmail: null, clientPhone: null,
                 date: '2026-07-01', status: 'confirmed', paymentStatus: 'unpaid', price: 0,
                 agreementRequired: false, paymentRequired: false, createdAt: new Date(),
             });

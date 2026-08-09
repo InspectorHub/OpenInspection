@@ -10,6 +10,7 @@ import type { EmailService } from '../../../server/services/email.service';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { asD1Db } from '../helpers/test-db';
 
 const T1            = '00000000-0000-0000-0000-0000000000a1';
 const T1_SUB        = 't1';
@@ -61,7 +62,7 @@ async function seedFixture(testDb: BetterSQLite3Database<typeof schema>, opts: S
     // Task 9c-X2 — confirmByClient's agent-notify now resolves the buyer_agent
     // contact via inspection_people, which createBooking only populates when
     // role profiles exist for the tenant (see its try/catch mirror-write).
-    await seedRoleProfiles(testDb, T1, new Date(1));
+    await seedRoleProfiles(asD1Db(testDb), T1, new Date(1));
 }
 
 const baseParams = () => ({
@@ -174,7 +175,7 @@ describe('ConciergeService — A3', () => {
     describe('approveByInspector', () => {
         it('transitions awaiting_inspector → awaiting_client + mints token + emails client', async () => {
             await seedFixture(testDb, { reviewRequired: true });
-            await seedRoleProfiles(testDb, T1, new Date(1));
+            await seedRoleProfiles(asD1Db(testDb), T1, new Date(1));
             const created = await svc.createBooking(baseParams());
 
             // Task 9b (people-role-profiles) — approveByInspector resolves the

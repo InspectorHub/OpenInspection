@@ -44,6 +44,8 @@ vi.mock('../../../server/lib/rate-limit', () => ({
 
 // eslint-disable-next-line import/order
 import { bookingsRoutes } from '../../../server/api/bookings';
+import { asD1Db } from '../helpers/test-db';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 // 2026-06-08 is a Monday (dayOfWeek = 1) — mirrors booking-autoassign.spec.ts.
 const MONDAY = '2026-06-08';
@@ -79,10 +81,7 @@ function makeServiceStubs(bookingSvc: BookingService, contactSvc: ContactService
     };
 }
 
-const FAKE_EXEC_CTX: ExecutionContext = {
-    waitUntil: vi.fn(),
-    passThroughOnException: vi.fn(),
-};
+const FAKE_EXEC_CTX: ExecutionContext = makeExecutionContext().ctx;
 
 function buildApp(
     db: BetterSQLite3Database<typeof schema>,
@@ -134,7 +133,7 @@ async function seedBaseTenant(db: BetterSQLite3Database<typeof schema>) {
     // booking.service.ts's people-write resolves role profile ids by key, so
     // the role profiles must exist for the write to land.
     const { seedRoleProfiles } = await import('../../../server/services/seed/seed-role-profiles');
-    await seedRoleProfiles(db, T1, new Date());
+    await seedRoleProfiles(asD1Db(db), T1, new Date());
 }
 
 function morningBody(overrides: Record<string, unknown> = {}) {

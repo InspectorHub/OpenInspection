@@ -19,6 +19,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import agentRoutes from '../../../server/api/agent';
 import type { HonoConfig } from '../../../server/types/hono';
+import { asD1Db } from '../helpers/test-db';
 
 const T = '00000000-0000-0000-0000-0000000000c1';
 const AGENT_USER = '00000000-0000-4000-8000-0000000000d1';
@@ -39,7 +40,7 @@ async function seedBase() {
         id: T, name: 'Acme', slug: 'acme-vis', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
-    await seedRoleProfiles(db, T, new Date(1));
+    await seedRoleProfiles(asD1Db(db), T, new Date(1));
     await db.insert(schema.users).values({
         id: AGENT_USER, tenantId: null, email: 'lister@realty.com', role: 'agent', name: 'Lister', createdAt: new Date(), passwordHash: 'h',
     } as never);

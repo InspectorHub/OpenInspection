@@ -21,7 +21,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { drizzle as drizzleFor } from 'drizzle-orm/better-sqlite3';
 import { aiContentReviews } from '../../../server/lib/db/schema';
 import { AppError } from '../../../server/lib/errors';
@@ -47,7 +46,10 @@ const PATH = '/api/ai/reviews';
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
 const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
 
-let db: DrizzleD1Database;
+// The better-sqlite3 handle, typed as what it actually is. The route under
+// test receives it through the mocked `drizzle-orm/d1` factory below; the spec
+// itself only reads rows off it.
+let db: ReturnType<typeof drizzleFor>;
 
 function buildApp(userId: string) {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);

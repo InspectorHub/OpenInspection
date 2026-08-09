@@ -18,6 +18,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import agentRoutes from '../../../server/api/agent';
 import type { HonoConfig } from '../../../server/types/hono';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const AGENT_CONTACT = '00000000-0000-4000-8000-0000000000a1';
@@ -55,14 +56,14 @@ describe('GET /api/agent/my-reports — buyer_agent via inspection_people (Task 
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values([
             { id: AGENT_CONTACT, tenantId: TENANT, type: 'agent', name: 'Jane', email: 'jane@realty.com', createdAt: new Date() },
             { id: OTHER_CONTACT, tenantId: TENANT, type: 'agent', name: 'Other', email: 'other@realty.com', createdAt: new Date() },
         ]);
         await db.insert(schema.inspections).values([
-            { id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid', price: 0, referredByAgentId: null, inspectorId: null, createdAt: new Date() },
-            { id: INSP_2, tenantId: TENANT, propertyAddress: '2 Oak', date: '2026-06-02', status: 'confirmed', paymentStatus: 'paid', price: 0, referredByAgentId: null, inspectorId: null, createdAt: new Date() },
+            { id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid', price: 0, inspectorId: null, createdAt: new Date() },
+            { id: INSP_2, tenantId: TENANT, propertyAddress: '2 Oak', date: '2026-06-02', status: 'confirmed', paymentStatus: 'paid', price: 0, inspectorId: null, createdAt: new Date() },
         ]);
     });
 
@@ -108,7 +109,7 @@ describe('GET /api/agent/leaderboard — buyer_agent via inspection_people (Task
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values([
             { id: AGENT_CONTACT, tenantId: TENANT, type: 'agent', name: 'Jane', agency: 'Realty Co', email: 'jane@realty.com', createdAt: new Date() },
         ]);
@@ -131,7 +132,7 @@ describe('GET /api/agent/leaderboard — buyer_agent via inspection_people (Task
 
     it('inspection with no buyer_agent inspection_people row is excluded from the leaderboard', async () => {
         await db.insert(schema.inspections).values({
-            id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid', price: 0, referredByAgentId: null, inspectorId: null, createdAt: new Date(),
+            id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid', price: 0, inspectorId: null, createdAt: new Date(),
         });
         const res = await buildApp('manager').request('/api/agent/leaderboard', {}, ENV, CTX);
         expect(res.status).toBe(200);

@@ -53,6 +53,7 @@ import { idempotencyMiddleware } from '../../../server/lib/middleware/idempotenc
 import { AppError } from '../../../server/lib/errors';
 // eslint-disable-next-line import/order
 import type { HonoConfig } from '../../../server/types/hono';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT = '00000000-0000-0000-0000-0000000000d1';
 const INSPECTION = 'insp-0000-0000-0000-000000000d01';
@@ -135,7 +136,7 @@ describe("POST '/api/public/inspections/{id}/deposit-intent' — replay does not
     });
 
     it('asks for the REMAINDER after a partial deposit, not the original amount', async () => {
-        await recordPayment(db, TENANT, {
+        await recordPayment(asD1Db<Record<string, unknown>>(db), TENANT, {
             inspectionId: INSPECTION, invoiceId: null, kind: 'deposit',
             amountCents: 4000, method: 'card', provider: 'stripe', providerRef: 'pi_partial',
         });
@@ -147,7 +148,7 @@ describe("POST '/api/public/inspections/{id}/deposit-intent' — replay does not
     });
 
     it('refuses once the deposit has landed, whatever Stripe would replay', async () => {
-        await recordPayment(db, TENANT, {
+        await recordPayment(asD1Db<Record<string, unknown>>(db), TENANT, {
             inspectionId: INSPECTION, invoiceId: null, kind: 'deposit',
             amountCents: 9000, method: 'card', provider: 'stripe', providerRef: 'pi_1',
         });
@@ -168,8 +169,11 @@ describe("POST '/api/public/inspections/{id}/deposit-intent' — replay does not
         expect(createDepositPaymentIntent).not.toHaveBeenCalled();
     });
 
-    it('refuses once the visit is under way — a deposit only holds a slot', async () => {
-        await db.update(schema.inspections).set({ status: 'in_progress' })
+    // The route admits `status === 'requested'` only (server/api/public/
+    // deposit-intent.ts); 'confirmed' is the first state past it on the
+    // INSPECTION_STATUSES axis, i.e. the slot is already committed.
+    it('refuses once the booking is confirmed — a deposit only holds a slot', async () => {
+        await db.update(schema.inspections).set({ status: 'confirmed' })
             .where(eq(schema.inspections.id, INSPECTION));
         expect((await startDeposit()).status).toBe(404);
         expect(createDepositPaymentIntent).not.toHaveBeenCalled();

@@ -19,6 +19,7 @@ import type { EmailService } from '../../../server/services/email.service';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const CLIENT = 'contact-client-1';
@@ -41,7 +42,7 @@ describe('ConciergeService.approveByInspector — primary-client resolution (Tas
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values({
             id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane Client',
             email: 'jane@example.com', phone: null, createdAt: new Date(),
@@ -51,7 +52,6 @@ describe('ConciergeService.approveByInspector — primary-client resolution (Tas
         // carries the primary client for this inspection.
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St',
-            clientName: null, clientEmail: null, clientPhone: null,
             date: '2026-06-01', status: 'scheduled', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, conciergeStatus: 'awaiting_inspector',
             createdAt: new Date(),

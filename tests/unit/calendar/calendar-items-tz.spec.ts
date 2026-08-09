@@ -198,7 +198,6 @@ describe('calendar items — timezone-correct civil date bucketing', () => {
         await testDb.insert(schema.tenantConfigs).values({
             tenantId: TENANT,
             defaultTimezone: 'America/New_York',
-            createdAt: now,
             updatedAt: now,
         });
         await testDb.insert(schema.users).values({

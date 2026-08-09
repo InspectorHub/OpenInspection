@@ -21,7 +21,8 @@ import { QBOServiceBase } from '../../../server/services/qbo/api-base';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 class ProbeQbo extends QBOServiceBase {
     public call(path: string) { return this.apiCall<unknown>('t1', 'GET', path); }
-    protected override async getToken() {
+    // `getToken` is PUBLIC on QBOServiceBase; narrowing it here is a TS2415.
+    public override async getToken() {
         return { accessToken: 'at', realmId: '9130350000000000', tenantId: 't1' };
     }
 }
