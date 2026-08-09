@@ -56,18 +56,36 @@ export default defineConfig({
     // environment, and the optimizer is applied per environment NAME. (The
     // ≤ v3 name `web` is read by nothing in v4 — see vitest.config.ts.)
     //
-    // The list stays short because an entry has to be safe on two counts:
-    //   - Never mocked. `vi.mock('drizzle-orm/d1')` appears in 361 specs, so
-    //     that subpath must stay out; only the untouched entries are listed.
-    //   - Duplicate-safe. A pre-bundled entry is a SECOND copy of that code:
-    //     `drizzle-orm/d1` and `drizzle-orm/better-sqlite3` (which tests/unit/db.ts
-    //     uses) still load the raw package. drizzle survives that by design —
-    //     its brands are `Symbol.for('drizzle:*')` from the global registry and
-    //     `is()` compares `entityKind` STRINGS, not identity. A package without
-    //     that property must not be added: `@hono/zod-openapi` was tried and
-    //     rejected because it would inline its own `zod`/`hono`, while server
-    //     code imports both raw — `extendZodWithOpenApi` would then patch a
-    //     prototype half the schemas never see.
+    // 🔴 THE LIST IS EMPTY, AND THAT IS A MEASURED RESULT, NOT AN OVERSIGHT.
+    // `include: ['drizzle-orm', 'drizzle-orm/sqlite-core']` was landed and
+    // reverted the same day. It worked in every way it was checked — the
+    // artifact appeared in deps_ssr/ AND the poison test proved it loaded — and
+    // it still broke the suite, in a way no targeted run could show:
+    //
+    //     Cannot find module '/node_modules/drizzle-orm/d1/index.js&v=b448f4c1'
+    //
+    // Optimizing ANY entry point of a package version-stamps how the whole
+    // package resolves. `drizzle-orm/d1` is `vi.mock`ed by 361 specs and was
+    // deliberately kept OUT of `include` for exactly that reason — but out of
+    // `include` is not out of reach. Adding it to `exclude` does not help
+    // either; the `&v=` query is still attached and the mock's resolution
+    // fails. Two calendar specs stopped collecting entirely.
+    //
+    // So the bar for adding an entry here is higher than "never mocked" and
+    // "duplicate-safe" (the two criteria that let `drizzle-orm` through):
+    // NO SUBPATH of the package may be mocked or aliased anywhere, and the only
+    // way to know is a full `npm run test:unit`. A 31-file sample said yes and
+    // was wrong.
+    //
+    // For the record, the two criteria that still apply on top of that:
+    //   - Never mocked, package-wide. `vi.mock('drizzle-orm/d1')` × 361.
+    //   - Duplicate-safe. A pre-bundled entry is a SECOND copy of that code.
+    //     drizzle would have survived that by design — brands are
+    //     `Symbol.for('drizzle:*')` from the global registry and `is()` compares
+    //     `entityKind` STRINGS — but `@hono/zod-openapi` would not: it inlines
+    //     its own `zod`/`hono` while server code imports both raw, so
+    //     `extendZodWithOpenApi` would patch a prototype half the schemas never
+    //     see.
     //
     // `exclude` keeps the stubbed Workers packages out: they are aliased above
     // to local stubs, and pre-bundling would resolve the real ones.
@@ -77,13 +95,17 @@ export default defineConfig({
     // than any plausible saving. Artifacts land in
     // node_modules/.vite/vitest/<sha1(project label, "" here)>/deps_ssr/ — and
     // "the file appeared" only proves it was BUILT. Prepend `throw new Error()`
-    // to it and re-run: the specs must fail. (They do today for both entries;
-    // the wall-clock gain is real in mechanism but was not measurable here.)
+    // to it and re-run: the specs must fail.
+    //
+    // ⚠️ And then run the FULL suite anyway. The poison test answers "is this
+    // bundle loaded", which is necessary and, as the revert above shows, not
+    // sufficient — it says nothing about what the package's other subpaths now
+    // resolve to.
     deps: {
       optimizer: {
         ssr: {
           enabled: true,
-          include: ['drizzle-orm', 'drizzle-orm/sqlite-core'],
+          include: [],
           exclude: ['@cloudflare/workers-oauth-provider', 'agents/mcp'],
         },
       },
