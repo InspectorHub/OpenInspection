@@ -883,7 +883,7 @@ export default function InspectionHubPage() {
 
         {/* 5. Inspection status — the visit itself. Independent of report
             publishing. */}
-        <LifecycleCard status={inspection.status} fetcher={completeInspection} />
+        <LifecycleCard status={inspection.status} inspectionId={inspection.id} fetcher={completeInspection} />
 
         {/* 5b. Communication — what has been said, and what we sent. The
             client already had a Messages tab; this is the inspector's first

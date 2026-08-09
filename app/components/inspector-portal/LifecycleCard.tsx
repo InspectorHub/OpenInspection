@@ -1,6 +1,8 @@
+import { useState } from "react";
 import type { useFetcher } from "react-router";
 import { Card, Button } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
+import { CancelInspectionModal } from "./CancelInspectionModal";
 import { lifecycleState } from "~/lib/hub-blocks";
 import { humanizeStatus, statusTone } from "~/lib/status";
 import { m } from "~/paraglide/messages";
@@ -15,17 +17,32 @@ import { m } from "~/paraglide/messages";
  * hidden in those states and nothing took its place. A title and a badge over
  * blank space reads as broken rather than finished, so each terminal state says
  * what it means: completed means the visit happened, cancelled means it will not.
+ *
+ * CANCELLING LIVES HERE (#67) because this card is the inspection's lifecycle,
+ * and cancelling is the other end of the same axis "Mark fieldwork complete"
+ * moves along — the one that says the visit will not happen. It is offered only
+ * in the `actionable` state: the two terminal states are already the answer.
+ *
+ * No role gate on the control. `POST /:id/cancel` mounts
+ * `requireRole('owner','manager','inspector')`, so an inspector standing at a
+ * door nobody answered may cancel, and hiding the button from them would be
+ * this page holding a second, stricter opinion than the endpoint that enforces
+ * it.
  */
 export function LifecycleCard({
     status,
+    inspectionId,
     fetcher,
 }: {
     status: string;
+    /** The order being cancelled — the quote and the cancel are both keyed on it. */
+    inspectionId: string;
     /** The hub's complete-fieldwork fetcher, so the button reflects its state. */
     fetcher: ReturnType<typeof useFetcher>;
 }) {
     const state = lifecycleState(status);
     const marking = fetcher.state !== "idle";
+    const [cancelOpen, setCancelOpen] = useState(false);
 
     return (
         <Card className="p-5">
@@ -41,12 +58,36 @@ export function LifecycleCard({
                         page while being, by its own contract above, advisory and
                         never a precondition — it outranked Publish report, which
                         is the irreversible one. */}
-                    <fetcher.Form method="post">
-                        <input type="hidden" name="intent" value="complete" />
-                        <Button type="submit" variant="secondary" size="sm" disabled={marking}>
-                            {marking ? m.inspections_hub_lifecycle_marking() : m.inspections_hub_lifecycle_mark_complete()}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <fetcher.Form method="post">
+                            <input type="hidden" name="intent" value="complete" />
+                            <Button type="submit" variant="secondary" size="sm" disabled={marking}>
+                                {marking ? m.inspections_hub_lifecycle_marking() : m.inspections_hub_lifecycle_mark_complete()}
+                            </Button>
+                        </fetcher.Form>
+                        {/* A link-weight danger control: cancelling is rare and
+                            irreversible, so it must be findable without competing
+                            with the button beside it. */}
+                        <Button
+                            type="button"
+                            variant="danger-link"
+                            size="sm"
+                            onClick={() => setCancelOpen(true)}
+                        >
+                            {m.inspections_hub_cancel_action()}
                         </Button>
-                    </fetcher.Form>
+                    </div>
+                    {/* Mounted only while open, so closing it discards the
+                        chosen reason, the notes, the quote and any error. A
+                        modal kept alive across closes reopens showing the last
+                        attempt's failure over a quote nobody asked for again. */}
+                    {cancelOpen && (
+                        <CancelInspectionModal
+                            open
+                            inspectionId={inspectionId}
+                            onClose={() => setCancelOpen(false)}
+                        />
+                    )}
                 </>
             ) : (
                 <p className="text-[12px] text-ih-fg-3">

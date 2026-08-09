@@ -104,6 +104,10 @@ export default [
   route("resources/agent-notices", "routes/resources/agent-notices.tsx"),
   route("resources/staff-notices", "routes/resources/staff-notices.tsx"),
   route("resources/inspection-communication", "routes/resources/inspection-communication.tsx"),
+  // #67 — the cancellation quote (loader) and the cancel itself (action). Both
+  // API endpoints shipped with the fee ladder and had no caller anywhere in
+  // app/; this is the only front door to them.
+  route("resources/inspection-cancellation", "routes/resources/inspection-cancellation.tsx"),
   route("resources/agreement-signers", "routes/resources/agreement-signers.tsx"),
   route("resources/team-members", "routes/resources/team-members.tsx"),
   route("resources/contact-access", "routes/resources/contact-access.tsx"),
