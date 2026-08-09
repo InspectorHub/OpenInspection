@@ -63,15 +63,36 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+
+/**
+ * Fixture overrides (OI #75):
+ *   node scripts/check-erasure-manifest.mjs --manifest <p> --out-of-scope <p> --schema-dir <p>
+ *
+ * They exist so this gate can be proven RED against a probe under
+ * `scripts/fixtures/erasure-gate-probe/` rather than by breaking the tracked
+ * catalogue and reverting it — a probe that mutates tracked source is one
+ * interrupted run from being committed.
+ */
+const argv = process.argv.slice(2);
+const flag = (name, fallback) => {
+  const i = argv.indexOf(name);
+  return i === -1 ? fallback : join(ROOT, argv[i + 1] ?? "");
+};
+/** True only when checking the tracked catalogue — see PENDING_ENFORCEMENT below. */
+const REAL_MANIFEST = argv.indexOf("--manifest") === -1;
+
 // The manifest and its out-of-scope register are two files and one document:
 // a column is covered by a rule in the first or excused by an entry in the
 // second, and neither array means anything without the other. They are read as
 // one concatenated source so `arrayBody` finds whichever it is asked for, and
 // so splitting the register out for line-count reasons could not quietly halve
 // what this gate sees. A missing file throws here rather than parsing as empty.
-const MANIFEST = join(ROOT, "server", "lib", "compliance", "erasure-manifest.ts");
-const OUT_OF_SCOPE = join(ROOT, "server", "lib", "compliance", "erasure-out-of-scope.ts");
-const SCHEMA_DIR = join(ROOT, "server", "lib", "db", "schema");
+const MANIFEST = flag("--manifest", join(ROOT, "server", "lib", "compliance", "erasure-manifest.ts"));
+const OUT_OF_SCOPE = flag(
+  "--out-of-scope",
+  join(ROOT, "server", "lib", "compliance", "erasure-out-of-scope.ts"),
+);
+const SCHEMA_DIR = flag("--schema-dir", join(ROOT, "server", "lib", "db", "schema"));
 
 const VALID_ACTIONS = new Set(["delete", "null", "hash", "retain", "anonymize"]);
 const REQUIRES_BASIS = new Set(["anonymize", "retain"]);
@@ -118,9 +139,31 @@ const errors = [];
 
 const src = `${readFileSync(MANIFEST, "utf8")}\n${readFileSync(OUT_OF_SCOPE, "utf8")}`;
 
-/** Extract the body of a top-level `export const NAME = [ ... ];` array. */
+/**
+ * Extract the body of a top-level `export const NAME = [ ... ];` array.
+ *
+ * The declaration is matched LINE-ANCHORED and with a trailing negative
+ * lookahead rather than by `indexOf`. Both were live holes here, each found by
+ * breaking this manifest and watching this gate give the wrong answer:
+ *
+ *  - Without the lookahead, `indexOf('export const ERASURE_MANIFEST')` also
+ *    matches `ERASURE_MANIFEST_V2`. Renaming the catalogue out from under every
+ *    consumer left this gate parsing the renamed copy and printing "OK (56
+ *    rules, 113 out-of-scope)" — the coarsest sabotage there is, as health.
+ *  - Without the `^` anchor the match lands inside PROSE. A doc comment that
+ *    quotes the declaration it describes (`export const ERASURE_MANIFEST:
+ *    ErasureRule[] = []`) was enough to make the gate parse from mid-sentence
+ *    and report ZERO rules while all 56 sat intact below it — a different wrong
+ *    answer, and a more confusing one, because it accuses the manifest of being
+ *    empty rather than the parser of being lost. Top-level exports start at
+ *    column 0; a mention of one does not.
+ *
+ * Kept deliberately identical to `check-non-translatable.mjs` and
+ * `check-retention-manifest.mjs` — one shape, and a fix in one has to land in
+ * all three. Asserted by `tests/unit/tooling/manifest-gate-parsing.spec.ts`.
+ */
 function arrayBody(text, name) {
-  const decl = text.indexOf(`export const ${name}`);
+  const decl = text.search(new RegExp(`^export const ${name}(?![A-Za-z0-9_$])`, "m"));
   if (decl === -1) return null;
   // Skip past the `=` so a type annotation like `: ErasureRule[]` (whose `[]`
   // would otherwise be mistaken for the array) is not matched.
@@ -265,8 +308,12 @@ rules.forEach((rule, i) => {
 });
 
 // The list must not outlive the rules it names, or it quietly becomes a blanket
-// permit for whatever lands on it next.
-for (const key of PENDING_ENFORCEMENT) {
+// permit for whatever lands on it next. This direction is a claim about the
+// TRACKED catalogue specifically, so it is skipped when `--manifest` points the
+// gate at a probe — a fixture manifest naturally names none of these rules, and
+// firing ten errors on every fixture run would make the fixture useless. The
+// real-tree run is where it bites, and the spec asserts that run is green.
+if (REAL_MANIFEST) for (const key of PENDING_ENFORCEMENT) {
   if (!seenPending.has(key)) {
     errors.push(
       `PENDING_ENFORCEMENT lists '${key}', but no manifest rule is marked pending for it. ` +

@@ -48,11 +48,12 @@
  * Usage:
  *   node scripts/check-retention-manifest.mjs
  *   node scripts/check-retention-manifest.mjs --schema-dir <path>
+ *   node scripts/check-retention-manifest.mjs --manifest <path> --schema-dir <path>
  *
- * `--schema-dir` exists so the gate can be proven against a FIXTURE
- * (`scripts/fixtures/retention-gate-probe/`) rather than by appending a
- * throwaway table to a tracked schema file and reverting it. A probe that
- * mutates tracked source is one interrupted run away from being committed.
+ * `--schema-dir` and `--manifest` exist so the gate can be proven against a
+ * FIXTURE (`scripts/fixtures/retention-gate-probe/`) rather than by editing a
+ * tracked schema or catalogue file and reverting it. A probe that mutates
+ * tracked source is one interrupted run away from being committed.
  *
  * console.* is intentional — this is a build script, not server code.
  */
@@ -60,13 +61,16 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
-const MANIFEST = join(ROOT, "server", "lib", "compliance", "retention-manifest.ts");
 
 const argv = process.argv.slice(2);
 const schemaDirArg = argv.indexOf("--schema-dir");
+const manifestArg = argv.indexOf("--manifest");
 const SCHEMA_DIR = schemaDirArg === -1
     ? join(ROOT, "server", "lib", "db", "schema")
     : join(ROOT, argv[schemaDirArg + 1] ?? "");
+const MANIFEST = manifestArg === -1
+    ? join(ROOT, "server", "lib", "compliance", "retention-manifest.ts")
+    : join(ROOT, argv[manifestArg + 1] ?? "");
 
 /**
  * A table whose NAME says it is a ledger.
@@ -106,9 +110,32 @@ const VALID_ACTIONS = new Set(["delete", "anonymize"]);
 const errors = [];
 const src = readFileSync(MANIFEST, "utf8");
 
-/** Extract the body of a top-level `export const NAME = [ ... ];` array. */
+/**
+ * Extract the body of a top-level `export const NAME = [ ... ];` array.
+ *
+ * The declaration is matched LINE-ANCHORED and with a trailing negative
+ * lookahead rather than by `indexOf`. Both were live holes here, each found by
+ * breaking this manifest and watching this gate give the wrong answer:
+ *
+ *  - Without the lookahead, `indexOf('export const RETENTION_MANIFEST')` also
+ *    matches `RETENTION_MANIFEST_V2`. Renaming the catalogue away left this gate
+ *    parsing the renamed copy and printing "OK (6 rules, 7 out-of-scope, 2
+ *    open)" — the coarsest possible sabotage, reported as health.
+ *  - Without the `^` anchor the match lands inside PROSE. A doc comment that
+ *    quotes the declaration it describes (`export const RETENTION_MANIFEST:
+ *    RetentionRule[] = []`) was enough to make the gate parse from the middle of
+ *    a sentence and report ZERO rules while all 6 sat intact below it — a
+ *    different wrong answer, and a more confusing one, because it accuses the
+ *    manifest of being empty rather than the parser of being lost. Top-level
+ *    exports start at column 0; a mention of one does not.
+ *
+ * Kept deliberately identical to `check-non-translatable.mjs` and
+ * `check-erasure-manifest.mjs` — these three parsers are one shape, and a fix
+ * in one has to land in all three. Asserted by
+ * `tests/unit/tooling/manifest-gate-parsing.spec.ts`.
+ */
 function arrayBody(text, name) {
-    const decl = text.indexOf(`export const ${name}`);
+    const decl = text.search(new RegExp(`^export const ${name}(?![A-Za-z0-9_$])`, "m"));
     if (decl === -1) return null;
     // Skip past the `=` so a type annotation like `: RetentionRule[]` (whose
     // `[]` would otherwise be mistaken for the array) is not matched.
