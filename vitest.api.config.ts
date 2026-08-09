@@ -44,15 +44,46 @@ export default defineConfig({
     // isolation, each of the 600+ spec files gets a fresh process that rebuilds
     // the whole module graph from scratch.
     //
-    // Pre-bundling node_modules with esbuild attacks that directly, and the
-    // result is cached in node_modules/.vite keyed on the dependency set — so
-    // the cost is paid once, not once per file per run. Left OFF for the
-    // stubbed Workers packages: they are aliased above to local stubs, and
-    // pre-bundling would resolve the real ones.
+    // Pre-bundling collapses a dependency's many small ESM files into one, so a
+    // fork pays one module fetch instead of dozens. `include` is the whole of
+    // it: ONLY the specifiers listed below are pre-bundled, and `enabled: true`
+    // on its own caches NOTHING. Vitest hard-sets `noDiscovery: true` on every
+    // optimizer environment (`resolveOptimizerConfig`), and Vite treats
+    // `noDiscovery && !include.length` as "optimizer off" outright
+    // (`isDepOptimizationDisabled`) — so nothing is ever auto-discovered into
+    // the list, and an empty list disables the option it appears to configure.
+    // `ssr` is the correct key: `environment: 'node'` runs in Vite's ssr
+    // environment, and the optimizer is applied per environment NAME. (The
+    // ≤ v3 name `web` is read by nothing in v4 — see vitest.config.ts.)
+    //
+    // The list stays short because an entry has to be safe on two counts:
+    //   - Never mocked. `vi.mock('drizzle-orm/d1')` appears in 361 specs, so
+    //     that subpath must stay out; only the untouched entries are listed.
+    //   - Duplicate-safe. A pre-bundled entry is a SECOND copy of that code:
+    //     `drizzle-orm/d1` and `drizzle-orm/better-sqlite3` (which tests/unit/db.ts
+    //     uses) still load the raw package. drizzle survives that by design —
+    //     its brands are `Symbol.for('drizzle:*')` from the global registry and
+    //     `is()` compares `entityKind` STRINGS, not identity. A package without
+    //     that property must not be added: `@hono/zod-openapi` was tried and
+    //     rejected because it would inline its own `zod`/`hono`, while server
+    //     code imports both raw — `extendZodWithOpenApi` would then patch a
+    //     prototype half the schemas never see.
+    //
+    // `exclude` keeps the stubbed Workers packages out: they are aliased above
+    // to local stubs, and pre-bundling would resolve the real ones.
+    //
+    // To verify a change here, look for the artifact, never at the clock. Runs
+    // of this suite vary by ±70% on an otherwise busy machine, which is more
+    // than any plausible saving. Artifacts land in
+    // node_modules/.vite/vitest/<sha1(project label, "" here)>/deps_ssr/ — and
+    // "the file appeared" only proves it was BUILT. Prepend `throw new Error()`
+    // to it and re-run: the specs must fail. (They do today for both entries;
+    // the wall-clock gain is real in mechanism but was not measurable here.)
     deps: {
       optimizer: {
         ssr: {
           enabled: true,
+          include: ['drizzle-orm', 'drizzle-orm/sqlite-core'],
           exclude: ['@cloudflare/workers-oauth-provider', 'agents/mcp'],
         },
       },
