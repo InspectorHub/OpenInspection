@@ -25,7 +25,8 @@ const RANK_BODY = 3;
 
 /** Rank an item's canned entries against a typed query. Lower rank = better;
  *  ties keep original order. Non-matching entries are dropped. Empty query
- *  returns every entry unchanged (used by the "Recommended ▾" button). */
+ *  returns every entry unchanged (used by the notes toolbar's "Recommended
+ *  comments" button). */
 export function rankTypeaheadMatches(
   entries: readonly TypeaheadEntry[],
   query: string,

@@ -98,7 +98,7 @@
   "editor_item_notes_label": "Notes",
   "editor_item_notes_chars": "{count} chars",
   "editor_item_notes_placeholder": "Add notes — type to see recommended comments, / for library",
-  "editor_item_recommended": "Recommended ▾",
+  "editor_item_recommended": "Recommended comments",
   "editor_item_add_photo": "Add photo",
   "editor_item_add_defect_photo_aria": "Add photo to this defect",
   "editor_item_defect_photo_count_one": "{count} photo · add",

@@ -6,6 +6,7 @@ import {
   flattenItemTabs, fragmentBeforeCaret, replaceFragmentBeforeCaret,
 } from "../../lib/comment-typeahead";
 import { AiAssistPanel } from "./AiAssistPanel";
+import { NotesFieldHeader } from "./NotesFieldHeader";
 import { CloneLastButton } from "./CloneLastButton";
 import type { DefectFieldsValue } from "./DefectFieldsRow";
 import { ItemAttributesPanel } from "./ItemAttributesPanel";
@@ -455,20 +456,16 @@ export function ItemEditor({
  </div>
  )}
 
- {/* Notes textarea with character count */}
+ {/* Notes field. The "Recommended comments" trigger lives in the header
+     ABOVE the textarea, never floated inside it — see NotesFieldHeader. */}
  <div>
- <div className="flex items-center justify-between mb-1">
- <label className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">
- {m.editor_item_notes_label()}
- </label>
- <span className={`text-[10px] font-mono tabular-nums ${
- ((result.notes as string) || "").length > 2000
- ? "text-ih-bad-fg"
- : "text-ih-fg-4"
- }`}>
- {m.editor_item_notes_chars({ count: ((result.notes as string) || "").length })}
- </span>
- </div>
+ <NotesFieldHeader
+  fieldId="notes-textarea"
+  charCount={((result.notes as string) || "").length}
+  canInsertCanned={taEntries.length > 0}
+  suggestionsOpen={taOpen}
+  onOpenSuggestions={() => { setTaQuery(""); setTaOpen(true); notesRef.current?.focus(); }}
+ />
  <div className="relative">
  <textarea
   id="notes-textarea"
@@ -502,13 +499,6 @@ export function ItemEditor({
   placeholder={m.editor_item_notes_placeholder()}
   className="w-full h-28 px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] resize-none focus:shadow-ih-focus focus:border-ih-primary outline-none"
  />
- <Button
-  variant="link" size="sm"
-  onClick={() => { setTaQuery(""); setTaOpen(true); notesRef.current?.focus(); }}
-  className="absolute right-2 top-2 h-auto px-0 py-0 text-[10px]"
- >
-  {m.editor_item_recommended()}
- </Button>
  <CommentTypeahead
   entries={taEntries}
   matches={ta.matches}
