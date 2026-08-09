@@ -132,6 +132,8 @@
   "settings_workspace_branding_heading": "Branding",
   "settings_workspace_company_name_label": "Company name",
   "settings_workspace_primary_color_label": "Primary Color",
+  "settings_workspace_color_contrast_warning": "Text on buttons filled with this colour can only reach {ratio}:1. WCAG AA needs {aa}:1, and on this fill neither white nor near-black text gets there.",
+  "settings_workspace_color_contrast_scope": "Brand-coloured text and links are not affected — those are derived to stay readable. It is the filled controls — buttons, badges, accent bars — that will be hard to read. Saving keeps your colour exactly as picked.",
   "settings_workspace_logo_label": "Company Logo",
   "settings_workspace_timezone_heading": "Timezone",
   "settings_workspace_timezone_subtitle": "Reports, reminders, and calendar events use this timezone. Individual users can override how times appear for them in their profile.",

@@ -75,8 +75,13 @@ export function brandFormat(brand: TenantBrand): {
  * near-threshold mistakes stops existing.
  */
 
-/** WCAG AA for normal-size text. */
-const AA_NORMAL = 4.5;
+/**
+ * WCAG AA for normal-size text. Exported because the settings picker quotes it
+ * back to the tenant (#91) — a warning that says "below AA" without saying what
+ * AA is asks the reader to look it up, and one that hardcodes 4.5 in a
+ * translatable string can drift away from the number the derivation uses.
+ */
+export const AA_NORMAL = 4.5;
 
 type Rgb = [number, number, number];
 
@@ -164,11 +169,40 @@ const ON_BRAND_LIGHT = "#ffffff";
  * pins that residual band so it cannot silently grow.
  */
 export function contrastForeground(hex: string | null | undefined): string {
+  return fillContrast(hex)?.foreground ?? ON_BRAND_LIGHT;
+}
+
+/** What a reader actually gets on a control filled with the brand colour. */
+export interface FillContrast {
+  /** The foreground `contrastForeground` will render — measured, not guessed. */
+  foreground: string;
+  /** WCAG ratio of that foreground against the fill, 1..21. */
+  ratio: number;
+  /** Whether that ratio clears AA for normal text. */
+  meetsAA: boolean;
+}
+
+/**
+ * Measure the best readability a FILL of this colour admits (#91).
+ *
+ * `contrastForeground` answers "which text colour" and throws the measurement
+ * away; the settings picker needs the measurement itself, to tell the tenant
+ * what their choice costs. Both answers come from this one function so the
+ * number shown in the warning is, by construction, the number the button will
+ * render — a second implementation could disagree with the first and neither
+ * side would know.
+ *
+ * `null` for an unparseable colour: there is nothing to measure, and a warning
+ * about a colour we could not read would be a guess.
+ */
+export function fillContrast(hex: string | null | undefined): FillContrast | null {
   const fill = parseColor(hex);
-  if (!fill) return ON_BRAND_LIGHT;
+  if (!fill) return null;
   const onLight = contrastRatio(parseColor(ON_BRAND_LIGHT)!, fill);
   const onDark = contrastRatio(parseColor(ON_BRAND_DARK)!, fill);
-  return onDark > onLight ? ON_BRAND_DARK : ON_BRAND_LIGHT;
+  const dark = onDark > onLight;
+  const ratio = dark ? onDark : onLight;
+  return { foreground: dark ? ON_BRAND_DARK : ON_BRAND_LIGHT, ratio, meetsAA: ratio >= AA_NORMAL };
 }
 
 /**
