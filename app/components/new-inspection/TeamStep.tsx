@@ -28,8 +28,8 @@ export function TeamStep({
       <div>
         <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_team_mode_label()}</label>
         <div className="flex gap-2">
-          <button onClick={() => setSoloMode(true)} className={`flex-1 py-2 rounded-md text-[12px] font-bold border transition-colors ${soloMode ? "border-ih-primary bg-ih-primary-tint text-ih-primary" : "border-ih-border text-ih-fg-3"}`}>{m.newinsp_team_solo()}</button>
-          <button onClick={() => setSoloMode(false)} className={`flex-1 py-2 rounded-md text-[12px] font-bold border transition-colors ${!soloMode ? "border-ih-primary bg-ih-primary-tint text-ih-primary" : "border-ih-border text-ih-fg-3"}`}>{m.newinsp_team_team()}</button>
+          <button onClick={() => setSoloMode(true)} className={`flex-1 py-2 rounded-md text-[12px] font-bold border transition-colors ${soloMode ? "border-ih-primary bg-ih-primary-tint text-ih-primary-text" : "border-ih-border text-ih-fg-3"}`}>{m.newinsp_team_solo()}</button>
+          <button onClick={() => setSoloMode(false)} className={`flex-1 py-2 rounded-md text-[12px] font-bold border transition-colors ${!soloMode ? "border-ih-primary bg-ih-primary-tint text-ih-primary-text" : "border-ih-border text-ih-fg-3"}`}>{m.newinsp_team_team()}</button>
         </div>
       </div>
       {!soloMode && (

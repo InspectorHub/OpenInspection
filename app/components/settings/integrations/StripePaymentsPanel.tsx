@@ -93,7 +93,7 @@ export function StripePaymentsPanel({
       <div className="rounded-md bg-ih-bg-muted border border-ih-border px-4 py-3 text-[12px] text-ih-fg-2 leading-relaxed">
         <span className="font-semibold text-ih-fg-2">{m.settings_stripe_test_mode_label()}</span> {m.settings_stripe_use_your()}{" "}
         <span className="font-mono">pk_test_…</span> / <span className="font-mono">sk_test_…</span> {m.settings_stripe_keys_from()}{" "}
-        <a href="https://dashboard.stripe.com/test/apikeys" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">
+        <a href="https://dashboard.stripe.com/test/apikeys" target="_blank" rel="noopener noreferrer" className="text-ih-primary-text hover:underline">
           dashboard.stripe.com/test/apikeys
         </a>{" "}
         {m.settings_stripe_pay_with_card()} <span className="font-mono">4242&nbsp;4242&nbsp;4242&nbsp;4242</span> {m.settings_stripe_verify_flow()}

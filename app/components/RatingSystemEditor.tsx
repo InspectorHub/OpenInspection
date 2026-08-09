@@ -224,7 +224,7 @@ export function RatingSystemEditor({
                   variant="secondary"
                   size="sm"
                   onClick={() => setLevels(p.levels.map((l) => ({ ...l })))}
-                  className="h-6 px-2 text-[11px] text-ih-primary hover:bg-ih-primary-tint"
+                  className="h-6 px-2 text-[11px] text-ih-primary-text hover:bg-ih-primary-tint"
                 >
                   {p.name}
                 </Button>
@@ -339,7 +339,7 @@ export function RatingSystemEditor({
               variant="secondary"
               size="sm"
               onClick={() => setLevels((prev) => [...prev, blankLevel()])}
-              className="mt-2 w-full h-8 rounded-lg border-dashed text-[12px] text-ih-fg-3 hover:text-ih-primary hover:border-ih-primary"
+              className="mt-2 w-full h-8 rounded-lg border-dashed text-[12px] text-ih-fg-3 hover:text-ih-primary-text hover:border-ih-primary"
             >
               {m.rating_editor_add_level()}
             </Button>

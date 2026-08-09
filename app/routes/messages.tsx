@@ -223,7 +223,7 @@ export default function MessagesPage() {
                   {mentionOptions.map(([id, address], i) => (
                     <span key={id}>
                       {i > 0 && " · "}
-                      <Link to={`/inspections/${id}`} className="text-ih-primary hover:underline">{address}</Link>
+                      <Link to={`/inspections/${id}`} className="text-ih-primary-text hover:underline">{address}</Link>
                     </span>
                   ))}
                 </p>

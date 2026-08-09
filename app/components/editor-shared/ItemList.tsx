@@ -257,7 +257,7 @@ export function ItemList({
             variant="ghost"
             size="sm"
             onClick={onAddItem}
-            className="w-full h-auto py-2 border border-dashed border-ih-border-strong font-bold text-ih-fg-3 hover:bg-transparent hover:text-ih-primary hover:border-ih-primary"
+            className="w-full h-auto py-2 border border-dashed border-ih-border-strong font-bold text-ih-fg-3 hover:bg-transparent hover:text-ih-primary-text hover:border-ih-primary"
           >
             {m.editor_shared_add_item()}
           </Button>

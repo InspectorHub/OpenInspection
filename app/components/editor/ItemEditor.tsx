@@ -326,7 +326,7 @@ export function ItemEditor({
  onAddDefectPhoto ? (
  <Button variant="ghost" size="sm" disabled={photoUploading} aria-label={m.editor_item_add_defect_photo_aria()} icon={addPhotoIcon}
  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddDefectPhoto(target); }}
- className="mt-1.5 h-auto px-2 py-1 border border-dashed border-ih-border-strong text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary"
+ className="mt-1.5 h-auto px-2 py-1 border border-dashed border-ih-border-strong text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary-text"
  >
  {count > 0 ? (count === 1 ? m.editor_item_defect_photo_count_one({ count }) : m.editor_item_defect_photo_count_other({ count })) : m.editor_item_add_photo()}
  </Button>
@@ -376,7 +376,7 @@ export function ItemEditor({
  <div className="max-w-2xl space-y-6">
  {/* Eyebrow + title */}
  <div>
- <div className="text-[11px] text-ih-primary font-bold uppercase tracking-wide">
+ <div className="text-[11px] text-ih-primary-text font-bold uppercase tracking-wide">
  {sectionTitle}
  </div>
  <ItemHeader label={item.label} size="lg" className="mt-1 text-ih-fg-1" as="h2" />
@@ -594,7 +594,7 @@ export function ItemEditor({
  {m.editor_item_photos_label()}
  </label>
  {photoCount > 0 && (
- <span className="inline-flex items-center gap-1 text-[10px] font-bold text-ih-primary bg-ih-primary-tint px-1.5 py-0.5 rounded">
+ <span className="inline-flex items-center gap-1 text-[10px] font-bold text-ih-primary-text bg-ih-primary-tint px-1.5 py-0.5 rounded">
  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
  </svg>

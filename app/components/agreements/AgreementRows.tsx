@@ -47,7 +47,7 @@ export function TemplateRow({
           <button
             type="button"
             onClick={() => onEdit(t.id)}
-            className="text-[13px] text-ih-primary hover:opacity-80 font-semibold"
+            className="text-[13px] text-ih-primary-text hover:opacity-80 font-semibold"
           >
             {m.common_edit()}
           </button>

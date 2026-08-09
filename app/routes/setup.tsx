@@ -174,7 +174,7 @@ export default function SetupPage() {
                   href="https://developers.cloudflare.com/workers/configuration/environment-variables/#add-environment-variables-via-the-dashboard"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-ih-primary hover:text-ih-primary-600 underline underline-offset-2"
+                  className="text-ih-primary-text hover:text-ih-primary-600 underline underline-offset-2"
                 >
                   {m.auth_setup_code_help_link()}
                 </a>

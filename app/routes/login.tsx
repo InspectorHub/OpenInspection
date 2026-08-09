@@ -141,7 +141,7 @@ export default function LoginPage() {
             type="password"
             label={m.auth_login_password_label()}
             labelAction={
-              <a href="/forgot-password" className="text-xs font-bold text-ih-primary hover:underline">
+              <a href="/forgot-password" className="text-xs font-bold text-ih-primary-text hover:underline">
                 {m.auth_login_forgot_link()}
               </a>
             }

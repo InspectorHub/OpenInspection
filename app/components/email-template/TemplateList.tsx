@@ -40,8 +40,8 @@ function TemplateRowItem({ row }: { row: TemplateRow }) {
     <div className="group flex items-center gap-4 px-5 py-3.5 hover:bg-ih-bg-muted/60 transition-colors">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <Link to={`/settings/communication/templates/${row.trigger}`} className="text-[13px] font-semibold text-ih-fg-1 hover:text-ih-primary transition-colors truncate">{row.name}</Link>
-          {row.isCustomized && <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-ih-primary-tint text-ih-primary">{m.email_list_customized()}</span>}
+          <Link to={`/settings/communication/templates/${row.trigger}`} className="text-[13px] font-semibold text-ih-fg-1 hover:text-ih-primary-text transition-colors truncate">{row.name}</Link>
+          {row.isCustomized && <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-ih-primary-tint text-ih-primary-text">{m.email_list_customized()}</span>}
           {row.required && <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-2">{m.email_list_alwayson()}</span>}
         </div>
         <p className="text-[11px] text-ih-fg-3 mt-0.5 font-mono truncate">{row.subject}</p>
@@ -60,7 +60,7 @@ function TemplateRowItem({ row }: { row: TemplateRow }) {
           </button>
         </fetcher.Form>
       )}
-      <Link to={`/settings/communication/templates/${row.trigger}`} className="shrink-0 h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-card hover:border-ih-primary hover:text-ih-primary transition-colors">{m.common_edit()}</Link>
+      <Link to={`/settings/communication/templates/${row.trigger}`} className="shrink-0 h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-card hover:border-ih-primary hover:text-ih-primary-text transition-colors">{m.common_edit()}</Link>
     </div>
   );
 }

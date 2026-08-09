@@ -134,7 +134,7 @@ export default function SettingsBillingPage() {
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-ih-border">
-                <Link to="/settings/usage" className="inline-flex items-center gap-1 text-ih-primary text-[13px] font-medium hover:underline">
+                <Link to="/settings/usage" className="inline-flex items-center gap-1 text-ih-primary-text text-[13px] font-medium hover:underline">
                   {m.settings_billing_view_usage()} <Icon name="arrowR" size={13} />
                 </Link>
               </div>
@@ -159,7 +159,7 @@ export default function SettingsBillingPage() {
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-ih-border">
-                <Link to="/settings/usage" className="inline-flex items-center gap-1 text-ih-primary text-[13px] font-medium hover:underline">
+                <Link to="/settings/usage" className="inline-flex items-center gap-1 text-ih-primary-text text-[13px] font-medium hover:underline">
                   {m.settings_billing_view_usage()} <Icon name="arrowR" size={13} />
                 </Link>
               </div>
@@ -200,7 +200,7 @@ export default function SettingsBillingPage() {
               </p>
               {portalUrl ? (
                 <a href={portalUrl} target="_blank" rel="noopener noreferrer"
-                  className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-ih-primary hover:underline">
+                  className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-ih-primary-text hover:underline">
                   {m.settings_billing_manage_portal()}
                   <ArrowIcon />
                 </a>
@@ -217,24 +217,24 @@ export default function SettingsBillingPage() {
         <aside className="space-y-4">
           {!hasBilling && (
             <section className="bg-ih-primary-tint border border-ih-primary rounded-md p-5">
-              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary">{m.settings_billing_need_hosted()}</div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary-text">{m.settings_billing_need_hosted()}</div>
               <p className="text-[12px] text-ih-fg-2 mt-2 leading-relaxed">
                 {m.settings_billing_hosted_pitch()}
               </p>
               <a href="https://inspectorhub.io/" target="_blank" rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-ih-primary hover:underline">
+                className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-ih-primary-text hover:underline">
                 {m.settings_billing_try_hosted()} <ArrowIcon />
               </a>
             </section>
           )}
           {hasBilling && hasSeatQuota && (
             <section className="bg-ih-primary-tint border border-ih-primary rounded-md p-5">
-              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary">{m.settings_billing_want_selfhost()}</div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary-text">{m.settings_billing_want_selfhost()}</div>
               <p className="text-[12px] text-ih-fg-2 mt-2 leading-relaxed">
                 {m.settings_billing_selfhost_pitch()}
               </p>
               <a href="https://github.com/InspectorHub/OpenInspection" target="_blank" rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-ih-primary hover:underline">
+                className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-ih-primary-text hover:underline">
                 {m.settings_billing_selfhost_docs()} <ArrowIcon />
               </a>
             </section>
@@ -242,7 +242,7 @@ export default function SettingsBillingPage() {
           <section className="bg-ih-bg-card border border-ih-border rounded-md p-5 text-[12px] text-ih-fg-3 leading-relaxed">
             <div className="font-bold text-ih-fg-1 mb-1.5 text-[13px]">{m.settings_billing_add_seat_heading()}</div>
             {m.settings_billing_add_seat_before()}{" "}
-            <Link to="/settings/team" className="font-semibold text-ih-primary hover:underline">{m.settings_billing_team_link()}</Link>.
+            <Link to="/settings/team" className="font-semibold text-ih-primary-text hover:underline">{m.settings_billing_team_link()}</Link>.
           </section>
         </aside>
       </div>

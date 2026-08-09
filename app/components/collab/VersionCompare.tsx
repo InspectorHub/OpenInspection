@@ -174,7 +174,7 @@ export function VersionCompare({
                                                 </pre>
                                             </div>
                                             <div className="min-w-0">
-                                                <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-ih-primary mb-1">
+                                                <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-ih-primary-text mb-1">
                                                     {toHead}
                                                 </div>
                                                 <pre className="bg-ih-primary-tint border border-ih-primary-tint rounded-md p-2 text-[12px] text-ih-fg-1 whitespace-pre-wrap break-words leading-relaxed">

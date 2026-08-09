@@ -140,7 +140,7 @@ export function CalendarDatePicker({
                   onClick={() => pickMonth(i)}
                   className={`h-9 rounded-md text-[13px] font-medium border transition-colors ${
                     active
-                      ? "border-ih-primary text-ih-primary bg-ih-primary-tint font-bold"
+                      ? "border-ih-primary text-ih-primary-text bg-ih-primary-tint font-bold"
                       : "border-transparent text-ih-fg-2 hover:bg-ih-bg-muted"
                   }`}
                 >
@@ -162,7 +162,7 @@ export function CalendarDatePicker({
                   onClick={() => pickYear(yr)}
                   className={`h-9 rounded-md text-[13px] font-medium border transition-colors ${
                     active
-                      ? "border-ih-primary text-ih-primary bg-ih-primary-tint font-bold"
+                      ? "border-ih-primary text-ih-primary-text bg-ih-primary-tint font-bold"
                       : "border-transparent text-ih-fg-2 hover:bg-ih-bg-muted"
                   }`}
                 >

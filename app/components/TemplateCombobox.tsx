@@ -198,7 +198,7 @@ export function TemplateCombobox({
                                         type="button"
                                         onClick={() => handleSelect(t)}
                                         className={`w-full px-3 py-2 text-left text-[13px] font-medium hover:bg-ih-bg-muted transition-colors ${
-                                            t.id === value ? "text-ih-primary bg-ih-primary-tint" :
+                                            t.id === value ? "text-ih-primary-text bg-ih-primary-tint" :
                                             i === activeIdx ? "bg-ih-bg-muted text-ih-fg-1" :
                                             "text-ih-fg-1"
                                         }`}

@@ -1030,7 +1030,7 @@ export default function InspectionHubPage() {
                 {reportBlockersPending && (
                   <Link
                     to={`/inspections/${inspection.id}/edit`}
-                    className="text-[12px] font-bold text-ih-primary hover:underline"
+                    className="text-[12px] font-bold text-ih-primary-text hover:underline"
                   >
                     {m.inspections_hub_report_resolve()}
                   </Link>
@@ -1074,7 +1074,7 @@ export default function InspectionHubPage() {
                       {href && (
                         <Link
                           to={href}
-                          className="shrink-0 text-[12px] font-bold text-ih-primary hover:underline"
+                          className="shrink-0 text-[12px] font-bold text-ih-primary-text hover:underline"
                         >
                           {m.inspections_hub_versions_view_changes()}
                         </Link>

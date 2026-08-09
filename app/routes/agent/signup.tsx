@@ -308,7 +308,7 @@ export default function AgentSignupPage() {
               // both modes (see routes/agent/login.tsx), so this is the only
               // sign-in that can accept the account they are being sent to.
               to="/agent-login"
-              className="text-ih-primary font-medium hover:underline"
+              className="text-ih-primary-text font-medium hover:underline"
             >
               {m.auth_agent_signup_login_link()}
             </Link>

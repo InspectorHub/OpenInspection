@@ -70,12 +70,12 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                   type="button"
                   data-testid={`browse-library-${tab}`}
                   onClick={() => onOpenLibrary(tab)}
-                  className="text-[10px] font-bold text-ih-fg-3 hover:text-ih-primary"
+                  className="text-[10px] font-bold text-ih-fg-3 hover:text-ih-primary-text"
                 >
                   {m.templates_comments_browse_library()}
                 </button>
               )}
-              <button onClick={() => addCannedToItem(tab)} className="text-[10px] font-bold text-ih-primary hover:text-ih-primary">{m.templates_comments_add()}</button>
+              <button onClick={() => addCannedToItem(tab)} className="text-[10px] font-bold text-ih-primary-text hover:text-ih-primary-text">{m.templates_comments_add()}</button>
             </div>
           </div>
           {(selectedItem.tabs?.[tab] || []).map((c, ci, arr) => {

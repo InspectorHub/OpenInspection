@@ -273,7 +273,7 @@ export default function SettingsWorkspacePage() {
               options={TIMEZONE_SELECT_OPTIONS}
             />
             {tzPrefilled && (
-              <p className="mt-2 text-[12px] text-ih-primary">
+              <p className="mt-2 text-[12px] text-ih-primary-text">
                 {m.settings_workspace_timezone_detected()}
               </p>
             )}

@@ -200,7 +200,7 @@ export function ScheduleStep({
             <button
               type="button"
               onClick={onClearRememberedContact}
-              className="font-semibold text-ih-primary hover:underline"
+              className="font-semibold text-ih-primary-text hover:underline"
             >
               {m.booking_prefill_clear()}
             </button>

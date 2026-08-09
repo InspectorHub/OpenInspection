@@ -110,7 +110,7 @@ export function QualificationWidget({ service, initialUserIds, members }: Qualif
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="text-[12px] font-semibold text-ih-primary hover:underline"
+            className="text-[12px] font-semibold text-ih-primary-text hover:underline"
           >
             {/* Named for what it opens. As a bare "Edit" it read as the way to
                 edit the SERVICE — which is what a reader looks for after the

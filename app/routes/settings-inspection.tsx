@@ -265,7 +265,7 @@ export default function SettingsInspectionPage() {
                         );
                     })}
                 </ul>
-                <a href="/library/tags" className="text-[12px] text-ih-primary hover:underline mt-3 inline-flex items-center gap-1">{m.settings_inspection_manage_tags()} <Icon name="arrowR" size={12} /></a>
+                <a href="/library/tags" className="text-[12px] text-ih-primary-text hover:underline mt-3 inline-flex items-center gap-1">{m.settings_inspection_manage_tags()} <Icon name="arrowR" size={12} /></a>
             </section>
         </div>
     );

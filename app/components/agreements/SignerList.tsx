@@ -167,7 +167,7 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
                                         onClick={() => handleRemind(s.id)}
                                         disabled={!!busy || !canRemind || remindingId === s.id}
                                         title={reason ?? undefined}
-                                        className="text-[13px] font-semibold text-ih-primary hover:opacity-80 disabled:text-ih-fg-4 disabled:cursor-not-allowed disabled:hover:opacity-100"
+                                        className="text-[13px] font-semibold text-ih-primary-text hover:opacity-80 disabled:text-ih-fg-4 disabled:cursor-not-allowed disabled:hover:opacity-100"
                                     >
                                         {remindingId === s.id ? m.agreement_signers_remind_pending() : m.agreement_signers_remind()}
                                     </button>
@@ -177,7 +177,7 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
                                         type="button"
                                         onClick={() => handleCopy(s.id)}
                                         disabled={!!busy}
-                                        className="text-[13px] font-semibold text-ih-primary hover:opacity-80 disabled:text-ih-fg-4 disabled:cursor-not-allowed"
+                                        className="text-[13px] font-semibold text-ih-primary-text hover:opacity-80 disabled:text-ih-fg-4 disabled:cursor-not-allowed"
                                     >
                                         {copiedId === s.id ? m.common_copied() : m.agreement_signers_copy()}
                                     </button>

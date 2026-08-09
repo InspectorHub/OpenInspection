@@ -17,7 +17,7 @@ import type { CostTables as CT, Table1Row } from "./types";
 function PhotoNoCell({ photoNo, isPrint }: { photoNo: number | null | undefined; isPrint: boolean }) {
   if (photoNo == null) return null;
   if (isPrint) return <>{m.pca_cost_photo_ref({ n: photoNo })}</>;
-  return <a href={`#photo-${photoNo}`} className="text-ih-primary hover:underline">{m.pca_cost_photo_ref({ n: photoNo })}</a>;
+  return <a href={`#photo-${photoNo}`} className="text-ih-primary-text hover:underline">{m.pca_cost_photo_ref({ n: photoNo })}</a>;
 }
 
 export function CostTables({ data, show, isPrint = false }: { data: CT | null; show: boolean; isPrint?: boolean }) {

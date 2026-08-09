@@ -244,7 +244,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
             onClick={() => toggle(tab.id)}
             className={`relative w-10 flex flex-col items-center gap-0.5 py-2.5 rounded-r-md transition-all ${
               effectiveTab === tab.id && open
-                ? "bg-ih-bg-card text-ih-primary shadow-ih-card border-l-2 border-ih-primary -ml-px"
+                ? "bg-ih-bg-card text-ih-primary-text shadow-ih-card border-l-2 border-ih-primary -ml-px"
                 : "text-ih-fg-4 hover:text-ih-fg-2"
             }`}
             title={tab.label()}

@@ -44,7 +44,7 @@ export function BrowserTimezoneHint({
       <button
         type="button"
         onClick={() => onUse(browserTz)}
-        className="font-semibold text-ih-primary rounded-sm hover:underline focus:outline-none focus-visible:shadow-ih-focus"
+        className="font-semibold text-ih-primary-text rounded-sm hover:underline focus:outline-none focus-visible:shadow-ih-focus"
       >
         {m.settings_timezone_browser_use()}
       </button>

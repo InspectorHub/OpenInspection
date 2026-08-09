@@ -77,7 +77,7 @@ export function ErrorState({ code, title, message, action, contacts }: ErrorStat
             {email && (
               <a
                 href={`mailto:${email}`}
-                className="text-[14px] font-medium text-ih-primary hover:underline break-all"
+                className="text-[14px] font-medium text-ih-primary-text hover:underline break-all"
               >
                 {email}
               </a>
@@ -88,7 +88,7 @@ export function ErrorState({ code, title, message, action, contacts }: ErrorStat
                  the number as text. */
               <a
                 href={`tel:${phone.replace(/[^\d+]/g, "")}`}
-                className="text-[14px] font-medium text-ih-primary hover:underline"
+                className="text-[14px] font-medium text-ih-primary-text hover:underline"
               >
                 {phone}
               </a>

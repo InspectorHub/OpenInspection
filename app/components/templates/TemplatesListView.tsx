@@ -35,7 +35,7 @@ export function TemplatesListView({
             <p className="py-12 text-center text-[13px] text-ih-fg-3">{m.templates_empty_search()}</p>
           ) : (
             <div className="py-14 flex flex-col items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-ih-primary-tint flex items-center justify-center text-ih-primary">
+              <div className="w-12 h-12 rounded-xl bg-ih-primary-tint flex items-center justify-center text-ih-primary-text">
                 <TemplateIcon size="lg" />
               </div>
               <div className="text-center">
@@ -67,11 +67,11 @@ export function TemplatesListView({
             label: m.templates_col_name(),
             cell: (t) => (
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-ih-primary-tint rounded-lg flex items-center justify-center text-ih-primary group-hover:bg-ih-primary group-hover:text-ih-fg-inverse transition-all shrink-0">
+                <div className="w-9 h-9 bg-ih-primary-tint rounded-lg flex items-center justify-center text-ih-primary-text group-hover:bg-ih-primary group-hover:text-ih-fg-inverse transition-all shrink-0">
                   <TemplateIcon />
                 </div>
                 <div>
-                  <Link to={`/templates/${t.id}/edit`} className="text-[13px] font-bold text-ih-fg-1 hover:text-ih-primary transition-colors">
+                  <Link to={`/templates/${t.id}/edit`} className="text-[13px] font-bold text-ih-fg-1 hover:text-ih-primary-text transition-colors">
                     {t.name}
                   </Link>
                   {t.source === "marketplace" && (
@@ -88,7 +88,7 @@ export function TemplatesListView({
           {
             label: m.templates_col_version(),
             cell: (t) => (
-              <span className="inline-flex items-center rounded border border-ih-primary/20 px-1.5 py-0.5 text-[10px] font-bold bg-ih-primary-tint text-ih-primary">
+              <span className="inline-flex items-center rounded border border-ih-primary/20 px-1.5 py-0.5 text-[10px] font-bold bg-ih-primary-tint text-ih-primary-text">
                 v{t.version || 1}.0
               </span>
             ),
@@ -99,10 +99,10 @@ export function TemplatesListView({
             align: "right",
             cell: (t) => (
               <div className="inline-flex items-center gap-3">
-                <Link to={`/templates/${t.id}/edit`} className="text-[11px] font-bold text-ih-primary hover:text-ih-primary">
+                <Link to={`/templates/${t.id}/edit`} className="text-[11px] font-bold text-ih-primary-text hover:text-ih-primary-text">
                   {m.common_edit()}
                 </Link>
-                <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary transition-colors">
+                <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary-text transition-colors">
                   {m.templates_action_duplicate()}
                 </button>
                 <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-bad-fg transition-colors">

@@ -122,7 +122,7 @@ export default function AgentLoginPage() {
         <p className="text-sm text-ih-fg-3">{m.auth_agent_login_link_sent_note()}</p>
         <Link
           to="/agent-login"
-          className="mt-6 inline-block text-sm font-bold text-ih-primary hover:underline"
+          className="mt-6 inline-block text-sm font-bold text-ih-primary-text hover:underline"
         >
           {m.auth_agent_login_back_link()}
         </Link>
@@ -137,7 +137,7 @@ export default function AgentLoginPage() {
       footer={
         <>
           {m.auth_agent_login_no_account()}{" "}
-          <Link to="/agent-signup" className="font-bold text-ih-primary hover:underline">
+          <Link to="/agent-signup" className="font-bold text-ih-primary-text hover:underline">
             {m.auth_agent_login_signup_link()}
           </Link>
         </>

@@ -237,7 +237,7 @@ export default function SettingsAutomations() {
                   </div>
                   <p className="text-[11px] text-ih-fg-3 mt-0.5">{TRIGGER_LABELS[rule.trigger] || rule.trigger} &rarr; {recipientLabel(rule, roleProfiles)}</p>
                 </div>
-                <button onClick={() => setEditing(rule)} className="text-[12px] text-ih-primary font-semibold">{m.common_edit()}</button>
+                <button onClick={() => setEditing(rule)} className="text-[12px] text-ih-primary-text font-semibold">{m.common_edit()}</button>
                 <Form method="post" className="shrink-0">
                   <input type="hidden" name="intent" value="toggle" />
                   <input type="hidden" name="id" value={rule.id} />
@@ -262,7 +262,7 @@ export default function SettingsAutomations() {
             {recentLogs.map((l) => (
               <div key={l.id} className="flex items-center gap-3 px-5 py-2.5 text-[12px]">
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
-                  l.channel === "sms" ? "bg-ih-primary-tint text-ih-primary" : "bg-ih-bg-muted text-ih-fg-3"}`}>{l.channel ?? "email"}</span>
+                  l.channel === "sms" ? "bg-ih-primary-tint text-ih-primary-text" : "bg-ih-bg-muted text-ih-fg-3"}`}>{l.channel ?? "email"}</span>
                 <span className="text-ih-fg-2 flex-1 min-w-0 truncate">{l.recipient}</span>
                 <span className="text-ih-fg-3">{formatDateTime(l.sendAt, { locale, timeZone: displayTz })}</span>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${

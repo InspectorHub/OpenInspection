@@ -139,7 +139,7 @@ export default function SettingsUsagePage() {
       {isSaas && (
         <Link
           to="/settings/billing"
-          className="inline-flex items-center text-ih-primary text-[13px] font-medium hover:underline"
+          className="inline-flex items-center text-ih-primary-text text-[13px] font-medium hover:underline"
         >
           {m.settings_usage_back_to_billing()}
         </Link>

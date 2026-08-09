@@ -31,7 +31,7 @@ export function SettingsCrumb({ items }: SettingsCrumbProps) {
                 </svg>
               )}
               {item.href && !isLast ? (
-                <a href={item.href} className="hover:text-ih-primary transition-colors">{item.label}</a>
+                <a href={item.href} className="hover:text-ih-primary-text transition-colors">{item.label}</a>
               ) : (
                 <span className="text-ih-fg-3">{item.label}</span>
               )}

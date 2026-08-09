@@ -88,7 +88,7 @@ export default function AgentLayout({ loaderData }: Route.ComponentProps) {
                 className={({ isActive }) =>
                   `px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
                     isActive
-                      ? "bg-ih-primary-tint text-ih-primary"
+                      ? "bg-ih-primary-tint text-ih-primary-text"
                       : "text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-fg-1"
                   }`
                 }

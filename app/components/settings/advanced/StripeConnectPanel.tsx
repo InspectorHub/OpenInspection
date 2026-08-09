@@ -26,7 +26,7 @@ export function StripeConnectPanel({ stripeConnected, stripeAccountId, stripeFor
       <p className="text-[13px] text-ih-fg-3">
         {m.settings_stripeconnect_desc()}{" "}
         <a href="https://dashboard.stripe.com/connect/express" target="_blank" rel="noopener noreferrer"
-          className="text-ih-primary hover:underline">
+          className="text-ih-primary-text hover:underline">
           dashboard.stripe.com/connect/express
         </a>{m.settings_stripeconnect_desc_suffix()}
       </p>

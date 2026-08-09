@@ -292,7 +292,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
               onClick={() => setCarrier("twilio")}
               className={`flex-1 h-9 rounded-md border text-[13px] font-bold transition-colors ${
                 carrier === "twilio"
-                  ? "border-ih-primary bg-ih-primary/5 text-ih-primary"
+                  ? "border-ih-primary bg-ih-primary/5 text-ih-primary-text"
                   : "border-ih-border bg-ih-bg-card text-ih-fg-2 hover:border-ih-primary/40"
               }`}
             >
@@ -304,7 +304,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
               onClick={() => setCarrier("telnyx")}
               className={`flex-1 h-9 rounded-md border text-[13px] font-bold transition-colors ${
                 carrier === "telnyx"
-                  ? "border-ih-primary bg-ih-primary/5 text-ih-primary"
+                  ? "border-ih-primary bg-ih-primary/5 text-ih-primary-text"
                   : "border-ih-border bg-ih-bg-card text-ih-fg-2 hover:border-ih-primary/40"
               }`}
             >

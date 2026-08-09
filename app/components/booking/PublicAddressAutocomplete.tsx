@@ -146,7 +146,7 @@ export function PublicAddressAutocomplete({
                 choose(s);
               }}
               onMouseEnter={() => setActive(i)}
-              className={`px-3 py-2 cursor-pointer text-[13px] ${i === active ? "bg-ih-primary-tint text-ih-primary" : "text-ih-fg-2"}`}
+              className={`px-3 py-2 cursor-pointer text-[13px] ${i === active ? "bg-ih-primary-tint text-ih-primary-text" : "text-ih-fg-2"}`}
             >
               <span className="font-medium">{s.line1}</span>
               {s.city && (

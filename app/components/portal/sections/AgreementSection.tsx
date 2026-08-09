@@ -194,7 +194,7 @@ export function AgreementSection({
       <div className="bg-ih-bg-card rounded-lg shadow-ih-popover overflow-hidden">
         {/* Title bar */}
         <div className="px-6 py-6 sm:px-10 sm:py-8 border-b border-ih-border">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary mb-2">{m.portal_agreement_eyebrow()}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary-text mb-2">{m.portal_agreement_eyebrow()}</p>
           <h1 className="text-xl font-bold text-ih-fg-1 tracking-tight">{agreement.agreementName}</h1>
           <p className="text-[13px] text-ih-fg-3 mt-1">
             {m.portal_agreement_for_signer({ name: agreement.signer.name })}
@@ -263,7 +263,7 @@ export function AgreementSection({
               <div className="mt-6 border-t border-ih-border pt-5">
                 <a
                   href={`/verify/${agreement.envelopeId}`}
-                  className="inline-flex items-center gap-1.5 text-[13px] font-bold text-ih-primary hover:underline"
+                  className="inline-flex items-center gap-1.5 text-[13px] font-bold text-ih-primary-text hover:underline"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />

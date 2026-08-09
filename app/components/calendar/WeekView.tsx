@@ -35,7 +35,7 @@ export function WeekView({
                 <span className="text-[10px] font-bold uppercase text-ih-fg-3 block">
                   {d.toLocaleDateString(locale, { weekday: "short" })}
                 </span>
-                <span className={`text-[14px] font-bold ${isSameDay(d, today) ? "text-ih-primary" : "text-ih-fg-2"}`}>
+                <span className={`text-[14px] font-bold ${isSameDay(d, today) ? "text-ih-primary-text" : "text-ih-fg-2"}`}>
                   {d.getDate()}
                 </span>
               </div>

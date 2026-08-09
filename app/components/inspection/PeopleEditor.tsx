@@ -219,7 +219,7 @@ export function PeopleEditor({
                     >
                       <div>
                         <p className="font-medium inline-flex items-center gap-2 flex-wrap">
-                          <Link to={`/contacts/${person.contactId}`} className="hover:text-ih-primary hover:underline">
+                          <Link to={`/contacts/${person.contactId}`} className="hover:text-ih-primary-text hover:underline">
                             {person.name}
                           </Link>
                           {isPrimary ? (
@@ -246,7 +246,7 @@ export function PeopleEditor({
                             <a
                               href={`mailto:${person.email}`}
                               title={m.inspections_hub_people_mailto_hint()}
-                              className="text-ih-primary hover:underline"
+                              className="text-ih-primary-text hover:underline"
                             >
                               {person.email}
                             </a>
@@ -254,7 +254,7 @@ export function PeopleEditor({
                           </span>
                         )}
                         {person.phone && (
-                          <a href={`tel:${person.phone}`} className="text-ih-primary hover:underline block">
+                          <a href={`tel:${person.phone}`} className="text-ih-primary-text hover:underline block">
                             {person.phone}
                           </a>
                         )}
@@ -271,7 +271,7 @@ export function PeopleEditor({
                               )
                             }
                             disabled={busy}
-                            className="text-[11px] font-bold text-ih-primary hover:underline disabled:opacity-60"
+                            className="text-[11px] font-bold text-ih-primary-text hover:underline disabled:opacity-60"
                           >
                             {m.inspections_hub_people_make_primary()}
                           </button>
@@ -448,7 +448,7 @@ function CopyEmailButton({ email }: { email: string }) {
       // Announce the address so screen-reader users get "Copy amy@realty.com"
       // rather than a row of identical unlabelled "Copy" buttons.
       aria-label={m.inspections_hub_people_copy_email_aria({ email })}
-      className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary shrink-0"
+      className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary-text shrink-0"
     >
       {copied ? m.inspections_hub_copied() : m.inspections_hub_people_copy_email()}
     </button>

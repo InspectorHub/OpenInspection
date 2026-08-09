@@ -239,7 +239,7 @@ export function SendAgreementModal({
                 type="button"
                 onClick={addRow}
                 disabled={busy}
-                className="mt-3 text-[13px] font-semibold text-ih-primary hover:opacity-80 disabled:opacity-40"
+                className="mt-3 text-[13px] font-semibold text-ih-primary-text hover:opacity-80 disabled:opacity-40"
             >
                 {m.agreement_send_add()}
             </button>

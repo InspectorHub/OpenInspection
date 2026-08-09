@@ -31,10 +31,11 @@ consume tokens, not literal colors — dark mode is then "free": swapping the
 
 | Token | Purpose |
 |---|---|
-| `--color-ih-primary` / `-600` / `-700` | Brand color + hover/active shades |
+| `--color-ih-primary` / `-600` / `-700` | Brand color + hover/active shades. The **FILL** role: button and accent-bar backgrounds. A tenant's brand color lands here verbatim |
+| `--color-ih-primary-text` | The **TEXT** role: links, tab labels, brand-colored glyphs. Equal to `--color-ih-primary` by default, but when a tenant sets a brand color this one is derived — the same hue and saturation, moved along the lightness axis until it clears 4.5:1 on the card (darker on light themes, lighter on dark). 63.6% of sRGB fails AA as text on white, so the two roles cannot share one value. Use `text-ih-primary` **only** where the brand is the fill of the thing being colored, e.g. a checkbox accent |
 | `--color-ih-primary-tint` | Low-opacity primary wash (selected tab pill, badges) |
 | `--color-ih-primary-glow` | Focus-ring glow color (see `shadow-ih-focus`) |
-| `--color-ih-primary-fg` | Foreground for content on `bg-ih-primary`; defaults to white, but flips to dark text per-surface when a bright custom brand color is set (YIQ contrast pick) |
+| `--color-ih-primary-fg` | Foreground for content on `bg-ih-primary`; defaults to white, but flips to dark text per-surface when a bright custom brand color is set. Chosen by measuring both candidates' real WCAG ratios and taking the higher — 6.7% of sRGB admits no passing choice at all, so this is a best-effort token, not a guarantee |
 | `--color-ih-fg-1` … `-5` | Text scale from near-black/white (`-1`, headings/body) down to faint (`-5`, disabled/hairline) |
 | `--color-ih-fg-inverse` | Text on an inverted surface (`bg-ih-bg-inverse`, `bg-ih-primary`) |
 | `--color-ih-bg-app` | Page background |

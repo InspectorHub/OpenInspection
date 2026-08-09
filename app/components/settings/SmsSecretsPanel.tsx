@@ -83,7 +83,7 @@ export function SmsSecretsPanel({
             <>
               <p className="text-[13px] text-ih-fg-3">
                 {m.settings_smssecrets_twilio_intro()}{" "}
-                <a href="https://www.twilio.com/docs/messaging/compliance/a2p-10dlc" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">{m.settings_smssecrets_a2p_link()}</a>{" "}
+                <a href="https://www.twilio.com/docs/messaging/compliance/a2p-10dlc" target="_blank" rel="noopener noreferrer" className="text-ih-primary-text hover:underline">{m.settings_smssecrets_a2p_link()}</a>{" "}
                 {m.settings_smssecrets_twilio_intro_suffix()}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -105,7 +105,7 @@ export function SmsSecretsPanel({
             <>
               <p className="text-[13px] text-ih-fg-3">
                 {m.settings_smssecrets_telnyx_intro()}{" "}
-                <a href="https://portal.telnyx.com/" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">{m.settings_smssecrets_telnyx_portal_link()}</a>{m.settings_smssecrets_telnyx_intro_suffix()}
+                <a href="https://portal.telnyx.com/" target="_blank" rel="noopener noreferrer" className="text-ih-primary-text hover:underline">{m.settings_smssecrets_telnyx_portal_link()}</a>{m.settings_smssecrets_telnyx_intro_suffix()}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <SecretField name="TELNYX_API_KEY" label={m.settings_smssecrets_telnyx_key_label()}

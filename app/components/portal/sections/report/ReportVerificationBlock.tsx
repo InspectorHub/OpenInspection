@@ -52,7 +52,7 @@ export function ReportVerificationBlock({ verification, baseUrl, timeZone = "UTC
               <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mr-2">{m.pca_verification_verify_at()}</span>
               <a
                 href={vb.verifyUrl}
-                className="text-ih-primary underline text-xs break-all"
+                className="text-ih-primary-text underline text-xs break-all"
                 target="_blank"
                 rel="noreferrer"
               >

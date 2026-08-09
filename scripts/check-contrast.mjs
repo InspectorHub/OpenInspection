@@ -66,6 +66,20 @@
  *     optimistic, so it under-reports and never over-reports.
  *   - Colours set in CSS rather than utilities — `.ih-eyebrow` sets
  *     `color: var(--ih-fg-4)` at 9px and no class string mentions a token.
+ *   - THE TENANT'S BRAND COLOUR, which is the largest blind spot by far and the
+ *     one most likely to be mistaken for coverage. Every public surface —
+ *     booking, client portal, report, invoice, payment — re-points
+ *     `--ih-primary` at a colour stored in the database, injected as an inline
+ *     style by `brandTokens()` at request time. It is not in this stylesheet, so
+ *     nothing below ever sees it. Measured over the sRGB cube: 63.6% of colours
+ *     fail AA as brand-coloured TEXT on white, and 6.7% admit no readable
+ *     foreground at all when used as a button fill. This gate scores the
+ *     platform defaults and says NOTHING about any of that. What guards it is
+ *     `app/lib/brand.ts` — `brandTextColor()` derives a text-safe variant into
+ *     `--ih-primary-text`, `contrastForeground()` picks the on-fill colour by
+ *     measured ratio — under a property test in `app/lib/brand.test.ts` that
+ *     samples the cube. Runtime colour needs a runtime guarantee; a green run
+ *     here is not one. TOKEN_INVARIANTS below is the static half of that pair.
  *
  * Escape hatches, all staleness-guarded so they cannot rot:
  *   - KNOWN_DEBT — one call site, matched against live code; a stale entry FAILS.
@@ -94,9 +108,17 @@ import {
   aliasMap,
 } from "./lib/contrast-css.mjs";
 
+import {
+  REFERENCE_SURFACE,
+  PALETTE_DEBT,
+  TOKEN_INVARIANTS,
+  checkTokenInvariants,
+} from "./lib/palette-invariants.mjs";
+
 export { classChunks, smallestSize, foregroundTokens, backgroundTokens, surfaceAnnotations };
 export { resolveSurface };
 export { AA_NORMAL, THEMES, parseHex, luminance, contrastRatio, resolveVar, aliasMap };
+export { REFERENCE_SURFACE, PALETTE_DEBT, TOKEN_INVARIANTS, checkTokenInvariants };
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const SCAN_DIRS = [join("packages", "shared-ui", "src"), "app"];
@@ -105,62 +127,12 @@ const CSS_PATH = join("app", "styles", "tailwind.css");
 /** Anything at or below this renders as normal text for AA purposes. */
 export const MAX_SMALL_PX = 14;
 
-/** The surface used when the element does not name one. See the header note. */
-export const REFERENCE_SURFACE = "--ih-bg-card";
-
 /**
  * Real AA failures at ONE call site that are deliberately not fixed, each with
  * the measured ratio. These are debt, not approvals. `match` must still be
  * found in `file`, otherwise the gate fails.
  */
 export const KNOWN_DEBT = [];
-
-/**
- * Real AA failures that belong to the PALETTE, not to a call site.
- *
- * `--ih-primary` in light mode is `#6366f1`. Against white that is 4.47:1 —
- * 0.03 short of AA, and because contrast is symmetric the same 4.47:1 governs
- * both directions: an indigo link on a card, and white label text on a filled
- * indigo button. That single fact accounts for 193 of the reports on this tree.
- * It is one token's value, not 193 mistakes, and the repair is one line:
- * `#6265f0` measures 4.53:1 and is a step of one per channel. It is left here
- * rather than applied because changing the brand colour repaints every button,
- * focus ring, link and chart series in the product and wants an eye on it, not
- * a script.
- *
- * Entries pin the MEASURED ratio. If the palette moves — fixed or worsened —
- * the entry stops matching and the gate fails, so the decision gets retaken
- * instead of inherited.
- */
-export const PALETTE_DEBT = [
-  {
-    fg: "--ih-primary",
-    bg: "--ih-bg-card",
-    theme: "light",
-    ratio: 4.47,
-    reason: "Brand indigo #6366f1 on white is 4.47:1 (#6265f0 would be 4.53:1). Whole-product recolour — needs a visual pass, see #80.",
-  },
-  {
-    fg: "--ih-fg-inverse",
-    bg: "--ih-primary",
-    theme: "light",
-    ratio: 4.47,
-    reason: "Same pair inverted: white on brand indigo. Fixed by the same one-line palette change.",
-  },
-  {
-    fg: "--ih-fg-inverse",
-    bg: "--ih-status-bad",
-    theme: "light",
-    ratio: 3.76,
-    reason:
-      "White on the danger fill `--ih-status-bad` (#ef4444, red-500) is 3.76:1; " +
-      "#dc2626 (red-600) would be 4.83:1. Recorded rather than repaired at the one " +
-      "call site the gate can see, because five destructive buttons share this " +
-      "pairing (the others escape the scan by writing `text-white`, which is a " +
-      "lint:ds problem) and making one of them different is worse than the debt. " +
-      "Dark and field already pass — the inverse foreground goes near-black there.",
-  },
-];
 
 /** Resolved reference-surface colour per theme. Throws if unreadable. */
 export function surfaces(css) {
@@ -309,6 +281,7 @@ export function findViolations({ css, files, debt = KNOWN_DEBT, palette = PALETT
     uselessAnnotations,
     staleDebt: debt.filter((d) => !debtHits.has(d)),
     stalePalette: palette.filter((p) => !paletteHits.has(p)),
+    tokenFailures: checkTokenInvariants(css),
     checked,
   };
 }
@@ -351,6 +324,15 @@ function main() {
     console.error(`\nStale KNOWN_DEBT entry — no longer matches ${d.file}:`);
     console.error(`  ${d.match}\n  Remove it from scripts/check-contrast.mjs.`);
   }
+  for (const t of r.tokenFailures) {
+    console.error(
+      `\nToken invariant broken — ${t.fg} on ${t.bg} (${t.theme}): ` +
+        (t.ratio === null
+          ? `one side is not a hex colour (${t.fgHex} / ${t.bgHex}).`
+          : `${t.fgHex} on ${t.bgHex} = ${t.ratio.toFixed(2)}:1 (need ${AA_NORMAL}:1).`),
+    );
+    console.error(`  ${t.why}`);
+  }
   for (const p of r.stalePalette) {
     console.error(
       `\nStale PALETTE_DEBT entry — ${p.fg} on ${p.bg} (${p.theme}) is no longer ` +
@@ -372,10 +354,15 @@ function main() {
   }
 
   const bad =
-    r.violations.length + r.staleDebt.length + r.stalePalette.length + r.uselessAnnotations.length;
+    r.violations.length +
+    r.staleDebt.length +
+    r.stalePalette.length +
+    r.uselessAnnotations.length +
+    r.tokenFailures.length;
   if (bad > 0) {
     console.error(
       `\n✖ check-contrast: ${r.violations.length} contrast failure(s), ` +
+        `${r.tokenFailures.length} broken token invariant(s), ` +
         `${r.uselessAnnotations.length} unnecessary annotation(s), ` +
         `${r.staleDebt.length + r.stalePalette.length} stale exemption(s).`,
     );
@@ -388,9 +375,19 @@ function main() {
   }
   console.log(
     `✓ check-contrast: ${r.checked} small-text colour(s) clear ${AA_NORMAL}:1 in ` +
-      `${THEMES.length} themes (${KNOWN_DEBT.length} site exemption(s), ` +
-      `${PALETTE_DEBT.length} palette exemption(s), ${r.unresolved.length} surface(s) ` +
-      "the scanner could not resolve and did not check).",
+      `${THEMES.length} themes, plus ${TOKEN_INVARIANTS.length} token invariant(s) ` +
+      `(${KNOWN_DEBT.length} site exemption(s), ${PALETTE_DEBT.length} palette ` +
+      `exemption(s), ${r.unresolved.length} surface(s) the scanner could not ` +
+      "resolve and did not check).",
+  );
+  console.log(
+    "  Not covered, and not coverable here: a TENANT's brand colour. It lives in " +
+      "the database, arrives as an inline style at request time, and never appears " +
+      "in this stylesheet — so 63.6% of sRGB, the share that fails AA as brand-" +
+      "coloured text on white, is invisible to every static gate. That share is " +
+      "held by app/lib/brand.ts (`brandTextColor`) and pinned by a property test " +
+      "over the sRGB cube in app/lib/brand.test.ts. A green run here says nothing " +
+      "about it.",
   );
 }
 

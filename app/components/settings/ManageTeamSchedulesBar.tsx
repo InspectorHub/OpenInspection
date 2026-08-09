@@ -20,7 +20,7 @@ export function ManageTeamSchedulesBar({
               <li key={member.id}>
                 <Link
                   to={`/settings/schedule?inspectorId=${encodeURIComponent(member.id)}`}
-                  className="text-[12px] text-ih-primary hover:underline"
+                  className="text-[12px] text-ih-primary-text hover:underline"
                 >
                   {member.email}
                 </Link>

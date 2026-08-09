@@ -212,7 +212,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
             type="button"
             onClick={runAutofill}
             disabled={addressString.length < 5 || autofilling}
-            className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-primary hover:bg-ih-primary-tint disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-primary-text hover:bg-ih-primary-tint disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {autofilling ? m.editor_property_autofill_loading() : m.editor_property_autofill_button()}
           </button>
@@ -229,7 +229,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
                 <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-3">
                   <span>{f.label}</span>
                   {Boolean(inspection[`_prefilled_${f.id}`]) && (
-                    <span className="text-[9px] font-semibold text-ih-primary normal-case tracking-normal">{m.editor_property_prefilled()}</span>
+                    <span className="text-[9px] font-semibold text-ih-primary-text normal-case tracking-normal">{m.editor_property_prefilled()}</span>
                   )}
                 </span>
                 {(f.type === "text" || f.type === "number" || f.type === "date") && (

@@ -41,7 +41,7 @@ export function CostExportButtons({
 
   if (variant === "panel") {
     const link =
-      "inline-flex items-center gap-1 text-[12px] font-bold text-ih-primary hover:underline";
+      "inline-flex items-center gap-1 text-[12px] font-bold text-ih-primary-text hover:underline";
     return (
       <div className="flex items-center gap-3" data-testid="cost-export-panel">
         <a href={href("csv")} download className={link} data-testid="cost-export-csv" title={CSV_HINT}>

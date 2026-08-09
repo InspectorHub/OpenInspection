@@ -142,7 +142,7 @@ export function ServiceFields({
             <input type="hidden" name={fields.templateId.name} value="" />
             <p className="text-[12px] text-ih-fg-3">
               {m.settings_services_template_none_available()}{" "}
-              <Link to="/templates" className="font-semibold text-ih-primary hover:underline">
+              <Link to="/templates" className="font-semibold text-ih-primary-text hover:underline">
                 {m.settings_services_template_create_link()}
               </Link>
             </p>

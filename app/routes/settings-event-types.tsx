@@ -208,7 +208,7 @@ export default function SettingsEventTypes() {
                   <>
                     <button
                       onClick={() => openEdit(t)}
-                      className="text-[12px] text-ih-primary hover:underline mr-3 font-bold"
+                      className="text-[12px] text-ih-primary-text hover:underline mr-3 font-bold"
                     >
                       {m.common_edit()}
                     </button>

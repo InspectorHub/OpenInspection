@@ -37,7 +37,7 @@ export function ContactsTable({
           {
             label: m.contacts_table_col_name(),
             cell: (c) => (
-              <Link to={`/contacts/${c.id}`} className="font-medium text-ih-fg-1 hover:text-ih-primary hover:underline">
+              <Link to={`/contacts/${c.id}`} className="font-medium text-ih-fg-1 hover:text-ih-primary-text hover:underline">
                 {c.name}
               </Link>
             ),
@@ -78,10 +78,10 @@ export function ContactsTable({
                 // An archived contact offers exactly one verb. Editing one
                 // would be editing a record nobody can reach from the live
                 // list, and archiving it again is a no-op.
-                <button onClick={() => onRestore?.(c)} className="text-ih-primary text-[12px] font-bold hover:underline">{m.contacts_action_restore()}</button>
+                <button onClick={() => onRestore?.(c)} className="text-ih-primary-text text-[12px] font-bold hover:underline">{m.contacts_action_restore()}</button>
               ) : (
                 <>
-                  <button onClick={() => onEdit(c)} className="text-ih-primary text-[12px] font-bold hover:underline mr-3">{m.common_edit()}</button>
+                  <button onClick={() => onEdit(c)} className="text-ih-primary-text text-[12px] font-bold hover:underline mr-3">{m.common_edit()}</button>
                   <button onClick={() => onArchive(c)} className="text-ih-fg-3 text-[12px] font-bold hover:text-ih-fg-1 hover:underline">{m.contacts_action_archive()}</button>
                 </>
               ),

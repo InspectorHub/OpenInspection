@@ -28,7 +28,7 @@ export function SeatBanner({
         billingUrl ? (
           <a
             href={billingUrl}
-            className="text-sm font-bold text-ih-primary hover:underline"
+            className="text-sm font-bold text-ih-primary-text hover:underline"
           >
             Upgrade
           </a>

@@ -254,7 +254,7 @@ export default function SettingsInspectionTypes() {
                   <div className="flex flex-col gap-1">
                     <button
                       onClick={() => openEdit(ot)}
-                      className="text-[12px] text-ih-primary hover:underline font-bold"
+                      className="text-[12px] text-ih-primary-text hover:underline font-bold"
                     >
                       {m.common_edit()}
                     </button>

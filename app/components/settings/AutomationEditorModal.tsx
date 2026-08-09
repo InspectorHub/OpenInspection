@@ -167,7 +167,7 @@ export function AutomationEditorModal({
                 {emailTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
               <Link to="/settings/communication/templates"
-                className="inline-flex items-center gap-1 text-[12px] text-ih-primary hover:underline mt-0.5">
+                className="inline-flex items-center gap-1 text-[12px] text-ih-primary-text hover:underline mt-0.5">
                 {m.settings_automations_edit_new_template()} <Icon name="arrowR" size={12} />
               </Link>
             </div>
@@ -184,7 +184,7 @@ export function AutomationEditorModal({
                 {smsTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
               <Link to="/settings/communication/templates"
-                className="inline-flex items-center gap-1 text-[12px] text-ih-primary hover:underline mt-0.5">
+                className="inline-flex items-center gap-1 text-[12px] text-ih-primary-text hover:underline mt-0.5">
                 {m.settings_automations_edit_new_template()} <Icon name="arrowR" size={12} />
               </Link>
             </div>

@@ -61,7 +61,7 @@ export function ProfilePhotoCard({ photoUrl }: { photoUrl: string | null }) {
               a visually-hidden input. The browser's raw file input was the odd
               one out on a page with three image uploads, and it is the only
               control here that cannot be styled to say it is busy. */}
-          <label className="h-9 px-3 inline-flex items-center rounded-md border border-ih-border bg-ih-bg-muted text-ih-fg-1 text-[13px] font-semibold cursor-pointer hover:border-ih-primary hover:text-ih-primary focus-within:border-ih-primary focus-within:shadow-ih-focus transition-colors">
+          <label className="h-9 px-3 inline-flex items-center rounded-md border border-ih-border bg-ih-bg-muted text-ih-fg-1 text-[13px] font-semibold cursor-pointer hover:border-ih-primary hover:text-ih-primary-text focus-within:border-ih-primary focus-within:shadow-ih-focus transition-colors">
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"

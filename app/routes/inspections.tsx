@@ -755,7 +755,7 @@ export default function InspectionsPage() {
       {/* Batch actions bar */}
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-ih-primary-tint rounded-lg border border-ih-border">
-          <span className="text-[13px] font-bold text-ih-primary">
+          <span className="text-[13px] font-bold text-ih-primary-text">
             {m.inspections_list_batch_selected({ count: selectedIds.size })}
           </span>
           <Button variant="danger" size="sm" onClick={batchDelete}>{m.common_delete()}</Button>

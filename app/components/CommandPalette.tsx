@@ -352,7 +352,7 @@ export function CommandPalette({
                       key={action.id}
                       onClick={() => executeAction(action)}
                       onMouseEnter={() => setActiveIdx(idx)}
-                      className={`w-full flex items-center gap-3 px-4 py-2 text-[13px] transition-colors ${idx === safeIdx ? "bg-ih-primary-tint text-ih-primary" : "text-ih-fg-3"}`}
+                      className={`w-full flex items-center gap-3 px-4 py-2 text-[13px] transition-colors ${idx === safeIdx ? "bg-ih-primary-tint text-ih-primary-text" : "text-ih-fg-3"}`}
                     >
                       <PaletteIcon type={action.icon} />
                       <span className="font-medium flex-1 text-left truncate">{action.label}</span>

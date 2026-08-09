@@ -46,7 +46,7 @@ export function TimeOffListPanel({
               </div>
               <Link
                 to="/calendar"
-                className="text-[12px] text-ih-primary font-bold hover:underline shrink-0"
+                className="text-[12px] text-ih-primary-text font-bold hover:underline shrink-0"
               >
                 {m.settings_timeoff_open_calendar()}
               </Link>

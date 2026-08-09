@@ -100,7 +100,7 @@ export function OnboardingChecklist({
                 className={`text-[13px] transition-colors ${
                   step.done
                     ? "line-through text-ih-fg-4"
-                    : "text-ih-fg-1 group-hover:text-ih-primary"
+                    : "text-ih-fg-1 group-hover:text-ih-primary-text"
                 }`}
               >
                 {step.label}
@@ -112,7 +112,7 @@ export function OnboardingChecklist({
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 16 16"
                   fill="none"
-                  className="w-3.5 h-3.5 ml-auto shrink-0 text-ih-fg-4 group-hover:text-ih-primary transition-colors"
+                  className="w-3.5 h-3.5 ml-auto shrink-0 text-ih-fg-4 group-hover:text-ih-primary-text transition-colors"
                 >
                   <path
                     d="M6 4l4 4-4 4"

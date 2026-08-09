@@ -120,11 +120,11 @@ function ScopeOption({
         type="button"
         onClick={onSelect}
         className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-ih-bg-muted ${
-          selected ? "text-ih-primary font-bold" : "text-ih-fg-2"
+          selected ? "text-ih-primary-text font-bold" : "text-ih-fg-2"
         }`}
       >
         <svg
-          className={`w-3.5 h-3.5 flex-shrink-0 ${selected ? "text-ih-primary" : "text-transparent"}`}
+          className={`w-3.5 h-3.5 flex-shrink-0 ${selected ? "text-ih-primary-text" : "text-transparent"}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

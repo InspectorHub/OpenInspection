@@ -165,7 +165,7 @@ export function AddPersonModal({
           </label>
           {selectedContact ? (
             <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-ih-primary bg-ih-primary-tint">
-              <span className="flex-1 text-[13px] font-medium text-ih-primary">
+              <span className="flex-1 text-[13px] font-medium text-ih-primary-text">
                 {selectedContact.name}
                 {selectedContact.email && (
                   <span className="ml-1 text-ih-fg-3 font-normal text-[12px]">({selectedContact.email})</span>
@@ -257,7 +257,7 @@ export function AddPersonModal({
             <button
               type="button"
               onClick={() => setCreateMode(true)}
-              className="mt-2 text-[12px] font-medium text-ih-primary hover:underline"
+              className="mt-2 text-[12px] font-medium text-ih-primary-text hover:underline"
             >
               {m.inspections_hub_people_create_new()}
             </button>

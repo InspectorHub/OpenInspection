@@ -135,7 +135,7 @@ export function CalendarConnectPanel({
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-lg bg-ih-primary-tint flex items-center justify-center">
-          <CalendarGlyph className="w-5 h-5 text-ih-primary" />
+          <CalendarGlyph className="w-5 h-5 text-ih-primary-text" />
         </div>
         <div>
           <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">

@@ -18,7 +18,7 @@ export function SpectoraMappingModal({ open, handleMappingDismiss }: SpectoraMap
         <div className="flex items-center justify-between w-full">
           <Link
             to="/settings/inspection"
-            className="text-[12px] text-ih-fg-3 hover:text-ih-primary underline underline-offset-2"
+            className="text-[12px] text-ih-fg-3 hover:text-ih-primary-text underline underline-offset-2"
             onClick={handleMappingDismiss}
           >
             {m.templates_mapping_review_settings()}
@@ -41,9 +41,9 @@ export function SpectoraMappingModal({ open, handleMappingDismiss }: SpectoraMap
           <div className="flex items-center gap-2 mb-0.5">
             <span className="text-[12px] font-bold text-ih-fg-3 line-through">{m.templates_mapping_row1_from()}</span>
             <span className="text-ih-fg-3 text-[11px]">&rarr;</span>
-            <span className="text-[12px] font-bold text-ih-primary">{m.templates_mapping_row1_to1()}</span>
+            <span className="text-[12px] font-bold text-ih-primary-text">{m.templates_mapping_row1_to1()}</span>
             <span className="text-ih-fg-3 text-[10px] font-bold">+</span>
-            <span className="text-[12px] font-bold text-ih-primary">{m.templates_mapping_row1_to2()}</span>
+            <span className="text-[12px] font-bold text-ih-primary-text">{m.templates_mapping_row1_to2()}</span>
           </div>
           <p className="text-[12px] text-ih-fg-3">{m.templates_mapping_row1_desc()}</p>
         </div>
@@ -65,9 +65,9 @@ export function SpectoraMappingModal({ open, handleMappingDismiss }: SpectoraMap
           <div className="flex items-center gap-2 mb-0.5">
             <span className="text-[12px] font-bold text-ih-fg-3 line-through">{m.templates_mapping_row3_from()}</span>
             <span className="text-ih-fg-3 text-[11px]">&rarr;</span>
-            <span className="text-[12px] font-bold text-ih-primary">{m.templates_mapping_row3_to1()}</span>
+            <span className="text-[12px] font-bold text-ih-primary-text">{m.templates_mapping_row3_to1()}</span>
             <span className="text-ih-fg-3 text-[10px] font-bold">+</span>
-            <span className="text-[12px] font-bold text-ih-primary">{m.templates_mapping_row3_to2()}</span>
+            <span className="text-[12px] font-bold text-ih-primary-text">{m.templates_mapping_row3_to2()}</span>
           </div>
           <p className="text-[12px] text-ih-fg-3">{m.templates_mapping_row3_desc()}</p>
         </div>

@@ -134,7 +134,7 @@ export default function RatingSystemsPage() {
                     <div className="flex items-center gap-2">
                       <p className="text-[13px] font-semibold text-ih-fg-1 truncate">{sys.name}</p>
                       {sys.isDefault && (
-                        <span className="shrink-0 inline-flex items-center h-4 px-1.5 rounded text-[9px] font-bold uppercase tracking-wide bg-ih-primary-tint text-ih-primary">{m.library_rating_default_badge()}</span>
+                        <span className="shrink-0 inline-flex items-center h-4 px-1.5 rounded text-[9px] font-bold uppercase tracking-wide bg-ih-primary-tint text-ih-primary-text">{m.library_rating_default_badge()}</span>
                       )}
                     </div>
                     {sys.description && (
@@ -142,7 +142,7 @@ export default function RatingSystemsPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => openEdit(sys)} className="text-[13px] text-ih-primary hover:opacity-80 font-semibold px-1">
+                    <button onClick={() => openEdit(sys)} className="text-[13px] text-ih-primary-text hover:opacity-80 font-semibold px-1">
                       {m.common_edit()}
                     </button>
                     {!sys.isSeed && (

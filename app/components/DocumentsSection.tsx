@@ -308,7 +308,7 @@ export default function DocumentsSection({
                       <div className="min-w-0 flex-1">
                         <a
                           href={downloadHref(item.id)}
-                          className="block truncate text-[13px] font-semibold text-ih-primary hover:underline"
+                          className="block truncate text-[13px] font-semibold text-ih-primary-text hover:underline"
                         >
                           {item.label || item.filename}
                         </a>

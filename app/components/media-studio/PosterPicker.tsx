@@ -124,7 +124,7 @@ export function PosterPicker({
             type="button"
             onClick={onPickFromPhotos}
             disabled={!onPickFromPhotos}
-            className="min-h-[44px] rounded-xl px-3 text-[13px] font-bold text-ih-primary hover:text-ih-primary-600 disabled:opacity-40"
+            className="min-h-[44px] rounded-xl px-3 text-[13px] font-bold text-ih-primary-text hover:text-ih-primary-600 disabled:opacity-40"
           >
             {m.media_poster_pick_from_photos()}
           </button>

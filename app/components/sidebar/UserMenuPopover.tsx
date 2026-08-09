@@ -71,7 +71,7 @@ export function UserMenuPopover({
         <a
           href={`${portalBaseUrl}/company/switch`}
           role="menuitem"
-          className="flex items-center gap-2 px-3 py-[7px] text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary transition-colors focus:outline-none focus:bg-ih-bg-muted"
+          className="flex items-center gap-2 px-3 py-[7px] text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary-text transition-colors focus:outline-none focus:bg-ih-bg-muted"
           onClick={onClose}
         >
           <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
@@ -106,7 +106,7 @@ export function UserMenuPopover({
         role="menuitem"
         className={({ isActive }) =>
           `flex items-center gap-2 px-3 py-[7px] text-[13px] font-medium transition-colors focus:outline-none focus:bg-ih-bg-muted ${
-            isActive ? "text-ih-primary bg-ih-primary-tint" : "text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary"
+            isActive ? "text-ih-primary-text bg-ih-primary-tint" : "text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary-text"
           }`
         }
         onClick={onClose}
@@ -122,7 +122,7 @@ export function UserMenuPopover({
           target="_blank"
           rel="noreferrer"
           role="menuitem"
-          className="flex items-center gap-2 px-3 py-[7px] text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary transition-colors focus:outline-none focus:bg-ih-bg-muted"
+          className="flex items-center gap-2 px-3 py-[7px] text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary-text transition-colors focus:outline-none focus:bg-ih-bg-muted"
           onClick={onClose}
         >
           <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>

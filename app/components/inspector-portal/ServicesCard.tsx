@@ -107,7 +107,7 @@ export function ServicesCard({
                                         <button
                                             type="button"
                                             onClick={() => setRepricing(svc)}
-                                            className="text-[12px] font-bold text-ih-primary hover:underline"
+                                            className="text-[12px] font-bold text-ih-primary-text hover:underline"
                                         >
                                             {m.inspections_hub_services_edit_price()}
                                         </button>
@@ -385,7 +385,7 @@ function RepriceModal({
                     <button
                         type="button"
                         onClick={() => setCents(line.priceSnapshot ?? null)}
-                        className="text-[11px] font-bold text-ih-primary hover:underline"
+                        className="text-[11px] font-bold text-ih-primary-text hover:underline"
                     >
                         {m.inspections_hub_services_price_revert()}
                     </button>

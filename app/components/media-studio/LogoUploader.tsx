@@ -49,7 +49,7 @@ export function LogoUploader({ currentUrl, uploading, onSelect, size = "default"
         <label className={`inline-flex items-center justify-center h-9 px-3 rounded-md border border-ih-border text-ih-fg-2 text-[12px] font-bold transition-colors ${
           uploading
             ? "opacity-50 cursor-default"
-            : "cursor-pointer hover:border-ih-primary hover:text-ih-primary focus-within:border-ih-primary focus-within:shadow-ih-focus"
+            : "cursor-pointer hover:border-ih-primary hover:text-ih-primary-text focus-within:border-ih-primary focus-within:shadow-ih-focus"
         }`}>
           <input
             ref={inputRef}

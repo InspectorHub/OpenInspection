@@ -31,7 +31,7 @@ export function InspectionsFilterStrip({
                     onClick={() => setActiveFilter(f.id)}
                     className={`px-3 py-2 border-b-2 text-[11px] font-bold transition-colors ${
                         activeFilter === f.id
-                            ? "border-ih-primary text-ih-primary"
+                            ? "border-ih-primary text-ih-primary-text"
                             : "border-transparent text-ih-fg-3 hover:text-ih-fg-1"
                     }`}
                 >

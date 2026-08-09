@@ -292,7 +292,7 @@ export function CannedCommentTabs({
                 category={cd.category}
                 categoryColor={categoryColor?.get(cd.category)}
                 extraBadge={
-                  <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-primary-tint text-ih-primary">
+                  <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-primary-tint text-ih-primary-text">
                     {m.editor_canned_custom_badge()}
                   </span>
                 }
@@ -337,7 +337,7 @@ export function CannedCommentTabs({
                   variant="ghost"
                   size="sm"
                   onClick={onOpenCustomForm}
-                  className="w-full h-auto py-2.5 justify-start border border-dashed border-ih-border-strong text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary"
+                  className="w-full h-auto py-2.5 justify-start border border-dashed border-ih-border-strong text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary-text"
                 >
                   {m.editor_canned_add_custom()}
                 </Button>

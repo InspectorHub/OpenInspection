@@ -68,7 +68,7 @@ export function BookingShell({
           {brand.logoUrl ? (
             <img src={brand.logoUrl} alt={brand.companyName ?? profile.company ?? m.booking_logo_alt()} className="h-10 w-auto" />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-ih-primary-tint flex items-center justify-center text-ih-primary text-lg font-bold">
+            <div className="w-10 h-10 rounded-full bg-ih-primary-tint flex items-center justify-center text-ih-primary-text text-lg font-bold">
               {profile.company.charAt(0)}
             </div>
           )}

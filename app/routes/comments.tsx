@@ -243,7 +243,7 @@ export default function CommentsPage() {
                     <button
                       type="button"
                       onClick={() => { setEditing(c); setEditorOpen(true); }}
-                      className="text-[11px] font-bold text-ih-primary hover:text-ih-primary-600"
+                      className="text-[11px] font-bold text-ih-primary-text hover:text-ih-primary-600"
                     >
                       {m.common_edit()}
                     </button>

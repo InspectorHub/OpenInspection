@@ -263,7 +263,7 @@ export function CancellationPolicyPanel({ policy, clause, agreements }: Props) {
                   agreements cannot act on "create one" from here, and this panel
                   is where they find out they need one — so it is also where the
                   way out belongs. */}
-              <Link to="/agreements" className="font-semibold text-ih-primary hover:underline">
+              <Link to="/agreements" className="font-semibold text-ih-primary-text hover:underline">
                 {m.settings_cancellation_clause_create_link()}
               </Link>
             </p>

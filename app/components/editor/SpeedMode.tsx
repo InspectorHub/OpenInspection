@@ -249,7 +249,7 @@ export function SpeedMode({
                                 setShowJumpTo(false);
                               }}
                               className={`w-full text-left px-3 py-2 rounded hover:bg-ih-bg-muted ${
-                                isActive ? 'bg-ih-bg-muted font-bold text-ih-primary' : 'text-ih-fg-1'
+                                isActive ? 'bg-ih-bg-muted font-bold text-ih-primary-text' : 'text-ih-fg-1'
                               }`}
                             >
                               {itLabel}

@@ -188,7 +188,7 @@ export function CredentialsEditor({
         </div>
       ))}
 
-      <button type="button" onClick={onAdd} className="text-[13px] font-bold text-ih-primary hover:underline">
+      <button type="button" onClick={onAdd} className="text-[13px] font-bold text-ih-primary-text hover:underline">
         {m.settings_profile_credentials_add()}
       </button>
 

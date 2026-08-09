@@ -105,7 +105,7 @@ export function RolesTable({
                   <input type="hidden" name="id" value={p.id} />
                   <button
                     type="submit"
-                    className={`text-[12px] font-bold hover:underline ${p.active ? "text-ih-bad-fg" : "text-ih-primary"}`}
+                    className={`text-[12px] font-bold hover:underline ${p.active ? "text-ih-bad-fg" : "text-ih-primary-text"}`}
                   >
                     {p.active ? m.contacts_roles_action_deactivate() : m.contacts_roles_action_reactivate()}
                   </button>

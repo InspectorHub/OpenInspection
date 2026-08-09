@@ -350,7 +350,7 @@ export function ItemPhotoStrip({
           onClick={onAddPhoto}
           disabled={photoUploading}
           aria-label={m.media_strip_add_photo_aria()}
-          className="strip-add w-16 h-16 shrink-0 rounded-lg border-2 border-dashed border-ih-border flex items-center justify-center text-ih-fg-4 hover:border-ih-primary hover:text-ih-primary transition-colors disabled:opacity-50"
+          className="strip-add w-16 h-16 shrink-0 rounded-lg border-2 border-dashed border-ih-border flex items-center justify-center text-ih-fg-4 hover:border-ih-primary hover:text-ih-primary-text transition-colors disabled:opacity-50"
         >
           {photoUploading ? (
             <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">

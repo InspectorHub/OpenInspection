@@ -90,7 +90,7 @@ export function CalendarScopeToolbar({
                   aria-pressed={selected}
                   className={`h-8 rounded-full border px-3 text-[12px] font-bold ${
                     selected
-                      ? "border-ih-primary bg-ih-primary-tint text-ih-primary"
+                      ? "border-ih-primary bg-ih-primary-tint text-ih-primary-text"
                       : "border-ih-border bg-ih-bg-card text-ih-fg-3 hover:bg-ih-bg-muted"
                   }`}
                 >

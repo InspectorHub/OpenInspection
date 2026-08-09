@@ -29,7 +29,7 @@ describe("SegmentedControl", () => {
     expect(c.getAttribute("aria-checked")).toBe("false");
     // Canonical active-state token present on active, absent on inactive.
     expect(b.className).toContain("bg-ih-bg-card");
-    expect(b.className).toContain("text-ih-primary");
+    expect(b.className).toContain("text-ih-primary-text");
     expect(b.className).toContain("shadow-ih-card");
     expect(a.className).not.toContain("bg-ih-bg-card");
     expect(c.className).not.toContain("bg-ih-bg-card");

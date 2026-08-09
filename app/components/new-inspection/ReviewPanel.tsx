@@ -38,7 +38,7 @@ function ReviewRow({
             className="w-full flex items-start justify-between gap-3 py-2 text-left group hover:bg-ih-bg-card px-2 -mx-2 rounded"
         >
             <span className="text-[12px] text-ih-fg-3 shrink-0">{label}</span>
-            <span className="text-[12px] text-ih-fg-1 text-right group-hover:text-ih-primary">{value}</span>
+            <span className="text-[12px] text-ih-fg-1 text-right group-hover:text-ih-primary-text">{value}</span>
         </button>
     );
 }

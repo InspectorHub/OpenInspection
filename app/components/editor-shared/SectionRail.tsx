@@ -132,7 +132,7 @@ export function SectionRail({
    title={m.editor_shared_inspection_details()}
    className={`w-full text-left px-3 py-2 rounded-md text-[13px] transition-all ${
     overviewActive
-     ? "bg-ih-primary-tint text-ih-primary font-bold border-l-2 border-ih-primary"
+     ? "bg-ih-primary-tint text-ih-primary-text font-bold border-l-2 border-ih-primary"
      : "text-ih-fg-3 hover:bg-ih-bg-muted"
    }`}
   >
@@ -182,7 +182,7 @@ export function SectionRail({
   }}
   className={`group relative flex items-stretch rounded-md text-[13px] transition-all ${
    activeSection === section.id
-    ? "bg-ih-primary-tint text-ih-primary font-bold border-l-2 border-ih-primary"
+    ? "bg-ih-primary-tint text-ih-primary-text font-bold border-l-2 border-ih-primary"
     : "text-ih-fg-3 hover:bg-ih-bg-muted"
   }`}
  >
@@ -307,7 +307,7 @@ export function SectionRail({
    size="sm"
    onClick={onAddSection}
    data-testid="add-section-btn"
-   className="w-full justify-start h-auto py-2 border border-dashed border-ih-border text-ih-fg-4 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary"
+   className="w-full justify-start h-auto py-2 border border-dashed border-ih-border text-ih-fg-4 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary-text"
   >
    {m.editor_shared_add_section()}
   </Button>

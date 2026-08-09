@@ -212,7 +212,7 @@ export function RepairDefectRow({
                     key={phrase}
                     type="button"
                     onClick={() => appendPhrase(phrase)}
-                    className="text-[11px] font-bold text-ih-primary hover:underline"
+                    className="text-[11px] font-bold text-ih-primary-text hover:underline"
                   >
                     {phrase}
                   </button>

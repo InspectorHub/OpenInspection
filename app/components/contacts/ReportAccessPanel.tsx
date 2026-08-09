@@ -98,7 +98,7 @@ export function ReportAccessPanel({
                 <div className="min-w-0">
                   <Link
                     to={`/inspections/${a.inspectionId}`}
-                    className="text-[13px] font-medium text-ih-fg-1 hover:text-ih-primary hover:underline"
+                    className="text-[13px] font-medium text-ih-fg-1 hover:text-ih-primary-text hover:underline"
                   >
                     {a.propertyAddress || a.inspectionId.slice(0, 8)}
                   </Link>

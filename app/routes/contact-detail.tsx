@@ -174,7 +174,7 @@ export default function ContactDetailPage() {
                 {m.contacts_field_email()}
               </p>
               {contact.email ? (
-                <a href={`mailto:${contact.email}`} className="text-ih-primary hover:underline">
+                <a href={`mailto:${contact.email}`} className="text-ih-primary-text hover:underline">
                   {contact.email}
                 </a>
               ) : (
@@ -187,7 +187,7 @@ export default function ContactDetailPage() {
                 {m.contacts_field_phone()}
               </p>
               {contact.phone ? (
-                <a href={`tel:${contact.phone}`} className="text-ih-primary hover:underline">
+                <a href={`tel:${contact.phone}`} className="text-ih-primary-text hover:underline">
                   {contact.phone}
                 </a>
               ) : (

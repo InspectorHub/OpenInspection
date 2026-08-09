@@ -36,7 +36,7 @@ export function DiscountCodesPanel({ discounts }: { discounts: Discount[] }) {
                     {d.active ? m.settings_discount_active() : m.settings_discount_disabled()}
                   </span>
                 </div>
-                <button className="text-[12px] font-semibold text-ih-primary hover:underline">
+                <button className="text-[12px] font-semibold text-ih-primary-text hover:underline">
                   {m.common_edit()}
                 </button>
               </div>

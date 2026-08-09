@@ -34,7 +34,7 @@ export function AiFeaturesPanel({ geminiConfigured, value, fieldError, saving, g
       <p className="text-[13px] text-ih-fg-3">
         {m.settings_ai_desc()}{" "}
         <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer"
-          className="text-ih-primary hover:underline">
+          className="text-ih-primary-text hover:underline">
           aistudio.google.com
         </a>.
       </p>

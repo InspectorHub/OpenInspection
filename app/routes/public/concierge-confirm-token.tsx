@@ -111,7 +111,7 @@ function ConciergeConfirmBody() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-ih-bg-card">
       <main className="max-w-[480px] w-full bg-ih-bg-card border border-ih-border rounded-xl p-9">
-        <div className="w-12 h-12 rounded-xl bg-ih-primary-tint text-ih-primary flex items-center justify-center mb-4">
+        <div className="w-12 h-12 rounded-xl bg-ih-primary-tint text-ih-primary-text flex items-center justify-center mb-4">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>

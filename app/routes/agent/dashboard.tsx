@@ -162,7 +162,7 @@ export default function AgentDashboardPage() {
  </div>
  <div className={`bg-ih-bg-card border border-ih-border rounded-xl p-5 ${unreadReports > 0 ? "border-ih-primary/40" : ""}`}>
  <p className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1">{m.agent_portal_dashboard_reports_ready()}</p>
- <p className={`text-3xl font-bold ${unreadReports > 0 ? "text-ih-primary" : "text-ih-fg-1"}`}>
+ <p className={`text-3xl font-bold ${unreadReports > 0 ? "text-ih-primary-text" : "text-ih-fg-1"}`}>
  {unreadReports}
  </p>
  <p className="text-[13px] text-ih-fg-3 mt-1">

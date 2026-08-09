@@ -38,7 +38,7 @@ export function GoogleCalendarPanel({
 
       <div className="rounded-md border border-ih-border bg-ih-primary-tint p-3 text-[13px] text-ih-fg-2">
         {m.settings_gcal_inspectors_connect_prefix()}{" "}
-        <Link to="/settings/schedule" className="font-bold text-ih-primary hover:underline">
+        <Link to="/settings/schedule" className="font-bold text-ih-primary-text hover:underline">
           {m.settings_gcal_my_schedule()}
         </Link>
         .
@@ -89,7 +89,7 @@ export function GoogleCalendarPanel({
               href="https://console.cloud.google.com/apis/credentials"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-ih-primary hover:underline"
+              className="text-ih-primary-text hover:underline"
             >
               {m.settings_gcal_cloud_console()}
             </a>

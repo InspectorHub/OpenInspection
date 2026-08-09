@@ -258,7 +258,7 @@ export function TemplateEditorModal({
                   key={v}
                   type="button"
                   onClick={() => insertVariable(v)}
-                  className="text-[11px] px-1.5 py-0.5 rounded border border-ih-border bg-ih-bg-card text-ih-primary font-mono hover:bg-ih-primary-tint transition-colors"
+                  className="text-[11px] px-1.5 py-0.5 rounded border border-ih-border bg-ih-bg-card text-ih-primary-text font-mono hover:bg-ih-primary-tint transition-colors"
                 >
                   {`{{${v}}}`}
                 </button>

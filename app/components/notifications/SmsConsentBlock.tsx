@@ -154,7 +154,7 @@ export function SmsConsentBlock({
                 {manageHref && (
                     <a
                         href={manageHref}
-                        className="text-[13px] font-semibold text-ih-primary hover:opacity-80 focus-visible:outline-2 focus-visible:outline-ih-primary rounded-sm"
+                        className="text-[13px] font-semibold text-ih-primary-text hover:opacity-80 focus-visible:outline-2 focus-visible:outline-ih-primary rounded-sm"
                     >
                         {m.notif_prefs_sms_manage()} →
                     </a>

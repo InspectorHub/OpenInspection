@@ -144,7 +144,7 @@ export function PeopleStep({
         {selectedAgent ? (
           /* Chip for the selected agent */
           <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-ih-primary bg-ih-primary-tint">
-            <span className="flex-1 text-[13px] font-medium text-ih-primary">
+            <span className="flex-1 text-[13px] font-medium text-ih-primary-text">
               {selectedAgent.name}
               {selectedAgent.email ? <span className="ml-1 text-ih-fg-3 font-normal text-[12px]">({selectedAgent.email})</span> : null}
             </span>
@@ -216,7 +216,7 @@ export function PeopleStep({
                 <button
                   type="button"
                   onMouseDown={enableNewAgentMode}
-                  className="text-[12px] font-semibold text-ih-primary hover:underline"
+                  className="text-[12px] font-semibold text-ih-primary-text hover:underline"
                 >
                   {m.newinsp_people_add_agent()}
                 </button>
@@ -229,7 +229,7 @@ export function PeopleStep({
           <button
             type="button"
             onClick={enableNewAgentMode}
-            className="text-[12px] font-medium text-ih-primary hover:underline"
+            className="text-[12px] font-medium text-ih-primary-text hover:underline"
           >{m.newinsp_people_add_agent()}</button>
         )}
       </div>

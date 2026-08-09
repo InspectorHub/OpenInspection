@@ -165,7 +165,7 @@ export function EmailDeliveryPanel({
               <p className="text-[13px] text-ih-fg-2">
                 <strong>
                   {config.companyName || config.senderDisplayName || (
-                    <Link to="/settings/workspace" className="text-ih-primary hover:underline">{m.settings_emaildelivery_set_company_link()}</Link>
+                    <Link to="/settings/workspace" className="text-ih-primary-text hover:underline">{m.settings_emaildelivery_set_company_link()}</Link>
                   )}
                 </strong>
                 {config.companyName && (

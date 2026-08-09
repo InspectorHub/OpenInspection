@@ -46,7 +46,7 @@ export function ReportToc({
           >
             <a
               href={`#${entry.id}`}
-              className="hover:text-ih-primary transition-colors"
+              className="hover:text-ih-primary-text transition-colors"
               onClick={(ev) => {
                 // RR scrollRestoration='manual' — a bare href doesn't scroll.
                 ev.preventDefault();

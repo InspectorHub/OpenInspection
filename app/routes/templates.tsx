@@ -331,13 +331,13 @@ export default function TemplatesPage() {
         <div className="flex bg-ih-bg-muted rounded-md p-0.5 ml-auto">
           <button
             onClick={() => setView("card")}
-            className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "card" ? "bg-ih-bg-card text-ih-primary shadow-ih-card" : "text-ih-fg-3"}`}
+            className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "card" ? "bg-ih-bg-card text-ih-primary-text shadow-ih-card" : "text-ih-fg-3"}`}
           >
             {m.templates_view_cards()}
           </button>
           <button
             onClick={() => setView("list")}
-            className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "list" ? "bg-ih-bg-card text-ih-primary shadow-ih-card" : "text-ih-fg-3"}`}
+            className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "list" ? "bg-ih-bg-card text-ih-primary-text shadow-ih-card" : "text-ih-fg-3"}`}
           >
             {m.templates_view_list()}
           </button>
