@@ -157,7 +157,7 @@ const bulkUpdateRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
-        400: { description: "Missing action argument, or status:'cancelled' — which only POST /{id}/cancel may write, one inspection at a time (#78)" },
+        400: { description: 'Missing action argument, or a request to cancel — cancellation is writable only through POST /{id}/cancel, one inspection at a time, so the fee and refund cannot be skipped (#78)' },
     },
     operationId: "bulkInspection"
 }, { scopes: ['write'], tier: 'extended', capability: 'scheduleOthers' }));

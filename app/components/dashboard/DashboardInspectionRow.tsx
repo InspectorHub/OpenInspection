@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { formatInspectionDateTime } from "~/lib/format-date";
-import { isReportPublished, statusTone } from "~/lib/status";
+import { INSPECTION_STATUS, isReportPublished, statusTone } from "~/lib/status";
 import { reportStateLabel } from "~/lib/dashboard-filters";
 import { REPORT_STATE_TONE, type Inspection } from "~/lib/dashboard-schema";
 import { Pill, Icon } from "@core/shared-ui";
@@ -164,7 +164,7 @@ export function DashboardInspectionRow({
           <option value="scheduled">{m.dashboard_row_status_scheduled()}</option>
           <option value="confirmed">{m.dashboard_row_status_confirmed()}</option>
           <option value="completed">{m.dashboard_row_status_completed()}</option>
-          {insp.status === "cancelled" && (
+          {insp.status === INSPECTION_STATUS.CANCELLED && (
             <option value="cancelled" disabled>
               {m.dashboard_row_status_cancelled()}
             </option>
