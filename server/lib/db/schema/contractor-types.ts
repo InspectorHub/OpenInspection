@@ -1,4 +1,5 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 // Comments-repair fold (2026-06-12) — tenant-scoped, customizable list of
 // recommended contractor types (e.g. "Licensed Electrician"). No .references()
@@ -33,4 +34,23 @@ export const contractorTypes = sqliteTable('contractor_types', {
     tradeSlug: text('trade_slug'),
 }, (t) => [
     index('idx_contractor_types_tenant').on(t.tenantId),
+    /**
+     * One row per canonical trade, per workspace — and PARTIAL, for the reason
+     * spelled out on `tradeSlug` above: SQLite treats NULLs as distinct, so an
+     * unconditional unique index would let unlimited NULL rows through while
+     * doing nothing for them, and NULL is the normal state for a
+     * tenant-created type.
+     *
+     * WHAT THIS PROTECTS. Seeding already dedupes by slug, but it dedupes in
+     * application code against a snapshot read — two concurrent seeds, or a
+     * backfill that stamps a slug onto an old row for a trade the workspace
+     * ALREADY has a slugged row for, both produce two rows for one trade and
+     * nothing objects. The `defectTrade -> contractorType` resolution would
+     * then pick whichever row the query happened to return first. Making that
+     * a constraint violation is the point: a backfill must FAIL rather than
+     * silently duplicate.
+     */
+    uniqueIndex('uq_contractor_types_tenant_trade')
+        .on(t.tenantId, t.tradeSlug)
+        .where(sql`trade_slug IS NOT NULL`),
 ]);
