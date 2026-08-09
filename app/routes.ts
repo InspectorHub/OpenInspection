@@ -141,6 +141,14 @@ export default [
     // is a full-screen work surface with its own chrome.) The hub had been
     // reproducing this layout's container by hand, which is now removed.
     route("inspections/:id", "routes/inspector-portal.tsx"),
+    // #69 — the Repair Request Log, entered from the hub's Report card. Its own
+    // page rather than a card on the hub: it lists every repair request built
+    // for the order, each with its items, which is more than a hub block can
+    // hold. Inside the auth layout for the same reason the hub is — walking out
+    // of the hub into it must not drop the workspace nav. The static
+    // `repair-requests` segment outranks nothing: `inspections/:id` is a leaf,
+    // not a layout, so this is a sibling path and there is no collision.
+    route("inspections/:id/repair-requests", "routes/inspection-repair-requests.tsx"),
     route("calendar", "routes/calendar.tsx"),
     // Day-centric dispatch board. Static `dispatch` sits under the calendar
     // path but is its own route, not a mode of /calendar: the audience is

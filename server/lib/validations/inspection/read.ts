@@ -205,6 +205,7 @@ export const InspectionHubSchema = z.object({
     publishedAt: z.string().nullable().describe('ISO instant THIS deliverable went out; null while unpublished'),
     versionCount: z.number().describe('Signed versions this report owns — part of what deleting it would destroy'),
     hasContent: z.boolean().describe('Whether its document has been written into ("information you already filled out")'),
+    hasNarrative: z.boolean().describe("Whether the inspector has written the report-level narrative (reports.inspector_narrative). The FLAG, not the prose — the text is unbounded free text and comes from GET /{id}/reports/{reportId}/narrative."),
     canDelete: z.boolean().describe('Decided server-side by the same function the DELETE endpoint enforces, so the UI cannot offer an action the API refuses'),
     deleteBlockedReason: z.enum(['primary', 'published']).nullable().describe('Why deletion is refused, for the disabled control reason; null when it is allowed'),
   })).describe("The order's deliverables. One order, several reports — each with its own document, signature chain and notification."),

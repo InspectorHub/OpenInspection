@@ -43,6 +43,7 @@ import inspectionServiceRoutes from './inspections/services';
 import inspectionReportRoutes from './inspections/reports';
 import paySplitRoutes from './inspections/pay-splits';
 import cancellationRoutes from './inspections/cancellation';
+import inspectionRepairRequestRoutes from './inspections/repair-requests';
 
 export const inspectionsRoutes = createApiRouter()
     .route('/', bulkRoutes)
@@ -88,6 +89,10 @@ export const inspectionsRoutes = createApiRouter()
     // /:id/cancel + /:id/cancellation-quote. Split out of publish.ts: the
     // report lifecycle and the money a cancellation moves are different
     // concerns, and that file was at its size ceiling.
-    .route('/', cancellationRoutes);
+    .route('/', cancellationRoutes)
+    // #69 — GET /:id/repair-requests, the Repair Request Log. The lists it
+    // reads are WRITTEN through /api/public/repair-builder, which authenticates
+    // a client's token; this read is staff-only and cannot live there.
+    .route('/', inspectionRepairRequestRoutes);
 
 export type InspectionsApi = typeof inspectionsRoutes;

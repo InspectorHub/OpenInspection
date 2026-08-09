@@ -2,6 +2,14 @@ import { drizzle } from 'drizzle-orm/d1';
 import { aiContentReviews } from '../db/schema';
 
 /**
+ * WHICH table `artifactId` points into. Derived from the schema column rather
+ * than re-typed, so a member added to one and forgotten in the other cannot
+ * compile — the union has been wrong in this direction before, when the enum
+ * held a member no column existed for.
+ */
+export type AiReviewArtifactType = typeof aiContentReviews.$inferInsert['artifactType'];
+
+/**
  * Record that a person reviewed model-assisted text before it was published.
  *
  * WHAT THIS IS EVIDENCE OF, precisely: a named staff user looked at the output
@@ -29,7 +37,7 @@ import { aiContentReviews } from '../db/schema';
 export async function recordContentReview(args: {
     db: D1Database;
     tenantId: string;
-    artifactType: 'inspection_result';
+    artifactType: AiReviewArtifactType;
     artifactId: string;
     reviewedBy: string;
     aiCallId: string;

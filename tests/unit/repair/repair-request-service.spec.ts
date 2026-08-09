@@ -347,3 +347,84 @@ describe('RepairRequestService', () => {
         expect(await svc.creditTotal(TENANT, OTHER_INSP, rr.id)).toBe(0);
     });
 });
+
+/**
+ * #69 — `listForInspection`, the Repair Request Log's read.
+ *
+ * Its whole reason to exist is that it does NOT filter by creator, which makes
+ * it the one read on this service that could hand a caller somebody else's
+ * list. The tests below therefore pin both halves: that it crosses the creator
+ * boundary on purpose, and that it crosses no other boundary by accident.
+ */
+describe('RepairRequestService.listForInspection (#69)', () => {
+    let testDb: BetterSQLite3Database<typeof schema>;
+    let svc: RepairRequestService;
+
+    beforeEach(async () => {
+        const f = createTestDb();
+        testDb = f.db as BetterSQLite3Database<typeof schema>;
+        await setupSchema(f.sqlite);
+        await seedTenant(testDb);
+        svc = makeRepairRequestService(testDb);
+    });
+
+    it('returns lists from EVERY creator, which listMine by design does not', async () => {
+        const buyer = await svc.create(TENANT, INSP, { kind: 'client', ref: 'buyer@example.com' });
+        const agent = await svc.create(TENANT, INSP, { kind: 'agent', ref: 'agent@example.com' });
+
+        // The contrast is the assertion: same tenant, same inspection, and the
+        // creator-scoped read sees one of the two.
+        const mine = await svc.listMine(TENANT, INSP, { kind: 'client', ref: 'buyer@example.com' });
+        expect(mine.map((r) => r.id)).toEqual([buyer.id]);
+
+        const log = await svc.listForInspection(TENANT, INSP);
+        expect(log.map((r) => r.id).sort()).toEqual([agent.id, buyer.id].sort());
+    });
+
+    it('newest list first — the log is read to find the latest ask', async () => {
+        const first = await svc.create(TENANT, INSP, { kind: 'client', ref: 'a' });
+        const second = await svc.create(TENANT, INSP, { kind: 'client', ref: 'b' });
+        // The injected clock advances per generated id, so `second` is newer.
+        const log = await svc.listForInspection(TENANT, INSP);
+        expect(log.map((r) => r.id)).toEqual([second.id, first.id]);
+    });
+
+    it('never crosses to another inspection in the same tenant', async () => {
+        const OTHER_INSP = '22222222-2222-2222-2222-222222222222';
+        await svc.create(TENANT, INSP, { kind: 'client', ref: 'a' });
+        const elsewhere = await svc.create(TENANT, OTHER_INSP, { kind: 'client', ref: 'a' });
+        const log = await svc.listForInspection(TENANT, INSP);
+        expect(log.map((r) => r.id)).not.toContain(elsewhere.id);
+    });
+
+    it('never crosses to another tenant', async () => {
+        const OTHER_TENANT = '00000000-0000-0000-0000-0000000000ff';
+        await svc.create(TENANT, INSP, { kind: 'client', ref: 'a' });
+        const foreign = await svc.create(OTHER_TENANT, INSP, { kind: 'client', ref: 'a' });
+        const log = await svc.listForInspection(TENANT, INSP);
+        expect(log.map((r) => r.id)).not.toContain(foreign.id);
+    });
+
+    it('attaches each list its OWN items and nobody else\'s', async () => {
+        // One query fetches the items for every list and groups them in memory,
+        // so a mis-grouped bucket would put the agent's asks under the buyer's
+        // name — the failure mode a per-row fetch cannot have.
+        const buyer = await svc.create(TENANT, INSP, { kind: 'client', ref: 'buyer' });
+        const agent = await svc.create(TENANT, INSP, { kind: 'agent', ref: 'agent' });
+        await svc.addItem(TENANT, buyer.id, {
+            findingKey: 'k1', sectionTitle: 'Roof', itemLabel: 'Shingles', note: 'buyer note',
+        });
+        await svc.addItem(TENANT, agent.id, {
+            findingKey: 'k2', sectionTitle: 'HVAC', itemLabel: 'Furnace', note: 'agent note',
+        });
+
+        const log = await svc.listForInspection(TENANT, INSP);
+        const byId = new Map(log.map((r) => [r.id, r]));
+        expect(byId.get(buyer.id)!.items.map((i) => i.note)).toEqual(['buyer note']);
+        expect(byId.get(agent.id)!.items.map((i) => i.note)).toEqual(['agent note']);
+    });
+
+    it('returns an empty array — not a query — when the inspection has no lists', async () => {
+        expect(await svc.listForInspection(TENANT, INSP)).toEqual([]);
+    });
+});

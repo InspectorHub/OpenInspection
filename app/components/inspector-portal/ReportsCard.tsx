@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
-import { Card, Pill } from "@core/shared-ui";
+import { Link, useFetcher } from "react-router";
+import { Card, Pill, buttonClasses } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { m } from "~/paraglide/messages";
@@ -42,10 +42,21 @@ export function ReportsCard({
     reports,
     canManage,
     formatDate,
+    repairLogHref,
 }: {
     reports: ReportRow[];
     canManage: boolean;
     formatDate: (iso: string) => string;
+    /**
+     * #69 — where to read what clients asked for after these reports went out,
+     * or null while the order is unpublished.
+     *
+     * A HREF, not a boolean: publication is the order-wide `reportStatus`, and
+     * this card only knows each deliverable's own `publishedAt`. Re-deriving
+     * the rule from those would give a second, subtly different answer to
+     * "is this order published" — so the route decides and this card renders.
+     */
+    repairLogHref: string | null;
 }) {
     const deleteFetcher = useFetcher<typeof action>();
     const [deleting, setDeleting] = useState<ReportRow | null>(null);
@@ -116,6 +127,25 @@ export function ReportsCard({
             )}
 
             {error && <p className="text-[12px] text-ih-bad-fg mt-3">{error}</p>}
+
+            {/* The card's one action, at the bottom of the card and below the
+                content it acts on — the rule BlockHeading's header states.
+                Absent, not disabled, before publication: a client cannot build
+                a repair list off an undelivered report, so the page it opens
+                could only explain why it is empty.
+
+                A real <a>, so it middle-clicks and opens in a new tab.
+                `buttonClasses` keeps it the same rank as the buttons on the
+                sibling cards without hand-copying their class list. */}
+            {repairLogHref && (
+                <Link
+                    to={repairLogHref}
+                    data-testid="hub-repair-log-link"
+                    className={`${buttonClasses({ variant: "secondary", size: "sm" })} mt-4`}
+                >
+                    {m.inspections_hub_report_repair_log()}
+                </Link>
+            )}
 
             {/* Names the report AND what is destroyed with it. A report is not a
                 row: it carries the content somebody filled in and its own

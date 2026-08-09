@@ -30,6 +30,10 @@ export type AuditAction =
     | 'inspection.share_agent'
     | 'inspection.property_facts.update'
     | 'inspection.pca_narrative.update'
+    // The inspector's report-level narrative on `reports`. Distinct from
+    // `pca_narrative` above, which is the commercial PCA block set on
+    // `inspections` — two different fields on two different tables.
+    | 'inspection.report_narrative.update'
     | 'inspection.media.attach'
     | 'inspection.media.video.finalize'
     | 'inspection.media.video.delete'

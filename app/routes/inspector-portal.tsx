@@ -858,6 +858,7 @@ export default function InspectionHubPage() {
           reports={hub.reports ?? []}
           canManage={isAdmin}
           formatDate={(iso) => formatInspectionDateTime(iso, undefined, displayTz, fmt)}
+          repairLogHref={reportShipped ? `/inspections/${inspection.id}/repair-requests` : null}
         />
 
         {/* 4. Signing requests — the paperwork the visit needs -------- */}

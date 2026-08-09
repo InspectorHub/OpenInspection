@@ -1,31 +1,14 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { repairRequests, repairRequestItems } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { SHARE_TOKEN_TTL_MS, isTokenRevokedOrExpired } from '../lib/token-ttl';
-import type { RepairActionTag } from '../lib/repair-action-tag';
+import type { Creator, ItemInput, RepairRequestWithItems } from './repair-request.types';
 
-export type Creator = { kind: 'client' | 'agent' | 'inspector'; ref: string };
+// Re-exported: these were declared here before the file hit its size ceiling,
+// and callers import them from the service by name.
+export type { Creator, ItemInput, RepairRequestWithItems };
 
-type ItemInput = {
-    findingKey: string;
-    sectionTitle: string;
-    itemLabel: string;
-    // IA-55 — snapshots captured at add time (stable after report changes).
-    defectTitle?: string | null;
-    location?: string | null;
-    category?: string | null;
-    // IA-57 — resolved trade label ("licensed roofer"), snapshotted at add time.
-    trade?: string | null;
-    commentSnapshot?: string | null;
-    requestedCreditCents?: number | null;
-    note?: string | null;
-    // #275 — what the buyer is asking for on this line. Buyer/agent-authored;
-    // the refusal for an inspector-authored tag lives at the route boundary
-    // (repair-gates.ts), not here, because an inspector adding an UNTAGGED item
-    // is a flow that works today and must keep working.
-    repairActionTag?: RepairActionTag | null;
-};
 
 export class RepairRequestService {
     constructor(
@@ -92,6 +75,43 @@ export class RepairRequestService {
             }),
         );
         return results;
+    }
+
+    /**
+     * EVERY list on this inspection, whoever built it (#69, Repair Request Log).
+     * Unlike `listMine` it takes no `Creator` — deliberately, so it can never be
+     * mistaken for an authoring read. That makes the tenant filter its ONLY
+     * isolation boundary; route-level RBAC is what keeps it staff-only. Newest
+     * list first; items keep the buyer's order. One item query, not one per list.
+     */
+    async listForInspection(tenantId: string, inspectionId: string): Promise<RepairRequestWithItems[]> {
+        const rows = await this.d()
+            .select()
+            .from(repairRequests)
+            .where(and(
+                eq(repairRequests.tenantId, tenantId),
+                eq(repairRequests.inspectionId, inspectionId),
+            ))
+            .orderBy(desc(repairRequests.createdAt))
+            .all();
+        if (rows.length === 0) return [];
+        const items = await this.d()
+            .select()
+            .from(repairRequestItems)
+            .where(and(
+                eq(repairRequestItems.tenantId, tenantId),
+                inArray(repairRequestItems.repairRequestId, rows.map((r) => r.id)),
+            ))
+            .orderBy(asc(repairRequestItems.sortOrder))
+            .all();
+
+        const byRequest = new Map<string, typeof items>();
+        for (const item of items) {
+            const bucket = byRequest.get(item.repairRequestId);
+            if (bucket) bucket.push(item);
+            else byRequest.set(item.repairRequestId, [item]);
+        }
+        return rows.map((rr) => ({ ...rr, items: byRequest.get(rr.id) ?? [] }));
     }
 
     /**

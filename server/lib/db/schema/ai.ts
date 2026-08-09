@@ -103,20 +103,32 @@ export const aiContentReviews = sqliteTable('ai_content_reviews', {
      *  change: it has to name a real table AND the column that model-assisted
      *  prose lands in there. */
     /**
-     * ⚠️ ONE MEMBER, deliberately. A `report_version` member was drafted here and
-     * removed after checking what that table's columns mean:
-     * `report_versions.summary` is NOT a report summary — it is the per-publish
-     * AMENDMENT REASON (`inspection-report.service.ts`: "Reason reuses
-     * report_versions.summary", surfaced as `reason` in the amendment trail and
-     * read into client delivery). There is no report-narrative column anywhere
-     * yet, so a `report_version` member would name a home that does not exist.
+     * TWO MEMBERS, each naming a real table AND a real column in it:
+     *   `inspection_result` -> `inspection_results.data`, the per-item prose the
+     *      editor writes.
+     *   `report`            -> `reports.inspector_narrative`, the inspector's
+     *      report-level narrative.
      *
-     * A reserved slot must not double as an unlocked door — the same rule the
-     * capability policy states about `translate`. Add the member in the commit
-     * that adds the field it points at.
+     * ⚠️ `report`, NOT `report_version`. A `report_version` member was drafted
+     * when this table was written and removed, because `report_versions.summary`
+     * is NOT a report summary — it is the per-publish AMENDMENT REASON
+     * (`inspection-report.service.ts`: "Reason reuses report_versions.summary",
+     * surfaced as `reason` in the amendment trail and read into client
+     * delivery). That reasoning still holds and is why the member added here
+     * points at `reports` instead: a version row is an immutable snapshot of a
+     * publish, and the narrative a person reviewed lives on the report, which is
+     * the row that is edited and re-published. Pointing a review at a version
+     * would attach the evidence to whichever copy happened to exist at the time,
+     * so a re-publish would leave the reviewed narrative with no review.
+     *
+     * The member was added in the same change that added
+     * `reports.inspector_narrative`, per the rule the removed draft recorded: a
+     * reserved slot must not double as an unlocked door. Any third member obeys
+     * the same rule — it has to name a real table AND the column that
+     * model-assisted prose lands in there.
      */
     artifactType: text('artifact_type', {
-        enum: ['inspection_result'],
+        enum: ['inspection_result', 'report'],
     }).notNull(),
     artifactId: text('artifact_id').notNull(),
     /** The STAFF user who reviewed the text (`users.id`), never a contact.

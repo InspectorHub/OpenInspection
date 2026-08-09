@@ -1,6 +1,6 @@
 {
   "app/routes/inspection-edit.tsx": 2532,
-  "app/routes/inspector-portal.tsx": 1258,
+  "app/routes/inspector-portal.tsx": 1259,
   "server/services/inspection/inspection-report.service.ts": 957,
   "server/durable-objects/inspection-doc.ts": 928,
   "app/routes/inspections.tsx": 879,
@@ -40,7 +40,7 @@
   "app/routes/inspection-edit/action.server.ts": 501,
   "server/services/report-export-consumer.ts": 499,
   "app/components/collab/VersionHistoryPanel.tsx": 497,
-  "server/lib/compliance/erasure-orchestrator.ts": 482,
+  "server/lib/compliance/erasure-orchestrator.ts": 488,
   "server/api/admin/admin-config.ts": 472,
   "server/api/calendar.ts": 472,
   "server/services/inspection/inspection-core.service.ts": 465,
@@ -57,5 +57,6 @@
   "app/hooks/useStructureEdit.ts": 424,
   "app/routes/templates.tsx": 414,
   "app/routes/calendar.tsx": 410,
-  "server/services/agreement/signer-state.ts": 409
+  "server/services/agreement/signer-state.ts": 409,
+  "server/lib/compliance/erasure-manifest.ts": 406
 }

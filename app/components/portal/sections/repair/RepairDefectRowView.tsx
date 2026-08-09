@@ -70,7 +70,11 @@ export function RepairDefectRowView({
   // Spans throughout: the client builder nests this inside a <button>, where
   // block-level elements are invalid HTML.
   return (
-    <span className="flex-1 min-w-0 flex items-start gap-3">
+    // The testid marks the SHARED region in every portal that renders a defect,
+    // so cross-portal-reuse.test.tsx can compare what a reader sees without
+    // also comparing each portal's own surrounding affordances (the client's
+    // checkbox, the staff log's "asked for" strip).
+    <span data-testid="repair-defect-view" className="flex-1 min-w-0 flex items-start gap-3">
       <span className="flex-1 min-w-0">
         {/* IA-55 — the defect's own title distinguishes two defects on one
             item; the item + section give context, and location helps a

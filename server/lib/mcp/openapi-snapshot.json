@@ -7524,6 +7524,73 @@
     "description": "Returns ready=true when every included defect has its REQUIRED fields filled (configurable per tenant/inspection — Track H IA-7); non-required gaps surface as warningDefects."
   },
   {
+    "operationId": "getInspectionRepairRequestLog",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/repair-requests",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Repair Request Log: every repair list built from this order's report",
+    "description": "Returns every repair request list built for this order, newest first, each with the items on it — what the buyer or their agent asked for, what they wrote about it, and any credit they named. Read only. Withheld until the order's report is published, matching the client-facing builder that produces these lists: before publication no list can legitimately exist, so a log shown then would be reporting on a document nobody has been given."
+  },
+  {
+    "operationId": "getInspectionReportNarrative",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/reports/{reportId}/narrative",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection the report belongs to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection the report belongs to."
+          }
+        },
+        {
+          "name": "reportId",
+          "in": "path",
+          "required": true,
+          "description": "reports.id of the deliverable whose narrative this is.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "reports.id of the deliverable whose narrative this is."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Read a report's inspector-authored narrative",
+    "description": "Returns the inspector's own prose about the report as a whole (`reports.inspector_narrative`), or null. This is NOT `report_versions.summary`, which is the amendment reason recorded at each publish and is a different field with a different meaning."
+  },
+  {
     "operationId": "getInspectionRequest",
     "method": "GET",
     "pathTemplate": "/api/inspection-requests/{id}",
@@ -12703,6 +12770,47 @@
     },
     "summary": "Patch inspection property fact",
     "description": "Patches the Property Facts strip plus the commercial subtype-preset `metadata` envelope. Omitted keys are unchanged; null clears a field."
+  },
+  {
+    "operationId": "patchInspectionReportNarrative",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/reports/{reportId}/narrative",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection the report belongs to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection the report belongs to."
+          }
+        },
+        {
+          "name": "reportId",
+          "in": "path",
+          "required": true,
+          "description": "reports.id of the deliverable whose narrative this is.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "reports.id of the deliverable whose narrative this is."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/ReportNarrativePatchRequest"
+      }
+    },
+    "summary": "Write a report's inspector-authored narrative",
+    "description": "Replaces the report-level narrative wholesale; null or blank clears it. Last writer wins, so a retry stores the same text. The narrative carries professional liability: model-assisted drafts must be recorded in ai_content_reviews (artifact_type 'report', artifact_id this reports.id) by the surface that offered them, before the text is saved here."
   },
   {
     "operationId": "patchInspectionTemplateSnapshot",

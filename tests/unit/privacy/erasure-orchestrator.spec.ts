@@ -510,6 +510,51 @@ describe('runErasure — the residences the original manifest missed (#88)', () 
         expect(rows.every((r) => r.accessTokenId !== 'iat-subject')).toBe(true);
     });
 
+    it("reports: the inspector's narrative is cleared, the row and its title placeholder stay", async () => {
+        // `reports.inspector_narrative` is the ONE column on this table a person
+        // composes — the title is system-written, as the 2026-08-07 correction
+        // in erasure-manifest.ts records. So it is where a report about this
+        // subject's property says things about this subject, in prose no PII
+        // heuristic can see. `lint:erasure` is green either way; only this is
+        // evidence the rule runs.
+        await seedRoleProfiles(db, TENANT_A, new Date(1));
+        await db.insert(schema.inspectionPeople).values({
+            id: 'ip-88', tenantId: TENANT_A, inspectionId: INSP,
+            contactId: 'contact-88', roleProfileId: `crp_${TENANT_A}_client`, createdAt: new Date(),
+        });
+        await db.insert(schema.inspections).values({
+            id: 'insp-88-other', tenantId: TENANT_A, propertyAddress: '3 Oak St',
+            date: '2026-06-03', status: 'completed', paymentStatus: 'unpaid', price: 40000, createdAt: new Date(),
+        });
+        await db.insert(schema.reports).values([
+            {
+                id: 'rep-subject', tenantId: TENANT_A, inspectionId: INSP, kind: 'primary',
+                title: 'Inspection Report', status: 'published', createdAt: new Date(), sortOrder: 0,
+                inspectorNarrative: 'Jane mentioned the roof was replaced in 2019 and that she lives here alone.',
+            },
+            {
+                id: 'rep-other', tenantId: TENANT_A, inspectionId: 'insp-88-other', kind: 'primary',
+                title: 'Inspection Report', status: 'published', createdAt: new Date(), sortOrder: 0,
+                inspectorNarrative: 'Someone else\'s property, someone else\'s narrative.',
+            },
+        ]);
+
+        await run();
+
+        const subject = await db.select().from(schema.reports)
+            .where(eq(schema.reports.id, 'rep-subject')).get();
+        expect(subject, 'the report row must survive — it is the spine of a signed document').toBeDefined();
+        expect(
+            subject?.inspectorNarrative,
+            'the inspector narrative survived the erasure; it is free prose about the subject',
+        ).toBeNull();
+        expect(subject?.title).toBe('Inspection Report (details removed)');
+
+        const other = await db.select().from(schema.reports)
+            .where(eq(schema.reports.id, 'rep-other')).get();
+        expect(other?.inspectorNarrative).toBe('Someone else\'s property, someone else\'s narrative.');
+    });
+
     it('inspection_requests: identity cleared in place (row kept — inspections.request_id references it)', async () => {
         await db.insert(schema.inspectionRequests).values([
             { id: 'ir-subject', tenantId: TENANT_A, clientName: 'Jane Subject', clientEmail: SUBJECT_EMAIL, clientPhone: '555-1111', propertyAddress: '2 Elm St', scheduledAt: new Date(), createdAt: new Date(), updatedAt: new Date() },

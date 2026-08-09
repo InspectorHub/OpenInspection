@@ -288,10 +288,18 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // declaration is enforced by something rather than merely present.
     { table: 'ai_content_reviews', column: 'reviewed_by',
       reason: 'the STAFF user who reviewed model-assisted text before publication — an accountability record of an employee professional act, the same posture as report_signoff.person_id and tenant_legal_versions.published_by_user_id. Staff offboarding lifecycle, not consumer-DSAR scope' },
+    // ⚠️ Both reasons below were written when `artifact_type` had ONE member and
+    // described a second that was never added. `artifact_id` named
+    // `report_versions` — the table the enum comment in `schema/ai.ts` explicitly
+    // REJECTED, because `report_versions.summary` is the amendment reason and not
+    // a narrative — and `artifact_type` called itself two-value while the enum
+    // held one. Corrected in the change that added the real second member,
+    // `report` -> `reports.inspector_narrative`. The classification is unaffected;
+    // what changes is that the reason now names the tables that exist.
     { table: 'ai_content_reviews', column: 'artifact_id',
-      reason: 'opaque primary key of the inspection_results or report_versions row that received the text; that row carries its own rules, the same answer as reports.inspection_id. Holds no part of the reviewed prose' },
+      reason: 'opaque primary key of the inspection_results or reports row that received the text; that row carries its own rules (reports.inspector_narrative has an anonymize rule in erasure-manifest.ts), the same answer as reports.inspection_id. Holds no part of the reviewed prose' },
     { table: 'ai_content_reviews', column: 'artifact_type',
-      reason: 'two-value enum naming WHICH table artifact_id points into — a pointer discriminator, not personal data' },
+      reason: 'two-value enum (inspection_result | report) naming WHICH table artifact_id points into — a pointer discriminator, not personal data' },
     { table: 'ai_content_reviews', column: 'ai_call_id',
       reason: 'pointer to the ai_call_provenance row for the call, itself call metadata with no subject linkage (see the ai_call_provenance block in erasure-manifest.ts)' },
     { table: 'ai_content_reviews', column: 'reviewed_at',

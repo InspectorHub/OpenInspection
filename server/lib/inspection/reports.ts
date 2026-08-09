@@ -111,6 +111,81 @@ export async function createPrimaryReport(
 }
 
 /**
+ * The inspector's report-level narrative, or null when they have not written
+ * one.
+ *
+ * Null and empty string are the SAME answer here and callers must not have to
+ * tell them apart: `setReportNarrative` normalises a blank patch to NULL on the
+ * way in, so a read never returns `''`. Reading a report that does not exist in
+ * this tenant is a 404 rather than a null narrative — "no such report" and "no
+ * narrative yet" are different facts, and collapsing them turns a cross-tenant
+ * probe into a blank textarea.
+ */
+export async function getReportNarrative(
+    db: DrizzleD1Database,
+    tenantId: string,
+    inspectionId: string,
+    reportId: string,
+): Promise<string | null> {
+    const row = await db.select({ narrative: reports.inspectorNarrative }).from(reports)
+        .where(and(
+            eq(reports.id, reportId),
+            eq(reports.tenantId, tenantId),
+            eq(reports.inspectionId, inspectionId),
+        ))
+        .get();
+    if (!row) throw Errors.NotFound('Report not found');
+    return row.narrative ?? null;
+}
+
+/**
+ * Write the inspector's report-level narrative, returning what is now stored.
+ *
+ * ⚠️ THIS COLUMN IS NOT `report_versions.summary` AND MUST NEVER BE WRITTEN
+ * THROUGH ONE ANOTHER. That column is the per-publish amendment REASON; this one
+ * is the inspector's prose about the report. They are independent by design: a
+ * report can carry a narrative and no amendment reason, an amendment reason and
+ * no narrative, or two different texts at once — and publishing an amendment
+ * writes a NEW `report_versions` row and does not touch `reports` at all, so a
+ * narrative survives every publish untouched.
+ *
+ * Blank in, NULL stored. An inspector who selects all and deletes has cleared
+ * the field, and storing `''` would make "cleared" a third state that every
+ * reader would then have to know about.
+ *
+ * ⚠️ WHAT THIS FUNCTION DELIBERATELY DOES NOT DO: check that a model-assisted
+ * draft was reviewed. The narrative carries professional liability, so AI output
+ * may assist it but may never become it without a human review on record — and
+ * that record is an `ai_content_reviews` row (`artifact_type = 'report'`,
+ * `artifact_id` = this report's id), written by the surface that offered the
+ * suggestion, before it lets the text land. A save arriving here is already the
+ * inspector's own text as far as this layer can tell; making the check here
+ * would mean re-deriving intent from a string, which cannot be done.
+ */
+export async function setReportNarrative(
+    db: DrizzleD1Database,
+    tenantId: string,
+    inspectionId: string,
+    reportId: string,
+    narrative: string | null,
+): Promise<string | null> {
+    const row = await db.select({ id: reports.id }).from(reports)
+        .where(and(
+            eq(reports.id, reportId),
+            eq(reports.tenantId, tenantId),
+            eq(reports.inspectionId, inspectionId),
+        ))
+        .get();
+    if (!row) throw Errors.NotFound('Report not found');
+
+    const next = narrative && narrative.trim().length > 0 ? narrative : null;
+    await db.update(reports)
+        .set({ inspectorNarrative: next })
+        .where(and(eq(reports.id, reportId), eq(reports.tenantId, tenantId)));
+    return next;
+}
+
+/**
  * Why a report may not be deleted, or null when it may.
  *
  * ONE function, because whether an actor may do something is decided where it
@@ -148,6 +223,17 @@ export interface ReportListItem {
     versionCount: number;
     /** True when its document has been written into: the "information you already filled out". */
     hasContent: boolean;
+    /**
+     * True when the inspector has written the report-level narrative.
+     *
+     * The FLAG and not the prose. `listReports` already loads the column, so
+     * this costs nothing to compute — but the narrative is unbounded free text
+     * and this is a list payload rendered once per deliverable, which is the
+     * same reason `hasContent` is a boolean rather than the findings map. The
+     * text itself comes from `getReportNarrative` / the per-report narrative
+     * endpoint, which is what an editor opens.
+     */
+    hasNarrative: boolean;
     canDelete: boolean;
     deleteBlockedReason: ReportDeleteBlock | null;
 }
@@ -206,6 +292,7 @@ export async function listReportsForHub(
             publishedAt: safeISODate(r.publishedAt) ?? null,
             versionCount: versionCounts.get(r.id) ?? 0,
             hasContent: written.has(r.id),
+            hasNarrative: (r.inspectorNarrative ?? '').trim().length > 0,
             canDelete: blocked === null,
             deleteBlockedReason: blocked,
         };

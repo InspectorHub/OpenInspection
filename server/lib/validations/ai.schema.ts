@@ -144,8 +144,8 @@ export const AiKeyAttestationSchema = z.object({
  * return null they returned no model output, and there is nothing to review.
  */
 export const AiContentReviewSchema = z.object({
-    artifactType: z.enum(['inspection_result']).openapi({ example: 'inspection_result' })
-        .describe('Which table holds the row that received the text.'),
+    artifactType: z.enum(['inspection_result', 'report']).openapi({ example: 'inspection_result' })
+        .describe("Which table holds the row that received the text: 'inspection_result' for per-item prose (inspection_results.data), 'report' for the inspector's report-level narrative (reports.inspector_narrative)."),
     artifactId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' })
         .describe('Primary key of the row that received the text.'),
     aiCallId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' })
