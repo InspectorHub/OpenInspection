@@ -35,7 +35,7 @@ const RADON: ReportRow = {
     canDelete: false, deleteBlockedReason: "published",
 };
 
-function renderCard(reports: ReportRow[], canManage = true, repairLogHref: string | null = null) {
+function renderCard(reports: ReportRow[], canManage = true) {
     const calls: Record<string, string>[] = [];
     const Stub = createRoutesStub([
         {
@@ -45,7 +45,6 @@ function renderCard(reports: ReportRow[], canManage = true, repairLogHref: strin
                     reports={reports}
                     canManage={canManage}
                     formatDate={(iso) => `on ${iso.slice(0, 10)}`}
-                    repairLogHref={repairLogHref}
                 />
             ),
             action: async ({ request }) => {
@@ -131,30 +130,5 @@ describe("ReportsCard", () => {
         renderCard([]);
         expect(screen.queryByTestId("hub-reports-list")).toBeNull();
         expect(screen.getByText(/No reports on this order yet/)).toBeTruthy();
-    });
-});
-
-/**
- * #69 — the card is the inspection record's entry point to the Repair Request
- * Log, and the ONLY place a staff user can reach it.
- *
- * `repairLogHref` is null until the ORDER's report is published, decided by the
- * route (this card knows only each deliverable's own `publishedAt`, which is a
- * different question). These two cases pin the halves of that contract from the
- * card's side: given a href it offers the link, given null it offers nothing —
- * not a disabled control, which would invite a click that cannot work.
- */
-describe("ReportsCard — Repair Request Log entry point (#69)", () => {
-    it("offers the log once the route says the order is published", () => {
-        renderCard([RADON], true, "/inspections/insp1/repair-requests");
-        const link = screen.getByTestId("hub-repair-log-link");
-        expect(link.getAttribute("href")).toBe("/inspections/insp1/repair-requests");
-    });
-
-    it("offers nothing at all while the order is unpublished", () => {
-        // Not a disabled button: before publication no repair list can exist,
-        // so the page behind it could only explain why it is empty.
-        renderCard([PRIMARY], true, null);
-        expect(screen.queryByTestId("hub-repair-log-link")).toBeNull();
     });
 });

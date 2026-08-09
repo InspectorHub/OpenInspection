@@ -16,7 +16,7 @@ import {
 import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "../../server/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { PageHeader, Card, Pill, Button, Modal } from "@core/shared-ui";
+import { PageHeader, Card, Pill, Button, Modal, buttonClasses } from "@core/shared-ui";
 import DocumentsSection, {
   type DocumentItem,
   type DocumentCategory,
@@ -858,7 +858,6 @@ export default function InspectionHubPage() {
           reports={hub.reports ?? []}
           canManage={isAdmin}
           formatDate={(iso) => formatInspectionDateTime(iso, undefined, displayTz, fmt)}
-          repairLogHref={reportShipped ? `/inspections/${inspection.id}/repair-requests` : null}
         />
 
         {/* 4. Signing requests — the paperwork the visit needs -------- */}
@@ -948,6 +947,18 @@ export default function InspectionHubPage() {
                     {m.inspections_hub_report_send_sms()}
                   </Button>
                 )}
+                {/* #69 — HERE, on the singular REPORT card, not on the plural
+                    REPORTS card. An order can have a published report and an
+                    EMPTY deliverables list, and the log then sat under the
+                    words "No reports on this order yet". This block is already
+                    inside `reportShipped`, which is the log's own precondition. */}
+                <Link
+                  to={`/inspections/${inspection.id}/repair-requests`}
+                  data-testid="hub-repair-log-link"
+                  className={buttonClasses({ variant: "secondary", size: "sm" })}
+                >
+                  {m.inspections_hub_report_repair_log()}
+                </Link>
                 {reportActionList.includes('unpublish') && (
                   <unpublishReport.Form method="post">
                     <input type="hidden" name="intent" value="unpublish" />
