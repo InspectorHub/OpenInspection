@@ -5,6 +5,7 @@ import { useCommentTypeahead } from "../../hooks/useCommentTypeahead";
 import {
   flattenItemTabs, fragmentBeforeCaret, replaceFragmentBeforeCaret,
 } from "../../lib/comment-typeahead";
+import { AiAssistPanel } from "./AiAssistPanel";
 import { CloneLastButton } from "./CloneLastButton";
 import type { DefectFieldsValue } from "./DefectFieldsRow";
 import { ItemAttributesPanel } from "./ItemAttributesPanel";
@@ -142,6 +143,10 @@ interface ItemEditorProps {
  videoPosterUrl?: (streamUid: string, posterPct?: number) => string | null;
  /** #181 PR-G — resolve the local blob URL for a pending (offline) photo entry. */
  pendingPhotoUrl?: (pendingId: string) => string | undefined;
+ /** #61 — `inspection_results.id`, the artifact an AI content-review row cites.
+  *  Absent/null ⇒ the AI writing-assistance affordance is not offered at all,
+  *  because a review recorded against no artifact is not evidence of anything. */
+ resultId?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -190,6 +195,7 @@ export function ItemEditor({
  onBulkMovePhotos,
  videoPosterUrl,
  pendingPhotoUrl,
+ resultId,
 }: ItemEditorProps) {
  const [activeTab, setActiveTab] = useState<CannedTabId>("information");
  const [defectQuery, setDefectQuery] = useState("");
@@ -514,6 +520,24 @@ export function ItemEditor({
   onClose={() => setTaOpen(false)}
  />
  </div>
+ {/* #61 — sits BELOW the textarea on purpose: the model's draft and the
+     inspector's own words stay visible at the same time, and the draft only
+     becomes the note once the review is on file.
+
+     Mounted only when there IS an artifact. The panel refuses on a null
+     `resultId` too (that is its own invariant, and where the spec pins it);
+     this outer check is about not mounting a router-subscribed component
+     with nothing to offer — `AiAssistPanel` calls `useFetcher`, which throws
+     outside a data router, and several ItemEditor specs render this tree
+     bare on purpose. */}
+ {resultId && (
+  <AiAssistPanel
+   notes={(result.notes as string) || ""}
+   context={`${sectionTitle} — ${item.label}`}
+   resultId={resultId}
+   onAccept={(text) => { onNotes(text); onNotesBlur(text); }}
+  />
+ )}
  {tagChipRow}
  </div>
 

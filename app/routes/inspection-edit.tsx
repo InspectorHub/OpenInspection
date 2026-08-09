@@ -1487,6 +1487,8 @@ export default function InspectionEditPage() {
  <ItemEditor
  item={state.activeItem || undefined}
  sectionTitle={state.currentSection?.title}
+ /* #61 — the artifact an AI content-review row cites. */
+ resultId={loaderData.resultId}
  result={
  state.activeItemId
  ? findings.getResult(

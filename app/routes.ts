@@ -84,6 +84,10 @@ export default [
   route("ui", "routes/docs.tsx"),
   // BFF resource routes (no UI) — Token-Relay endpoints for editor hooks
   // (Track H / C-12: client code never fetches /api directly).
+  // #61 — AI writing assistance on an inspection note, and the record that a
+  // person reviewed the result before it became one. The API endpoints predate
+  // this route by a long way and had no caller in `app/` at all.
+  route("resources/ai-assist", "routes/resources/ai-assist.tsx"),
   route("resources/comments-library", "routes/resources/comments-library.tsx"),
   route("resources/defect-categories", "routes/resources/defect-categories.tsx"),
   route("resources/repair-items", "routes/resources/repair-items.tsx"),

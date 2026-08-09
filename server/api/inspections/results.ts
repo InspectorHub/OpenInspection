@@ -154,7 +154,22 @@ const getResultsRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ results: z.record(z.string(), z.unknown()).describe('TODO describe results field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({
+                        results: z.record(z.string(), z.unknown()).describe('TODO describe results field for the OpenInspection MCP integration'),
+                        // The `inspection_results` PRIMARY KEY, which the map itself
+                        // does not carry. An `ai_content_reviews` row cites the row
+                        // that received model-assisted text, and the editor is where
+                        // that text lands — without the id here the review surface
+                        // has no artifact to name, and a review that cannot name its
+                        // artifact is not evidence of anything.
+                        //
+                        // Nullable only for inspections that predate the "every
+                        // inspection starts with a results row" invariant in
+                        // `inspection-core.service.ts`. Null means the AI review
+                        // surface fails CLOSED rather than recording against a
+                        // guessed id.
+                        resultId: z.string().nullable().describe('Primary key of the inspection_results row backing this map, or null for legacy inspections that have none yet.'),
+                    })),
                 },
             },
             description: 'Success',
@@ -363,7 +378,7 @@ const resultsRoutes = createApiRouter()
         // Phase U — read-slice to one scope's findings when requested; no scope
         // ⇒ full map, unchanged. Write model (Yjs/DO) is untouched.
         const sliced = scope ? findingsForUnit(data, scope) : data;
-        return c.json({ success: true, data: { results: sliced } }, 200);
+        return c.json({ success: true, data: { results: sliced, resultId: results?.id ?? null } }, 200);
     })
     .openapi(updateTemplateSnapshotRoute, async (c) => {
         const { id } = c.req.valid('param');
