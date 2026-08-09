@@ -86,9 +86,11 @@ export const inspectionsRoutes = createApiRouter()
     // since every path is per-inspection. Visibility is query scoping inside
     // the handler, not a capability: an inspector reads only their own row.
     .route('/', paySplitRoutes)
-    // /:id/cancel + /:id/cancellation-quote. Split out of publish.ts: the
-    // report lifecycle and the money a cancellation moves are different
-    // concerns, and that file was at its size ceiling.
+    // /:id/cancellation-quote + /:id/cancel + /:id/uncancel — the cancellation
+    // axis in both directions. Split out of publish.ts: the report lifecycle
+    // and the cancellation state (plus the money it moves) are different
+    // concerns, and that file was at its size ceiling. Order-independent, as
+    // above: all three paths are unique and end in a static segment.
     .route('/', cancellationRoutes)
     // #69 — GET /:id/repair-requests, the Repair Request Log. The lists it
     // reads are WRITTEN through /api/public/repair-builder, which authenticates

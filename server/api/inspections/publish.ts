@@ -1,9 +1,10 @@
-// Report lifecycle sub-router: complete, publish-readiness gate, confirm /
-// cancel / uncancel, publish, re-inspection create + candidates, the report
-// review state machine (submit / return / unpublish), and the PDF render
-// pipeline (refresh + download). The read/delivery side (report-data, repair
-// list, recipients, people, hub, send-pdf, agent share) lives in
-// ./report-delivery.ts; the agreement signing envelope lives in ./agreements.ts.
+// Report lifecycle sub-router: complete, publish-readiness gate, confirm,
+// publish, re-inspection create + candidates, the report review state machine
+// (submit / return / unpublish), and the PDF render pipeline (refresh +
+// download). The read/delivery side (report-data, repair list, recipients,
+// people, hub, send-pdf, agent share) lives in ./report-delivery.ts; the
+// agreement signing envelope lives in ./agreements.ts; the cancellation axis in
+// both directions (cancel / uncancel / quote) lives in ./cancellation.ts.
 // Behavior-preserving extraction from inspections.ts — handler bodies + route
 // definitions are byte-identical to the original (only their location changed).
 import { createRoute, z } from '@hono/zod-openapi';
@@ -20,7 +21,6 @@ import { inspections as inspectionTable } from '../../lib/db/schema';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation } from '../../services/inspection/shared';
-import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
 import { refuseLeaveCancelledViaStatusWrite } from './cancel-write-path';
 import { eq, and } from 'drizzle-orm';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
@@ -352,47 +352,10 @@ const publishRoutes = createApiRouter()
         await c.var.services.inspection.confirmInspection(tenantId, id);
         return c.json({ success: true });
     })
-    // POST /{id}/cancel MOVED to ./cancellation.ts, which owns the whole
-    // cancellation surface: the quote, the fee acknowledgement, and the refund.
-    //
-    // THE ONE DOOR BACK (#81). This endpoint shipped complete and unwired: the
-    // product's only recovery was the list row's status dropdown, PATCHing a new
-    // status straight on. Two doors for one idea, disagreeing — the PATCH
-    // audited the change and re-pushed Google Calendar, this did neither; the
-    // bulk door cleared nothing at all. Rather than adopt the weaker of them,
-    // the two things this was missing moved HERE and the others now refuse
-    // (./cancel-write-path).
-    //
-    // ROLE MATCHES `POST /:id/cancel`, deliberately widened from owner+manager.
-    // An inspector standing at a door nobody answered may cancel; a stricter
-    // gate on the way back would make their own mis-click the one thing they
-    // cannot undo.
-    .openapi(createRoute(withMcpMetadata({
-        method: 'post', path: '/{id}/uncancel',
-        tags: ["inspections"], summary: "Bring a cancelled inspection back to scheduled",
-        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        request: { params: z.object({ id: z.string().describe('The cancelled inspection to bring back.') }).describe('Path parameters.') },
-        responses: {
-            200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('Recovered.') } }, description: 'Uncancelled' },
-            400: { description: 'The inspection is not cancelled, so there is nothing to recover.' },
-        },
-        operationId: "createInspectionUncancel",
-        description: "Returns a mistakenly-cancelled inspection to `scheduled`, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        await c.var.services.inspection.uncancelInspection(tenantId, id);
-
-        // Both of these are what the dropdown's PATCH did and this did not.
-        // The calendar entry was REMOVED by the cancel — pushInspectionToGoogle
-        // re-reads the row and puts it back, same call, no case analysis here.
-        pushInspectionAfterResponse(c, tenantId, id);
-        auditFromContext(c, 'inspection.status_change', 'inspection', {
-            entityId: id,
-            metadata: { from: INSPECTION_STATUS.CANCELLED, to: INSPECTION_STATUS.SCHEDULED },
-        });
-        return c.json({ success: true });
-    })
+    // POST /{id}/cancel AND POST /{id}/uncancel both live in ./cancellation.ts,
+    // which owns the cancellation axis in both directions: the quote, the fee
+    // acknowledgement, the refund, and the one door back (#81). Neither is a
+    // report-lifecycle event, which is what this file is for.
     .openapi(publishRoute, async (c) => {
         const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');
