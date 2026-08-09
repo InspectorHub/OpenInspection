@@ -1292,6 +1292,24 @@
     "description": "Auto-generated placeholder for createAiCommentEdit (POST /comment/edit, ai domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "createAiContentReview",
+    "method": "POST",
+    "pathTemplate": "/api/ai/reviews",
+    "scopes": [
+      "write"
+    ],
+    "tag": "ai",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/AiContentReviewRequest"
+      }
+    },
+    "summary": "Record a human review of AI-assisted content",
+    "description": "Record that a named user reviewed the output of one AI call attached to one artifact. Idempotent on (person, artifact, call): a retry is a no-op, and a second REVIEWER is a second row rather than a duplicate."
+  },
+  {
     "operationId": "createAiSuggestComment",
     "method": "POST",
     "pathTemplate": "/api/ai/suggest-comment",

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /**
  * AI call provenance — one row per prompt this deployment sends to a model
@@ -138,6 +138,26 @@ export const aiContentReviews = sqliteTable('ai_content_reviews', {
         .on(t.tenantId, t.artifactType, t.artifactId),
     /** The reverse walk: every review citing one AI call. */
     byAiCall: index('idx_ai_content_reviews_ai_call').on(t.aiCallId),
+    /**
+     * One review per (person, artifact, AI call) — which makes the write
+     * NATURALLY IDEMPOTENT, and that is the point rather than a side effect.
+     *
+     * The same person confirming the same output twice is not two facts, so a
+     * retried request must land as a no-op instead of a second row. The writer
+     * pairs this with `ON CONFLICT DO NOTHING`; without the index that clause
+     * has nothing to conflict on and the retry silently duplicates.
+     *
+     * ⚠️ `reviewed_by` is IN the key on purpose. Two people reviewing the same
+     * output IS two facts — a second reviewer is exactly the evidence a
+     * four-eyes policy would want — so the key must not collapse them.
+     *
+     * ⚠️ Unconditional unique is safe here only because all five columns are
+     * NOT NULL. SQLite treats NULLs as distinct, so the moment any member of
+     * this key becomes nullable this index stops constraining those rows and
+     * says nothing about it.
+     */
+    oneReviewPerPersonPerCall: uniqueIndex('uq_ai_content_reviews_person_call')
+        .on(t.tenantId, t.artifactType, t.artifactId, t.aiCallId, t.reviewedBy),
 }));
 
 export type AiContentReview = typeof aiContentReviews.$inferSelect;

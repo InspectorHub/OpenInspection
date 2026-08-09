@@ -133,3 +133,34 @@ export const AiKeyAttestationSchema = z.object({
     understandsProviderProcessing: z.boolean().openapi({ example: true })
         .describe('They understand inspection content is processed by that provider.'),
 }).openapi('AiKeyAttestation');
+
+/**
+ * Input for recording that a person reviewed model-assisted text (#61).
+ *
+ * `aiCallId` is REQUIRED and there is no "unknown" arm. A review that cannot
+ * name the call it reviewed is not evidence of anything — it would assert that
+ * someone looked at something, with no way to establish what. The four AI
+ * responses carry the id precisely so this field can be filled; where they
+ * return null they returned no model output, and there is nothing to review.
+ */
+export const AiContentReviewSchema = z.object({
+    artifactType: z.enum(['inspection_result']).openapi({ example: 'inspection_result' })
+        .describe('Which table holds the row that received the text.'),
+    artifactId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' })
+        .describe('Primary key of the row that received the text.'),
+    aiCallId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' })
+        .describe('The ai_call_provenance row id this review is about.'),
+}).openapi('AiContentReviewRequest');
+
+/**
+ * Response for a recorded review.
+ *
+ * Deliberately says nothing about whether a row was INSERTED. The write is
+ * idempotent on (person, artifact, call), so a retry is a no-op — and a caller
+ * that could tell an insert from a no-op would eventually branch on it, which
+ * is exactly the distinction the idempotency is there to erase.
+ */
+export const AiContentReviewResponseSchema = createApiResponseSchema(z.object({
+    reviewed: z.literal(true).openapi({ example: true })
+        .describe('The review is on file. True for both a fresh record and a retry.'),
+})).openapi('AiContentReviewResponse');

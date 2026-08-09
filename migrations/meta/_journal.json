@@ -379,6 +379,13 @@
       "when": 1786202265112,
       "tag": "0053_curved_elektra",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1786243406649,
+      "tag": "0054_smart_zodiak",
+      "breakpoints": true
     }
   ]
 }
