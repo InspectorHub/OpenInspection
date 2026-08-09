@@ -198,7 +198,19 @@ const aiRoutes = createApiRouter()
         return c.json({ success: true, data }, 200);
     })
     .openapi(suggestCommentRoute, async (c) => {
-        const params = c.req.valid('json');
+        const input = c.req.valid('json');
+        // Same strip as rewriteComment above. `SuggestCommentPromptArgs` declares
+        // rating/yearBuilt/sqft as ABSENT-able, and the prompt renderer tests them
+        // for truthiness — so an omitted field and an explicitly-undefined one
+        // produce the identical prompt. Build the argument without the keys the
+        // caller did not send rather than widening the prompt contract.
+        const params = {
+            itemName:    input.itemName,
+            sectionName: input.sectionName,
+            ...(input.rating    !== undefined ? { rating:    input.rating }    : {}),
+            ...(input.yearBuilt !== undefined ? { yearBuilt: input.yearBuilt } : {}),
+            ...(input.sqft      !== undefined ? { sqft:      input.sqft }      : {}),
+        };
         const data = await c.var.services.ai.suggestComment(params);
         return c.json({ success: true, data });
     })

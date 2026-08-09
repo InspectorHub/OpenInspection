@@ -8,6 +8,7 @@ import {
     CreateServiceSchema, UpdateServiceSchema, ServiceResponseSchema,
     ServiceListResponseSchema, CreateDiscountCodeSchema, UpdateDiscountCodeSchema,
     ValidateDiscountSchema, ValidateDiscountResponseSchema,
+    DiscountCodeListResponseSchema, DiscountCodeResponseSchema,
     ServiceInspectorListResponseSchema, SetServiceInspectorsSchema, SetServiceInspectorsResponseSchema,
     CreatePayRuleSchema, UpdatePayRuleSchema, PayRuleResponseSchema, PayRuleListResponseSchema,
 } from '../lib/validations/service.schema';
@@ -66,7 +67,7 @@ export const servicesRoutes = createApiRouter()
         method: 'get', path: '/discount-codes',
         tags: ["services"], summary: "List service discount codes",
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' } },
+        responses: { 200: { content: { 'application/json': { schema: DiscountCodeListResponseSchema } }, description: 'OK' } },
         operationId: "listServiceDiscountCodes",
         description: "Auto-generated placeholder for listServiceDiscountCodes (GET /discount-codes, services domain). TODO: replace with a real description sourced from the handler."
     }, { scopes: ['read'], tier: 'extended' })), async (c) => {
@@ -83,7 +84,7 @@ export const servicesRoutes = createApiRouter()
             params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
             body: { content: { 'application/json': { schema: UpdateDiscountCodeSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
         },
-        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Updated' } },
+        responses: { 200: { content: { 'application/json': { schema: DiscountCodeResponseSchema } }, description: 'Updated' } },
         operationId: "updateServiceDiscountCode",
         description: "Auto-generated placeholder for updateServiceDiscountCode (PUT /discount-codes/{id}, services domain). TODO: replace with a real description sourced from the handler."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {

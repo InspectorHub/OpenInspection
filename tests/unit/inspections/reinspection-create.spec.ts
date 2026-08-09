@@ -136,6 +136,29 @@ describe('InspectionService.createReinspection (#119)', () => {
         expect(r2.reinspectionRound).toBe(2);
     });
 
+    // The round the endpoint reports is `createReinspection`'s return value, and
+    // POST /{id}/reinspect used to hedge it with `?? 1` because the declared
+    // return type (`Promise<Inspection>`) did not carry the field at all. Print
+    // the two numbers that must be equal side by side: what the service returned,
+    // and what is actually in `inspections.reinspection_round`. A default that
+    // ever fires shows up here as 1 next to 3.
+    it('a third round reports 3, and the returned round is exactly the persisted column', async () => {
+        const r1 = await svc.createReinspection(TENANT, ORIGINAL, { selectedItemIds: ['item-a'], inspectorId: 'user-a' });
+        await reportVersionSvc.snapshotOnPublish(TENANT, r1.id, 'user-a');
+        const r2 = await svc.createReinspection(TENANT, r1.id, { selectedItemIds: ['item-a'], inspectorId: 'user-a' });
+        await reportVersionSvc.snapshotOnPublish(TENANT, r2.id, 'user-a');
+        const r3 = await svc.createReinspection(TENANT, r2.id, { selectedItemIds: ['item-a'], inspectorId: 'user-a' });
+
+        expect([r1.reinspectionRound, r2.reinspectionRound, r3.reinspectionRound]).toEqual([1, 2, 3]);
+        expect(r3.rootInspectionId).toBe(ORIGINAL);
+
+        for (const r of [r1, r2, r3]) {
+            const persisted = await testDb.select().from(schema.inspections)
+                .where(schema_eq(schema.inspections.id, r.id)).get();
+            expect(persisted?.reinspectionRound).toBe(r.reinspectionRound);
+        }
+    });
+
     it('rejects creating a re-inspection from an unpublished baseline', async () => {
         await expect(svc.createReinspection(TENANT, DRAFT, { selectedItemIds: ['x'], inspectorId: 'user-a' }))
             .rejects.toThrow(/published/i);

@@ -105,10 +105,19 @@ describe('InspectionAnalyticsService.getDashboardBuckets — agent attribution v
         expect(row!.agentName).toBe('Bob Buyer');
     });
 
-    it('leaves agentName undefined when no inspection_people agent row exists', async () => {
+    it('reports agentName as null — key PRESENT — when no inspection_people agent row exists', async () => {
         const buckets = await svc.getDashboardBuckets(TENANT);
         const row = buckets.today.find(r => r.id === INSP_NONE);
         expect(row).toBeDefined();
-        expect(row!.agentName).toBeUndefined();
+        // The key must EXIST. It used to be omitted via a conditional spread,
+        // which makes it an OPTIONAL property in the type — and an optional
+        // property cannot be assigned to the `JSONValue` index signature that
+        // `InspectionListItemSchema.passthrough()` produces, because `JSONValue`
+        // has no way to spell "may be absent". That is what stopped /dashboard
+        // from being typed against its own response schema. Asserting the value
+        // alone would not catch a regression back to omission: `undefined` and
+        // "absent" both read as undefined.
+        expect(Object.hasOwn(row!, 'agentName'), 'agentName key was omitted, not set to null').toBe(true);
+        expect(row!.agentName).toBeNull();
     });
 });

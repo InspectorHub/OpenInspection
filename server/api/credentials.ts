@@ -111,19 +111,37 @@ const credentialsRoutes = createApiRouter()
     return c.json({ success: true as const, data: rows.map(toDto) }, 200);
   })
   .openapi(createRouteDef, async (c) => {
-    const input = c.req.valid('json');
+    const { label, memberNumber, sortOrder } = c.req.valid('json');
     const tenantId = c.get('tenantId') as string;
     const userId = c.get('user').sub;
-    const row = await c.var.services.credentials.create(tenantId, userId, input);
+    // Zod `.optional()` produces `T | undefined`, which an omitted-key parameter
+    // (`memberNumber?: string | null`) refuses under exactOptionalPropertyTypes.
+    // Spread only the keys the caller actually sent, so "absent" stays absent
+    // instead of arriving as an explicit `undefined` — the service writes any
+    // key that is not `undefined`, so the two are not interchangeable.
+    const row = await c.var.services.credentials.create(tenantId, userId, {
+      label,
+      ...(memberNumber !== undefined ? { memberNumber } : {}),
+      ...(sortOrder !== undefined ? { sortOrder } : {}),
+    });
     auditFromContext(c, 'credential.created', 'credential', { entityId: row.id });
     return c.json({ success: true as const, data: toDto(row) }, 200);
   })
   .openapi(updateRouteDef, async (c) => {
     const { id } = c.req.valid('param');
-    const patch = c.req.valid('json');
+    const { label, memberNumber, sortOrder } = c.req.valid('json');
     const tenantId = c.get('tenantId') as string;
     const userId = c.get('user').sub;
-    const row = await c.var.services.credentials.update(id, tenantId, userId, patch);
+    // Same conditional spread as create() above, and load-bearing here: the
+    // PATCH contract is "carry exactly the fields the caller sent" (see the
+    // comment on UpdateCredentialSchema), and the service branches on
+    // `!== undefined`. Passing an explicit `undefined` key would be a no-op
+    // today but is the shape that reintroduced the silent field-blanking bug.
+    const row = await c.var.services.credentials.update(id, tenantId, userId, {
+      ...(label !== undefined ? { label } : {}),
+      ...(memberNumber !== undefined ? { memberNumber } : {}),
+      ...(sortOrder !== undefined ? { sortOrder } : {}),
+    });
     auditFromContext(c, 'credential.updated', 'credential', { entityId: id });
     return c.json({ success: true as const, data: toDto(row) }, 200);
   })

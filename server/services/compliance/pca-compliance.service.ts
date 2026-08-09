@@ -6,6 +6,8 @@ import { SigningKeyService, base64UrlEncode, base64UrlDecode } from '../signing-
 import { buildAttestationPayload } from '../../lib/pca-attestation';
 import { DOCUMENT_REVIEW_CATALOG } from '../../lib/pca-document-catalog';
 import { logger } from '../../lib/logger';
+import type { z } from '@hono/zod-openapi';
+import type { DocReviewPatchSchema } from '../../lib/validations/compliance.schema';
 
 type SignoffRole = 'field_observer' | 'pcr_reviewer';
 
@@ -18,13 +20,15 @@ type SignoffInput = {
     dualRole: boolean;
 };
 
-type DocumentReviewPatch = {
-    requested?: boolean;
-    received?: boolean;
-    reviewed?: boolean;
-    na?: boolean;
-    notes?: string | null;
-};
+/**
+ * The PATCH body, taken from the published request schema rather than restated.
+ * Zod's `.optional()` yields `T | undefined`, so the hand-written twin of this
+ * type refused the very value the route hands it — and the two could drift on
+ * the next field either way. Drizzle's `.set()` drops undefined entries, so an
+ * omitted key and an explicitly-undefined one leave the column unchanged
+ * identically; there is nothing for the callee to distinguish.
+ */
+type DocumentReviewPatch = z.infer<typeof DocReviewPatchSchema>;
 
 /**
  * Commercial PCA Phase M — ASTM compliance artifacts. Sign-off reuses the

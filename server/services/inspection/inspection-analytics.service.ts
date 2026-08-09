@@ -658,11 +658,14 @@ export class InspectionAnalyticsService extends InspectionSubService {
 
         const decorate = <T extends { id: unknown; status?: unknown; inspectorId?: unknown; price?: unknown; requestId?: unknown }>(rows: T[]): Array<T & {
             defectStats:    DefectCounts;
-            agentName?:     string;
-            inspectorName?: string;
+            // These four are ALWAYS PRESENT, null when they do not apply — NOT
+            // optional. Why that is load-bearing rather than a style choice is
+            // written on `InspectionListItemSchema` in validations/inspection/read.ts.
+            agentName:      string | null;
+            inspectorName:  string | null;
             statusFlags:    { reportPublished: boolean; reportReady: boolean; agreementSigned: boolean; paid: boolean; sent: boolean; flagged: boolean; canceled: boolean };
-            requestId?:     string;
-            siblingCount?:  number;
+            requestId:      string | null;
+            siblingCount:   number | null;
         }> =>
             rows.map(r => {
                 const id = r.id as string;
@@ -686,8 +689,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
                         inspectionPriceCents: (r.price as number | null) ?? null,
                     }),
                     defectStats: statsMap.get(id) ?? zeroCounts(),
-                    ...(agentName ? { agentName } : {}),
-                    ...(inspectorName ? { inspectorName } : {}),
+                    agentName:     agentName ?? null,
+                    inspectorName: inspectorName ?? null,
                     statusFlags: {
                         reportPublished: reportReady,
                         reportReady,
@@ -697,7 +700,9 @@ export class InspectionAnalyticsService extends InspectionSubService {
                         flagged:         overdueSet.has(id),
                         canceled:        r.status === INSPECTION_STATUS.CANCELLED,
                     },
-                    ...(reqId ? { requestId: reqId, siblingCount } : {}),
+                    // null, not 1: an inspection in no request has no sibling group.
+                    requestId:    reqId ?? null,
+                    siblingCount: reqId ? siblingCount : null,
                 };
             });
 

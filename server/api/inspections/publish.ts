@@ -463,7 +463,7 @@ const publishRoutes = createApiRouter()
                 selectedItemIds: body.selectedItemIds,
                 inspectorId: body.inspectorId,
             });
-            return c.json({ success: true, data: { id: created.id, reinspectionRound: created.reinspectionRound ?? 1 } }, 200);
+            return c.json({ success: true, data: { id: created.id, reinspectionRound: created.reinspectionRound } }, 200);
         } catch (err) {
             return c.json({ success: false, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to create re-inspection' } }, 400);
         }

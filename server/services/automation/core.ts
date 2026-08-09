@@ -136,13 +136,26 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
             return { ...rest, channels: this.parseChannels(channels) };
         }
 
+        /**
+         * `channels` is typed `AutomationChannel[]`, derived from the column, not a
+         * hand-written `('email' | 'sms')[]`: `in_app` (B1) is a first-class channel
+         * and the literal pair silently excluded it. Every optional property spells
+         * `| undefined` because the API layer hands us Zod `.optional()` output,
+         * where an absent key IS `T | undefined`; the body already normalizes both
+         * (`?? null`, truthiness) so accepting it is a statement of fact, not a
+         * loosening. Without it, exactOptionalPropertyTypes rejects the caller.
+         */
         async create(tenantId: string, data: {
             name: string; trigger: string;
-            recipientKind: RecipientKind; recipientRoleProfileId?: string | null;
+            recipientKind: RecipientKind; recipientRoleProfileId?: string | null | undefined;
             delayMinutes: number;
-            conditions?: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
-            channels?: ('email' | 'sms')[];
-            emailTemplateId?: string | null; smsTemplateId?: string | null;
+            conditions?: {
+                requirePaid?: boolean | undefined;
+                requireSigned?: boolean | undefined;
+                serviceIds?: string[] | undefined;
+            } | null | undefined;
+            channels?: AutomationChannel[] | undefined;
+            emailTemplateId?: string | null | undefined; smsTemplateId?: string | null | undefined;
         }) {
             const db = this.getDrizzle();
             const id = nanoid();

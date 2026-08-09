@@ -25,20 +25,31 @@ import type { Severity } from '../lib/validations/rating-system.schema';
 export interface Recommendation {
     id: string; tenantId: string; category: string | null; name: string;
     severity: Severity;
-    defaultRepairSummary: string; createdByUserId: string | null; createdAt: number | null;
+    defaultRepairSummary: string; createdByUserId: string | null;
+    /** Epoch MILLISECONDS. `comments.created_at` is NOT NULL, so this is never null. */
+    createdAt: number;
     recommendedContractorTypeId: string | null;
 }
+// Every optional key spells `| undefined` explicitly. These inputs are handed a
+// Zod-parsed request body, and `.optional()` infers `T | undefined`, which
+// `exactOptionalPropertyTypes` refuses to assign to a plain `k?: T`.
 export interface CreateRecommendationInput {
-    category?: string | null; name: string;
+    category?: string | null | undefined; name: string;
     severity: Severity;
-    defaultRepairSummary: string; createdByUserId?: string | null;
-    recommendedContractorTypeId?: string | null;
+    defaultRepairSummary: string; createdByUserId?: string | null | undefined;
+    recommendedContractorTypeId?: string | null | undefined;
 }
-export type UpdateRecommendationInput = Partial<CreateRecommendationInput>;
+export type UpdateRecommendationInput = {
+    [K in keyof CreateRecommendationInput]?: CreateRecommendationInput[K] | undefined;
+};
 
 type CommentRow = typeof comments.$inferSelect;
 function toRec(c: CommentRow): Recommendation {
-    const createdAt = c.createdAt as Date | number | null;
+    // Drizzle types the column `Date`, but D1 hands back a raw epoch-ms integer
+    // on some read paths, so accept both and normalise to milliseconds. NOT
+    // safeISODate/safeTimestamp: both read a bare number as SECONDS, and this
+    // column is milliseconds — running it through them shifts the year by ~1900.
+    const createdAt = c.createdAt as Date | number;
     return {
         id: c.id, tenantId: c.tenantId, category: c.category ?? null,
         name: c.text,
@@ -46,7 +57,7 @@ function toRec(c: CommentRow): Recommendation {
         defaultRepairSummary: c.repairSummary ?? '',
         recommendedContractorTypeId: c.recommendedContractorTypeId ?? null,
         createdByUserId: null,
-        createdAt: createdAt instanceof Date ? createdAt.getTime() : (createdAt ?? null),
+        createdAt: createdAt instanceof Date ? createdAt.getTime() : createdAt,
     };
 }
 

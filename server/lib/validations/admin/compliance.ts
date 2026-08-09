@@ -135,7 +135,18 @@ export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
         name: z.string().nullable().describe("The member's display name; null when never set (renders as 'Unnamed')."),
         email: z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
         role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
-        permissionOverrides: z.record(z.string(), z.boolean()).nullable().optional()
+        // Named bits, not `z.record(z.string(), z.boolean())`. The column holds a
+        // SPARSE map (`PermissionOverrides` = `Partial<CapabilitySet>`), so a
+        // record-of-required-booleans described a payload the server never sends
+        // and left the toggle names undiscoverable in the OpenAPI document. The
+        // set mirrors TOGGLEABLE in server/lib/auth/capabilities.ts.
+        permissionOverrides: z.object({
+            publish: z.boolean().optional(),
+            scheduleOthers: z.boolean().optional(),
+            financial: z.boolean().optional(),
+            manageContacts: z.boolean().optional(),
+            viewCommunication: z.boolean().optional(),
+        }).nullable().optional()
             .describe("Capability toggles that differ from this member's role template, or null when they match it exactly."),
         createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
     })).describe('TODO describe members field for the OpenInspection MCP integration'),

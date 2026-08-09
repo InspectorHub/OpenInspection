@@ -22,6 +22,29 @@ import { findScheduleConflicts } from '../../lib/schedule-conflicts';
 import { eq, inArray, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
+import { safeISODate } from '../../lib/date';
+
+/**
+ * `getDashboardBuckets` hands back raw `inspections` rows, whose `created_at` /
+ * `confirmed_at` are `timestamp_ms` columns — drizzle materialises them as `Date`
+ * instances. `DashboardResponseSchema` says those two fields are ISO strings, and
+ * the schema is the one telling the truth: it is the published OpenAPI/MCP
+ * contract, `app/lib/dashboard-schema.ts` declares `confirmedAt?: string | null`,
+ * and JSON has no Date — `JSON.stringify` was already emitting exactly
+ * `Date#toISOString()` on the wire. So the handler was the wrong side: it fed
+ * `c.json()` a value the response type never described.
+ *
+ * Serialising here (per the D1 date-safety rule in CLAUDE.md) is byte-identical
+ * on the wire — `safeISODate(Date)` IS `toISOString()`. `null` is passed through
+ * rather than run through `safeISODate`, which would turn it into `''` and
+ * genuinely change the payload.
+ */
+const toWireDates = <T extends { createdAt: Date; confirmedAt: Date | null }>(rows: T[]) =>
+    rows.map((row) => ({
+        ...row,
+        createdAt:   safeISODate(row.createdAt),
+        confirmedAt: row.confirmedAt === null ? null : safeISODate(row.confirmedAt),
+    }));
 
 // --- GET /api/inspections/dashboard — Spec 3A ---
 const dashboardRoute = createRoute(withMcpMetadata({
@@ -210,7 +233,19 @@ const bulkRoutes = createApiRouter()
                 error: err instanceof Error ? err.message : String(err),
             });
         }
-        return c.json({ success: true, data: { ...buckets, conciergePending } });
+        return c.json({
+            success: true,
+            data: {
+                ...buckets,
+                needsAttention: toWireDates(buckets.needsAttention),
+                today:          toWireDates(buckets.today),
+                thisWeek:       toWireDates(buckets.thisWeek),
+                later:          toWireDates(buckets.later),
+                recentReports:  toWireDates(buckets.recentReports),
+                cancelled:      toWireDates(buckets.cancelled),
+                conciergePending,
+            },
+        });
     })
     .openapi(listInspectionsRoute, async (c) => {
         const tenantId = c.get('tenantId');
