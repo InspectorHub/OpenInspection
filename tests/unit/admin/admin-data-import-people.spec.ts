@@ -27,6 +27,7 @@ import { ContactService } from '../../../server/services/contact.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { logger } from '../../../server/lib/logger';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -39,7 +40,7 @@ import adminDataImportRoutes from '../../../server/api/admin/admin-data-import';
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
 const FAKE_ENV: HonoConfig['Bindings'] = { DB: {} as D1Database } as unknown as HonoConfig['Bindings'];
-const FAKE_EXEC_CTX: ExecutionContext = { waitUntil: vi.fn(), passThroughOnException: vi.fn() };
+const FAKE_EXEC_CTX: ExecutionContext = makeExecutionContext().ctx;
 
 function buildApp(contact: ContactService, people: PeopleService) {
     const app = new OpenAPIHono<HonoConfig>();

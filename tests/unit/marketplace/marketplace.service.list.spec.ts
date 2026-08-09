@@ -29,7 +29,7 @@ describe('MarketplaceService.list', () => {
                 authorId: 'system',
                 changelog: '',
                 downloadCount: i,
-                featured: i < 5 ? 1 : 0,
+                featured: i < 5,
                 createdAt: now,
                 updatedAt: now,
             });

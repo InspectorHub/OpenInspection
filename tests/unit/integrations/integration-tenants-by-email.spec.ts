@@ -10,6 +10,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import integrationRoutes from '../../../server/portal/integration.routes';
 import { signM2mHeader, M2M_HEADER } from '../../../server/lib/m2m-auth';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { asD1Db } from '../helpers/test-db';
 
 const FAKE_PEM = `-----BEGIN PRIVATE KEY-----\n${btoa('test-m2m-shared-key-material-0123456789')}\n-----END PRIVATE KEY-----`;
 const ENV = { DB: {}, JWT_CURRENT_KID: 'v1', JWT_PRIVATE_KEY_V1: FAKE_PEM } as Record<string, unknown>;
@@ -31,8 +32,8 @@ describe('GET /api/integration/tenants/by-email', () => {
     // The discovery query now joins each grant's role key against its OWN
     // tenant's active role profiles and gates on the selfRetrieveReport
     // capability (client/co_client by default), not a hard-coded literal list.
-    await seedRoleProfiles(testDb, 't1', new Date(1));
-    await seedRoleProfiles(testDb, 't2', new Date(1));
+    await seedRoleProfiles(asD1Db(testDb), 't1', new Date(1));
+    await seedRoleProfiles(asD1Db(testDb), 't2', new Date(1));
     await testDb.insert(schema.inspectionAccessTokens).values([
       { id: 'g1', tenantId: 't1', inspectionId: 'i1', recipientEmail: 'jane@x.com', role: 'client', token: 'tok1', createdAt: new Date() },
       { id: 'g2', tenantId: 't2', inspectionId: 'i2', recipientEmail: 'jane@x.com', role: 'co_client', token: 'tok2', createdAt: new Date(), revokedAt: new Date() }, // revoked → excluded

@@ -12,6 +12,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HonoConfig } from '../../../server/types/hono';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 vi.mock('../../../server/lib/public-access', async (importOriginal) => {
@@ -73,16 +74,13 @@ describe('repair share round trip — trade (IA-57)', () => {
             trade:        'licensed roofer',
         });
 
-        const app = new OpenAPIHono();
+        const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            c.env = { DB: ENV_DB } as any;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            c.set('services' as never, { repairRequest } as any);
+            c.env = { DB: ENV_DB } as HonoConfig['Bindings'];
+            c.set('services', { repairRequest } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        app.route('/api/public', repairBuilderRoutes as any);
+        app.route('/api/public', repairBuilderRoutes);
 
         const res = await app.request(`/api/public/repair-request/share/${rr.shareToken}`);
         expect(res.status).toBe(200);

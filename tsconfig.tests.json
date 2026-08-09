@@ -73,10 +73,21 @@
         // run look cold to the other — that is how a 20s check becomes a
         // six-minute one with nothing in the diff to explain it.
         "tsBuildInfoFile": "./.tsbuildinfo.tests",
-        // HEAP: `type-check:tests` caps this pass at 1024 MB, and the tightness
-        // is the feature — same reasoning as tsconfig.playwright.json.
+        // HEAP: `type-check:tests` caps this pass, and the tightness is the
+        // feature — same reasoning as tsconfig.playwright.json.
         // MEASURED by bisection on the first single-process run (587 files,
-        // 15.7s): 512 MB OOMs, 768 MB passes. 1024 is the floor plus headroom.
+        // 15.7s): 512 MB OOMs, 768 MB passes. 1024 was the floor plus headroom.
+        //
+        // ⚠️ THE CAP MOVES AS THE RATCHET BURNS DOWN, and it moved once already.
+        // Phase 1 batch 1 took the list from 198 to 160, i.e. 587 -> 625 files.
+        // Re-measured COLD (build-info deleted, which is the only honest way —
+        // pre-commit runs warm, CI always runs cold): 1024 MB now OOMs, 1280 MB
+        // passes in 15.1s, 1536 MB passes in 15.6s. `package.json` must carry
+        // 1536 (floor plus the same headroom ratio as the original). If a later
+        // batch reds this pass with `Ineffective mark-compacts near heap limit`
+        // and nothing in the diff explains it, this is why — bisect cold and
+        // move the number, do not reach for 4096, which is exactly the value at
+        // which a lost `references` (see below) stops being caught in seconds.
         //
         // Why not leave it generous: the failure this cap is really guarding
         // against is losing `references` below. `references` is NOT inherited
@@ -173,8 +184,6 @@
         "dist",
         ".types",
         "tests/e2e/**",
-        "tests/unit/admin/admin-data-import-people.spec.ts",
-        "tests/unit/admin/admin.service.spec.ts",
         "tests/unit/admin/members-calendar-sync.spec.ts",
         "tests/unit/agents/agent-notification-prefs.spec.ts",
         "tests/unit/agents/agent-referral-people.spec.ts",
@@ -183,17 +192,12 @@
         "tests/unit/agents/portal-visibility.spec.ts",
         "tests/unit/agreements/agreement-public-routes.spec.ts",
         "tests/unit/agreements/agreement-send-endpoints.spec.ts",
-        "tests/unit/agreements/agreement-signer-tenant-scope.spec.ts",
-        "tests/unit/agreements/agreement-signers.spec.ts",
-        "tests/unit/agreements/agreement.service.spec.ts",
         "tests/unit/agreements/agreements-render.spec.ts",
         "tests/unit/agreements/auto-sign-publish.spec.ts",
         "tests/unit/agreements/envelope-legacy-primary-client.spec.ts",
         "tests/unit/agreements/inspection-agreement-multi-signer.spec.ts",
         "tests/unit/agreements/inspection-agreement-request-primary-client.spec.ts",
         "tests/unit/agreements/inspection-agreement-request.spec.ts",
-        "tests/unit/agreements/inspection-sign-unification-dashboard.spec.ts",
-        "tests/unit/agreements/inspection-sign-unification.spec.ts",
         "tests/unit/agreements/inspector-signature.spec.ts",
         "tests/unit/agreements/iter2-bug9-sign-redirect.spec.ts",
         "tests/unit/automations/automation-channels.spec.ts",
@@ -215,8 +219,6 @@
         "tests/unit/automations/recipient-locale.spec.ts",
         "tests/unit/automations/resolve-recipients.spec.ts",
         "tests/unit/automations/staff-alerts-via-rules.spec.ts",
-        "tests/unit/billing/cancellation-held-deposit.spec.ts",
-        "tests/unit/billing/stripe-service-currency.spec.ts",
         "tests/unit/bookings/booking-aggregation.spec.ts",
         "tests/unit/bookings/booking-autoassign.spec.ts",
         "tests/unit/bookings/booking-contact-upsert.spec.ts",
@@ -242,7 +244,6 @@
         "tests/unit/client-portal/public-invoice-token-gate.spec.ts",
         "tests/unit/client-portal/tenant-bulk-link-expiry.spec.ts",
         "tests/unit/client-portal/view-confirmation.spec.ts",
-        "tests/unit/collab/schema-blob.spec.ts",
         "tests/unit/comments/recommendation-contractor-type.service.spec.ts",
         "tests/unit/comments/recommendation.service.spec.ts",
         "tests/unit/concierge/concierge-approve-primary-client.spec.ts",
@@ -250,17 +251,11 @@
         "tests/unit/concierge/concierge-resolve-token-primary-client.spec.ts",
         "tests/unit/concierge/concierge-schema.spec.ts",
         "tests/unit/concierge/concierge-service.spec.ts",
-        "tests/unit/contacts/contact-detail.spec.ts",
-        "tests/unit/contacts/contact.service.spec.ts",
-        "tests/unit/data/data-service-export-agent.spec.ts",
-        "tests/unit/data/data-service-export-primary-client.spec.ts",
         "tests/unit/email/email-events.spec.ts",
         "tests/unit/email/email-provider-resend.spec.ts",
         "tests/unit/email/email-providers.spec.ts",
         "tests/unit/email/transactional-message-notification.spec.ts",
         "tests/unit/email/webhook-verify.spec.ts",
-        "tests/unit/helpers/agreement-signers-setup.ts",
-        "tests/unit/helpers/inspection-sign-unification-setup.ts",
         "tests/unit/holidays/apply-holiday-policy.spec.ts",
         "tests/unit/idempotency/agreement-send-replay.spec.ts",
         "tests/unit/idempotency/ai-content-review-replay.spec.ts",
@@ -297,7 +292,6 @@
         "tests/unit/inspections/send-report-multi.spec.ts",
         "tests/unit/inspections/send-report-role-template.spec.ts",
         "tests/unit/inspections/share-agent-people.spec.ts",
-        "tests/unit/integrations/integration-tenants-by-email.spec.ts",
         "tests/unit/invoices/deposit-application.spec.ts",
         "tests/unit/invoices/invoice-currency-snapshot.spec.ts",
         "tests/unit/invoices/invoice-request-payment-primary-client.spec.ts",
@@ -306,13 +300,6 @@
         "tests/unit/invoices/iter2-bug10-public-invoice.spec.ts",
         "tests/unit/invoices/partial-balance.spec.ts",
         "tests/unit/invoices/payment-ledger.spec.ts",
-        "tests/unit/marketplace/marketplace.service.list.spec.ts",
-        "tests/unit/mcp/generate-snapshot.spec.ts",
-        "tests/unit/mcp/mcp-grants-api.spec.ts",
-        "tests/unit/mcp/snapshot-drift.spec.ts",
-        "tests/unit/media/media-center.spec.ts",
-        "tests/unit/media/media-type.spec.ts",
-        "tests/unit/media/strip-exif.spec.ts",
         "tests/unit/messaging/message.service.spec.ts",
         "tests/unit/messaging/sms-api.spec.ts",
         "tests/unit/messaging/sms-ensure-contact.spec.ts",
@@ -321,7 +308,6 @@
         "tests/unit/messaging/telnyx-rest-client.spec.ts",
         "tests/unit/messaging/twilio-client.spec.ts",
         "tests/unit/messaging/twilio-rest-client.spec.ts",
-        "tests/unit/metrics/metrics-top-agents-people.spec.ts",
         "tests/unit/notifications/agent-preferences-api.spec.ts",
         "tests/unit/notifications/automation-classes.spec.ts",
         "tests/unit/notifications/channel-consent.spec.ts",
@@ -332,13 +318,7 @@
         "tests/unit/people/role-profile-audit.spec.ts",
         "tests/unit/people/role-profiles-api.spec.ts",
         "tests/unit/people/seed-automations.spec.ts",
-        "tests/unit/platform/authorization-surface.spec.ts",
         "tests/unit/platform/rbac-require-role.spec.ts",
-        "tests/unit/platform/require-capability.spec.ts",
-        "tests/unit/portal/exchange-agent-route.spec.ts",
-        "tests/unit/portal/find-my-report-agent-dest.spec.ts",
-        "tests/unit/portal/self-retrieve-capability.spec.ts",
-        "tests/unit/portal/token-role-key.spec.ts",
         "tests/unit/privacy/account-export-delete.spec.ts",
         "tests/unit/privacy/audit-metadata-redaction.spec.ts",
         "tests/unit/privacy/erasure-orchestrator.spec.ts",
@@ -349,9 +329,6 @@
         "tests/unit/qbo/qbo-api-env.spec.ts",
         "tests/unit/qbo/qbo-oauth-callback.spec.ts",
         "tests/unit/qbo/refund-push.spec.ts",
-        "tests/unit/repair/repair-builder-action-tag.spec.ts",
-        "tests/unit/repair/repair-list.service.spec.ts",
-        "tests/unit/repair/share-trade-end-to-end.spec.ts",
         "tests/unit/reports/compliance-routes.spec.ts",
         "tests/unit/reports/inspection-report-photo-appendix.spec.ts",
         "tests/unit/reports/pca-narrative.spec.ts",
@@ -361,15 +338,11 @@
         "tests/unit/reports/report-review-endpoints.spec.ts",
         "tests/unit/reports/report-review-workflow.spec.ts",
         "tests/unit/reports/section-disclaimer-render.spec.ts",
-        "tests/unit/storage/r2-object-route.spec.ts",
-        "tests/unit/storage/r2-upload-route.spec.ts",
         "tests/unit/sync/sync-outbox-queue.spec.ts",
-        "tests/unit/team/update-member.spec.ts",
         "tests/unit/tenancy/inspector-palette-tenant-slug.spec.ts",
         "tests/unit/tenancy/team-invite.service.spec.ts",
         "tests/unit/tenancy/team-remove-softdelete.spec.ts",
         "tests/unit/tenancy/users-partial-unique.spec.ts",
-        "tests/unit/test-hooks/last-email.spec.ts",
         "tests/unit/usage/plan-quota-guarded-services.spec.ts"
     ]
 }

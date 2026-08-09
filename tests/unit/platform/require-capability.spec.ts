@@ -4,6 +4,7 @@ import { requireCapability, type OverrideResolver } from '../../../server/lib/mi
 import { coerceOverrides, type PermissionOverrides } from '../../../server/lib/auth/capabilities';
 import { AppError } from '../../../server/lib/errors';
 import type { Role } from '../../../server/lib/auth/roles';
+import type { HonoConfig } from '../../../server/types/hono';
 
 /**
  * Task 10 — requireCapability middleware.
@@ -19,7 +20,7 @@ function buildApp(
     { role, overrides }: { role: Role; overrides: PermissionOverrides | null },
 ) {
     const resolver: OverrideResolver = vi.fn(async () => overrides);
-    const app = new Hono();
+    const app = new Hono<HonoConfig>();
     app.onError((err, c) => {
         if (err instanceof AppError) return c.json({ error: err.message }, err.status);
         return c.json({ error: String(err) }, 500);
@@ -33,7 +34,7 @@ function buildApp(
     return { app, resolver };
 }
 
-async function call(app: Hono) {
+async function call(app: Hono<HonoConfig>) {
     const res = await app.request('/gated');
     return { status: res.status, body: await res.json() as Record<string, unknown> };
 }
@@ -74,7 +75,7 @@ describe('requireCapability middleware', () => {
     });
 
     it('401 when no role is present in context', async () => {
-        const app = new Hono();
+        const app = new Hono<HonoConfig>();
         app.onError((err, c) =>
             err instanceof AppError ? c.json({ error: err.message }, err.status) : c.json({ error: String(err) }, 500),
         );

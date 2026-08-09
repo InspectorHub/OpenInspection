@@ -5,6 +5,7 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { HonoConfig } from '../../../server/types/hono';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { asD1Db } from '../helpers/test-db';
 import { PortalService } from '../../../server/services/portal.service';
 import { PeopleService } from '../../../server/services/people.service';
 import portalRoutes from '../../../server/api/portal';
@@ -86,7 +87,7 @@ describe('GET /api/portal/:tenant/exchange — agent tokens never mint a client 
             id: TENANT, name: 'Acme', slug: 'acme-exchange-agent', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as never);
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
     });
 
     afterEach(() => {

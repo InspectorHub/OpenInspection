@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { asD1Db } from '../helpers/test-db';
 import { PeopleService } from '../../../server/services/people.service';
 
 // Mock the drizzle-orm/d1 module to return our in-memory SQLite DB
@@ -169,7 +170,7 @@ describe('AdminService', () => {
             date: new Date().toISOString().split('T')[0], // Text column needs string
             createdAt: new Date(),
         });
-        await seedRoleProfiles(testDb, tenantId, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), tenantId, new Date(1));
         await testDb.insert(contacts).values({
             id: 'contact-privacy', tenantId, type: 'client',
             name: 'Original Name', email: clientEmail, createdAt: new Date(),
@@ -219,8 +220,10 @@ describe('AdminService', () => {
             id: 'insp-actor',
             tenantId,
             propertyAddress: '99 Actor Ave',
-            clientName: 'Actor Client',
-            clientEmail,
+            // No clientName/clientEmail: those columns were DROPPED from
+            // `inspections` (schema/inspection/core.ts). This row is scaffolding
+            // only — the assertion below is about the erasure_log entry
+            // eraseClientData writes, not about what it matched.
             status: 'requested',
             paymentStatus: 'unpaid',
             price: 0,

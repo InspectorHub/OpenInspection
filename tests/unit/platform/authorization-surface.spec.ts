@@ -43,7 +43,7 @@ function declaredOps(): Map<string, string | undefined> {
 }
 
 function mountedGuards(): Map<string, string> {
-    const routes = (app as unknown as { routes: Array<{ method: string; path: string; handler: { capability?: string } }> }).routes;
+    const routes = (app as unknown as { routes: Array<{ method: string; path: string; handler: ((...args: unknown[]) => unknown) & { capability?: string } }> }).routes;
     const out = new Map<string, string>();
     for (const r of routes) {
         if (typeof r.handler === 'function' && typeof r.handler.capability === 'string') {

@@ -317,6 +317,30 @@ describe('ConciergeService — A3', () => {
             await expect(svc.confirmByClient('does-not-exist')).rejects.toThrow(/not found/i);
         });
 
+        it('refuses to resurrect an inspection cancelled while the link sat in the inbox (#81)', async () => {
+            // The link is minted BEFORE the client confirms, so the window is
+            // real. Redeeming it used to write `confirmed` unconditionally —
+            // a cancelled job back on the calendar, `cancel_reason` still on
+            // the row, and nobody signed in for any of it.
+            await seedFixture(testDb, { reviewRequired: false });
+            const created = await svc.createBooking(baseParams());
+            const tok = emailedToken();
+            await testDb.update(schema.inspections)
+                .set({ status: 'cancelled', cancelReason: 'client_cancelled' })
+                .where(eq(schema.inspections.id, created.inspectionId));
+
+            await expect(svc.confirmByClient(tok)).rejects.toThrow(/was cancelled/i);
+
+            const insp = await testDb.select().from(schema.inspections)
+                .where(eq(schema.inspections.id, created.inspectionId)).get();
+            expect(insp?.status).toBe('cancelled');
+            expect(insp?.cancelReason).toBe('client_cancelled');
+            // The token is NOT burned: the office may legitimately restore the
+            // inspection, and a link spent on a refusal would strand the client.
+            const after = await testDb.select().from(schema.conciergeConfirmTokens).all();
+            expect(after[0].confirmedAt).toBeFalsy();
+        });
+
         it('emails the agent that the booking was confirmed', async () => {
             await seedFixture(testDb, { reviewRequired: false });
             await svc.createBooking(baseParams());

@@ -24,9 +24,10 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { and, eq, isNull } from 'drizzle-orm';
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { asD1Db, type TestDb } from '../helpers/test-db';
 import { recordPayment, getHeldDepositCents, getNetReceivedCents } from '../../../server/services/payment-ledger.service';
 import { quoteCancellation, applyCancellationRefund } from '../../../server/services/inspection/cancellation.service';
 import { refundHeldDeposit } from '../../../server/services/invoice/refund';
@@ -48,11 +49,18 @@ const POLICY = {
     remedy: 'refund' as const,
 };
 
-let db: BetterSQLite3Database<typeof schema>;
+let db: TestDb;
+/**
+ * The same database, presented as the permissive `AnyDb` the payment-ledger
+ * and cancellation services declare. `db` stays the better-sqlite3 handle the
+ * `schema.*` reads below use directly.
+ */
+let svcDb: DrizzleD1Database;
 
 beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
+    svcDb = asD1Db(db);
     await setupSchema(fixture.sqlite);
 
     await db.insert(schema.tenants).values({
@@ -71,7 +79,7 @@ beforeEach(async () => {
 });
 
 const payDeposit = (amountCents = 9000, providerRef = 'pi_dep') =>
-    recordPayment(db, TENANT, {
+    recordPayment(svcDb, TENANT, {
         inspectionId: INSPECTION, invoiceId: null, kind: 'deposit',
         amountCents, method: 'card', provider: 'stripe', providerRef,
     });
@@ -83,7 +91,7 @@ async function seedInvoice(amountCents = 45000, receivedCents = 0) {
         createdAt: new Date(), currency: 'USD',
     });
     if (receivedCents > 0) {
-        await recordPayment(db, TENANT, {
+        await recordPayment(svcDb, TENANT, {
             inspectionId: INSPECTION, invoiceId: INVOICE, kind: 'balance',
             amountCents: receivedCents, method: 'card', provider: 'stripe', providerRef: 'pi_bal',
         });
@@ -102,7 +110,7 @@ const heldRefundRows = () =>
 describe('a held deposit is money collected, and the ladder must see it', () => {
     it('counts toward paidCents when the order has no invoice at all', async () => {
         await payDeposit();
-        const quote = await quoteCancellation(db, TENANT, INSPECTION, 'client_cancelled', LATE);
+        const quote = await quoteCancellation(svcDb, TENANT, INSPECTION, 'client_cancelled', LATE);
         expect(quote.invoiceId).toBeNull();
         expect(quote.paidCents).toBe(9000);
         expect(quote.heldDepositCents).toBe(9000);
@@ -112,7 +120,7 @@ describe('a held deposit is money collected, and the ladder must see it', () => 
         // The reason the feature exists. With paidCents at 0 this would charge
         // nothing, refund nothing, and leave the money held with nobody told.
         await payDeposit();
-        const quote = await quoteCancellation(db, TENANT, INSPECTION, 'no_show', LATE);
+        const quote = await quoteCancellation(svcDb, TENANT, INSPECTION, 'no_show', LATE);
         expect(quote.outcome.feeCents).toBe(9000);
         expect(quote.outcome.refundCents).toBe(0);
         // The ladder wanted 100% of $450 and could only keep the $90 collected.
@@ -123,7 +131,7 @@ describe('a held deposit is money collected, and the ladder must see it', () => 
 
     it('gives the deposit back in full when the client cancels in time', async () => {
         await payDeposit();
-        const quote = await quoteCancellation(db, TENANT, INSPECTION, 'client_cancelled', EARLY);
+        const quote = await quoteCancellation(svcDb, TENANT, INSPECTION, 'client_cancelled', EARLY);
         expect(quote.outcome.reason).toBe('sufficient_notice');
         expect(quote.outcome.refundCents).toBe(9000);
     });
@@ -133,7 +141,7 @@ describe('a held deposit is money collected, and the ladder must see it', () => 
         // job cancelled before invoicing, and an invoice-scoped lookup would
         // quote a zero processing loss on exactly that cancellation.
         await payDeposit();
-        const quote = await quoteCancellation(db, TENANT, INSPECTION, 'client_cancelled', EARLY);
+        const quote = await quoteCancellation(svcDb, TENANT, INSPECTION, 'client_cancelled', EARLY);
         expect(quote.retainedProcessingFeeCents).toBeGreaterThan(0);
     });
 });
@@ -141,8 +149,8 @@ describe('a held deposit is money collected, and the ladder must see it', () => 
 describe('the refund is actually written, with no invoice to write it against', () => {
     it('appends an invoice-less refund row and empties the held pool', async () => {
         await payDeposit();
-        const quote = await quoteCancellation(db, TENANT, INSPECTION, 'client_cancelled', EARLY);
-        const row = await applyCancellationRefund(db, TENANT, quote, 'user-1');
+        const quote = await quoteCancellation(svcDb, TENANT, INSPECTION, 'client_cancelled', EARLY);
+        const row = await applyCancellationRefund(svcDb, TENANT, quote, 'user-1');
 
         expect(row).not.toBeNull();
         expect(row!.row.kind).toBe('refund');
@@ -158,29 +166,29 @@ describe('the refund is actually written, with no invoice to write it against', 
         expect(refunds[0].invoiceId).toBeNull();
 
         // Receipts minus refunds: nothing is held any more.
-        expect(await getHeldDepositCents(db, TENANT, INSPECTION)).toBe(0);
+        expect(await getHeldDepositCents(svcDb, TENANT, INSPECTION)).toBe(0);
     });
 
     it('keeps the retained fee and refunds only the rest on a late cancellation', async () => {
         await payDeposit();
-        const quote = await quoteCancellation(db, TENANT, INSPECTION, 'client_cancelled', LATE);
+        const quote = await quoteCancellation(svcDb, TENANT, INSPECTION, 'client_cancelled', LATE);
         expect(quote.outcome.feeCents).toBe(9000);   // 50% of $450, capped at the $90 collected
         expect(quote.outcome.refundCents).toBe(0);
-        expect(await applyCancellationRefund(db, TENANT, quote, null)).toBeNull();
-        expect(await getHeldDepositCents(db, TENANT, INSPECTION)).toBe(9000);
+        expect(await applyCancellationRefund(svcDb, TENANT, quote, null)).toBeNull();
+        expect(await getHeldDepositCents(svcDb, TENANT, INSPECTION)).toBe(9000);
     });
 
     it('refuses to send back more than is held', async () => {
         await payDeposit(9000);
         await expect(
-            refundHeldDeposit(db, TENANT, INSPECTION, { amountCents: 15000, reason: 'oops' }),
+            refundHeldDeposit(svcDb, TENANT, INSPECTION, { amountCents: 15000, reason: 'oops' }),
         ).rejects.toThrow(/larger than the deposit still held/);
     });
 
     it('refuses a zero or negative refund', async () => {
         await payDeposit();
         await expect(
-            refundHeldDeposit(db, TENANT, INSPECTION, { amountCents: 0, reason: 'oops' }),
+            refundHeldDeposit(svcDb, TENANT, INSPECTION, { amountCents: 0, reason: 'oops' }),
         ).rejects.toThrow(/positive whole number/);
     });
 });
@@ -193,17 +201,17 @@ describe('when both pools hold money, the invoice is drained first', () => {
         await seedInvoice(45000, 20000);
         await payDeposit();
 
-        const quote = await quoteCancellation(db, TENANT, INSPECTION, 'inspector_cancelled', LATE);
+        const quote = await quoteCancellation(svcDb, TENANT, INSPECTION, 'inspector_cancelled', LATE);
         expect(quote.paidCents).toBe(29000);
         expect(quote.heldDepositCents).toBe(9000);
         expect(quote.outcome.refundCents).toBe(29000);
 
-        await applyCancellationRefund(db, TENANT, quote, null);
+        await applyCancellationRefund(svcDb, TENANT, quote, null);
 
         // The invoice's own cache is square — that is the number a human reads.
-        expect(await getNetReceivedCents(db, TENANT, INVOICE)).toBe(0);
+        expect(await getNetReceivedCents(svcDb, TENANT, INVOICE)).toBe(0);
         // And the invisible pool is square too.
-        expect(await getHeldDepositCents(db, TENANT, INSPECTION)).toBe(0);
+        expect(await getHeldDepositCents(svcDb, TENANT, INSPECTION)).toBe(0);
         expect(await heldRefundRows()).toHaveLength(1);
     });
 
@@ -211,14 +219,14 @@ describe('when both pools hold money, the invoice is drained first', () => {
         await seedInvoice(45000, 20000);
         await payDeposit();
 
-        const quote = await quoteCancellation(db, TENANT, INSPECTION, 'client_cancelled', LATE);
+        const quote = await quoteCancellation(svcDb, TENANT, INSPECTION, 'client_cancelled', LATE);
         // 50% of $450 = $225 fee, capped at the $290 collected → $65 back, all
         // of which the invoice can cover on its own.
         expect(quote.outcome.refundCents).toBe(6500);
-        await applyCancellationRefund(db, TENANT, quote, null);
+        await applyCancellationRefund(svcDb, TENANT, quote, null);
 
-        expect(await getNetReceivedCents(db, TENANT, INVOICE)).toBe(13500);
-        expect(await getHeldDepositCents(db, TENANT, INSPECTION)).toBe(9000);
+        expect(await getNetReceivedCents(svcDb, TENANT, INVOICE)).toBe(13500);
+        expect(await getHeldDepositCents(svcDb, TENANT, INSPECTION)).toBe(9000);
         expect(await heldRefundRows()).toHaveLength(0);
     });
 });

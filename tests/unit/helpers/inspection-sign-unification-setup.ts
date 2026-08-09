@@ -8,10 +8,11 @@ import { AgreementService } from '../../../server/services/agreement.service';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { ScopedDB } from '../../../server/lib/db/scoped';
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { inspectionsRoutes } from '../../../server/api/inspections';
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { ROLE } from '../../../server/lib/auth/roles';
+import { asD1Db, asD1DrizzleReturn, asScopedDbSource, type TestDb } from './test-db';
 
 export const TENANT_ID = '00000000-0000-0000-0000-000000000001';
 export const INSP_ID = '00000000-0000-0000-0000-000000000010';
@@ -43,7 +44,23 @@ export interface Stubs {
     workflowCreate?: ReturnType<typeof vi.fn>;
 }
 
-export function buildApp(db: BetterSQLite3Database<typeof schema>, stubs: Stubs = {}) {
+type SignWorkflow = NonNullable<HonoConfig['Bindings']['SIGN_COMPLETION_WORKFLOW']>;
+
+/**
+ * A `Workflow` binding whose only exercised method is `create` — the one
+ * `server/lib/sign-effects.ts` calls, and whose RESULT that caller discards.
+ * All three members are present so the shape is complete; the cast covers only
+ * the return types, because `vi.fn()`'s default `Mock<Procedure |
+ * Constructable>` is both callable and constructable and therefore matches no
+ * concrete method signature. Narrowing the mocks instead (`vi.fn<SignWorkflow
+ * ['create']>()`) would force every spec to resolve a real `WorkflowInstance`
+ * that nothing reads.
+ */
+function workflowStub(create: ReturnType<typeof vi.fn>): SignWorkflow {
+    return { create, get: vi.fn(), createBatch: vi.fn() } as unknown as SignWorkflow;
+}
+
+export function buildApp(db: TestDb, stubs: Stubs = {}) {
     const auditAppend = stubs.auditAppend ?? vi.fn().mockResolvedValue({ id: 'a', hash: 'h' });
     const automationTrigger = stubs.automationTrigger ?? vi.fn().mockResolvedValue(undefined);
     const notificationCreate = stubs.notificationCreate ?? vi.fn().mockResolvedValue(undefined);
@@ -63,10 +80,10 @@ export function buildApp(db: BetterSQLite3Database<typeof schema>, stubs: Stubs 
 
     app.use('*', async (c, next) => {
         c.set('tenantId', TENANT_ID);
-        c.set('userRole', 'owner' as any);
+        c.set('userRole', ROLE.OWNER);
         c.set('services', {
             agreement,
-            inspection: new InspectionService({} as D1Database, undefined, new ScopedDB(db as never, TENANT_ID)),
+            inspection: new InspectionService({} as D1Database, undefined, new ScopedDB(asScopedDbSource(db), TENANT_ID)),
             people: new PeopleService({ DB: {} as D1Database }),
             auditLog: { append: auditAppend },
             automation: { trigger: automationTrigger },
@@ -76,49 +93,54 @@ export function buildApp(db: BetterSQLite3Database<typeof schema>, stubs: Stubs 
                 sendAgreementRequest: emailAgreementRequest,
             },
         } as unknown as HonoConfig['Variables']['services']);
-        (c.env as Record<string, unknown>).SIGN_COMPLETION_WORKFLOW = { create: workflowCreate };
+        // `SIGN_COMPLETION_WORKFLOW` is a declared optional binding on AppEnv
+        // (server/types/hono.ts), so this is a plain assignment — only the
+        // stub itself needs shaping, and `Workflow` is a 3-method interface.
+        c.env.SIGN_COMPLETION_WORKFLOW = workflowStub(workflowCreate);
         await next();
     });
     app.route('/', inspectionsRoutes);
-    (mockDrizzle as any).mockReturnValue(db);
+    // `drizzle-orm/d1` is vi.mock'd by the specs that use this helper; hand the
+    // mock the SQLite database every service under test will actually query.
+    vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(db));
 
     return { app, auditAppend, automationTrigger, notificationCreate, emailConfirm, emailAgreementRequest, workflowCreate };
 }
 
-export async function seedBase(db: BetterSQLite3Database<typeof schema>, opts: { withTemplate?: boolean } = {}) {
+export async function seedBase(db: TestDb, opts: { withTemplate?: boolean } = {}) {
     await db.insert(schema.tenants).values({
         id: TENANT_ID, name: 'Acme', slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
-    } as any);
-    await db.insert(schema.inspections).values({
-        id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', clientName: 'Jane',
-        clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
-        price: 50000, agreementRequired: true, paymentRequired: false, createdAt: new Date(),
-    } as any);
+    });
     // Task 9b (people-role-profiles) — AgreementService.findOrCreate's default
-    // signer now resolves via the inspection_people primary-client join
-    // (PeopleService.getPrimaryClient) instead of the legacy
-    // inspection.clientName/.clientEmail columns above. Seed a matching
-    // contact + primary-client role so specs relying on the no-opts default
-    // signer being "Jane" / "jane@test.com" keep passing.
-    await seedRoleProfiles(db, TENANT_ID, new Date(1));
+    // signer resolves via the inspection_people primary-client join
+    // (PeopleService.getPrimaryClient). The clientName/clientEmail columns this
+    // row used to carry were DROPPED from `inspections` (schema/inspection/
+    // core.ts); the contact + primary-client rows below are now the only
+    // source of the "Jane" / "jane@test.com" default signer.
+    await db.insert(schema.inspections).values({
+        id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St',
+        date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+        price: 50000, agreementRequired: true, paymentRequired: false, createdAt: new Date(),
+    });
+    await seedRoleProfiles(asD1Db(db), TENANT_ID, new Date(1));
     await db.insert(schema.contacts).values({
         id: CLIENT_CONTACT_ID, tenantId: TENANT_ID, type: 'client', name: 'Jane', email: 'jane@test.com', createdAt: new Date(),
-    } as any);
+    });
     await db.insert(schema.inspectionPeople).values({
         id: `ip_${INSP_ID}_client`, tenantId: TENANT_ID, inspectionId: INSP_ID,
         contactId: CLIENT_CONTACT_ID, roleProfileId: `crp_${TENANT_ID}_client`, createdAt: new Date(),
-    } as any);
+    });
     if (opts.withTemplate ?? true) {
         await db.insert(schema.agreements).values({
             id: AGR_ID, tenantId: TENANT_ID, name: 'Standard Agreement',
             content: 'ORIGINAL agreement text', version: 1, createdAt: new Date(),
-        } as any);
+        });
     }
 }
 
 /** Seed a 2-signer envelope directly via the service. */
-export async function createTwoSignerEnvelope(db: BetterSQLite3Database<typeof schema>, policy: 'all' | 'one' = 'all') {
+export async function createTwoSignerEnvelope(db: TestDb, policy: 'all' | 'one' = 'all') {
     const svc = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
     const r = await svc.findOrCreate(TENANT_ID, INSP_ID, {
         signers: [

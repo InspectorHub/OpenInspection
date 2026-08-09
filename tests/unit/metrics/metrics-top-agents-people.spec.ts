@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { asD1Db } from '../helpers/test-db';
 import { PeopleService } from '../../../server/services/people.service';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -53,7 +54,7 @@ describe('GET /api/metrics — topAgents via inspection_people (Task 9c)', () =>
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values({
             id: AGENT_CONTACT, tenantId: TENANT, type: 'agent', name: 'Jane', agency: 'Realty Co', email: 'jane@realty.com', createdAt: new Date(),
         });
@@ -106,7 +107,7 @@ describe('GET /api/metrics — topAgents via inspection_people (Task 9c)', () =>
     it('inspection with no referrer is excluded from topAgents', async () => {
         const today = new Date().toISOString().slice(0, 10);
         await db.insert(schema.inspections).values({
-            id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: today, status: 'confirmed', paymentStatus: 'paid', price: 10000, referredByAgentId: null, inspectorId: null, createdAt: new Date(),
+            id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: today, status: 'confirmed', paymentStatus: 'paid', price: 10000, inspectorId: null, createdAt: new Date(),
         });
         const res = await buildApp().request('/api/metrics?from=2024-01-01&to=2028-12-31', {}, ENV, CTX);
         expect(res.status).toBe(200);

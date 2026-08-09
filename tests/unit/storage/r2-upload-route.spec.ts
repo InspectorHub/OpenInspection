@@ -86,7 +86,7 @@ function makeMinimalD1Stub(): D1Database {
                 raw: async () => [],
                 run: async () => ({ meta: {}, success: true }),
             }),
-        }) as ReturnType<D1Database['prepare']>,
+        }),
         exec: async () => ({ count: 0, duration: 0 }),
         batch: async () => [],
         dump: async () => new ArrayBuffer(0),

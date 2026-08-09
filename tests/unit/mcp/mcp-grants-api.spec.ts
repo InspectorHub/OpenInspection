@@ -38,7 +38,13 @@ const CALLER_ID = 'user-caller-001';
 const MEMBER_ID = 'user-member-002';
 
 /** Grant owned by the caller */
-const GRANT_CALLER = {
+const GRANT_CALLER: {
+    id: string; clientId: string; userId: string; scope: string[];
+    /** Nullable: a client that registered without metadata is a real case, and
+     *  the "returns null clientName" test below constructs exactly that. */
+    metadata: { clientName: string } | null;
+    createdAt: number; expiresAt: number | undefined;
+} = {
     id: 'grant-caller-1',
     clientId: 'client-mcp-claude',
     userId: CALLER_ID,

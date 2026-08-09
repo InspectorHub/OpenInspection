@@ -17,6 +17,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app } from '../../../server/index';
 import { reduceOpenApiDoc, type SnapshotEntry } from '../../../server/lib/mcp/snapshot-helpers';
+import { plainPaths } from '../helpers/openapi-doc';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SNAPSHOT_PATH = resolve(__dirname, '../../../server/lib/mcp/openapi-snapshot.json');
@@ -31,9 +32,7 @@ describe('openapi snapshot drift', { timeout: 30_000 }, () => {
             openapi: '3.0.0',
             info: { version: 'snapshot', title: 'OpenInspection Core API' },
         });
-        const fresh = reduceOpenApiDoc(
-            doc as { paths?: Record<string, Record<string, unknown>> },
-        );
+        const fresh = reduceOpenApiDoc({ paths: plainPaths(doc) });
         const committed = loadCommitted();
         expect(fresh).toEqual(committed);
     });

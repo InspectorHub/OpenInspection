@@ -55,7 +55,7 @@ function inspectorServices() {
     return makeServices({ portalAccessResolveToken: vi.fn().mockResolvedValue(null) });
 }
 
-function addItem(app: { request: (p: string, i?: RequestInit) => Promise<Response> }, body: unknown, token = true) {
+function addItem(app: { request: (p: string, i?: RequestInit) => Response | Promise<Response> }, body: unknown, token = true) {
     return app.request(`/api/public/repair-builder/t1/insp1/lists/rr1/items${token ? '?token=tok1' : ''}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -63,7 +63,7 @@ function addItem(app: { request: (p: string, i?: RequestInit) => Promise<Respons
     });
 }
 
-function patchItem(app: { request: (p: string, i?: RequestInit) => Promise<Response> }, body: unknown, token = true) {
+function patchItem(app: { request: (p: string, i?: RequestInit) => Response | Promise<Response> }, body: unknown, token = true) {
     return app.request(`/api/public/repair-builder/t1/insp1/lists/rr1/items/item1${token ? '?token=tok1' : ''}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
