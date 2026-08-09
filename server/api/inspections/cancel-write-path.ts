@@ -22,14 +22,37 @@
  * because it is the code both routes already use for a body they will not
  * apply, and the machine-readable part callers branch on is the `code`.
  *
- * NOT a guard against leaving `cancelled`. Un-cancelling is a plain status write
- * and stays one: a mis-click in the confirmation dialog has to be recoverable,
- * and the PATCH handler clears the cancellation record on the way out.
+ * ── The way BACK is one door too (#81) ──────────────────────────────────────
+ *
+ * Leaving `cancelled` used to be a plain status write, and that left the same
+ * shape pointing the other way: `POST /:id/uncancel` existed with no caller,
+ * while the row dropdown PATCHed a new status straight on. The two did not
+ * agree, and a third writer disagreed with both — printed side by side:
+ *
+ *   PATCH /:id { status }              cleared cancel_reason/notes, audited, re-pushed Google Calendar
+ *   POST  /:id/uncancel                cleared cancel_reason/notes, NO audit, NO calendar
+ *   PATCH /bulk { updateStatus }       LEFT cancel_reason/notes in place — a live job carrying "no_show"
+ *   POST  /:id/complete                same leak, from cancelled straight to completed
+ *
+ * `POST /:id/uncancel` is now the one door back, doing everything the widest of
+ * those did, and the others refuse with {@link refuseLeaveCancelledViaStatusWrite}.
+ *
+ * A FIFTH exists outside this module and is guarded where it lives:
+ * `ConciergeService.confirmByClient` — a magic link, redeemable by someone who
+ * is not signed in, minted before the client confirms and therefore capable of
+ * arriving after a cancellation. It refuses in its own words rather than
+ * sharing the refusal below: its reader is a client following an email link,
+ * not a caller who can POST anywhere.
+ *
+ * THE MONEY DOES NOT COME BACK WITH IT. A kept fee and an issued refund are
+ * ledger facts; the inspection returns to `scheduled`, and reversing either
+ * amount is an invoice adjustment, not a status change. Copy at every door that
+ * offers recovery has to say so.
  */
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 
 export interface CancelWritePathRefusal {
-    code: 'USE_CANCEL_ENDPOINT';
+    code: 'USE_CANCEL_ENDPOINT' | 'USE_UNCANCEL_ENDPOINT';
     message: string;
 }
 
@@ -47,5 +70,28 @@ export function refuseCancelViaStatusWrite(status: string | null | undefined): C
         message:
             'Cancelling applies the tenant cancellation policy — the fee, the refund and the recorded reason '
             + 'are computed there. Use POST /api/inspections/{id}/cancel instead of writing this status.',
+    };
+}
+
+/**
+ * Returns the refusal when a write would move an inspection OUT of `cancelled`.
+ *
+ * Takes the inspection's CURRENT status, not the requested one — that is the
+ * asymmetry with the function above and the reason both exist. Cancelling is
+ * recognisable from the payload alone; recovering is only recognisable from
+ * where the row is standing.
+ *
+ * Callers that legitimately leave `cancelled` — `POST /:id/uncancel` — never ask.
+ */
+export function refuseLeaveCancelledViaStatusWrite(
+    currentStatus: string | null | undefined,
+): CancelWritePathRefusal | null {
+    if (currentStatus !== INSPECTION_STATUS.CANCELLED) return null;
+    return {
+        code: 'USE_UNCANCEL_ENDPOINT',
+        message:
+            'Bringing a cancelled inspection back clears the recorded cancellation reason, records who did it '
+            + 'and restores the calendar entry. Use POST /api/inspections/{id}/uncancel. It does not reverse '
+            + 'a cancellation fee or a refund — those are ledger entries.',
     };
 }

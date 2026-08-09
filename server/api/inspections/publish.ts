@@ -20,6 +20,8 @@ import { inspections as inspectionTable } from '../../lib/db/schema';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation } from '../../services/inspection/shared';
+import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
+import { refuseLeaveCancelledViaStatusWrite } from './cancel-write-path';
 import { eq, and } from 'drizzle-orm';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
@@ -45,9 +47,10 @@ const completeInspectionRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
+        400: { description: 'The inspection is cancelled. Bring it back with POST /{id}/uncancel first (#81).' },
     },
     operationId: "completeInspection",
-    description: "Auto-generated placeholder for completeInspection (POST /{id}/complete, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -294,6 +297,15 @@ const publishRoutes = createApiRouter()
             return c.json({ success: true }, 200);
         }
 
+        // #81 — a fourth way out of `cancelled`, and it leaked the same way the
+        // bulk one did: straight to `completed` with `cancel_reason` still
+        // attached. `confirmInspection` has always refused a cancelled
+        // inspection; this route is the same claim about the same axis ("the
+        // visit happened") and had no guard at all. Recovery goes through
+        // `POST /:id/uncancel` first, then the visit can be marked complete.
+        const leaveRefusal = refuseLeaveCancelledViaStatusWrite(inspection.status);
+        if (leaveRefusal) return c.json({ success: false as const, error: leaveRefusal }, 400);
+
         const db = getDrizzle(c);
         await db.update(inspectionTable).set({ status: INSPECTION_STATUS.COMPLETED }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
@@ -342,18 +354,43 @@ const publishRoutes = createApiRouter()
     })
     // POST /{id}/cancel MOVED to ./cancellation.ts, which owns the whole
     // cancellation surface: the quote, the fee acknowledgement, and the refund.
+    //
+    // THE ONE DOOR BACK (#81). This endpoint shipped complete and unwired: the
+    // product's only recovery was the list row's status dropdown, PATCHing a new
+    // status straight on. Two doors for one idea, disagreeing — the PATCH
+    // audited the change and re-pushed Google Calendar, this did neither; the
+    // bulk door cleared nothing at all. Rather than adopt the weaker of them,
+    // the two things this was missing moved HERE and the others now refuse
+    // (./cancel-write-path).
+    //
+    // ROLE MATCHES `POST /:id/cancel`, deliberately widened from owner+manager.
+    // An inspector standing at a door nobody answered may cancel; a stricter
+    // gate on the way back would make their own mis-click the one thing they
+    // cannot undo.
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/uncancel',
-        tags: ["inspections"], summary: "Create inspection uncancel for current tenant",
-        middleware: [requireRole('owner', 'manager')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
-        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Uncancelled' } },
+        tags: ["inspections"], summary: "Bring a cancelled inspection back to scheduled",
+        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+        request: { params: z.object({ id: z.string().describe('The cancelled inspection to bring back.') }).describe('Path parameters.') },
+        responses: {
+            200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('Recovered.') } }, description: 'Uncancelled' },
+            400: { description: 'The inspection is not cancelled, so there is nothing to recover.' },
+        },
         operationId: "createInspectionUncancel",
-        description: "Auto-generated placeholder for createInspectionUncancel (POST /{id}/uncancel, inspections domain). TODO: replace with a real description sourced from the handler."
+        description: "Returns a mistakenly-cancelled inspection to `scheduled`, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         await c.var.services.inspection.uncancelInspection(tenantId, id);
+
+        // Both of these are what the dropdown's PATCH did and this did not.
+        // The calendar entry was REMOVED by the cancel — pushInspectionToGoogle
+        // re-reads the row and puts it back, same call, no case analysis here.
+        pushInspectionAfterResponse(c, tenantId, id);
+        auditFromContext(c, 'inspection.status_change', 'inspection', {
+            entityId: id,
+            metadata: { from: INSPECTION_STATUS.CANCELLED, to: INSPECTION_STATUS.SCHEDULED },
+        });
         return c.json({ success: true });
     })
     .openapi(publishRoute, async (c) => {

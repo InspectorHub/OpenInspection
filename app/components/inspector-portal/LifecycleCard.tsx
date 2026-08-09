@@ -3,6 +3,7 @@ import type { useFetcher } from "react-router";
 import { Card, Button } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { CancelInspectionModal } from "./CancelInspectionModal";
+import { RestoreInspectionAction } from "~/components/RestoreInspectionAction";
 import { lifecycleState } from "~/lib/hub-blocks";
 import { humanizeStatus, statusTone } from "~/lib/status";
 import { m } from "~/paraglide/messages";
@@ -17,6 +18,11 @@ import { m } from "~/paraglide/messages";
  * hidden in those states and nothing took its place. A title and a badge over
  * blank space reads as broken rather than finished, so each terminal state says
  * what it means: completed means the visit happened, cancelled means it will not.
+ *
+ * AND SO DOES RECOVERY (#81), for the same reason and one more: this is where
+ * the mis-click happens. Restoring is NOT an undo — the fee and the refund are
+ * ledger entries that already happened — so the control says "Restore to
+ * scheduled" and its confirmation names both halves. See RestoreInspectionAction.
  *
  * CANCELLING LIVES HERE (#67) because this card is the inspection's lifecycle,
  * and cancelling is the other end of the same axis "Mark fieldwork complete"
@@ -89,12 +95,20 @@ export function LifecycleCard({
                         />
                     )}
                 </>
+            ) : state === "completed" ? (
+                <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_lifecycle_done()}</p>
             ) : (
-                <p className="text-[12px] text-ih-fg-3">
-                    {state === "completed"
-                        ? m.inspections_hub_lifecycle_done()
-                        : m.inspections_hub_lifecycle_cancelled()}
-                </p>
+                /* THE CANCELLED STATE HAD NO WAY OUT (#81). Cancelling happens
+                   on this card, and its terminal state said "nothing further is
+                   scheduled" over blank space — while the only recovery in the
+                   product sat on a hover-only dropdown on a different page,
+                   which nobody who had just mis-clicked here would think to
+                   look for. The axis this card owns runs both ways. */
+                <div className="space-y-2">
+                    <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_lifecycle_cancelled()}</p>
+                    <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_lifecycle_cancelled_recover()}</p>
+                    <RestoreInspectionAction inspectionId={inspectionId} />
+                </div>
             )}
         </Card>
     );

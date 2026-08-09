@@ -30,14 +30,20 @@
  * `POST /:id/cancel`, so any other writer produces a cancelled job whose money
  * still says it is on.
  *
- * Leaving `cancelled` stays allowed, and `clearCancellationOnRecovery` below is
- * the correction that direction implies.
+ * LEAVING `cancelled` IS REFUSED TOO (#81), and for the mirror reason. Recovery
+ * has to clear the cancellation record, record who did it and put the calendar
+ * entry back; this PATCH only ever did the first two, and the bulk door did
+ * none of them. `POST /:id/uncancel` does all three, so it is the one door back
+ * and this one points at it.
  */
 import { and, eq, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users } from '../../lib/db/schema';
-import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
-import { refuseCancelViaStatusWrite, type CancelWritePathRefusal } from './cancel-write-path';
+import {
+    refuseCancelViaStatusWrite,
+    refuseLeaveCancelledViaStatusWrite,
+    type CancelWritePathRefusal,
+} from './cancel-write-path';
 
 export type PatchRefusal = CancelWritePathRefusal | {
     code: 'INVALID_COVER_PHOTO' | 'INVALID_INSPECTOR' | 'INVALID_REFERRER';
@@ -52,29 +58,6 @@ interface GuardedPatch {
     status?: string | null | undefined;
 }
 
-/**
- * Coming BACK from cancelled, the cancellation's own record goes with it.
- *
- * `cancel_reason` and `cancel_notes` describe a cancellation that no longer
- * stands, and a live inspection carrying "no_show" is a lie that outlives the
- * mistake. This is what `uncancelInspection()` has always done, applied to the
- * door people actually use — the row status dropdown, which is the ONLY way a
- * mis-cancelled inspection comes back (`POST /:id/uncancel` has no caller
- * anywhere in the product).
- *
- * The MONEY does not come back with it. A fee kept and a refund issued are
- * ledger facts, reversed by an invoice adjustment, not by re-scheduling the job.
- */
-export function clearCancellationOnRecovery(
-    updateValues: Record<string, unknown>,
-    currentStatus: string | null | undefined,
-    nextStatus: string | null | undefined,
-): void {
-    if (!nextStatus || currentStatus !== INSPECTION_STATUS.CANCELLED) return;
-    updateValues.cancelReason = null;
-    updateValues.cancelNotes = null;
-}
-
 export async function findPatchRefusal(
     db: DrizzleD1Database,
     tenantId: string,
@@ -83,6 +66,8 @@ export async function findPatchRefusal(
     // Ownership of a photo key is an inspection-service question (it spans the
     // item photos and the loose pool), so it stays where that knowledge lives.
     isInspectionPhotoKey: (id: string, tenantId: string, key: string) => Promise<boolean>,
+    /** What the row says NOW — the only way to recognise a recovery (#81). */
+    currentStatus?: string | null,
 ): Promise<PatchRefusal | null> {
     // #78 — checked FIRST, and it refuses the whole patch rather than dropping
     // the one field. A patch that saved the county and quietly discarded the
@@ -90,6 +75,15 @@ export async function findPatchRefusal(
     // which half took effect.
     const cancelRefusal = refuseCancelViaStatusWrite(body.status);
     if (cancelRefusal) return cancelRefusal;
+
+    // #81 — the same refusal pointing the other way, and gated on `body.status`
+    // being present at all: a cancelled inspection is still editable. Correcting
+    // its address, or attaching the note that explains the cancellation, is
+    // ordinary work and must not be refused because of the status it is in.
+    if (body.status) {
+        const leaveRefusal = refuseLeaveCancelledViaStatusWrite(currentStatus);
+        if (leaveRefusal) return leaveRefusal;
+    }
 
     // DB-16 — coverPhotoId holds the R2 key of a photo belonging to THIS
     // inspection (an attached item photo or a loose pool photo); null clears

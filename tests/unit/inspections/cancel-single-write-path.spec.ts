@@ -15,12 +15,17 @@
  * paired with positive controls, because a gate that refuses everything is
  * indistinguishable from a gate that works.
  *
- * THE RECOVERY CASE IS PART OF THE CONTRACT. A mistakenly-cancelled inspection
- * is moved back through the same PATCH — 'cancelled' → 'scheduled' — and that
- * direction must keep working, or a mis-click in the confirmation dialog would
- * be permanent. Coming back also clears `cancel_reason` / `cancel_notes`: they
- * describe a cancellation that no longer stands, and leaving them behind is how
- * a live inspection ends up carrying "no_show" in its record.
+ * THE RECOVERY CASE MOVED (#81). This spec used to assert that a mistakenly-
+ * cancelled inspection came back through the same PATCH — 'cancelled' →
+ * 'scheduled' — because that was the product's only way out of `cancelled`.
+ * It is not any more: `POST /:id/uncancel`, which had existed with no caller
+ * the whole time, is now the one door back, and this PATCH refuses that
+ * direction too. What that door does, and what the three closed ones did
+ * differently, is pinned in ./uncancel-write-paths.spec.ts.
+ *
+ * What stays here is the half that belongs to THIS guard: a cancelled
+ * inspection is still EDITABLE. The refusal is about the status field, not
+ * about the row.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
@@ -131,19 +136,6 @@ describe('#78 — `cancelled` may only be written by POST /api/inspections/:id/c
     });
 
     // ── Recovery from a mis-click ───────────────────────────────────────────
-    it('un-cancels: cancelled → scheduled succeeds and clears the cancellation record', async () => {
-        await db.update(schema.inspections)
-            .set({ status: 'cancelled', cancelReason: 'no_show', cancelNotes: 'nobody home' })
-            .where(eq(schema.inspections.id, INSP_ID));
-
-        expect((await patchOne({ status: 'scheduled' }, 'cancelled')).status).toBe(200);
-
-        const after = await row();
-        expect(after.status).toBe('scheduled');
-        expect(after.cancelReason).toBeNull();
-        expect(after.cancelNotes).toBeNull();
-    });
-
     it('does not clear the cancellation record on a patch that leaves the status alone', async () => {
         await db.update(schema.inspections)
             .set({ status: 'cancelled', cancelReason: 'no_show' })

@@ -1,24 +1,24 @@
 /**
- * Inspection Lifecycle E2E — cancel through the priced door, un-cancel through
- * the row.
+ * Inspection Lifecycle E2E — cancel and recover, both through their own door.
  *
- * REWRITTEN FOR #78, and the rewrite is the point of the spec. This test used to
- * cancel by picking "Cancelled" in the dashboard row's status <select>, which
- * PATCHed the status straight onto the inspection — no quote, no fee, no refund,
- * no recorded reason. That door is closed: the API answers 400
- * USE_CANCEL_ENDPOINT and the option is gone from the dropdown, so a spec
- * driving it would now be asserting a bug.
+ * REWRITTEN FOR #78, THEN AGAIN FOR #81, and each rewrite is the point of the
+ * spec. It first cancelled by picking "Cancelled" in the dashboard row's status
+ * <select>, which PATCHed the status straight on — no quote, no fee, no refund,
+ * no recorded reason. Then it recovered through the same <select>, which was
+ * the product's only way back and did less than the endpoint built for the job.
  *
- * The two halves are deliberately asymmetric, because the product is:
+ * Both doors are closed now and the API answers 400 for either direction, so a
+ * spec driving that dropdown would be asserting a bug. The flow is symmetric:
  *
  *   CANCEL happens on the inspection hub's Lifecycle card, behind a modal that
- *   prices the cancellation and a confirmation that names the money. It is the
- *   only writer of `status = 'cancelled'`.
+ *   prices the cancellation and a confirmation that names the money.
+ *   `POST /:id/cancel` is the only writer of `status = 'cancelled'`.
  *
- *   UN-CANCEL is still the row dropdown. A mis-click in that confirmation has to
- *   be recoverable, and `POST /:id/uncancel` has no caller in the product — so
- *   picking another status is how a cancelled inspection comes back, and this
- *   spec pins that it still works.
+ *   RECOVER happens on the SAME card, in its cancelled state, behind a
+ *   confirmation that says the inspection goes back to scheduled and that the
+ *   money already moved. `POST /:id/uncancel` is the only way out of
+ *   `cancelled`. This is the half that had no discoverable door at all: the
+ *   mis-click happened here and the only remedy was on another page.
  *
  * Fixture: the `editor-seed` setup project seeds one editable inspection and
  * records it via {@link readEditorSeed}; this spec depends on it (see
@@ -65,12 +65,12 @@ test.describe('Inspection lifecycle — cancel / uncancel', () => {
             page.getByText('This inspection was cancelled. Nothing further is scheduled for it.'),
         ).toBeVisible();
 
-        // ── Back on the list: cancelled, and not re-selectable ─────────────
+        // ── Back on the list: cancelled, and nothing to pick ───────────────
         await page.goto('/inspections');
 
         // Locate the seeded inspection's row via its unique edit-link href, then
         // walk up to the nearest ancestor row that owns a <select> (the status
-        // dropdown). `.first()` because the grouped dashboard view does NOT dedup
+        // control). `.first()` because the grouped dashboard view does NOT dedup
         // across buckets — a cancelled inspection can render in more than one
         // bucket, but every copy's select is bound to the same server status.
         const row = page
@@ -80,15 +80,29 @@ test.describe('Inspection lifecycle — cancel / uncancel', () => {
         await expect(row).toBeVisible();
 
         const statusSelect = row.locator('select').first();
+        // It says the truth and offers nothing: every target status is a write
+        // the API now refuses. Asserted on the live DOM because "disabled" is
+        // exactly the kind of detail that survives a refactor as "enabled".
         await expect(statusSelect).toHaveValue('cancelled');
-        // Present so the row tells the truth, disabled so this is not a second
-        // way in. Asserted on the live DOM because a disabled <option> is
-        // exactly the kind of detail that survives a refactor as an enabled one.
-        await expect(statusSelect.locator('option[value="cancelled"]')).toBeDisabled();
+        await expect(statusSelect).toBeDisabled();
 
-        // ── Un-cancel: the mis-click is recoverable ────────────────────────
-        await row.hover();
-        await statusSelect.selectOption('scheduled');
-        await expect(statusSelect).toHaveValue('scheduled');
+        // ── Recover, on the hub, where the mis-click happened ──────────────
+        await page.goto(`/inspections/${seed!.inspectionId}`);
+        await expect(
+            page.getByText('This inspection was cancelled. Nothing further is scheduled for it.'),
+        ).toBeVisible();
+
+        await page.getByRole('button', { name: 'Restore to scheduled' }).click();
+
+        // The confirmation names what changes and what does not. The second
+        // half is the one that must not quietly disappear: restoring is not an
+        // undo, and the fee and refund are already in the ledger.
+        const dialog = page.getByRole('dialog');
+        await expect(dialog).toContainText('returns to Scheduled');
+        await expect(dialog).toContainText('does not reverse them');
+        await dialog.getByRole('button', { name: 'Restore to scheduled' }).click();
+
+        // The card leaves its terminal state; the lifecycle pill reads Scheduled.
+        await expect(page.getByRole('button', { name: 'Mark fieldwork complete' })).toBeVisible();
     });
 });

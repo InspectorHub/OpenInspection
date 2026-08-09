@@ -19,7 +19,7 @@ import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.s
 import { inspections as inspectionTable, inspectionResults } from '../../lib/db/schema';
 import { datePatchValues } from '../../services/inspection/reschedule-date';
 import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
-import { findPatchRefusal, clearCancellationOnRecovery } from './patch-guards';
+import { findPatchRefusal } from './patch-guards';
 import { deleteInspectionCascade } from '../../services/inspection/inspection-cascade';
 import { syncAssignmentsAndSplits } from '../../services/pay-split.service';
 import { eq, and } from 'drizzle-orm';
@@ -170,7 +170,7 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
-        400: { description: 'A refused patch: a dangling soft reference (DB-16), or status:cancelled, which only POST /{id}/cancel may write (#78)' },
+        400: { description: 'A refused patch: a dangling soft reference (DB-16); status:cancelled, which only POST /{id}/cancel may write (#78); or any status change on an already-cancelled inspection, which only POST /{id}/uncancel may make (#81)' },
     },
     operationId: "patchInspection"
 }, { scopes: ['write'], tier: 'primary' }));
@@ -300,11 +300,13 @@ const coreRoutes = createApiRouter()
 
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
 
-        // Every soft reference this patch can dangle, plus the one status it may
-        // not write (#78 — cancelled). Refused before anything is. ./patch-guards.
+        // Every soft reference this patch can dangle, plus the two status moves
+        // it may not make: INTO `cancelled` (#78) and OUT of it (#81). Both live
+        // behind their own endpoint. Refused before anything is. ./patch-guards.
         const refusal = await findPatchRefusal(
             db, tenantId, id, body,
             (i, t, key) => c.var.services.inspection.isInspectionPhotoKey(i, t, key),
+            inspection.status,
         );
         if (refusal) return c.json({ success: false as const, error: refusal }, 400);
 
@@ -320,7 +322,6 @@ const coreRoutes = createApiRouter()
         // the second. Clearing the amount clears the override with it —
         // otherwise the order stays pinned to a number that no longer exists.
         if ('depositRequiredCents' in body) updateValues.depositOverridden = body.depositRequiredCents != null;
-        clearCancellationOnRecovery(updateValues, inspection.status, body.status); // #78 — see ./patch-guards
 
         // Tenant-ownership pre-check above guards access. The validated `body`
         // can legitimately be empty: the settings sheet forwards its whole form

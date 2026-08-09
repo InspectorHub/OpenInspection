@@ -108,6 +108,9 @@ export default [
   // API endpoints shipped with the fee ladder and had no caller anywhere in
   // app/; this is the only front door to them.
   route("resources/inspection-cancellation", "routes/resources/inspection-cancellation.tsx"),
+  // #81 — the way back, and the same story: POST /:id/uncancel had no caller
+  // either. One door, shared by the hub's Lifecycle card and the list row.
+  route("resources/inspection-restore", "routes/resources/inspection-restore.tsx"),
   route("resources/agreement-signers", "routes/resources/agreement-signers.tsx"),
   route("resources/agreement-templates", "routes/resources/agreement-templates.tsx"),
   route("resources/team-members", "routes/resources/team-members.tsx"),

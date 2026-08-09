@@ -240,7 +240,12 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
   if (intent === "status") {
     const id = formData.get("id") as string;
-    const status = formData.get("status") as "requested" | "scheduled" | "confirmed" | "completed"; // #78 — no "cancelled": that moves money, so only POST /:id/cancel writes it (the API 400s USE_CANCEL_ENDPOINT here)
+    // #78 — no "cancelled": that moves money, so only POST /:id/cancel writes it
+    // (the API 400s USE_CANCEL_ENDPOINT here). #81 — and this intent never
+    // reaches an already-cancelled inspection either: that PATCH 400s
+    // USE_UNCANCEL_ENDPOINT, and the row renders no dropdown for a cancelled
+    // inspection at all — recovery is /resources/inspection-restore.
+    const status = formData.get("status") as "requested" | "scheduled" | "confirmed" | "completed";
     const res = await api.inspections[":id"].$patch({
       param: { id },
       json: { status },

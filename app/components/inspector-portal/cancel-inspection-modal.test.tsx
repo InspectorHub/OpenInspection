@@ -142,7 +142,7 @@ describe("cancelling an inspection from the hub", () => {
         expect(harness.quoted).toEqual(["client_cancelled", "no_show"]);
     });
 
-    it("names the fee and the refund in the confirmation, and that it cannot be undone", async () => {
+    it("names the fee and the refund in the confirmation, and that neither reverses", async () => {
         renderCard();
         await openModal();
         await screen.findByText(/Fee your company keeps: \$125\.00/);
@@ -151,7 +151,14 @@ describe("cancelling an inspection from the hub", () => {
         const dialog = await screen.findByRole("dialog");
         expect(dialog.textContent).toMatch(/\$125\.00 is kept as a cancellation fee/);
         expect(dialog.textContent).toMatch(/\$375\.00 is refunded to the client/);
-        expect(dialog.textContent).toMatch(/cannot be un-cancelled/i);
+        // #81 — this used to read "cannot be un-cancelled from this page", and
+        // the card now offers exactly that. The sentence had to change or
+        // become a lie; what it must NOT do is drop the money half, which is
+        // the part that is still true. Restoring returns the inspection to
+        // scheduled; the fee and the refund are ledger entries and stay.
+        expect(dialog.textContent).toMatch(/back on the schedule/i);
+        expect(dialog.textContent).toMatch(/does not reverse either amount/i);
+        expect(dialog.textContent).not.toMatch(/cannot be un-cancelled/i);
     });
 
     it("says plainly when nothing is charged rather than quoting a zero", async () => {
@@ -207,7 +214,7 @@ describe("cancelling an inspection from the hub", () => {
         fireEvent.click(
             within(await screen.findByRole("dialog")).getByRole("button", { name: "Keep the inspection" }),
         );
-        await waitFor(() => expect(screen.queryByText(/cannot be un-cancelled/i)).toBeNull());
+        await waitFor(() => expect(screen.queryByText(/is kept as a cancellation fee/i)).toBeNull());
         expect(harness.submitted).toHaveLength(0);
     });
 

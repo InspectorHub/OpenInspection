@@ -19,7 +19,8 @@ import {
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { syncInspectionAssignmentsBatch } from '../../lib/db/assignment-links';
 import { findScheduleConflicts } from '../../lib/schedule-conflicts';
-import { refuseCancelViaStatusWrite } from './cancel-write-path';
+import { refuseCancelViaStatusWrite, refuseLeaveCancelledViaStatusWrite } from './cancel-write-path';
+import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { eq, inArray, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
@@ -157,7 +158,7 @@ const bulkUpdateRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
-        400: { description: 'Missing action argument, or a request to cancel — cancellation is writable only through POST /{id}/cancel, one inspection at a time, so the fee and refund cannot be skipped (#78)' },
+        400: { description: 'Missing action argument; a request to cancel — cancellation is writable only through POST /{id}/cancel, one inspection at a time, so the fee and refund cannot be skipped (#78); or a batch containing an already-cancelled inspection, which only POST /{id}/uncancel may move (#81)' },
     },
     operationId: "bulkInspection"
 }, { scopes: ['write'], tier: 'extended', capability: 'scheduleOthers' }));
@@ -316,6 +317,26 @@ const bulkRoutes = createApiRouter()
             // ./cancel-write-path.
             const cancelRefusal = refuseCancelViaStatusWrite(body.status);
             if (cancelRefusal) return c.json({ success: false as const, error: cancelRefusal }, 400);
+
+            // #81 — and the other direction, which was the WORSE of the two here.
+            // This write never consulted the row it was overwriting, so a bulk
+            // move of a cancelled inspection back to `scheduled` left
+            // `cancel_reason = 'no_show'` attached to a live job: the one lie the
+            // single PATCH went out of its way to prevent. Recovery is
+            // per-inspection anyway — it is a decision about one mis-click, not a
+            // batch operation — so the whole batch is refused rather than the
+            // cancelled members silently skipped.
+            const stuck = await db.select({ id: inspectionTable.id }).from(inspectionTable)
+                .where(and(
+                    inArray(inspectionTable.id, body.ids),
+                    eq(inspectionTable.tenantId, tenantId),
+                    eq(inspectionTable.status, INSPECTION_STATUS.CANCELLED),
+                ))
+                .limit(1).get();
+            const leaveRefusal = refuseLeaveCancelledViaStatusWrite(
+                stuck ? INSPECTION_STATUS.CANCELLED : null,
+            );
+            if (leaveRefusal) return c.json({ success: false as const, error: leaveRefusal }, 400);
 
             await db.update(inspectionTable).set({ status: body.status })
                 .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
