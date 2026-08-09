@@ -3,6 +3,7 @@ import { InspectionService } from '../../../server/services/inspection.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -12,11 +13,18 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const SLUG = 'acme';
 
-// getInspectionHub's `people` block reuses getPeopleCard (Task 8), which now
-// sources people from inspection_people (via PeopleService.listPeople), not
-// the legacy inline/agent-id columns — tests below seed inspection_people
-// rows alongside the legacy columns so those columns stay realistic without
-// being what's actually read.
+// getInspectionHub's `people` block reuses getPeopleCard (Task 8), which
+// sources people from inspection_people (via PeopleService.listPeople).
+//
+// ⚠️ This spec used to seed DIVERGENT values into the inline
+// clientName/clientEmail/clientPhone/clientContactId/referredByAgentId/
+// sellingAgentId columns and then assert the reader had not picked them up.
+// Those columns are gone (schema/inspection/core.ts: "the former denormalized
+// ... columns were DROPPED (superseded by inspection_people)"), drizzle
+// discarded the keys silently, and the decoy values therefore never existed to
+// be read. The seeds, the two decoy contacts and the `.not.toBe(sentinel)`
+// assertions are removed; the positive `toMatchObject` below is what actually
+// pins the sourcing.
 const roleProfileId = (tenantId: string, key: string) => `crp_${tenantId}_${key}`;
 
 describe('Issue #111 — InspectionService.getInspectionHub', () => {
@@ -36,7 +44,7 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
         await testDb.insert(schema.tenants).values([
             { id: TENANT, name: 'Acme', slug: SLUG, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
     });
 
     it('returns every block fully populated for a complete inspection', async () => {
@@ -49,12 +57,6 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
             { id: 'client-1',        tenantId: TENANT, type: 'client', name: 'Jane Buyer',        email: 'jane@example.com', phone: '+15551234567', createdAt: new Date() },
             { id: 'agent-buyer-1',   tenantId: TENANT, type: 'agent', name: 'Bob Buyer-Agent',    email: 'bob@bba.com',  phone: '+15550001111', createdAt: new Date() },
             { id: 'agent-listing-1', tenantId: TENANT, type: 'agent', name: 'Lisa Listing-Agent', email: 'lisa@lla.com', phone: null,            createdAt: new Date() },
-            // Task 9c — decoy contacts backing the deliberately-WRONG legacy
-            // referredByAgentId/sellingAgentId column values below (sellingAgentId
-            // carries a frozen legacy FK to contacts.id, so the decoy must be a
-            // real row — just not the one inspection_people actually links).
-            { id: 'stale-agent-buyer',   tenantId: TENANT, type: 'agent', name: 'Decoy Buyer-Agent',   email: 'decoy-buyer@example.com',   createdAt: new Date() },
-            { id: 'stale-agent-listing', tenantId: TENANT, type: 'agent', name: 'Decoy Listing-Agent', email: 'decoy-listing@example.com', createdAt: new Date() },
         ]);
         await testDb.insert(schema.templates).values({
             id: 'tpl-1', tenantId: TENANT, name: 'Standard', version: 1,
@@ -63,17 +65,11 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
         await testDb.insert(schema.inspections).values({
             id: 'insp-full', tenantId: TENANT, inspectorId: 'user-insp',
             propertyAddress: '1 Main St',
-            // Task 9c — legacy client/agent columns intentionally DIVERGE from
-            // inspection_people below (stale decoy values). getInspectionHub
-            // must resolve `inspection.clientName/clientEmail/clientPhone/
-            // clientContactId/referredByAgentId/sellingAgentId` from
+            // getInspectionHub resolves clientName/clientEmail/clientPhone/
+            // clientContactId/referredByAgentId/sellingAgentId from
             // inspection_people (PeopleService.getPrimaryClient /
-            // contactIdForRole), never these columns — they survive GDPR
-            // erasure as a stale denormalized cache and would leak an erased
-            // subject's PII.
-            clientContactId: 'stale-contact-id',
-            clientName: 'STALE-LEGACY-NAME', clientEmail: 'stale-legacy@example.com', clientPhone: '000-000-0000',
-            templateId: 'tpl-1', referredByAgentId: 'stale-agent-buyer', sellingAgentId: 'stale-agent-listing',
+            // contactIdForRole). The row itself carries none of them.
+            templateId: 'tpl-1',
             coverPhotoId: 'cover-1', date: '2026-06-01', status: 'completed',
             paymentStatus: 'unpaid', price: 35000, paymentRequired: true, agreementRequired: true,
             createdAt: new Date(),
@@ -110,8 +106,7 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
         expect(hub).not.toBeNull();
         if (!hub) throw new Error('unreachable');
 
-        // inspection block — sourced from inspection_people (Task 9c), not the
-        // deliberately-divergent legacy columns seeded above.
+        // inspection block — sourced from inspection_people (Task 9c).
         expect(hub.inspection).toMatchObject({
             id: 'insp-full', propertyAddress: '1 Main St', clientName: 'Jane Buyer',
             clientEmail: 'jane@example.com', clientPhone: '+15551234567', clientContactId: 'client-1',
@@ -119,12 +114,6 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
             paymentStatus: 'unpaid', paymentRequired: true, agreementRequired: true,
             coverPhoto: 'cover-1', referredByAgentId: 'agent-buyer-1', sellingAgentId: 'agent-listing-1',
         });
-        expect(hub.inspection.clientName).not.toBe('STALE-LEGACY-NAME');
-        expect(hub.inspection.clientEmail).not.toBe('stale-legacy@example.com');
-        expect(hub.inspection.clientPhone).not.toBe('000-000-0000');
-        expect(hub.inspection.clientContactId).not.toBe('stale-contact-id');
-        expect(hub.inspection.referredByAgentId).not.toBe('stale-agent-buyer');
-        expect(hub.inspection.sellingAgentId).not.toBe('stale-agent-listing');
         expect(hub.tenantSlug).toBe(SLUG);
 
         // people block (reuses getPeopleCard shape)
@@ -169,7 +158,6 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
         });
         await testDb.insert(schema.inspections).values({
             id: 'insp-other', tenantId: OTHER, propertyAddress: 'X',
-            clientName: null, clientEmail: null, clientPhone: null,
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
             price: 0, paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         });
@@ -184,7 +172,6 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
         });
         await testDb.insert(schema.inspections).values({
             id: 'insp-bare', tenantId: TENANT, propertyAddress: '1 Main St',
-            clientName: 'Jane', clientEmail: null, clientPhone: null,
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
             price: 0, paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         });

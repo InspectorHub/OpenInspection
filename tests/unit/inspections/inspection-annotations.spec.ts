@@ -49,7 +49,7 @@ describe('saveAnnotation', () => {
     });
     await testDb.insert(schema.inspections).values({
       id: INSPECTION_ID, tenantId: TENANT, templateId: null,
-      propertyAddress: '1 Main St', clientName: 'C', clientEmail: 'c@example.com',
+      propertyAddress: '1 Main St',
       date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
       paymentRequired: false, agreementRequired: false, createdAt: new Date(),
     });

@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -49,7 +50,7 @@ beforeEach(async () => {
     await db.insert(schema.tenantConfigs).values({
         tenantId: T, defaultLocale: 'en-US', updatedAt: new Date(),
     } as never);
-    await seedRoleProfiles(db, T, new Date(1));
+    await seedRoleProfiles(asD1Db(db), T, new Date(1));
     await db.insert(schema.inspections).values({
         id: INSP, tenantId: T, propertyAddress: '12 Oak Lane', date: '2026-06-01',
         status: 'completed', reportStatus: 'published', paymentStatus: 'unpaid',

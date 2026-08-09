@@ -32,7 +32,7 @@ describe('InvoiceService — currency snapshot on creation', () => {
 
     async function seedCurrency(currency: string) {
         await testDb.insert(schema.tenantConfigs).values({
-            tenantId: TENANT, currency, createdAt: new Date(), updatedAt: new Date(),
+            tenantId: TENANT, currency, updatedAt: new Date(),
         });
     }
 

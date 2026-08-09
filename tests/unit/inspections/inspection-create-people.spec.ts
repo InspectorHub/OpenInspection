@@ -13,6 +13,7 @@ import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq, and } from 'drizzle-orm';
@@ -57,7 +58,7 @@ beforeEach(async () => {
     // referredByAgentId/sellingAgentId dropped from inspections). createInspection's
     // Task 7 people-write resolves role profile ids by key, so the role
     // profiles must exist for the write to land.
-    await seedRoleProfiles(testDb, TENANT, new Date());
+    await seedRoleProfiles(asD1Db(testDb), TENANT, new Date());
 
     inspectionSvc = new InspectionService({} as D1Database, undefined, sdb);
     contactSvc = new ContactService({} as D1Database);

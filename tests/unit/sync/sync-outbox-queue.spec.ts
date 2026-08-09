@@ -168,7 +168,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
         await testDb.insert(tenants).values({ id: 't1', name: 'T1', slug: 't1', createdAt: new Date() } as typeof tenants.$inferInsert);
         await testDb.insert(users).values({
             id: 'u-victim', tenantId: 't1', email: 'victim@example.com',
-            passwordHash: 'hash', role: 'member', createdAt: new Date(),
+            passwordHash: 'hash', role: 'inspector', createdAt: new Date(),
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const outbox = new OutboxService({} as any);

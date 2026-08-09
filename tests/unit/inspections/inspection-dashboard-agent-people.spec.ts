@@ -15,6 +15,7 @@ import { InspectionAnalyticsService } from '../../../server/services/inspection/
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -58,30 +59,28 @@ describe('InspectionAnalyticsService.getDashboardBuckets — agent attribution v
             id: TENANT, name: 'Acme', slug: 'acme-9c3', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
         await testDb.insert(schema.contacts).values([
             { id: LISTING_AGENT, tenantId: TENANT, type: 'agent', name: 'Lisa Listing', email: 'lisa@realty.example', createdAt: new Date() },
             { id: BUYER_AGENT, tenantId: TENANT, type: 'agent', name: 'Bob Buyer', email: 'bob@realty.example', createdAt: new Date() },
         ]);
 
-        // Legacy sellingAgentId/referredByAgentId columns intentionally NULL —
-        // only inspection_people carries agent attribution.
+        // Only inspection_people carries agent attribution: the
+        // sellingAgentId/referredByAgentId columns were dropped from
+        // `inspections` (schema/inspection/core.ts).
         await testDb.insert(schema.inspections).values([
             {
                 id: INSP_LISTING, tenantId: TENANT, propertyAddress: '1 Main St',
-                sellingAgentId: null, referredByAgentId: null,
                 date: todayStr(), status: 'confirmed', paymentStatus: 'unpaid', price: 10000,
                 paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             },
             {
                 id: INSP_BUYER, tenantId: TENANT, propertyAddress: '2 Oak Ave',
-                sellingAgentId: null, referredByAgentId: null,
                 date: todayStr(), status: 'confirmed', paymentStatus: 'unpaid', price: 20000,
                 paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             },
             {
                 id: INSP_NONE, tenantId: TENANT, propertyAddress: '3 Elm St',
-                sellingAgentId: null, referredByAgentId: null,
                 date: todayStr(), status: 'confirmed', paymentStatus: 'unpaid', price: 0,
                 paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             },

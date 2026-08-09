@@ -90,10 +90,10 @@ describe('AdminService', () => {
         const tenantId = 't1';
 
         await testDb.insert(inspections).values({
-            id: 'insp-export', tenantId, propertyAddress: '1 Main', clientName: 'Client',
-            clientEmail: 'client@example.com', date: '2026-06-01', status: 'requested',
+            id: 'insp-export', tenantId, propertyAddress: '1 Main',
+            date: '2026-06-01', status: 'requested',
             paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
-        } as any);
+        });
         await testDb.insert(agreements).values({
             id: 'agr-tpl', tenantId, name: 'Tpl', content: 'body', createdAt: new Date(),
         } as any);
@@ -220,7 +220,7 @@ describe('AdminService', () => {
             id: 'insp-actor',
             tenantId,
             propertyAddress: '99 Actor Ave',
-            // No clientName/clientEmail: those columns were DROPPED from
+            // No client columns: clientName/clientEmail were DROPPED from
             // `inspections` (schema/inspection/core.ts). This row is scaffolding
             // only — the assertion below is about the erasure_log entry
             // eraseClientData writes, not about what it matched.

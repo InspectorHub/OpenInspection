@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
@@ -38,7 +39,7 @@ beforeEach(async () => {
         id: T, name: 'Acme Inspections', slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
-    await seedRoleProfiles(db, T, new Date(1));
+    await seedRoleProfiles(asD1Db(db), T, new Date(1));
 });
 
 describe('SP2 delivery characterization — Report Ready output unchanged after decoupling', () => {

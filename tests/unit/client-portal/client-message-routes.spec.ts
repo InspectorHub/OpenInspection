@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -69,9 +70,9 @@ describe('client message routes (resolveClientActor-gated)', () => {
         await testDb.insert(schema.inspections).values({
             id: inspectionId, tenantId: TENANT, propertyAddress: '1 Main St', date: '2026-06-01',
             status: 'requested', reportStatus: 'in_progress', paymentStatus: 'unpaid',
-            clientName: null, clientEmail: null, createdAt: new Date(), price: 0,
+            createdAt: new Date(), price: 0,
         });
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
         await testDb.insert(schema.contacts).values({
             id: 'contact-client-1', tenantId: TENANT, type: 'client', name: 'Pat Client',
             email: 'client@x.com', phone: null, createdAt: new Date(),
@@ -107,7 +108,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
         expect(noTok.status).toBe(401);
         const ok = await app.request(`/api/public/inspections/${inspectionId}/messages?token=${clientToken}`, {}, reqEnv());
         expect(ok.status).toBe(200);
-        const body = await ok.json();
+        const body = await ok.json<{ success: boolean; data: unknown[] }>();
         expect(body.success).toBe(true);
         expect(Array.isArray(body.data)).toBe(true);
     });
@@ -154,7 +155,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
         await testDb.insert(schema.inspections).values({
             id: 'insp2', tenantId: TENANT, propertyAddress: '2 Main St', date: '2026-06-02',
             status: 'requested', reportStatus: 'in_progress', paymentStatus: 'unpaid',
-            clientName: 'Other', clientEmail: 'other@x.com', createdAt: new Date(), price: 0,
+            createdAt: new Date(), price: 0,
         });
         const otherToken = await portalAccess.issueToken({
             tenantId: TENANT, inspectionId: 'insp2', recipientEmail: 'other@x.com', role: 'client',
@@ -170,7 +171,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
         }, reqEnv());
         const inspRes = await app.request(`/api/inspections/${inspectionId}/messages`, {}, reqEnv());
         expect(inspRes.status).toBe(200);
-        const body = await inspRes.json();
+        const body = await inspRes.json<{ data: { body: string }[] }>();
         expect(body.data.length).toBe(1);
         expect(body.data[0].body).toBe('ping');
     });

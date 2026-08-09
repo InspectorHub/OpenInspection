@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { inspectorSignature } from '../../../server/lib/inspector-signature';
+import { inspectorSignature, type SignatureUser } from '../../../server/lib/inspector-signature';
 
-const FULL_USER = {
+const FULL_USER: SignatureUser = {
     name: 'Mike Reynolds',
     email: 'mike@acme.test',
     phone: '(303) 555-0142',
@@ -12,7 +12,7 @@ const FULL_USER = {
     credentials: [
         { label: 'Licensed home inspector', memberNumber: 'TX-INSP-9001', imageUrl: null },
     ],
-} as const;
+};
 
 const HOST = 'app.inspectorhub.io';
 

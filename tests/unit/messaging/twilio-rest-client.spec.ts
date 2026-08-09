@@ -7,15 +7,10 @@
 // a non-2xx error path.
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createTwilioRestClient } from '../../../server/lib/messaging/twilio-rest-client';
+import { stubFetchJson as mockFetchOnce } from '../helpers/fetch-mock';
 
 const CREDS = { accountSid: 'ACmain', apiKeySid: 'SKkey', apiKeySecret: 'secret123' };
 const BASIC_AUTH = `Basic ${btoa('SKkey:secret123')}`;
-
-function mockFetchOnce(status: number, body: unknown, headers?: Record<string, string>) {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify(body), { status, headers }));
-    vi.stubGlobal('fetch', fetchMock);
-    return fetchMock;
-}
 
 describe('createTwilioRestClient — generic request()', () => {
     afterEach(() => vi.restoreAllMocks());

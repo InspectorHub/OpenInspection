@@ -31,7 +31,18 @@ const TENANT = '00000000-0000-0000-0000-000000000001';
 const INSP = '550e8400-e29b-41d4-a716-446655440000';
 const PERSON = 'ip-1';
 
-const CLIENT = { id: PERSON, contactId: 'c1', roleProfileId: 'rp1', roleKey: 'client', roleLabel: 'Client', kind: 'client', name: 'Buyer', email: 'buyer@example.com', phone: null, agency: null };
+/** What the route reads off each `listPeople` row. `email` and `phone` are
+ *  nullable on the real row, and one case below turns on exactly that: a person
+ *  with no email has no link to reset. Annotated rather than inferred — with the
+ *  shape inferred from the literal, `email` widens to `string` and that case
+ *  cannot be expressed. */
+interface PersonRow {
+    id: string; contactId: string; roleProfileId: string; roleKey: string;
+    roleLabel: string; kind: string; name: string;
+    email: string | null; phone: string | null; agency: string | null;
+}
+
+const CLIENT: PersonRow = { id: PERSON, contactId: 'c1', roleProfileId: 'rp1', roleKey: 'client', roleLabel: 'Client', kind: 'client', name: 'Buyer', email: 'buyer@example.com', phone: null, agency: null };
 const CO_CLIENT = { ...CLIENT, id: 'ip-2', contactId: 'c2', roleKey: 'co_client', roleLabel: 'Co-Client', name: 'Co Buyer', email: 'co@example.com' };
 
 let rotateForRecipient: ReturnType<typeof vi.fn>;

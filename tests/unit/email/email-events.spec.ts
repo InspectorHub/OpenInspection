@@ -70,7 +70,13 @@ function bytesToBase64(bytes: Uint8Array): string {
     for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
     return btoa(bin);
 }
-async function hmacSha256(keyBytes: Uint8Array, message: string): Promise<Uint8Array> {
+// `Uint8Array<ArrayBuffer>` rather than a bare `Uint8Array`: since TS 5.7 the
+// element-buffer is a type parameter and `BufferSource` (what `importKey` takes)
+// admits only the `ArrayBuffer` instantiation, not the `ArrayBufferLike` default
+// that could be a `SharedArrayBuffer`. Every caller here builds its key from an
+// array literal or a `subtle` result, both of which already ARE that narrower
+// type — so naming it is a tightening, not a cast.
+async function hmacSha256(keyBytes: Uint8Array<ArrayBuffer>, message: string): Promise<Uint8Array<ArrayBuffer>> {
     const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
     return new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message)));
 }

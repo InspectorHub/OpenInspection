@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
@@ -94,14 +95,14 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
         // Task 9a — the route resolves the client via the inspection_people
         // join (PeopleService), not the legacy inline columns, so those are
         // intentionally left NULL here and the primary client rides the join.
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values({
             id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane',
             email: 'jane@example.com', phone: null, createdAt: new Date(),
         });
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT,
-            propertyAddress: '1 Main St', clientName: null, clientEmail: null,
+            propertyAddress: '1 Main St',
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
@@ -179,7 +180,7 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
     it('honors the tenant default_locale for the email amount label (es-419)', async () => {
         await db.insert(schema.tenantConfigs).values({
             tenantId: TENANT, defaultLocale: 'es-419', currency: 'USD',
-            createdAt: new Date(), updatedAt: new Date(),
+            updatedAt: new Date(),
         });
         const res = await post({ inspectionId: INSP_ID });
         expect(res.status).toBe(200);
@@ -259,7 +260,7 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
         });
         await db.insert(schema.inspections).values({
             id: OTHER_INSP_ID, tenantId: OTHER, propertyAddress: 'X',
-            clientName: 'X', clientEmail: 'x@y.com', date: '2026-06-01', status: 'requested',
+            date: '2026-06-01', status: 'requested',
             paymentStatus: 'unpaid', price: 10000, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
         const res = await post({ inspectionId: OTHER_INSP_ID });

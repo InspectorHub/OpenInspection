@@ -17,6 +17,7 @@ import { PeopleService } from '../../../server/services/people.service';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -43,7 +44,7 @@ describe('InspectionCoreService.getInspection / .listInspections — primary-cli
         await db.insert(schema.tenants).values([
             { id: T1, name: 'Tenant One', slug: T1, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        await seedRoleProfiles(db, T1, new Date(1));
+        await seedRoleProfiles(asD1Db(db), T1, new Date(1));
         await db.insert(schema.contacts).values({
             id: CLIENT, tenantId: T1, type: 'client', name: 'Jane Client',
             email: 'jane@example.com', phone: '+15551234567', createdAt: new Date(),
@@ -55,13 +56,11 @@ describe('InspectionCoreService.getInspection / .listInspections — primary-cli
         await db.insert(schema.inspections).values([
             {
                 id: INSP_WITH_CLIENT, tenantId: T1, propertyAddress: '1 Main St',
-                clientName: null, clientEmail: null, clientPhone: null,
                 date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
                 paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             },
             {
                 id: INSP_NO_CLIENT, tenantId: T1, propertyAddress: '2 Oak Ave',
-                clientName: null, clientEmail: null, clientPhone: null,
                 date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 0,
                 paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             },
@@ -113,9 +112,8 @@ describe('InspectionCoreService.getInspection / .listInspections — primary-cli
         it('free-text search matches a client name that lives ONLY in inspection_people (no legacy inspections.client_name column)', async () => {
             const svc = makeSvc();
             // "Jane Client" is seeded exclusively via inspection_people ->
-            // contacts (INSP_WITH_CLIENT's legacy clientName column is NULL) —
-            // search must still find it via the primary-client join, not the
-            // frozen legacy column.
+            // contacts; `inspections` has no client_name column to fall back
+            // on, so search must find it through the primary-client join.
             const { inspections } = await svc.listInspections(T1, { limit: 20, search: 'Jane' });
             expect(inspections.map(i => i.id)).toEqual([INSP_WITH_CLIENT]);
 

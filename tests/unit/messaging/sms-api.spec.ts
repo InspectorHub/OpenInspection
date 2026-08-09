@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
@@ -100,7 +101,7 @@ function form(fields: Record<string, string>): RequestInit {
 
 describe('SMS consent API (Track L Task 8)', () => {
     it('inspector attestation records granted for an already-linked client contact', async () => {
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         const contactId = crypto.randomUUID();
         await db.insert(schema.contacts).values({
             id: contactId, tenantId: TENANT, type: 'client', name: 'Jane', email: 'jane@x.com', createdAt: new Date(),
@@ -143,7 +144,7 @@ describe('SMS consent API (Track L Task 8)', () => {
             date: '2026-07-02',
             status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         } as never);
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         const bobContactId = crypto.randomUUID();
         await db.insert(schema.contacts).values({
             id: bobContactId, tenantId: TENANT, type: 'client', name: 'Bob', email: 'bob@x.com', createdAt: new Date(),
@@ -163,7 +164,7 @@ describe('SMS consent API (Track L Task 8)', () => {
     });
 
     it('GET /sms/consent reports the latest action', async () => {
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         const contactId = crypto.randomUUID();
         await db.insert(schema.contacts).values({
             id: contactId, tenantId: TENANT, type: 'client', name: 'Jane', email: 'jane@x.com', createdAt: new Date(),
@@ -1341,7 +1342,7 @@ import { managedSendAllowed } from '../../../server/lib/sms/managed-send-gate';
 describe('managedSendAllowed — compliance gate unit tests (Task 8)', () => {
     it('managed_dedicated: no compliance row → blocked (fail-closed)', async () => {
         // No row seeded for TENANT.
-        const result = await managedSendAllowed(db, {}, TENANT, 'managed_dedicated');
+        const result = await managedSendAllowed(asD1Db(db), {}, TENANT, 'managed_dedicated');
         expect(result.allowed).toBe(false);
         expect(result.reason).toBe('managed_not_approved');
     });
@@ -1352,7 +1353,7 @@ describe('managedSendAllowed — compliance gate unit tests (Task 8)', () => {
             tenantId: TENANT, mode: 'managed_dedicated',
             complianceStatus: 'not_started', createdAt: now, updatedAt: now,
         } as never);
-        const result = await managedSendAllowed(db, {}, TENANT, 'managed_dedicated');
+        const result = await managedSendAllowed(asD1Db(db), {}, TENANT, 'managed_dedicated');
         expect(result.allowed).toBe(false);
         expect(result.reason).toBe('managed_not_approved');
     });
@@ -1363,7 +1364,7 @@ describe('managedSendAllowed — compliance gate unit tests (Task 8)', () => {
             tenantId: TENANT, mode: 'managed_dedicated',
             complianceStatus: 'campaign_pending', createdAt: now, updatedAt: now,
         } as never);
-        const result = await managedSendAllowed(db, {}, TENANT, 'managed_dedicated');
+        const result = await managedSendAllowed(asD1Db(db), {}, TENANT, 'managed_dedicated');
         expect(result.allowed).toBe(false);
     });
 
@@ -1373,7 +1374,7 @@ describe('managedSendAllowed — compliance gate unit tests (Task 8)', () => {
             tenantId: TENANT, mode: 'managed_dedicated',
             complianceStatus: 'approved', createdAt: now, updatedAt: now,
         } as never);
-        const result = await managedSendAllowed(db, {}, TENANT, 'managed_dedicated');
+        const result = await managedSendAllowed(asD1Db(db), {}, TENANT, 'managed_dedicated');
         expect(result.allowed).toBe(true);
         expect(result.reason).toBeUndefined();
     });
@@ -1384,29 +1385,29 @@ describe('managedSendAllowed — compliance gate unit tests (Task 8)', () => {
             tenantId: TENANT, mode: 'managed_dedicated',
             complianceStatus: 'rejected', createdAt: now, updatedAt: now,
         } as never);
-        const result = await managedSendAllowed(db, {}, TENANT, 'managed_dedicated');
+        const result = await managedSendAllowed(asD1Db(db), {}, TENANT, 'managed_dedicated');
         expect(result.allowed).toBe(false);
     });
 
     it('managed_shared: TWILIO_SHARED_MESSAGING_SERVICE_SID set → allowed', async () => {
         const env = { TWILIO_SHARED_MESSAGING_SERVICE_SID: 'MG_shared_test' };
-        const result = await managedSendAllowed(db, env, TENANT, 'managed_shared');
+        const result = await managedSendAllowed(asD1Db(db), env, TENANT, 'managed_shared');
         expect(result.allowed).toBe(true);
     });
 
     it('managed_shared: TWILIO_SHARED_MESSAGING_SERVICE_SID absent → blocked', async () => {
-        const result = await managedSendAllowed(db, {}, TENANT, 'managed_shared');
+        const result = await managedSendAllowed(asD1Db(db), {}, TENANT, 'managed_shared');
         expect(result.allowed).toBe(false);
         expect(result.reason).toBe('managed_not_approved');
     });
 
     it('own → always allowed (no DB read needed)', async () => {
-        const result = await managedSendAllowed(db, {}, TENANT, 'own');
+        const result = await managedSendAllowed(asD1Db(db), {}, TENANT, 'own');
         expect(result.allowed).toBe(true);
     });
 
     it('platform → always allowed', async () => {
-        const result = await managedSendAllowed(db, {}, TENANT, 'platform');
+        const result = await managedSendAllowed(asD1Db(db), {}, TENANT, 'platform');
         expect(result.allowed).toBe(true);
     });
 });

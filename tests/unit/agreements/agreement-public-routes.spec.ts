@@ -88,7 +88,7 @@ function buildApp(db: BetterSQLite3Database<typeof schema>, stubs: Stubs = {}) {
             email: { sendAgreementSignedConfirmation: emailConfirm },
         } as unknown as HonoConfig['Variables']['services']);
         // Wire the workflow binding onto env so the completion pipeline can fire.
-        (c.env as Record<string, unknown>).SIGN_COMPLETION_WORKFLOW = { create: workflowCreate };
+        Object.assign(c.env, { SIGN_COMPLETION_WORKFLOW: { create: workflowCreate } });
         await next();
     });
     app.route('/', bookingsRoutes);
@@ -103,8 +103,8 @@ async function seedBase(db: BetterSQLite3Database<typeof schema>) {
         deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
     } as any);
     await db.insert(schema.inspections).values({
-        id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', clientName: 'Jane',
-        clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+        id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St',
+        date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
         price: 50000, agreementRequired: true, paymentRequired: false, createdAt: new Date(),
     } as any);
     await db.insert(schema.agreements).values({

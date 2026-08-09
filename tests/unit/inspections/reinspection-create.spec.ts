@@ -31,8 +31,8 @@ async function seed(testDb: BetterSQLite3Database<typeof schema>) {
     // Published ORIGINAL inspection.
     await testDb.insert(schema.inspections).values({
         id: ORIGINAL, tenantId: TENANT,
-        propertyAddress: '1 Main St', clientName: 'Jane Buyer',
-        clientEmail: 'jane@example.com', date: '2026-06-01',
+        propertyAddress: '1 Main St',
+        date: '2026-06-01',
         status: 'completed', reportStatus: 'published', paymentStatus: 'unpaid', price: 0,
         paymentRequired: false, agreementRequired: false, createdAt: new Date(),
     });

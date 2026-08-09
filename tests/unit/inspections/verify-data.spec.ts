@@ -41,10 +41,10 @@ describe('loadVerifyData — Track I-a snapshot + signers', () => {
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({
-      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane',
-      clientEmail: 'jane@x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St',
+      date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
       price: 0, createdAt: new Date(),
-    } as any);
+    });
     await db.insert(schema.agreements).values({
       id: AGR_ID, tenantId: TENANT_A, name: 'Standard', content: '<p>Body</p>',
       version: 1, createdAt: new Date(),

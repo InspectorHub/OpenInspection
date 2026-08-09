@@ -4,6 +4,7 @@ import { runErasure } from '../../../server/lib/compliance/erasure-orchestrator'
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { PeopleService } from '../../../server/services/people.service';
 import { createTestDb, setupSchema } from '../db';
+import { asAnyDb, asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -41,7 +42,7 @@ async function seedTenants(db: BetterSQLite3Database<typeof schema>) {
 async function seedSignedEnvelope(db: BetterSQLite3Database<typeof schema>, signedAtMs: number) {
     const inspId = 'insp-signed';
     const reqId = 'req-signed';
-    await seedRoleProfiles(db, TENANT_A, new Date(1));
+    await seedRoleProfiles(asD1Db(db), TENANT_A, new Date(1));
     await db.insert(schema.inspections).values({
         id: inspId, tenantId: TENANT_A, propertyAddress: '1 Main St',
         date: '2026-06-01', status: 'completed', paymentStatus: 'unpaid', price: 50000, createdAt: new Date(),
@@ -108,7 +109,7 @@ describe('runErasure', () => {
         const signedAtMs = Date.UTC(2024, 0, 1);
         await seedSignedEnvelope(db, signedAtMs);
 
-        const summary = await runErasure(db, {
+        const summary = await runErasure(asAnyDb(db), {
             tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6,
             requestedBy: 'admin-sub', identityBasis: 'admin_action',
         });
@@ -169,7 +170,7 @@ describe('runErasure', () => {
 
     it('other signers PII on the same envelope is NOT touched', async () => {
         await seedSignedEnvelope(db, Date.UTC(2024, 0, 1));
-        await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
+        await runErasure(asAnyDb(db), { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
 
         const coclient = await db.select().from(schema.agreementSigners)
             .where(eq(schema.agreementSigners.id, 'signer-coclient')).get();
@@ -182,8 +183,8 @@ describe('runErasure', () => {
         const inspId = 'insp-draft';
         const reqId = 'req-draft';
         await db.insert(schema.inspections).values({
-            id: inspId, tenantId: TENANT_A, propertyAddress: '2 Main', clientName: 'Drafty',
-            clientEmail: SUBJECT_EMAIL, date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
+            id: inspId, tenantId: TENANT_A, propertyAddress: '2 Main',
+            date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
         });
         await db.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: inspId, agreementId: 'agr-1',
@@ -195,7 +196,7 @@ describe('runErasure', () => {
             name: 'Drafty', email: SUBJECT_EMAIL, role: 'client', status: 'viewed', createdAt: new Date(),
         });
 
-        const summary = await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
+        const summary = await runErasure(asAnyDb(db), { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
         expect(summary.deletedCount).toBeGreaterThan(0);
 
         const env = await db.select().from(schema.agreementRequests)
@@ -221,7 +222,6 @@ describe('runErasure', () => {
         const subjectSignedAtMs = Date.UTC(2024, 5, 15);
         await db.insert(schema.inspections).values({
             id: inspId, tenantId: TENANT_A, propertyAddress: '4 Main',
-            clientName: 'Jane Subject', clientEmail: SUBJECT_EMAIL, clientPhone: '555-2222',
             date: '2026-06-04', status: 'completed', reportStatus: 'in_progress', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
         });
         await db.insert(schema.agreementRequests).values({
@@ -245,7 +245,7 @@ describe('runErasure', () => {
             },
         ]);
 
-        const summary = await runErasure(db, {
+        const summary = await runErasure(asAnyDb(db), {
             tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6,
         });
 
@@ -282,7 +282,7 @@ describe('runErasure', () => {
 
     it('non-agreement client PII (contacts + inspection_people) -> actually erased from every live read path', async () => {
         const { inspId } = await seedSignedEnvelope(db, Date.UTC(2024, 0, 1));
-        const summary = await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
+        const summary = await runErasure(asAnyDb(db), { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
 
         // contacts.name is NOT NULL -> the CRM contact row (the LIVE source of
         // client PII) is deleted outright.
@@ -320,7 +320,7 @@ describe('runErasure', () => {
 
     it('tenant-scoped: other tenant contact + inspection_people rows with same email untouched', async () => {
         await seedSignedEnvelope(db, Date.UTC(2024, 0, 1));
-        await seedRoleProfiles(db, TENANT_B, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT_B, new Date(1));
         await db.insert(schema.inspections).values({
             id: 'insp-other-tenant', tenantId: TENANT_B, propertyAddress: '3 Main',
             date: '2026-06-03', status: 'requested', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
@@ -334,7 +334,7 @@ describe('runErasure', () => {
             contactId: 'contact-other-tenant', roleProfileId: `crp_${TENANT_B}_client`, createdAt: new Date(),
         });
 
-        await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
+        await runErasure(asAnyDb(db), { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
 
         const otherContact = await db.select().from(schema.contacts)
             .where(eq(schema.contacts.id, 'contact-other-tenant')).get();
@@ -348,10 +348,10 @@ describe('runErasure', () => {
 
     it('idempotent re-run -> 0 new anonymizations, still writes a log row', async () => {
         await seedSignedEnvelope(db, Date.UTC(2024, 0, 1));
-        const first = await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
+        const first = await runErasure(asAnyDb(db), { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
         expect(first.anonymizedCount).toBeGreaterThan(0);
 
-        const second = await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
+        const second = await runErasure(asAnyDb(db), { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
         expect(second.anonymizedCount).toBe(0);
         expect(second.deletedCount).toBe(0);
         expect(second.status).toBe('completed');
@@ -376,7 +376,7 @@ describe('runErasure', () => {
             return realDelete(table as never);
         }) as never);
 
-        const summary = await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
+        const summary = await runErasure(asAnyDb(db), { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
         spy.mockRestore();
 
         expect(summary.status).toBe('partially_completed');
@@ -430,7 +430,7 @@ describe('runErasure — the residences the original manifest missed (#88)', () 
         });
     });
 
-    const run = () => runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
+    const run = () => runErasure(asAnyDb(db), { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
 
     it('invoices: identity nulled in place, the financial record kept, other invoices untouched', async () => {
         await db.insert(schema.invoices).values([
@@ -517,7 +517,7 @@ describe('runErasure — the residences the original manifest missed (#88)', () 
         // subject's property says things about this subject, in prose no PII
         // heuristic can see. `lint:erasure` is green either way; only this is
         // evidence the rule runs.
-        await seedRoleProfiles(db, TENANT_A, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT_A, new Date(1));
         await db.insert(schema.inspectionPeople).values({
             id: 'ip-88', tenantId: TENANT_A, inspectionId: INSP,
             contactId: 'contact-88', roleProfileId: `crp_${TENANT_A}_client`, createdAt: new Date(),
@@ -629,7 +629,7 @@ describe('runErasure — repair-request lists (#88)', () => {
         db = fixture.db;
         await setupSchema(fixture.sqlite);
         await seedTenants(db);
-        await seedRoleProfiles(db, TENANT_A, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT_A, new Date(1));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(db);
         await db.insert(schema.inspections).values({
@@ -647,7 +647,7 @@ describe('runErasure — repair-request lists (#88)', () => {
         });
     });
 
-    const run = () => runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
+    const run = () => runErasure(asAnyDb(db), { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
 
     /** A list, with one item. `createdByRef` is an EMAIL on the portal-token path. */
     async function seedList(id: string, createdByRef: string, kind: 'client' | 'agent' | 'inspector') {
@@ -661,7 +661,6 @@ describe('runErasure — repair-request lists (#88)', () => {
             findingKey: 'f1', sectionTitle: 'Roof', itemLabel: 'Shingles',
             commentSnapshot: 'Shingles are cupping at the south slope.',
             note: 'Call Jane on 555-1111 to arrange access.',
-            createdAt: new Date(),
         });
     }
 

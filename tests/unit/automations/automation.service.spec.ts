@@ -4,6 +4,7 @@ import { AgreementService } from '../../../server/services/agreement.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -25,12 +26,12 @@ async function seedFor(testDb: BetterSQLite3Database<typeof schema>, agreementRe
     await testDb.insert(schema.tenants).values([
         { id: TENANT, name: 'T', slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
-    await seedRoleProfiles(testDb, TENANT, new Date(1));
+    await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
     await testDb.insert(schema.contacts).values([
         { id: CLIENT, tenantId: TENANT, type: 'client', name: 'J', email: 'j@t.com', createdAt: new Date() },
     ]);
     await testDb.insert(schema.inspections).values([
-        { id: INSP, tenantId: TENANT, propertyAddress: '1 St', clientName: 'J', clientEmail: 'j@t.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired, paymentRequired: false, createdAt: new Date() },
+        { id: INSP, tenantId: TENANT, propertyAddress: '1 St', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired, paymentRequired: false, createdAt: new Date() },
     ]);
     await testDb.insert(schema.agreements).values([
         { id: AGR, tenantId: TENANT, name: 'Std', content: 'text', version: 1, createdAt: new Date() },

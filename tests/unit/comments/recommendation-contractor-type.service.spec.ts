@@ -22,7 +22,7 @@ describe('RecommendationService — contractor type', () => {
   });
 
   it('persists and returns recommendedContractorTypeId on create + update', async () => {
-    const rec = await svc.create(T, { name: 'Fix panel', severity: 'defect', defaultRepairSummary: 'Replace breaker', recommendedContractorTypeId: 'ct-electrician' });
+    const rec = await svc.create(T, { name: 'Fix panel', severity: 'significant', defaultRepairSummary: 'Replace breaker', recommendedContractorTypeId: 'ct-electrician' });
     expect(rec.recommendedContractorTypeId).toBe('ct-electrician');
 
     const stored = await testDb.select().from(schema.comments).where(eq(schema.comments.id, rec.id)).get();

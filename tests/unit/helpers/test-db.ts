@@ -57,6 +57,22 @@ export function asScopedDbSource(db: TestDb): DrizzleDB {
 }
 
 /**
+ * Present a test SQLite database to a `server/` helper whose parameter is the
+ * `AnyDb` union — `DrizzleD1Database<Record<string, unknown>> | { [k: string]:
+ * unknown }`, declared identically in `server/lib/compliance/{erasure-
+ * orchestrator,retention-logs,retention-sweep}.ts` and
+ * `server/services/payment-ledger.service.ts`.
+ *
+ * This is `asD1Db<Record<string, unknown>>` and nothing more, but it is spelled
+ * out here because that generic argument is not guessable from the call site:
+ * the compiler picks the DEFAULT (`Record<string, never>`) and then reports a
+ * mismatch against a union whose printed name (`AnyDb`) does not mention it.
+ */
+export function asAnyDb(db: TestDb): DrizzleD1Database<Record<string, unknown>> {
+    return asD1Db<Record<string, unknown>>(db);
+}
+
+/**
  * Present a test SQLite database as the return value of a `vi.mock`'d
  * `drizzle-orm/d1` `drizzle()`. Specs that stub that module do so precisely
  * because the code under test builds its own handle from `env.DB`; this is what

@@ -20,7 +20,9 @@ describe('sendTwilioSms', () => {
     it('returns ok=false + error text on non-2xx', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"message":"bad"}', { status: 400 })));
         const res = await sendTwilioSms({ sid: 'ACx', token: 'tok', from: '+1999' }, '+1555', 'Hi');
-        expect(res.ok).toBe(false);
+        // Narrow rather than assert: `sendTwilioSms` returns a discriminated
+        // union and `expect(res.ok).toBe(false)` does not narrow it for tsc.
+        if (res.ok) throw new Error('expected the non-2xx response to produce ok:false');
         expect(res.error).toContain('bad');
     });
 });

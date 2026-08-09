@@ -241,26 +241,38 @@ describe('surface inference: the element paints its own background', () => {
         expect(violations).toEqual([]);
     });
 
-    it('POSITIVE CONTROL: inverse text on the brand primary is not reported as a site defect', () => {
-        // The pairing is legitimate — a filled button. It is also 4.47:1 in
+    it('POSITIVE CONTROL: inverse text on a filled status chip is not reported as a site defect', () => {
+        // The pairing is legitimate — a filled control. It is also 2.15:1 in
         // light, which is a fact about the PALETTE, recorded once. With that
         // record in place the call site is silent...
+        //
+        // ⚠️ THE RECORD IS SYNTHETIC ON PURPOSE. This used to pass
+        // `gate.PALETTE_DEBT` and lean on `--ih-primary` being in it at 4.47:1.
+        // #86 paid that debt, `PALETTE_DEBT` went empty, and the assertion kept
+        // passing — for the opposite reason: nothing left to excuse. A control
+        // that survives its own subject disappearing is not a control. Building
+        // the record here keeps this test about the MACHINERY, whatever the
+        // real list happens to hold.
+        const record = [{
+            fg: '--ih-fg-inverse', bg: '--ih-status-watch', theme: 'light',
+            ratio: 2.15, reason: 'synthetic fixture for this test',
+        }];
         const withRecord = scan(
-            [fixture('text-[12px] text-ih-fg-inverse bg-ih-primary')],
-            gate.PALETTE_DEBT,
+            [fixture('text-[12px] text-ih-fg-inverse bg-ih-watch')],
+            record,
         );
         expect(withRecord.violations).toEqual([]);
-        expect(withRecord.stalePalette.map((p) => p.bg)).not.toContain('--ih-primary');
+        expect(withRecord.stalePalette.map((p) => p.bg)).not.toContain('--ih-status-watch');
 
         // ...and without it the gate still sees the shortfall, in light only,
         // measured against the button and not against a card. This is the
         // assertion that stops the exemption from being a blindfold.
-        const bare = scan([fixture('text-[12px] text-ih-fg-inverse bg-ih-primary')]);
+        const bare = scan([fixture('text-[12px] text-ih-fg-inverse bg-ih-watch')]);
         expect(bare.violations).toHaveLength(1);
-        expect(bare.violations[0].surface).toBe('--ih-primary');
+        expect(bare.violations[0].surface).toBe('--ih-status-watch');
         expect(bare.violations[0].origin).toBe('element');
         expect(bare.violations[0].failures.map((f) => f.theme)).toEqual(['light']);
-        expect(bare.violations[0].failures[0].ratio).toBeCloseTo(4.47, 2);
+        expect(bare.violations[0].failures[0].ratio).toBeCloseTo(2.15, 2);
     });
 
     it('ACCUSES too: fg-3 clears AA on a card and fails on bg-ih-bg-muted', () => {
@@ -357,16 +369,21 @@ describe('the call-site surface annotation', () => {
 
 describe('PALETTE_DEBT — a colour pair recorded with its measurement pinned', () => {
     const entry = (over: Partial<Palette> = {}): Palette => ({
-        fg: '--ih-primary',
+        // `--ih-status-watch` on a card is 2.15:1 in light and clears in dark
+        // and field — the same light-only shape `--ih-primary` had before #86
+        // fixed it to 4.53:1. A control needs a pair that actually fails; when
+        // the palette moves under it, move the control rather than letting it
+        // quietly assert nothing.
+        fg: '--ih-status-watch',
         bg: '--ih-bg-card',
         theme: 'light',
-        ratio: 4.47,
+        ratio: 2.15,
         reason: 'test',
         ...over,
     });
 
     it('excuses exactly the pair, theme and measurement it names', () => {
-        const files = [fixture('text-[13px] text-ih-primary')];
+        const files = [fixture('text-[13px] text-ih-watch')];
         expect(scan(files).violations).toHaveLength(1);
         expect(scan(files, [entry()]).violations).toEqual([]);
         expect(scan(files, [entry()]).stalePalette).toEqual([]);
@@ -380,7 +397,7 @@ describe('PALETTE_DEBT — a colour pair recorded with its measurement pinned', 
     it('goes STALE when the palette moves, instead of covering the new number', () => {
         // The staleness guard is the entire difference between a record and a
         // mute button: edit the token and the gate demands the decision again.
-        const drifted = scan([fixture('text-[13px] text-ih-primary')], [entry({ ratio: 4.2 })]);
+        const drifted = scan([fixture('text-[13px] text-ih-watch')], [entry({ ratio: 1.9 })]);
         expect(drifted.violations).toHaveLength(1);
         expect(drifted.stalePalette).toHaveLength(1);
     });

@@ -57,7 +57,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         });
         await testDb.insert(schema.users).values({
             id: ADMIN, tenantId: TENANT, email: 'admin@acme.test',
-            passwordHash: 'x', role: 'admin', createdAt: new Date(),
+            passwordHash: 'x', role: 'owner', createdAt: new Date(),
         });
         await testDb.insert(schema.users).values({
             id: MEMBER, tenantId: TENANT, email: MEMBER_EMAIL,
@@ -158,7 +158,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         const invite = await team.createInvite({
             tenantId: TENANT,
             email: MEMBER_EMAIL,
-            role: 'admin',
+            role: 'manager',
         });
 
         await auth.joinTeam(invite.token, 'new-password-123');
@@ -167,7 +167,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         expect(row).toBeDefined();
         expect(row!.id).toBe(MEMBER); // reactivated in place, not a fresh row
         expect(row!.deletedAt).toBeNull();
-        expect(row!.role).toBe('admin');
+        expect(row!.role).toBe('manager');   // the INVITED role is applied on reactivation
 
         expect((await getSeatUsage(TENANT, {} as never)).used).toBe(2);
 

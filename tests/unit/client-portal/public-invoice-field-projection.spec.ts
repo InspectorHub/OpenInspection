@@ -14,6 +14,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -88,7 +89,7 @@ describe('IA-86 — public invoice response carries only declared fields', () =>
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(testDb, TENANT);
+        await seedRoleProfiles(asD1Db(testDb), TENANT);
         portalAccess = new PortalAccessService({} as D1Database, { jwtSecret: SECRET });
         token = await portalAccess.issueToken({ tenantId: TENANT, inspectionId: INSP, recipientEmail: 'dana@example.com' });
     });

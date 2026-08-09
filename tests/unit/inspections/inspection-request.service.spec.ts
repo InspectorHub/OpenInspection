@@ -11,6 +11,7 @@ import { InspectionRequestService } from '../../../server/services/inspection-re
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -47,8 +48,8 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
         ]);
         // Task 9c — role profiles so create() writes the client into
         // inspection_people (list()/get() now read clientName from there).
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
-        await seedRoleProfiles(testDb, TENANT2, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT2, new Date(1));
     });
 
     it('creates a request with multiple sub-inspections', async () => {

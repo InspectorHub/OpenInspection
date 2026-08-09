@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
@@ -38,7 +39,7 @@ beforeEach(async () => {
         id: TENANT, name: 'Acme', slug: 'acme', status: 'active', phone: '+15550001111',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
-    await seedRoleProfiles(db, TENANT, new Date(1));
+    await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
     svc = new AutomationService({} as D1Database);
     await new SmsConsentService({} as D1Database).publishDisclosure('disclosure');
     smsRuntime.resolveProvider.mockResolvedValue({ provider: fakeProvider, from: '+1999' });
@@ -314,7 +315,7 @@ describe('flush() — managed-send compliance gate (Task 8)', () => {
         // flush() → deliverSms() currently receives env as an additional arg.
         // The cron would pass env; in tests we call flush with a patched svc.
         // Directly call deliverSms through the service with env.
-        const db2 = svc['getDrizzle']() as import('drizzle-orm/better-sqlite3').BetterSQLite3Database<typeof schema>;
+        const db2 = db;   // `drizzle-orm/d1` is mocked to return this very handle
         // Re-use the logs already created. Instead of going through flush, call deliverSms directly.
         const logs = await db2.select().from(schema.automationLogs).all();
         const automationRow = await db2.select().from(schema.automations).get();
@@ -336,7 +337,7 @@ describe('flush() — managed-send compliance gate (Task 8)', () => {
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
         // No shared SID env → gate blocks.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const db2 = svc['getDrizzle']() as import('drizzle-orm/better-sqlite3').BetterSQLite3Database<typeof schema>;
+        const db2 = db;   // `drizzle-orm/d1` is mocked to return this very handle
         const logs = await db2.select().from(schema.automationLogs).all();
         const automationRow = await db2.select().from(schema.automations).get();
         const inspRow = logs[0] ? await loadFlushInspection(logs[0].inspectionId) : undefined;
@@ -452,8 +453,8 @@ describe('flush() — derived reminder due-time (Track L Step 3b)', () => {
     async function seedReminder(dateStr: string) {
         const inspId = crypto.randomUUID();
         await db.insert(schema.inspections).values({
-            id: inspId, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
-            clientEmail: 'jane@example.com', date: dateStr, status: 'confirmed',
+            id: inspId, tenantId: TENANT, propertyAddress: '1 Main',
+            date: dateStr, status: 'confirmed',
             paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         } as never);
         const ruleId = crypto.randomUUID();
@@ -523,7 +524,7 @@ describe('managedSendAllowed — SMS quota gate (Task 10)', () => {
             tenantId: TENANT, mode: 'managed_dedicated',
             complianceStatus: 'approved', createdAt: now, updatedAt: now,
         } as never);
-        const result = await managedSendAllowed(db, { MANAGED_SMS_MONTHLY_ALLOWANCE: '2' }, TENANT, 'managed_dedicated');
+        const result = await managedSendAllowed(asD1Db(db), { MANAGED_SMS_MONTHLY_ALLOWANCE: '2' }, TENANT, 'managed_dedicated');
         expect(result.allowed).toBe(true);
     });
 
@@ -538,7 +539,7 @@ describe('managedSendAllowed — SMS quota gate (Task 10)', () => {
         await db.insert(schema.usageCounters).values({
             tenantId: TENANT, metric: 'sms', periodKey: period, value: 2, updatedAt: now,
         } as never);
-        const result = await managedSendAllowed(db, { MANAGED_SMS_MONTHLY_ALLOWANCE: '2' }, TENANT, 'managed_dedicated');
+        const result = await managedSendAllowed(asD1Db(db), { MANAGED_SMS_MONTHLY_ALLOWANCE: '2' }, TENANT, 'managed_dedicated');
         expect(result.allowed).toBe(false);
         expect(result.reason).toBe('managed_quota_exceeded');
     });
@@ -563,7 +564,7 @@ describe('managedSendAllowed — SMS quota gate (Task 10)', () => {
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
         smsRuntime.resolveProvider.mockResolvedValueOnce({ provider: fakeProvider, from: null, messagingServiceSid: 'MG_dedic' });
 
-        const db2 = svc['getDrizzle']() as typeof db;
+        const db2 = db;   // `drizzle-orm/d1` is mocked to return this very handle
         const logs = await db2.select().from(schema.automationLogs).all();
         const automationRow = await db2.select().from(schema.automations).get();
         const inspRow = logs[0] ? await loadFlushInspection(logs[0].inspectionId) : undefined;
@@ -600,7 +601,7 @@ describe('managedSendAllowed — SMS quota gate (Task 10)', () => {
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
         smsRuntime.resolveProvider.mockResolvedValueOnce({ provider: fakeProvider, from: null, messagingServiceSid: 'MG_dedic' });
 
-        const db2 = svc['getDrizzle']() as typeof db;
+        const db2 = db;   // `drizzle-orm/d1` is mocked to return this very handle
         const logs = await db2.select().from(schema.automationLogs).all();
         const automationRow = await db2.select().from(schema.automations).get();
         const inspRow = logs[0] ? await loadFlushInspection(logs[0].inspectionId) : undefined;
@@ -622,7 +623,7 @@ describe('managedSendAllowed — SMS quota gate (Task 10)', () => {
         await db.insert(schema.usageCounters).values({
             tenantId: TENANT, metric: 'sms', periodKey: period, value: 99999, updatedAt: new Date(),
         } as never);
-        const result = await managedSendAllowed(db, { MANAGED_SMS_MONTHLY_ALLOWANCE: '2' }, TENANT, 'own');
+        const result = await managedSendAllowed(asD1Db(db), { MANAGED_SMS_MONTHLY_ALLOWANCE: '2' }, TENANT, 'own');
         expect(result.allowed).toBe(true);
     });
 
@@ -631,17 +632,17 @@ describe('managedSendAllowed — SMS quota gate (Task 10)', () => {
         await db.insert(schema.usageCounters).values({
             tenantId: TENANT, metric: 'sms', periodKey: period, value: 99999, updatedAt: new Date(),
         } as never);
-        const result = await managedSendAllowed(db, { MANAGED_SMS_MONTHLY_ALLOWANCE: '2' }, TENANT, 'platform');
+        const result = await managedSendAllowed(asD1Db(db), { MANAGED_SMS_MONTHLY_ALLOWANCE: '2' }, TENANT, 'platform');
         expect(result.allowed).toBe(true);
     });
 
     it('own mode → always allowed regardless of count', async () => {
-        const result = await managedSendAllowed(db, {}, TENANT, 'own');
+        const result = await managedSendAllowed(asD1Db(db), {}, TENANT, 'own');
         expect(result.allowed).toBe(true);
     });
 
     it('platform mode → always allowed', async () => {
-        const result = await managedSendAllowed(db, {}, TENANT, 'platform');
+        const result = await managedSendAllowed(asD1Db(db), {}, TENANT, 'platform');
         expect(result.allowed).toBe(true);
     });
 

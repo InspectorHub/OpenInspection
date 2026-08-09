@@ -30,10 +30,10 @@ describe('applyInspectorPreSign', () => {
       role: 'inspector', createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({
-      id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St', clientName: 'Client',
-      clientEmail: 'c@x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+      id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St',
+      date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
       price: 0, createdAt: new Date(),
-    } as any);
+    });
     await db.insert(schema.agreements).values({
       id: AGR_ID, tenantId: TENANT, name: 'A', content: 'x', version: 1, createdAt: new Date(),
     });

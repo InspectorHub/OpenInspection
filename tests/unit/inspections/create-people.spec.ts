@@ -12,6 +12,7 @@ import { PeopleService } from '../../../server/services/people.service';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -43,7 +44,7 @@ describe('InspectionCoreService.createInspection — writes inspection_people (T
         await db.insert(schema.tenants).values([
             { id: T1, name: 'Tenant One', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        await seedRoleProfiles(db, T1, new Date(1));
+        await seedRoleProfiles(asD1Db(db), T1, new Date(1));
         await db.insert(schema.contacts).values([
             { id: BUYER_AGENT, tenantId: T1, type: 'agent', name: 'Buyer Agent', email: 'ba@x.com', createdAt: new Date() },
             { id: LISTING_AGENT, tenantId: T1, type: 'agent', name: 'Listing Agent', email: 'la@x.com', createdAt: new Date() },

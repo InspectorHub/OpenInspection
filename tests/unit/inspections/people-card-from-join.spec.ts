@@ -12,6 +12,7 @@ import { PeopleService } from '../../../server/services/people.service';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -40,7 +41,7 @@ describe('InspectionCoreService.getPeopleCard / getRecipientList — read from i
         await db.insert(schema.tenants).values([
             { id: T1, name: 'Tenant One', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        await seedRoleProfiles(db, T1, new Date(1));
+        await seedRoleProfiles(asD1Db(db), T1, new Date(1));
         await db.insert(schema.contacts).values([
             { id: CLIENT,       tenantId: T1, type: 'client', name: 'Jane Client',       email: 'jane@example.com', phone: '+15551234567', createdAt: new Date() },
             { id: BUYER_AGENT,  tenantId: T1, type: 'agent',  name: 'Bob Buyer-Agent',    email: 'bob@bba.com',     phone: null, agency: 'Buyer Realty',   createdAt: new Date() },
@@ -53,11 +54,8 @@ describe('InspectionCoreService.getPeopleCard / getRecipientList — read from i
             id:                INSP,
             tenantId:          T1,
             propertyAddress:   '1 Main St',
-            clientName:        null,
-            clientEmail:       null,
-            clientPhone:       null,
-            referredByAgentId: null,
-            sellingAgentId:    null,
+
+
             date:              '2026-06-01',
             status:            'requested',
             paymentStatus:     'unpaid',
