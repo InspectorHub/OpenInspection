@@ -58,6 +58,12 @@ const SCRIPT_GATES = [
     // this covers the second route to a provider, which no type can see. 0.4s,
     // between the price gate and the tracking gate.
     { key: 'aiclass', label: 'AI output classification', script: 'check-ai-classification.mjs', fix: 'npm run lint:ai-classification' },
+    // Two file reads and a set comparison -- the cheapest gate in this list by an
+    // order of magnitude, and the one whose failure is most easily argued away
+    // later. It belongs at pre-commit for the same reason the price and tracking
+    // gates do: what it catches is a spec being written OFF the type-check, and
+    // the moment to question that is while the line is being typed.
+    { key: 'teststsconfig', label: 'tests tsconfig exclude ratchet', script: 'check-tests-tsconfig.mjs', fix: 'npm run lint:tests-tsconfig' },
 ];
 
 const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup' };

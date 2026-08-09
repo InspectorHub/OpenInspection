@@ -1,0 +1,375 @@
+{
+    // Program for the SERVER-SIDE specs under `tests/` — `tests/unit/**` (the
+    // `test:unit` suite), `tests/workers/**` (`test:workers`), and the shared
+    // infra they import (`tests/{db,mocks,setup-client}.ts`, `tests/helpers/`,
+    // `tests/unit/{helpers,stubs}/`).
+    //
+    // ⚠️ BEFORE THIS FILE, NOTHING TYPE-CHECKED ANY OF IT. 753 files / ~101k
+    // lines were compiled by exactly zero tsc programs: tsconfig.json excludes
+    // `app/**/*.test.*` and never mentioned `tests/`, tsconfig.api.json's
+    // include is `server/**` only, tsconfig.playwright.json is deliberately
+    // scoped to `tests/e2e`, and tsconfig.tests-typecheck.json takes only the
+    // four `*.spec-d.ts`. vitest strips types with esbuild and never checks
+    // them. The same hole is why `tests/**` sits in eslint's `ignores`: the
+    // type-aware parser refuses a file that belongs to no project, so building
+    // this program is also what unblocks linting those specs.
+    //
+    // WHY IT IS NOT PART OF tsconfig.api.json. That config is COMPOSITE and is a
+    // project reference of the app program, so `tsc -b tsconfig.json` builds it
+    // FIRST. Adding 753 root files there would put the entire spec tree on the
+    // critical path of every pure-frontend commit and of CI's `type-check (app)`
+    // job. This program REFERENCES api instead, which costs the app program
+    // nothing and costs this one one `stat` when server/ has not moved.
+    //
+    // ⚠️ `references` is NOT inherited through `extends`, and `tsc -p` does NOT
+    // build referenced projects — it expects their output to exist and fails
+    // TS6305 when it does not. `npm run type-check:tests` therefore runs
+    // `tsc -b tsconfig.api.json` first. Do not invoke this config directly.
+    // (Same contract as tsconfig.playwright.json and tsconfig.tests-typecheck.json.)
+    "extends": "./tsconfig.json",
+    "references": [{ "path": "./tsconfig.api.json" }],
+    "compilerOptions": {
+        // The base config's array is `["vite/client", "@cloudflare/workers-types"]`
+        // and the api config's is `["@types/node", "@cloudflare/vitest-pool-workers"]`.
+        // Neither side alone covers a spec tree: the specs are Node processes
+        // (`node:fs`, `node:crypto`, `process.env`) that assert on Workers types
+        // (`D1Database`, `R2Bucket`, `ExecutionContext`). Portal's
+        // tsconfig.api.json is the only array in either repo that already spans
+        // both, and it is the template for the first two entries here.
+        //
+        // `vitest/globals` is the third: `vitest.api.config.ts` sets
+        // `globals: true`, and 8 of the 753 files rely on that instead of
+        // importing from 'vitest'. Without it those 8 are a wall of TS2304 and
+        // the honest-looking fix is to edit specs — which Phase 0 does not do.
+        //
+        // `@cloudflare/vitest-pool-workers/types` is the fourth, and the
+        // SUBPATH matters. 18 specs under tests/workers/ import
+        // `cloudflare:test`; that module is declared in this package's
+        // `types/cloudflare-test.d.ts`, reachable only through its `./types`
+        // export condition. The bare package name — which is what
+        // tsconfig.api.json and tsconfig.tests-typecheck.json list — resolves to
+        // `dist/pool/index.d.mts` (the `defineWorkersConfig` helper) and leaves
+        // all 18 as TS2307. Measured both ways.
+        //
+        // `vite/client` is the fifth, and it is NOT decorative. Four specs
+        // import `workers/app.ts`, which reads `import.meta.env` — without this
+        // entry that is TS2339 in a file no spec author owns. (Same reason the
+        // `.react-router/types/+server-build.d.ts` line appears in `include`
+        // below: the other half of the same import.)
+        "types": [
+            "@types/node",
+            "@cloudflare/workers-types",
+            "@cloudflare/vitest-pool-workers/types",
+            "vitest/globals",
+            "vite/client"
+        ],
+        // `lib` keeps DOM from the base config on purpose. Specs carrying
+        // `// @vitest-environment happy-dom` touch `document`, `localStorage`
+        // and `IndexedDB`; they are ordinary members of the `test:unit` suite,
+        // not a separate program.
+        "noEmit": true,
+        "incremental": true,
+        // Its own build-info file. Sharing one with the app program makes each
+        // run look cold to the other — that is how a 20s check becomes a
+        // six-minute one with nothing in the diff to explain it.
+        "tsBuildInfoFile": "./.tsbuildinfo.tests",
+        // HEAP: `type-check:tests` caps this pass at 1024 MB, and the tightness
+        // is the feature — same reasoning as tsconfig.playwright.json.
+        // MEASURED by bisection on the first single-process run (587 files,
+        // 15.7s): 512 MB OOMs, 768 MB passes. 1024 is the floor plus headroom.
+        //
+        // Why not leave it generous: the failure this cap is really guarding
+        // against is losing `references` below. `references` is NOT inherited
+        // through `extends`, and when it goes missing this stops consuming the
+        // api project's `.d.ts` and starts SOURCE-COMPILING ~790 server files
+        // instead — which needs well over 2048 MB. At 1024 that mistake dies
+        // in seconds; at 4096 it might just get slower and pass.
+
+        // `paths` is re-declared in full because `extends` REPLACES the whole
+        // object rather than merging it: the base config's `~/*` and
+        // `@core/shared-ui` would be lost by adding `@core/api-types` alone.
+        //
+        // ⚠️ WHAT IS DELIBERATELY *NOT* MIRRORED HERE. `vitest.api.config.ts`
+        // registers three more aliases — `cloudflare:workers`,
+        // `@cloudflare/workers-oauth-provider` and `agents/mcp` — each pointing
+        // at a hand-written stub in `tests/unit/stubs/`. Those stubs exist
+        // because Node's ESM loader REJECTS the real modules at import time;
+        // they are runtime shims, not type shims. Mirroring them as `paths`
+        // would redirect the `.types/**/*.d.ts` this program consumes — which
+        // the api program already checked against the REAL types — onto a
+        // 22-line stub whose `DurableObject` has no `ctx: DurableObjectState`.
+        // The result is errors in generated declarations with no source to fix.
+        // Verified rather than assumed: zero files under `tests/` import any of
+        // the three; only the transitive `server/index.ts` graph does, and it
+        // arrives here pre-compiled. If a spec ever imports a stub directly,
+        // that is the moment to add the alias — and to accept the fallout above.
+        "paths": {
+            "~/*": ["./app/*"],
+            "@core/shared-ui": ["./packages/shared-ui/src/index.ts"],
+            "@core/api-types": ["./packages/api-types/index.ts"]
+        }
+    },
+    // ⚠️ INCLUDE IS THE WHOLE TREE, ON PURPOSE — the burn-down lives in
+    // `exclude`, not in a hand-picked include list. An include whitelist would
+    // let a NEW spec in a NEW domain silently escape coverage, which is exactly
+    // the bug this program exists to close. `tests/e2e/**` is the one structural
+    // subtraction: tsconfig.playwright.json owns it, at a 2048 MB cap it must
+    // keep meeting.
+    //
+    // `.react-router/types/+server-build.d.ts` is ONE generated file, not the
+    // whole `.react-router/types/**` tree the app program takes. It declares
+    // `virtual:react-router/server-build`, which `workers/app.ts` imports and
+    // four specs reach transitively. Taking the whole tree instead would pull
+    // every route module's `+types` — and through them `app/routes/**` as
+    // SOURCE, turning this program into a second app compile. It is generated
+    // by `react-router typegen`; when it is absent the pattern simply matches
+    // nothing and those four specs report TS2307, which is the honest signal.
+    "include": [
+        "worker-configuration.d.ts",
+        ".react-router/types/+server-build.d.ts",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+    ],
+    // ⚠️ THE ENTRIES AFTER THE STRUCTURAL FOUR ARE A BURN-DOWN RATCHET.
+    //
+    // HOW THEY WERE DERIVED, because it bounds how far to trust them. Phase 0
+    // was built on a machine that cannot hold two heavy compiles (15.8 GB, a
+    // second agent working concurrently), so this program was never run as one
+    // process. It was swept in tranches of ~100 files, each a separate `tsc -p`
+    // capped at 2048 MB, and the union of what they reported is the list below:
+    // 198 files excluded out of 785, leaving 587 CHECKED ON DAY ONE.
+    //
+    // A union of tranches is not identical to one program. Specs are leaves —
+    // nothing imports them — so a spec's diagnostics do not depend on which
+    // other specs share its program, and the shared infra every tranche pulls
+    // in (tests/unit/db.ts, mocks.ts, helpers/) was present in all of them. The
+    // residual risk is real but small, and it points one way: a single-process
+    // run may find a few MORE errors, not fewer.
+    //
+    // ⚠️ WHY SOME CLEAN SPECS ARE ON THIS LIST. `exclude` only removes files
+    // from the include EXPANSION; a file still enters the program if something
+    // included IMPORTS it. Two shared setup helpers under tests/unit/helpers/
+    // are dirty, so excluding them alone changed nothing — four otherwise-clean
+    // specs that import them had to go too. Discovered by measurement, not
+    // reasoning: the list needed a second sweep to converge. Any future entry
+    // for a non-spec file has to carry its importers with it.
+    //
+    // `scripts/check-tests-tsconfig.mjs` pins this array to
+    // `scripts/tests-tsconfig-baseline.json` and lets it SHRINK only. Deleting
+    // an entry is the unit of progress; adding one fails the gate. The one-time
+    // bootstrap after the first single-process compile is
+    // `--seed-from <tsc-output>`, which refuses to run twice.
+    //
+    // The four structural entries are NOT part of the ratchet, and the gate
+    // knows the difference: `tests/e2e/**` belongs to tsconfig.playwright.json,
+    // at a 2048 MB cap that config must keep meeting.
+    //
+    // End state (a later phase): this array drops back to the structural four,
+    // the baseline file is deleted, and the membership assertion moves into
+    // `scripts/check-test-layout.mjs`, which already owns "every spec is
+    // collected by exactly one config" and already runs in pre-commit and CI.
+    "exclude": [
+        "node_modules",
+        "dist",
+        ".types",
+        "tests/e2e/**",
+        "tests/unit/admin/admin-data-import-people.spec.ts",
+        "tests/unit/admin/admin.service.spec.ts",
+        "tests/unit/admin/members-calendar-sync.spec.ts",
+        "tests/unit/agents/agent-notification-prefs.spec.ts",
+        "tests/unit/agents/agent-referral-people.spec.ts",
+        "tests/unit/agents/agent-reports-leaderboard.spec.ts",
+        "tests/unit/agents/agent-service-listings.spec.ts",
+        "tests/unit/agents/portal-visibility.spec.ts",
+        "tests/unit/agreements/agreement-public-routes.spec.ts",
+        "tests/unit/agreements/agreement-send-endpoints.spec.ts",
+        "tests/unit/agreements/agreement-signer-tenant-scope.spec.ts",
+        "tests/unit/agreements/agreement-signers.spec.ts",
+        "tests/unit/agreements/agreement.service.spec.ts",
+        "tests/unit/agreements/agreements-render.spec.ts",
+        "tests/unit/agreements/auto-sign-publish.spec.ts",
+        "tests/unit/agreements/envelope-legacy-primary-client.spec.ts",
+        "tests/unit/agreements/inspection-agreement-multi-signer.spec.ts",
+        "tests/unit/agreements/inspection-agreement-request-primary-client.spec.ts",
+        "tests/unit/agreements/inspection-agreement-request.spec.ts",
+        "tests/unit/agreements/inspection-sign-unification-dashboard.spec.ts",
+        "tests/unit/agreements/inspection-sign-unification.spec.ts",
+        "tests/unit/agreements/inspector-signature.spec.ts",
+        "tests/unit/agreements/iter2-bug9-sign-redirect.spec.ts",
+        "tests/unit/automations/automation-channels.spec.ts",
+        "tests/unit/automations/automation-characterization.spec.ts",
+        "tests/unit/automations/automation-conditions.spec.ts",
+        "tests/unit/automations/automation-delivery-characterization.spec.ts",
+        "tests/unit/automations/automation-fanout.spec.ts",
+        "tests/unit/automations/automation-flush-sms.spec.ts",
+        "tests/unit/automations/automation-idempotency.spec.ts",
+        "tests/unit/automations/automation-people-sourcing.spec.ts",
+        "tests/unit/automations/automation-reminders.spec.ts",
+        "tests/unit/automations/automation-report-delivery.spec.ts",
+        "tests/unit/automations/automation-seeds-sms.spec.ts",
+        "tests/unit/automations/automation-seeds.spec.ts",
+        "tests/unit/automations/automation.service.spec.ts",
+        "tests/unit/automations/manual-send-logging.spec.ts",
+        "tests/unit/automations/manual-sms-send.spec.ts",
+        "tests/unit/automations/notice-headers.spec.ts",
+        "tests/unit/automations/recipient-locale.spec.ts",
+        "tests/unit/automations/resolve-recipients.spec.ts",
+        "tests/unit/automations/staff-alerts-via-rules.spec.ts",
+        "tests/unit/billing/cancellation-held-deposit.spec.ts",
+        "tests/unit/billing/stripe-service-currency.spec.ts",
+        "tests/unit/bookings/booking-aggregation.spec.ts",
+        "tests/unit/bookings/booking-autoassign.spec.ts",
+        "tests/unit/bookings/booking-contact-upsert.spec.ts",
+        "tests/unit/bookings/booking-people.spec.ts",
+        "tests/unit/bookings/booking-toctou.spec.ts",
+        "tests/unit/bookings/deposit-collection.spec.ts",
+        "tests/unit/calendar/calendar-items-tz.spec.ts",
+        "tests/unit/calendar/event-followup-delay.spec.ts",
+        "tests/unit/calendar/event-results-received.spec.ts",
+        "tests/unit/calendar/event.service.spec.ts",
+        "tests/unit/calendar/google-export.spec.ts",
+        "tests/unit/calendar/ics-busy-feed.spec.ts",
+        "tests/unit/calendar/ics-token-feed-primary-client.spec.ts",
+        "tests/unit/client-portal/checkout-portal-token-handoff.spec.ts",
+        "tests/unit/client-portal/client-document-routes.spec.ts",
+        "tests/unit/client-portal/client-message-routes.spec.ts",
+        "tests/unit/client-portal/portal-access-lifecycle.spec.ts",
+        "tests/unit/client-portal/portal-access-tenant-scope.spec.ts",
+        "tests/unit/client-portal/portal-access.spec.ts",
+        "tests/unit/client-portal/portal-routes-service.spec.ts",
+        "tests/unit/client-portal/portal-routes.spec.ts",
+        "tests/unit/client-portal/public-invoice-field-projection.spec.ts",
+        "tests/unit/client-portal/public-invoice-token-gate.spec.ts",
+        "tests/unit/client-portal/tenant-bulk-link-expiry.spec.ts",
+        "tests/unit/client-portal/view-confirmation.spec.ts",
+        "tests/unit/collab/schema-blob.spec.ts",
+        "tests/unit/comments/recommendation-contractor-type.service.spec.ts",
+        "tests/unit/comments/recommendation.service.spec.ts",
+        "tests/unit/concierge/concierge-approve-primary-client.spec.ts",
+        "tests/unit/concierge/concierge-confirm-agent-notify.spec.ts",
+        "tests/unit/concierge/concierge-resolve-token-primary-client.spec.ts",
+        "tests/unit/concierge/concierge-schema.spec.ts",
+        "tests/unit/concierge/concierge-service.spec.ts",
+        "tests/unit/contacts/contact-detail.spec.ts",
+        "tests/unit/contacts/contact.service.spec.ts",
+        "tests/unit/data/data-service-export-agent.spec.ts",
+        "tests/unit/data/data-service-export-primary-client.spec.ts",
+        "tests/unit/email/email-events.spec.ts",
+        "tests/unit/email/email-provider-resend.spec.ts",
+        "tests/unit/email/email-providers.spec.ts",
+        "tests/unit/email/transactional-message-notification.spec.ts",
+        "tests/unit/email/webhook-verify.spec.ts",
+        "tests/unit/helpers/agreement-signers-setup.ts",
+        "tests/unit/helpers/inspection-sign-unification-setup.ts",
+        "tests/unit/holidays/apply-holiday-policy.spec.ts",
+        "tests/unit/idempotency/agreement-send-replay.spec.ts",
+        "tests/unit/idempotency/ai-content-review-replay.spec.ts",
+        "tests/unit/idempotency/booking-deposit-intent-replay.spec.ts",
+        "tests/unit/idempotency/inspection-agreement-request-replay.spec.ts",
+        "tests/unit/idempotency/invoice-request-payment-replay.spec.ts",
+        "tests/unit/idempotency/middleware.spec.ts",
+        "tests/unit/idempotency/sms-send-replay.spec.ts",
+        "tests/unit/inspections/clone-people.spec.ts",
+        "tests/unit/inspections/complete-route-primary-client.spec.ts",
+        "tests/unit/inspections/cover-crop.spec.ts",
+        "tests/unit/inspections/create-people.spec.ts",
+        "tests/unit/inspections/estimate-range.spec.ts",
+        "tests/unit/inspections/inspection-annotations.spec.ts",
+        "tests/unit/inspections/inspection-core-reads-primary-client.spec.ts",
+        "tests/unit/inspections/inspection-create-fk-validation.spec.ts",
+        "tests/unit/inspections/inspection-create-people.spec.ts",
+        "tests/unit/inspections/inspection-create-results-row.spec.ts",
+        "tests/unit/inspections/inspection-dashboard-agent-people.spec.ts",
+        "tests/unit/inspections/inspection-patch-settings.spec.ts",
+        "tests/unit/inspections/inspection-people-card.spec.ts",
+        "tests/unit/inspections/inspection-recipients.spec.ts",
+        "tests/unit/inspections/inspection-request.service.spec.ts",
+        "tests/unit/inspections/inspection-results-batch.spec.ts",
+        "tests/unit/inspections/inspection-results-tenant-scope.spec.ts",
+        "tests/unit/inspections/inspection-service.spec.ts",
+        "tests/unit/inspections/inspector-portal.spec.ts",
+        "tests/unit/inspections/people-card-from-join.spec.ts",
+        "tests/unit/inspections/photo-crop-item.spec.ts",
+        "tests/unit/inspections/property-facts.spec.ts",
+        "tests/unit/inspections/publish-notification-coalescing.spec.ts",
+        "tests/unit/inspections/reinspection-create.spec.ts",
+        "tests/unit/inspections/report-access-lifecycle-routes.spec.ts",
+        "tests/unit/inspections/send-report-multi.spec.ts",
+        "tests/unit/inspections/send-report-role-template.spec.ts",
+        "tests/unit/inspections/share-agent-people.spec.ts",
+        "tests/unit/integrations/integration-tenants-by-email.spec.ts",
+        "tests/unit/invoices/deposit-application.spec.ts",
+        "tests/unit/invoices/invoice-currency-snapshot.spec.ts",
+        "tests/unit/invoices/invoice-request-payment-primary-client.spec.ts",
+        "tests/unit/invoices/invoice-request-payment.spec.ts",
+        "tests/unit/invoices/invoice-void-qbo.spec.ts",
+        "tests/unit/invoices/iter2-bug10-public-invoice.spec.ts",
+        "tests/unit/invoices/partial-balance.spec.ts",
+        "tests/unit/invoices/payment-ledger.spec.ts",
+        "tests/unit/marketplace/marketplace.service.list.spec.ts",
+        "tests/unit/mcp/generate-snapshot.spec.ts",
+        "tests/unit/mcp/mcp-grants-api.spec.ts",
+        "tests/unit/mcp/snapshot-drift.spec.ts",
+        "tests/unit/media/media-center.spec.ts",
+        "tests/unit/media/media-type.spec.ts",
+        "tests/unit/media/strip-exif.spec.ts",
+        "tests/unit/messaging/message.service.spec.ts",
+        "tests/unit/messaging/sms-api.spec.ts",
+        "tests/unit/messaging/sms-ensure-contact.spec.ts",
+        "tests/unit/messaging/sms-send.spec.ts",
+        "tests/unit/messaging/sms-status.spec.ts",
+        "tests/unit/messaging/telnyx-rest-client.spec.ts",
+        "tests/unit/messaging/twilio-client.spec.ts",
+        "tests/unit/messaging/twilio-rest-client.spec.ts",
+        "tests/unit/metrics/metrics-top-agents-people.spec.ts",
+        "tests/unit/notifications/agent-preferences-api.spec.ts",
+        "tests/unit/notifications/automation-classes.spec.ts",
+        "tests/unit/notifications/channel-consent.spec.ts",
+        "tests/unit/notifications/preference-enforcement.spec.ts",
+        "tests/unit/notifications/preferences-api.spec.ts",
+        "tests/unit/people/capabilities.spec.ts",
+        "tests/unit/people/inspection-people-api.spec.ts",
+        "tests/unit/people/role-profile-audit.spec.ts",
+        "tests/unit/people/role-profiles-api.spec.ts",
+        "tests/unit/people/seed-automations.spec.ts",
+        "tests/unit/platform/authorization-surface.spec.ts",
+        "tests/unit/platform/rbac-require-role.spec.ts",
+        "tests/unit/platform/require-capability.spec.ts",
+        "tests/unit/portal/exchange-agent-route.spec.ts",
+        "tests/unit/portal/find-my-report-agent-dest.spec.ts",
+        "tests/unit/portal/self-retrieve-capability.spec.ts",
+        "tests/unit/portal/token-role-key.spec.ts",
+        "tests/unit/privacy/account-export-delete.spec.ts",
+        "tests/unit/privacy/audit-metadata-redaction.spec.ts",
+        "tests/unit/privacy/erasure-orchestrator.spec.ts",
+        "tests/unit/privacy/retention-logs.spec.ts",
+        "tests/unit/privacy/tenant-purge.service.spec.ts",
+        "tests/unit/qbo/payment-push-amount.spec.ts",
+        "tests/unit/qbo/payment-push.spec.ts",
+        "tests/unit/qbo/qbo-api-env.spec.ts",
+        "tests/unit/qbo/qbo-oauth-callback.spec.ts",
+        "tests/unit/qbo/refund-push.spec.ts",
+        "tests/unit/repair/repair-builder-action-tag.spec.ts",
+        "tests/unit/repair/repair-list.service.spec.ts",
+        "tests/unit/repair/share-trade-end-to-end.spec.ts",
+        "tests/unit/reports/compliance-routes.spec.ts",
+        "tests/unit/reports/inspection-report-photo-appendix.spec.ts",
+        "tests/unit/reports/pca-narrative.spec.ts",
+        "tests/unit/reports/report-pdf.service.spec.ts",
+        "tests/unit/reports/report-photo-precedence.spec.ts",
+        "tests/unit/reports/report-photos-numbering.spec.ts",
+        "tests/unit/reports/report-review-endpoints.spec.ts",
+        "tests/unit/reports/report-review-workflow.spec.ts",
+        "tests/unit/reports/section-disclaimer-render.spec.ts",
+        "tests/unit/storage/r2-object-route.spec.ts",
+        "tests/unit/storage/r2-upload-route.spec.ts",
+        "tests/unit/sync/sync-outbox-queue.spec.ts",
+        "tests/unit/team/update-member.spec.ts",
+        "tests/unit/tenancy/inspector-palette-tenant-slug.spec.ts",
+        "tests/unit/tenancy/team-invite.service.spec.ts",
+        "tests/unit/tenancy/team-remove-softdelete.spec.ts",
+        "tests/unit/tenancy/users-partial-unique.spec.ts",
+        "tests/unit/test-hooks/last-email.spec.ts",
+        "tests/unit/usage/plan-quota-guarded-services.spec.ts"
+    ]
+}
