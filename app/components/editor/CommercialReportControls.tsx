@@ -85,7 +85,7 @@ export function CommercialReportControls({
  options={TIERS.map((t) => ({ value: t.value, label: t.label }))}
  className="max-w-sm"
  />
- <p className="mt-1.5 text-[11px] text-ih-fg-4">
+ <p className="mt-1.5 text-[11px] text-ih-fg-3">
  {m.editor_commercial_pca_description()}
  </p>
  </div>

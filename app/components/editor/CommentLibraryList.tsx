@@ -26,7 +26,7 @@ export function CommentLibraryList({ serverComments, selectedIndex, sort, onInse
         >
           <div className="flex items-start gap-2 p-2.5 hover:bg-ih-bg-muted">
             <p className="flex-1 text-[12px] text-ih-fg-2 leading-relaxed">{c.text}</p>
-            <span className="text-[10px] text-ih-fg-4 tabular-nums whitespace-nowrap">
+            <span className="text-[10px] text-ih-fg-3 tabular-nums whitespace-nowrap">
               {sort === "recent" && c.lastUsedAt
                 ? formatRelativeTime(c.lastUsedAt, { locale, ...(now === undefined ? {} : { now }) })
                 : ""}

@@ -103,7 +103,7 @@ export default function SettingsBillingPage() {
             <section className="bg-ih-bg-card border border-ih-border rounded-md p-6">
               <div className="flex items-start justify-between gap-4 mb-5">
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4">{m.settings_billing_current_plan()}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.settings_billing_current_plan()}</div>
                   <div className="text-2xl font-bold capitalize text-ih-fg-1 mt-1">{tier}</div>
                 </div>
                 {portalUrl && (
@@ -118,7 +118,7 @@ export default function SettingsBillingPage() {
               {/* Seat breakdown */}
               <div className="grid grid-cols-2 gap-4 pt-5 border-t border-ih-border">
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-3">
                     {hasSeatQuota ? m.settings_billing_seats_used() : m.settings_billing_active_members()}
                   </div>
                   <div className="text-2xl font-bold text-ih-fg-1 mt-1 tabular-nums">
@@ -129,7 +129,7 @@ export default function SettingsBillingPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">{m.settings_billing_permanent()}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-3">{m.settings_billing_permanent()}</div>
                   <div className="text-2xl font-bold text-ih-fg-1 mt-1 tabular-nums">{permanent}</div>
                 </div>
               </div>
@@ -150,11 +150,11 @@ export default function SettingsBillingPage() {
               </header>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">{m.settings_billing_active_members()}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-3">{m.settings_billing_active_members()}</div>
                   <div className="text-2xl font-bold text-ih-fg-1 mt-1 tabular-nums">{seatsUsed}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">{m.settings_billing_permanent()}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-3">{m.settings_billing_permanent()}</div>
                   <div className="text-2xl font-bold text-ih-fg-1 mt-1 tabular-nums">{permanent}</div>
                 </div>
               </div>

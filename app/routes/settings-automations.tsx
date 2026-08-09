@@ -232,8 +232,8 @@ export default function SettingsAutomations() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-[13px] font-bold text-ih-fg-1">{rule.name}</p>
-                    {rule.isDefault && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-3 rounded uppercase tracking-widest">{m.settings_automations_default_badge()}</span>}
-                    {(rule.channels ?? []).includes("sms") &&<span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-3 rounded uppercase">{m.settings_channel_sms()}</span>}
+                    {rule.isDefault && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-2 rounded uppercase tracking-widest">{m.settings_automations_default_badge()}</span>}
+                    {(rule.channels ?? []).includes("sms") &&<span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-2 rounded uppercase">{m.settings_channel_sms()}</span>}
                   </div>
                   <p className="text-[11px] text-ih-fg-3 mt-0.5">{TRIGGER_LABELS[rule.trigger] || rule.trigger} &rarr; {recipientLabel(rule, roleProfiles)}</p>
                 </div>

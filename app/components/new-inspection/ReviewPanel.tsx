@@ -101,7 +101,7 @@ export function ReviewPanel({
             {/* Before anything has been entered, the panel is a heading over one
                 row — say what it is for instead of looking broken. */}
             {!summary.address && !summary.template && !summary.client && !summary.services && (
-                <p className="mt-2 text-[12px] text-ih-fg-4">{m.newinsp_review_empty_hint()}</p>
+                <p className="mt-2 text-[12px] text-ih-fg-2">{m.newinsp_review_empty_hint()}</p>
             )}
         </aside>
     );

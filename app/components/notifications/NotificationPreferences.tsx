@@ -177,7 +177,7 @@ export function NotificationPreferences({
                     <span className="text-[28px] leading-none font-bold text-ih-fg-1 tabular-nums">
                         {alwaysSent.length}
                     </span>
-                    <h2 id="notif-always-h" className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest">
+                    <h2 id="notif-always-h" className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest">
                         {m.notif_prefs_always_heading()}
                     </h2>
                 </div>
@@ -211,7 +211,7 @@ export function NotificationPreferences({
                     <span className="text-[28px] leading-none font-bold text-ih-fg-1 tabular-nums">
                         {youChoose.length}
                     </span>
-                    <h2 id="notif-choose-h" className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest">
+                    <h2 id="notif-choose-h" className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest">
                         {m.notif_prefs_choose_heading()}
                     </h2>
                     {/* Only the IN-FLIGHT state lives here. The result is a
@@ -245,7 +245,7 @@ export function NotificationPreferences({
                                             disabled={busy}
                                             onToggle={(enabled) => bulk(enabled, {})}
                                         />
-                                        <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-wider">
+                                        <span className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-wider">
                                             {m.notif_prefs_bulk_all_short()}
                                         </span>
                                     </>
@@ -253,7 +253,7 @@ export function NotificationPreferences({
                             </span>
                             {CHANNELS.map((c) => (
                                 <span key={c.id} role="columnheader" className="flex flex-col items-center gap-1">
-                                    <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-wider">
+                                    <span className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-wider">
                                         {c.label()}
                                     </span>
                                     {bulk && !lockedChannels[c.id] && bulkStateOf(youChoose, { channel: c.id }) && (
@@ -303,7 +303,7 @@ export function NotificationPreferences({
                             channel with nothing behind it yet is quiet, not
                             broken — and switching it off now is honoured the
                             moment something does send on it. */}
-                        <p className="text-[12px] text-ih-fg-4 mt-3">{m.notif_prefs_legend()}</p>
+                        <p className="text-[12px] text-ih-fg-3 mt-3">{m.notif_prefs_legend()}</p>
                     </div>
                 )}
             </section>

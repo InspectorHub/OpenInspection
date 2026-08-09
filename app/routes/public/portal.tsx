@@ -112,7 +112,7 @@ function BrandEyebrow({ brand }: { brand: TenantBrand }) {
     );
   }
   return (
-    <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-4 mb-1">
+    <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-3 mb-1">
       {brand.companyName ?? m.portal_brand_eyebrow_fallback()}
     </p>
   );

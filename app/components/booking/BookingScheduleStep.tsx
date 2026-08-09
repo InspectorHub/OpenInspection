@@ -144,7 +144,7 @@ export function ScheduleStep({
                 onChange={(e) => setCustomTime(e.target.value)}
                 className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[13px] font-medium tabular-nums"
               />
-              <span className="text-[11px] text-ih-fg-4">{m.booking_schedule_custom_time_suffix()}</span>
+              <span className="text-[11px] text-ih-fg-3">{m.booking_schedule_custom_time_suffix()}</span>
             </div>
           )}
         </div>

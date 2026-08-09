@@ -63,14 +63,14 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
       {(["information", "limitations", "defects"] as const).map((tab) => (
         <div key={tab}>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 capitalize">{tab}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 capitalize">{tab}</span>
             <div className="flex items-center gap-2">
               {onOpenLibrary && (
                 <button
                   type="button"
                   data-testid={`browse-library-${tab}`}
                   onClick={() => onOpenLibrary(tab)}
-                  className="text-[10px] font-bold text-ih-fg-4 hover:text-ih-primary"
+                  className="text-[10px] font-bold text-ih-fg-3 hover:text-ih-primary"
                 >
                   {m.templates_comments_browse_library()}
                 </button>
@@ -98,7 +98,7 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                         if (a && ci > 0) { const [m] = a.splice(ci, 1); a.splice(ci - 1, 0, m); }
                         return s;
                       })}
-                      className="text-[10px] text-ih-fg-4 hover:text-ih-fg-2 disabled:opacity-30"
+                      className="text-[10px] text-ih-fg-3 hover:text-ih-fg-2 disabled:opacity-30"
                     ><Icon name="chevU" size={14} /></button>
                     <button
                       aria-label={m.templates_comments_move_down()}
@@ -109,7 +109,7 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                         if (a && ci < a.length - 1) { const [m] = a.splice(ci, 1); a.splice(ci + 1, 0, m); }
                         return s;
                       })}
-                      className="text-[10px] text-ih-fg-4 hover:text-ih-fg-2 disabled:opacity-30"
+                      className="text-[10px] text-ih-fg-3 hover:text-ih-fg-2 disabled:opacity-30"
                     ><Icon name="chevD" size={14} /></button>
                   </div>
                 }
@@ -130,7 +130,7 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                 trailing={
                   <button
                     onClick={() => removeCannedFromItem(tab, ci)}
-                    className="text-ih-fg-4 hover:text-ih-bad-fg text-[10px] mt-1"
+                    className="text-ih-fg-3 hover:text-ih-bad-fg text-[10px] mt-1"
                     aria-label={m.templates_comments_delete_aria()}
                   >
                     &times;

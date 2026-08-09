@@ -181,7 +181,7 @@ export default function MessagesPage() {
                           <span className={`text-[13px] truncate ${t.unread > 0 ? "font-bold text-ih-fg-1" : "font-medium text-ih-fg-2"}`}>
                             {t.contactName ?? t.contactEmail ?? m.messages_unknown_contact()}
                           </span>
-                          <span className="text-[11px] text-ih-fg-4 tabular-nums shrink-0">{threadTime(t.lastAt, locale, timeZone)}</span>
+                          <span className="text-[11px] text-ih-fg-3 tabular-nums shrink-0">{threadTime(t.lastAt, locale, timeZone)}</span>
                         </span>
                         <span className="flex items-center justify-between gap-2">
                           <span className="text-[12px] text-ih-fg-3 truncate">{t.lastBody}</span>
@@ -210,7 +210,7 @@ export default function MessagesPage() {
                 <Avatar name={thread.contact.name ?? thread.contact.email ?? "?"} size={28} />
                 <div className="min-w-0">
                   <p className="text-[14px] font-bold text-ih-fg-1 truncate">{thread.contact.name ?? m.messages_unknown_contact()}</p>
-                  {thread.contact.email && <p className="text-[12px] text-ih-fg-4 truncate">{thread.contact.email}</p>}
+                  {thread.contact.email && <p className="text-[12px] text-ih-fg-3 truncate">{thread.contact.email}</p>}
                 </div>
               </div>
 
@@ -218,7 +218,7 @@ export default function MessagesPage() {
                   thread rather than per-bubble chrome: the thread interleaves
                   several inspections, and a link on EVERY bubble is noise. */}
               {mentionOptions.length > 0 && (
-                <p className="text-[11px] text-ih-fg-4 mb-2">
+                <p className="text-[11px] text-ih-fg-3 mb-2">
                   {m.messages_thread_spans()}{" "}
                   {mentionOptions.map(([id, address], i) => (
                     <span key={id}>
@@ -246,7 +246,7 @@ export default function MessagesPage() {
                 composeExtra={
                   mentionOptions.length > 0 ? (
                     <div className="mb-2 flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-[0.1em]">{m.messages_mention_label()}</span>
+                      <span className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-[0.1em]">{m.messages_mention_label()}</span>
                       <select
                         value={mentionId}
                         onChange={(e) => setMentionId(e.target.value)}

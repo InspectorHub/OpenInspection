@@ -230,7 +230,7 @@ export default function SettingsWorkspacePage() {
                   onChange={(e) => setColor(e.target.value)}
                   className="h-10 w-16 rounded-md border border-ih-border p-1 cursor-pointer bg-ih-bg-card" />
                 <input type="text" readOnly value={color}
-                  className="flex-1 px-3 py-2 rounded-md border border-ih-border bg-ih-bg-muted text-ih-fg-3 font-mono text-[13px] cursor-default" />
+                  className="flex-1 px-3 py-2 rounded-md border border-ih-border bg-ih-bg-muted text-ih-fg-2 font-mono text-[13px] cursor-default" />
               </div>
               {fields.primaryColor.errors && (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.primaryColor.errors[0]}</p>

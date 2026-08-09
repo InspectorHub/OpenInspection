@@ -319,7 +319,7 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
       {/* Header */}
       <div>
-        <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-4 mb-1">
+        <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-3 mb-1">
           {m.portal_repair_eyebrow()}
         </p>
         <h1 className="text-2xl font-bold text-ih-fg-1">{m.portal_repair_heading()}</h1>
@@ -330,7 +330,7 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
 
       {/* Sort controls */}
       <div className="flex items-center gap-2">
-        <span className="text-[12px] font-bold text-ih-fg-4 uppercase tracking-widest">{m.portal_repair_sort_by()}</span>
+        <span className="text-[12px] font-bold text-ih-fg-3 uppercase tracking-widest">{m.portal_repair_sort_by()}</span>
         {(
           [
             ["section", m.portal_repair_sort_section()],

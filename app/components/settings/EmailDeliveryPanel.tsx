@@ -105,7 +105,7 @@ export function EmailDeliveryPanel({
             </div>
           ) : null}
           {config.pointOfContact === "inspector" ? (
-            <div className="px-4 py-2.5 rounded-md bg-ih-bg-muted border border-ih-border text-[12px] text-ih-fg-3">
+            <div className="px-4 py-2.5 rounded-md bg-ih-bg-muted border border-ih-border text-[12px] text-ih-fg-2">
               {m.settings_emaildelivery_inspector_note()}
             </div>
           ) : null}
@@ -126,7 +126,7 @@ export function EmailDeliveryPanel({
               {/* SegmentedControl renders buttons, not a form field — carry the
                   value into the native form POST via a hidden input. */}
               <input type="hidden" name={emailFields.emailMode.name} value={mode} />
-              <p className="text-[11px] text-ih-fg-4">
+              <p className="text-[11px] text-ih-fg-3">
                 {mode === "platform"
                   ? m.settings_emaildelivery_mode_platform_desc()
                   : m.settings_emaildelivery_mode_own_desc()}
@@ -137,7 +137,7 @@ export function EmailDeliveryPanel({
               {/* Force `own` so the save action never writes the schema's
                   default `platform` back into self-host config. */}
               <input type="hidden" name={emailFields.emailMode.name} value="own" />
-              <p className="text-[13px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
+              <p className="text-[13px] text-ih-fg-2 bg-ih-bg-muted border border-ih-border rounded-md p-3">
                 {m.settings_emaildelivery_selfhost_note()}
               </p>
             </>
@@ -156,7 +156,7 @@ export function EmailDeliveryPanel({
                 {emailFields.senderEmail.errors ? (
                   <p className="mt-1 text-xs text-ih-bad-fg">{emailFields.senderEmail.errors[0]}</p>
                 ) : (
-                  <p className="text-[11px] text-ih-fg-4 mt-1">{m.settings_emaildelivery_sender_verified({ provider: providerLabel })}</p>
+                  <p className="text-[11px] text-ih-fg-3 mt-1">{m.settings_emaildelivery_sender_verified({ provider: providerLabel })}</p>
                 )}
               </div>
             )}
@@ -169,7 +169,7 @@ export function EmailDeliveryPanel({
                   )}
                 </strong>
                 {config.companyName && (
-                  <span className="text-[11px] text-ih-fg-4 ml-2">{m.settings_emaildelivery_from_workspace()}</span>
+                  <span className="text-[11px] text-ih-fg-3 ml-2">{m.settings_emaildelivery_from_workspace()}</span>
                 )}
               </p>
               <label className="flex items-center gap-2 text-[12px] text-ih-fg-2 cursor-pointer">
@@ -216,7 +216,7 @@ export function EmailDeliveryPanel({
               {emailFields.replyTo.errors ? (
                 <p className="mt-1 text-xs text-ih-bad-fg">{emailFields.replyTo.errors[0]}</p>
               ) : (
-                <p className="text-[11px] text-ih-fg-4 mt-1">{m.settings_emaildelivery_replies_note()}</p>
+                <p className="text-[11px] text-ih-fg-3 mt-1">{m.settings_emaildelivery_replies_note()}</p>
               )}
             </div>
           </div>
@@ -232,7 +232,7 @@ export function EmailDeliveryPanel({
                 { value: "inspector", title: m.settings_emaildelivery_poc_inspector() },
               ]}
             />
-            <p className="text-[11px] text-ih-fg-4 pt-1">
+            <p className="text-[11px] text-ih-fg-3 pt-1">
               {m.settings_emaildelivery_send_as()}{" "}
               <strong>
                 {poc === "company"

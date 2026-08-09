@@ -153,7 +153,7 @@ export default function RatingSystemsPage() {
                           <button type="submit" className="text-[12px] font-bold text-ih-bad-fg hover:opacity-80 px-1">{m.library_action_confirm()}</button>
                         </deleteFetcher.Form>
                       ) : (
-                        <button onClick={() => setConfirmId(sys.id)} className="text-[13px] text-ih-fg-4 hover:text-ih-bad-fg font-semibold px-1" title={m.common_delete()}>{m.common_delete()}</button>
+                        <button onClick={() => setConfirmId(sys.id)} className="text-[13px] text-ih-fg-3 hover:text-ih-bad-fg font-semibold px-1" title={m.common_delete()}>{m.common_delete()}</button>
                       )
                     )}
                   </div>

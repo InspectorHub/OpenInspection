@@ -139,7 +139,7 @@ export function SmsSecretsPanel({
             <div className="flex items-center gap-2">
               <input
                 type="text" readOnly value={inboundUrl || m.settings_smssecrets_inbound_placeholder()}
-                className="flex-1 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-muted text-[11px] font-mono text-ih-fg-3 outline-none"
+                className="flex-1 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-muted text-[11px] font-mono text-ih-fg-2 outline-none"
               />
               <button type="button" disabled={!inboundUrl}
                 onClick={() => { if (inboundUrl) void navigator.clipboard.writeText(inboundUrl); }}
@@ -147,7 +147,7 @@ export function SmsSecretsPanel({
                 {m.common_copy()}
               </button>
             </div>
-            <p className="text-[11px] text-ih-fg-4">
+            <p className="text-[11px] text-ih-fg-3">
               {provider === "telnyx"
                 ? m.settings_smssecrets_inbound_note_telnyx()
                 : m.settings_smssecrets_inbound_note_twilio()}

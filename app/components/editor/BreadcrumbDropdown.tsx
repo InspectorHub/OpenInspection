@@ -133,7 +133,7 @@ function ScopeOption({
         </svg>
         <span className="min-w-0 flex-1">
           <span className="block truncate">{label}</span>
-          {hint && <span className="block text-[11px] text-ih-fg-4 font-normal truncate">{hint}</span>}
+          {hint && <span className="block text-[11px] text-ih-fg-3 font-normal truncate">{hint}</span>}
         </span>
       </button>
     </li>

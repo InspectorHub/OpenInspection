@@ -129,7 +129,7 @@ export function FormField({
  );
  case "photo_only":
  return (
- <div className="p-4 rounded-lg border border-dashed border-ih-border-strong text-center text-[13px] text-ih-fg-4">
+ <div className="p-4 rounded-lg border border-dashed border-ih-border-strong text-center text-[13px] text-ih-fg-3">
  {m.form_field_photo_hint()}
  </div>
  );

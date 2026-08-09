@@ -152,7 +152,7 @@ export default function AgentDashboardPage() {
  {/* Stat cards */}
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <div className="bg-ih-bg-card border border-ih-border rounded-xl p-5">
- <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{m.agent_portal_dashboard_active_referrals()}</p>
+ <p className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1">{m.agent_portal_dashboard_active_referrals()}</p>
  <p className="text-3xl font-bold text-ih-fg-1">{referrals.length}</p>
  <p className="text-[13px] text-ih-fg-3 mt-1">
  {companies.length === 1
@@ -161,7 +161,7 @@ export default function AgentDashboardPage() {
  </p>
  </div>
  <div className={`bg-ih-bg-card border border-ih-border rounded-xl p-5 ${unreadReports > 0 ? "border-ih-primary/40" : ""}`}>
- <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{m.agent_portal_dashboard_reports_ready()}</p>
+ <p className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1">{m.agent_portal_dashboard_reports_ready()}</p>
  <p className={`text-3xl font-bold ${unreadReports > 0 ? "text-ih-primary" : "text-ih-fg-1"}`}>
  {unreadReports}
  </p>
@@ -209,7 +209,7 @@ export default function AgentDashboardPage() {
  <div className="flex items-center gap-3 px-5 py-3 bg-ih-bg-app/30 border-b border-ih-border">
  <span className="w-1 h-6 rounded bg-ih-primary" />
  <span className="text-sm font-bold text-ih-fg-1 truncate">{section.label}</span>
- <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest ml-auto shrink-0">
+ <span className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest ml-auto shrink-0">
  {section.rows.length} {section.rows.length === 1 ? m.agent_portal_dashboard_referral_one() : m.agent_portal_dashboard_referral_other()}
  </span>
  </div>

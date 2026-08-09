@@ -179,7 +179,7 @@ export default function SettingsEventTypes() {
                       {t.name}
                     </span>
                     {!t.active && (
-                      <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ih-bg-muted text-ih-fg-3">
+                      <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ih-bg-muted text-ih-fg-2">
                         {m.settings_event_types_inactive()}
                       </span>
                     )}
@@ -376,7 +376,7 @@ export default function SettingsEventTypes() {
                 {/* This one earns always-on help: the field's whole subtlety is
                     that 0 is a setting rather than a blank, which a label and a
                     placeholder cannot say. */}
-                <p className="mt-1 text-[11px] text-ih-fg-4">
+                <p className="mt-1 text-[11px] text-ih-fg-3">
                   {m.settings_event_types_followup_hint()}
                 </p>
               </div>

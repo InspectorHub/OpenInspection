@@ -79,7 +79,7 @@ export function InvoiceCard({
                 <p className="text-[12px] font-medium text-ih-watch-fg mb-1">{pill.detail}</p>
             )}
             {hasServiceLines && (
-                <p className="text-[11px] text-ih-fg-4 mb-3">{m.inspections_hub_invoice_from_services()}</p>
+                <p className="text-[11px] text-ih-fg-3 mb-3">{m.inspections_hub_invoice_from_services()}</p>
             )}
             {!hasServiceLines && <div className="mb-3" />}
 
@@ -150,7 +150,7 @@ export function InvoiceCard({
                     className="w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-1 text-[14px] font-medium focus:border-ih-primary focus:shadow-ih-focus outline-none"
                     ariaLabel={m.inspections_hub_invoice_amount_title()}
                 />
-                <p className="mt-2 text-[11px] text-ih-fg-4">{m.inspections_hub_invoice_amount_hint()}</p>
+                <p className="mt-2 text-[11px] text-ih-fg-3">{m.inspections_hub_invoice_amount_hint()}</p>
             </Modal>
         </Card>
     );

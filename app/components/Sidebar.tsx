@@ -85,7 +85,7 @@ export function Sidebar() {
           <button
             type="button"
             onClick={openPalette}
-            className="w-full flex items-center gap-2 px-[10px] py-[7px] rounded-ih-button bg-ih-bg-muted hover:bg-ih-bg-muted/80 text-ih-fg-4 transition-all border border-ih-border text-[12px]"
+            className="w-full flex items-center gap-2 px-[10px] py-[7px] rounded-ih-button bg-ih-bg-muted hover:bg-ih-bg-muted/80 text-ih-fg-2 transition-all border border-ih-border text-[12px]"
             aria-label={m.nav_action_command_palette()}
           >
             <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M16.5 10.5a6 6 0 11-12 0 6 6 0 0112 0z" /></svg>
@@ -175,7 +175,7 @@ export function Sidebar() {
               <>
                 <div className="flex-1 min-w-0 text-left">
                   <div className="text-[12px] font-bold text-ih-fg-1 truncate">{userName}</div>
-                  <div className="text-[10px] text-ih-fg-4 font-[var(--font-ih-mono)] truncate">{userSubline}</div>
+                  <div className="text-[10px] text-ih-fg-3 font-[var(--font-ih-mono)] truncate">{userSubline}</div>
                 </div>
                 {/* Small chevron indicator */}
                 <svg

@@ -111,7 +111,7 @@ export function PeopleStep({
               && !clientNameMissing
               && clientName.trim().length > 0
               && clientEmail.trim().length === 0 ? (
-                <p className="text-[12px] text-ih-fg-4">{m.newinsp_people_email_hint()}</p>
+                <p className="text-[12px] text-ih-fg-3">{m.newinsp_people_email_hint()}</p>
               ) : null}
           </div>
         </div>
@@ -146,7 +146,7 @@ export function PeopleStep({
           <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-ih-primary bg-ih-primary-tint">
             <span className="flex-1 text-[13px] font-medium text-ih-primary">
               {selectedAgent.name}
-              {selectedAgent.email ? <span className="ml-1 text-ih-fg-4 font-normal text-[12px]">({selectedAgent.email})</span> : null}
+              {selectedAgent.email ? <span className="ml-1 text-ih-fg-3 font-normal text-[12px]">({selectedAgent.email})</span> : null}
             </span>
             <button
               type="button"
@@ -163,7 +163,7 @@ export function PeopleStep({
               <button
                 type="button"
                 onClick={() => setNewAgentMode(false)}
-                className="text-[12px] text-ih-fg-4 hover:text-ih-fg-2"
+                className="text-[12px] text-ih-fg-2 hover:text-ih-fg-1"
               >{m.common_cancel()}</button>
             </div>
             <div>

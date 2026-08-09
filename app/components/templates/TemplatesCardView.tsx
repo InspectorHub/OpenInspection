@@ -75,7 +75,7 @@ export function TemplatesCardView({
                   <p className="text-[11px] text-ih-fg-3 line-clamp-2 mt-1">{t.description}</p>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-[10px] font-mono text-ih-fg-4">
+              <div className="flex items-center gap-2 text-[10px] font-mono text-ih-fg-3">
                 <span className="inline-flex items-center rounded border border-ih-primary/20 px-1.5 py-0.5 bg-ih-primary-tint text-ih-primary">
                   v{t.version || 1}.0
                 </span>
@@ -92,7 +92,7 @@ export function TemplatesCardView({
                 <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary transition-colors">
                   {m.templates_action_duplicate()}
                 </button>
-                <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-4 hover:text-ih-bad-fg transition-colors ml-auto">
+                <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-bad-fg transition-colors ml-auto">
                   {m.common_delete()}
                 </button>
               </div>

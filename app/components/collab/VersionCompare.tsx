@@ -162,11 +162,11 @@ export function VersionCompare({
                                             key={change.field}
                                             className="px-4 py-3 grid grid-cols-1 md:grid-cols-[120px_1fr_1fr_auto] gap-3 items-start"
                                         >
-                                            <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 pt-1">
+                                            <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-ih-fg-3 pt-1">
                                                 {change.field}
                                             </div>
                                             <div className="min-w-0">
-                                                <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1">
+                                                <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-ih-fg-3 mb-1">
                                                     {fromHead}
                                                 </div>
                                                 <pre className="bg-ih-bg-app/40 border border-ih-border rounded-md p-2 text-[12px] text-ih-fg-2 whitespace-pre-wrap break-words leading-relaxed">

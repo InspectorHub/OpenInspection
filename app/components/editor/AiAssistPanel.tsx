@@ -124,7 +124,7 @@ export function AiAssistPanel({ notes, context, resultId, onAccept }: AiAssistPa
         // (There is no `ih-warn` in this design system — a class naming one
         // compiles to nothing and the rule silently disappears.)
         <div className="rounded-lg border border-ih-border-strong border-l-4 border-l-ih-watch bg-ih-bg-app p-3 space-y-2.5">
-          <div className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">
+          <div className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">
             {m.editor_ai_assist_draft_eyebrow()}
           </div>
           {/* Same size and face as the note above it, so the inspector reads

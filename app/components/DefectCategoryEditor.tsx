@@ -111,7 +111,7 @@ export function DefectCategoryEditor({
             />
           </label>
           <div className="flex-1 min-w-0">
-            <label htmlFor="defect-category-name" className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5">{m.defect_category_editor_name_label()}</label>
+            <label htmlFor="defect-category-name" className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-3 mb-1.5">{m.defect_category_editor_name_label()}</label>
             <input
               id="defect-category-name"
               value={name}
@@ -123,7 +123,7 @@ export function DefectCategoryEditor({
         </div>
 
         <div>
-          <label htmlFor="defect-category-sort-order" className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5">{m.defect_category_editor_sort_label()}</label>
+          <label htmlFor="defect-category-sort-order" className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-3 mb-1.5">{m.defect_category_editor_sort_label()}</label>
           <input
             id="defect-category-sort-order"
             type="number"

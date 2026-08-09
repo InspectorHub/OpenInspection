@@ -58,7 +58,7 @@ export function GoogleCalendarPanel({
           {/* No hidden input here: the toggle radios were never inside the
               form. The save Form below carries the value via its own
               hidden `googleOAuthMode` input. */}
-          <p className="text-[11px] text-ih-fg-4">
+          <p className="text-[11px] text-ih-fg-3">
             {oauthMode === "platform"
               ? m.settings_gcal_mode_platform_desc()
               : m.settings_gcal_mode_own_desc()}
@@ -76,7 +76,7 @@ export function GoogleCalendarPanel({
           </Form>
         </div>
       ) : (
-        <p className="text-[13px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
+        <p className="text-[13px] text-ih-fg-2 bg-ih-bg-muted border border-ih-border rounded-md p-3">
           {m.settings_gcal_selfhost_note()}
         </p>
       )}

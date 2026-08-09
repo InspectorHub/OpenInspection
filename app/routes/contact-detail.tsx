@@ -170,7 +170,7 @@ export default function ContactDetailPage() {
           <BlockHeading title={m.contacts_detail_info_heading()} />
           <div className="space-y-3 text-[13px]">
             <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3 mb-1">
                 {m.contacts_field_email()}
               </p>
               {contact.email ? (
@@ -183,7 +183,7 @@ export default function ContactDetailPage() {
             </div>
 
             <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3 mb-1">
                 {m.contacts_field_phone()}
               </p>
               {contact.phone ? (
@@ -196,14 +196,14 @@ export default function ContactDetailPage() {
             </div>
 
             <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3 mb-1">
                 {m.contacts_field_agency()}
               </p>
               <p className="text-ih-fg-1">{contact.agency || <span className="text-ih-fg-4">—</span>}</p>
             </div>
 
             <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3 mb-1">
                 {m.contacts_field_notes()}
               </p>
               {contact.notes ? (
@@ -220,7 +220,7 @@ export default function ContactDetailPage() {
           <BlockHeading title={m.contacts_detail_stats_heading()} />
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3 mb-1">
                 {m.contacts_field_inspections()}
               </p>
               <p className="text-[24px] font-bold text-ih-fg-1 tabular-nums">
@@ -228,7 +228,7 @@ export default function ContactDetailPage() {
               </p>
             </div>
             <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3 mb-1">
                 {m.contacts_detail_revenue_label()}
               </p>
               <p className="text-[24px] font-bold text-ih-fg-1 tabular-nums">

@@ -98,7 +98,7 @@ export function PaymentSection({
               </svg>
               {m.portal_payment_download_pdf()}
             </button>
-            <p className="text-[12px] text-ih-fg-4">
+            <p className="text-[12px] text-ih-fg-3">
               {m.portal_payment_questions({ name: invoice.inspectorName || m.portal_pay_inspector_fallback() })}
             </p>
           </div>

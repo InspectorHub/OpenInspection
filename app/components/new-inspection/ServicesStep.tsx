@@ -53,7 +53,7 @@ export function ServicesStep({
                 />
               ) : catalogCents !== null ? (
                 // FE-7: price is stored in cents — "$400.00", not "$40000"
-                <span className="text-[12px] text-ih-fg-4 flex-shrink-0">{formatPriceCents(catalogCents)}</span>
+                <span className="text-[12px] text-ih-fg-3 flex-shrink-0">{formatPriceCents(catalogCents)}</span>
               ) : null}
             </div>
           );

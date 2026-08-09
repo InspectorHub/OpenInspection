@@ -166,7 +166,7 @@ export function AddressAutocomplete({
         document.body,
       )}
       {detailsFetcher.state === "loading" && (
-        <p className="mt-1 text-[11px] text-ih-fg-4">{m.common_loading()}</p>
+        <p className="mt-1 text-[11px] text-ih-fg-3">{m.common_loading()}</p>
       )}
     </div>
   );

@@ -84,7 +84,7 @@ export function VideoIntegrationPanel({
       </div>
 
       {/* Info callout */}
-      <div className="rounded-md bg-ih-bg-muted border border-ih-border px-4 py-3 text-[12px] text-ih-fg-3 leading-relaxed">
+      <div className="rounded-md bg-ih-bg-muted border border-ih-border px-4 py-3 text-[12px] text-ih-fg-2 leading-relaxed">
         <span className="font-semibold text-ih-fg-2">{m.settings_video_default_label()}</span> {m.settings_video_r2_desc()}{" "}
         <span className="font-semibold text-ih-fg-2">{m.settings_video_stream_label()}</span> {m.settings_video_stream_desc()}{" "}
         <span className="font-mono">STREAM</span> {m.settings_video_stream_binding()}{" "}

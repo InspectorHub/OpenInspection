@@ -112,6 +112,8 @@ describe("Table", () => {
     expect(th?.className).toContain("text-[10px]");
     expect(th?.className).toContain("uppercase");
     expect(th?.className).toContain("tracking-widest");
-    expect(th?.className).toContain("text-ih-fg-4");
+    // fg-3, not fg-4: 10px is normal-size text for WCAG and fg-4 is 2.56:1 on a
+    // light card. See the note on HEADER_CLASS and `npm run lint:contrast`.
+    expect(th?.className).toContain("text-ih-fg-3");
   });
 });

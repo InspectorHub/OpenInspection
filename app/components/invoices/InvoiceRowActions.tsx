@@ -123,7 +123,7 @@ export function InvoiceRowActions({
         <button
           onClick={onCancelPicker}
           disabled={busy}
-          className="px-2 h-7 rounded-md text-[12px] font-semibold text-ih-fg-4 hover:text-ih-fg-2 disabled:opacity-50"
+          className="px-2 h-7 rounded-md text-[12px] font-semibold text-ih-fg-3 hover:text-ih-fg-2 disabled:opacity-50"
         >
           {m.common_cancel()}
         </button>

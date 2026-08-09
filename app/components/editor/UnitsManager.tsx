@@ -336,7 +336,7 @@ function BulkCreateForm({ busy, onSubmit }: { busy: boolean; onSubmit: (fields: 
             </label>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-ih-fg-4 tabular-nums">
+            <span className="text-[11px] text-ih-fg-3 tabular-nums">
               {gridCount > 0 ? (gridCount === 1 ? m.editor_unitsmanager_creates_one({ count: gridCount }) : m.editor_unitsmanager_creates_many({ count: gridCount })) : m.editor_unitsmanager_grid_hint()}
             </span>
             <Button variant="primary" size="sm" disabled={busy || gridCount <= 0} onClick={createGrid}>
@@ -355,7 +355,7 @@ function BulkCreateForm({ busy, onSubmit }: { busy: boolean; onSubmit: (fields: 
             className="w-full px-2.5 py-2 rounded-ih-input border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 font-mono"
           />
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-ih-fg-4 tabular-nums">
+            <span className="text-[11px] text-ih-fg-3 tabular-nums">
               {csvCount > 0 ? (csvCount === 1 ? m.editor_unitsmanager_row_one({ count: csvCount }) : m.editor_unitsmanager_row_many({ count: csvCount })) : m.editor_unitsmanager_csv_hint()}
             </span>
             <Button variant="primary" size="sm" disabled={busy || csvCount <= 0} onClick={createCsv}>

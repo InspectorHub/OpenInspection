@@ -175,9 +175,9 @@ export function TemplateCombobox({
                     {/* List */}
                     <div className="max-h-52 overflow-y-auto">
                         {isLoading ? (
-                            <div className="py-6 text-center text-[12px] text-ih-fg-4">{m.common_loading()}</div>
+                            <div className="py-6 text-center text-[12px] text-ih-fg-3">{m.common_loading()}</div>
                         ) : results.length === 0 ? (
-                            <div className="py-6 text-center text-[12px] text-ih-fg-4">
+                            <div className="py-6 text-center text-[12px] text-ih-fg-3">
                                 {query ? m.template_combobox_no_match() : m.template_combobox_no_templates()}
                             </div>
                         ) : (
@@ -187,7 +187,7 @@ export function TemplateCombobox({
                                     <button
                                         type="button"
                                         onClick={() => { onChange(""); setOpen(false); setQuery(""); }}
-                                        className="w-full px-3 py-2 text-left text-[12px] text-ih-fg-4 hover:bg-ih-bg-muted italic"
+                                        className="w-full px-3 py-2 text-left text-[12px] text-ih-fg-3 hover:bg-ih-bg-muted italic"
                                     >
                                         {m.template_combobox_clear()}
                                     </button>

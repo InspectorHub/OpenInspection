@@ -86,12 +86,12 @@ export function RepairDefectRowView({
           {itemLabel} &middot; {sectionTitle}
         </span>
         {location && (
-          <span className="block text-[12px] text-ih-fg-4 mt-0.5">
+          <span className="block text-[12px] text-ih-fg-3 mt-0.5">
             {m.repair_defect_location_prefix()} {location}
           </span>
         )}
         {comment && (
-          <span className="block text-[12px] text-ih-fg-4 mt-0.5 line-clamp-2">{comment}</span>
+          <span className="block text-[12px] text-ih-fg-3 mt-0.5 line-clamp-2">{comment}</span>
         )}
         {photos && photos.length > 0 && (
           <span className={`mt-2 ${DEFECT_PHOTO_GRID_CLASS}`}>
@@ -109,7 +109,7 @@ export function RepairDefectRowView({
       </span>
       <span className="flex items-center gap-1.5 shrink-0 ml-2">
         {isCustom && (
-          <span className="inline-flex items-center h-5 px-1.5 rounded text-[10px] font-bold uppercase tracking-wide bg-ih-bg-muted text-ih-fg-3">
+          <span className="inline-flex items-center h-5 px-1.5 rounded text-[10px] font-bold uppercase tracking-wide bg-ih-bg-muted text-ih-fg-2">
             {m.agent_portal_repair_inspector_added()}
           </span>
         )}

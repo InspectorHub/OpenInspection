@@ -86,7 +86,7 @@ export function SmsConsentBlock({
 
     return (
         <section aria-labelledby="notif-sms-h" className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
-            <h2 id="notif-sms-h" className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest">
+            <h2 id="notif-sms-h" className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest">
                 {m.notif_prefs_sms_heading()}
             </h2>
 
@@ -159,7 +159,7 @@ export function SmsConsentBlock({
                         {m.notif_prefs_sms_manage()} →
                     </a>
                 )}
-                <span className="text-[12px] text-ih-fg-4">{m.notif_prefs_sms_stop_hint()}</span>
+                <span className="text-[12px] text-ih-fg-3">{m.notif_prefs_sms_stop_hint()}</span>
             </div>
         </section>
     );

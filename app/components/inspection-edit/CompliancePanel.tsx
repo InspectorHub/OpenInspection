@@ -127,7 +127,7 @@ function ConformancePreview({ data }: { data: CompliancePanelData }) {
           {conforms ? m.editor_compliance_conforms() : m.editor_compliance_does_not_conform()}
         </span>
       </div>
-      <ul className="text-[11px] text-ih-fg-4 space-y-0.5">
+      <ul className="text-[11px] text-ih-fg-3 space-y-0.5">
         <li>{reviewerSigned ? "✓" : "—"} {m.editor_compliance_check_pcr()}</li>
         <li>{psqOk ? "✓" : "—"} {m.editor_compliance_check_psq()}</li>
         <li>{docReviewStarted ? "✓" : "—"} {m.editor_compliance_check_doc_review()}</li>
@@ -214,7 +214,7 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
         <div className="text-[12px] text-ih-fg-2 space-y-1">
           <div>{existing.name}{existing.license ? m.editor_compliance_license_suffix({ license: existing.license }) : ""}</div>
           {existing.signedAt ? (
-            <div className="text-[11px] text-ih-fg-4">{m.editor_compliance_signed()} {formatDateTime(existing.signedAt, { locale, timeZone: displayTz })}</div>
+            <div className="text-[11px] text-ih-fg-3">{m.editor_compliance_signed()} {formatDateTime(existing.signedAt, { locale, timeZone: displayTz })}</div>
           ) : null}
           <Button variant="danger-link" size="sm" disabled={removing} onClick={() => setConfirmOpen(true)}>
             {removing ? m.editor_compliance_removing() : m.common_remove()}
@@ -330,7 +330,7 @@ function PsqPanel({ psq }: { psq: PsqView | null }) {
   return (
     <div className="rounded-ih-card border border-ih-border bg-ih-bg-card p-3 space-y-3" data-testid="psq-panel">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">{m.editor_compliance_status()}</span>
+        <span className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.editor_compliance_status()}</span>
         <fieldset disabled={settingStatus} className="contents">
           <SegmentedControl
             ariaLabel={m.editor_compliance_psq_status()}
@@ -571,13 +571,13 @@ function RelianceFieldRow({ fieldKey, label, initial }: { fieldKey: keyof Relian
 function RelianceSection({ relianceText }: { relianceText: RelianceTextView }) {
   return (
     <section className="space-y-1.5" data-testid="reliance-section">
-      <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">{m.editor_compliance_reliance_heading()}</h3>
+      <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-3">{m.editor_compliance_reliance_heading()}</h3>
       <div className="space-y-2">
         {relianceFields().map((f) => (
           <RelianceFieldRow key={f.key} fieldKey={f.key} label={f.label} initial={relianceText[f.key]} />
         ))}
       </div>
-      <p className="text-[11px] text-ih-fg-4 italic">
+      <p className="text-[11px] text-ih-fg-3 italic">
         {m.editor_compliance_reliance_note()}
       </p>
     </section>
@@ -599,7 +599,7 @@ export function CompliancePanel({ inspectionId, data }: { inspectionId: string; 
       <ConformancePreview data={data} />
 
       <section className="space-y-2">
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">{m.editor_compliance_dual_signoff()}</h3>
+        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-3">{m.editor_compliance_dual_signoff()}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <SignoffRoleCard role="field_observer" existing={fieldObserver} />
           <SignoffRoleCard role="pcr_reviewer" existing={pcrReviewer} />
@@ -607,12 +607,12 @@ export function CompliancePanel({ inspectionId, data }: { inspectionId: string; 
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">{m.editor_compliance_psq_heading()}</h3>
+        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-3">{m.editor_compliance_psq_heading()}</h3>
         <PsqPanel psq={data.psq} />
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">{m.editor_compliance_doc_review_heading()}</h3>
+        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-3">{m.editor_compliance_doc_review_heading()}</h3>
         <DocReviewSection items={data.documentReview} />
       </section>
 

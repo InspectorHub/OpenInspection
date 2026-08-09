@@ -191,7 +191,7 @@ function CappedMetricCard({
       <div className="text-[12px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{label}</div>
       <div className="text-[28px] font-bold text-ih-fg-1 mt-1 tabular-nums">
         {formatNumber(used, { locale })}
-        <span className="text-[14px] font-medium text-ih-fg-4"> / {formatNumber(cap, { locale })}</span>
+        <span className="text-[14px] font-medium text-ih-fg-3"> / {formatNumber(cap, { locale })}</span>
       </div>
       <div className="mt-2 h-1.5 rounded-full bg-ih-bg-muted overflow-hidden">
         <div
@@ -203,7 +203,7 @@ function CappedMetricCard({
         {atCap ? m.settings_usage_cap_reached() : m.settings_usage_cap_remaining({ count: cap - used })}
       </div>
       {byo !== undefined && (
-        <div className="text-[11px] text-ih-fg-4 mt-1">{m.settings_usage_byo({ count: formatNumber(byo, { locale }) })}</div>
+        <div className="text-[11px] text-ih-fg-3 mt-1">{m.settings_usage_byo({ count: formatNumber(byo, { locale }) })}</div>
       )}
     </div>
   );

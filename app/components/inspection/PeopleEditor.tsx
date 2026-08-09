@@ -204,7 +204,7 @@ export function PeopleEditor({
             <div key={group.kind}>
               <p
                 data-testid={`people-group-${group.kind}`}
-                className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1"
+                className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3 mb-1"
               >
                 {groupLabel(group.kind)}
               </p>
@@ -309,7 +309,7 @@ export function PeopleEditor({
                         crammed under a red button reads as a validation error
                         about something the operator just did wrong. */}
                     {sole && (
-                      <p className="text-[11px] text-ih-fg-4 mt-1">
+                      <p className="text-[11px] text-ih-fg-3 mt-1">
                         {m.inspections_hub_people_remove_sole_reason()}
                       </p>
                     )}
@@ -335,7 +335,7 @@ export function PeopleEditor({
           self-describing way to act on the ones already out there. */}
       {issuedCount > 0 && (
         <div className="mt-5 pt-4 border-t border-ih-line">
-          <h3 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-ih-fg-4 mb-1">
+          <h3 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-ih-fg-3 mb-1">
             {m.inspections_hub_people_link_expiry_heading()}
           </h3>
           <p className="text-[12px] text-ih-fg-3 mb-2">{m.inspections_hub_people_link_expiry_help()}</p>
@@ -355,7 +355,7 @@ export function PeopleEditor({
             {expiryLabel}
           </Button>
           {expiryWouldChangeNothing && (
-            <p className="text-[11px] text-ih-fg-4 mt-1">{m.inspections_hub_people_link_expiry_noop()}</p>
+            <p className="text-[11px] text-ih-fg-3 mt-1">{m.inspections_hub_people_link_expiry_noop()}</p>
           )}
         </div>
       )}

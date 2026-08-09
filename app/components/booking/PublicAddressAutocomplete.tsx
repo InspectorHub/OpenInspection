@@ -161,7 +161,7 @@ export function PublicAddressAutocomplete({
           ))}
         </ul>
       )}
-      <p className="mt-1 text-[11px] text-ih-fg-4">{m.booking_field_address_hint()}</p>
+      <p className="mt-1 text-[11px] text-ih-fg-3">{m.booking_field_address_hint()}</p>
     </div>
   );
 }

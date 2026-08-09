@@ -200,7 +200,7 @@ export default function RepairRequestSharePage() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 print:py-4">
       {/* Header */}
       <header className="mb-6">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">
           {m.repair_request_eyebrow()}
         </p>
         <h1 className="text-[24px] sm:text-[28px] font-semibold tracking-tight text-ih-fg-1 leading-tight">
@@ -223,7 +223,7 @@ export default function RepairRequestSharePage() {
       ) : (
         <div className="rounded-lg border border-ih-border overflow-hidden mb-8">
           {/* Table header */}
-          <div className="grid grid-cols-[1fr_1fr_2fr_auto_1fr_auto] gap-0 bg-ih-bg-muted border-b border-ih-border px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-4">
+          <div className="grid grid-cols-[1fr_1fr_2fr_auto_1fr_auto] gap-0 bg-ih-bg-muted border-b border-ih-border px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-2">
             <span>{m.repair_request_col_section()}</span>
             <span>{m.repair_request_col_item()}</span>
             <span>{m.repair_request_col_finding()}</span>
@@ -248,7 +248,7 @@ export default function RepairRequestSharePage() {
                   <span className="block font-semibold text-ih-fg-1">{row.defectTitle}</span>
                 )}
                 {row.location && (
-                  <span className="block text-[11px] text-ih-fg-4">
+                  <span className="block text-[11px] text-ih-fg-3">
                     {m.repair_request_col_location_prefix()} {row.location}
                   </span>
                 )}
@@ -259,7 +259,7 @@ export default function RepairRequestSharePage() {
                 {row.trade && (
                   <span
                     data-testid="share-row-trade"
-                    className="block text-[11px] text-ih-fg-4"
+                    className="block text-[11px] text-ih-fg-3"
                   >
                     <span className="font-bold uppercase tracking-wider">
                       {m.repair_request_col_trade_prefix()}
@@ -270,7 +270,7 @@ export default function RepairRequestSharePage() {
               </span>
               <span className="pr-3">
                 {row.category && (
-                  <span className="inline-flex items-center h-5 px-2 rounded bg-ih-bg-muted text-ih-fg-3 text-[10px] font-bold uppercase tracking-wider">
+                  <span className="inline-flex items-center h-5 px-2 rounded bg-ih-bg-muted text-ih-fg-2 text-[10px] font-bold uppercase tracking-wider">
                     {sharePriorityLabel(row.category)}
                   </span>
                 )}
@@ -289,7 +289,7 @@ export default function RepairRequestSharePage() {
                   is absent from the file the seller actually receives. */}
               <span className="text-ih-fg-3 pr-3 leading-snug">
                 {row.actionTag && (
-                  <span data-testid="share-row-action-tag" className="block text-[11px] text-ih-fg-4">
+                  <span data-testid="share-row-action-tag" className="block text-[11px] text-ih-fg-3">
                     <span className="font-bold uppercase tracking-wider">
                       {m.repair_request_action_tag_prefix()}
                     </span>{" "}
@@ -333,13 +333,13 @@ export default function RepairRequestSharePage() {
           repair-request-share-attribution.test.tsx. */}
       <p
         data-testid="amount-attribution"
-        className="mt-8 text-[11px] leading-relaxed text-ih-fg-4"
+        className="mt-8 text-[11px] leading-relaxed text-ih-fg-3"
       >
         {m.repair_request_amount_attribution()}
       </p>
 
       {/* Footer */}
-      <footer className="print:hidden mt-10 pt-6 border-t border-ih-border text-[11px] text-ih-fg-4 text-center">
+      <footer className="print:hidden mt-10 pt-6 border-t border-ih-border text-[11px] text-ih-fg-3 text-center">
         {m.repair_request_footer_1()}{" "}
         <strong className="text-ih-fg-3">OpenInspection</strong>{m.repair_request_footer_2()}
       </footer>

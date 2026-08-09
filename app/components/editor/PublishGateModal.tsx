@@ -26,7 +26,7 @@ function DefectList({ entries, onJump, tone }: {
                         className={`mt-1 inline-block w-2 h-2 rounded-full shrink-0 ${tone === 'blocking' ? 'bg-ih-bad-fg' : 'bg-ih-watch-fg'}`}
                     />
                     <div className="flex-1 min-w-0">
-                        <div className="text-[11px] uppercase tracking-[0.1em] text-ih-fg-4">
+                        <div className="text-[11px] uppercase tracking-[0.1em] text-ih-fg-3">
                             {b.sectionTitle} &rsaquo; {b.itemLabel}
                         </div>
                         <div className="text-[13px] font-bold">{b.cannedTitle}</div>

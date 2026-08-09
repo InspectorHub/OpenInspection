@@ -298,7 +298,7 @@ export default function AgentRepairItemsPage() {
       />
 
       {customCount > 0 && (
-        <p className="text-[12px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md px-3 py-2">
+        <p className="text-[12px] text-ih-fg-2 bg-ih-bg-muted border border-ih-border rounded-md px-3 py-2">
           {customCount === 1
             ? m.agent_portal_repair_custom_note_one()
             : m.agent_portal_repair_custom_note_other({ count: customCount })}
@@ -315,7 +315,7 @@ export default function AgentRepairItemsPage() {
             <div className="flex items-center gap-3 px-5 py-3 bg-ih-bg-app/30 border-b border-ih-border">
               <span className="w-1 h-6 rounded bg-ih-primary" />
               <h2 className="text-sm font-bold text-ih-fg-1 truncate">{section.label}</h2>
-              <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest ml-auto shrink-0">
+              <span className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest ml-auto shrink-0">
                 {section.blocks.reduce((n, b) => n + b.rows.length, 0)}{" "}
                 {section.blocks.reduce((n, b) => n + b.rows.length, 0) === 1
                   ? m.agent_portal_recommendations_item_one()

@@ -96,7 +96,7 @@ export function DateRangePicker({ range, today, locale, onChange }: DateRangePic
         </svg>
         <span className="flex flex-col leading-tight">
           <span className="text-[12px] font-bold text-ih-fg-1">{triggerLabel}</span>
-          <span className="text-[10px] text-ih-fg-4 tabular-nums">{formatRange(range, locale)}</span>
+          <span className="text-[10px] text-ih-fg-3 tabular-nums">{formatRange(range, locale)}</span>
         </span>
         <svg className="w-3 h-3 shrink-0 text-ih-fg-4" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
           <path d="M3 4.5 6 7.5 9 4.5" />
@@ -125,7 +125,7 @@ export function DateRangePicker({ range, today, locale, onChange }: DateRangePic
                     }`}
                   >
                     <span className="whitespace-nowrap">{presetLabel(id)}</span>
-                    <span className="text-[11px] text-ih-fg-4 tabular-nums shrink-0">
+                    <span className="text-[11px] text-ih-fg-3 tabular-nums shrink-0">
                       {formatRange(presetRange(id, today), locale)}
                     </span>
                   </button>
@@ -135,7 +135,7 @@ export function DateRangePicker({ range, today, locale, onChange }: DateRangePic
           </ul>
 
           <div className="mt-2 pt-2 border-t border-ih-border">
-            <p className="px-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ih-fg-4">
+            <p className="px-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ih-fg-3">
               {m.metrics_range_custom_heading()}
             </p>
             <div className="px-2.5 flex items-center gap-2">
@@ -149,7 +149,7 @@ export function DateRangePicker({ range, today, locale, onChange }: DateRangePic
                   className="w-full h-8 px-2 rounded-md border border-ih-border bg-ih-bg-card text-[12px] text-ih-fg-1 outline-none focus:border-ih-primary"
                 />
               </label>
-              <span className="text-ih-fg-4 text-[12px]" aria-hidden="true">–</span>
+              <span className="text-ih-fg-3 text-[12px]" aria-hidden="true">–</span>
               <label className="flex-1">
                 <span className="sr-only">{m.metrics_range_to()}</span>
                 <input

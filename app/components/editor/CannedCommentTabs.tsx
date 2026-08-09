@@ -258,7 +258,7 @@ export function CannedCommentTabs({
             committing — a library comment is language, not a finished defect. */}
         {activeTab === "defects" && libraryMatches.length > 0 && (
           <div className="pt-1">
-            <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-ih-fg-4 px-1 pb-1">
+            <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-ih-fg-3 px-1 pb-1">
               {m.editor_canned_from_library()}
             </div>
             <div className="space-y-1.5">
@@ -270,7 +270,7 @@ export function CannedCommentTabs({
                   className="w-full text-left p-2.5 rounded-lg bg-ih-bg-app/50 hover:bg-ih-bg-muted border border-dashed border-ih-border transition-colors"
                 >
                   <p className="text-[12px] leading-relaxed text-ih-fg-2 line-clamp-2">{match.text}</p>
-                  <span className="text-[10px] text-ih-fg-4">
+                  <span className="text-[10px] text-ih-fg-3">
                     {match.severity !== "all" ? match.severity : m.editor_canned_any_severity()}
                     {match.section ? ` · ${match.section}` : ""} · {m.editor_canned_tap_to_use()}
                   </span>

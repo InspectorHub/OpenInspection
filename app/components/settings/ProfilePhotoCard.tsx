@@ -49,7 +49,7 @@ export function ProfilePhotoCard({ photoUrl }: { photoUrl: string | null }) {
       </header>
 
       <div className="flex items-center gap-4">
-        <div className="w-24 h-24 rounded-full bg-ih-bg-muted border border-ih-border overflow-hidden flex items-center justify-center text-ih-fg-4 text-[11px]">
+        <div className="w-24 h-24 rounded-full bg-ih-bg-muted border border-ih-border overflow-hidden flex items-center justify-center text-ih-fg-2 text-[11px]">
           {photoUrl ? (
             <img src={photoUrl} alt={m.settings_profile_photo_alt()} className="w-full h-full object-cover" />
           ) : (

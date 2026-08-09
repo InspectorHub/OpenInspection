@@ -39,7 +39,7 @@ export function BrowserTimezoneHint({
   if (!browserTz || browserTz === effectiveValue || !TIMEZONE_OPTIONS.includes(browserTz)) return null;
 
   return (
-    <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ih-fg-4">
+    <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ih-fg-3">
       <span>{m.settings_timezone_browser_hint({ zone: timeZoneLabel(browserTz) })}</span>
       <button
         type="button"

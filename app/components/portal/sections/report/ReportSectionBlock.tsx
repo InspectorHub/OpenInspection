@@ -61,7 +61,7 @@ export function ReportSectionBlock({
           {section.title}
         </h2>
         <div className="flex-1 h-px" style={{ borderTop: "1px solid var(--report-band)" }} />
-        <span className="text-xs font-mono text-ih-fg-4">
+        <span className="text-xs font-mono text-ih-fg-3">
           {m.report_view_section_items({ count: section.items.length })}
         </span>
       </div>

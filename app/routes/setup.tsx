@@ -166,7 +166,7 @@ export default function SetupPage() {
               <>
                 <span className="font-medium text-ih-fg-2">{m.auth_setup_code_help_required()}</span>{" "}
                 {m.auth_setup_code_help_enter_prefix()}{" "}
-                <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-3 font-mono text-[10px]">SETUP_CODE</code>{" "}
+                <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-2 font-mono text-[10px]">SETUP_CODE</code>{" "}
                 {m.auth_setup_code_help_middle()}{" "}
                 <span className="font-medium text-ih-fg-2">{m.auth_setup_code_help_settings_path()}</span>{" "}
                 {m.auth_setup_code_help_suffix()}{" "}

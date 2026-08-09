@@ -131,7 +131,7 @@ export default function CalendarDispatchPage() {
         meta={board ? board.date : undefined}
         actions={
           <span className="inline-flex items-center gap-2">
-            <span className="rounded-full bg-ih-bg-muted px-3 py-1 text-[11px] font-bold text-ih-fg-3">
+            <span className="rounded-full bg-ih-bg-muted px-3 py-1 text-[11px] font-bold text-ih-fg-2">
               {board?.conflictPolicy === "block"
                 ? m.dispatch_policy_block()
                 : m.dispatch_policy_advisory()}

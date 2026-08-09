@@ -40,9 +40,9 @@ export function SpectoraMappingModal({ open, handleMappingDismiss }: SpectoraMap
         <div className="px-4 py-3">
           <div className="flex items-center gap-2 mb-0.5">
             <span className="text-[12px] font-bold text-ih-fg-3 line-through">{m.templates_mapping_row1_from()}</span>
-            <span className="text-ih-fg-4 text-[11px]">&rarr;</span>
+            <span className="text-ih-fg-3 text-[11px]">&rarr;</span>
             <span className="text-[12px] font-bold text-ih-primary">{m.templates_mapping_row1_to1()}</span>
-            <span className="text-ih-fg-4 text-[10px] font-bold">+</span>
+            <span className="text-ih-fg-3 text-[10px] font-bold">+</span>
             <span className="text-[12px] font-bold text-ih-primary">{m.templates_mapping_row1_to2()}</span>
           </div>
           <p className="text-[12px] text-ih-fg-3">{m.templates_mapping_row1_desc()}</p>
@@ -51,11 +51,11 @@ export function SpectoraMappingModal({ open, handleMappingDismiss }: SpectoraMap
         <div className="px-4 py-3">
           <div className="flex items-center gap-2 mb-0.5">
             <span className="text-[12px] font-bold text-ih-fg-3 line-through">{m.templates_mapping_row2_from()}</span>
-            <span className="text-ih-fg-4 text-[11px]">&rarr;</span>
+            <span className="text-ih-fg-3 text-[11px]">&rarr;</span>
             <span className="text-[12px] font-bold text-ih-good-fg">{m.templates_mapping_row2_to1()}</span>
-            <span className="text-ih-fg-4 text-[10px]">&middot;</span>
+            <span className="text-ih-fg-3 text-[10px]">&middot;</span>
             <span className="text-[12px] font-bold text-ih-watch-fg">{m.templates_mapping_row2_to2()}</span>
-            <span className="text-ih-fg-4 text-[10px]">&middot;</span>
+            <span className="text-ih-fg-3 text-[10px]">&middot;</span>
             <span className="text-[12px] font-bold text-ih-bad-fg">{m.templates_mapping_row2_to3()}</span>
           </div>
           <p className="text-[12px] text-ih-fg-3">{m.templates_mapping_row2_desc()}</p>
@@ -64,9 +64,9 @@ export function SpectoraMappingModal({ open, handleMappingDismiss }: SpectoraMap
         <div className="px-4 py-3">
           <div className="flex items-center gap-2 mb-0.5">
             <span className="text-[12px] font-bold text-ih-fg-3 line-through">{m.templates_mapping_row3_from()}</span>
-            <span className="text-ih-fg-4 text-[11px]">&rarr;</span>
+            <span className="text-ih-fg-3 text-[11px]">&rarr;</span>
             <span className="text-[12px] font-bold text-ih-primary">{m.templates_mapping_row3_to1()}</span>
-            <span className="text-ih-fg-4 text-[10px] font-bold">+</span>
+            <span className="text-ih-fg-3 text-[10px] font-bold">+</span>
             <span className="text-[12px] font-bold text-ih-primary">{m.templates_mapping_row3_to2()}</span>
           </div>
           <p className="text-[12px] text-ih-fg-3">{m.templates_mapping_row3_desc()}</p>

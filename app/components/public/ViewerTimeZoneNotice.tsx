@@ -23,7 +23,7 @@ export function ViewerTimeZoneNotice({ className }: { className?: string }) {
 
   return (
     <div
-      className={`print:hidden text-[12px] text-ih-fg-4 ${className ?? ""}`}
+      className={`print:hidden text-[12px] text-ih-fg-3 ${className ?? ""}`}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span>{m.public_viewer_tz_label()}</span>

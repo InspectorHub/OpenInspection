@@ -81,7 +81,7 @@ export function ReportViewDisclosure({
       >
         <h2
           id="view-tracking-heading"
-          className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-2"
+          className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-2"
         >
           {m.report_view_disclosure_heading()}
         </h2>

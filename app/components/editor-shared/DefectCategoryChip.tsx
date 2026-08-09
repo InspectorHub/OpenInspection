@@ -22,8 +22,14 @@ const CATEGORY_TOKENS: Record<string, string> = {
   recommendation: "bg-ih-watch-bg text-ih-watch-fg",
 };
 // Canonical "other"/maintenance styling. Converges the prior drift
-// (canned used text-ih-fg-3, custom used text-ih-fg-2) onto fg-3.
-const DEFAULT_TOKENS = "bg-ih-bg-muted text-ih-fg-3";
+// (canned used text-ih-fg-3, custom used text-ih-fg-2) onto fg-2.
+//
+// fg-2 rather than fg-3 because of the SURFACE: light --ih-fg-3 on
+// --ih-bg-muted is 4.34:1, under the 4.5:1 AA floor that applies to this 9px
+// text. `npm run lint:contrast` cannot see it — the size lives in the template
+// literal below and the colour lives in this constant, and the gate only reads
+// one string literal at a time.
+const DEFAULT_TOKENS = "bg-ih-bg-muted text-ih-fg-2";
 
 export function DefectCategoryChip({ category, className, color }: DefectCategoryChipProps) {
   // A configured color replaces the tokened text color (keeps the neutral

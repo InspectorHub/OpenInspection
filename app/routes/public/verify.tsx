@@ -130,7 +130,7 @@ function VerifyBody() {
         {m.public_verify_section_signed()}
       </h2>
       {result.contentSnapshot === null ? (
-        <div className="rounded-lg border border-ih-border bg-ih-bg-muted p-4 text-[13px] text-ih-fg-3 mb-6">
+        <div className="rounded-lg border border-ih-border bg-ih-bg-muted p-4 text-[13px] text-ih-fg-2 mb-6">
           {m.public_verify_snapshot_unavailable()}
         </div>
       ) : (

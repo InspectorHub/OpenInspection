@@ -111,7 +111,7 @@ export function RepairDefectRow({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label
-                className="block text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1"
+                className="block text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1"
                 htmlFor={`action-${defect.findingKey}`}
               >
                 {m.repair_defect_action_label()}
@@ -165,7 +165,7 @@ export function RepairDefectRow({
                 instead of two. */}
             {actionTag === "fund" && (
               <div>
-                <label className="block text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">
+                <label className="block text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1">
                   {m.repair_defect_credit_label()}
                 </label>
                 <MoneyInput
@@ -183,14 +183,14 @@ export function RepairDefectRow({
                     had priced the repair. Telling a seeded number apart from one
                     the tenant typed would need provenance on the estimate, and
                     there is none — so neither is offered. */}
-                <p className="mt-1 text-[11px] text-ih-fg-4">
+                <p className="mt-1 text-[11px] text-ih-fg-3">
                   {m.repair_defect_credit_hint()}
                 </p>
               </div>
             )}
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">
+            <label className="block text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1">
               {m.repair_defect_note_label()}
             </label>
             <textarea

@@ -101,7 +101,7 @@ export function AgentRepairInspectionBlock({
   return (
     <div data-testid={`repair-inspection-${inspectionId}`} className="p-5 space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest">{tenantName}</p>
+        <p className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest">{tenantName}</p>
         {/* Sharing creates a repair_requests row, which the API refuses under
             `read` and `off` — so the action only exists where it can succeed. */}
         {!shareToken && agentMayWriteRepairList(repairAccess) && (

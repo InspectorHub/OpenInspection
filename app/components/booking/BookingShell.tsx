@@ -79,7 +79,7 @@ export function BookingShell({
 
         {children}
 
-        <p className="text-center text-[11px] text-ih-fg-4 mt-6">
+        <p className="text-center text-[11px] text-ih-fg-3 mt-6">
           {m.booking_powered_by()}
         </p>
         {(privacyUrl || termsUrl) && (

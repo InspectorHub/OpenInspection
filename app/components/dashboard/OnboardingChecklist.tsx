@@ -42,14 +42,14 @@ export function OnboardingChecklist({
       <div className="flex items-center justify-between px-5 py-4 border-b border-ih-border">
         <div className="flex items-center gap-3">
           <h2 className="text-[14px] font-bold text-ih-fg-1">{m.dashboard_onboarding_title()}</h2>
-          <span className="text-[12px] font-medium text-ih-fg-4">
+          <span className="text-[12px] font-medium text-ih-fg-3">
             {m.dashboard_onboarding_progress({ done: doneCount, total })}
           </span>
         </div>
         <button
           type="button"
           onClick={onDismiss}
-          className="text-[12px] font-medium text-ih-fg-4 hover:text-ih-fg-2 transition-colors"
+          className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-2 transition-colors"
         >
           {m.dashboard_onboarding_dismiss()}
         </button>

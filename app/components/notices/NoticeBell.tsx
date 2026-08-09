@@ -97,7 +97,7 @@ export function NoticeBell({
             and shadow, and a second one inside it reads as a box in a box. */}
         <div className="w-[min(360px,calc(100vw-2rem))] max-h-[70vh] overflow-y-auto rounded-ih-card">
           <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-3 py-2 border-b border-ih-border bg-ih-bg-card rounded-t-ih-card">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-3">
               {m.notice_panel_title()}
             </span>
             {unread > 0 && (

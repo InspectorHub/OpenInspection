@@ -331,7 +331,7 @@ function TemplateList({
                 <p className="text-[11px] text-ih-fg-3 mt-0.5 truncate">{m.settings_msgtpl_subject_prefix({ subject: t.subject })}</p>
               )}
               {t.variables.length > 0 && (
-                <p className="text-[11px] text-ih-fg-4 mt-0.5">
+                <p className="text-[11px] text-ih-fg-3 mt-0.5">
                   {m.settings_msgtpl_variables_prefix({ vars: t.variables.map((v) => `{{${v}}}`).join(", ") })}
                 </p>
               )}

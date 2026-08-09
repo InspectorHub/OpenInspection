@@ -241,7 +241,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
         />
 
         {error && (
-          <p data-testid="video-error" role="alert" className="mb-3 rounded-lg bg-ih-bad-bg px-3 py-2 text-[12px] font-semibold text-ih-bad">
+          <p data-testid="video-error" role="alert" className="mb-3 rounded-lg bg-ih-bad-bg px-3 py-2 text-[12px] font-semibold text-ih-bad-fg">
             {error}
           </p>
         )}
@@ -289,7 +289,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
           </button>
         )}
 
-        <p className="mt-3 text-[11px] text-ih-fg-4">{m.media_video_formats_hint({ maxSec: MAX_VIDEO_SEC })}</p>
+        <p className="mt-3 text-[11px] text-ih-fg-3">{m.media_video_formats_hint({ maxSec: MAX_VIDEO_SEC })}</p>
       </div>
     </div>
   );

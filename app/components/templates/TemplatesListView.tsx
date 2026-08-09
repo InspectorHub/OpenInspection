@@ -78,7 +78,7 @@ export function TemplatesListView({
                     <span className="ml-2 text-[9px] font-bold uppercase tracking-widest text-ih-info-fg bg-ih-info-bg px-1.5 py-0.5 rounded">{m.templates_badge_marketplace()}</span>
                   )}
                   {t.description && (
-                    <p className="text-[11px] text-ih-fg-4 mt-0.5 line-clamp-1">{t.description}</p>
+                    <p className="text-[11px] text-ih-fg-3 mt-0.5 line-clamp-1">{t.description}</p>
                   )}
                   <EntityAuditTrail entityId={t.id} timeZone={timeZone} />
                 </div>
@@ -105,7 +105,7 @@ export function TemplatesListView({
                 <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary transition-colors">
                   {m.templates_action_duplicate()}
                 </button>
-                <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-4 hover:text-ih-bad-fg transition-colors">
+                <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-bad-fg transition-colors">
                   {m.common_delete()}
                 </button>
               </div>

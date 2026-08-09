@@ -203,7 +203,7 @@ export function AgreementSection({
             )}
           </p>
           {multiSigner && (
-            <p className="text-[12px] text-ih-fg-4 mt-1.5">
+            <p className="text-[12px] text-ih-fg-3 mt-1.5">
               {m.portal_agreement_signature_x_of_y({ current: Math.min(myIndex, progress.total), total: progress.total })}
               {agreement.completionPolicy === "one" && m.portal_agreement_any_one_completes()}
             </p>
@@ -256,7 +256,7 @@ export function AgreementSection({
               </svg>
               {m.portal_agreement_download_pdf()}
             </button>
-            <p className="text-[11px] text-ih-fg-4 italic mt-3">
+            <p className="text-[11px] text-ih-fg-3 italic mt-3">
               {m.portal_agreement_print_hint()}
             </p>
             {agreement.envelopeId && (
@@ -270,7 +270,7 @@ export function AgreementSection({
                   </svg>
                   {m.portal_agreement_verify_link()}
                 </a>
-                <p className="text-[11px] text-ih-fg-4 mt-1.5">
+                <p className="text-[11px] text-ih-fg-3 mt-1.5">
                   {m.portal_agreement_verify_hint()}
                 </p>
               </div>

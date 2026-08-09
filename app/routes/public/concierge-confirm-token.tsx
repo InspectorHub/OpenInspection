@@ -141,7 +141,7 @@ function ConciergeConfirmBody() {
         </dl>
 
         {view.inspection.agreementRequired && (
-          <p className="text-[13px] text-ih-fg-4 mb-4">
+          <p className="text-[13px] text-ih-fg-3 mb-4">
             {m.concierge_confirm_agreement_notice()}
           </p>
         )}

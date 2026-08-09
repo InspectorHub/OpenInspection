@@ -72,7 +72,7 @@ export function UnitSections({
                         </span>
                       )}
                       {(safety > 0 || recommendation > 0 || maintenance > 0) && (
-                        <span className="flex gap-2 text-[11px] tabular-nums text-ih-fg-4">
+                        <span className="flex gap-2 text-[11px] tabular-nums text-ih-fg-3">
                           {safety > 0 && <span>{m.pca_unit_sections_count_safety({ n: safety })}</span>}
                           {recommendation > 0 && <span>{m.pca_unit_sections_count_recommendation({ n: recommendation })}</span>}
                           {maintenance > 0 && <span>{m.pca_unit_sections_count_maintenance({ n: maintenance })}</span>}

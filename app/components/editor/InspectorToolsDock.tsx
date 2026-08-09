@@ -74,7 +74,7 @@ export function InspectorToolsDock({
               className="gap-3 py-2 rounded"
             >
               <span className="flex-1 text-left text-sm">{t.label}</span>
-              {t.hotkey && <span className="ih-kbd text-[11px] text-ih-fg-4 bg-ih-bg-muted px-1.5 py-0.5 rounded font-mono">{t.hotkey}</span>}
+              {t.hotkey && <span className="ih-kbd text-[11px] text-ih-fg-2 bg-ih-bg-muted px-1.5 py-0.5 rounded font-mono">{t.hotkey}</span>}
             </MenuItem>
           ))}
         </div>

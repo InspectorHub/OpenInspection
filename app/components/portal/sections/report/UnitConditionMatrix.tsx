@@ -90,7 +90,7 @@ export function UnitConditionMatrix({
                         {SEVERITY_LABEL[cell.worst]}
                       </span>
                       {(safety > 0 || recommendation > 0 || maintenance > 0) && (
-                        <div className="mt-1 flex gap-1.5 text-[10px] tabular-nums text-ih-fg-4">
+                        <div className="mt-1 flex gap-1.5 text-[10px] tabular-nums text-ih-fg-3">
                           {safety > 0 && <span>{m.pca_unit_matrix_count_safety({ n: safety })}</span>}
                           {recommendation > 0 && <span>{m.pca_unit_matrix_count_recommendation({ n: recommendation })}</span>}
                           {maintenance > 0 && <span>{m.pca_unit_matrix_count_maintenance({ n: maintenance })}</span>}

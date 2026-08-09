@@ -311,7 +311,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
               {m.settings_sms_provider_telnyx()}
             </button>
           </div>
-          <p className="text-[11px] text-ih-fg-4">
+          <p className="text-[11px] text-ih-fg-3">
             {m.settings_mcw_carrier_note()}
           </p>
         </div>
@@ -484,7 +484,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
                 placeholder="415"
                 className={inputCls}
               />
-              <p className="text-[11px] text-ih-fg-4 mt-1">
+              <p className="text-[11px] text-ih-fg-3 mt-1">
                 {m.settings_mcw_areacode_hint()}
               </p>
             </div>

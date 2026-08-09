@@ -313,7 +313,7 @@ function AddServiceModal({
                             className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-1 text-[14px] font-medium focus:border-ih-primary focus:shadow-ih-focus outline-none"
                             ariaLabel={m.inspections_hub_services_field_price()}
                         />
-                        <span className="mt-1 block text-[11px] text-ih-fg-4">
+                        <span className="mt-1 block text-[11px] text-ih-fg-3">
                             {m.inspections_hub_services_price_hint()}
                         </span>
                     </label>
@@ -378,7 +378,7 @@ function RepriceModal({
                 ariaLabel={m.inspections_hub_services_field_price()}
             />
             <div className="mt-2 flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] text-ih-fg-4">
+                <span className="text-[11px] text-ih-fg-3">
                     {m.inspections_hub_services_price_catalog({ price: formatCents(line.priceSnapshot ?? 0) })}
                 </span>
                 {line.priceOverride !== null && (

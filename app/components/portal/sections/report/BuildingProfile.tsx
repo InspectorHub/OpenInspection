@@ -33,7 +33,7 @@ export function BuildingProfile({ rows }: { rows: ProfileRow[] }) {
       <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
         {groups.map((g) => (
           <div key={g.group}>
-            <h3 className="mb-1 text-xs font-medium text-ih-fg-4">{GROUP_LABEL[g.group] ?? g.group}</h3>
+            <h3 className="mb-1 text-xs font-medium text-ih-fg-3">{GROUP_LABEL[g.group] ?? g.group}</h3>
             <dl className="space-y-1">
               {g.rows.map((r) => (
                 <div key={r.id} className="flex justify-between gap-4 text-sm">

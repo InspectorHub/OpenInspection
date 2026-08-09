@@ -129,7 +129,7 @@ export function WeeklySchedulePanel({
                 />
               </div>
             ) : (
-              <span className="text-[12px] text-ih-fg-4 italic">{m.settings_weekly_unavailable()}</span>
+              <span className="text-[12px] text-ih-fg-3 italic">{m.settings_weekly_unavailable()}</span>
             )}
           </div>
         ))}

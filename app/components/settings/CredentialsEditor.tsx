@@ -108,7 +108,7 @@ export function CredentialsEditor({
       </div>
 
       {credentials.length === 0 && (
-        <p className="text-[12px] text-ih-fg-4">{m.settings_profile_credentials_empty()}</p>
+        <p className="text-[12px] text-ih-fg-3">{m.settings_profile_credentials_empty()}</p>
       )}
 
       {credentials.map((c, i) => (

@@ -32,7 +32,7 @@ export function ReportVerificationBlock({ verification, baseUrl, timeZone = "UTC
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-8">
       <div className="border border-ih-border rounded-xl p-6 bg-ih-bg-card">
-        <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-4">
+        <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-4">
           {m.pca_verification_title()}
         </div>
         <div className="flex flex-col sm:flex-row items-start gap-6">
@@ -49,7 +49,7 @@ export function ReportVerificationBlock({ verification, baseUrl, timeZone = "UTC
               <span className="text-ih-fg-4 font-normal"> · {formatUnixSeconds(vb.publishedAt, timeZone)}</span>
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mr-2">{m.pca_verification_verify_at()}</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mr-2">{m.pca_verification_verify_at()}</span>
               <a
                 href={vb.verifyUrl}
                 className="text-ih-primary underline text-xs break-all"
@@ -59,7 +59,7 @@ export function ReportVerificationBlock({ verification, baseUrl, timeZone = "UTC
                 {vb.verifyUrl}
               </a>
             </div>
-            <div className="text-xs text-ih-fg-4 font-mono">
+            <div className="text-xs text-ih-fg-3 font-mono">
               {m.pca_verification_integrity_hash({ hash: vb.shortHash })}
             </div>
           </div>

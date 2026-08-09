@@ -153,7 +153,7 @@ export default function VersionDiffPage() {
 
  {/* Diff table */}
  {rows.length === 0 ? (
- <div className="p-6 rounded-lg border border-dashed border-ih-border-strong text-center text-[13px] text-ih-fg-4">
+ <div className="p-6 rounded-lg border border-dashed border-ih-border-strong text-center text-[13px] text-ih-fg-3">
  {m.misc_version_diff_no_changes()}
  </div>
  ) : (

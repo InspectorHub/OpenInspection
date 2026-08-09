@@ -62,7 +62,7 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
             {/* Workspace identity card */}
             <div className="px-3 py-2 mb-1 rounded-ih-button bg-ih-bg-muted/60">
               <div className="text-[11px] font-bold text-ih-fg-1 truncate">{companyName}</div>
-              <div className="text-[10px] font-[var(--font-ih-mono)] text-ih-fg-4 truncate">{tenantSlug}</div>
+              <div className="text-[10px] font-[var(--font-ih-mono)] text-ih-fg-3 truncate">{tenantSlug}</div>
               {userRole && <div className="text-[10px] text-ih-fg-3 capitalize">{userRole}</div>}
             </div>
 
@@ -95,7 +95,7 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
         {/* Mobile bottom: theme control + name + log out */}
         <div className="p-3 border-t border-ih-border bg-ih-bg-muted/50 space-y-1">
           <div className="px-1 py-0.5">
-            <div className="text-[10px] font-bold text-ih-fg-4 uppercase tracking-wide mb-1.5 px-1">{m.nav_theme_label()}</div>
+            <div className="text-[10px] font-bold text-ih-fg-3 uppercase tracking-wide mb-1.5 px-1">{m.nav_theme_label()}</div>
             <ThemeSegmentControl className="w-full" />
           </div>
           {/* Language (#269) — the mobile drawer is the phone's user menu, so

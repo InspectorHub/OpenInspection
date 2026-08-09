@@ -49,7 +49,7 @@ export function NotesFieldHeader({
 }: NotesFieldHeaderProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
-      <label htmlFor={fieldId} className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">
+      <label htmlFor={fieldId} className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">
         {m.editor_item_notes_label()}
       </label>
       {canInsertCanned && (

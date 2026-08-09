@@ -748,7 +748,7 @@ export default function SettingsCommunication() {
             <Link to="/settings/communication/templates" className="inline-flex items-center gap-1 text-[12px] text-ih-primary font-semibold hover:underline">
               {m.settings_comms_manage_templates_link()} <Icon name="arrowR" size={12} />
             </Link>
-            <span className="text-[11px] text-ih-fg-4">{m.settings_comms_templates_count({ count: emailTemplates.length })}</span>
+            <span className="text-[11px] text-ih-fg-3">{m.settings_comms_templates_count({ count: emailTemplates.length })}</span>
           </div>
         </div>
         {emailTemplates.length === 0 ? (

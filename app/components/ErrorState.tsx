@@ -54,7 +54,7 @@ export function ErrorState({ code, title, message, action, contacts }: ErrorStat
           </svg>
         </div>
         {code != null && (
-          <p className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4 mb-1">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
             Error {code}
           </p>
         )}

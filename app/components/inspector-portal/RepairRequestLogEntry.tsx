@@ -101,7 +101,7 @@ export function RepairRequestLogEntry({ list }: { list: RepairRequestLogList }) 
           </span>
           <span className="text-[12px] text-ih-fg-3">{list.createdAtDisplay}</span>
           <span className="ml-auto flex items-center gap-3 shrink-0">
-            <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest">
+            <span className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest">
               {list.items.length === 1
                 ? m.inspections_repair_log_items_one()
                 : m.inspections_repair_log_items_other({ count: list.items.length })}
@@ -156,7 +156,7 @@ export function RepairRequestLogEntry({ list }: { list: RepairRequestLogList }) 
                       data-testid="repair-log-ask"
                       className="mx-4 mb-4 pl-3 border-l-2 border-ih-primary/50 space-y-1"
                     >
-                      <p className="text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest">
+                      <p className="text-[10px] font-bold text-ih-fg-3 uppercase tracking-widest">
                         {m.inspections_repair_log_ask_heading()}
                       </p>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

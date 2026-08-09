@@ -22,7 +22,7 @@ export function TemplateList({ rows }: { rows: TemplateRow[] }) {
         if (!items.length) return null;
         return (
           <div key={g.key}>
-            <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-2 px-1">{g.label()}</h4>
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-2 px-1">{g.label()}</h4>
             <div className="bg-ih-bg-card border border-ih-border rounded-lg divide-y divide-ih-border overflow-hidden">
               {items.map((r) => <TemplateRowItem key={r.trigger} row={r} />)}
             </div>
@@ -42,9 +42,9 @@ function TemplateRowItem({ row }: { row: TemplateRow }) {
         <div className="flex items-center gap-2">
           <Link to={`/settings/communication/templates/${row.trigger}`} className="text-[13px] font-semibold text-ih-fg-1 hover:text-ih-primary transition-colors truncate">{row.name}</Link>
           {row.isCustomized && <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-ih-primary-tint text-ih-primary">{m.email_list_customized()}</span>}
-          {row.required && <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-4">{m.email_list_alwayson()}</span>}
+          {row.required && <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-2">{m.email_list_alwayson()}</span>}
         </div>
-        <p className="text-[11px] text-ih-fg-4 mt-0.5 font-mono truncate">{row.subject}</p>
+        <p className="text-[11px] text-ih-fg-3 mt-0.5 font-mono truncate">{row.subject}</p>
       </div>
       {row.required ? (
         <span className="text-[10px] font-bold uppercase tracking-widest text-ih-ok-fg shrink-0">{m.email_list_active()}</span>

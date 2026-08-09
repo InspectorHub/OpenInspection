@@ -148,7 +148,7 @@ export function CalendarConnectPanel({
       </div>
 
       {disabled ? (
-        <p className="text-[12px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
+        <p className="text-[12px] text-ih-fg-2 bg-ih-bg-muted border border-ih-border rounded-md p-3">
           {m.settings_calconnect_personal_note()}
         </p>
       ) : connected ? (

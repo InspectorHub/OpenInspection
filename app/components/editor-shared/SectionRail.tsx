@@ -222,7 +222,7 @@ export function SectionRail({
     <span className="ml-1 shrink-0 flex items-center">
     {mode === 'fill'
      ? <SectionDonut rated={rated} total={total} hasDefect={hasDefect} />
-     : <span className="text-[10px] text-ih-fg-4 font-mono">{section.items.length}</span>}
+     : <span className="text-[10px] text-ih-fg-3 font-mono">{section.items.length}</span>}
     </span>
    </button>
   )}

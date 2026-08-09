@@ -238,11 +238,11 @@ export default function SettingsSecurityPage() {
         <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_security_account_details_heading()}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">{m.settings_security_email_label()}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_security_email_label()}</p>
             <p className="text-[13px] text-ih-fg-1 font-medium">{user.email || m.settings_security_not_set()}</p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">{m.settings_security_name_label()}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_security_name_label()}</p>
             <p className="text-[13px] text-ih-fg-1 font-medium">{user.name || m.settings_security_not_set()}</p>
           </div>
         </div>

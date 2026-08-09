@@ -51,9 +51,9 @@ export function CompanyClosedStrip({
           ))}
         </ul>
       ) : (
-        <p className="text-[12px] text-ih-fg-4 italic">{m.settings_closed_none_upcoming()}</p>
+        <p className="text-[12px] text-ih-fg-3 italic">{m.settings_closed_none_upcoming()}</p>
       )}
-      <p className="text-[11px] text-ih-fg-4">
+      <p className="text-[11px] text-ih-fg-3">
         {m.settings_closed_owner_note()}
       </p>
     </section>

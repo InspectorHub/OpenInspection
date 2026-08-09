@@ -1045,7 +1045,7 @@ export default function InspectionHubPage() {
               links to a field-level diff against its immediate predecessor. */}
           {versions.length > 0 && (
             <div className="mt-4 pt-4 border-t border-ih-border">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-ih-fg-4 mb-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-ih-fg-3 mb-2">
                 {m.inspections_hub_versions_title()}
               </p>
               <ul className="space-y-2">
@@ -1062,7 +1062,7 @@ export default function InspectionHubPage() {
                             <Pill tone="gen">{m.inspections_hub_versions_amendment()}</Pill>
                           )}
                           {v.publishedAt && (
-                            <span className="text-[11px] text-ih-fg-4">
+                            <span className="text-[11px] text-ih-fg-3">
                               {formatInspectionDateTime(new Date(v.publishedAt * 1000).toISOString(), undefined, displayTz, fmt)}
                             </span>
                           )}

@@ -273,7 +273,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
                     <option value="trade">{m.editor_settings_required_trade()}</option>
                     <option value="both">{m.editor_settings_required_both()}</option>
                   </select>
-                  <p className="mt-1 text-[11px] text-ih-fg-4">{m.editor_settings_required_defect_help()}</p>
+                  <p className="mt-1 text-[11px] text-ih-fg-3">{m.editor_settings_required_defect_help()}</p>
                 </label>
               </fieldset>
 
@@ -300,7 +300,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
                   }}
                 />
                 {photos.length === 0 ? (
-                  <p className="text-[12px] text-ih-fg-4">{m.editor_settings_cover_empty()}</p>
+                  <p className="text-[12px] text-ih-fg-3">{m.editor_settings_cover_empty()}</p>
                 ) : (
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                     {photos.map((p) => {
@@ -329,7 +329,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
                   <Button variant="secondary" size="sm" onClick={() => coverFileRef.current?.click()} disabled={coverFetcher.state !== "idle"} className="hover:border-ih-primary hover:text-ih-primary">
                     {coverFetcher.state !== "idle" && coverFetcher.formData?.get("intent") === "upload-cover" ? m.editor_uploading() : m.editor_settings_cover_upload()}
                   </Button>
-                  <p className="text-[11px] text-ih-fg-4">{m.editor_settings_cover_hint()}</p>
+                  <p className="text-[11px] text-ih-fg-3">{m.editor_settings_cover_hint()}</p>
                 </div>
 
                 {/* Report Style Presets — collapsed by default (progressive
@@ -348,7 +348,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
-                    <p className="mt-1 text-[11px] text-ih-fg-4">{m.editor_settings_appearance_help()}</p>
+                    <p className="mt-1 text-[11px] text-ih-fg-3">{m.editor_settings_appearance_help()}</p>
                   </label>
                 </details>
               </fieldset>
@@ -367,7 +367,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
                   />
                   <span>
                     {m.editor_settings_original_quality()}
-                    <span className="block text-[11px] text-ih-fg-4">
+                    <span className="block text-[11px] text-ih-fg-3">
                       {m.editor_settings_original_quality_help()}
                     </span>
                   </span>

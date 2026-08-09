@@ -118,7 +118,7 @@ export default function MarketplacePage() {
                       <Pill tone="gen">{t.category}</Pill>
                     )}
                     {t.author && (
-                      <span className="text-[11px] text-ih-fg-4">{t.author}</span>
+                      <span className="text-[11px] text-ih-fg-3">{t.author}</span>
                     )}
                   </div>
                   <Button

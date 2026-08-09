@@ -381,7 +381,7 @@ export function ItemEditor({
  </div>
  <ItemHeader label={item.label} size="lg" className="mt-1 text-ih-fg-1" as="h2" />
  {item.description && (
- <p data-testid="item-description-hint" className="mt-1 text-[12px] text-ih-fg-4 leading-relaxed">
+ <p data-testid="item-description-hint" className="mt-1 text-[12px] text-ih-fg-3 leading-relaxed">
  {item.description}
  </p>
  )}
@@ -590,7 +590,7 @@ export function ItemEditor({
  {/* Photo strip with count badge */}
  <div>
  <div className="flex items-center justify-between mb-1">
- <label className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">
+ <label className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">
  {m.editor_item_photos_label()}
  </label>
  {photoCount > 0 && (
@@ -641,7 +641,7 @@ export function ItemEditor({
  ))}
  </div>
  )}
- <span className="block mt-1 text-[12px] text-ih-fg-4">
+ <span className="block mt-1 text-[12px] text-ih-fg-3">
  {photoStatus}
  </span>
  </div>

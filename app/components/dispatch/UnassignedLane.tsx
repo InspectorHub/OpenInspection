@@ -58,7 +58,7 @@ export function UnassignedLane({
       </div>
       <div className="space-y-2 p-2" data-dispatch-dropzone="unassigned">
         {sorted.length === 0 ? (
-          <p className="px-1 py-6 text-center text-[12px] text-ih-fg-4">
+          <p className="px-1 py-6 text-center text-[12px] text-ih-fg-3">
             {m.dispatch_unassigned_empty()}
           </p>
         ) : (
@@ -81,7 +81,7 @@ export function UnassignedLane({
                   data-drag-handle
                   aria-label={m.dispatch_card_grip()}
                   title={m.dispatch_card_grip()}
-                  className="mt-0.5 cursor-grab select-none text-[12px] leading-none text-ih-fg-4"
+                  className="mt-0.5 cursor-grab select-none text-[12px] leading-none text-ih-fg-3"
                 >
                   ⠿
                 </span>

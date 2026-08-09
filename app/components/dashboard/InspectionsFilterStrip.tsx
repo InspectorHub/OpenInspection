@@ -43,7 +43,7 @@ export function InspectionsFilterStrip({
                 <select
                     value={activeTagFilter}
                     onChange={(e) => setActiveTagFilter(e.target.value)}
-                    className="h-7 px-2 rounded-md text-[11px] font-bold bg-ih-bg-muted text-ih-fg-3 border-0 outline-none ml-2"
+                    className="h-7 px-2 rounded-md text-[11px] font-bold bg-ih-bg-muted text-ih-fg-2 border-0 outline-none ml-2"
                 >
                     <option value="">{m.inspections_list_filter_all_tags()}</option>
                     {tags.map((t) => (

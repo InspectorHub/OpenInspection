@@ -21,7 +21,7 @@ export function DayView({
   return (
     <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           <div className="flex min-h-[48px] border-b border-ih-border">
-            <div className="w-16 shrink-0 pr-3 pt-2 text-right text-[10px] font-bold text-ih-fg-4">{m.calendar_all_day()}</div>
+            <div className="w-16 shrink-0 pr-3 pt-2 text-right text-[10px] font-bold text-ih-fg-3">{m.calendar_all_day()}</div>
             <div
               className="flex-1 cursor-pointer border-l border-ih-border p-1 hover:bg-ih-primary-tint"
               onClick={() => handleDayClick(`${dateStr}T09:00`)}
@@ -47,7 +47,7 @@ export function DayView({
               });
               return (
                 <div key={h} className="flex border-b border-ih-border min-h-[56px]">
-                  <div className="w-16 text-[11px] font-bold text-ih-fg-4 text-right pr-3 pt-2 shrink-0">
+                  <div className="w-16 text-[11px] font-bold text-ih-fg-3 text-right pr-3 pt-2 shrink-0">
                     {h > 12 ? h - 12 : h}:00 {h >= 12 ? "PM" : "AM"}
                   </div>
                   <div

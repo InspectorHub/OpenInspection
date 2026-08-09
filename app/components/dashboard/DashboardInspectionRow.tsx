@@ -158,7 +158,7 @@ export function DashboardInspectionRow({
           value={insp.status}
           onChange={(e) => transitionStatus(insp.id, e.target.value)}
           onClick={(e) => e.stopPropagation()}
-          className="h-6 px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-3 border-0 outline-none cursor-pointer"
+          className="h-6 px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-2 border-0 outline-none cursor-pointer"
         >
           <option value="requested">{m.dashboard_row_status_requested()}</option>
           <option value="scheduled">{m.dashboard_row_status_scheduled()}</option>
