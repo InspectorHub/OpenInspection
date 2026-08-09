@@ -48,7 +48,17 @@ export interface AgreementTemplateDraft {
 }
 
 export type AgreementTemplateLoadResult =
-    | { ok: true; template: AgreementTemplateDraft }
+    | {
+        ok: true;
+        template: AgreementTemplateDraft;
+        /**
+         * #83 — this template is the one a LIVE cancellation-fee attestation
+         * names, so saving it revokes that attestation. False for every other
+         * template, and false once the attestation has already drifted (there
+         * is nothing left to revoke). See the loader for where it comes from.
+         */
+        clauseAttested: boolean;
+    }
     | { ok: false; error: string };
 
 export type AgreementTemplateSaveResult =
@@ -79,6 +89,19 @@ async function apiErrorMessage(
  * tenant-scoped list rather than pretending an endpoint exists. The list is
  * already filtered by `tenantId` server-side, so an id belonging to another
  * workspace simply is not in it and falls through to the refusal below.
+ *
+ * #83 — IT ALSO READS THE CANCELLATION-CLAUSE ATTESTATION, because saving this
+ * template may revoke it. `updateAgreement` increments `agreements.version` on
+ * every write (identical content included — it compares nothing), and
+ * `getCancellationAttestation()` returns null as soon as the attested version
+ * stops matching. So one edit turns fee-charging off, and until the editor
+ * existed nothing in the product could bump that version.
+ *
+ * ⚠️ `cancellationClause.current` is computed SERVER-SIDE by the same function
+ * the fee gate reads, and is used here as-is. Recomputing it from the raw
+ * columns plus the template's version would be a second copy of the
+ * invalidation rule; the copy behind the warning would eventually disagree with
+ * the copy behind the refusal.
  */
 export async function loader({ request, context }: Route.LoaderArgs): Promise<AgreementTemplateLoadResult> {
     const failed = m.library_agreement_editor_err_load();
@@ -90,8 +113,17 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<Ag
 
     const api = createApi(context, { token });
     try {
-        const res = await api.admin.agreements.$get();
+        const [res, brandingRes] = await Promise.all([
+            api.admin.agreements.$get(),
+            api.adminBranding.branding.$get(),
+        ]);
         if (!res.ok) return { ok: false, error: await apiErrorMessage(res, failed) };
+        // Fail-closed, exactly like an unreadable list. Opening the editor with
+        // `clauseAttested: false` because this read failed would produce the
+        // silent revocation the flag exists to prevent — an author would be told
+        // nothing and lose fee-charging anyway.
+        if (!brandingRes.ok) return { ok: false, error: await apiErrorMessage(brandingRes, failed) };
+
         const body = (await res.json()) as { data?: Array<{ id: string; name?: string; content?: string }> };
         const row = (body.data ?? []).find((t) => t.id === id);
         // ⚠️ NOT `{ content: "" }`. An unknown id opening a blank editor is how
@@ -99,7 +131,21 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<Ag
         // have no way to tell "this template is empty" from "we did not find
         // it".
         if (!row) return { ok: false, error: failed };
-        return { ok: true, template: { id: row.id, name: row.name ?? "", content: row.content ?? "" } };
+
+        const brandingBody = (await brandingRes.json()) as {
+            data?: { branding?: { cancellationClause?: { current?: boolean; agreementId?: string | null } } };
+        };
+        const clause = brandingBody.data?.branding?.cancellationClause;
+        // Scoped to the ONE template the attestation names. A workspace-wide
+        // "you have an attestation" flag would warn on every agreement edit,
+        // and a banner that is always there is a banner nobody reads.
+        const clauseAttested = clause?.current === true && clause.agreementId === row.id;
+
+        return {
+            ok: true,
+            template: { id: row.id, name: row.name ?? "", content: row.content ?? "" },
+            clauseAttested,
+        };
     } catch {
         return { ok: false, error: failed };
     }

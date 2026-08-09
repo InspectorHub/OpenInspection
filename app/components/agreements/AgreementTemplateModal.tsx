@@ -12,6 +12,19 @@
  * duplication for its own sake: the route's refusal is the one that protects
  * the data, and this one is the one that tells somebody why before they press
  * a button. They are the same rule read from the same helper.
+ *
+ * #83 — THE CANCELLATION-CLAUSE WARNING IS NOT A BLOCK, AND MUST NOT BECOME
+ * ONE. `updateAgreement` increments `agreements.version` on every save (it
+ * compares nothing, so re-saving identical text bumps it too) and
+ * `getCancellationAttestation()` invalidates on that comparison — so editing the
+ * template the fees rest on revokes the confirmation and `updateBranding` starts
+ * refusing fee-charging policies. That is CORRECT: an agreement whose words
+ * changed has genuinely not been re-confirmed, and skipping the bump would make
+ * the attestation worthless. What was missing is that nobody was told. So this
+ * banner states the cost and names the destination, and the Save button behaves
+ * exactly as it does for any other template — no extra tick-box, which would
+ * only read as absolution, and no refusal, which would trap an author inside
+ * their own agreement.
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { useFetcher } from "react-router";
@@ -107,6 +120,10 @@ export function AgreementTemplateModal({
 
     const loadData = loadFetcher.state === "idle" ? loadFetcher.data : undefined;
     const loadError = loadData && !loadData.ok ? loadData.error : null;
+    // Scoped to the ONE template the live attestation names — the loader gets
+    // that from the branding endpoint, which computes it with the same function
+    // the fee gate reads. Never derived here.
+    const clauseAttested = loadData?.ok === true && loadData.clauseAttested;
     const saveData = saveFetcher.state === "idle" ? saveFetcher.data : undefined;
     const serverError = saveData && !saveData.ok ? saveData.error : null;
     const loading = editing && loadFetcher.state === "loading";
@@ -132,6 +149,11 @@ export function AgreementTemplateModal({
             <div className="space-y-4">
                 {loadError && <Banner tone="danger">{loadError}</Banner>}
                 {(localError || serverError) && <Banner tone="danger">{localError ?? serverError}</Banner>}
+                {/* `warn` is the DS `ih-watch` family — this is a consequence to
+                    read before saving, not a failure and not an error. */}
+                {clauseAttested && (
+                    <Banner tone="warn">{m.library_agreement_editor_clause_warning()}</Banner>
+                )}
 
                 <Input
                     ref={nameRef}

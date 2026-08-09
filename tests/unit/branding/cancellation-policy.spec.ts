@@ -108,6 +108,34 @@ describe('BrandingService — cancellation policy attestation gate', () => {
             .rejects.toThrow(/agreement contains a cancellation clause/i);
     });
 
+    it('revokes the attestation even when the save changed nothing', async () => {
+        // #83, and the reason the editor has to WARN rather than reason about
+        // whether an edit was material. `updateAgreement` compares nothing: it
+        // writes `version + 1` unconditionally, so re-saving byte-identical
+        // text revokes the attestation exactly like a rewritten clause would.
+        // Characterization — this is today's behaviour, pinned so that anyone
+        // who later "optimises" the bump away has to do it on purpose. Skipping
+        // it is NOT the fix for the silent revocation: the version bump is what
+        // makes the attestation mean anything.
+        const agreementId = await seedAgreement();
+        const before = await testDb.select({ v: schema.agreements.version })
+            .from(schema.agreements).where(eq(schema.agreements.id, agreementId)).get();
+        await branding.attestCancellationClause(TENANT, agreementId);
+
+        const original = await testDb.select({ name: schema.agreements.name, content: schema.agreements.content })
+            .from(schema.agreements).where(eq(schema.agreements.id, agreementId)).get();
+        await agreementSvc.updateAgreement(agreementId, TENANT, original!.name, original!.content);
+
+        const after = await testDb.select({ v: schema.agreements.version })
+            .from(schema.agreements).where(eq(schema.agreements.id, agreementId)).get();
+        // The attested version and the current one, side by side: the gap IS
+        // the defect the editor now has to announce.
+        expect(after!.v).toBe(before!.v + 1);
+        expect(await branding.getCancellationAttestation(TENANT)).toBeNull();
+        await expect(branding.updateBranding(TENANT, { cancellationPolicy: FEE_POLICY }))
+            .rejects.toThrow(/agreement contains a cancellation clause/i);
+    });
+
     it('does not honour an attestation against a DIFFERENT tenant agreement being edited', async () => {
         // `agreements` is multi-row per tenant: a commercial template's edit must
         // not void the residential attestation, which a bare timestamp would do.

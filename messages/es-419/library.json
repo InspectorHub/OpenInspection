@@ -73,6 +73,7 @@
   "library_agreement_editor_name_label": "Nombre de la plantilla",
   "library_agreement_editor_name_placeholder": "p. ej. Acuerdo de preinspección residencial",
   "library_agreement_editor_body_hint": "El formato se limita a lo que pueden mostrar tanto el navegador del firmante como el PDF firmado. Todo lo que pegue se convierte a ese formato al llegar, así que lo que ve aquí es exactamente lo que se enviará.",
+  "library_agreement_editor_clause_warning": "Sus tarifas de cancelación se apoyan en este acuerdo. Cada guardado cambia su versión, así que guardar revoca la confirmación de cláusula que hizo sobre él y las tarifas de cancelación se rechazarán hasta que la confirme de nuevo en Configuración → Reservas en línea → Política de cancelación. Guarde si lo desea; luego verifique que la cláusula de cancelación siga presente tras su edición y confírmela otra vez.",
   "library_agreement_editor_err_name_required": "Asigne un nombre a la plantilla.",
   "library_agreement_editor_err_body_required": "Un acuerdo no puede estar vacío. Escriba los términos antes de guardar.",
   "library_agreement_editor_err_load": "No se pudo abrir esta plantilla de acuerdo. Vuelva a cargar e inténtelo de nuevo.",

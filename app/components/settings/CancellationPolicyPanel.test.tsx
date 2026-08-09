@@ -171,4 +171,27 @@ describe("CancellationPolicyPanel — drift", () => {
         expect(screen.queryByText(/no longer applies/i)).toBeNull();
         expect(screen.getByText(/only collectable if the agreement/i)).toBeTruthy();
     });
+
+    it("is a place a drifted attestation can actually be re-made", async () => {
+        // #83 — the agreement editor now warns that saving revokes the
+        // attestation and NAMES THIS PANEL as where to restore it. That warning
+        // is only honest while the control below is reachable from the drifted
+        // state, so the destination is pinned here rather than assumed: a copy
+        // change that hid the picker would turn the editor's warning into a
+        // signpost to nowhere, and nothing else would fail.
+        const { calls } = renderPanel(FEE_POLICY, DRIFTED);
+
+        fireEvent.change(screen.getByLabelText(/agreement containing the clause/i), {
+            target: { value: "ag-1" },
+        });
+        // The confirmation control itself, not the prose around it: picking the
+        // agreement IS the statement, and it must arm rather than stay inert.
+        const confirm = screen.getByRole("checkbox") as HTMLInputElement;
+        expect(confirm.disabled).toBe(false);
+        expect(confirm.checked).toBe(true);
+        save();
+
+        await waitFor(() => expect(calls).toHaveLength(1));
+        expect(calls[0]!.attestCancellationClause).toBe("ag-1");
+    });
 });

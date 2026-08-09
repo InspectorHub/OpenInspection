@@ -25,6 +25,7 @@ const listGet = vi.fn();
 const createPost = vi.fn();
 const updatePut = vi.fn();
 const removeDelete = vi.fn();
+const brandingGet = vi.fn();
 const getToken = vi.fn();
 
 vi.mock("~/lib/session.server", () => ({
@@ -38,6 +39,7 @@ vi.mock("~/lib/api-client.server", () => ({
                 { ":id": { $put: updatePut, $delete: removeDelete } },
             ),
         },
+        adminBranding: { branding: { $get: brandingGet } },
     })),
 }));
 
@@ -50,6 +52,13 @@ const TEMPLATES = [
     { id: "a1", tenantId: "t1", name: "Residential", content: "<p>Terms A</p>", version: 3 },
     { id: "a2", tenantId: "t1", name: "Commercial", content: "<p>Terms B</p>", version: 1 },
 ];
+
+/** A branding payload whose cancellation clause is in the named state. */
+const branding = (clause: { current: boolean; everAttested: boolean; agreementId: string | null }) =>
+    json({ success: true, data: { branding: { cancellationClause: clause } } });
+
+/** Nobody has ever confirmed a clause — the state every workspace starts in. */
+const NO_CLAUSE = { current: false, everAttested: false, agreementId: null };
 
 function get(query: Record<string, string>) {
     const url = `https://x/resources/agreement-templates?${new URLSearchParams(query)}`;
@@ -72,6 +81,7 @@ beforeEach(() => {
     createPost.mockReset();
     updatePut.mockReset();
     removeDelete.mockReset();
+    brandingGet.mockReset().mockResolvedValue(branding(NO_CLAUSE));
     getToken.mockReset().mockResolvedValue("tok");
 });
 
@@ -81,7 +91,11 @@ describe("agreement-template loader", () => {
         // route selects from the list rather than pretending an endpoint exists.
         listGet.mockResolvedValue(json({ success: true, data: TEMPLATES }));
         const res = await get({ id: "a2" });
-        expect(res).toEqual({ ok: true, template: { id: "a2", name: "Commercial", content: "<p>Terms B</p>" } });
+        expect(res).toEqual({
+            ok: true,
+            template: { id: "a2", name: "Commercial", content: "<p>Terms B</p>" },
+            clauseAttested: false,
+        });
     });
 
     it("loads nothing when there is no session", async () => {
@@ -108,6 +122,63 @@ describe("agreement-template loader", () => {
 
     it("reports a failed list rather than an empty one", async () => {
         listGet.mockResolvedValue(json({ success: false }, 403));
+        const res = await get({ id: "a1" });
+        expect(res.ok).toBe(false);
+    });
+});
+
+/**
+ * #83 — the editor must be able to say that saving costs something.
+ *
+ * `PUT /agreements/{id}` increments `agreements.version` on EVERY save, and
+ * `BrandingService.getCancellationAttestation()` returns null the moment the
+ * attested version stops matching the current one. So editing the template the
+ * cancellation fees rest on revokes the attestation, and the next attempt to
+ * save a fee-charging policy is refused. Until the editor shipped nothing could
+ * bump that version, so the path had never fired.
+ *
+ * ⚠️ THE ANSWER COMES FROM THE BRANDING ENDPOINT, NOT FROM A RULE RESTATED HERE.
+ * `cancellationClause.current` is computed server-side by the same function the
+ * fee gate reads. Deriving "is this attested" in the loader from the raw columns
+ * plus a version comparison would be a second copy of the invalidation rule, and
+ * the copy the warning is based on would eventually disagree with the gate.
+ *
+ * The attestation NAMES ONE TEMPLATE (`cancellation_clause_agreement_id`), so
+ * the warning is scoped to that one — the pairs below are the positive control.
+ */
+describe("agreement-template loader — cancellation-clause warning", () => {
+    beforeEach(() => {
+        listGet.mockResolvedValue(json({ success: true, data: TEMPLATES }));
+    });
+
+    it("flags the template the live attestation names", async () => {
+        brandingGet.mockResolvedValue(branding({ current: true, everAttested: true, agreementId: "a1" }));
+        const res = await get({ id: "a1" });
+        expect(res).toMatchObject({ ok: true, clauseAttested: true });
+    });
+
+    it("does NOT flag a different template in the same workspace", async () => {
+        // The positive control for the assertion above. A bare "this workspace
+        // has an attestation" boolean would warn on every agreement edit and
+        // teach an author to ignore the banner.
+        brandingGet.mockResolvedValue(branding({ current: true, everAttested: true, agreementId: "a1" }));
+        const res = await get({ id: "a2" });
+        expect(res).toMatchObject({ ok: true, clauseAttested: false });
+    });
+
+    it("does NOT flag a template whose attestation has already drifted", async () => {
+        // Nothing is left to revoke: a previous edit already cleared it, and
+        // the settings panel is already showing the "confirm again" state.
+        brandingGet.mockResolvedValue(branding({ current: false, everAttested: true, agreementId: "a1" }));
+        const res = await get({ id: "a1" });
+        expect(res).toMatchObject({ ok: true, clauseAttested: false });
+    });
+
+    it("refuses to open rather than open with the warning unanswered", async () => {
+        // Fail-closed, the same way an unreadable template list is. Opening the
+        // editor with `clauseAttested: false` because a read failed would be the
+        // silent revocation this whole change exists to remove.
+        brandingGet.mockResolvedValue(json({ success: false }, 500));
         const res = await get({ id: "a1" });
         expect(res.ok).toBe(false);
     });

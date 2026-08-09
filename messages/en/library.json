@@ -73,6 +73,7 @@
   "library_agreement_editor_name_label": "Template name",
   "library_agreement_editor_name_placeholder": "e.g. Residential pre-inspection agreement",
   "library_agreement_editor_body_hint": "Formatting is limited to what a signer's browser and the signed PDF can both show. Anything pasted in is converted to that formatting as it arrives, so what you see here is exactly what will be sent.",
+  "library_agreement_editor_clause_warning": "Your cancellation fees rest on this agreement. Every save changes its version, so saving revokes the clause confirmation you made against it and cancellation fees will be refused until you confirm it again in Settings → Online Booking → Cancellation policy. Go ahead and save — then check the cancellation clause survived your edit and confirm it again.",
   "library_agreement_editor_err_name_required": "Give the template a name.",
   "library_agreement_editor_err_body_required": "An agreement cannot be empty. Write the terms before saving.",
   "library_agreement_editor_err_load": "This agreement template could not be opened. Reload and try again.",
