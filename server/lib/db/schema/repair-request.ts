@@ -72,6 +72,30 @@ export const repairRequestItems = sqliteTable('repair_request_items', {
   //      CONDITION axis. This is the product's first ACTION axis. A condition
   //      and a requested remedy are different statements about a defect, so the
   //      two do not line up and neither can be derived from the other.
+  //
+  // ⚠️ THE FOUR VALUES ARE A PRODUCT CHOICE, NOT AN INDUSTRY DERIVATION, AND
+  // THE ONE VENDOR WITH A PUBLISHED ANSWER PUTS THEM ON THE OTHER SIDE.
+  // The plan that introduced this column cited "the union of HIP and ISN" for
+  // the vocabulary. Checking that afterwards: ISN's help centre describes the
+  // same four as something the reviewing AGENT selects — verbatim, "as a
+  // response to the request item" — and Home Inspector Pro's page carries no
+  // role label at all, so it settles nothing. Nobody was found putting these
+  // four on the requester.
+  //
+  // The column stays on the REQUEST axis anyway, deliberately: "I want it
+  // repaired / replaced / funded" is a coherent and useful thing for a buyer
+  // to say, and HIP revealing a money field only under `fund` supports hanging
+  // the amount off it. Both facts are recorded here because one of them is
+  // evidence and the other is a decision, and a later reader must not mistake
+  // the second for the first.
+  //
+  // ⚠️ A RESPONSE AXIS, IF IT IS EVER BUILT, MUST NOT REUSE THIS COLUMN OR ITS
+  // VOCABULARY. Same four words on the same row for two different actors is
+  // unreadable a year later — nothing would say whether `fund` was asked for
+  // or offered. Name the roles in the columns (`requested_action` vs
+  // `responded_action`) and give the response its own enum, even if the
+  // members happen to coincide.
+  // Evidence: docs/superpowers/research/competitors/2026-08-08-inspector-side-repair-request-visibility.md
   repairActionTag: text('repair_action_tag', { enum: REPAIR_ACTION_TAGS }),
 }, (t) => ({
   idxRr: index('idx_repair_request_items_rr').on(t.repairRequestId),

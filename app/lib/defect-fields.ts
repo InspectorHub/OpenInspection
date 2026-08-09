@@ -1,81 +1,38 @@
 /**
- * Per-defect structured field vocabularies.
+ * Per-defect structured field vocabularies, for app-side use.
  *
- * Drives the dropdowns rendered under each included defect in the
- * inspection editor (location text + trade/deadline/timeframe enums).
- * The same labels are read out of {@link DEFECT_TRADE_LABELS} by the
- * Mustache renderer so prose like "recommend repair by {{trade}}"
- * substitutes to "recommend repair by licensed plumber".
+ * The vocabularies themselves are NOT defined here. They are re-exported from
+ * `server/types/defect-fields.ts`, because that list is what decides whether a
+ * value survives a write: `server/services/inspection/shared.ts` sanitizes
+ * every incoming defect state against it and stores NULL for anything it does
+ * not recognise, and `contractor_types.trade_slug` is seeded from the same
+ * list. An option this module offered but the server did not know would throw
+ * away the inspector's choice on save, silently and with no error surface.
+ * Importing removes the possibility rather than adding a check for it.
  *
- * Vocabularies are append-only — never remove or renumber ids without a
- * data backfill of existing inspection_results rows. Adding a new id is
- * always safe (old data simply doesn't reference it).
+ * What is genuinely app-only lives below: the `*_OPTIONS` arrays, shaped for
+ * `<select>` / dropdown UI, derived from the same imported lists.
  */
 
-const DEFECT_TRADES = [
-    'general-contractor', 'licensed-electrician', 'licensed-plumber', 'licensed-roofer',
-    'hvac-technician', 'structural-engineer', 'mold-remediation-specialist', 'septic-contractor',
-    'chimney-sweep', 'pest-control', 'arborist', 'garage-door-technician',
-    'appliance-technician', 'waterproofing-contractor', 'mason', 'landscaper',
-    'painter', 'flooring-contractor', 'glazier', 'qualified-handyman',
-] as const;
-export type DefectTrade = typeof DEFECT_TRADES[number];
+import {
+    DEFECT_TRADES,
+    DEFECT_DEADLINES,
+    DEFECT_TIMEFRAMES,
+    DEFECT_TRADE_LABELS,
+    DEFECT_DEADLINE_LABELS,
+    DEFECT_TIMEFRAME_LABELS,
+} from '../../server/types/defect-fields';
 
-const DEFECT_DEADLINES = [
-    'immediate', 'before-closing', 'within-30-days',
-    'within-90-days', 'next-maintenance', 'monitor',
-] as const;
-export type DefectDeadline = typeof DEFECT_DEADLINES[number];
+export type {
+    DefectTrade,
+    DefectDeadline,
+    DefectTimeframe,
+} from '../../server/types/defect-fields';
 
-const DEFECT_TIMEFRAMES = [
-    '0-1-year', '1-3-years', '3-5-years',
-    '5-10-years', '10-plus-years', 'end-of-life',
-] as const;
-export type DefectTimeframe = typeof DEFECT_TIMEFRAMES[number];
-
-export const DEFECT_TRADE_LABELS: Record<DefectTrade, string> = {
-    'general-contractor':           'general contractor',
-    'licensed-electrician':         'licensed electrician',
-    'licensed-plumber':             'licensed plumber',
-    'licensed-roofer':              'licensed roofer',
-    'hvac-technician':              'HVAC technician',
-    'structural-engineer':          'structural engineer',
-    'mold-remediation-specialist':  'mold-remediation specialist',
-    'septic-contractor':            'septic contractor',
-    'chimney-sweep':                'chimney sweep',
-    'pest-control':                 'pest-control professional',
-    'arborist':                     'arborist',
-    'garage-door-technician':       'garage-door technician',
-    'appliance-technician':         'appliance technician',
-    'waterproofing-contractor':     'waterproofing contractor',
-    'mason':                        'qualified mason',
-    'landscaper':                   'landscaper',
-    'painter':                      'painter',
-    'flooring-contractor':          'flooring contractor',
-    'glazier':                      'glazier',
-    'qualified-handyman':           'qualified handyman',
-};
-
-export const DEFECT_DEADLINE_LABELS: Record<DefectDeadline, string> = {
-    'immediate':         'immediately',
-    'before-closing':    'before closing',
-    'within-30-days':    'within 30 days',
-    'within-90-days':    'within 90 days',
-    'next-maintenance':  'at next scheduled maintenance',
-    'monitor':           'monitor for change',
-};
-
-export const DEFECT_TIMEFRAME_LABELS: Record<DefectTimeframe, string> = {
-    '0-1-year':       'within the next year',
-    '1-3-years':      '1 to 3 years',
-    '3-5-years':      '3 to 5 years',
-    '5-10-years':     '5 to 10 years',
-    '10-plus-years':  '10 or more years',
-    'end-of-life':    'at end of expected service life',
-};
+export { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS };
 
 // React-friendly option arrays for <select> / dropdown UI.
-// These do not exist in the API mirror — frontend-only convenience.
+// These do not exist server-side — frontend-only convenience.
 
 export const DEFECT_TRADE_OPTIONS = DEFECT_TRADES.map(id => ({
     value: id,
