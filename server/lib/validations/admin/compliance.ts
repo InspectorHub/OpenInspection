@@ -1,6 +1,30 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from '../shared.schema';
 import { ROLES } from '../../auth/roles';
+import { TOGGLEABLE, type Capability } from '../../auth/capabilities';
+
+/**
+ * The sparse capability-toggle map, DERIVED from `TOGGLEABLE` — never hand-listed.
+ *
+ * A literal list is precisely how `viewCommunication` went missing (#77): the
+ * capability was declared, defaulted per role, enforced on
+ * `GET /api/inspections/:id/communication`, returned by `/me` and by the team
+ * endpoint, and rendered as a checkbox in BOTH drawers — while these request
+ * schemas silently stripped it, so ticking that box did nothing and no one in
+ * any workspace could grant or withdraw it. A sixth capability would have gone
+ * the same way. Each call returns a fresh `z.object` so the three consumers do
+ * not share one OpenAPI-decorated instance.
+ *
+ * Parity with `TOGGLEABLE` is asserted by
+ * `tests/unit/platform/capability-schema-parity.spec.ts`.
+ */
+function capabilityToggleMap() {
+    return z.object(
+        Object.fromEntries(TOGGLEABLE.map((cap) => [cap, z.boolean().optional()])) as {
+            [K in Capability]: z.ZodOptional<z.ZodBoolean>;
+        },
+    );
+}
 
 /**
  * Validation schema for inviting a new team member.
@@ -9,16 +33,11 @@ export const InviteMemberSchema = z.object({
     email: z.string().email('Invalid email address').openapi({ example: 'new-user@example.com' }).describe('TODO describe email field for the OpenInspection MCP integration'),
     role: z.enum(ROLES)
         .default('inspector').openapi({ example: 'inspector' }).describe('TODO describe role field for the OpenInspection MCP integration'),
-    // Role permission-template overrides (2026-06-13). Optional sparse map of the
-    // four toggleable capabilities. Only differing-from-template keys are sent;
+    // Role permission-template overrides (2026-06-13). Optional sparse map of
+    // every toggleable capability. Only differing-from-template keys are sent;
     // TeamService stores the diff (or null when nothing differs) and it is
     // replayed onto the new users row at accept time.
-    permissionOverrides: z.object({
-        publish: z.boolean().optional(),
-        scheduleOthers: z.boolean().optional(),
-        financial: z.boolean().optional(),
-        manageContacts: z.boolean().optional(),
-    }).partial().optional().openapi({ example: { publish: false } }).describe('Sparse capability override map for the invited member'),
+    permissionOverrides: capabilityToggleMap().optional().openapi({ example: { publish: false } }).describe('Sparse capability override map for the invited member'),
 }).openapi('InviteMember');
 
 /**
@@ -30,16 +49,11 @@ export const InviteMemberSchema = z.object({
  * not a client mistake.
  *
  * `permissionOverrides` is REPLACE, not merge: the drawer always submits the
- * full set of four, and a merge would make un-ticking a box unexpressible.
+ * full toggle set, and a merge would make un-ticking a box unexpressible.
  */
 export const UpdateMemberSchema = z.object({
     role: z.enum(ROLES).optional().openapi({ example: 'manager' }).describe('New role for this member. Omit to leave unchanged.'),
-    permissionOverrides: z.object({
-        publish: z.boolean().optional(),
-        scheduleOthers: z.boolean().optional(),
-        financial: z.boolean().optional(),
-        manageContacts: z.boolean().optional(),
-    }).partial().nullable().optional().openapi({ example: { financial: true } }).describe('Full capability map to store as the diff against the role template. Null clears all overrides.'),
+    permissionOverrides: capabilityToggleMap().nullable().optional().openapi({ example: { financial: true } }).describe('Full capability map to store as the diff against the role template. Null clears all overrides.'),
 }).openapi('UpdateMember');
 
 /**
@@ -139,14 +153,8 @@ export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
         // SPARSE map (`PermissionOverrides` = `Partial<CapabilitySet>`), so a
         // record-of-required-booleans described a payload the server never sends
         // and left the toggle names undiscoverable in the OpenAPI document. The
-        // set mirrors TOGGLEABLE in server/lib/auth/capabilities.ts.
-        permissionOverrides: z.object({
-            publish: z.boolean().optional(),
-            scheduleOthers: z.boolean().optional(),
-            financial: z.boolean().optional(),
-            manageContacts: z.boolean().optional(),
-            viewCommunication: z.boolean().optional(),
-        }).nullable().optional()
+        // names come from TOGGLEABLE, so read and write describe one set.
+        permissionOverrides: capabilityToggleMap().nullable().optional()
             .describe("Capability toggles that differ from this member's role template, or null when they match it exactly."),
         createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
     })).describe('TODO describe members field for the OpenInspection MCP integration'),
