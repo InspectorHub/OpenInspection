@@ -192,7 +192,7 @@ describe("agreement-template action — create", () => {
         expect(createPost).toHaveBeenCalledWith({
             json: { name: "Residential", content: "<p>A <strong>term</strong></p>" },
         });
-        expect(res).toEqual({ ok: true, intent: "create", id: "new-1" });
+        expect(res).toEqual({ ok: true, intent: "create", id: "new-1", clauseRevoked: false });
     });
 
     it("creates nothing when there is no session", async () => {
@@ -226,7 +226,7 @@ describe("agreement-template action — update", () => {
             param: { id: "a1" },
             json: { name: "Residential v2", content: "<p>New</p>" },
         });
-        expect(res).toEqual({ ok: true, intent: "update", id: "a1" });
+        expect(res).toEqual({ ok: true, intent: "update", id: "a1", clauseRevoked: false });
     });
 
     it("updates nothing without a session or without an id", async () => {
@@ -253,7 +253,7 @@ describe("agreement-template action — delete", () => {
         removeDelete.mockResolvedValue(json({ success: true }));
         const res = await post({ intent: "delete", id: "a1" });
         expect(removeDelete).toHaveBeenCalledWith({ param: { id: "a1" } });
-        expect(res).toEqual({ ok: true, intent: "delete", id: "a1" });
+        expect(res).toEqual({ ok: true, intent: "delete", id: "a1", clauseRevoked: false });
     });
 
     it("deletes nothing when there is no session", async () => {
@@ -273,6 +273,58 @@ describe("agreement-template action — delete", () => {
         removeDelete.mockResolvedValue(json({ success: false, error: { message: "Agreement template not found" } }, 404));
         const res = await post({ intent: "delete", id: "gone" });
         expect(res.ok).toBe(false);
+    });
+});
+
+/**
+ * #84 — the server says what a write revoked; this route must hand that on.
+ *
+ * `PUT` and `DELETE /agreements/{id}` return
+ * `effects.cancellationFeeAttestationRevoked`, computed by reading
+ * `getCancellationAttestation()` on both sides of the write. The page turns it
+ * into a notice. What must NOT happen here is this route re-deriving the answer
+ * from the id it just posted: that would be a second copy of the invalidation
+ * rule, and the copy behind the notice would eventually disagree with the copy
+ * behind the refusal. It relays, and nothing else.
+ */
+describe("agreement-template action — relaying the revocation signal", () => {
+    const withEffects = (revoked: boolean, data?: unknown) =>
+        json({ success: true, effects: { cancellationFeeAttestationRevoked: revoked }, ...(data ? { data } : {}) });
+
+    it("relays a save that revoked the cancellation-fee confirmation", async () => {
+        updatePut.mockResolvedValue(withEffects(true, { agreement: { id: "a1" } }));
+        expect(await post({ intent: "update", id: "a1", name: "N", content: "<p>c</p>" }))
+            .toEqual({ ok: true, intent: "update", id: "a1", clauseRevoked: true });
+    });
+
+    it("relays a save that revoked nothing", async () => {
+        // The positive control. A route that reported `true` whenever an
+        // attestation exists anywhere would warn on every template.
+        updatePut.mockResolvedValue(withEffects(false, { agreement: { id: "a2" } }));
+        expect(await post({ intent: "update", id: "a2", name: "N", content: "<p>c</p>" }))
+            .toEqual({ ok: true, intent: "update", id: "a2", clauseRevoked: false });
+    });
+
+    it("relays a delete that revoked the cancellation-fee confirmation", async () => {
+        removeDelete.mockResolvedValue(withEffects(true));
+        expect(await post({ intent: "delete", id: "a1" }))
+            .toEqual({ ok: true, intent: "delete", id: "a1", clauseRevoked: true });
+    });
+
+    it("relays a delete that revoked nothing", async () => {
+        removeDelete.mockResolvedValue(withEffects(false));
+        expect(await post({ intent: "delete", id: "a2" }))
+            .toEqual({ ok: true, intent: "delete", id: "a2", clauseRevoked: false });
+    });
+
+    it("claims no revocation when the response carries no signal at all", async () => {
+        // Creating a template cannot revoke anything, so `POST /agreements`
+        // declares no `effects`. Absence must read as "nothing was revoked" and
+        // never as "unknown, so warn" — an unconditional warning on every
+        // create is how a notice stops being read.
+        createPost.mockResolvedValue(json({ success: true, data: { agreement: { id: "new-1" } } }, 201));
+        expect(await post({ intent: "create", name: "X", content: "<p>y</p>" }))
+            .toEqual({ ok: true, intent: "create", id: "new-1", clauseRevoked: false });
     });
 });
 

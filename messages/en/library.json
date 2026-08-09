@@ -81,6 +81,8 @@
   "library_agreement_editor_err_delete": "This agreement template could not be deleted. Nothing was changed.",
   "library_agreements_delete_title": "Delete this agreement template?",
   "library_agreements_delete_message": "\"{name}\" and its wording will be deleted, and any service or booking page that attaches it will stop attaching an agreement. This cannot be undone. Agreements already sent keep their own signed copy and are not affected.",
+  "library_agreements_delete_message_attested": "\"{name}\" and its wording will be deleted, and any service or booking page that attaches it will stop attaching an agreement. This cannot be undone. It is also the agreement your cancellation fees rest on, so deleting it revokes that clause confirmation and cancellation fees will be refused until you confirm another agreement in Settings → Online Booking → Cancellation policy. Agreements already sent keep their own signed copy and are not affected.",
+  "library_agreements_clause_revoked": "Cancellation fees are off until you confirm a clause again. That change removed the agreement your fee policy was confirmed against, so fee-charging cancellation policies will be refused. Reconfirm in Settings → Online Booking → Cancellation policy.",
   "library_agreements_sign_title": "Inspector signature",
   "library_agreements_sign_desc": "Draw your signature below. This will pre-sign the agreement; the client signs separately after you send it.",
   "library_agreements_save_signature": "Save signature",

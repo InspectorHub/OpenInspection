@@ -62,8 +62,36 @@ export type AgreementTemplateLoadResult =
     | { ok: false; error: string };
 
 export type AgreementTemplateSaveResult =
-    | { ok: true; intent: string; id: string }
+    | {
+        ok: true;
+        intent: string;
+        id: string;
+        /**
+         * #84 — this write invalidated the cancellation-fee attestation, so
+         * fee-charging policies are refused until it is confirmed again.
+         *
+         * RELAYED from the API's `effects` block, never re-derived here. The
+         * server computes it by reading `getCancellationAttestation()` on both
+         * sides of the write; a second opinion in this route would eventually
+         * disagree with the gate that does the refusing.
+         */
+        clauseRevoked: boolean;
+    }
     | { ok: false; intent: string; error: string };
+
+/**
+ * Read the one signal both the UI and MCP callers read.
+ *
+ * Absent means "nothing was revoked", not "unknown": `POST /agreements` creates
+ * a template and cannot revoke anything, so it declares no `effects` at all. The
+ * two operations that CAN revoke always send the field, false included — so an
+ * absent field on those would be a route that never learned to speak, and that
+ * is a server-side gap, not something to guess about here.
+ */
+function revokedFrom(body: unknown): boolean {
+    const effects = (body as { effects?: { cancellationFeeAttestationRevoked?: boolean } } | null)?.effects;
+    return effects?.cancellationFeeAttestationRevoked === true;
+}
 
 /** Pull the API's own refusal text out of an error envelope, if it sent one. */
 async function apiErrorMessage(
@@ -189,7 +217,7 @@ export async function action({ request, context }: Route.ActionArgs): Promise<Ag
             // path already knows the one it addressed.
             const savedId = body.data?.agreement?.id ?? id;
             if (!savedId) return { ok: false, intent, error: failed };
-            return { ok: true, intent, id: savedId };
+            return { ok: true, intent, id: savedId, clauseRevoked: revokedFrom(body) };
         } catch {
             return { ok: false, intent, error: failed };
         }
@@ -200,7 +228,7 @@ export async function action({ request, context }: Route.ActionArgs): Promise<Ag
         try {
             const res = await api.admin.agreements[":id"].$delete({ param: { id } });
             if (!res.ok) return { ok: false, intent, error: await apiErrorMessage(res, failed) };
-            return { ok: true, intent, id };
+            return { ok: true, intent, id, clauseRevoked: revokedFrom(await res.json()) };
         } catch {
             return { ok: false, intent, error: failed };
         }

@@ -970,7 +970,7 @@
       "body": null
     },
     "summary": "Complete inspection for current tenant",
-    "description": "Auto-generated placeholder for completeInspection (POST /{id}/complete, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection."
   },
   {
     "operationId": "completeTwoFactorLogin",
@@ -4142,17 +4142,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "The cancelled inspection to bring back.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "The cancelled inspection to bring back."
           }
         }
       ],
       "body": null
     },
-    "summary": "Create inspection uncancel for current tenant",
-    "description": "Auto-generated placeholder for createInspectionUncancel (POST /{id}/uncancel, inspections domain). TODO: replace with a real description sourced from the handler."
+    "summary": "Bring a cancelled inspection back to scheduled",
+    "description": "Returns a mistakenly-cancelled inspection to `scheduled`, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
   },
   {
     "operationId": "createInspectionUnits",
@@ -6325,7 +6325,7 @@
       "body": null
     },
     "summary": "Delete tenant agreement for current tenant",
-    "description": "Auto-generated placeholder for deleteTenantAgreement (DELETE /agreements/{id}, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Delete an agreement template. Services and booking pages that attach it stop attaching an agreement; agreements already sent keep their own signed copy. If this template is the one the workspace confirmed contains its cancellation clause, deleting it revokes that confirmation and cancellation fees stop being chargeable until another template is confirmed. The response always reports this as `effects.cancellationFeeAttestationRevoked`; tell the user when it is true."
   },
   {
     "operationId": "deleteTenantComment",
@@ -21153,7 +21153,7 @@
       }
     },
     "summary": "Update tenant agreement for current tenant",
-    "description": "Auto-generated placeholder for updateTenantAgreement (PUT /agreements/{id}, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update an agreement template's name and/or body. Every save increments the template version, identical content included. If this template is the one the workspace confirmed contains its cancellation clause, saving revokes that confirmation and cancellation fees stop being chargeable until it is confirmed again. The response always reports this as `effects.cancellationFeeAttestationRevoked`; tell the user when it is true."
   },
   {
     "operationId": "updateTenantComment",

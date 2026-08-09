@@ -60,6 +60,50 @@ export const AgreementResponseSchema = createApiResponseSchema(z.object({
 })).openapi('AgreementResponse');
 
 /**
+ * #84 — what a write did to state the caller did not name.
+ *
+ * Only the two operations that CAN revoke declare it: editing bumps
+ * `agreements.version` and deleting removes the row, and either makes
+ * `BrandingService.getCancellationAttestation()` return null. Creating a
+ * template cannot revoke anything, so `POST /agreements` does not carry a field
+ * that would always read false.
+ */
+const AgreementWriteEffectsSchema = z.object({
+    cancellationFeeAttestationRevoked: z.boolean().openapi({ example: false }).describe(
+        'True when this write invalidated the confirmation that the workspace agreement contains '
+        + 'a cancellation clause. While it is false, cancellation policies that charge a fee are '
+        + 'refused; re-confirm under Settings > Online Booking > Cancellation policy. Always '
+        + 'present, including when nothing was revoked.',
+    ),
+}).openapi('AgreementWriteEffects');
+
+/**
+ * ⚠️ `effects` is declared BEFORE `data`, and the handler builds its response
+ * object in the same order. The MCP tool surface slices a tool result at
+ * `MCP_MAX_RESULT_BYTES` (see `lib/mcp/result-limits`) and this body echoes the
+ * whole agreement — a long agreement would push a trailing key past the cut.
+ */
+export const AgreementUpdateResponseSchema = z.object({
+    success: z.literal(true),
+    effects: AgreementWriteEffectsSchema,
+    data: z.object({
+        agreement: z.object({
+            id: z.string().trim().min(1).describe('Identifier of the template that was updated'),
+            tenantId: z.string().trim().min(1).describe('Workspace the template belongs to'),
+            name: z.string().describe('Template name after the update'),
+            content: z.string().describe('Sanitised agreement HTML after the update'),
+            version: z.number().describe('Version after the update; incremented by every save, identical content included'),
+            createdAt: z.string().describe('When the template was first created'),
+        }).describe('The template as stored after the update'),
+    }),
+}).openapi('AgreementUpdateResponse');
+
+export const AgreementDeleteResponseSchema = z.object({
+    success: z.literal(true),
+    effects: AgreementWriteEffectsSchema,
+}).openapi('AgreementDeleteResponse');
+
+/**
  * Validation schema for inspector pre-sign request body.
  * Spec 5H D1 — optional inspector signature before sending to client.
  */

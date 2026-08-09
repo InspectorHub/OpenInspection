@@ -48,7 +48,15 @@ export function AgreementTemplateModal({
     /** `null` creates a new template; an id edits that one. */
     templateId: string | null;
     onClose: () => void;
-    onSaved: () => void;
+    /**
+     * #84 — the SAVE RESULT is handed back, not a bare "done".
+     *
+     * The response carries `clauseRevoked`, measured server-side around the
+     * write, and the page turns it into a notice. The banner above warns before
+     * the save; this reports what the save actually did, and it is the only way
+     * the page learns it — the modal is closed by then.
+     */
+    onSaved: (result: AgreementTemplateSaveResult) => void;
 }) {
     const loadFetcher = useFetcher<AgreementTemplateLoadResult>();
     const saveFetcher = useFetcher<AgreementTemplateSaveResult>();
@@ -92,7 +100,7 @@ export function AgreementTemplateModal({
 
     useEffect(() => {
         if (saveFetcher.state !== "idle" || !saveFetcher.data) return;
-        if (saveFetcher.data.ok) onSaved();
+        if (saveFetcher.data.ok) onSaved(saveFetcher.data);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [saveFetcher.state, saveFetcher.data]);
 
