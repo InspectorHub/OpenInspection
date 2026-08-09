@@ -1,5 +1,13 @@
 /**
- * The soft references an inspection PATCH can dangle, re-resolved before the write.
+ * What an inspection PATCH must be refused for, and what it must correct, before
+ * the write.
+ *
+ * Two kinds of rule live here, for the same reason: both are conditions the
+ * route handler would otherwise carry as look-alike inline blocks, and both are
+ * forgotten the same way. `findPatchRefusal` says no; `clearCancellationOnRecovery`
+ * says "and while you are here, this other column is now wrong".
+ *
+ * ── 1. Dangling soft references ─────────────────────────────────────────────
  *
  * Three fields on `UpdateInspection` name a row in another table —
  * `coverPhotoId`, `inspectorId`, `referredByContactId` — and Schema Rules
@@ -14,21 +22,57 @@
  *
  * Returns the refusal (code + message) or null. Deliberately does not build the
  * Response — the route owns its own status codes and envelope shape.
+ *
+ * ── 2. Cancelling is not a status write (#78) ───────────────────────────────
+ *
+ * `status: 'cancelled'` is refused outright. See ./cancel-write-path for why —
+ * in one line: the fee, the refund and the recorded reason happen only inside
+ * `POST /:id/cancel`, so any other writer produces a cancelled job whose money
+ * still says it is on.
+ *
+ * Leaving `cancelled` stays allowed, and `clearCancellationOnRecovery` below is
+ * the correction that direction implies.
  */
 import { and, eq, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users } from '../../lib/db/schema';
+import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
+import { refuseCancelViaStatusWrite, type CancelWritePathRefusal } from './cancel-write-path';
 
-export interface PatchRefusal {
+export type PatchRefusal = CancelWritePathRefusal | {
     code: 'INVALID_COVER_PHOTO' | 'INVALID_INSPECTOR' | 'INVALID_REFERRER';
     message: string;
-}
+};
 
-/** Only the three fields this checks; the rest of the body is none of its business. */
+/** Only the fields this checks; the rest of the body is none of its business. */
 interface GuardedPatch {
     coverPhotoId?: string | null | undefined;
     inspectorId?: string | null | undefined;
     referredByContactId?: string | null | undefined;
+    status?: string | null | undefined;
+}
+
+/**
+ * Coming BACK from cancelled, the cancellation's own record goes with it.
+ *
+ * `cancel_reason` and `cancel_notes` describe a cancellation that no longer
+ * stands, and a live inspection carrying "no_show" is a lie that outlives the
+ * mistake. This is what `uncancelInspection()` has always done, applied to the
+ * door people actually use — the row status dropdown, which is the ONLY way a
+ * mis-cancelled inspection comes back (`POST /:id/uncancel` has no caller
+ * anywhere in the product).
+ *
+ * The MONEY does not come back with it. A fee kept and a refund issued are
+ * ledger facts, reversed by an invoice adjustment, not by re-scheduling the job.
+ */
+export function clearCancellationOnRecovery(
+    updateValues: Record<string, unknown>,
+    currentStatus: string | null | undefined,
+    nextStatus: string | null | undefined,
+): void {
+    if (!nextStatus || currentStatus !== INSPECTION_STATUS.CANCELLED) return;
+    updateValues.cancelReason = null;
+    updateValues.cancelNotes = null;
 }
 
 export async function findPatchRefusal(
@@ -40,6 +84,13 @@ export async function findPatchRefusal(
     // item photos and the loose pool), so it stays where that knowledge lives.
     isInspectionPhotoKey: (id: string, tenantId: string, key: string) => Promise<boolean>,
 ): Promise<PatchRefusal | null> {
+    // #78 — checked FIRST, and it refuses the whole patch rather than dropping
+    // the one field. A patch that saved the county and quietly discarded the
+    // cancellation is worse than either outcome: nothing on screen would say
+    // which half took effect.
+    const cancelRefusal = refuseCancelViaStatusWrite(body.status);
+    if (cancelRefusal) return cancelRefusal;
+
     // DB-16 — coverPhotoId holds the R2 key of a photo belonging to THIS
     // inspection (an attached item photo or a loose pool photo); null clears
     // the cover. Reject foreign/dangling keys so the preflight gate + report

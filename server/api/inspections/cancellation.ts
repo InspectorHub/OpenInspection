@@ -7,6 +7,8 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { CancelInspectionSchema } from '../../lib/validations/inspection.schema';
 import { CANCELLATION_REASONS } from '../../lib/cancellation-reason';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
+import { auditFromContext } from '../../lib/audit';
+import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { quoteCancellation, applyCancellationRefund } from '../../services/inspection/cancellation.service';
 
@@ -133,6 +135,29 @@ const cancellationRoutes = createApiRouter()
 
         const userId = (c.get('user') as { sub?: string } | undefined)?.sub ?? null;
         const refund = await applyCancellationRefund(db, tenantId, quote, userId);
+
+        // #78 — INHERITED FROM THE DOOR THAT CLOSED. `PATCH /{id}` used to be a
+        // second way to cancel, and it carried two things this route did not:
+        // it took the job off the lead inspector's Google Calendar
+        // (pushInspectionToGoogle deletes the entry once the row reads
+        // 'cancelled'), and it wrote the status change to the audit log.
+        // Refusing 'cancelled' there without moving these here would have
+        // traded a billing hole for a cancelled inspection that still occupies
+        // an inspector's Monday and left no record of who cancelled it.
+        //
+        // The audit metadata names the money, because that is the part of a
+        // cancellation nobody can reconstruct from the row afterwards.
+        pushInspectionAfterResponse(c, tenantId, id);
+        auditFromContext(c, 'inspection.status_change', 'inspection', {
+            entityId: id,
+            metadata: {
+                to: 'cancelled',
+                reason,
+                feeCents: quote.outcome.feeCents,
+                refundCents: quote.outcome.refundCents,
+                refundPaymentId: refund?.row.id ?? null,
+            },
+        });
 
         // THE SEAM. All three refund writers reach money through
         // `applyCancellationRefund`, and this is the only production entry to

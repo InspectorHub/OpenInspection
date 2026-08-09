@@ -19,6 +19,7 @@ import {
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { syncInspectionAssignmentsBatch } from '../../lib/db/assignment-links';
 import { findScheduleConflicts } from '../../lib/schedule-conflicts';
+import { refuseCancelViaStatusWrite } from './cancel-write-path';
 import { eq, inArray, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
@@ -156,6 +157,7 @@ const bulkUpdateRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
+        400: { description: "Missing action argument, or status:'cancelled' — which only POST /{id}/cancel may write, one inspection at a time (#78)" },
     },
     operationId: "bulkInspection"
 }, { scopes: ['write'], tier: 'extended', capability: 'scheduleOthers' }));
@@ -306,6 +308,15 @@ const bulkRoutes = createApiRouter()
             });
         } else {
             if (!body.status) throw Errors.BadRequest('status is required for updateStatus.');
+
+            // #78 — the surface the cancel route's own comment predicted. A
+            // bulk cancel is not one confirmation covering N jobs: each has its
+            // own price, its own notice window and its own fee, so there is no
+            // single figure a caller could have acknowledged. See
+            // ./cancel-write-path.
+            const cancelRefusal = refuseCancelViaStatusWrite(body.status);
+            if (cancelRefusal) return c.json({ success: false as const, error: cancelRefusal }, 400);
+
             await db.update(inspectionTable).set({ status: body.status })
                 .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
 

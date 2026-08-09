@@ -139,6 +139,21 @@ export function DashboardInspectionRow({
             <Icon name="share" size={14} />
           </Link>
         )}
+        {/* #78 — NO "Cancelled" TO PICK. This dropdown PATCHes the status
+            straight onto the inspection, which skips the fee ladder, the
+            refund and the recorded reason that only `POST /:id/cancel`
+            performs — so a cancellation taken from here left the money saying
+            the job was still on. Cancelling lives on the inspection's own
+            Lifecycle card, behind the priced confirmation. The API refuses this
+            write regardless; the option is gone so the UI stops offering a door
+            the server has closed.
+
+            An ALREADY-cancelled row still renders one, disabled: without it the
+            select has no matching option and the browser shows "Requested" over
+            a cancelled inspection. Disabled and present, it shows the truth and
+            leaves the other four selectable — which is how a mis-cancelled job
+            is put back (the PATCH clears the cancellation record on the way
+            out). Reversing the status does NOT reverse a fee or a refund. */}
         <select
           value={insp.status}
           onChange={(e) => transitionStatus(insp.id, e.target.value)}
@@ -149,7 +164,11 @@ export function DashboardInspectionRow({
           <option value="scheduled">{m.dashboard_row_status_scheduled()}</option>
           <option value="confirmed">{m.dashboard_row_status_confirmed()}</option>
           <option value="completed">{m.dashboard_row_status_completed()}</option>
-          <option value="cancelled">{m.dashboard_row_status_cancelled()}</option>
+          {insp.status === "cancelled" && (
+            <option value="cancelled" disabled>
+              {m.dashboard_row_status_cancelled()}
+            </option>
+          )}
         </select>
       </div>
     </div>

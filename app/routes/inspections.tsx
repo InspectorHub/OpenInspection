@@ -240,7 +240,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
   if (intent === "status") {
     const id = formData.get("id") as string;
-    const status = formData.get("status") as "requested" | "scheduled" | "confirmed" | "completed" | "cancelled";
+    const status = formData.get("status") as "requested" | "scheduled" | "confirmed" | "completed"; // #78 — no "cancelled": that moves money, so only POST /:id/cancel writes it (the API 400s USE_CANCEL_ENDPOINT here)
     const res = await api.inspections[":id"].$patch({
       param: { id },
       json: { status },

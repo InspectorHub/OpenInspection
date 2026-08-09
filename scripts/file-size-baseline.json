@@ -27,7 +27,7 @@
   "server/services/agent/referral.ts": 564,
   "app/lib/collab/results-binding.ts": 560,
   "app/routes/settings-profile.tsx": 548,
-  "server/api/inspections/core.ts": 544,
+  "server/api/inspections/core.ts": 543,
   "app/components/NewInspectionWizard.tsx": 539,
   "server/services/inspection/inspection-photo.service.ts": 531,
   "server/api/inspections/media-studio.ts": 530,

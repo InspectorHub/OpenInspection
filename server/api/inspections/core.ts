@@ -19,7 +19,7 @@ import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.s
 import { inspections as inspectionTable, inspectionResults } from '../../lib/db/schema';
 import { datePatchValues } from '../../services/inspection/reschedule-date';
 import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
-import { findPatchRefusal } from './patch-guards';
+import { findPatchRefusal, clearCancellationOnRecovery } from './patch-guards';
 import { deleteInspectionCascade } from '../../services/inspection/inspection-cascade';
 import { syncAssignmentsAndSplits } from '../../services/pay-split.service';
 import { eq, and } from 'drizzle-orm';
@@ -170,7 +170,7 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
-        400: { description: 'coverPhotoId does not reference a photo of this inspection (DB-16)' },
+        400: { description: 'A refused patch: a dangling soft reference (DB-16), or status:cancelled, which only POST /{id}/cancel may write (#78)' },
     },
     operationId: "patchInspection"
 }, { scopes: ['write'], tier: 'primary' }));
@@ -300,8 +300,8 @@ const coreRoutes = createApiRouter()
 
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
 
-        // Every soft reference this patch can dangle, resolved inside the
-        // caller's tenant before anything is written. See ./patch-guards.
+        // Every soft reference this patch can dangle, plus the one status it may
+        // not write (#78 — cancelled). Refused before anything is. ./patch-guards.
         const refusal = await findPatchRefusal(
             db, tenantId, id, body,
             (i, t, key) => c.var.services.inspection.isInspectionPhotoKey(i, t, key),
@@ -319,9 +319,8 @@ const coreRoutes = createApiRouter()
         // agreed on the phone, so a later re-resolve would silently overwrite
         // the second. Clearing the amount clears the override with it —
         // otherwise the order stays pinned to a number that no longer exists.
-        if ('depositRequiredCents' in body) {
-            updateValues.depositOverridden = body.depositRequiredCents != null;
-        }
+        if ('depositRequiredCents' in body) updateValues.depositOverridden = body.depositRequiredCents != null;
+        clearCancellationOnRecovery(updateValues, inspection.status, body.status); // #78 — see ./patch-guards
 
         // Tenant-ownership pre-check above guards access. The validated `body`
         // can legitimately be empty: the settings sheet forwards its whole form
