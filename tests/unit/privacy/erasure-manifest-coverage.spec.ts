@@ -190,6 +190,16 @@ const HEURISTIC_BLIND_SPOTS = [
     // side of that: the gate pattern matches no part of `repair_action_tag`, so
     // the only thing standing between it and silence is this line.
     'repair_request_items.repair_action_tag',
+    // #61 — AI content review evidence. `reviewed_by` is a user id and
+    // `artifact_id` is the only route from a review row back to an inspection,
+    // and the gate pattern matches neither, so the whole table was invisible to
+    // `lint:erasure` from the moment it was written. Only these two of the
+    // table's seven columns are pinned: the rest are an opaque key, a scope key,
+    // a pointer discriminator and a timestamp, where losing the declaration
+    // changes no answer. These two are where a wrong or missing answer would —
+    // one names a person, the other names the record the person acted on.
+    'ai_content_reviews.reviewed_by',
+    'ai_content_reviews.artifact_id',
 ];
 
 describe('columns the PII heuristic cannot see', () => {

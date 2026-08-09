@@ -130,21 +130,26 @@ const suggestCommentRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createAiSuggestComment (POST /suggest-comment, ai domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
+// Each handler returns the service result AS ITS `data`, rather than picking
+// fields out of it. The service already shapes the payload — text/summary/
+// rewritten/suggestions plus the `aiCallId` a content-review record cites — and
+// a handler that re-listed those fields is exactly where the next field gets
+// dropped on the way out.
 const aiRoutes = createApiRouter()
     .openapi(commentAssistRoute, async (c) => {
         const { text, context } = c.req.valid('json');
         const service = c.var.services.ai;
 
-        const professionalText = await service.generateProfessionalComment(text, context);
-        return c.json({ success: true, data: { text: professionalText } }, 200);
+        const data = await service.generateProfessionalComment(text, context);
+        return c.json({ success: true, data }, 200);
     })
     .openapi(autoSummaryRoute, async (c) => {
         const { inspectionId } = c.req.valid('json');
         const tenantId = c.get('tenantId');
         const service = c.var.services.ai;
 
-        const summary = await service.generateInspectionSummary(tenantId, inspectionId);
-        return c.json({ success: true, data: { summary } }, 200);
+        const data = await service.generateInspectionSummary(tenantId, inspectionId);
+        return c.json({ success: true, data }, 200);
     })
     .openapi(commentEditRoute, async (c) => {
         await checkRateLimit(c, 'ai-comment-edit');
@@ -159,13 +164,13 @@ const aiRoutes = createApiRouter()
             ...(input.category !== undefined ? { category: input.category } : {}),
             ...(input.location !== undefined ? { location: input.location } : {}),
         };
-        const rewritten = await c.var.services.ai.rewriteComment(payload);
-        return c.json({ success: true, data: { rewritten } }, 200);
+        const data = await c.var.services.ai.rewriteComment(payload);
+        return c.json({ success: true, data }, 200);
     })
     .openapi(suggestCommentRoute, async (c) => {
         const params = c.req.valid('json');
-        const suggestions = await c.var.services.ai.suggestComment(params);
-        return c.json({ success: true, data: suggestions });
+        const data = await c.var.services.ai.suggestComment(params);
+        return c.json({ success: true, data });
     });
 
 export type AiApi = typeof aiRoutes;

@@ -182,7 +182,7 @@ describe('the gate at the AI chokepoint', () => {
      *  covered in `provenance.spec.ts`; here it exists because the chokepoint
      *  refuses to run without one, so a case that omitted it would pass on the
      *  wrong refusal. */
-    const provenance = { record: async () => {} };
+    const provenance = { record: async () => 'ai-call-row' };
 
     function service(
         credentials: { source: 'byo' | 'managed'; tenantKeyAttested: boolean },
@@ -206,7 +206,8 @@ describe('the gate at the AI chokepoint', () => {
         // The control. Without it, "record was not called" proves nothing —
         // a meter that never fires at all would satisfy the case above.
         const record = vi.fn(async () => {});
-        await expect(service(OWN_CONFIRMED_KEY, record).generateProfessionalComment('note')).resolves.toBe('x');
+        await expect(service(OWN_CONFIRMED_KEY, record).generateProfessionalComment('note'))
+            .resolves.toEqual({ text: 'x', aiCallId: 'ai-call-row' });
         expect(record).toHaveBeenCalledTimes(1);
         expect(record).toHaveBeenCalledWith('assist');
         expect(fetchMock).toHaveBeenCalledOnce();

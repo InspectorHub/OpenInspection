@@ -73,11 +73,13 @@ export interface ClassificationPosture {
     /**
      * Whether a person must review this output before it reaches a client.
      *
-     * ⚠️ Recorded here and NOT yet enforced anywhere: enforcement needs a
-     * review surface and a place to record that the review happened, neither of
-     * which exists. This field is the policy; do not read it as a live gate.
-     * Wiring it up is what makes an `ai_content_reviews` row mandatory rather
-     * than merely possible.
+     * ⚠️ Recorded here and NOT yet enforced anywhere. This field is the policy;
+     * do not read it as a live gate. Of the two things enforcement needs, the
+     * place to record a review now exists — the `ai_content_reviews` table, and
+     * the chokepoint hands out the `ai_call_provenance` id a row there has to
+     * cite. What is still missing is the review SURFACE: no control writes such
+     * a row, so nothing consumes this flag. Wiring that up is what makes a review
+     * row mandatory rather than merely possible.
      */
     readonly requiresReview: boolean;
     /**

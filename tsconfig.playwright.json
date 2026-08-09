@@ -30,6 +30,15 @@
         // run look cold to the other, which is how a 20s check becomes a 6-minute
         // one with nothing in the diff to explain it.
         "tsBuildInfoFile": "./.tsbuildinfo.playwright"
+        //
+        // ⚠️ MEASURED FOOTPRINT, and why `type-check:e2e` caps the heap at 2048
+        // rather than the 8192 its siblings use. With the reference in place this
+        // program needs between 256 MB (OOMs) and 512 MB (passes, 6s cold); it
+        // also passes on Node's DEFAULT heap, which is the exact condition that
+        // used to kill it. An 8 GB cap would be 16x the need — and it would let a
+        // regression HIDE: drop the `references` line or widen `include` back to
+        // `tests/**` and the program silently eats gigabytes and slows to minutes
+        // instead of failing. A tight cap makes that regression loud.
     },
     // ⚠️ SCOPED TO tests/e2e, not all of tests/**, and the difference is a
     // decision rather than a name. Widened to the whole test tree this program

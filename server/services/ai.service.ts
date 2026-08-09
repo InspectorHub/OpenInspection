@@ -57,6 +57,15 @@ import type { AiUsageKind } from '../lib/usage/period';
  * URL ended up pinned to one model for two years with no way to change it, and
  * a fallback would hide the same mistake next time. Unconfigured fails closed.
  */
+/**
+ * The summary the system states when there is nothing for a model to summarise.
+ *
+ * A constant because it is returned from two arms that must say the same thing,
+ * and because it is the one summary in this file that no model wrote — the
+ * reason both arms return a null `aiCallId`.
+ */
+const NO_DEFECTS_SUMMARY = 'No significant defects observed during this inspection.';
+
 export class AIService {
     constructor(
         private db: D1Database,
@@ -140,12 +149,21 @@ export class AIService {
      * token was in scope at every call site and reached this method at none of
      * them. There is no overload accepting bare text, so no feature can send a
      * prompt this method cannot name.
+     *
+     * IT RETURNS THE PROVENANCE ROW ID ALONGSIDE THE TEXT, and that pairing is
+     * the point. The ledger recorded every call from the day it shipped and no
+     * caller could say WHICH row was theirs, so a review of this output had
+     * nothing to cite: the call and its acceptance were two events with nothing
+     * linking them. Handing the id back at the same moment as the text is what
+     * makes `ai_content_reviews.ai_call_id` a fact rather than a guess, and it
+     * is why `model` and `prompt_version` are not copied onto a review row —
+     * they are reachable through this id.
      */
     private async callGemini<A>(
         prompt: VersionedPrompt<A>,
         args: A,
         kind: AiUsageKind = 'assist',
-    ) {
+    ): Promise<{ text: string; aiCallId: string }> {
         // The capability gate, placed AFTER credential resolution (the source
         // was resolved upstream and handed to the constructor) and BEFORE any
         // content leaves the process. Every AI feature funnels through here, so
@@ -195,7 +213,7 @@ export class AIService {
         // it has to exist first. A sink that cannot write therefore stops the
         // send rather than letting inspection content reach a third party
         // untracked.
-        await provenance.record({
+        const aiCallId = await provenance.record({
             capability: kind,
             promptVersion: prompt.version,
             provider: provider.id,
@@ -206,11 +224,27 @@ export class AIService {
         // matches the send sites: a metering failure must never fail the
         // inspector's operation.
         if (this.meter) await this.meter.record(kind).catch(() => {});
-        return text;
+        return { text, aiCallId };
     }
 
     /**
+     * WHAT `aiCallId` IS NULL FOR, ON EVERY METHOD BELOW THAT CAN RETURN NULL.
+     *
+     * The invariant is one sentence: `aiCallId` is present exactly when the
+     * payload carries model-generated text. Three arms return prose that no
+     * model wrote — the standalone dev mocks, the "no defects observed" literal
+     * on the summary path, and the empty suggestion list a runtime failure
+     * degrades to — and a provenance id attached to any of them would be
+     * evidence of a call that either never happened or produced nothing. A
+     * review row cites this id, so an id here that names the wrong thing is
+     * worse than no id: it would document a human reviewing model output where
+     * there was none. Callers read the null as "there is nothing to review".
+     */
+
+    /**
      * Rewrites a rough note into a professional report comment.
+     *
+     * The one path with no non-AI arm, so `aiCallId` is always a real row.
      */
     async generateProfessionalComment(text: string, context?: string) {
         return this.callGemini(AI_PROMPTS.professionalComment, { text, context });
@@ -219,7 +253,10 @@ export class AIService {
     /**
      * Generates a high-level summary of defects found in an inspection.
      */
-    async generateInspectionSummary(tenantId: string, inspectionId: string) {
+    async generateInspectionSummary(
+        tenantId: string,
+        inspectionId: string,
+    ): Promise<{ summary: string; aiCallId: string | null }> {
         const db = this.getDrizzle();
 
         // 1. Verify ownership and existence
@@ -230,7 +267,7 @@ export class AIService {
 
         // 2. Fetch results (scoped by tenantId for defense-in-depth)
         const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId))).get();
-        if (!results) return 'No significant defects observed during this inspection.';
+        if (!results) return { summary: NO_DEFECTS_SUMMARY, aiCallId: null };
 
         const data = results.data as Record<string, { status: string; notes?: string }>;
         const defects = Object.entries(data)
@@ -238,9 +275,10 @@ export class AIService {
             .map(([_, val]) => `- ${val.notes || 'No description provided'}`)
             .join('\n');
 
-        if (!defects) return 'No significant defects observed during this inspection.';
+        if (!defects) return { summary: NO_DEFECTS_SUMMARY, aiCallId: null };
 
-        return this.callGemini(AI_PROMPTS.inspectionSummary, { defects });
+        const { text, aiCallId } = await this.callGemini(AI_PROMPTS.inspectionSummary, { defects });
+        return { summary: text, aiCallId };
     }
 
     /**
@@ -253,11 +291,16 @@ export class AIService {
      *    failure, throws so the UI can show an error toast (no silent
      *    overwrite of the inspector's existing text).
      */
-    async rewriteComment(input: RewriteCommentPromptArgs): Promise<string> {
+    async rewriteComment(
+        input: RewriteCommentPromptArgs,
+    ): Promise<{ rewritten: string; aiCallId: string | null }> {
         if (!this.hasApiKey()) {
             // Sprint 1 A-4: dev-mock instead of throwing in standalone mode.
             if (this.isDevMode()) {
-                return `[DEV] ${input.originalComment} (rewritten: ${input.instruction})`.trim();
+                return {
+                    rewritten: `[DEV] ${input.originalComment} (rewritten: ${input.instruction})`.trim(),
+                    aiCallId: null,
+                };
             }
             throw Errors.AINotConfigured(
                 'AI is not configured. Set GEMINI_API_KEY in Settings → Advanced → AI.'
@@ -265,9 +308,9 @@ export class AIService {
         }
         this.assertModelConfigured();
 
-        const text = await this.callGemini(AI_PROMPTS.rewriteComment, input);
+        const { text, aiCallId } = await this.callGemini(AI_PROMPTS.rewriteComment, input);
         // Strip wrapping quotes / markdown the model sometimes adds.
-        return text.replace(/^["'`]+|["'`]+$/g, '').trim();
+        return { rewritten: text.replace(/^["'`]+|["'`]+$/g, '').trim(), aiCallId };
     }
 
     /**
@@ -276,17 +319,22 @@ export class AIService {
      * UI can surface a clear "set up your API key" message instead of a silent
      * empty popover. Runtime Gemini failures still degrade to an empty array.
      */
-    async suggestComment(params: SuggestCommentPromptArgs): Promise<string[]> {
+    async suggestComment(
+        params: SuggestCommentPromptArgs,
+    ): Promise<{ suggestions: string[]; aiCallId: string | null }> {
         if (!this.hasApiKey()) {
             // Sprint 1 A-4: dev-mode mock so local development can exercise
             // the full Suggest flow without burning Gemini quota.
             if (this.isDevMode()) {
                 const item = params.itemName || 'Item';
-                return [
-                    `[DEV] ${item} appears serviceable with no defects observed at the time of inspection.`,
-                    `[DEV] ${item} requires routine maintenance attention; recommend periodic inspection.`,
-                    `[DEV] ${item} shows signs of wear; monitor over the next inspection cycle.`,
-                ];
+                return {
+                    suggestions: [
+                        `[DEV] ${item} appears serviceable with no defects observed at the time of inspection.`,
+                        `[DEV] ${item} requires routine maintenance attention; recommend periodic inspection.`,
+                        `[DEV] ${item} shows signs of wear; monitor over the next inspection cycle.`,
+                    ],
+                    aiCallId: null,
+                };
             }
             throw Errors.AINotConfigured(
                 'AI is not configured. Set GEMINI_API_KEY in Settings → Advanced → AI.'
@@ -298,10 +346,14 @@ export class AIService {
         this.assertModelConfigured();
 
         try {
-            const text = await this.callGemini(AI_PROMPTS.suggestComment, params);
+            const { text, aiCallId } = await this.callGemini(AI_PROMPTS.suggestComment, params);
             const match = text.match(/\[[\s\S]*\]/);
-            if (!match) return [];
-            return JSON.parse(match[0]) as string[];
+            // An unparseable completion yields nothing to review, so it yields
+            // no id either — see the invariant above. The provenance row for the
+            // call still exists; what does not exist is any text a person could
+            // have reviewed, and this method's contract is about the latter.
+            if (!match) return { suggestions: [], aiCallId: null };
+            return { suggestions: JSON.parse(match[0]) as string[], aiCallId };
         } catch (err) {
             // Same rule as `assertModelConfigured` above, applied to the one
             // refusal that can only be raised from INSIDE this try: the
@@ -310,7 +362,7 @@ export class AIService {
             // reach the inspector as a refusal, not as an empty popover that
             // looks like the model had nothing to say.
             if (err instanceof AppError && err.code === ErrorCode.AI_NOT_CONFIGURED) throw err;
-            return [];
+            return { suggestions: [], aiCallId: null };
         }
     }
 }

@@ -101,3 +101,8 @@ export type { ServicePayRule, InspectionServicePaySplit } from './pay-split';
 // only; the prompt text is never stored (see the file for why that is a rule).
 export { aiCallProvenance } from './ai';
 export type { AiCallProvenance, NewAiCallProvenance } from './ai';
+// AI content review evidence — who reviewed which artifact against which AI
+// call. Points AT the provenance row; model/prompt version are read through it
+// rather than copied (see the file for why that is a rule, not a shortcut).
+export { aiContentReviews } from './ai';
+export type { AiContentReview, NewAiContentReview } from './ai';
