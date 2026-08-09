@@ -134,12 +134,21 @@ and borders for higher contrast.
    — every token needs a value in both, or dark mode silently falls back to
    the light value.
 2. Expose it as a Tailwind utility by adding a matching line to the `@theme`
-   block (`--color-ih-foo: var(--ih-foo);`).
+   block (`--color-ih-foo: var(--ih-foo);`). **Step 2 is not optional.**
+   Without it `bg-ih-foo` is not an error — Tailwind emits no CSS for it and
+   says nothing, so the element paints no background in every theme. Ten alias
+   names shipped in that state, one of them at 17 call sites.
 3. Consume it as `bg-ih-foo` / `text-ih-foo` / etc. Never reference the raw
    `--ih-foo` CSS variable directly from a component unless there is no
    Tailwind utility surface for it (e.g. inline `style={{ boxShadow: ... }}`).
-4. Run `npm run lint:ds` — new raw palette usage elsewhere won't be caught by
-   adding a token, but it confirms you haven't introduced a violation.
+   Mind the namespace: `bg-`/`text-`/`border-` read `--color-*`, `rounded-`
+   reads `--radius-*`, `p-`/`gap-` read `--spacing-*`, `shadow-` reads
+   `--shadow-*`. `ih-card` exists in three of those, so `shadow-ih-card`
+   resolves and `bg-ih-card` does not.
+4. Run `npm run lint:ds`. It fails on an `ih-*` alias with no `@theme` entry
+   (step 2 above) and on raw palette classes. It has nothing to say about what
+   the token is WORTH — `npm run lint:contrast` is the gate that does the
+   arithmetic.
 
 ---
 

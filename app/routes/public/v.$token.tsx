@@ -191,7 +191,7 @@ export default function VerifyTokenPage() {
           {m.report_verify_agreement_text()}{" "}
           <a
             href={`/verify/${result.envelopeId}`}
-            className="text-ih-accent underline underline-offset-2"
+            className="text-ih-primary underline underline-offset-2"
           >
             {m.report_verify_agreement_link()}
           </a>

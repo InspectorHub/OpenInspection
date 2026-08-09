@@ -52,7 +52,7 @@ export function SpectoraMappingModal({ open, handleMappingDismiss }: SpectoraMap
           <div className="flex items-center gap-2 mb-0.5">
             <span className="text-[12px] font-bold text-ih-fg-3 line-through">{m.templates_mapping_row2_from()}</span>
             <span className="text-ih-fg-3 text-[11px]">&rarr;</span>
-            <span className="text-[12px] font-bold text-ih-good-fg">{m.templates_mapping_row2_to1()}</span>
+            <span className="text-[12px] font-bold text-ih-ok-fg">{m.templates_mapping_row2_to1()}</span>
             <span className="text-ih-fg-3 text-[10px]">&middot;</span>
             <span className="text-[12px] font-bold text-ih-watch-fg">{m.templates_mapping_row2_to2()}</span>
             <span className="text-ih-fg-3 text-[10px]">&middot;</span>

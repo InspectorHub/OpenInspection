@@ -132,7 +132,7 @@ export function SendSmsModal({
             </ul>
           </div>
         ))}
-        {error && <p className="text-[12px] text-ih-danger" role="alert">{error}</p>}
+        {error && <p className="text-[12px] text-ih-bad-fg" role="alert">{error}</p>}
       </fetcher.Form>
     </Modal>
   );

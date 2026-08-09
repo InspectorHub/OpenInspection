@@ -334,7 +334,7 @@ export function PeopleEditor({
           ever governs links minted after it changes; this is the deliberate,
           self-describing way to act on the ones already out there. */}
       {issuedCount > 0 && (
-        <div className="mt-5 pt-4 border-t border-ih-line">
+        <div className="mt-5 pt-4 border-t border-ih-border">
           <h3 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-ih-fg-3 mb-1">
             {m.inspections_hub_people_link_expiry_heading()}
           </h3>

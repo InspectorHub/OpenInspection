@@ -94,7 +94,7 @@ export function PeopleStep({
             style={clientSearch.dropdownStyle}
           />
           {clientNameMissing && (
-            <p className="text-[12px] text-ih-danger mt-1">{m.newinsp_people_name_required()}</p>
+            <p className="text-[12px] text-ih-bad-fg mt-1">{m.newinsp_people_name_required()}</p>
           )}
           {/* One slot, always occupying its line, for whatever this field has to
               say. Reserved rather than conditional: as an in-flow paragraph it

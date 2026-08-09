@@ -216,7 +216,7 @@ export default function SettingsAutomations() {
         <p className="text-[11px] text-ih-fg-3">{m.settings_automations_review_hint()}</p>
         <div className="flex gap-2">
           <input id="reviewUrl" name="reviewUrl" type="url" defaultValue={reviewUrl} placeholder={m.settings_automations_review_placeholder()}
-            className="flex-1 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1" />
+            className="flex-1 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1" />
           <button type="submit" disabled={nav.state !== "idle"}
             className="h-9 px-4 rounded-md bg-ih-bg-muted text-ih-fg-1 font-semibold text-[13px] border border-ih-border">{m.common_save()}</button>
         </div>

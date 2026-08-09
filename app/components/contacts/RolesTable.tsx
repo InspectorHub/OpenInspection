@@ -46,7 +46,7 @@ export function RolesTable({
           type="button"
           aria-label={m.contacts_roles_matrix_open_aria()}
           onClick={() => setMatrixOpen((v) => !v)}
-          className="h-7 w-7 rounded-full border border-ih-border text-ih-fg-muted text-sm font-semibold hover:text-ih-fg-1 hover:border-ih-fg-muted transition-colors"
+          className="h-7 w-7 rounded-full border border-ih-border text-ih-fg-3 text-sm font-semibold hover:text-ih-fg-1 hover:border-ih-border-strong transition-colors"
         >
           ?
         </button>

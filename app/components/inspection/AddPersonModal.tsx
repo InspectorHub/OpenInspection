@@ -300,7 +300,7 @@ export function AddPersonModal({
         )}
 
         {alreadyPresent && (
-          <p role="status" className="text-[12px] text-ih-fg-2 bg-ih-status-watch-bg border border-ih-border rounded-md px-3 py-2">
+          <p role="status" className="text-[12px] text-ih-fg-2 bg-ih-watch-bg border border-ih-border rounded-md px-3 py-2">
             {m.inspections_hub_people_already_present({
               name: selectedContact?.name ?? (newName.trim() || m.inspections_hub_people_this_contact()),
             })}

@@ -383,7 +383,7 @@ function VariantRow({
     <div className="mt-2 flex items-center gap-1.5 flex-wrap">
       <span className="text-[11px] text-ih-fg-3 mr-0.5">{m.settings_msgtpl_languages_label()}</span>
       {group.variants.map((v) => (
-        <span key={v.id} className="inline-flex items-center rounded-md border border-ih-border bg-ih-bg-input">
+        <span key={v.id} className="inline-flex items-center rounded-md border border-ih-border bg-ih-bg-card">
           <button
             onClick={() => onEdit(v)}
             className="text-[11px] px-2 py-0.5 font-semibold text-ih-primary hover:underline"

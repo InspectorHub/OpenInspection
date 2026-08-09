@@ -192,7 +192,7 @@ export function TemplateEditorModal({
               id="tpl-locale"
               value={locale}
               onChange={(e) => setLocale(e.target.value)}
-              className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1"
+              className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1"
             >
               {SUPPORTED_CONTACT_LOCALES.map((l) => (
                 <option key={l} value={l}>{localeLabel(l)}</option>
@@ -219,7 +219,7 @@ export function TemplateEditorModal({
             // here would silently create an unrelated template that no send
             // path would ever fall back to.
             readOnly={prefill !== null}
-            className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 read-only:text-ih-fg-3"
+            className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 read-only:text-ih-fg-3"
           />
         </div>
 
@@ -237,7 +237,7 @@ export function TemplateEditorModal({
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder={m.settings_msgtpl_subject_placeholder()}
-              className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
+              className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
             />
           </div>
         )}
@@ -258,7 +258,7 @@ export function TemplateEditorModal({
                   key={v}
                   type="button"
                   onClick={() => insertVariable(v)}
-                  className="text-[11px] px-1.5 py-0.5 rounded border border-ih-border bg-ih-bg-input text-ih-primary font-mono hover:bg-ih-primary-tint transition-colors"
+                  className="text-[11px] px-1.5 py-0.5 rounded border border-ih-border bg-ih-bg-card text-ih-primary font-mono hover:bg-ih-primary-tint transition-colors"
                 >
                   {`{{${v}}}`}
                 </button>
@@ -276,7 +276,7 @@ export function TemplateEditorModal({
                 ? "Hi {{inspector_name}}, your report for {{address}} is ready."
                 : "Hi {{name}}, your report is ready: {{link}}"
             }
-            className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 resize-y focus:outline-none focus:border-ih-primary"
+            className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 resize-y focus:outline-none focus:border-ih-primary"
           />
           {!isEmail && (
             <p className="text-[11px] text-ih-fg-3 mt-1">
@@ -346,7 +346,7 @@ export function TemplateEditorModal({
                 }}
                 placeholder={isEmail ? m.settings_msgtpl_to_email_placeholder() : m.settings_msgtpl_to_phone_placeholder()}
                 type={isEmail ? "email" : "tel"}
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
+                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
               />
             </div>
             <fetcher.Form method="post">
