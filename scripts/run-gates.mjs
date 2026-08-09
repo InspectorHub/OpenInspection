@@ -32,6 +32,7 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 /** Gates that are plain node scripts in this repo. */
 const SCRIPT_GATES = [
     { key: 'ds', label: 'DS token conformance', script: 'check-ds-tokens.mjs', fix: 'npm run lint:ds' },
+    { key: 'contrast', label: 'Small-text WCAG AA contrast', script: 'check-contrast.mjs', fix: 'npm run lint:contrast' },
     { key: 'svg', label: 'SVG dimensions', script: 'check-svg-dimensions.mjs', fix: 'npm run lint:svg' },
     { key: 'migrefs', label: 'Migration-reference hygiene', script: 'check-migration-refs.mjs', fix: 'npm run lint:migrefs' },
     { key: 'filesize', label: 'Large-file ratchet', script: 'check-file-size.mjs', fix: 'npm run lint:filesize' },

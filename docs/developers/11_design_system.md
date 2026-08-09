@@ -203,6 +203,18 @@ route files.
 `Eyebrow` and `PageHeader`'s `eyebrow`/`eyebrowColor` props are deprecated but
 still shipped for back-compat — don't use them on new pages.
 
+### Helper text: `ih-fg-3`, never `ih-fg-4`
+
+Hints, descriptions and other 11px small print use **`text-ih-fg-3`**.
+`ih-fg-4` is a *decoration* tier — chevrons, dividers, offline dots,
+placeholders — not a text tier: at 11px it measures 2.56:1 on a light card and
+3.07:1 on a dark one, against WCAG AA's 4.5:1 for normal-size text. `ih-fg-3`
+clears it in all three themes (4.76:1 light, 5.71:1 dark, 12.02:1 field).
+
+`lint:ds` cannot see this — it validates token *names*, and `ih-fg-4` is a
+legitimate name. `npm run lint:contrast` (`scripts/check-contrast.mjs`) does the
+arithmetic instead, and runs in pre-commit and CI.
+
 ---
 
 ## 4. Interaction patterns

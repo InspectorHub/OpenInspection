@@ -167,8 +167,10 @@ export function FileDropzone({
             <span className="text-[13px] font-bold text-ih-fg-2" title={fileName ?? undefined}>
               {truncateMiddle(fileName ?? "", 34)}
             </span>
+            {/* fg-3 like the `hint` line below — same 11px normal-size text,
+                same 4.5:1 requirement (see lint:contrast). */}
             {typeof fileSize === "number" && (
-              <span className="text-[11px] text-ih-fg-4">{formatFileSize(fileSize)}</span>
+              <span className="text-[11px] text-ih-fg-3">{formatFileSize(fileSize)}</span>
             )}
             {onClear && (
               <button
