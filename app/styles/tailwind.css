@@ -286,6 +286,45 @@ html[data-color-scheme="field"] {
 .ih-pill--defect { background: var(--ih-status-bad-bg); color: var(--ih-status-bad-fg); }
 .ih-pill--ni { background: var(--ih-bg-muted); color: var(--ih-fg-3); }
 
+/* ── Agreement body typography (#67) ──
+   The ONE place the shape of an agreement is described, shared by the editor
+   (`AgreementRichText`) and by every surface that renders a stored agreement,
+   so an author and a signer see the same document.
+
+   It exists because those render surfaces asked for `prose prose-sm`, and
+   `@tailwindcss/typography` is not installed — the classes matched no rule at
+   all. Under Tailwind's preflight reset that left `<h2>` and `<h3>` at body
+   size and weight and `<ul>`/`<ol>` with no marker and no indent, so an
+   agreement's headings and lists were invisible on the very page a client signs
+   it, while both sanitizers went on carefully permitting those tags.
+
+   Kept to exactly the tags `sanitizeAgreementHtml()` allows: adding a rule here
+   for anything else would describe markup that cannot survive to the page. */
+.ih-agreement-prose > * + * { margin-top: 0.75em; }
+.ih-agreement-prose h2 {
+  font-size: 1.125em;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ih-fg-1);
+}
+.ih-agreement-prose h3 {
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ih-fg-1);
+}
+.ih-agreement-prose h2 + *,
+.ih-agreement-prose h3 + * { margin-top: 0.35em; }
+.ih-agreement-prose ul,
+.ih-agreement-prose ol { padding-left: 1.5em; }
+.ih-agreement-prose ul { list-style: disc; }
+.ih-agreement-prose ol { list-style: decimal; }
+.ih-agreement-prose li { display: list-item; }
+.ih-agreement-prose li + li { margin-top: 0.25em; }
+.ih-agreement-prose strong { font-weight: 700; }
+.ih-agreement-prose em { font-style: italic; }
+.ih-agreement-prose u { text-decoration: underline; }
+
 /* ── Row hover-reveal pattern §3.6 ── */
 .ih-row .ih-row__hover { opacity: 0; transition: opacity 140ms; }
 .ih-row:hover .ih-row__hover,

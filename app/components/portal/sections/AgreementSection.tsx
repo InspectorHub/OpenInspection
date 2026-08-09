@@ -215,8 +215,13 @@ export function AgreementSection({
           data-testid="agreement-body"
           className="px-6 py-6 sm:px-10 sm:py-8 border-b border-ih-border max-h-96 overflow-y-auto"
         >
+          {/* `ih-agreement-prose`, not `prose prose-sm`: this project has no
+              @tailwindcss/typography, so those two classes matched no rule and
+              the agreement's headings and lists rendered flat — on the page
+              where a client signs it. The shared class is defined once in
+              app/styles/tailwind.css and used by the editor too. */}
           <SanitizedHtml
-            className="prose prose-sm max-w-none text-ih-fg-3 leading-relaxed"
+            className="ih-agreement-prose max-w-none text-ih-fg-3 leading-relaxed"
             html={agreement.agreementContent}
           />
         </div>

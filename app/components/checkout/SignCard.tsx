@@ -134,7 +134,11 @@ export function SignCard({
                 className="px-6 py-5 sm:px-8 border-b border-ih-border max-h-72 overflow-y-auto"
             >
                 <SanitizedHtml
-                    className="prose prose-sm max-w-none text-ih-fg-3 leading-relaxed"
+                    // `ih-agreement-prose`, not the `prose prose-sm` that was
+                    // here: @tailwindcss/typography is not installed, so those
+                    // classes matched nothing and the agreement's headings and
+                    // lists rendered flat. Shared with the editor.
+                    className="ih-agreement-prose max-w-none text-ih-fg-3 leading-relaxed"
                     html={content}
                 />
             </div>

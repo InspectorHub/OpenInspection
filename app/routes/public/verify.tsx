@@ -135,7 +135,11 @@ function VerifyBody() {
         </div>
       ) : (
         <SanitizedHtml
-          className="prose prose-sm max-w-none rounded-lg border border-ih-border bg-ih-bg-card p-4 text-[13px] text-ih-fg-2 leading-relaxed mb-6"
+          // `ih-agreement-prose` — `prose prose-sm` matched no rule here
+          // (@tailwindcss/typography is not installed). This box shows the
+          // exact snapshot that was signed, so it above all must render the
+          // document's structure rather than flatten it.
+          className="ih-agreement-prose max-w-none rounded-lg border border-ih-border bg-ih-bg-card p-4 text-[13px] text-ih-fg-2 leading-relaxed mb-6"
           html={result.contentSnapshot}
         />
       )}

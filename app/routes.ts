@@ -109,6 +109,7 @@ export default [
   // app/; this is the only front door to them.
   route("resources/inspection-cancellation", "routes/resources/inspection-cancellation.tsx"),
   route("resources/agreement-signers", "routes/resources/agreement-signers.tsx"),
+  route("resources/agreement-templates", "routes/resources/agreement-templates.tsx"),
   route("resources/team-members", "routes/resources/team-members.tsx"),
   route("resources/contact-access", "routes/resources/contact-access.tsx"),
   route("resources/template-search", "routes/resources/template-search.tsx"),
