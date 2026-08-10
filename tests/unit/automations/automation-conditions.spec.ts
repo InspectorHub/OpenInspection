@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -22,7 +23,7 @@ beforeEach(async () => {
         id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
-    await seedRoleProfiles(db, TENANT, new Date(1));
+    await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
     svc = new AutomationService({} as D1Database);
 });
 
@@ -30,7 +31,7 @@ describe('AutomationService create/update — conditions + channels (Track J/L)'
     it('serializes conditions to JSON and defaults channels to email-only', async () => {
         const row = await svc.create(TENANT, {
             name: 'Follow-up', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
-            delayMinutes: 1440, subjectTemplate: 's', bodyTemplate: 'b',
+            delayMinutes: 1440,
             conditions: { requirePaid: true, serviceIds: ['svc-1'] },
         });
         // Track L (Part A) — channels parsed on output; conditions stays a JSON string.
@@ -41,11 +42,11 @@ describe('AutomationService create/update — conditions + channels (Track J/L)'
     it('update can clear conditions and change channels', async () => {
         const created = await svc.create(TENANT, {
             name: 'R', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
-            delayMinutes: 0, subjectTemplate: 's', bodyTemplate: 'b',
+            delayMinutes: 0,
             conditions: { requireSigned: true },
         });
         const updated = await svc.update(TENANT, created.id, {
-            conditions: null, channels: ['email', 'sms'], smsBody: 'hi',
+            conditions: null, channels: ['email', 'sms'],
         });
         expect(updated.conditions).toBeNull();
         expect(updated.channels).toEqual(['email', 'sms']);

@@ -122,9 +122,14 @@ async function networkFirstWithCacheFallback(request) {
     return response;
   } catch {
     const cached = await cache.match(request);
+    // ⚠️ `charset=utf-8` is load-bearing. The em-dash below is two UTF-8 bytes,
+    // and a `text/plain` response with no charset is decoded with the browser's
+    // legacy default — which rendered this sentence as "Offline 钦� please
+    // reconnect to continue." on a machine with a CJK locale. Found by reading
+    // the offline page in a browser; nothing in the source looks wrong.
     return cached || new Response('Offline — please reconnect to continue.', {
       status: 503,
-      headers: { 'Content-Type': 'text/plain' },
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
   }
 }

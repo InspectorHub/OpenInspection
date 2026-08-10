@@ -72,7 +72,7 @@ export function ConnectionTestStatus({
 
   if (mine.length === 0) {
     return (
-      <span className="text-[11px] text-ih-fg-4" aria-live="polite">
+      <span className="text-[11px] text-ih-fg-3" aria-live="polite">
         {m.settings_conn_status_not_tested()}
       </span>
     );

@@ -84,7 +84,7 @@ export function VideoIntegrationPanel({
       </div>
 
       {/* Info callout */}
-      <div className="rounded-md bg-ih-bg-muted border border-ih-border px-4 py-3 text-[12px] text-ih-fg-3 leading-relaxed">
+      <div className="rounded-md bg-ih-bg-muted border border-ih-border px-4 py-3 text-[12px] text-ih-fg-2 leading-relaxed">
         <span className="font-semibold text-ih-fg-2">{m.settings_video_default_label()}</span> {m.settings_video_r2_desc()}{" "}
         <span className="font-semibold text-ih-fg-2">{m.settings_video_stream_label()}</span> {m.settings_video_stream_desc()}{" "}
         <span className="font-mono">STREAM</span> {m.settings_video_stream_binding()}{" "}
@@ -137,7 +137,7 @@ export function VideoIntegrationPanel({
               onChange={(e) => handleSubdomainChange(e.target.value)}
               placeholder={m.settings_video_subdomain_placeholder()}
               className={[
-                "w-full max-w-sm h-9 px-3 rounded-md border text-[13px] font-mono bg-ih-bg-input text-ih-fg-1 placeholder:text-ih-fg-4 outline-none transition-colors",
+                "w-full max-w-sm h-9 px-3 rounded-md border text-[13px] font-mono bg-ih-bg-card text-ih-fg-1 placeholder:text-ih-fg-4 outline-none transition-colors",
                 subdomainError
                   ? "border-ih-bad focus:ring-1 focus:ring-ih-bad"
                   : "border-ih-border focus:border-ih-primary focus:ring-1 focus:ring-ih-primary",

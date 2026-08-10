@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
@@ -300,7 +301,7 @@ describe('WH-2 Telnyx delivery-status receiver', () => {
 describe('WH-2 send-path id-stamping (recordSentStatus)', () => {
     it('seeds a sent status row keyed on the returned id', async () => {
         const id = 'SM_seeded';
-        await recordSentStatus(db, TENANT, id, 1_700_000_000_000);
+        await recordSentStatus(asD1Db(db), TENANT, id, 1_700_000_000_000);
         const row = await statusRow(id);
         expect(row?.status).toBe('sent');
         expect(row?.providerMessageId).toBe(id);

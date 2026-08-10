@@ -90,6 +90,19 @@ jobs:
           key: rr-typegen-${{ hashFiles('app/routes.ts', 'app/routes/**', 'react-router.config.ts', 'package-lock.json') }}
       - run: npx react-router typegen
       - run: npm run type-check:app
+      # Also HERE rather than in its own job, and for the same arithmetic as
+      # `test:types` below. `tsconfig.tests.json` is the program for
+      # `tests/unit/**` + `tests/workers/**` — 785 files that no tsc program
+      # compiled at all before it existed. It REFERENCES the api project rather
+      # than joining it, so the `tsc -b` on the line above has already built
+      # everything it consumes: what is left is one up-to-date check plus the
+      # specs themselves.
+      #
+      # ⚠️ Do NOT move this into `tsconfig.api.json`'s include instead. That
+      # project is composite and is a reference of the app program, so
+      # `type-check:app` would build those 785 files FIRST — every pure-frontend
+      # commit would pay for the spec tree, and so would this job's first step.
+      - run: npm run type-check:tests
       # Runs HERE rather than in its own job. `test:types` only checks four
       # `*.spec-d.ts` files, but its tsconfig references the api project, and
       # `tsc -b` has already built that one line above — so this costs ~6s

@@ -21,6 +21,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // eslint-disable-next-line import/order
 import agentNotificationPreferenceRoutes from '../../../server/api/agent/notification-preferences';
+import type { Role } from '../../../server/lib/auth/roles';
 
 const AGENT = 'ag1';
 const ACME = 't-acme';
@@ -29,7 +30,7 @@ const BOLT = 't-bolt';
 let db: BetterSQLite3Database<typeof schema>;
 let sqlite: { close: () => void };
 
-function buildApp(role = 'agent', sub = AGENT) {
+function buildApp(role: Role = 'agent', sub = AGENT) {
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => {
         if (err instanceof AppError) {

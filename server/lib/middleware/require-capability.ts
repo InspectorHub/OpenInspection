@@ -9,6 +9,7 @@ import {
 } from '../auth/capabilities';
 import { isRole } from '../auth/roles';
 import { users } from '../db/schema';
+import type { HonoConfig } from '../../types/hono';
 
 /**
  * Resolve the acting user's permission_overrides FRESH from the tenant-scoped
@@ -72,7 +73,11 @@ export const requireCapability = (
     cap: Capability,
     resolveOverrides: OverrideResolver = resolveOverridesFromDb,
 ) => {
-    const handler = async (c: Context, next: Next) => {
+    // `Context<HonoConfig>` is load-bearing — see the note on requireRole in
+    // ./rbac.ts. An unannotated `Context` here defaults its Env generic to
+    // `any`, which `.openapi()` folds into the handler Env and collapses `c`
+    // to `Context<any>` on every route that mounts this guard.
+    const handler = async (c: Context<HonoConfig>, next: Next) => {
         const caps = await capabilitiesFor(c, resolveOverrides);
         if (!caps[cap]) {
             throw Errors.Forbidden(`Requires the '${cap}' capability`);

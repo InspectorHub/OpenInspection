@@ -21,6 +21,7 @@ import { buildNotificationPreferences, isPreferenceMuted } from '../../../server
 import { EmailBaseService } from '../../../server/services/email/base';
 // eslint-disable-next-line import/order
 import { assembleTenantEmailService, type EmailServiceEnv } from '../../../server/lib/email/build-email-service';
+import { recordingEmailProvider } from '../helpers/email-provider';
 
 const TENANT = 't-pref';
 const ADDR = 'jo@example.com';
@@ -163,7 +164,7 @@ describe('send boundary honours the port', () => {
         constructor(prefs?: { isMuted(c: string, e: string): Promise<boolean> }) {
             const sent: string[][] = [];
             super('re_test', 'from@x.com', 'Acme', undefined, undefined, undefined,
-                { sendEmail: async (m: { to: string[] }) => { sent.push(m.to); return { ok: true as const, id: 'm1' }; } },
+                recordingEmailProvider(sent),
                 undefined, undefined, prefs);
             this.sent = sent;
         }

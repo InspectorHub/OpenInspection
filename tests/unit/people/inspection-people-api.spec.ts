@@ -21,6 +21,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 import peopleRoutes from '../../../server/api/inspections/people';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT_ID = '00000000-0000-0000-0000-000000000001';
 const OTHER_TENANT_ID = '00000000-0000-0000-0000-000000000002';
@@ -71,8 +72,8 @@ describe('/api/inspections/:id/people', () => {
             { id: TENANT_ID, name: 'Test Tenant', slug: 'test', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
             { id: OTHER_TENANT_ID, name: 'Other Tenant', slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ] as never);
-        await seedRoleProfiles(testDb, TENANT_ID, new Date(1));
-        await seedRoleProfiles(testDb, OTHER_TENANT_ID, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT_ID, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), OTHER_TENANT_ID, new Date(1));
 
         await testDb.insert(schema.inspections).values({
             id: INSPECTION_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', date: '2026-07-20',

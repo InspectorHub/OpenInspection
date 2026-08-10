@@ -5,7 +5,12 @@ import { services, inspectionServices } from '../db/schema';
 /** One service the caller asked for, with an optional per-line reprice. */
 export interface ServiceSelection {
     serviceId: string;
-    priceOverrideCents?: number;
+    // `| undefined` is deliberate: every producer is a Zod `.optional()` field,
+    // which is `number | undefined`, and under exactOptionalPropertyTypes a bare
+    // `?: number` rejects that. Consumers all test `!== undefined` / `?? null`, so
+    // "key omitted" and "key present, undefined" already mean the same thing —
+    // no override on this line.
+    priceOverrideCents?: number | undefined;
 }
 
 /** The rows written, in catalog-row order. */

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
@@ -95,7 +96,7 @@ describe('POST /api/inspections/:id/agreement-requests (Task 7, #111)', () => {
         });
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT,
-            propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@example.com',
+            propertyAddress: '1 Main St',
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
@@ -104,7 +105,7 @@ describe('POST /api/inspections/:id/agreement-requests (Task 7, #111)', () => {
         // instead of the legacy clientName/clientEmail columns above. Seed a
         // matching primary-client contact so the "happy path" default-recipient
         // tests keep resolving to Jane / jane@example.com.
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values({
             id: CLIENT_CONTACT_ID, tenantId: TENANT, type: 'client', name: 'Jane',
             email: 'jane@example.com', createdAt: new Date(),
@@ -222,7 +223,7 @@ describe('POST /api/inspections/:id/agreement-requests (Task 7, #111)', () => {
         });
         await db.insert(schema.inspections).values({
             id: 'insp-other', tenantId: OTHER, propertyAddress: 'X',
-            clientName: null, clientEmail: 'x@y.com', date: '2026-06-01', status: 'requested',
+            date: '2026-06-01', status: 'requested',
             paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
         const res = await send(`/api/inspections/insp-other/agreement-requests`, '{}');

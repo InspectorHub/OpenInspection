@@ -188,7 +188,7 @@ export function RatingSystemEditor({
         {/* Identity */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5">{m.rating_editor_name_label()}</label>
+            <label className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-3 mb-1.5">{m.rating_editor_name_label()}</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -196,11 +196,11 @@ export function RatingSystemEditor({
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
             {name.trim() && (
-              <p className="mt-1 text-[11px] text-ih-fg-4 font-mono">/{effectiveSlug || "…"}</p>
+              <p className="mt-1 text-[11px] text-ih-fg-3 font-mono">/{effectiveSlug || "…"}</p>
             )}
           </div>
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5">{m.rating_editor_description_label()} <span className="font-medium normal-case tracking-normal text-ih-fg-4">{m.rating_editor_optional()}</span></label>
+            <label className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-3 mb-1.5">{m.rating_editor_description_label()} <span className="font-medium normal-case tracking-normal text-ih-fg-4">{m.rating_editor_optional()}</span></label>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -213,18 +213,18 @@ export function RatingSystemEditor({
         {/* Levels */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4">
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-3">
               {m.rating_editor_levels_heading()} <span className="text-ih-fg-4 font-mono normal-case tracking-normal">· {levels.length}</span>
             </span>
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-ih-fg-4 mr-1">{m.rating_editor_start_from()}</span>
+              <span className="text-[11px] text-ih-fg-3 mr-1">{m.rating_editor_start_from()}</span>
               {PRESETS.map((p) => (
                 <Button
                   key={p.name}
                   variant="secondary"
                   size="sm"
                   onClick={() => setLevels(p.levels.map((l) => ({ ...l })))}
-                  className="h-6 px-2 text-[11px] text-ih-primary hover:bg-ih-primary-tint"
+                  className="h-6 px-2 text-[11px] text-ih-primary-text hover:bg-ih-primary-tint"
                 >
                   {p.name}
                 </Button>
@@ -339,7 +339,7 @@ export function RatingSystemEditor({
               variant="secondary"
               size="sm"
               onClick={() => setLevels((prev) => [...prev, blankLevel()])}
-              className="mt-2 w-full h-8 rounded-lg border-dashed text-[12px] text-ih-fg-3 hover:text-ih-primary hover:border-ih-primary"
+              className="mt-2 w-full h-8 rounded-lg border-dashed text-[12px] text-ih-fg-3 hover:text-ih-primary-text hover:border-ih-primary"
             >
               {m.rating_editor_add_level()}
             </Button>

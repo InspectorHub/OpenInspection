@@ -96,7 +96,7 @@ export function SendSmsModal({
         <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_send_sms_hint()}</p>
         {byKind.map(({ kind, rows }) => (
           <div key={kind}>
-            <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-1.5">
+            <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-1.5">
               {groupLabel(kind)}
             </p>
             <ul className="space-y-1">
@@ -118,12 +118,12 @@ export function SendSmsModal({
                       <span className="font-medium">{person.name}</span>
                       <span className="text-ih-fg-4"> · {person.roleLabel}</span>
                       {disabled && (
-                        <span className="block text-[11px] text-ih-fg-4">
+                        <span className="block text-[11px] text-ih-fg-3">
                           {m.inspections_hub_send_sms_no_phone_hint()}
                         </span>
                       )}
                       {!disabled && person.phone && (
-                        <span className="block text-[11px] text-ih-fg-4 tabular-nums">{person.phone}</span>
+                        <span className="block text-[11px] text-ih-fg-3 tabular-nums">{person.phone}</span>
                       )}
                     </label>
                   </li>
@@ -132,7 +132,7 @@ export function SendSmsModal({
             </ul>
           </div>
         ))}
-        {error && <p className="text-[12px] text-ih-danger" role="alert">{error}</p>}
+        {error && <p className="text-[12px] text-ih-bad-fg" role="alert">{error}</p>}
       </fetcher.Form>
     </Modal>
   );

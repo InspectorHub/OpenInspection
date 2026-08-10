@@ -165,10 +165,10 @@ export function AddPersonModal({
           </label>
           {selectedContact ? (
             <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-ih-primary bg-ih-primary-tint">
-              <span className="flex-1 text-[13px] font-medium text-ih-primary">
+              <span className="flex-1 text-[13px] font-medium text-ih-primary-text">
                 {selectedContact.name}
                 {selectedContact.email && (
-                  <span className="ml-1 text-ih-fg-4 font-normal text-[12px]">({selectedContact.email})</span>
+                  <span className="ml-1 text-ih-fg-3 font-normal text-[12px]">({selectedContact.email})</span>
                 )}
               </span>
               <button
@@ -187,7 +187,7 @@ export function AddPersonModal({
                 <button
                   type="button"
                   onClick={() => setCreateMode(false)}
-                  className="text-[12px] text-ih-fg-4 hover:text-ih-fg-2"
+                  className="text-[12px] text-ih-fg-2 hover:text-ih-fg-1"
                 >
                   {m.common_cancel()}
                 </button>
@@ -233,7 +233,7 @@ export function AddPersonModal({
               {dropdownOpen && (
                 <div className="absolute z-10 w-full mt-1 rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover overflow-hidden">
                   {searchFetcher.state === "submitting" || searchFetcher.state === "loading" ? (
-                    <p className="px-3 py-2 text-[12px] text-ih-fg-4">{m.inspections_hub_people_searching()}</p>
+                    <p className="px-3 py-2 text-[12px] text-ih-fg-3">{m.inspections_hub_people_searching()}</p>
                   ) : searchFetcher.data?.contacts && searchFetcher.data.contacts.length > 0 ? (
                     searchFetcher.data.contacts.map((c) => (
                       <button
@@ -243,11 +243,11 @@ export function AddPersonModal({
                         className="w-full text-left px-3 py-2 text-[13px] hover:bg-ih-bg-muted border-b border-ih-border last:border-b-0"
                       >
                         <span className="font-medium">{c.name}</span>
-                        {c.email && <span className="ml-2 text-ih-fg-4 text-[12px]">{c.email}</span>}
+                        {c.email && <span className="ml-2 text-ih-fg-3 text-[12px]">{c.email}</span>}
                       </button>
                     ))
                   ) : searchFetcher.data ? (
-                    <p className="px-3 py-2 text-[12px] text-ih-fg-4">{m.inspections_hub_people_no_contacts()}</p>
+                    <p className="px-3 py-2 text-[12px] text-ih-fg-3">{m.inspections_hub_people_no_contacts()}</p>
                   ) : null}
                 </div>
               )}
@@ -257,7 +257,7 @@ export function AddPersonModal({
             <button
               type="button"
               onClick={() => setCreateMode(true)}
-              className="mt-2 text-[12px] font-medium text-ih-primary hover:underline"
+              className="mt-2 text-[12px] font-medium text-ih-primary-text hover:underline"
             >
               {m.inspections_hub_people_create_new()}
             </button>
@@ -293,14 +293,14 @@ export function AddPersonModal({
             (IA-100). Saying "they will need an account" would be false, and
             worse, it would read as a barrier that does not exist. */}
         {grantsAccess && (
-          <p className="text-[12px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md px-3 py-2">
+          <p className="text-[12px] text-ih-fg-2 bg-ih-bg-muted border border-ih-border rounded-md px-3 py-2">
             {m.inspections_hub_people_access_notice()}{" "}
             <span className="text-ih-fg-4">{m.inspections_hub_people_access_revoke_hint()}</span>
           </p>
         )}
 
         {alreadyPresent && (
-          <p role="status" className="text-[12px] text-ih-fg-2 bg-ih-status-watch-bg border border-ih-border rounded-md px-3 py-2">
+          <p role="status" className="text-[12px] text-ih-fg-2 bg-ih-watch-bg border border-ih-border rounded-md px-3 py-2">
             {m.inspections_hub_people_already_present({
               name: selectedContact?.name ?? (newName.trim() || m.inspections_hub_people_this_contact()),
             })}

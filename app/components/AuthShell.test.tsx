@@ -5,7 +5,7 @@ import { AuthShell } from '~/components/AuthShell';
 
 describe('AuthShell', () => {
   it('renders the heading and children', () => {
-    const { getByRole, getByText } = render(
+    const { getByRole } = render(
       <AuthShell heading="Reset your password">
         <button type="submit">Send reset link</button>
       </AuthShell>,

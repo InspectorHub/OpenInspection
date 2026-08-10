@@ -235,7 +235,7 @@ export function PayRuleWidget({ serviceId, rules, members }: PayRuleWidgetProps)
                     <button
                         type="button"
                         onClick={() => setOpen(true)}
-                        className="text-[12px] font-semibold text-ih-primary hover:underline"
+                        className="text-[12px] font-semibold text-ih-primary-text hover:underline"
                     >
                         {m.settings_pay_rule_change_link()}
                     </button>
@@ -280,7 +280,7 @@ export function PayRuleWidget({ serviceId, rules, members }: PayRuleWidgetProps)
                             <button
                                 type="button"
                                 onClick={() => setAdding(true)}
-                                className="text-[12px] font-semibold text-ih-primary hover:underline"
+                                className="text-[12px] font-semibold text-ih-primary-text hover:underline"
                             >
                                 {m.settings_pay_rule_add()}
                             </button>

@@ -14,6 +14,7 @@ import { auditFromContext, writeAuditLogWithSlug } from '../../../server/lib/aud
 import { ERASURE_MANIFEST } from '../../../server/lib/compliance/erasure-manifest';
 import { runErasure } from '../../../server/lib/compliance/erasure-orchestrator';
 import { createTestDb, setupSchema } from '../db';
+import { asAnyDb } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { Context } from 'hono';
@@ -152,7 +153,7 @@ describe('audit metadata never becomes a PII store', () => {
             },
         ]);
 
-        await runErasure(testDb, { tenantId: TENANT, subjectEmail: SUBJECT, retentionYears: 6 });
+        await runErasure(asAnyDb(testDb), { tenantId: TENANT, subjectEmail: SUBJECT, retentionYears: 6 });
 
         const rows = await testDb.select().from(schema.auditLogs).all();
         const subjectRow = rows.find((r) => r.id === 'a1')!;

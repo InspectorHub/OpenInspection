@@ -31,10 +31,11 @@ consume tokens, not literal colors — dark mode is then "free": swapping the
 
 | Token | Purpose |
 |---|---|
-| `--color-ih-primary` / `-600` / `-700` | Brand color + hover/active shades |
+| `--color-ih-primary` / `-600` / `-700` | Brand color + hover/active shades. The **FILL** role: button and accent-bar backgrounds. A tenant's brand color lands here verbatim |
+| `--color-ih-primary-text` | The **TEXT** role: links, tab labels, brand-colored glyphs. Equal to `--color-ih-primary` by default, but when a tenant sets a brand color this one is derived — the same hue and saturation, moved along the lightness axis until it clears 4.5:1 on the card (darker on light themes, lighter on dark). 63.6% of sRGB fails AA as text on white, so the two roles cannot share one value. Use `text-ih-primary` **only** where the brand is the fill of the thing being colored, e.g. a checkbox accent |
 | `--color-ih-primary-tint` | Low-opacity primary wash (selected tab pill, badges) |
 | `--color-ih-primary-glow` | Focus-ring glow color (see `shadow-ih-focus`) |
-| `--color-ih-primary-fg` | Foreground for content on `bg-ih-primary`; defaults to white, but flips to dark text per-surface when a bright custom brand color is set (YIQ contrast pick) |
+| `--color-ih-primary-fg` | Foreground for content on `bg-ih-primary`; defaults to white, but flips to dark text per-surface when a bright custom brand color is set. Chosen by measuring both candidates' real WCAG ratios and taking the higher — 6.7% of sRGB admits no passing choice at all, so this is a best-effort token, not a guarantee |
 | `--color-ih-fg-1` … `-5` | Text scale from near-black/white (`-1`, headings/body) down to faint (`-5`, disabled/hairline) |
 | `--color-ih-fg-inverse` | Text on an inverted surface (`bg-ih-bg-inverse`, `bg-ih-primary`) |
 | `--color-ih-bg-app` | Page background |
@@ -134,12 +135,21 @@ and borders for higher contrast.
    — every token needs a value in both, or dark mode silently falls back to
    the light value.
 2. Expose it as a Tailwind utility by adding a matching line to the `@theme`
-   block (`--color-ih-foo: var(--ih-foo);`).
+   block (`--color-ih-foo: var(--ih-foo);`). **Step 2 is not optional.**
+   Without it `bg-ih-foo` is not an error — Tailwind emits no CSS for it and
+   says nothing, so the element paints no background in every theme. Ten alias
+   names shipped in that state, one of them at 17 call sites.
 3. Consume it as `bg-ih-foo` / `text-ih-foo` / etc. Never reference the raw
    `--ih-foo` CSS variable directly from a component unless there is no
    Tailwind utility surface for it (e.g. inline `style={{ boxShadow: ... }}`).
-4. Run `npm run lint:ds` — new raw palette usage elsewhere won't be caught by
-   adding a token, but it confirms you haven't introduced a violation.
+   Mind the namespace: `bg-`/`text-`/`border-` read `--color-*`, `rounded-`
+   reads `--radius-*`, `p-`/`gap-` read `--spacing-*`, `shadow-` reads
+   `--shadow-*`. `ih-card` exists in three of those, so `shadow-ih-card`
+   resolves and `bg-ih-card` does not.
+4. Run `npm run lint:ds`. It fails on an `ih-*` alias with no `@theme` entry
+   (step 2 above) and on raw palette classes. It has nothing to say about what
+   the token is WORTH — `npm run lint:contrast` is the gate that does the
+   arithmetic.
 
 ---
 
@@ -202,6 +212,18 @@ route files.
 
 `Eyebrow` and `PageHeader`'s `eyebrow`/`eyebrowColor` props are deprecated but
 still shipped for back-compat — don't use them on new pages.
+
+### Helper text: `ih-fg-3`, never `ih-fg-4`
+
+Hints, descriptions and other 11px small print use **`text-ih-fg-3`**.
+`ih-fg-4` is a *decoration* tier — chevrons, dividers, offline dots,
+placeholders — not a text tier: at 11px it measures 2.56:1 on a light card and
+3.07:1 on a dark one, against WCAG AA's 4.5:1 for normal-size text. `ih-fg-3`
+clears it in all three themes (4.76:1 light, 5.71:1 dark, 12.02:1 field).
+
+`lint:ds` cannot see this — it validates token *names*, and `ih-fg-4` is a
+legitimate name. `npm run lint:contrast` (`scripts/check-contrast.mjs`) does the
+arithmetic instead, and runs in pre-commit and CI.
 
 ---
 

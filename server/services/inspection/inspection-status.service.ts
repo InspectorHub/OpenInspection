@@ -44,6 +44,19 @@ export class InspectionStatusService extends InspectionSubService {
         await fireAutomation(this.db, tenantId, id, 'inspection.cancelled');
     }
 
+    /**
+     * The only writer that takes an inspection OUT of `cancelled` (#81).
+     *
+     * Clears `cancel_reason` / `cancel_notes` with the move: they describe a
+     * cancellation that no longer stands, and a live inspection carrying
+     * "no_show" is a lie that outlives the mistake.
+     *
+     * The MONEY does not come back. A kept fee and an issued refund are ledger
+     * facts, reversed by an invoice adjustment, not by re-scheduling the job.
+     * No automation fires either — there is no `inspection.uncancelled` trigger
+     * to fire, and re-sending the client a "your inspection is booked" notice
+     * off a correction is not what any of the existing rules mean.
+     */
     async uncancelInspection(tenantId: string, id: string): Promise<void> {
         const { db, inspection } = await this.fetchForStatusChange(tenantId, id);
         if (inspection.status !== INSPECTION_STATUS.CANCELLED) throw Errors.BadRequest('Inspection is not cancelled');

@@ -1,6 +1,29 @@
 import { describe, it, expect } from 'vitest';
 import { shareViewModel } from '~/routes/public/repair-request.$shareToken';
 import { builderCreditTotal, sortDefects, toggleSelected } from '~/routes/public/repair-builder.$tenant.$id';
+import type { Defect } from '~/components/portal/sections/RepairBuilderSection';
+
+/**
+ * One defect as the builder receives it. `sortDefects` reads sectionTitle,
+ * category and severityBucket only; the rest are snapshot fields (IA-42/55/57)
+ * that exist on every real row, so defaulting them here keeps the sort cases
+ * about the sort.
+ */
+function defect(over: Partial<Defect> & Pick<Defect, 'findingKey'>): Defect {
+  return {
+    sectionId: 's',
+    sectionTitle: 'Roof',
+    itemId: 'i',
+    itemLabel: 'Shingles',
+    defectTitle: 'Worn shingles',
+    location: null,
+    comment: 'worn',
+    category: 'safety',
+    severityBucket: 'defect',
+    trade: null,
+    ...over,
+  };
+}
 
 describe('shareViewModel', () => {
   it('formats credit total and lists items', () => {
@@ -23,7 +46,9 @@ describe('shareViewModel', () => {
   });
 
   it('not_published flag renders a not-published state', () => {
-    const m = shareViewModel({ notPublished: true } as any);
+    // Uncast: every field on ShareApiData is optional, so this is already a
+    // legal argument — and the other five calls in this file pass one.
+    const m = shareViewModel({ notPublished: true });
     expect(m.state).toBe('not_published');
   });
 
@@ -124,9 +149,9 @@ describe('repair-builder helpers', () => {
 
   it('sortDefects by section groups on sectionTitle alphabetically', () => {
     const defects = [
-      { findingKey: 'k1', sectionId: 's1', sectionTitle: 'Roof', itemId: 'i1', itemLabel: 'Shingles', comment: 'worn', category: 'safety' as const },
-      { findingKey: 'k2', sectionId: 's2', sectionTitle: 'Attic', itemId: 'i2', itemLabel: 'Insulation', comment: 'missing', category: 'recommendation' as const },
-      { findingKey: 'k3', sectionId: 's3', sectionTitle: 'Electrical', itemId: 'i3', itemLabel: 'Panel', comment: 'dated', category: 'maintenance' as const },
+      defect({ findingKey: 'k1', sectionId: 's1', sectionTitle: 'Roof', itemId: 'i1', itemLabel: 'Shingles', comment: 'worn', category: 'safety' }),
+      defect({ findingKey: 'k2', sectionId: 's2', sectionTitle: 'Attic', itemId: 'i2', itemLabel: 'Insulation', comment: 'missing', category: 'recommendation' }),
+      defect({ findingKey: 'k3', sectionId: 's3', sectionTitle: 'Electrical', itemId: 'i3', itemLabel: 'Panel', comment: 'dated', category: 'maintenance' }),
     ];
     const sorted = sortDefects(defects, 'section');
     expect(sorted[0].sectionTitle).toBe('Attic');

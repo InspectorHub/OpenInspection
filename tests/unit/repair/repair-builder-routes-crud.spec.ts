@@ -140,6 +140,10 @@ describe('POST .../lists/:rrId/items — add item', () => {
             category: null,
             trade: null,
             commentSnapshot: null,
+            // #275 — this is an EXHAUSTIVE object match on purpose: it is the one
+            // assertion in the suite that goes red when the route forgets to
+            // forward a newly added item field at all.
+            repairActionTag: null,
         });
     });
 

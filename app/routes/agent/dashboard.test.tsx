@@ -16,11 +16,19 @@ import { describe, it, expect } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { createRoutesStub, Outlet } from "react-router";
 
-import AgentDashboardPage from "~/routes/agent/dashboard";
+import AgentDashboardPage, { type loader } from "~/routes/agent/dashboard";
+import { asSelect } from "../../../tests/helpers/dom";
 
-const REFERRAL_I1 = {
+// Derived from the loader rather than from the first fixture. `typeof
+// REFERRAL_I1[]` made the fixture its own contract: it pinned reportStatus and
+// inspectorName to `string` (I1 happens to fill both) and repairAccess to the
+// literal "readwrite", so the null-bearing I2 and the "off"/"read" policy cases
+// below described referrals the route can never receive.
+type Referral = Awaited<ReturnType<typeof loader>>["referrals"][number];
+
+const REFERRAL_I1: Referral = {
   id: "i1",
-  repairAccess: "readwrite" as const,
+  repairAccess: "readwrite",
   tenantName: "Acme Inspections",
   tenantSlug: "acme",
   tenantTimezone: "UTC",
@@ -32,9 +40,9 @@ const REFERRAL_I1 = {
   inspectorName: "Bob Inspector",
 };
 
-const REFERRAL_I2 = {
+const REFERRAL_I2: Referral = {
   id: "i2",
-  repairAccess: "readwrite" as const,
+  repairAccess: "readwrite",
   tenantName: "Acme Inspections",
   tenantSlug: "acme",
   tenantTimezone: "UTC",
@@ -47,7 +55,7 @@ const REFERRAL_I2 = {
 };
 
 function renderDashboard(opts: {
-  referrals?: typeof REFERRAL_I1[];
+  referrals?: Referral[];
   welcomeInspectionId?: string | null;
   unreadReports?: number;
   agentTimezone?: string | null;
@@ -245,7 +253,7 @@ describe("AgentDashboardPage property/transaction grouping (IA-51)", () => {
     await findByTestId("referral-row-acme");
     await findByTestId("referral-row-best");
 
-    const filter = getByLabelText("Filter referrals by company") as HTMLSelectElement;
+    const filter = asSelect(getByLabelText("Filter referrals by company"));
     fireEvent.change(filter, { target: { value: "Best Inspect" } });
 
     expect(queryByTestId("referral-row-acme")).toBeNull();

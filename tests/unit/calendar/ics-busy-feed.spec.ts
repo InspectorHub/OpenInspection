@@ -42,13 +42,11 @@ describe('IcsService — inspector feeds', () => {
         await testDb.insert(schema.inspections).values([
             {
                 id: 'i1', tenantId: TENANT, propertyAddress: '1 Main St',
-                clientName: 'Sarah', clientEmail: 's@t.com',
                 date: '2026-06-01', status: 'confirmed', paymentStatus: 'unpaid',
                 price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
             },
             {
                 id: 'i2', tenantId: TENANT, propertyAddress: '2 Oak Ave',
-                clientName: 'Bob', clientEmail: 'b@t.com',
                 date: '2026-06-02', status: 'cancelled', paymentStatus: 'unpaid',
                 price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
             },
@@ -57,8 +55,8 @@ describe('IcsService — inspector feeds', () => {
         // left NULL on purpose: it is the frozen legacy column, and a feed that
         // reads it sees nothing here.
         await testDb.insert(schema.inspectionInspectors).values([
-            { id: 'ii1', tenantId: TENANT, inspectionId: 'i1', userId: USER, role: 'lead', createdAt: new Date() },
-            { id: 'ii2', tenantId: TENANT, inspectionId: 'i2', userId: USER, role: 'lead', createdAt: new Date() },
+            { tenantId: TENANT, inspectionId: 'i1', userId: USER, role: 'lead', createdAt: new Date() },
+            { tenantId: TENANT, inspectionId: 'i2', userId: USER, role: 'lead', createdAt: new Date() },
         ]);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -100,7 +98,7 @@ describe('IcsService — inspector feeds', () => {
 
         it('shows lead assignments only, not helper work', async () => {
             await testDb.insert(schema.inspectionInspectors).values({
-                id: 'ii3', tenantId: TENANT, inspectionId: 'i1', userId: HELPER,
+                tenantId: TENANT, inspectionId: 'i1', userId: HELPER,
                 role: 'helper', createdAt: new Date(),
             });
             const ics = await svc.busyFeedForInspector(TENANT, 'helper');

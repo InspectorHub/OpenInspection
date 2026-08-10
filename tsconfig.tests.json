@@ -1,0 +1,233 @@
+{
+    // Program for the SERVER-SIDE specs under `tests/` — `tests/unit/**` (the
+    // `test:unit` suite), `tests/workers/**` (`test:workers`), and the shared
+    // infra they import (`tests/{db,mocks,setup-client}.ts`, `tests/helpers/`,
+    // `tests/unit/{helpers,stubs}/`).
+    //
+    // ⚠️ SCOPE NOTE (kept current): this program is `tests/**` ONLY. The
+    // co-located web suite — `app/**/*.test.*` and
+    // `packages/shared-ui/src/**/*.test.*` — is compiled by tsconfig.json
+    // itself, not from here. Folding it in was measured and rejected: this
+    // program consumes api's `.d.ts`, and app specs import app SOURCE, which
+    // would drag `app/**` in as source and make this a second full app compile.
+    //
+    // ⚠️ BEFORE THIS FILE, NOTHING TYPE-CHECKED ANY OF IT. 753 files / ~101k
+    // lines were compiled by exactly zero tsc programs: tsconfig.json excluded
+    // `app/**/*.test.*` (it no longer does) and never mentioned `tests/`,
+    // tsconfig.api.json's
+    // include is `server/**` only, tsconfig.playwright.json is deliberately
+    // scoped to `tests/e2e`, and tsconfig.tests-typecheck.json takes only the
+    // four `*.spec-d.ts`. vitest strips types with esbuild and never checks
+    // them. The same hole is why `tests/**` sits in eslint's `ignores`: the
+    // type-aware parser refuses a file that belongs to no project, so building
+    // this program is also what unblocks linting those specs.
+    //
+    // WHY IT IS NOT PART OF tsconfig.api.json. That config is COMPOSITE and is a
+    // project reference of the app program, so `tsc -b tsconfig.json` builds it
+    // FIRST. Adding 753 root files there would put the entire spec tree on the
+    // critical path of every pure-frontend commit and of CI's `type-check (app)`
+    // job. This program REFERENCES api instead, which costs the app program
+    // nothing and costs this one one `stat` when server/ has not moved.
+    //
+    // ⚠️ `references` is NOT inherited through `extends`, and `tsc -p` does NOT
+    // build referenced projects — it expects their output to exist and fails
+    // TS6305 when it does not. `npm run type-check:tests` therefore runs
+    // `tsc -b tsconfig.api.json` first. Do not invoke this config directly.
+    // (Same contract as tsconfig.playwright.json and tsconfig.tests-typecheck.json.)
+    "extends": "./tsconfig.json",
+    "references": [{ "path": "./tsconfig.api.json" }],
+    "compilerOptions": {
+        // The base config's array is `["vite/client", "@cloudflare/workers-types"]`
+        // and the api config's is `["@types/node", "@cloudflare/vitest-pool-workers"]`.
+        // Neither side alone covers a spec tree: the specs are Node processes
+        // (`node:fs`, `node:crypto`, `process.env`) that assert on Workers types
+        // (`D1Database`, `R2Bucket`, `ExecutionContext`). Portal's
+        // tsconfig.api.json is the only array in either repo that already spans
+        // both, and it is the template for the first two entries here.
+        //
+        // `vitest/globals` is the third: `vitest.api.config.ts` sets
+        // `globals: true`, and 8 of the 753 files rely on that instead of
+        // importing from 'vitest'. Without it those 8 are a wall of TS2304 and
+        // the honest-looking fix is to edit specs — which Phase 0 does not do.
+        //
+        // `@cloudflare/vitest-pool-workers/types` is the fourth, and the
+        // SUBPATH matters. 18 specs under tests/workers/ import
+        // `cloudflare:test`; that module is declared in this package's
+        // `types/cloudflare-test.d.ts`, reachable only through its `./types`
+        // export condition. The bare package name — which is what
+        // tsconfig.api.json and tsconfig.tests-typecheck.json list — resolves to
+        // `dist/pool/index.d.mts` (the `defineWorkersConfig` helper) and leaves
+        // all 18 as TS2307. Measured both ways.
+        //
+        // `vite/client` is the fifth, and it is NOT decorative. Four specs
+        // import `workers/app.ts`, which reads `import.meta.env` — without this
+        // entry that is TS2339 in a file no spec author owns. (Same reason the
+        // `.react-router/types/+server-build.d.ts` line appears in `include`
+        // below: the other half of the same import.)
+        "types": [
+            "@types/node",
+            "@cloudflare/workers-types",
+            "@cloudflare/vitest-pool-workers/types",
+            "vitest/globals",
+            "vite/client"
+        ],
+        // `lib` keeps DOM from the base config on purpose. Specs carrying
+        // `// @vitest-environment happy-dom` touch `document`, `localStorage`
+        // and `IndexedDB`; they are ordinary members of the `test:unit` suite,
+        // not a separate program.
+        "noEmit": true,
+        "incremental": true,
+        // Its own build-info file. Sharing one with the app program makes each
+        // run look cold to the other — that is how a 20s check becomes a
+        // six-minute one with nothing in the diff to explain it.
+        "tsBuildInfoFile": "./.tsbuildinfo.tests",
+        // HEAP: `type-check:tests` caps this pass, and the tightness is the
+        // feature — same reasoning as tsconfig.playwright.json.
+        // MEASURED by bisection on the first single-process run (587 files,
+        // 15.7s): 512 MB OOMs, 768 MB passes. 1024 was the floor plus headroom.
+        //
+        // ⚠️ THE CAP MOVES AS THE RATCHET BURNS DOWN, and it moved once already.
+        // Phase 1 batch 1 took the list from 198 to 160, i.e. 587 -> 625 files.
+        // Re-measured COLD (build-info deleted, which is the only honest way —
+        // pre-commit runs warm, CI always runs cold): 1024 MB now OOMs, 1280 MB
+        // passes in 15.1s, 1536 MB passes in 15.6s. `package.json` must carry
+        // 1536 (floor plus the same headroom ratio as the original).
+        //
+        // Batch 2 took it 160 -> 105 (625 -> 680 spec files; 697 counting the
+        // shared infra under tests/). Re-bisected COLD at that size and the
+        // floor did NOT move: 1024 MB still OOMs, 1280 MB still passes, 1536 MB
+        // passes in 14.5s. `package.json` is unchanged and still correct. If a later
+        // batch reds this pass with `Ineffective mark-compacts near heap limit`
+        // and nothing in the diff explains it, this is why — bisect cold and
+        // move the number, do not reach for 4096, which is exactly the value at
+        // which a lost `references` (see below) stops being caught in seconds.
+        //
+        // Why not leave it generous: the failure this cap is really guarding
+        // against is losing `references` below. `references` is NOT inherited
+        // through `extends`, and when it goes missing this stops consuming the
+        // api project's `.d.ts` and starts SOURCE-COMPILING ~790 server files
+        // instead — which needs well over 2048 MB. At 1024 that mistake dies
+        // in seconds; at 4096 it might just get slower and pass.
+
+        // `paths` is re-declared in full because `extends` REPLACES the whole
+        // object rather than merging it: the base config's `~/*` and
+        // `@core/shared-ui` would be lost by adding `@core/api-types` alone.
+        //
+        // ⚠️ WHAT IS DELIBERATELY *NOT* MIRRORED HERE. `vitest.api.config.ts`
+        // registers three more aliases — `cloudflare:workers`,
+        // `@cloudflare/workers-oauth-provider` and `agents/mcp` — each pointing
+        // at a hand-written stub in `tests/unit/stubs/`. Those stubs exist
+        // because Node's ESM loader REJECTS the real modules at import time;
+        // they are runtime shims, not type shims. Mirroring them as `paths`
+        // would redirect the `.types/**/*.d.ts` this program consumes — which
+        // the api program already checked against the REAL types — onto a
+        // 22-line stub whose `DurableObject` has no `ctx: DurableObjectState`.
+        // The result is errors in generated declarations with no source to fix.
+        // Verified rather than assumed: zero files under `tests/` import any of
+        // the three; only the transitive `server/index.ts` graph does, and it
+        // arrives here pre-compiled. If a spec ever imports a stub directly,
+        // that is the moment to add the alias — and to accept the fallout above.
+        "paths": {
+            "~/*": ["./app/*"],
+            "@core/shared-ui": ["./packages/shared-ui/src/index.ts"],
+            "@core/api-types": ["./packages/api-types/index.ts"]
+        }
+    },
+    // ⚠️ INCLUDE IS THE WHOLE TREE, ON PURPOSE — the burn-down lives in
+    // `exclude`, not in a hand-picked include list. An include whitelist would
+    // let a NEW spec in a NEW domain silently escape coverage, which is exactly
+    // the bug this program exists to close. `tests/e2e/**` is the one structural
+    // subtraction: tsconfig.playwright.json owns it, at a 2048 MB cap it must
+    // keep meeting.
+    //
+    // `.react-router/types/+server-build.d.ts` is ONE generated file, not the
+    // whole `.react-router/types/**` tree the app program takes. It declares
+    // `virtual:react-router/server-build`, which `workers/app.ts` imports and
+    // four specs reach transitively. Taking the whole tree instead would pull
+    // every route module's `+types` — and through them `app/routes/**` as
+    // SOURCE, turning this program into a second app compile. It is generated
+    // by `react-router typegen`; when it is absent the pattern simply matches
+    // nothing and those four specs report TS2307, which is the honest signal.
+    "include": [
+        "worker-configuration.d.ts",
+        ".react-router/types/+server-build.d.ts",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+    ],
+    // ⚠️ THE ENTRIES AFTER THE STRUCTURAL FOUR ARE A BURN-DOWN RATCHET.
+    //
+    // HOW THEY WERE DERIVED, because it bounds how far to trust them. Phase 0
+    // was built on a machine that cannot hold two heavy compiles (15.8 GB, a
+    // second agent working concurrently), so this program was never run as one
+    // process. It was swept in tranches of ~100 files, each a separate `tsc -p`
+    // capped at 2048 MB, and the union of what they reported is the list below:
+    // 198 files excluded out of 785, leaving 587 CHECKED ON DAY ONE.
+    //
+    // A union of tranches is not identical to one program. Specs are leaves —
+    // nothing imports them — so a spec's diagnostics do not depend on which
+    // other specs share its program, and the shared infra every tranche pulls
+    // in (tests/unit/db.ts, mocks.ts, helpers/) was present in all of them. The
+    // residual risk is real but small, and it points one way: a single-process
+    // run may find a few MORE errors, not fewer.
+    //
+    // ⚠️ WHY SOME CLEAN SPECS ARE ON THIS LIST. `exclude` only removes files
+    // from the include EXPANSION; a file still enters the program if something
+    // included IMPORTS it. Two shared setup helpers under tests/unit/helpers/
+    // are dirty, so excluding them alone changed nothing — four otherwise-clean
+    // specs that import them had to go too. Discovered by measurement, not
+    // reasoning: the list needed a second sweep to converge. Any future entry
+    // for a non-spec file has to carry its importers with it.
+    //
+    // `scripts/check-tests-tsconfig.mjs` pins this array to
+    // `scripts/tests-tsconfig-baseline.json` and lets it SHRINK only. Deleting
+    // an entry is the unit of progress; adding one fails the gate. The one-time
+    // bootstrap after the first single-process compile is
+    // `--seed-from <tsc-output>`, which refuses to run twice.
+    //
+    // The four structural entries are NOT part of the ratchet, and the gate
+    // knows the difference: `tests/e2e/**` belongs to tsconfig.playwright.json,
+    // at a 2048 MB cap that config must keep meeting.
+    //
+    // End state (a later phase): this array drops back to the structural four,
+    // the baseline file is deleted, and the membership assertion moves into
+    // `scripts/check-test-layout.mjs`, which already owns "every spec is
+    // collected by exactly one config" and already runs in pre-commit and CI.
+    //
+    // ⚠️ THE THREE THAT ARE LEFT ARE NOT SPEC BUGS. Every other entry was a
+    // test that had gone stale against the schema or the role/severity
+    // vocabularies, and was fixed. These three are blocked from the OTHER side:
+    // a `server/` type that is narrower than the function it describes. Fixing
+    // them means editing `server/`, which Phase 1 does not do, so they wait for
+    // a change that has a reason of its own to touch those signatures.
+    //
+    //   create-people / inspection-create-fk-validation
+    //     `InspectionCoreService.createInspection`'s parameter is
+    //     `CreateInspectionData` = `z.infer<CreateInspectionSchema>` — the
+    //     PARSED-REQUEST shape, in which `templateId` and `clientName` are
+    //     required. Its body does not require them (`if (data.templateId)`,
+    //     inspection-core.service.ts), and the one internal production caller
+    //     already routes around the type with `as unknown as CreateInspectionData`
+    //     (inspection-create-variants.service.ts:117). Both specs create
+    //     inspections with neither a template nor a named client — legitimate
+    //     inputs the declared type refuses. The honest fix is a parameter type
+    //     for direct callers; a fixture carrying `templateId: ''` would only be
+    //     a lie that compiles.
+    //
+    //   property-facts
+    //     `InspectionService.updatePropertyFacts` (inspection.service.ts:215)
+    //     forwards straight to `InspectionResultsService.updatePropertyFacts`
+    //     (inspection/inspection-results.service.ts:58) but its parameter type
+    //     omits three keys the delegate declares — `unit`, `county` and
+    //     `metadata`. `metadata` is the commercial subtype-preset envelope, and
+    //     five cases here are about it. They pass at RUNTIME (the facade spreads
+    //     the object through); only the facade's type has fallen behind.
+    "exclude": [
+        "node_modules",
+        "dist",
+        ".types",
+        "tests/e2e/**",
+        "tests/unit/inspections/create-people.spec.ts",
+        "tests/unit/inspections/inspection-create-fk-validation.spec.ts",
+        "tests/unit/inspections/property-facts.spec.ts"
+    ]
+}

@@ -46,7 +46,7 @@ export function RolesTable({
           type="button"
           aria-label={m.contacts_roles_matrix_open_aria()}
           onClick={() => setMatrixOpen((v) => !v)}
-          className="h-7 w-7 rounded-full border border-ih-border text-ih-fg-muted text-sm font-semibold hover:text-ih-fg-1 hover:border-ih-fg-muted transition-colors"
+          className="h-7 w-7 rounded-full border border-ih-border text-ih-fg-3 text-sm font-semibold hover:text-ih-fg-1 hover:border-ih-border-strong transition-colors"
         >
           ?
         </button>
@@ -105,7 +105,7 @@ export function RolesTable({
                   <input type="hidden" name="id" value={p.id} />
                   <button
                     type="submit"
-                    className={`text-[12px] font-bold hover:underline ${p.active ? "text-ih-bad-fg" : "text-ih-primary"}`}
+                    className={`text-[12px] font-bold hover:underline ${p.active ? "text-ih-bad-fg" : "text-ih-primary-text"}`}
                   >
                     {p.active ? m.contacts_roles_action_deactivate() : m.contacts_roles_action_reactivate()}
                   </button>

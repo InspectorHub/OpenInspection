@@ -76,7 +76,7 @@ export default function AgentLayout({ loaderData }: Route.ComponentProps) {
             <span className="text-sm font-bold text-ih-fg-1">
               OpenInspection
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 ml-2 hidden sm:inline">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 ml-2 hidden sm:inline">
               {m.agent_portal_layout_badge()}
             </span>
           </div>
@@ -88,7 +88,7 @@ export default function AgentLayout({ loaderData }: Route.ComponentProps) {
                 className={({ isActive }) =>
                   `px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
                     isActive
-                      ? "bg-ih-primary-tint text-ih-primary"
+                      ? "bg-ih-primary-tint text-ih-primary-text"
                       : "text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-fg-1"
                   }`
                 }

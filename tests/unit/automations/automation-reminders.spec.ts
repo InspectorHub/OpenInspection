@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
@@ -30,7 +31,7 @@ beforeEach(async () => {
         id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
-    await seedRoleProfiles(db, TENANT, new Date(1));
+    await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
     svc = new AutomationService({} as D1Database);
 });
 
@@ -49,7 +50,14 @@ async function reminderRule(delayMinutes = 1440) {
 // original fixture's "no client" signal, e.g. the "ignores ... inspections
 // with no client email" case below) skips seeding the person so resolveAddress
 // still resolves null for that case.
-async function insp(date: string, over: Partial<typeof schema.inspections.$inferInsert> = {}) {
+async function insp(
+    date: string,
+    // `clientEmail`/`clientName` are this fixture's own controls, NOT columns —
+    // `inspections` has neither any more. They are stripped below and decide
+    // whether an inspection_people client is seeded, and with what contact.
+    over: Partial<typeof schema.inspections.$inferInsert>
+        & { clientEmail?: string | null; clientName?: string | null } = {},
+) {
     const id = crypto.randomUUID();
     const { clientEmail, clientName, ...inspOver } = over;
     await db.insert(schema.inspections).values({
@@ -83,7 +91,7 @@ describe('AutomationService.enqueueReminders (Track J D7)', () => {
         expect(log.automationId).toBe(ruleId);
         // Track L — dedup key is now per-channel (default email-only rule → :email).
         expect(log.eventId).toBe(`reminder:${ruleId}:${i}:email`);
-        expect(Date.parse(log.sendAt)).toBe(Date.parse('2026-05-30T09:00:00Z'));
+        expect(log.sendAt.getTime()).toBe(Date.parse('2026-05-30T09:00:00Z'));
     });
 
     it('floors a near-term reminder to now + 5min', async () => {
@@ -91,7 +99,7 @@ describe('AutomationService.enqueueReminders (Track J D7)', () => {
         const i = await insp('2026-05-30'); // today 09:00Z; 24h lead is already in the past
         await svc.enqueueReminders(NOW);
         const [log] = await logsFor(i);
-        expect(Date.parse(log.sendAt)).toBe(NOW + 5 * 60_000);
+        expect(log.sendAt.getTime()).toBe(NOW + 5 * 60_000);
     });
 
     it('is idempotent — re-scan does not double-create', async () => {

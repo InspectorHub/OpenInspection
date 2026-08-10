@@ -374,11 +374,17 @@ export async function runErasure(
     // Scoped through the subject's inspections rather than by matching the
     // title text — an address can be spelled several ways, and a title that
     // happens to mention someone else's street is not this subject's data.
+    //
+    // TWO columns. `inspector_narrative` is the one the paragraph above was wrong
+    // about `title`: genuinely free prose a person writes about this property for
+    // this client. See the reports block in `erasure-manifest.ts`.
     await step('reports', 'anonymize', { legalBasis: 'art_17_3_e' }, async () => {
         const inspIds = await subjectInspectionIds();
         if (inspIds.length === 0) return 0;
+        // NULL, not a placeholder: a title is a label every list renders and
+        // needs SOMETHING; an absent narrative is already a normal state.
         const res = await db.update(reports)
-            .set({ title: ANONYMIZED_TITLE })
+            .set({ title: ANONYMIZED_TITLE, inspectorNarrative: null })
             .where(and(eq(reports.tenantId, tenantId), inArray(reports.inspectionId, inspIds)))
             .run();
         const c = changeCount(res);

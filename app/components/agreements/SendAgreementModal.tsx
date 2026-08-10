@@ -168,7 +168,7 @@ export function SendAgreementModal({
 
             {templates !== undefined && (
                 <label className="flex flex-col gap-1 mb-4">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">
                         {m.library_agreements_field_agreement()}
                     </span>
                     <select
@@ -239,13 +239,13 @@ export function SendAgreementModal({
                 type="button"
                 onClick={addRow}
                 disabled={busy}
-                className="mt-3 text-[13px] font-semibold text-ih-primary hover:opacity-80 disabled:opacity-40"
+                className="mt-3 text-[13px] font-semibold text-ih-primary-text hover:opacity-80 disabled:opacity-40"
             >
                 {m.agreement_send_add()}
             </button>
 
             <fieldset className="mt-5">
-                <legend className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-2">{m.agreement_send_completion_legend()}</legend>
+                <legend className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-2">{m.agreement_send_completion_legend()}</legend>
                 <div className="space-y-2">
                     <label className="flex items-start gap-2.5 cursor-pointer">
                         <input

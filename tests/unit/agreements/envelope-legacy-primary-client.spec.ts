@@ -14,6 +14,7 @@ import { AgreementService } from '../../../server/services/agreement.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -44,7 +45,7 @@ describe('AgreementService.findOrCreate — default signer resolves via primary-
         await db.insert(schema.agreements).values({
             id: AGR_ID, tenantId: TENANT, name: 'Standard Agreement', content: 'Agreement text...', version: 1, createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values({
             id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane Client',
             email: 'jane@example.com', phone: '+15551234567', createdAt: new Date(),
@@ -54,7 +55,6 @@ describe('AgreementService.findOrCreate — default signer resolves via primary-
         // carries the primary client for this inspection.
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St',
-            clientName: null, clientEmail: null, clientPhone: null,
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: true, paymentRequired: false, createdAt: new Date(),
         });

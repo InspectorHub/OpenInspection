@@ -93,7 +93,7 @@ export function CalendarNavBar({
             onClick={() => onViewModeChange(mode)}
             className={`h-9 px-3 rounded-md text-[13px] font-bold capitalize border transition-colors ${
               viewMode === mode
-                ? "border-ih-primary text-ih-primary bg-ih-primary-tint"
+                ? "border-ih-primary text-ih-primary-text bg-ih-primary-tint"
                 : "border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted"
             }`}
           >

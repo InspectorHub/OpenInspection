@@ -209,11 +209,11 @@ export function SavedSignatureCard({ savedSignature }: { savedSignature: string 
             <button
               type="button"
               onClick={() => { setUploadError(null); setShowPad(true); }}
-              className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-muted text-ih-fg-1 text-[13px] font-semibold hover:border-ih-primary hover:text-ih-primary transition-colors"
+              className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-muted text-ih-fg-1 text-[13px] font-semibold hover:border-ih-primary hover:text-ih-primary-text transition-colors"
             >
               {m.settings_profile_signature_draw()}
             </button>
-            <label className="h-9 px-3 inline-flex items-center rounded-md border border-ih-border bg-ih-bg-muted text-ih-fg-1 text-[13px] font-semibold cursor-pointer hover:border-ih-primary hover:text-ih-primary focus-within:border-ih-primary focus-within:shadow-ih-focus transition-colors">
+            <label className="h-9 px-3 inline-flex items-center rounded-md border border-ih-border bg-ih-bg-muted text-ih-fg-1 text-[13px] font-semibold cursor-pointer hover:border-ih-primary hover:text-ih-primary-text focus-within:border-ih-primary focus-within:shadow-ih-focus transition-colors">
               {/* A label wrapping the input, so the picker opens NATIVELY. The
                   button-plus-`input.click()` pattern depends on a hidden input
                   being clickable, and when it is not there is nothing on screen

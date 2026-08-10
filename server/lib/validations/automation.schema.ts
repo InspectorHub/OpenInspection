@@ -114,7 +114,11 @@ export const UpdateAutomationSchema = CreateAutomationBase.partial().extend({
 
 const AutomationLogSchema = z.object({
     id:             z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    automationId:   z.string().describe('TODO describe automationId field for the OpenInspection MCP integration'),
+    // Nullable, and the null is the MANUAL-send marker: `automation_logs.automation_id
+    // IS NULL` means an operator pressed Send rather than a rule firing (see the
+    // column comment in db/schema/inspection/automation.ts). Declaring it `z.string()`
+    // described a row shape the table cannot produce.
+    automationId:   z.string().nullable().describe('The rule that produced this delivery; null for a manual send.'),
     inspectionId:   z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
     // Track L — email address for email logs, E.164 phone for sms logs.
     recipient:      z.string().describe('Delivery address: email for email logs, E.164 phone for sms logs.'),

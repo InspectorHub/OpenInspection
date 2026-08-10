@@ -107,7 +107,7 @@ export function HeaderOverflowMenu({
             </li>
           )}
           <li role="none" className={`${HEADER_OVERFLOW.theme.row} mt-1 border-t border-ih-border px-3 pt-2 pb-1`}>
-            <div className="text-[11px] uppercase tracking-[0.1em] text-ih-fg-4 mb-1.5">{m.nav_theme_label()}</div>
+            <div className="text-[11px] uppercase tracking-[0.1em] text-ih-fg-3 mb-1.5">{m.nav_theme_label()}</div>
             {themeControl}
           </li>
         </ul>

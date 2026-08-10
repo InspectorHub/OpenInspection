@@ -6,7 +6,17 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const createPaymentIntent = vi.fn(async () => ({ id: 'pi_1', client_secret: 'cs_1' }));
+/**
+ * Declared with the parameter the service actually passes, not `()` — a
+ * zero-arg mock types `mock.calls[0]` as the empty tuple, and the assertions
+ * below read `calls[0][0]`.
+ */
+const createPaymentIntent = vi.fn(
+    async (_params: { amount: number; currency: string;[k: string]: unknown }) => ({
+        id: 'pi_1',
+        client_secret: 'cs_1',
+    }),
+);
 
 vi.mock('stripe', () => {
     class FakeStripe {

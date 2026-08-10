@@ -1,0 +1,11 @@
+{
+  "$comment": "Ratchet baselines for the exclude arrays of the two spec-compiling programs. See scripts/check-tests-tsconfig.mjs. Each list may only SHRINK: delete an entry when the file type-checks, then run npm run lint:tests-tsconfig -- --update.",
+  "seeded": false,
+  "$comment_appExcluded": "tsconfig.json (app/** + packages/shared-ui/src/** co-located specs). EMPTY, and intended to stay empty — the program took all 352 specs at once with nothing carved out, so any entry here is a regression, not debt.",
+  "appExcluded": [],
+  "excluded": [
+    "tests/unit/inspections/create-people.spec.ts",
+    "tests/unit/inspections/inspection-create-fk-validation.spec.ts",
+    "tests/unit/inspections/property-facts.spec.ts"
+  ]
+}

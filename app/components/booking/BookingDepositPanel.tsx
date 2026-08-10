@@ -97,7 +97,7 @@ export function BookingDepositPanel({
           </button>
           {/* The appointment is already made. Say so beside the button, or the
               client reads the deposit as the thing that confirms it. */}
-          <p className="mt-2 text-center text-[11px] text-ih-fg-4">{m.booking_deposit_already_booked()}</p>
+          <p className="mt-2 text-center text-[11px] text-ih-fg-2">{m.booking_deposit_already_booked()}</p>
         </>
       )}
 

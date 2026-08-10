@@ -90,7 +90,7 @@ export function BookingWizard({
                 : "bg-ih-bg-muted text-ih-fg-4"
             }`}>{i + 1}</div>
             <span className={`text-[11px] font-medium hidden sm:inline ${
-              i <= step ? "text-ih-primary" : "text-ih-fg-4"
+              i <= step ? "text-ih-primary-text" : "text-ih-fg-4"
             }`}>{s}</span>
             {i < stepLabels().length - 1 && (
               <div className={`flex-1 h-px mx-1 ${i < step ? "bg-ih-primary" : "bg-ih-bg-muted"}`} />

@@ -146,7 +146,7 @@ function ScopesSummary({ scopes }: { scopes: string[] }) {
   );
 
   if (covered.length === 0) {
-    return <span className="text-[12px] text-ih-fg-4">{m.settings_apps_no_modules()}</span>;
+    return <span className="text-[12px] text-ih-fg-3">{m.settings_apps_no_modules()}</span>;
   }
 
   return (
@@ -164,13 +164,16 @@ function ScopesSummary({ scopes }: { scopes: string[] }) {
   );
 }
 
+// Both tones sit on bg-ih-bg-muted, which has less headroom than a card: at
+// 10px, ih-primary there is 4.08:1 and even ih-fg-3 is 4.34:1. info-fg keeps
+// write a different colour from read (5.42:1 light / 5.79:1 dark).
 function Badge({ kind }: { kind: "R" | "W" }) {
   return (
     <span
       className={
         kind === "W"
-          ? "px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-primary"
-          : "px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-3"
+          ? "px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-info-fg"
+          : "px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-2"
       }
     >
       {kind}
@@ -213,7 +216,7 @@ function GrantRow({
         <div className="mt-0.5">
           <ScopesSummary scopes={grant.scopes} />
         </div>
-        <p className="text-[11px] text-ih-fg-4 mt-1">
+        <p className="text-[11px] text-ih-fg-3 mt-1">
           {m.settings_apps_created({ date: formatUnixDate(grant.createdAt, locale, tz) })}{" "}
           {grant.expiresAt != null
             ? m.settings_apps_expires({ date: formatUnixDate(grant.expiresAt, locale, tz) })
@@ -261,7 +264,7 @@ export default function SettingsConnectedApps() {
     return (
       <div className="text-center py-16 bg-ih-bg-card border border-ih-border rounded-lg">
         <p className="font-bold text-[14px] text-ih-fg-2">{m.settings_apps_mcp_disabled_title()}</p>
-        <p className="text-[12px] text-ih-fg-4 mt-1">{m.settings_apps_mcp_disabled_desc()}</p>
+        <p className="text-[12px] text-ih-fg-3 mt-1">{m.settings_apps_mcp_disabled_desc()}</p>
       </div>
     );
   }
@@ -295,7 +298,7 @@ export default function SettingsConnectedApps() {
         ) : self.length === 0 ? (
           <div className="text-center py-10 bg-ih-bg-card border border-ih-border rounded-lg">
             <p className="font-bold text-[14px] text-ih-fg-2">{m.settings_apps_none_title()}</p>
-            <p className="text-[12px] text-ih-fg-4 mt-1">
+            <p className="text-[12px] text-ih-fg-3 mt-1">
               {m.settings_apps_none_desc()}
             </p>
           </div>
@@ -320,7 +323,7 @@ export default function SettingsConnectedApps() {
           <h3 className="text-[13px] font-semibold text-ih-fg-3 uppercase tracking-wide mb-2">
             {m.settings_apps_tenant_heading()}
           </h3>
-          <p className="text-[12px] text-ih-fg-4 mb-3">
+          <p className="text-[12px] text-ih-fg-3 mb-3">
             {m.settings_apps_tenant_desc()}
           </p>
           {all!.length === 0 ? (

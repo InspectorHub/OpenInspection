@@ -1,15 +1,48 @@
 import { describe, it, expect } from 'vitest';
+import * as SidebarModule from '~/components/Sidebar';
+import { WORKSPACE_ITEMS, visibleNavItems } from '~/components/sidebar/nav-items';
+
+/**
+ * Why the two real module graphs above are STATIC imports (#88/#95).
+ *
+ * They used to sit inside `it()` bodies under an explicit `20000` timeout, with
+ * a comment saying the graph is heavy and can exceed the 5 s default. The
+ * comment was right and the mitigation was not. `~/components/Sidebar` reaches
+ * `~/paraglide/messages`, whose generated `_index.js` is ~3.67 MB and which
+ * ~441 source files import; Vite transforms it once, on the single main thread
+ * every vitest worker shares. So the wait is QUEUEING, and it scales with how
+ * busy the suite is rather than with the machine:
+ *
+ *   solo   (`vitest run app/components/sidebar.test.ts`)      2472 ms
+ *   loaded (`vitest run app/components --maxWorkers=16`)     19206 ms
+ *
+ * A 7.8x swing against a 20000 ms ceiling — 794 ms of headroom, on a laptop, on
+ * a suite that is still growing, on a runner that is not CI. A raised timeout
+ * never removed the cost; it moved the cliff. It also only ever protected the
+ * payer: every other worker queued behind the same transform regardless.
+ *
+ * ⚠️ THE `beforeAll` HOIST IS NOT ENOUGH FOR THIS PARTICULAR GRAPH, and that is
+ * worth knowing before reaching for it elsewhere. `beforeAll`'s budget is
+ * separate from `testTimeout` but it is not absent: it is `hookTimeout`, which
+ * defaults to 10000 ms. Hoisting these two imports into a `beforeAll` was tried
+ * and failed under the same loaded run — "Hook timed out in 10000ms" — because
+ * 19 s does not fit in a 10 s budget any more than in a 5 s one. Hoisting
+ * relocates a cost; only a static import stops it being ANYONE's deadline,
+ * because it is paid during COLLECTION, which has no timeout at all.
+ *
+ * So the order of preference is: static import; then `beforeAll` when a
+ * `vi.doMock` must be installed before the module resolves (which is why the
+ * repair-builder specs are dynamic and this one is not); and never a raised
+ * timeout of either kind. Nothing here mocks anything, so nothing here has to
+ * be dynamic. Placement is enforced by `npm run lint:test-imports`.
+ */
 
 describe('Sidebar', () => {
-  it('exports Sidebar and MobileHeader', async () => {
-    // Basic smoke test that the module loads. Generous timeout: this actually
-    // executes the Sidebar module, whose transitive imports are heavy (session
-    // context, Stripe, and the full Paraglide message set, which grows with the
-    // i18n catalog); under concurrent full-suite load it can exceed the 5s default.
-    const mod = await import('~/components/Sidebar');
-    expect(mod.Sidebar).toBeDefined();
-    expect(mod.MobileHeader).toBeDefined();
-  }, 20000);
+  it('exports Sidebar and MobileHeader', () => {
+    // Basic smoke test that the module loads and names what it promises.
+    expect(SidebarModule.Sidebar).toBeDefined();
+    expect(SidebarModule.MobileHeader).toBeDefined();
+  });
 
   it('WORKSPACE_ITEMS includes Team, not Reports; Library is a single hub entry', async () => {
     // Import the raw module source to verify the nav arrays.
@@ -38,8 +71,7 @@ describe('Sidebar', () => {
     expect(text).not.toContain('"/repair-items"');
   });
 
-  it('hides Dispatch without scheduleOthers and shows it with the override', async () => {
-    const { WORKSPACE_ITEMS, visibleNavItems } = await import('~/components/sidebar/nav-items');
+  it('hides Dispatch without scheduleOthers and shows it with the override', () => {
     const dispatchItem = WORKSPACE_ITEMS.find((i) => i.to === '/calendar/dispatch');
     expect(dispatchItem?.capability).toBe('scheduleOthers');
 
@@ -54,15 +86,14 @@ describe('Sidebar', () => {
 
     // Ungated entries are never filtered out by this.
     expect(hidden.some((i) => i.to === '/inspections')).toBe(true);
-  }, 20000);
+  });
 
-  it('fails CLOSED when the session context is missing', async () => {
-    const { WORKSPACE_ITEMS, visibleNavItems } = await import('~/components/sidebar/nav-items');
+  it('fails CLOSED when the session context is missing', () => {
     for (const capabilities of [null, undefined, {}]) {
       const items = visibleNavItems(WORKSPACE_ITEMS, capabilities);
       expect(items.some((i) => i.to === '/calendar/dispatch')).toBe(false);
     }
-  }, 20000);
+  });
 
   it('filters in BOTH nav surfaces, not just the desktop one', async () => {
     // A capability filter applied to one surface only is invisible in review
@@ -72,7 +103,7 @@ describe('Sidebar', () => {
       const text = (src as unknown as { default: string }).default;
       expect(text).toContain('visibleNavItems(WORKSPACE_ITEMS');
     }
-  }, 20000);
+  });
 
   it('IA-25: User Menu trigger button is present in Sidebar source', async () => {
     const src = await import('~/components/Sidebar?raw');

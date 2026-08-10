@@ -17,7 +17,7 @@ import { ServiceService } from '../service.service';
 import type { ScopedDB } from '../../lib/db/scoped';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
 import { InspectionQueryService } from './inspection-query.service';
-import { InspectionReinspectionService } from './inspection-reinspection.service';
+import { InspectionReinspectionService, type CreatedReinspection } from './inspection-reinspection.service';
 import { InspectionCreateVariantsService } from './inspection-create-variants.service';
 import { InspectionRecipientsService } from './inspection-recipients.service';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
@@ -416,8 +416,8 @@ export class InspectionCoreService extends InspectionSubService {
     async createReinspection(
         tenantId: string,
         baselineId: string,
-        opts: { selectedItemIds: string[]; inspectorId?: string },
-    ): Promise<Inspection> {
+        opts: { selectedItemIds: string[]; inspectorId?: string | undefined },
+    ): Promise<CreatedReinspection> {
         return this.reinspection.createReinspection(tenantId, baselineId, opts);
     }
 
@@ -433,7 +433,7 @@ export class InspectionCoreService extends InspectionSubService {
     async applyServicePriceOverrides(
         inspectionId: string,
         tenantId: string,
-        selections: Array<{ serviceId: string; priceOverrideCents?: number }>,
+        selections: ServiceSelection[],
     ): Promise<void> {
         return this.variants.applyServicePriceOverrides(inspectionId, tenantId, selections);
     }

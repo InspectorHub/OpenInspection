@@ -5,7 +5,7 @@ import { formatDateTime } from "~/lib/format";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
 import { AgreementLanguageDisclosure } from "~/components/agreements/AgreementLanguageDisclosure";
 import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
-import { ViewerTimeZoneNotice } from "~/components/public/ViewerTimeZoneNotice";
+import { LazyViewerTimeZoneNotice } from "~/components/public/LazyViewerTimeZoneNotice";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -130,12 +130,16 @@ function VerifyBody() {
         {m.public_verify_section_signed()}
       </h2>
       {result.contentSnapshot === null ? (
-        <div className="rounded-lg border border-ih-border bg-ih-bg-muted p-4 text-[13px] text-ih-fg-3 mb-6">
+        <div className="rounded-lg border border-ih-border bg-ih-bg-muted p-4 text-[13px] text-ih-fg-2 mb-6">
           {m.public_verify_snapshot_unavailable()}
         </div>
       ) : (
         <SanitizedHtml
-          className="prose prose-sm max-w-none rounded-lg border border-ih-border bg-ih-bg-card p-4 text-[13px] text-ih-fg-2 leading-relaxed mb-6"
+          // `ih-agreement-prose` — `prose prose-sm` matched no rule here
+          // (@tailwindcss/typography is not installed). This box shows the
+          // exact snapshot that was signed, so it above all must render the
+          // document's structure rather than flatten it.
+          className="ih-agreement-prose max-w-none rounded-lg border border-ih-border bg-ih-bg-card p-4 text-[13px] text-ih-fg-2 leading-relaxed mb-6"
           html={result.contentSnapshot}
         />
       )}
@@ -206,7 +210,7 @@ function VerifyBody() {
         )}
       </div>
 
-      {result.signers.some((s) => s.signedAt) && <ViewerTimeZoneNotice className="mt-4" />}
+      {result.signers.some((s) => s.signedAt) && <LazyViewerTimeZoneNotice className="mt-4" />}
     </div>
   );
 }

@@ -16,7 +16,7 @@ import {
 import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "../../server/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { PageHeader, Card, Pill, Button, Modal } from "@core/shared-ui";
+import { PageHeader, Card, Pill, Button, Modal, buttonClasses } from "@core/shared-ui";
 import DocumentsSection, {
   type DocumentItem,
   type DocumentCategory,
@@ -883,7 +883,7 @@ export default function InspectionHubPage() {
 
         {/* 5. Inspection status — the visit itself. Independent of report
             publishing. */}
-        <LifecycleCard status={inspection.status} fetcher={completeInspection} />
+        <LifecycleCard status={inspection.status} inspectionId={inspection.id} fetcher={completeInspection} />
 
         {/* 5b. Communication — what has been said, and what we sent. The
             client already had a Messages tab; this is the inspector's first
@@ -947,6 +947,18 @@ export default function InspectionHubPage() {
                     {m.inspections_hub_report_send_sms()}
                   </Button>
                 )}
+                {/* #69 — HERE, on the singular REPORT card, not on the plural
+                    REPORTS card. An order can have a published report and an
+                    EMPTY deliverables list, and the log then sat under the
+                    words "No reports on this order yet". This block is already
+                    inside `reportShipped`, which is the log's own precondition. */}
+                <Link
+                  to={`/inspections/${inspection.id}/repair-requests`}
+                  data-testid="hub-repair-log-link"
+                  className={buttonClasses({ variant: "secondary", size: "sm" })}
+                >
+                  {m.inspections_hub_report_repair_log()}
+                </Link>
                 {reportActionList.includes('unpublish') && (
                   <unpublishReport.Form method="post">
                     <input type="hidden" name="intent" value="unpublish" />
@@ -1018,7 +1030,7 @@ export default function InspectionHubPage() {
                 {reportBlockersPending && (
                   <Link
                     to={`/inspections/${inspection.id}/edit`}
-                    className="text-[12px] font-bold text-ih-primary hover:underline"
+                    className="text-[12px] font-bold text-ih-primary-text hover:underline"
                   >
                     {m.inspections_hub_report_resolve()}
                   </Link>
@@ -1033,7 +1045,7 @@ export default function InspectionHubPage() {
               links to a field-level diff against its immediate predecessor. */}
           {versions.length > 0 && (
             <div className="mt-4 pt-4 border-t border-ih-border">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-ih-fg-4 mb-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-ih-fg-3 mb-2">
                 {m.inspections_hub_versions_title()}
               </p>
               <ul className="space-y-2">
@@ -1050,7 +1062,7 @@ export default function InspectionHubPage() {
                             <Pill tone="gen">{m.inspections_hub_versions_amendment()}</Pill>
                           )}
                           {v.publishedAt && (
-                            <span className="text-[11px] text-ih-fg-4">
+                            <span className="text-[11px] text-ih-fg-3">
                               {formatInspectionDateTime(new Date(v.publishedAt * 1000).toISOString(), undefined, displayTz, fmt)}
                             </span>
                           )}
@@ -1062,7 +1074,7 @@ export default function InspectionHubPage() {
                       {href && (
                         <Link
                           to={href}
-                          className="shrink-0 text-[12px] font-bold text-ih-primary hover:underline"
+                          className="shrink-0 text-[12px] font-bold text-ih-primary-text hover:underline"
                         >
                           {m.inspections_hub_versions_view_changes()}
                         </Link>

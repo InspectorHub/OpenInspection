@@ -42,14 +42,14 @@ export function OnboardingChecklist({
       <div className="flex items-center justify-between px-5 py-4 border-b border-ih-border">
         <div className="flex items-center gap-3">
           <h2 className="text-[14px] font-bold text-ih-fg-1">{m.dashboard_onboarding_title()}</h2>
-          <span className="text-[12px] font-medium text-ih-fg-4">
+          <span className="text-[12px] font-medium text-ih-fg-3">
             {m.dashboard_onboarding_progress({ done: doneCount, total })}
           </span>
         </div>
         <button
           type="button"
           onClick={onDismiss}
-          className="text-[12px] font-medium text-ih-fg-4 hover:text-ih-fg-2 transition-colors"
+          className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-2 transition-colors"
         >
           {m.dashboard_onboarding_dismiss()}
         </button>
@@ -100,7 +100,7 @@ export function OnboardingChecklist({
                 className={`text-[13px] transition-colors ${
                   step.done
                     ? "line-through text-ih-fg-4"
-                    : "text-ih-fg-1 group-hover:text-ih-primary"
+                    : "text-ih-fg-1 group-hover:text-ih-primary-text"
                 }`}
               >
                 {step.label}
@@ -112,7 +112,7 @@ export function OnboardingChecklist({
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 16 16"
                   fill="none"
-                  className="w-3.5 h-3.5 ml-auto shrink-0 text-ih-fg-4 group-hover:text-ih-primary transition-colors"
+                  className="w-3.5 h-3.5 ml-auto shrink-0 text-ih-fg-4 group-hover:text-ih-primary-text transition-colors"
                 >
                   <path
                     d="M6 4l4 4-4 4"

@@ -12,6 +12,7 @@ const roleProfileId = (tenantId: string, key: string) => `crp_${tenantId}_${key}
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { asD1Db } from '../helpers/test-db';
 
 const T1 = '00000000-0000-0000-0000-000000000001';
 const T2 = '00000000-0000-0000-0000-000000000002';
@@ -39,8 +40,8 @@ describe('AgentService.listReferrals — A2', () => {
         await testDb.insert(schema.tenantConfigs).values([
             { tenantId: T1, defaultTimezone: 'America/New_York', updatedAt: new Date() },
         ]);
-        await seedRoleProfiles(testDb, T1, new Date(1));
-        await seedRoleProfiles(testDb, T2, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), T1, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), T2, new Date(1));
 
         await testDb.insert(schema.users).values([
             { id: AGENT_USER, tenantId: null, email: 'jane@realty.com', role: 'agent', name: 'Jane', createdAt: new Date(), passwordHash: 'h' },
@@ -69,11 +70,11 @@ describe('AgentService.listReferrals — A2', () => {
         await testDb.update(schema.contacts).set({ agentUserId: OTHER_AGENT_USER, agentLinkedAt: new Date() }).where(eq(schema.contacts.id, 'other-c1'));
 
         await testDb.insert(schema.inspections).values([
-            { id: 'i-1', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '1 Main', clientName: 'Sarah', date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid', referredByAgentId: 'jane-c1', price: 0, createdAt: new Date() },
-            { id: 'i-2', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '2 Oak', clientName: 'Bob', date: '2026-06-02', status: 'completed', reportStatus: 'published', paymentStatus: 'paid', referredByAgentId: 'jane-c1', price: 0, createdAt: new Date() },
-            { id: 'i-3', tenantId: T2, inspectorId: INSPECTOR_T2, propertyAddress: '3 Elm', clientName: 'Tim', date: '2026-06-03', status: 'requested', paymentStatus: 'unpaid', referredByAgentId: 'jane-c2', price: 0, createdAt: new Date() },
-            { id: 'other-agent-inspection', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '99 Pine', clientName: 'Dan', date: '2026-06-04', status: 'requested', paymentStatus: 'unpaid', referredByAgentId: 'other-c1', price: 0, createdAt: new Date() },
-            { id: 'no-referral-inspection', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '11 Pine', clientName: 'Eve', date: '2026-06-05', status: 'requested', paymentStatus: 'unpaid', referredByAgentId: null, price: 0, createdAt: new Date() },
+            { id: 'i-1', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '1 Main', date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid', price: 0, createdAt: new Date() },
+            { id: 'i-2', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '2 Oak', date: '2026-06-02', status: 'completed', reportStatus: 'published', paymentStatus: 'paid', price: 0, createdAt: new Date() },
+            { id: 'i-3', tenantId: T2, inspectorId: INSPECTOR_T2, propertyAddress: '3 Elm', date: '2026-06-03', status: 'requested', paymentStatus: 'unpaid', price: 0, createdAt: new Date() },
+            { id: 'other-agent-inspection', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '99 Pine', date: '2026-06-04', status: 'requested', paymentStatus: 'unpaid', price: 0, createdAt: new Date() },
+            { id: 'no-referral-inspection', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '11 Pine', date: '2026-06-05', status: 'requested', paymentStatus: 'unpaid', price: 0, createdAt: new Date() },
         ]);
 
         // Buyer-agent attribution now lives on inspection_people (Task 9c) —
@@ -142,9 +143,7 @@ describe('AgentService.listReferrals — A2', () => {
 
     it('Task 9c — legacy referredByAgentId NULL, buyer_agent inspection_people row present — still resolves as a referral', async () => {
         await testDb.insert(schema.inspections).values({
-            id: 'i-people-only', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '77 Birch',
-            clientName: 'Pat', date: '2026-06-06', status: 'requested', paymentStatus: 'unpaid',
-            referredByAgentId: null, price: 0, createdAt: new Date(),
+            id: 'i-people-only', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '77 Birch', date: '2026-06-06', status: 'requested', paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
         });
         const people = new PeopleService({ DB: {} as D1Database });
         await people.addPerson(T1, 'i-people-only', 'jane-c1', roleProfileId(T1, 'buyer_agent'));
@@ -154,15 +153,23 @@ describe('AgentService.listReferrals — A2', () => {
     });
 
     it('ANTI-LEAK (Task 9c) — after GDPR erasure deletes the client\'s inspection_people + contacts rows, ' +
-        'the stale legacy inspections.client_name column must NOT leak through listReferrals', async () => {
+        'listReferrals reports no client rather than a stale one', async () => {
         // Mirrors erasure-orchestrator.ts: the subject's contacts row and
-        // inspection_people row are DELETED outright (not anonymized) — the
-        // legacy inspections.client_name column is a denormalized cache the
-        // erasure job never touches, so it is the leak vector this closes.
+        // inspection_people row are DELETED outright (not anonymized).
+        //
+        // ⚠️ THE ORIGINAL LEAK VECTOR IS GONE AT THE SCHEMA LEVEL. This test was
+        // written when `inspections.client_name` was a denormalized cache the
+        // erasure job never touched, and it seeded that column with a sentinel
+        // ('LEAKED-PII-SHOULD-NOT-APPEAR') to prove the read did not fall back
+        // to it. The column has since been DROPPED (see
+        // server/lib/db/schema/inspection/core.ts), so the seed was writing a
+        // key drizzle silently discarded — the sentinel could not appear, and
+        // the assertion against it had stopped proving anything. What remains
+        // IS still real: the post-erasure state (buyer_agent row present, no
+        // client row) must surface a null client, not an invented one.
         await testDb.insert(schema.inspections).values({
-            id: 'i-erased', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '5 Cedar',
-            clientName: 'LEAKED-PII-SHOULD-NOT-APPEAR', date: '2026-06-07', status: 'requested',
-            paymentStatus: 'unpaid', referredByAgentId: 'jane-c1', price: 0, createdAt: new Date(),
+            id: 'i-erased', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '5 Cedar', date: '2026-06-07', status: 'requested',
+            paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
         });
         const people = new PeopleService({ DB: {} as D1Database });
         await people.addPerson(T1, 'i-erased', 'jane-c1', roleProfileId(T1, 'buyer_agent'));
@@ -172,7 +179,6 @@ describe('AgentService.listReferrals — A2', () => {
         const erased = refs.find((r) => r.id === 'i-erased');
         expect(erased).toBeDefined();
         expect(erased?.clientName).toBeNull();
-        expect(erased?.clientName).not.toBe('LEAKED-PII-SHOULD-NOT-APPEAR');
     });
 });
 

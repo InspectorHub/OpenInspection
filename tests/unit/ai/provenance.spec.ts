@@ -33,6 +33,9 @@ const TENANT = 'tenant-provenance';
 /** The only credential picture the capability gate lets through. */
 const OWN_CONFIRMED_KEY = { source: 'byo', tenantKeyAttested: true } as const;
 const MANAGED = { source: 'managed', tenantKeyAttested: false } as const;
+/** The id the stub sink claims to have written, so a caller citing it can be
+ *  distinguished from a caller inventing one. */
+const AI_CALL_ROW_ID = 'ai-call-row-1';
 
 let db: BetterSQLite3Database<typeof schema>;
 
@@ -57,7 +60,7 @@ describe('the provenance sink writes one fully-populated row', () => {
         const sink = buildAiProvenanceSink({
             db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'gemini-3.1-flash-lite',
         });
-        await sink!.record({ capability: 'assist', promptVersion: 'professional-comment.v1', provider: 'gemini' });
+        const returnedId = await sink!.record({ capability: 'assist', promptVersion: 'professional-comment.v1', provider: 'gemini' });
 
         const all = rows();
         expect(all).toHaveLength(1);
@@ -65,6 +68,11 @@ describe('the provenance sink writes one fully-populated row', () => {
         // Field by field. "A row exists" is not evidence: a row whose provider,
         // mode, model and prompt version are all null answers nothing.
         expect(row.id).toMatch(/\S/);
+        // The id the caller is handed must be the id of the row that was
+        // written. A sink that minted one id for the insert and returned another
+        // would satisfy every other assertion here while every review record
+        // citing it pointed at nothing.
+        expect(returnedId).toBe(row.id);
         expect(row.tenantId).toBe(TENANT);
         expect(row.capability).toBe('assist');
         expect(row.provider).toBe('gemini');
@@ -108,7 +116,7 @@ describe('the chokepoint records every AI call', () => {
             ok: true,
             json: async () => ({ candidates: [{ content: { parts: [{ text: '["a","b","c"]' }] } }] }),
         } as Response);
-        record = vi.fn(async () => {});
+        record = vi.fn(async () => AI_CALL_ROW_ID);
         sink = { record } as unknown as AiProvenanceSink;
     });
     afterEach(() => { globalThis.fetch = originalFetch; });
@@ -172,6 +180,139 @@ describe('the chokepoint records every AI call', () => {
         await expect(svc.generateProfessionalComment('rough note')).rejects.toMatchObject({ code: 'ai_not_configured' });
         expect(record).not.toHaveBeenCalled();
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * The id has to reach the CALLER, not just the row.
+ *
+ * A ledger that records every call and cannot tell a caller which row is theirs
+ * produces no citable evidence: review of an output had nothing to point at, so
+ * the AI call and its acceptance stayed two events with nothing linking them.
+ * These cases are about that link, one per public method — and about the arms
+ * that must NOT carry an id, because prose no model wrote must never arrive
+ * looking like reviewed model output.
+ */
+describe('the chokepoint hands the provenance row id to its caller', () => {
+    const fetchMock = vi.fn();
+    let originalFetch: typeof globalThis.fetch;
+    let record: ReturnType<typeof vi.fn>;
+    let sink: AiProvenanceSink;
+
+    const INSPECTION = 'insp-review-1';
+
+    beforeEach(async () => {
+        await freshDb();
+        originalFetch = globalThis.fetch;
+        globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+        fetchMock.mockReset();
+        fetchMock.mockResolvedValue({
+            ok: true,
+            json: async () => ({ candidates: [{ content: { parts: [{ text: '["a","b","c"]' }] } }] }),
+        } as Response);
+        record = vi.fn(async () => AI_CALL_ROW_ID);
+        sink = { record } as unknown as AiProvenanceSink;
+    });
+    afterEach(() => { globalThis.fetch = originalFetch; });
+
+    const service = (mode: 'standalone' | 'saas' = 'saas', apiKey = 'a-key') => new AIService(
+        {} as D1Database, apiKey, mode, 'a-model', undefined, OWN_CONFIRMED_KEY, sink,
+    );
+
+    /** The summary path reads the inspection before it reaches the chokepoint,
+     *  and `inspections.tenant_id` carries a legacy FK, so the workspace row has
+     *  to exist too — the migrations enable foreign_keys. */
+    async function seedInspection() {
+        await db.insert(schema.tenants).values({
+            id: TENANT, name: 'Provenance Co', slug: 'provenance-co', createdAt: new Date(),
+        });
+        await db.insert(schema.inspections).values({
+            id: INSPECTION, tenantId: TENANT, propertyAddress: '1 Test St',
+            date: '2026-08-08', createdAt: new Date(),
+        });
+    }
+
+    it('comment-assist returns the id of the row written for that call', async () => {
+        const out = await service().generateProfessionalComment('rough note');
+        expect(out.aiCallId).toBe(AI_CALL_ROW_ID);
+        expect(out.text).toBe('["a","b","c"]');
+    });
+
+    it('comment rewrite returns the id alongside the rewritten text', async () => {
+        const out = await service().rewriteComment({
+            itemLabel: 'Roof', sectionTitle: 'Roof', tab: 'defects',
+            originalComment: 'foo', instruction: 'shorten',
+        });
+        expect(out.aiCallId).toBe(AI_CALL_ROW_ID);
+        expect(out.rewritten).toContain('a');
+    });
+
+    it('suggest-comment returns the id alongside the parsed suggestions', async () => {
+        const out = await service().suggestComment({ itemName: 'Roof', sectionName: 'Roof' });
+        expect(out.aiCallId).toBe(AI_CALL_ROW_ID);
+        expect(out.suggestions).toEqual(['a', 'b', 'c']);
+    });
+
+    it('auto-summary returns the id alongside the generated summary', async () => {
+        await seedInspection();
+        await db.insert(schema.inspectionResults).values({
+            id: 'res-1', tenantId: TENANT, inspectionId: INSPECTION,
+            data: { 'item-1': { status: 'Defect', notes: 'cracked flashing' } },
+            lastSyncedAt: new Date(),
+        });
+        fetchMock.mockResolvedValue({
+            ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'a summary' }] } }] }),
+        } as Response);
+
+        const out = await service().generateInspectionSummary(TENANT, INSPECTION);
+        expect(out.summary).toBe('a summary');
+        expect(out.aiCallId).toBe(AI_CALL_ROW_ID);
+    });
+
+    it('the no-defects summary carries NO id, because no model wrote it', async () => {
+        // The inspection EXISTS and the method returns normally — without that
+        // half, "aiCallId is null" would also pass if the lookup had thrown or
+        // the method had never run at all. The literal is the system speaking,
+        // and an id here would document a review of model output that was never
+        // generated.
+        await seedInspection();
+        const out = await service().generateInspectionSummary(TENANT, INSPECTION);
+        expect(out.summary).toMatch(/^No significant defects/);
+        expect(out.aiCallId).toBeNull();
+        expect(record).not.toHaveBeenCalled();
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('the standalone dev mocks carry NO id', async () => {
+        // No key at all, so nothing is sent and nothing is recorded. `[DEV]`
+        // placeholder prose must not be citable as reviewed model output.
+        const svc = service('standalone', '');
+        const rewrite = await svc.rewriteComment({
+            itemLabel: 'Roof', sectionTitle: 'Roof', tab: 'defects',
+            originalComment: 'Old text', instruction: 'shorten',
+        });
+        expect(rewrite.rewritten).toMatch(/^\[DEV\] /);
+        expect(rewrite.aiCallId).toBeNull();
+
+        const suggest = await svc.suggestComment({ itemName: 'Roof', sectionName: 'Roof' });
+        expect(suggest.suggestions).toHaveLength(3);
+        expect(suggest.aiCallId).toBeNull();
+        expect(record).not.toHaveBeenCalled();
+    });
+
+    it('an unparseable completion returns no suggestions and no id — but the call DID run', async () => {
+        // The absence-assertion trap: "aiCallId is null" is satisfied for free
+        // by a method that never reached the provider. The provenance write and
+        // the outbound call are asserted to have happened, so the null is about
+        // the completion being unusable and nothing else.
+        fetchMock.mockResolvedValue({
+            ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'no array here' }] } }] }),
+        } as Response);
+        const out = await service().suggestComment({ itemName: 'Roof', sectionName: 'Roof' });
+        expect(out.suggestions).toEqual([]);
+        expect(out.aiCallId).toBeNull();
+        expect(record).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledOnce();
     });
 });
 

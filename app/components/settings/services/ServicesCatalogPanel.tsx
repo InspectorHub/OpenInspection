@@ -156,7 +156,7 @@ export function ServicesCatalogPanel({
                   <button
                     type="button"
                     onClick={() => onEdit(editingId === svc.id ? null : svc.id)}
-                    className="text-[12px] font-semibold text-ih-primary hover:underline"
+                    className="text-[12px] font-semibold text-ih-primary-text hover:underline"
                   >
                     {editingId === svc.id ? m.common_cancel() : m.settings_services_edit()}
                   </button>
@@ -165,7 +165,7 @@ export function ServicesCatalogPanel({
                   <input type="hidden" name="intent" value="toggle-service" />
                   <input type="hidden" name="id" value={svc.id} />
                   <input type="hidden" name="active" value={String(svc.active)} />
-                  <button type="submit" className="text-[12px] font-semibold text-ih-primary hover:underline">
+                  <button type="submit" className="text-[12px] font-semibold text-ih-primary-text hover:underline">
                     {svc.active ? m.settings_services_deactivate() : m.settings_services_activate()}
                   </button>
                 </Form>

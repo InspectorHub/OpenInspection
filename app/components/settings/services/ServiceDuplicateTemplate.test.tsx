@@ -16,6 +16,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
 import { ServiceFields } from "~/components/settings/services/ServiceFields";
+import { asSelect } from "../../../../tests/helpers/dom";
 
 const TEMPLATES = [
   { id: "tpl-residential", name: "Standard Residential Inspection" },
@@ -50,7 +51,7 @@ function renderFields(otherServices = OTHERS, initialTemplateId = "") {
     },
   ]);
   render(<Stub initialEntries={["/settings/services"]} />);
-  return screen.getByLabelText(/template/i) as HTMLSelectElement;
+  return asSelect(screen.getByLabelText(/template/i));
 }
 
 describe("service template picker — the duplicate-report trap", () => {

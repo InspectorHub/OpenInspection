@@ -37,7 +37,7 @@ export function PayCard({
 }) {
     return (
         <section className="px-6 py-5 sm:px-8">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4 mb-3">{m.checkout_pay_step_label()}</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-3 mb-3">{m.checkout_pay_step_label()}</p>
 
             {state === "na" && (
                 <p className="text-[13px] text-ih-fg-3">{m.checkout_pay_none_required()}</p>
@@ -157,7 +157,7 @@ function PayPanel({
                     >
                         {phase === "loading" ? m.checkout_pay_starting() : m.checkout_pay_button({ amount: formatCurrency(amountCents, { locale, currency }) })}
                     </button>
-                    <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-ih-fg-4">
+                    <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-ih-fg-2">
                         <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                             <rect x="3" y="7" width="10" height="6" rx="1" />
                             <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />

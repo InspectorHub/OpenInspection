@@ -23,6 +23,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asAnyDb, asD1Db } from '../helpers/test-db';
 import { recordPayment, getHeldDepositCents } from '../../../server/services/payment-ledger.service';
 import { applyHeldDepositsToInvoice } from '../../../server/services/invoice/deposit-application';
 
@@ -57,7 +58,7 @@ beforeEach(async () => {
 });
 
 const payDeposit = (amountCents = 9000, providerRef = 'pi_dep') =>
-    recordPayment(db, TENANT, {
+    recordPayment(asAnyDb(db), TENANT, {
         inspectionId: INSPECTION, invoiceId: null, kind: 'deposit',
         amountCents, method: 'card', provider: 'stripe', providerRef,
     });
@@ -124,12 +125,12 @@ describe('applying a held deposit when the invoice is created', () => {
     it('decrements the held-deposit count the QBO health card reports', async () => {
         await payDeposit();
         expect(await heldDepositCount()).toBe(1);
-        expect(await getHeldDepositCents(db, TENANT, INSPECTION)).toBe(9000);
+        expect(await getHeldDepositCents(asAnyDb(db), TENANT, INSPECTION)).toBe(9000);
 
         await createInvoiceFor(45000);
 
         expect(await heldDepositCount()).toBe(0);
-        expect(await getHeldDepositCents(db, TENANT, INSPECTION)).toBe(0);
+        expect(await getHeldDepositCents(asAnyDb(db), TENANT, INSPECTION)).toBe(0);
     });
 
     it('does not double-apply to a second invoice on the same order', async () => {
@@ -173,13 +174,13 @@ describe('applying a held deposit when the invoice is created', () => {
             lineItems: [{ description: 'Consultation', amountCents: 20000 }],
         });
         expect(await rowsFor(inv.id)).toHaveLength(0);
-        expect(await getHeldDepositCents(db, TENANT, INSPECTION)).toBe(9000);
+        expect(await getHeldDepositCents(asAnyDb(db), TENANT, INSPECTION)).toBe(9000);
     });
 
     it('is idempotent called twice against the same invoice', async () => {
         await payDeposit();
         const inv = await createInvoiceFor(45000);
-        const moved = await applyHeldDepositsToInvoice(db, TENANT, inv.id, INSPECTION);
+        const moved = await applyHeldDepositsToInvoice(asD1Db(db), TENANT, inv.id, INSPECTION);
         expect(moved).toBe(0);
         expect(await rowsFor(inv.id)).toHaveLength(1);
     });

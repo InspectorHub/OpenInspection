@@ -27,7 +27,7 @@ export function CheckoutShell({
                     <span className="text-lg font-bold tracking-tight text-ih-fg-1">{companyName}</span>
                 </div>
                 <div className="bg-ih-bg-card rounded-lg shadow-ih-popover overflow-hidden">{children}</div>
-                <p className="text-center text-[11px] text-ih-fg-4 mt-6">{m.checkout_powered_by()}</p>
+                <p className="text-center text-[11px] text-ih-fg-3 mt-6">{m.checkout_powered_by()}</p>
             </div>
         </div>
     );

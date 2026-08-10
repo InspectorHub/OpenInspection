@@ -56,7 +56,7 @@ export function OnBehalfFields({
             {value.enabled && (
                 <div className="mt-3 pl-6 space-y-3">
                     <div>
-                        <label htmlFor={nameId} className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">
+                        <label htmlFor={nameId} className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">
                             {m.agreement_onbehalf_name_label()}
                         </label>
                         <input
@@ -71,7 +71,7 @@ export function OnBehalfFields({
                         />
                     </div>
                     <div>
-                        <label htmlFor={disclaimerId} className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">
+                        <label htmlFor={disclaimerId} className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">
                             {m.agreement_onbehalf_disclaimer_label()}
                         </label>
                         <textarea

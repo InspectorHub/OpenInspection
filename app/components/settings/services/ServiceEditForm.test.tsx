@@ -1,18 +1,22 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { createRoutesStub } from "react-router";
 import { ServiceEditForm } from "./ServiceEditForm";
+import { asSelect } from "../../../../tests/helpers/dom";
 
 afterEach(cleanup);
 
-const SERVICE = {
+type Service = ComponentProps<typeof ServiceEditForm>["service"];
+
+const SERVICE: Service = {
     id: "svc-1",
     name: "Full Home Inspection",
     description: "Everything except the roof",
     price: 45000,
     durationMinutes: 210,
-    templateId: null as string | null,
+    templateId: null,
 };
 
 const TEMPLATES = [
@@ -20,7 +24,7 @@ const TEMPLATES = [
     { id: "tpl-2", name: "Radon Measurement" },
 ];
 
-function renderForm(service = SERVICE) {
+function renderForm(service: Service = SERVICE) {
     const Stub = createRoutesStub([
         {
             path: "/",
@@ -68,7 +72,7 @@ describe("ServiceEditForm — opens with the service in it", () => {
 
     it("keeps the service's own template selected", () => {
         renderForm({ ...SERVICE, templateId: "tpl-2" });
-        expect((screen.getByLabelText(/report template/i) as HTMLSelectElement).value).toBe("tpl-2");
+        expect(asSelect(screen.getByLabelText(/report template/i)).value).toBe("tpl-2");
     });
 
     it("says what a missing template costs, on a service that has none", () => {

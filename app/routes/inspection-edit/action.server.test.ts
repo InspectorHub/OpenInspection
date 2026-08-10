@@ -26,6 +26,9 @@ vi.mock('~/lib/api-client.server', () => ({
 }));
 
 import { action } from './action.server';
+import { routeArgs } from '../../../tests/helpers/route-args';
+/** Minimal AppLoadContext stub — the action only forwards it to createApi. */
+const CONTEXT = {} as Parameters<typeof action>[0]['context'];
 
 function post(fields: Record<string, string>) {
     const body = new URLSearchParams(fields);
@@ -34,8 +37,7 @@ function post(fields: Record<string, string>) {
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: body.toString(),
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return action({ request, params: { id: 'insp-1' }, context: {} as any });
+    return action(routeArgs(request, { params: { id: 'insp-1' }, context: CONTEXT }));
 }
 
 describe('editor action — order-lifecycle intents (IA-30 Task 4)', () => {

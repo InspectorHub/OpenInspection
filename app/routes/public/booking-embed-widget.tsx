@@ -86,7 +86,7 @@ export function EmbedWizard({
               {m.booking_embed_not_open({ name: data.inspectorName })}
             </p>
             {(data.privacyUrl || data.termsUrl) && (
-              <p className="mt-4 text-center text-[11px] text-ih-fg-4">
+              <p className="mt-4 text-center text-[11px] text-ih-fg-3">
                 {data.privacyUrl && (
                   <a href={data.privacyUrl} target="_blank" rel="noreferrer" className="hover:underline">
                     {m.booking_link_privacy_policy()}

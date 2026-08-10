@@ -84,7 +84,7 @@ describe('automation seed classes', () => {
         // The screen filters on `audience`, so a class that disagrees with the
         // rule that sends it shows a client an office alert, or hides an agent
         // notification from the agent.
-        const audienceOf = (seed: { recipientKind?: string; recipientRoleKey?: string }) => {
+        const audienceOf = (seed: { recipientKind?: string; recipientRoleKey?: string | null }) => {
             if (seed.recipientKind === 'staff' || seed.recipientKind === 'inspector') return 'staff';
             if (seed.recipientRoleKey === 'buyer_agent' || seed.recipientRoleKey === 'listing_agent') return 'agent';
             return 'client';

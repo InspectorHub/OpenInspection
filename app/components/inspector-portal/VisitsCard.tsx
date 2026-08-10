@@ -132,7 +132,7 @@ export function VisitRow({
                             type="button"
                             disabled={busy}
                             onClick={() => onAction("complete", visit)}
-                            className="text-[12px] font-bold text-ih-primary enabled:hover:underline disabled:opacity-40"
+                            className="text-[12px] font-bold text-ih-primary-text enabled:hover:underline disabled:opacity-40"
                         >
                             {m.inspections_hub_visits_action_complete()}
                         </button>
@@ -142,7 +142,7 @@ export function VisitRow({
                             type="button"
                             disabled={busy}
                             onClick={() => onAction("results", visit)}
-                            className="text-[12px] font-bold text-ih-primary enabled:hover:underline disabled:opacity-40"
+                            className="text-[12px] font-bold text-ih-primary-text enabled:hover:underline disabled:opacity-40"
                         >
                             {m.inspections_hub_visits_action_results()}
                         </button>

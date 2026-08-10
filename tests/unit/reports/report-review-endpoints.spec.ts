@@ -23,6 +23,8 @@ import { AppError } from '../../../server/lib/errors';
 import { INSPECTION_STATUS } from '../../../server/lib/status/inspection-status';
 import { REPORT_STATUS } from '../../../server/lib/status/report-status';
 import type { UserRole } from '../../../server/types/auth';
+import { ScopedDB } from '../../../server/lib/db/scoped';
+import { asScopedDbSource } from '../helpers/test-db';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -47,6 +49,22 @@ const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
  * purely through `role` (owner/manager have publish=true, agent has
  * publish=false/pinned, inspector defaults to publish=true).
  */
+/**
+ * A REAL `ScopedDB` over the test database with only `getById` swapped, rather
+ * than an object literal cast to `ScopedDB`. `requireCapability` is the only
+ * consumer here and it calls `getById` alone, but a literal carrying one of
+ * nine members does not convert — and a stub that silently lacks the other
+ * eight is exactly the shape error a cast would hide.
+ */
+function sdbWithOverrides(
+    db: BetterSQLite3Database<typeof schema>,
+    permissionOverrides: Record<string, boolean> | null,
+): ScopedDB {
+    const sdb = new ScopedDB(asScopedDbSource(db), TENANT);
+    sdb.getById = async () => ({ permissionOverrides });
+    return sdb;
+}
+
 function buildApp(
     db: BetterSQLite3Database<typeof schema>,
     role: UserRole,
@@ -69,9 +87,7 @@ function buildApp(
         c.set('user', { sub: USER_ID, role, tenantId: TENANT });
         // sdb is used by requireCapability to resolve permission_overrides.
         // Provide a minimal stub that returns null overrides (pure role defaults).
-        c.set('sdb', {
-            getById: async () => ({ permissionOverrides: null }),
-        } as HonoConfig['Variables']['sdb']);
+        c.set('sdb', sdbWithOverrides(db, null));
         c.set('services', {
             inspection: svc,
             // Stubs for other services the router may touch:
@@ -97,8 +113,6 @@ async function seedInspection(
         id:               INSP_ID,
         tenantId:         TENANT,
         propertyAddress:  '1 Main St',
-        clientName:       'Test Client',
-        clientEmail:      'client@example.com',
         date:             '2026-06-01',
         status:           INSPECTION_STATUS.COMPLETED,
         reportStatus:     REPORT_STATUS.IN_PROGRESS,
@@ -225,9 +239,7 @@ describe('POST /api/inspections/:id/return — publish-gated', () => {
             c.set('userRole', 'inspector');
             c.set('user', { sub: USER_ID, role: 'inspector', tenantId: TENANT });
             // Return publish:false override — simulates "requires review" inspector
-            c.set('sdb', {
-                getById: async () => ({ permissionOverrides: { publish: false } }),
-            } as HonoConfig['Variables']['sdb']);
+            c.set('sdb', sdbWithOverrides(db, { publish: false }));
             c.set('services', {
                 inspection: svc,
                 reportVersion: { snapshotOnPublish: vi.fn().mockResolvedValue({ versionNumber: 1 }) },
@@ -300,9 +312,7 @@ describe('POST /api/inspections/:id/unpublish — publish-gated', () => {
             c.set('tenantId', TENANT);
             c.set('userRole', 'inspector');
             c.set('user', { sub: USER_ID, role: 'inspector', tenantId: TENANT });
-            c.set('sdb', {
-                getById: async () => ({ permissionOverrides: { publish: false } }),
-            } as HonoConfig['Variables']['sdb']);
+            c.set('sdb', sdbWithOverrides(db, { publish: false }));
             c.set('services', {
                 inspection: svc,
                 reportVersion: { snapshotOnPublish: vi.fn().mockResolvedValue({ versionNumber: 1 }) },

@@ -365,7 +365,7 @@ export function VersionHistoryPanel({
 
                     {loadState === "error" && (
                         <div className="py-6 text-center space-y-2">
-                            <p className="text-[13px] text-ih-bad">{m.editor_collab_load_failed()}</p>
+                            <p className="text-[13px] text-ih-bad-fg">{m.editor_collab_load_failed()}</p>
                             <button
                                 type="button"
                                 onClick={() => void loadSnapshots()}
@@ -456,7 +456,7 @@ export function VersionHistoryPanel({
                     {m.editor_collab_restore_confirm_body()}
                 </p>
                 {restoreError && (
-                    <p className="mt-3 text-[12px] text-ih-bad">{restoreError}</p>
+                    <p className="mt-3 text-[12px] text-ih-bad-fg">{restoreError}</p>
                 )}
             </Modal>
 

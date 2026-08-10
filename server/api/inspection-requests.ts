@@ -166,7 +166,15 @@ const inspectionRequestsRoutes = createApiRouter()
         if (q.from)   filter.from   = q.from;
         if (q.to)     filter.to     = q.to;
         const rows = await c.var.services.inspectionRequest.list(tenantId, filter);
-        return c.json({ success: true, data: rows, meta: { total: rows.length } }, 200);
+        // `InspectionRequestListResponseSchema` puts `{ requests, total }` INSIDE
+        // `data` — that is what the OpenAPI document publishes and what
+        // `packages/api-types` exports. The handler had drifted to the bare
+        // `data: rows` + `meta.total` envelope used by /api/inspections, so a
+        // generated client following the contract read `data.requests` and got
+        // undefined. Nothing under `app/` calls this endpoint (the hono client is
+        // wired in api-client.server.ts but never used), so the contract is the
+        // only consumer and the handler is the side that was wrong.
+        return c.json({ success: true, data: { requests: rows, total: rows.length } }, 200);
     })
     .openapi(detailRoute, async (c) => {
         const tenantId = c.get('tenantId');

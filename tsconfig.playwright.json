@@ -1,7 +1,58 @@
 {
+    // Program for the E2E / integration specs under `tests/`.
+    //
+    // ⚠️ IT WAS NEVER RUN BY ANYTHING, and that was not an oversight about
+    // wiring — it could not run. `extends` brings the app program's settings,
+    // and with no `references` the 2000+ `../../../server/…` imports in
+    // `tests/**` were compiled AS SOURCE, so a single non-composite pass tried
+    // to hold the whole server tree plus the app tree plus every spec. Measured:
+    // 2 minutes to a heap OOM at the default ~4 GB limit. A program that dies is
+    // indistinguishable from a program nobody added to CI, and a real TS1005
+    // syntax error sat in `tests/e2e/core.integration.spec.ts` behind it.
+    //
+    // Now it REFERENCES the api project and consumes the `.d.ts` that project
+    // already emits — the same change that fixed `tsconfig.tests-typecheck.json`
+    // (238s → 7s) and the app pass before it. `app/**` and `workers/**` stay
+    // source-compiled: only ~20 test files import from them, against ~2045 that
+    // import from `server/`.
+    //
+    // ⚠️ `references` is NOT inherited through `extends`, and `tsc -p` does NOT
+    // build referenced projects — it expects their output to exist and fails
+    // TS6305 when it does not. `npm run type-check:e2e` therefore runs
+    // `tsc -b tsconfig.api.json` first. Do not invoke this config directly.
     "extends": "./tsconfig.json",
+    "references": [{ "path": "./tsconfig.api.json" }],
     "compilerOptions": {
-        "types": ["@types/node"]
+        "types": ["@types/node"],
+        "noEmit": true,
+        "incremental": true,
+        // Its own build-info file. Sharing one with the app program makes each
+        // run look cold to the other, which is how a 20s check becomes a 6-minute
+        // one with nothing in the diff to explain it.
+        "tsBuildInfoFile": "./.tsbuildinfo.playwright"
+        //
+        // ⚠️ MEASURED FOOTPRINT, and why `type-check:e2e` caps the heap at 2048
+        // rather than the 8192 its siblings use. With the reference in place this
+        // program needs between 256 MB (OOMs) and 512 MB (passes, 6s cold); it
+        // also passes on Node's DEFAULT heap, which is the exact condition that
+        // used to kill it. An 8 GB cap would be 16x the need — and it would let a
+        // regression HIDE: drop the `references` line or widen `include` back to
+        // `tests/**` and the program silently eats gigabytes and slows to minutes
+        // instead of failing. A tight cap makes that regression loud.
     },
-    "include": ["tests/**/*", "playwright*.config.ts"]
+    // ⚠️ SCOPED TO tests/e2e, not all of tests/**, and the difference is a
+    // decision rather than a name. Widened to the whole test tree this program
+    // reports HUNDREDS of pre-existing errors in `tests/unit/**` — missing
+    // Cloudflare globals, a better-sqlite3 handle passed where a D1 one is
+    // typed, drizzle insert shapes. None of that is checked by anything today
+    // (vitest strips types with esbuild), so it is real debt, but it is a
+    // cleanup and not this gate. Turning it all on at once would mean either a
+    // red gate nobody can land against or a suppression list, and a suppressed
+    // gate is the state this config was already in.
+    "include": [
+        "worker-configuration.d.ts",
+        "tests/e2e/**/*",
+        "playwright*.config.ts"
+    ],
+    "exclude": ["node_modules", "dist", ".types"]
 }

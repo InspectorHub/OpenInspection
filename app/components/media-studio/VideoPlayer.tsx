@@ -49,7 +49,7 @@ export function VideoPlayer({
       return (
         <div
           data-testid="video-unavailable"
-          className="flex aspect-video w-full items-center justify-center rounded-xl bg-ih-bg-muted text-[13px] text-ih-fg-3"
+          className="flex aspect-video w-full items-center justify-center rounded-xl bg-ih-bg-muted text-[13px] text-ih-fg-2"
         >
           {m.media_video_unavailable()}
         </div>
@@ -76,7 +76,7 @@ export function VideoPlayer({
     return (
       <div
         data-testid="video-unavailable"
-        className="flex aspect-video w-full items-center justify-center rounded-xl bg-ih-bg-muted text-[13px] text-ih-fg-3"
+        className="flex aspect-video w-full items-center justify-center rounded-xl bg-ih-bg-muted text-[13px] text-ih-fg-2"
       >
         Video unavailable
       </div>
@@ -87,9 +87,9 @@ export function VideoPlayer({
     return (
       <div
         data-testid="video-processing"
-        className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl bg-ih-bg-muted text-[13px] text-ih-fg-3"
+        className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl bg-ih-bg-muted text-[13px] text-ih-fg-2"
       >
-        <svg className="h-6 w-6 animate-spin text-ih-primary" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+        <svg className="h-6 w-6 animate-spin text-ih-primary-text" fill="none" viewBox="0 0 24 24" aria-hidden="true">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
         </svg>

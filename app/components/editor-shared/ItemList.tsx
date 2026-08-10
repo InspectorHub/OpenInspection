@@ -146,7 +146,7 @@ export function ItemList({
 
               {editing && onRenameItem ? (
                 <div className="min-w-0 flex-1 flex items-center gap-2 px-2 py-2">
-                  <span className="text-[10px] text-ih-fg-4 font-mono w-5 shrink-0">{String(idx + 1).padStart(2, "0")}</span>
+                  <span className="text-[10px] text-ih-fg-3 font-mono w-5 shrink-0">{String(idx + 1).padStart(2, "0")}</span>
                   <InlineRename
                     value={item.label}
                     ariaLabel={m.editor_shared_item_name_aria()}
@@ -188,7 +188,7 @@ export function ItemList({
                     </span>
                   )}
                   {/* Number, label and rating dot are ALWAYS visible. */}
-                  <span className="text-[10px] text-ih-fg-4 font-mono w-5 shrink-0">
+                  <span className="text-[10px] text-ih-fg-3 font-mono w-5 shrink-0">
                     {String(idx + 1).padStart(2, "0")}
                   </span>
                   <span className="flex-1 truncate">{item.label}</span>
@@ -198,7 +198,7 @@ export function ItemList({
                     />
                   )}
                   {mode === "author" && (
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-4 flex-shrink-0">
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-2 flex-shrink-0">
                       {item.type}
                     </span>
                   )}
@@ -257,7 +257,7 @@ export function ItemList({
             variant="ghost"
             size="sm"
             onClick={onAddItem}
-            className="w-full h-auto py-2 border border-dashed border-ih-border-strong font-bold text-ih-fg-3 hover:bg-transparent hover:text-ih-primary hover:border-ih-primary"
+            className="w-full h-auto py-2 border border-dashed border-ih-border-strong font-bold text-ih-fg-3 hover:bg-transparent hover:text-ih-primary-text hover:border-ih-primary"
           >
             {m.editor_shared_add_item()}
           </Button>

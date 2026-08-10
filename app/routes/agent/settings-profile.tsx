@@ -8,7 +8,7 @@ import { PageHeader, Input, Button, Select, Checkbox } from "@core/shared-ui";
 import { BrowserTimezoneHint } from "~/components/settings/BrowserTimezoneHint";
 import { NotificationSettings } from "~/components/notifications/NotificationSettings";
 import type { AlwaysSentItem, ChannelId, ChoiceRow } from "~/components/notifications/NotificationPreferences";
-import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
+import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezone-options";
 import type { SmsConsent } from "~/components/notifications/SmsConsentBlock";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
@@ -193,7 +193,7 @@ export default function AgentSettingsProfilePage() {
 
       {/* Slug card */}
       <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
-        <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{m.agent_portal_settings_slug_eyebrow()}</p>
+        <p className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1">{m.agent_portal_settings_slug_eyebrow()}</p>
         <h2 className="text-sm font-bold text-ih-fg-1 mb-1">{m.agent_portal_settings_slug_heading()}</h2>
         <p className="text-[13px] text-ih-fg-3 mb-4">
           {m.agent_portal_settings_slug_desc()}
@@ -216,7 +216,7 @@ export default function AgentSettingsProfilePage() {
           </Button>
         </div>
         {!slugError && (
-          <p className="text-[12px] text-ih-fg-4 mt-2">
+          <p className="text-[12px] text-ih-fg-3 mt-2">
             {m.agent_portal_settings_slug_hint()}
           </p>
         )}
@@ -229,7 +229,7 @@ export default function AgentSettingsProfilePage() {
 
       {/* Notifications — per company, because the relationships are separate. */}
       <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
-        <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{m.agent_portal_settings_notifications_eyebrow()}</p>
+        <p className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1">{m.agent_portal_settings_notifications_eyebrow()}</p>
         <h2 className="text-sm font-bold text-ih-fg-1 mb-1">{m.agent_portal_settings_notifications_heading()}</h2>
         <p className="text-[13px] text-ih-fg-3 mb-4">
           {m.agent_portal_settings_notifications_desc()}
@@ -290,7 +290,7 @@ export default function AgentSettingsProfilePage() {
 
       {/* Timezone */}
       <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
-        <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{m.agent_portal_settings_timezone_eyebrow()}</p>
+        <p className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1">{m.agent_portal_settings_timezone_eyebrow()}</p>
         <h2 className="text-sm font-bold text-ih-fg-1 mb-1">{m.agent_portal_settings_timezone_heading()}</h2>
         <p className="text-[13px] text-ih-fg-3 mb-4">
           {m.agent_portal_settings_timezone_desc()}

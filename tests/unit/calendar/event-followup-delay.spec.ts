@@ -20,6 +20,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT = '00000000-0000-0000-0000-000000000097';
 const hours = (n: number) => n * 3600_000;
@@ -97,12 +98,11 @@ describe('EventService.followUpSendAt — per-event-type delay', () => {
         });
         await testDb.insert(schema.inspections).values({
             id: 'insp-followup', tenantId: TENANT, propertyAddress: '1 Main St',
-            clientName: null, clientEmail: null, clientPhone: null,
             date: '2026-08-01', status: 'confirmed', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
         const { seedRoleProfiles } = await import('../../../server/services/seed/seed-role-profiles');
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
         const { PeopleService } = await import('../../../server/services/people.service');
         await new PeopleService({ DB: {} as D1Database })
             .addPerson(TENANT, 'insp-followup', 'contact-followup', `crp_${TENANT}_client`);

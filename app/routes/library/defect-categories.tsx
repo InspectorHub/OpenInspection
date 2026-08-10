@@ -101,11 +101,11 @@ export default function DefectCategoriesPage() {
                     />
                     <p className="text-[13px] font-semibold text-ih-fg-1 truncate">{cat.name}</p>
                     {cat.drivesSummary && (
-                      <span className="shrink-0 inline-flex items-center h-4 px-1.5 rounded text-[9px] font-bold uppercase tracking-wide bg-ih-primary-tint text-ih-primary">{m.library_defect_summary_badge()}</span>
+                      <span className="shrink-0 inline-flex items-center h-4 px-1.5 rounded text-[9px] font-bold uppercase tracking-wide bg-ih-primary-tint text-ih-primary-text">{m.library_defect_summary_badge()}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => openEdit(cat)} className="text-[13px] text-ih-primary hover:opacity-80 font-semibold px-1">
+                    <button onClick={() => openEdit(cat)} className="text-[13px] text-ih-primary-text hover:opacity-80 font-semibold px-1">
                       {m.common_edit()}
                     </button>
                     {!cat.isSeed && (
@@ -116,7 +116,7 @@ export default function DefectCategoriesPage() {
                           <button type="submit" className="text-[12px] font-bold text-ih-bad-fg hover:opacity-80 px-1">{m.library_action_confirm()}</button>
                         </deleteFetcher.Form>
                       ) : (
-                        <button onClick={() => setConfirmId(cat.id)} className="text-[13px] text-ih-fg-4 hover:text-ih-bad-fg font-semibold px-1" title={m.common_delete()}>{m.common_delete()}</button>
+                        <button onClick={() => setConfirmId(cat.id)} className="text-[13px] text-ih-fg-3 hover:text-ih-bad-fg font-semibold px-1" title={m.common_delete()}>{m.common_delete()}</button>
                       )
                     )}
                   </div>

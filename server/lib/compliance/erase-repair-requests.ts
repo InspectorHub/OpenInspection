@@ -103,6 +103,14 @@ export async function eraseRepairRequests(
     const survivingIds = (survivingRows as Array<{ id: string }>).map((r) => r.id);
     if (survivingIds.length === 0) return;
 
+    // Only the free text is cleared, and `repair_action_tag` (#275) is not free
+    // text — it is a four-value classification of a defect, chosen from a fixed
+    // list, naming nobody. So it needs no rule here and gets none; the reasoning
+    // is registered in `erasure-out-of-scope.ts` alongside the snapshot columns.
+    // Checked at this file rather than assumed from the register, because this is
+    // where the rules actually execute and it is what the coverage spec's drift
+    // scan reads.
+    //
     // `isNotNull` is not an optimisation — it keeps the recorded count truthful.
     // Without it every row on the inspection reports as "cleared", and a
     // decision log that overstates what it did is the failure this log exists

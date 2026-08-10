@@ -24,6 +24,8 @@ import { useFetcher } from "react-router";
 import { m } from "~/paraglide/messages";
 import { RepairDefectRow } from "./repair/RepairDefectRow";
 import { useRepairOpQueue } from "./repair/useRepairOpQueue";
+import { useRepairItemDrafts } from "./repair/useRepairItemDrafts";
+import type { RepairActionTag } from "~/lib/repair-action-tag";
 import { resolveQuickPhrases, seedQuickPhrases } from "~/lib/repair-quick-phrases";
 import { RepairIntroPanel } from "./repair/RepairIntroPanel";
 import { RepairSharePanel } from "./repair/RepairSharePanel";
@@ -65,6 +67,8 @@ export interface RepairRequestItem {
   requestedCreditCents: number | null;
   note: string | null;
   sortOrder: number | null;
+  /** #275 — repair / replace / fund / other; null when the buyer never tagged it. */
+  repairActionTag: RepairActionTag | null;
 }
 
 export interface RepairRequest {
@@ -153,11 +157,6 @@ export function repairBuilderSectionProps(data: {
 // Component helpers
 // ---------------------------------------------------------------------------
 
-interface ItemDraft {
-  requestedCreditCents: number | null;
-  note: string;
-}
-
 // ---------------------------------------------------------------------------
 // Section entry — gated states OR the builder UI
 // ---------------------------------------------------------------------------
@@ -238,26 +237,22 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
   // Build initial selection + drafts + item-id lookup from the existing list.
   // (item-id lookup maps findingKey → server item id, used for PATCH/DELETE.)
   const existingItems: RepairRequestItem[] = (existingList?.items as RepairRequestItem[] | undefined) ?? [];
-  const initialSelected = new Set(existingItems.map((it) => it.findingKey));
-  const initialDrafts: Record<string, ItemDraft> = {};
   const initialItemIds: Record<string, string> = {};
-  for (const it of existingItems) {
-    initialDrafts[it.findingKey] = {
-      requestedCreditCents: it.requestedCreditCents,
-      note: it.note ?? "",
-    };
-    initialItemIds[it.findingKey] = it.id;
-  }
+  for (const it of existingItems) initialItemIds[it.findingKey] = it.id;
 
   const [sortKey, setSortKey] = useState<SortKey>("section");
-  const [selected, setSelected] = useState<Set<string>>(initialSelected);
-  const [drafts, setDrafts] = useState<Record<string, ItemDraft>>(initialDrafts);
   const { rrId, enqueueOp, mutationError } = useRepairOpQueue({
     initialRrId: existingList?.id ?? null,
     initialItemIds,
     token,
     actionPath,
   });
+  // Draft state + the four item mutations live in a sibling hook: this file was
+  // at its size cap when #275 added a fifth per-item field. The queue stays
+  // here because the hook needs `enqueueOp`, and the queue needs the item-id
+  // map derived above — one direction only.
+  const { selected, setSelected, drafts, toggleDefect, updateCredit, updateNote, updateTag } =
+    useRepairItemDrafts({ existingItems, token, enqueueOp });
   const [customIntro, setCustomIntro] = useState<string>(existingList?.customIntro ?? "");
   const [copyLabel, setCopyLabel] = useState(m.portal_repair_copy_share());
   const [emailTo, setEmailTo] = useState("");
@@ -276,80 +271,6 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
       setEmailSent(true);
     }
   }, [emailFetcher.state, emailFetcher.data]);
-
-  const toggleDefect = useCallback(
-    (defect: Defect) => {
-      const key = defect.findingKey;
-      const nowSelected = !selected.has(key);
-
-      setSelected((prev) => toggleSelected(prev, key));
-
-      if (nowSelected) {
-        // Selecting: enqueue an add-item. rrId is stamped at drain time, so this
-        // works even before the list has been created.
-        const fd = new FormData();
-        fd.append("_token", token ?? "");
-        fd.append("_intent", "add-item");
-        fd.append("findingKey", key);
-        fd.append("sectionTitle", defect.sectionTitle);
-        fd.append("itemLabel", defect.itemLabel);
-        fd.append("defectTitle", defect.defectTitle);
-        if (defect.location) fd.append("location", defect.location);
-        fd.append("category", defect.category);
-        if (defect.trade) fd.append("trade", defect.trade);
-        fd.append("commentSnapshot", defect.comment);
-        const draft = drafts[key];
-        if (draft?.requestedCreditCents != null) {
-          fd.append("requestedCreditCents", String(draft.requestedCreditCents));
-        }
-        if (draft?.note) fd.append("note", draft.note);
-        enqueueOp(fd);
-      } else {
-        // Deselecting: enqueue a remove-item. The server item id is resolved at
-        // drain time via _findingKey so an add still in flight is handled.
-        const fd = new FormData();
-        fd.append("_token", token ?? "");
-        fd.append("_intent", "remove-item");
-        fd.append("_findingKey", key);
-        enqueueOp(fd);
-      }
-    },
-    [selected, token, drafts, enqueueOp],
-  );
-
-  const updateCredit = useCallback(
-    (defect: Defect, cents: number | null) => {
-      setDrafts((prev) => ({
-        ...prev,
-        [defect.findingKey]: { ...(prev[defect.findingKey] ?? { note: "" }), requestedCreditCents: cents },
-      }));
-      if (cents !== null) {
-        const fd = new FormData();
-        fd.append("_token", token ?? "");
-        fd.append("_intent", "update-item");
-        fd.append("_findingKey", defect.findingKey);
-        fd.append("requestedCreditCents", String(cents));
-        enqueueOp(fd);
-      }
-    },
-    [token, enqueueOp],
-  );
-
-  const updateNote = useCallback(
-    (defect: Defect, note: string) => {
-      setDrafts((prev) => ({
-        ...prev,
-        [defect.findingKey]: { ...(prev[defect.findingKey] ?? { requestedCreditCents: null }), note },
-      }));
-      const fd = new FormData();
-      fd.append("_token", token ?? "");
-      fd.append("_intent", "update-item");
-      fd.append("_findingKey", defect.findingKey);
-      fd.append("note", note);
-      enqueueOp(fd);
-    },
-    [token, enqueueOp],
-  );
 
   const saveIntro = useCallback(() => {
     if (!rrId) return;
@@ -398,7 +319,7 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
       {/* Header */}
       <div>
-        <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-4 mb-1">
+        <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-3 mb-1">
           {m.portal_repair_eyebrow()}
         </p>
         <h1 className="text-2xl font-bold text-ih-fg-1">{m.portal_repair_heading()}</h1>
@@ -409,7 +330,7 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
 
       {/* Sort controls */}
       <div className="flex items-center gap-2">
-        <span className="text-[12px] font-bold text-ih-fg-4 uppercase tracking-widest">{m.portal_repair_sort_by()}</span>
+        <span className="text-[12px] font-bold text-ih-fg-3 uppercase tracking-widest">{m.portal_repair_sort_by()}</span>
         {(
           [
             ["section", m.portal_repair_sort_section()],
@@ -465,10 +386,12 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
                 isSelected={isSelected}
                 draft={draft}
                 creditCents={draft?.requestedCreditCents ?? null}
+                actionTag={draft?.actionTag ?? null}
                 phrases={phrases}
                 onToggle={toggleDefect}
                 onUpdateCredit={updateCredit}
                 onUpdateNote={updateNote}
+                onUpdateTag={updateTag}
               />
             );
           })}

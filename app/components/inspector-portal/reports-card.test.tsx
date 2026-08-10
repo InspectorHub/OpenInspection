@@ -41,7 +41,11 @@ function renderCard(reports: ReportRow[], canManage = true) {
         {
             path: "/hub",
             Component: () => (
-                <ReportsCard reports={reports} canManage={canManage} formatDate={(iso) => `on ${iso.slice(0, 10)}`} />
+                <ReportsCard
+                    reports={reports}
+                    canManage={canManage}
+                    formatDate={(iso) => `on ${iso.slice(0, 10)}`}
+                />
             ),
             action: async ({ request }) => {
                 const form = await request.formData();

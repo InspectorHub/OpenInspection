@@ -206,7 +206,7 @@ export default function SettingsIntegrationsQbo() {
         <p className="text-[13px] text-ih-fg-3">
           {m.settings_qbo_credentials_desc_before()}{" "}
           <a href="https://developer.intuit.com/app/developer/appdetail" target="_blank" rel="noopener noreferrer"
-            className="text-ih-primary hover:underline">
+            className="text-ih-primary-text hover:underline">
             {m.settings_qbo_credentials_link()}
           </a>.
         </p>
@@ -334,7 +334,7 @@ export default function SettingsIntegrationsQbo() {
               <button
                 onClick={triggerSync}
                 disabled={syncing}
-                className="px-4 py-2 text-[12px] font-bold bg-ih-primary-tint text-ih-primary rounded-md hover:bg-ih-primary-tint transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-[12px] font-bold bg-ih-primary-tint text-ih-primary-text rounded-md hover:bg-ih-primary-tint transition-colors disabled:opacity-50"
               >
                 {syncing ? m.settings_qbo_syncing() : m.settings_qbo_sync_now()}
               </button>

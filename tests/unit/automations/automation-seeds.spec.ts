@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq, and } from 'drizzle-orm';
 
@@ -26,7 +27,7 @@ beforeEach(async () => {
     // Spec 2 Task 0 — ensureSeeds now resolves each seed's recipientRoleKey to a
     // per-tenant contact_role_profiles.id and SKIPS a rule whose role isn't
     // seeded yet, so role profiles must exist before ensureSeeds runs.
-    await seedRoleProfiles(db, TENANT, new Date(1));
+    await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
     svc = new AutomationService({} as D1Database);
 });
 

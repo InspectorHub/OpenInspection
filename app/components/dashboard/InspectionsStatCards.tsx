@@ -12,7 +12,7 @@ export function InspectionsStatCards({
     counts: { upcoming: number; inProgress: number; needsAttention: number; recent: number };
 }) {
     const stats = [
-        { label: m.inspections_list_stat_upcoming(), value: counts.upcoming, icon: "calendar" as const, color: "text-ih-primary bg-ih-primary-tint" },
+        { label: m.inspections_list_stat_upcoming(), value: counts.upcoming, icon: "calendar" as const, color: "text-ih-primary-text bg-ih-primary-tint" },
         { label: m.inspections_list_stat_in_progress(), value: counts.inProgress, icon: "edit" as const, color: "text-ih-watch-fg bg-ih-watch-bg" },
         { label: m.inspections_list_stat_needs_attention(), value: counts.needsAttention, icon: "zap" as const, color: "text-ih-bad-fg bg-ih-bad-bg" },
         { label: m.inspections_list_stat_recent_reports(), value: counts.recent, icon: "check" as const, color: "text-ih-ok-fg bg-ih-ok-bg" },

@@ -124,13 +124,13 @@ export function PhotoCropper({
         <div className={`items-center gap-2 flex-wrap ${options.length > 1 ? "flex" : "hidden"}`}>
           {options.map((a) => (
             <button key={a} type="button" onClick={() => setAspectKey(a)}
-              className={`h-8 px-3 rounded-md text-[12px] font-bold border transition-colors ${aspectKey === a ? "border-ih-primary text-ih-primary" : "border-ih-border text-ih-fg-2 hover:border-ih-primary/60"}`}>
+              className={`h-8 px-3 rounded-md text-[12px] font-bold border transition-colors ${aspectKey === a ? "border-ih-primary text-ih-primary-text" : "border-ih-border text-ih-fg-2 hover:border-ih-primary/60"}`}>
               {a === "free" ? m.media_cropper_free() : a}
             </button>
           ))}
           <button type="button" onClick={() => setPortrait((p) => !p)} title={m.media_cropper_orientation_toggle()}
             aria-pressed={portrait} disabled={isFree}
-            className={`h-8 px-3 rounded-md text-[12px] font-bold border transition-colors disabled:opacity-40 ${portrait ? "border-ih-primary text-ih-primary" : "border-ih-border text-ih-fg-2 hover:border-ih-primary/60"}`}>
+            className={`h-8 px-3 rounded-md text-[12px] font-bold border transition-colors disabled:opacity-40 ${portrait ? "border-ih-primary text-ih-primary-text" : "border-ih-border text-ih-fg-2 hover:border-ih-primary/60"}`}>
             ↔ {portrait ? m.media_cropper_portrait() : m.media_cropper_landscape()}
           </button>
         </div>
@@ -141,12 +141,12 @@ export function PhotoCropper({
               subject where I want it before I cut". */}
           <button type="button" onClick={() => setRotation((r) => normalizeRotation(r - 90))}
             aria-label={m.media_cropper_rotate_left()} title={m.media_cropper_rotate_left()}
-            className="h-8 w-8 shrink-0 rounded-md border border-ih-border text-ih-fg-2 hover:border-ih-primary hover:text-ih-primary transition-colors flex items-center justify-center">
+            className="h-8 w-8 shrink-0 rounded-md border border-ih-border text-ih-fg-2 hover:border-ih-primary hover:text-ih-primary-text transition-colors flex items-center justify-center">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a4 4 0 014 4v2M3 10l4-4M3 10l4 4" /></svg>
           </button>
           <button type="button" onClick={() => setRotation((r) => normalizeRotation(r + 90))}
             aria-label={m.media_cropper_rotate_right()} title={m.media_cropper_rotate_right()}
-            className="h-8 w-8 shrink-0 rounded-md border border-ih-border text-ih-fg-2 hover:border-ih-primary hover:text-ih-primary transition-colors flex items-center justify-center">
+            className="h-8 w-8 shrink-0 rounded-md border border-ih-border text-ih-fg-2 hover:border-ih-primary hover:text-ih-primary-text transition-colors flex items-center justify-center">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10H11a4 4 0 00-4 4v2M21 10l-4-4M21 10l-4 4" /></svg>
           </button>
         </div>

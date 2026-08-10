@@ -54,9 +54,9 @@ class ProbeQbo extends withInvoiceSync(QBOServiceBase) {
     ) {
         super({} as never, 'cid', 'secret', 'whsec', 'jwt');
     }
-    protected override getDrizzle() { return stubDb(this.mappedQboId, this.tenantTz) as never; }
-    protected override async getQBOCustomerIdForInvoice(): Promise<string | null> { return 'QBO-CUST-9'; }
-    protected override async apiCall<T>(
+    public override getDrizzle() { return stubDb(this.mappedQboId, this.tenantTz) as never; }
+    public override async getQBOCustomerIdForInvoice(): Promise<string | null> { return 'QBO-CUST-9'; }
+    public override async apiCall<T>(
         _tenantId: string, method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown,
     ): Promise<T> {
         this.calls.push({ method, path, body });

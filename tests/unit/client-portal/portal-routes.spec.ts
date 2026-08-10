@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PortalService } from '../../../server/services/portal.service';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -43,7 +44,7 @@ describe('portal API', () => {
         });
     }
 
-    async function seedToken(inspectionId: string, recipientEmail: string, role: 'client' | 'co_client' | 'agent' = 'client', revokedAt: number | null = null) {
+    async function seedToken(inspectionId: string, recipientEmail: string, role: 'client' | 'co_client' | 'agent' = 'client', revokedAt: Date | null = null) {
         await testDb.insert(schema.inspectionAccessTokens).values({
             id: crypto.randomUUID(),
             tenantId: TENANT,
@@ -164,7 +165,7 @@ describe('portal API', () => {
         // Both listRecipientInspections and the /exchange capability gate now
         // derive their role filter from active role profiles' selfRetrieveReport
         // capability (client/co_client by default) instead of a hard-coded list.
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
     });
 
     it('POST /request-link returns 200 for a known recipient and sends an email', async () => {
@@ -177,7 +178,7 @@ describe('portal API', () => {
             body: JSON.stringify({ email: 'a@x.com' }),
         }, reqEnv());
         expect(res.status).toBe(200);
-        const json = await res.json();
+        const json = await res.json<{ data: { sent: boolean } }>();
         expect(json.data.sent).toBe(true);
         // The route's job is the LINK; the email body is the email service's
         // (see `sendClientPortalLogin` — it renders the branded template and
@@ -199,7 +200,7 @@ describe('portal API', () => {
             body: JSON.stringify({ email: 'nobody@x.com' }),
         }, reqEnv());
         expect(res.status).toBe(200);
-        const json = await res.json();
+        const json = await res.json<{ data: { sent: boolean } }>();
         expect(json.data.sent).toBe(true);
         expect(sendClientPortalLogin).not.toHaveBeenCalled();
     });
@@ -274,7 +275,7 @@ describe('portal API', () => {
         const token = await signMagicLink(SECRET, 'a@x.com');
         const ok = await app.request(`/api/portal/acme/redeem?link=${encodeURIComponent(token)}`, {}, reqEnv());
         expect(ok.status).toBe(200);
-        expect((await ok.json()).data.email).toBe('a@x.com');
+        expect((await ok.json<{ data: { email: string } }>()).data.email).toBe('a@x.com');
         // Redeem now establishes the session: __Host-portal_session must be set.
         expect(ok.headers.get('set-cookie') ?? '').toContain('__Host-portal_session=');
 
@@ -290,7 +291,7 @@ describe('portal API', () => {
             `/api/portal/acme/exchange?token=${encodeURIComponent(token)}&inspectionId=insp1`,
             {}, reqEnv());
         expect(res.status).toBe(200);
-        expect((await res.json()).data.email).toBe('a@x.com');
+        expect((await res.json<{ data: { email: string } }>()).data.email).toBe('a@x.com');
         expect(res.headers.get('set-cookie') ?? '').toContain('__Host-portal_session=');
     });
 
@@ -345,7 +346,7 @@ describe('portal API', () => {
             headers: { cookie: '__Host-portal_session=' + cookie },
         }, reqEnv());
         expect(res.status).toBe(200);
-        const json = await res.json();
+        const json = await res.json<{ data: { email: string; inspections: unknown[] } }>();
         expect(json.data.email).toBe('a@x.com');
         expect(json.data.inspections.length).toBeGreaterThan(0);
     });
@@ -359,7 +360,7 @@ describe('portal API', () => {
             headers: { cookie: '__Host-portal_session=' + cookie },
         }, reqEnv());
         expect(res.status).toBe(200);
-        const body = await res.json();
+        const body = await res.json<{ data: { address: string; token: string } }>();
         expect(body.data.address).toContain('insp1');
         // The Hub needs the recipient's persistent per-inspection token to build
         // section deep-links (works for magic-link sessions with no URL ?token).
@@ -397,7 +398,7 @@ describe('portal API', () => {
             headers: { cookie: '__Host-portal_session=' + cookie },
         }, reqEnv());
         expect(res.status).toBe(200);
-        const body = await res.json();
+        const body = await res.json<{ data: { sections: { name: string; totalItems: number; completedItems: number }[] } }>();
         expect(Array.isArray(body.data.sections)).toBe(true);
         expect(body.data.sections.length).toBeGreaterThan(0);
         expect(typeof body.data.sections[0].name).toBe('string');
@@ -426,7 +427,7 @@ describe('portal API', () => {
             headers: { cookie: '__Host-portal_session=' + cookie },
         }, reqEnv());
         expect(res.status).toBe(200);
-        expect((await res.json()).data.ok).toBe(true);
+        expect((await res.json<{ data: { ok: boolean } }>()).data.ok).toBe(true);
         // deleteCookie emits a clearing Set-Cookie (Max-Age=0 / past expiry).
         const setCookieHdr = res.headers.get('set-cookie') ?? '';
         expect(setCookieHdr).toContain('__Host-portal_session=');
@@ -439,7 +440,7 @@ describe('portal API', () => {
             method: 'POST',
         }, reqEnv());
         expect(res.status).toBe(200);
-        expect((await res.json()).data.ok).toBe(true);
+        expect((await res.json<{ data: { ok: boolean } }>()).data.ok).toBe(true);
     });
 
     it('POST /logout → 200 even when the tenant slug is unresolved (clearing is tenant-agnostic)', async () => {
@@ -448,6 +449,6 @@ describe('portal API', () => {
             method: 'POST',
         }, reqEnv());
         expect(res.status).toBe(200);
-        expect((await res.json()).data.ok).toBe(true);
+        expect((await res.json<{ data: { ok: boolean } }>()).data.ok).toBe(true);
     });
 });

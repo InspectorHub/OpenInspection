@@ -245,9 +245,67 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'repair_request_items', column: 'trade_snapshot', reason: 'resolved trade label ("licensed roofer") snapshotted at add time — tenant taxonomy value, not personal data' },
     { table: 'repair_request_items', column: 'section_title', reason: 'frozen copy of the report section heading — template structure, not personal data' },
     { table: 'repair_request_items', column: 'item_label', reason: 'frozen copy of the report item label — template structure, not personal data' },
+    // Declared here rather than left silent, and the honest note about WHY it
+    // needed declaring: no gate asked for it. `check-erasure-manifest.mjs`
+    // matches a fixed PII name pattern and `repair_action_tag` matches nothing,
+    // so this column was invisible to `lint:erasure` from the moment it existed.
+    // It is pinned in the coverage spec's HEURISTIC_BLIND_SPOTS list for exactly
+    // that reason — that list is the population found by reading.
+    { table: 'repair_request_items', column: 'repair_action_tag', reason: 'the buyer\'s requested remedy on one line (repair / replace / fund / other) — a four-value classification of a defect, chosen from a fixed list, carrying no free text and naming nobody. Not prose about or by the data subject, and unlike `note` it cannot be made to hold any: the enum is enforced at the request boundary' },
     // Sits inside the address family by name and outside it by substance: it
     // records WHEN the geocode ran, not where the property is. Excluded rather
     // than retained so the retain rules above stay a list of columns that
     // actually hold the address.
     { table: 'inspections', column: 'address_geocoded_at', reason: 'timestamp recording when the address was geocoded — a processing record, not the address itself' },
+
+    // ── ai_content_reviews (AI governance — review evidence) ──────────────────
+    // One row per human review of model-assisted text: which artifact was
+    // reviewed, by which staff user, at what time, against which
+    // `ai_call_provenance` row. The sibling ledger `ai_call_provenance` is
+    // recorded in `erasure-manifest.ts` as `retain`; this table is recorded HERE
+    // instead, and the difference is deliberate rather than editorial.
+    //
+    // WHY THE REGISTER AND NOT A RULE. A `retain` rule is an answer to "what do
+    // we do with the data subject's data on this table". There is none: the row
+    // holds a STAFF identity, two opaque ids, an enum and a timestamp, and no
+    // part of the reviewed text — the same design constraint as the provenance
+    // ledger, for the same reason (an inspector's defect note routinely names
+    // the client and the property, so neither table may hold what was said). The
+    // manifest's own reviewer note on `ai_call_provenance` says columns carrying
+    // no personal data belong in this file; those eight are here by that logic
+    // too, just not yet moved.
+    //
+    // ⚠️ WHAT WOULD CHANGE THIS. A column carrying any part of the reviewed
+    // prose, or an identifier of a CONTACT rather than of a staff user. Either
+    // one makes a row subject-linkable and needs a manifest rule with a basis, a
+    // period, and something that enforces the period.
+    //
+    // ⚠️ NOTHING WENT RED TO PRODUCE THIS BLOCK. `PII_HEURISTIC` in
+    // `scripts/check-erasure-manifest.mjs` matches no column on this table —
+    // not `reviewed_by`, not `artifact_id` — so the table could have shipped and
+    // `lint:erasure` would have stayed green. `reviewed_by` and `artifact_id`
+    // are pinned in the coverage spec's HEURISTIC_BLIND_SPOTS so that the
+    // declaration is enforced by something rather than merely present.
+    { table: 'ai_content_reviews', column: 'reviewed_by',
+      reason: 'the STAFF user who reviewed model-assisted text before publication — an accountability record of an employee professional act, the same posture as report_signoff.person_id and tenant_legal_versions.published_by_user_id. Staff offboarding lifecycle, not consumer-DSAR scope' },
+    // ⚠️ Both reasons below were written when `artifact_type` had ONE member and
+    // described a second that was never added. `artifact_id` named
+    // `report_versions` — the table the enum comment in `schema/ai.ts` explicitly
+    // REJECTED, because `report_versions.summary` is the amendment reason and not
+    // a narrative — and `artifact_type` called itself two-value while the enum
+    // held one. Corrected in the change that added the real second member,
+    // `report` -> `reports.inspector_narrative`. The classification is unaffected;
+    // what changes is that the reason now names the tables that exist.
+    { table: 'ai_content_reviews', column: 'artifact_id',
+      reason: 'opaque primary key of the inspection_results or reports row that received the text; that row carries its own rules (reports.inspector_narrative has an anonymize rule in erasure-manifest.ts), the same answer as reports.inspection_id. Holds no part of the reviewed prose' },
+    { table: 'ai_content_reviews', column: 'artifact_type',
+      reason: 'two-value enum (inspection_result | report) naming WHICH table artifact_id points into — a pointer discriminator, not personal data' },
+    { table: 'ai_content_reviews', column: 'ai_call_id',
+      reason: 'pointer to the ai_call_provenance row for the call, itself call metadata with no subject linkage (see the ai_call_provenance block in erasure-manifest.ts)' },
+    { table: 'ai_content_reviews', column: 'reviewed_at',
+      reason: 'timestamp recording when the review happened — a processing record about a staff action, not personal data of any data subject' },
+    { table: 'ai_content_reviews', column: 'tenant_id',
+      reason: 'tenant scope key, not personal data' },
+    { table: 'ai_content_reviews', column: 'id',
+      reason: 'opaque primary key' },
 ];

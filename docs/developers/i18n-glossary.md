@@ -4,10 +4,31 @@ One equivalent per term, decided once. The catalogue is 4,300 keys across 29
 module files in `messages/`; without a fixed term list the same noun acquires
 four translations across those files and the result reads as machine output.
 
-This file is **machine-read**. `npm run lint:i18n-glossary`
-(`scripts/check-i18n-glossary.mjs`) parses the tables below and fails the build
-when `messages/es-419/**` contradicts them, so the glossary cannot quietly drift
-away from the catalogue it governs. Edit the table, not the gate.
+This file is **machine-read** — but only in part, and the difference matters.
+`npm run lint:i18n-glossary` (`scripts/check-i18n-glossary.mjs`) parses the
+tables below and holds `messages/es-419/**` to exactly four things:
+
+- the **Never** column of every `<!-- gate:terms -->` table — a translation
+  containing a ruled-out word fails the build;
+- the `<!-- gate:literal -->` table — a string that must reach the reader
+  byte-identical (`STOP`, `pk_test_`, `label,floor`) and did not;
+- **placeholders** — `{name}` tokens must be the same set in both locales;
+- **consistency** — character-identical English must have identical Spanish,
+  unless the keys are declared under `<!-- gate:divergence -->`.
+
+Everything else here is prose a human has to honour. In particular the
+**es-419** column is *not* compared against the catalogue: no gate can tell that
+*informe* is the word the translator should have reached for. That column is
+checked only for self-consistency — a term this file bans in one row can never
+be the term it approves in another — and the rest is review.
+
+The gate refuses to run at all on a document it cannot fully parse: an unknown
+table header, a marker not sitting directly above its table, prose in a Never
+column, or any section shrinking below `scripts/i18n-glossary-baseline.json`.
+That strictness is the lesson of its own history — every time this gate went
+quiet it was reading *less*, never reading something wrong. Edit the table, not
+the gate; if a section legitimately shrinks, run
+`node scripts/check-i18n-glossary.mjs --update` and commit the baseline with it.
 
 ## Status of the Spanish catalogue
 
@@ -75,9 +96,72 @@ catalogue.
    header row only when it reads exactly that. Translating the hint to
    `etiqueta,piso` would teach a Spanish user to type a header the parser then
    imports as a unit named "etiqueta". Translate the prose around such a
-   literal; leave the literal alone.
+   literal; leave the literal alone. The literals themselves are listed in the
+   next section and enforced from there — this rule explains *why*, that table
+   is *what*.
 
 ---
+
+## Literals that must survive translation
+
+Rules 3 and 7 above name strings that have to reach the reader unchanged. Naming
+them in a paragraph made them advice; this table makes them a check. For every
+row, **any `messages/en` value containing the literal must have an `es-419`
+value containing it byte-identically** — same case, same punctuation. A key with
+no Spanish yet is fine: it falls back to English, which is the correct string by
+definition.
+
+A row belongs here when some rule in this file already says the string stays
+English *and* getting it wrong is not a matter of taste. The three classes are:
+a value a parser or a carrier matches on (`label,floor`, `STOP`), a sample of a
+format the user must reproduce (`pk_test_`, `+15551234567`), and a proper noun
+(`OpenInspection`, `Stripe`). Words that merely *look* invariant do not qualify:
+`GDPR` is *RGPD* in Spanish and "Resend" is *Reenviar* when it is the verb — both
+are in the tables below, where a human decides, not in here.
+
+Rows are matched as plain substrings, so keep them distinctive. The gate fails
+if a listed literal appears in no English value at all — a typo here would
+otherwise protect nothing while looking like protection.
+
+<!-- gate:literal -->
+
+| Literal | Where it appears | Why it stays English |
+|---|---|---|
+| `label,floor` | the unit-CSV placeholder and hint | `parseUnitCsv` (`server/lib/unit-pattern.ts`) skips the header row only on this exact text; a translated hint teaches the user to type a header that then imports as a unit. |
+| `radon_pickup` | the event-type slug sample | A sample of a URL-safe key the user copies. See the Slug row. |
+| `STOP` | SMS consent copy, compliance panels | The word a consumer texts back to opt out. Carriers match it; a translated one is a compliance failure, not a typo. |
+| `START` | SMS consent copy, provider webhooks | Re-subscribe keyword, same reason as STOP. |
+| `HELP` | SMS consent copy, provider webhooks | Help keyword, same reason as STOP. |
+| `pk_test_` | Stripe key-field hints | A key prefix the user checks their own credential against. |
+| `sk_test_` | Stripe key-field hints | As above. |
+| `whsec_` | Stripe webhook-secret hints | As above. |
+| `SG.` | SendGrid key-field hint | As above. The trailing dot is part of the prefix. |
+| `acct_1AbCdEfGhIjKlMnO` | Stripe account-id sample | A format sample. |
+| `+15551234567` | phone-number format samples | E.164 sample; a localised one would be a wrong number. |
+| `customer.cloudflarestream.com` | Stream subdomain hint | A hostname the user pastes. |
+| `Account SID` | Twilio credential fields | The field is labelled this in Twilio's console; a translated label sends the user hunting. |
+| `Auth Token` | Twilio credential fields | As above. |
+| `Send test event` | Stripe webhook setup steps | The label of a button the user clicks *in Stripe*. |
+| `OpenInspection` | product name, 87 keys | Rule 3. |
+| `Stripe` | payments settings and checkout | Vendor name. |
+| `Twilio` | SMS settings | Vendor name. |
+| `Telnyx` | SMS settings | Vendor name. |
+| `SendGrid` | email settings | Vendor name. |
+| `Postmark` | email settings | Vendor name. |
+| `Mailgun` | email settings | Vendor name. |
+| `QuickBooks` | accounting integration | Vendor name. |
+| `Cloudflare` | infrastructure copy | Vendor name. |
+| `Google` | calendar and places integrations | Vendor name. |
+| `Turnstile` | booking bot protection | Product name. |
+| `10DLC` | SMS registration copy | The carrier programme's name. |
+| `TCR` | SMS registration copy | The Campaign Registry, a proper noun. |
+| `ASTM` | commercial report copy | Standards body. |
+| `PCA` | commercial report copy | Acronym of the standard — see the Commercial PCA table. |
+| `PSQ` | commercial report copy | As above. |
+| `PCR` | commercial report copy | As above. |
+| `EUL` | commercial cost tables | As above. |
+| `RUL` | commercial cost tables | As above. |
+| `N/A` | severity and field values | Abbreviates *no aplica* in Spanish — same letters, same expansion. |
 
 ## Product nouns
 
@@ -148,9 +232,9 @@ gate compares them against each other.
 ### Roles that are database seeds, not catalogue keys
 
 `Buyer's Agent`, `Listing Agent`, `Attorney`, `Transaction Coordinator`,
-`Insurance Agent`, `Title Company` and `Co-Client` are seeded labels in
-`server/lib/people/default-role-profiles.ts`, and tenants can rename them. They
-are **not** translatable today and **no message key should be invented for
+`Insurance Agent` and `Title Company` are seeded labels in
+`server/lib/people/default-role-profiles.ts`, and tenants can rename them. None
+of them has a message key today, and **no message key should be invented for
 them** during translation. The equivalents are fixed here so that whenever they
 do become translatable the term is already decided:
 
@@ -162,6 +246,16 @@ do become translatable the term is already decided:
 | Transaction Coordinator | Coordinador de transacción | |
 | Insurance Agent | Agente de seguros | |
 | Title Company | Empresa de títulos | *Empresa*, not *compañía* — consistent with the Company row above. |
+
+**`Co-Client` is deliberately not in that list.** It is the one name that is
+*both*: a seeded, tenant-renameable role profile (`co_client` in
+`default-role-profiles.ts`) **and** a fixed catalogue string. The public
+signature-verification page renders the signer's role from a hardcoded switch
+(`app/routes/public/verify.tsx`), so `public_verify_role_co_client` exists and
+**is** translated — *Cliente secundario*, per the Co-Client row in the table
+above. The two renderings agree, and they must: a tenant who renamed their role
+profile sees their own words in the people list (rule 5) and the fixed label on
+the verify page. Do not "fix" this by deleting the key.
 
 ## Ratings and severity
 
@@ -428,7 +522,10 @@ field name (`Twilio Account SID`, `Auth Token`), a key prefix (`pk_test_`,
 `customer.cloudflarestream.com`) and the SMS keywords carriers match on
 (**STOP / START / HELP**) all stay English. Translate the prose around them. The
 STOP/HELP case is not cosmetic: those are the words a consumer texts back, and a
-translated one would be a compliance failure, not a typo.
+translated one would be a compliance failure, not a typo. The individual strings
+named in this paragraph are enforced from the "Literals that must survive
+translation" table near the top of this file — add a row there when you add one
+here, or the sentence is the only thing holding the line.
 
 <!-- gate:terms -->
 
@@ -493,9 +590,16 @@ Every entry here is wrong in `es-419` in every context, which is what makes it
 safe to ban outright. Soft preferences belong in the "Why" column of the tables
 above, not in this one.
 
+The columns are the same four as every other table, so the gate reads it the
+same way — headers are bound by name, and a table calling them anything else is
+treated as a different table and rejected. The only oddity is that the first
+column holds a grammatical category ("Possessive, 2nd person") rather than an
+English word for half the rows. That is what the English side *is* for a
+register rule; the column still means "the thing being fixed".
+
 <!-- gate:terms -->
 
-| Concept | Use | Never | Why |
+| English | es-419 | Never | Why |
 |---|---|---|---|
 | Possessive, 2nd person | su / sus | tu, tus | *tú* register. Both accented and unaccented forms are caught. |
 | Subject pronoun, 2nd person | usted | tú, ti, contigo, tuyo, tuya | |

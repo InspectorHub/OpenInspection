@@ -27,8 +27,8 @@ describe('agreement-render handler', () => {
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({
-      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane',
-      clientEmail: 'jane@x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St',
+      date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
       price: 0, createdAt: new Date(),
     } as any);
     await db.insert(schema.agreements).values({
@@ -299,8 +299,8 @@ describe('cert-render handler', () => {
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({
-      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane',
-      clientEmail: 'jane@x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St',
+      date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
       price: 0, createdAt: new Date(),
     } as any);
     await db.insert(schema.agreements).values({
@@ -335,7 +335,7 @@ describe('cert-render handler', () => {
       signedAt: new Date(),
       createdAt: new Date(),
     });
-    const events = ['request.created', 'request.sent', 'agreement.signed'];
+    const events = ['request.created', 'request.sent', 'agreement.signed'] as const;
     for (let i = 0; i < events.length; i++) {
       await db.insert(schema.esignAuditLogs).values({
         id: '00000000-0000-0000-0000-' + String(i).padStart(12, '0'),
@@ -423,8 +423,8 @@ describe('agreement-render handler — language disclosure', () => {
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({
-      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane',
-      clientEmail: 'jane@x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St',
+      date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
       price: 0, createdAt: new Date(),
     } as never);
     await db.insert(schema.agreements).values({
@@ -552,8 +552,8 @@ describe('cert-render handler — language disclosure version', () => {
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({
-      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane',
-      clientEmail: 'jane@x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St',
+      date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
       price: 0, createdAt: new Date(),
     } as never);
     await db.insert(schema.agreements).values({

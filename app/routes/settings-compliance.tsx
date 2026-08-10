@@ -288,7 +288,7 @@ function ErasureLogView({ rows }: { rows: ErasureLogRow[] }) {
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-[12px] text-ih-fg-4 italic">{m.settings_compliance_erasure_empty()}</p>
+        <p className="text-[12px] text-ih-fg-3 italic">{m.settings_compliance_erasure_empty()}</p>
       ) : (
         <div className="overflow-x-auto">
           <Table<ErasureLogRow>

@@ -85,21 +85,7 @@ import { RATING_SYSTEMS } from './starter-content/fixtures/rating-systems';
 import { MARKETPLACE_LIBRARIES } from './starter-content/fixtures/marketplace';
 import { seedRoleProfiles } from './seed/seed-role-profiles';
 
-// Comments-repair fold (2026-06-12) — the standard contractor-type taxonomy.
-// MUST stay in sync with the contractor-type backfill in `0000_baseline.sql`
-// so a freshly-provisioned tenant gets the same dropdown as pre-existing tenants.
-const CONTRACTOR_TYPES: ReadonlyArray<{ name: string; sortOrder: number }> = [
-    { name: 'Licensed Electrician',   sortOrder: 1 },
-    { name: 'Plumber',                sortOrder: 2 },
-    { name: 'Roofer',                 sortOrder: 3 },
-    { name: 'HVAC Technician',        sortOrder: 4 },
-    { name: 'General Contractor',     sortOrder: 5 },
-    { name: 'Structural Engineer',    sortOrder: 6 },
-    { name: 'Foundation Specialist',  sortOrder: 7 },
-    { name: 'Pest/Termite',           sortOrder: 8 },
-    { name: 'Chimney Sweep',          sortOrder: 9 },
-    { name: 'Grading/Drainage',       sortOrder: 10 },
-];
+import { CONTRACTOR_TYPES } from './starter-content/fixtures/contractor-types';
 
 export interface StarterContentResult {
     inspectionTemplatesSeeded: number;
@@ -311,16 +297,26 @@ export async function seedStarterContent(
     // that already has any contractor_types is skipped row-by-row.
     let contractorTypesSeeded = 0;
     {
-        const existing = await d.select({ name: contractorTypes.name }).from(contractorTypes)
-            .where(eq(contractorTypes.tenantId, tenantId)).all();
+        const existing = await d
+            .select({ name: contractorTypes.name, tradeSlug: contractorTypes.tradeSlug })
+            .from(contractorTypes).where(eq(contractorTypes.tenantId, tenantId)).all();
         const existingNames = new Set(existing.map(r => r.name as string));
+        // Canonical rows are matched by SLUG, not by name (#277). A workspace that
+        // renamed "Licensed Electrician" to "Our Sparky" still HAS that trade, and
+        // keying on name would seed a second row for it on the next run. There is
+        // no unique index on this table, so nothing downstream would object.
+        const existingSlugs = new Set(existing.map(r => r.tradeSlug).filter(Boolean) as string[]);
         const now = new Date();
-        const rows = CONTRACTOR_TYPES.filter(ct => !existingNames.has(ct.name)).map(ct => ({
+        const rows = CONTRACTOR_TYPES.filter(ct =>
+            // Extras have no slug to match on, so they fall back to the name.
+            ct.tradeSlug ? !existingSlugs.has(ct.tradeSlug) : !existingNames.has(ct.name),
+        ).map(ct => ({
             id:        crypto.randomUUID(),
             tenantId,
             name:      ct.name,
             sortOrder: ct.sortOrder,
             createdAt: now,
+            tradeSlug: ct.tradeSlug,
         }));
         await batchInsert(d, contractorTypes, rows);
         contractorTypesSeeded = rows.length;

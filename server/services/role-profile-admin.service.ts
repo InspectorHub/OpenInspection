@@ -5,6 +5,21 @@ import { capabilitiesForProfile, type RoleCapabilities, type RoleKind } from '..
 import { Errors } from '../lib/errors';
 
 /**
+ * A sparse capability-override map exactly as a Zod-parsed request body carries
+ * it. `z.boolean().optional()` infers `boolean | undefined`, and
+ * `exactOptionalPropertyTypes` refuses to assign that to `Partial<RoleCapabilities>`
+ * (whose optional members do NOT admit an explicit `undefined`) — so the two
+ * route handlers could not hand their validated body to this service at all.
+ * The bits themselves are still whitelisted on read by `coerceOverrides`.
+ *
+ * @declarationEmit Exported so the emitted `.d.ts` can NAME it: it appears in
+ * the parameter types of two public methods on the exported class below.
+ */
+export type RoleCapabilityOverridesInput = {
+    [K in keyof RoleCapabilities]?: RoleCapabilities[K] | undefined;
+};
+
+/**
  * Role-profile administration — the settings-page CRUD over
  * `contact_role_profiles` (list/create/update/deactivate + key slugging).
  *
@@ -26,7 +41,7 @@ export class RoleProfileAdminService {
     /** Rejects any template id that is not an active row in THIS tenant's
      *  message_templates — a role profile must never reference another tenant's
      *  (or a bogus) template id. Null/undefined ids are allowed (no reference). */
-    private async assertTemplatesOwned(tenantId: string, emailTemplateId?: string | null, smsTemplateId?: string | null) {
+    private async assertTemplatesOwned(tenantId: string, emailTemplateId?: string | null | undefined, smsTemplateId?: string | null | undefined) {
         for (const id of [emailTemplateId, smsTemplateId]) {
             if (!id) continue;
             const row = await this.db.select({ id: messageTemplates.id }).from(messageTemplates)
@@ -37,14 +52,14 @@ export class RoleProfileAdminService {
 
     /** The account track only exists for agent-kind roles today; storing a
      *  switch that redeems nothing would read as "supported, just not wired". */
-    private assertOverridesRedeemable(kind: RoleKind, overrides: Partial<RoleCapabilities> | null | undefined) {
+    private assertOverridesRedeemable(kind: RoleKind, overrides: RoleCapabilityOverridesInput | null | undefined) {
         if (overrides?.canHaveAccount === true && kind !== 'agent') {
             throw Errors.BadRequest('Accounts are not yet available for this role type');
         }
     }
 
     /** Creates a tenant-defined (non-system) role profile with a unique, slugified key. */
-    async createProfile(tenantId: string, input: { label: string; kind: RoleKind; emailTemplateId?: string; smsTemplateId?: string; capabilityOverrides?: Partial<RoleCapabilities> | null }) {
+    async createProfile(tenantId: string, input: { label: string; kind: RoleKind; emailTemplateId?: string | undefined; smsTemplateId?: string | undefined; capabilityOverrides?: RoleCapabilityOverridesInput | null | undefined }) {
         await this.assertTemplatesOwned(tenantId, input.emailTemplateId, input.smsTemplateId);
         this.assertOverridesRedeemable(input.kind, input.capabilityOverrides);
         const key = await this.uniqueKey(tenantId, input.label);
@@ -63,7 +78,7 @@ export class RoleProfileAdminService {
      * sets when the edit changed them, so the route can audit the diff —
      * permission changes carry who/what/when, label edits stay out of that log.
      */
-    async updateProfile(tenantId: string, id: string, patch: { label?: string; emailTemplateId?: string | null; smsTemplateId?: string | null; active?: boolean; capabilityOverrides?: Partial<RoleCapabilities> | null }) {
+    async updateProfile(tenantId: string, id: string, patch: { label?: string | undefined; emailTemplateId?: string | null | undefined; smsTemplateId?: string | null | undefined; active?: boolean | undefined; capabilityOverrides?: RoleCapabilityOverridesInput | null | undefined }) {
         const cur = await this.db.select().from(contactRoleProfiles)
             .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.id, id))).get();
         if (!cur) throw Errors.NotFound('Role profile not found');

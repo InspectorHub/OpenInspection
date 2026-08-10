@@ -5,6 +5,8 @@ import { useCommentTypeahead } from "../../hooks/useCommentTypeahead";
 import {
   flattenItemTabs, fragmentBeforeCaret, replaceFragmentBeforeCaret,
 } from "../../lib/comment-typeahead";
+import { AiAssistPanel } from "./AiAssistPanel";
+import { NotesFieldHeader } from "./NotesFieldHeader";
 import { CloneLastButton } from "./CloneLastButton";
 import type { DefectFieldsValue } from "./DefectFieldsRow";
 import { ItemAttributesPanel } from "./ItemAttributesPanel";
@@ -142,6 +144,10 @@ interface ItemEditorProps {
  videoPosterUrl?: (streamUid: string, posterPct?: number) => string | null;
  /** #181 PR-G — resolve the local blob URL for a pending (offline) photo entry. */
  pendingPhotoUrl?: (pendingId: string) => string | undefined;
+ /** #61 — `inspection_results.id`, the artifact an AI content-review row cites.
+  *  Absent/null ⇒ the AI writing-assistance affordance is not offered at all,
+  *  because a review recorded against no artifact is not evidence of anything. */
+ resultId?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -190,6 +196,7 @@ export function ItemEditor({
  onBulkMovePhotos,
  videoPosterUrl,
  pendingPhotoUrl,
+ resultId,
 }: ItemEditorProps) {
  const [activeTab, setActiveTab] = useState<CannedTabId>("information");
  const [defectQuery, setDefectQuery] = useState("");
@@ -319,7 +326,7 @@ export function ItemEditor({
  onAddDefectPhoto ? (
  <Button variant="ghost" size="sm" disabled={photoUploading} aria-label={m.editor_item_add_defect_photo_aria()} icon={addPhotoIcon}
  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddDefectPhoto(target); }}
- className="mt-1.5 h-auto px-2 py-1 border border-dashed border-ih-border-strong text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary"
+ className="mt-1.5 h-auto px-2 py-1 border border-dashed border-ih-border-strong text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary-text"
  >
  {count > 0 ? (count === 1 ? m.editor_item_defect_photo_count_one({ count }) : m.editor_item_defect_photo_count_other({ count })) : m.editor_item_add_photo()}
  </Button>
@@ -369,12 +376,12 @@ export function ItemEditor({
  <div className="max-w-2xl space-y-6">
  {/* Eyebrow + title */}
  <div>
- <div className="text-[11px] text-ih-primary font-bold uppercase tracking-wide">
+ <div className="text-[11px] text-ih-primary-text font-bold uppercase tracking-wide">
  {sectionTitle}
  </div>
  <ItemHeader label={item.label} size="lg" className="mt-1 text-ih-fg-1" as="h2" />
  {item.description && (
- <p data-testid="item-description-hint" className="mt-1 text-[12px] text-ih-fg-4 leading-relaxed">
+ <p data-testid="item-description-hint" className="mt-1 text-[12px] text-ih-fg-3 leading-relaxed">
  {item.description}
  </p>
  )}
@@ -449,20 +456,16 @@ export function ItemEditor({
  </div>
  )}
 
- {/* Notes textarea with character count */}
+ {/* Notes field. The "Recommended comments" trigger lives in the header
+     ABOVE the textarea, never floated inside it — see NotesFieldHeader. */}
  <div>
- <div className="flex items-center justify-between mb-1">
- <label className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">
- {m.editor_item_notes_label()}
- </label>
- <span className={`text-[10px] font-mono tabular-nums ${
- ((result.notes as string) || "").length > 2000
- ? "text-ih-bad-fg"
- : "text-ih-fg-4"
- }`}>
- {m.editor_item_notes_chars({ count: ((result.notes as string) || "").length })}
- </span>
- </div>
+ <NotesFieldHeader
+  fieldId="notes-textarea"
+  charCount={((result.notes as string) || "").length}
+  canInsertCanned={taEntries.length > 0}
+  suggestionsOpen={taOpen}
+  onOpenSuggestions={() => { setTaQuery(""); setTaOpen(true); notesRef.current?.focus(); }}
+ />
  <div className="relative">
  <textarea
   id="notes-textarea"
@@ -496,13 +499,6 @@ export function ItemEditor({
   placeholder={m.editor_item_notes_placeholder()}
   className="w-full h-28 px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] resize-none focus:shadow-ih-focus focus:border-ih-primary outline-none"
  />
- <Button
-  variant="link" size="sm"
-  onClick={() => { setTaQuery(""); setTaOpen(true); notesRef.current?.focus(); }}
-  className="absolute right-2 top-2 h-auto px-0 py-0 text-[10px]"
- >
-  {m.editor_item_recommended()}
- </Button>
  <CommentTypeahead
   entries={taEntries}
   matches={ta.matches}
@@ -514,6 +510,24 @@ export function ItemEditor({
   onClose={() => setTaOpen(false)}
  />
  </div>
+ {/* #61 — sits BELOW the textarea on purpose: the model's draft and the
+     inspector's own words stay visible at the same time, and the draft only
+     becomes the note once the review is on file.
+
+     Mounted only when there IS an artifact. The panel refuses on a null
+     `resultId` too (that is its own invariant, and where the spec pins it);
+     this outer check is about not mounting a router-subscribed component
+     with nothing to offer — `AiAssistPanel` calls `useFetcher`, which throws
+     outside a data router, and several ItemEditor specs render this tree
+     bare on purpose. */}
+ {resultId && (
+  <AiAssistPanel
+   notes={(result.notes as string) || ""}
+   context={`${sectionTitle} — ${item.label}`}
+   resultId={resultId}
+   onAccept={(text) => { onNotes(text); onNotesBlur(text); }}
+  />
+ )}
  {tagChipRow}
  </div>
 
@@ -576,11 +590,11 @@ export function ItemEditor({
  {/* Photo strip with count badge */}
  <div>
  <div className="flex items-center justify-between mb-1">
- <label className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">
+ <label className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">
  {m.editor_item_photos_label()}
  </label>
  {photoCount > 0 && (
- <span className="inline-flex items-center gap-1 text-[10px] font-bold text-ih-primary bg-ih-primary-tint px-1.5 py-0.5 rounded">
+ <span className="inline-flex items-center gap-1 text-[10px] font-bold text-ih-primary-text bg-ih-primary-tint px-1.5 py-0.5 rounded">
  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
  </svg>
@@ -627,7 +641,7 @@ export function ItemEditor({
  ))}
  </div>
  )}
- <span className="block mt-1 text-[12px] text-ih-fg-4">
+ <span className="block mt-1 text-[12px] text-ih-fg-3">
  {photoStatus}
  </span>
  </div>

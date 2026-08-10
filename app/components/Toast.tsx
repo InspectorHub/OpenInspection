@@ -18,7 +18,7 @@ export function ToastPortal() {
                     {t.actionLabel && t.onAction && (
                         <button
                             onClick={() => t.onAction?.()}
-                            className="text-[12px] font-bold text-ih-primary hover:opacity-80"
+                            className="text-[12px] font-bold text-ih-primary-text hover:opacity-80"
                         >
                             {t.actionLabel}
                         </button>

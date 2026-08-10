@@ -101,7 +101,7 @@ export function InspectorServiceAreasPanel({ members }: { members: ServiceAreaMe
           hint={m.settings_serviceareas_zips_hint()}
           onChange={(e) => setZips(e.target.value)}
         />
-        <p className="text-[11px] text-ih-fg-4">
+        <p className="text-[11px] text-ih-fg-3">
           {parsed.length === 0
             ? m.settings_serviceareas_empty_state()
             : m.settings_serviceareas_parsed({ list: parsed.join(", ") })}
@@ -127,7 +127,7 @@ export function InspectorServiceAreasPanel({ members }: { members: ServiceAreaMe
           hint={m.settings_serviceareas_origin_hint()}
           onChange={(e) => setOrigin(e.target.value)}
         />
-        <p className="text-[11px] text-ih-fg-4">
+        <p className="text-[11px] text-ih-fg-3">
           {origin.trim() === ""
             ? m.settings_serviceareas_origin_inherits()
             : selected?.originLocated

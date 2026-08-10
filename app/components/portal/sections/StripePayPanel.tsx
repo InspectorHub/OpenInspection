@@ -81,7 +81,7 @@ export function StripePayPanel({ id, portalToken, balanceDue, inspectorName, bra
           >
             {phase === "loading" ? m.portal_pay_starting_checkout() : m.portal_pay_amount({ amount: money(balanceDue, cur) })}
           </button>
-          <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-ih-fg-4">
+          <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-ih-fg-2">
             <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <rect x="3" y="7" width="10" height="6" rx="1" />
               <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
@@ -151,7 +151,7 @@ function CheckoutForm({ balanceDue, returnUrl, currency }: { balanceDue: number;
         {submitting ? m.portal_pay_processing() : m.portal_pay_amount({ amount: money(balanceDue, { currency }) })}
       </button>
       {error && <p className="text-[12px] text-ih-bad-fg font-medium">{error}</p>}
-      <div className="flex items-center justify-center gap-1.5 text-[11px] text-ih-fg-4">
+      <div className="flex items-center justify-center gap-1.5 text-[11px] text-ih-fg-3">
         <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
           <rect x="3" y="7" width="10" height="6" rx="1" />
           <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />

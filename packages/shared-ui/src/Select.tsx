@@ -76,7 +76,8 @@ export function Select({
         )}
         {control}
         {error && <p className="text-[11px] text-ih-bad-fg mt-1">{error}</p>}
-        {!error && hint && <p className="text-[11px] text-ih-fg-4 mt-1">{hint}</p>}
+        {/* fg-3, not fg-4 — 11px hints are normal-size text (see lint:contrast). */}
+        {!error && hint && <p className="text-[11px] text-ih-fg-3 mt-1">{hint}</p>}
       </div>
     );
 }

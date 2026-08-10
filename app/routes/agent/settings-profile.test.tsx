@@ -10,8 +10,37 @@
  * hooks (useFetcher) fire on click, including the 409 slug-conflict path.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, fireEvent, waitFor } from "@testing-library/react";
+import { render, fireEvent, waitFor, configure } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
+
+/**
+ * The rendering suite below is the slowest in `app/routes`, and it races a
+ * deadline nobody in this repo chose: testing-library's DEFAULT
+ * `asyncUtilTimeout` of 1000 ms.
+ *
+ * `createRoutesStub` starts in a loading state, so `render()` returns before the
+ * page exists — the whole first paint is billed against the following
+ * `findBy*`/`waitFor`, not against vitest's 5000 ms `testTimeout`. That paint is
+ * genuinely expensive here: the timezone card is a `<Select>` over
+ * `Intl.supportedValuesOf('timeZone')`, so happy-dom builds ~418 `<option>`
+ * nodes on each of this file's renders.
+ *
+ * Measured (whole-suite `app/routes` run, idle machine): these tests take
+ * 430-690 ms, the five slowest in the suite. Against 1000 ms that is under a 2x
+ * margin, and a loaded machine closes it — under a deliberate CPU load the same
+ * waits reach 1000-2000 ms and fail as "Unable to find an element with the
+ * display value: jane".
+ *
+ * So this is a deadline that is too tight for the work, NOT a condition that is
+ * never satisfied: the elapsed time tracks CPU contention, and every assertion
+ * here passes on an idle machine. Raising the budget is the fix; it hides
+ * nothing, because a genuinely unsatisfiable condition still fails — just 4 s
+ * later. The vitest backstop is raised alongside it only so it cannot fire
+ * FIRST: testing-library's error names the element and dumps the DOM, vitest's
+ * says only that 5000 ms elapsed.
+ */
+configure({ asyncUtilTimeout: 4000 });
+vi.setConfig({ testTimeout: 20_000 });
 
 const profileGet = vi.fn();
 const profilePost = vi.fn();

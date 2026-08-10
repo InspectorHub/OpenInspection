@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { RouterContextProvider } from "react-router";
 import { getCloudflareEnv, createLoadContext, type LoadContext } from "./load-context";
@@ -34,7 +34,6 @@ describe("load-context access is centralized", () => {
   const APP_DIR = join(import.meta.dirname, "..");
 
   function sourceFilesUnder(dir: string): string[] {
-    const { readdirSync } = require("node:fs") as typeof import("node:fs");
     return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) return entry.name === "paraglide" ? [] : sourceFilesUnder(full);

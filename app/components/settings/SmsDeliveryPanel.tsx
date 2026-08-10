@@ -139,7 +139,7 @@ export function SmsDeliveryPanel({
             />
           )}
           {!isSaas && (
-            <p className="text-[13px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
+            <p className="text-[13px] text-ih-fg-2 bg-ih-bg-muted border border-ih-border rounded-md p-3">
               {m.settings_smsdelivery_selfhost_note()}
             </p>
           )}
@@ -182,7 +182,7 @@ export function SmsDeliveryPanel({
               placeholder="+1 555 123 4567"
               className="w-full md:w-1/2 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
             />
-            <p className="text-[11px] text-ih-fg-4 mt-1">{m.settings_smsdelivery_phone_note_prefix()}<code>{"{{company_phone}}"}</code>{m.settings_smsdelivery_phone_note_suffix()}</p>
+            <p className="text-[11px] text-ih-fg-3 mt-1">{m.settings_smsdelivery_phone_note_prefix()}<code>{"{{company_phone}}"}</code>{m.settings_smsdelivery_phone_note_suffix()}</p>
           </div>
 
           <div className="flex justify-end pt-3 border-t border-ih-border">

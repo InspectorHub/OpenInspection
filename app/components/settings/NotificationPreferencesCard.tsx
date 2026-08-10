@@ -34,7 +34,7 @@ export function NotificationPreferencesCard({
   const locale = useDisplayLocale();
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
-      <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">
+      <p className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1">
         {m.settings_notifications_eyebrow()}
       </p>
       <h2 className="text-sm font-bold text-ih-fg-1 mb-1">{m.settings_notifications_heading()}</h2>

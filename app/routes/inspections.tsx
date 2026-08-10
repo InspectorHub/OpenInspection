@@ -240,7 +240,12 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
   if (intent === "status") {
     const id = formData.get("id") as string;
-    const status = formData.get("status") as "requested" | "scheduled" | "confirmed" | "completed" | "cancelled";
+    // #78 — no "cancelled": that moves money, so only POST /:id/cancel writes it
+    // (the API 400s USE_CANCEL_ENDPOINT here). #81 — and this intent never
+    // reaches an already-cancelled inspection either: that PATCH 400s
+    // USE_UNCANCEL_ENDPOINT, and the row renders no dropdown for a cancelled
+    // inspection at all — recovery is /resources/inspection-restore.
+    const status = formData.get("status") as "requested" | "scheduled" | "confirmed" | "completed";
     const res = await api.inspections[":id"].$patch({
       param: { id },
       json: { status },
@@ -750,7 +755,7 @@ export default function InspectionsPage() {
       {/* Batch actions bar */}
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-ih-primary-tint rounded-lg border border-ih-border">
-          <span className="text-[13px] font-bold text-ih-primary">
+          <span className="text-[13px] font-bold text-ih-primary-text">
             {m.inspections_list_batch_selected({ count: selectedIds.size })}
           </span>
           <Button variant="danger" size="sm" onClick={batchDelete}>{m.common_delete()}</Button>
@@ -789,10 +794,10 @@ export default function InspectionsPage() {
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-ih-bg-muted transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4">
+                    <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3">
                       {meta.label}
                     </span>
-                    <span className="text-[11px] text-ih-fg-4">
+                    <span className="text-[11px] text-ih-fg-3">
                       {meta.hint}
                     </span>
                     <Pill tone="gen">{items.length}</Pill>
@@ -822,7 +827,7 @@ export default function InspectionsPage() {
           return (
             <Card className="overflow-hidden">
               <div className="px-4 py-2 border-b border-ih-border">
-                <span className="text-[11px] font-bold text-ih-fg-4">
+                <span className="text-[11px] font-bold text-ih-fg-3">
                   {isSearching
                     ? m.inspections_list_searching()
                     : displayCount === 1
@@ -834,7 +839,7 @@ export default function InspectionsPage() {
                 {!isSearching && displayList.map(renderRow)}
               </div>
               {isSearching && (
-                <div className="py-8 text-center text-[12px] text-ih-fg-4">{m.inspections_list_searching()}</div>
+                <div className="py-8 text-center text-[12px] text-ih-fg-3">{m.inspections_list_searching()}</div>
               )}
               {/* Server search load-more */}
               {isServerSearch && serverHasMore && !isSearching && (

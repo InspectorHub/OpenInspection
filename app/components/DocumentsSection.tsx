@@ -291,7 +291,7 @@ export default function DocumentsSection({
 
       <div className="mt-5 flex flex-col gap-5">
         {groups.length === 0 ? (
-          <p className="rounded-lg bg-ih-bg-muted px-4 py-6 text-center text-[13px] text-ih-fg-3">
+          <p className="rounded-lg bg-ih-bg-muted px-4 py-6 text-center text-[13px] text-ih-fg-2">
             {m.documents_empty()}
           </p>
         ) : (
@@ -308,7 +308,7 @@ export default function DocumentsSection({
                       <div className="min-w-0 flex-1">
                         <a
                           href={downloadHref(item.id)}
-                          className="block truncate text-[13px] font-semibold text-ih-primary hover:underline"
+                          className="block truncate text-[13px] font-semibold text-ih-primary-text hover:underline"
                         >
                           {item.label || item.filename}
                         </a>

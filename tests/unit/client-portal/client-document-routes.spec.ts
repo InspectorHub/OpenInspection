@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -16,6 +17,12 @@ import { PortalAccessService } from '../../../server/services/portal-access.serv
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { signPortalSession } from '../../../server/lib/portal-session';
 import clientDocumentsRoutes, { inspectorDocumentsRoutes } from '../../../server/api/client-documents';
+
+/** The document envelopes, as far as these cases read them. `Response.json()`
+ *  (@cloudflare/workers-types) is generic and defaults to `unknown`; naming the
+ *  shape here is what that parameter is for, and it costs no assertion. */
+type DocList = { data: Array<Record<string, unknown> & { id: string; filename: string; visibility: string }> };
+type DocOne = { data: Record<string, unknown> & { id: string; visibility: string } };
 
 const TENANT = '00000000-0000-0000-0000-0000000000a1';
 const SECRET = 'test-jwt-secret';
@@ -136,7 +143,7 @@ describe('client document routes (token-gated)', () => {
         // issueToken validates `role` against the tenant's active role
         // profiles — seed the defaults so the 'client' role used by
         // seedInspectionWithClientToken resolves.
-        await seedRoleProfiles(testDb, TENANT);
+        await seedRoleProfiles(asD1Db(testDb), TENANT);
     });
 
     it('PUT streams a valid file; bad extension → 400; no token → 401/403', async () => {
@@ -163,7 +170,7 @@ describe('client document routes (token-gated)', () => {
         const { app, inspectionId, clientToken } = await seedInspectionWithClientToken();
         await app.request(`/api/public/inspections/${inspectionId}/documents?filename=My Report.pdf&category=prior_reports&token=${clientToken}`,
             { method: 'PUT', headers: { 'content-type': 'application/pdf', 'content-length': '3' }, body: new Uint8Array([1, 2, 3]) }, reqEnv());
-        const list = await (await app.request(`/api/public/inspections/${inspectionId}/documents?token=${clientToken}`, {}, reqEnv())).json();
+        const list = await (await app.request(`/api/public/inspections/${inspectionId}/documents?token=${clientToken}`, {}, reqEnv())).json<DocList>();
         expect(list.data.length).toBe(1);
         const docId = list.data[0].id;
         const dl = await app.request(`/api/public/inspections/${inspectionId}/documents/${docId}?token=${clientToken}`, {}, reqEnv());
@@ -183,7 +190,7 @@ describe('client document routes (token-gated)', () => {
         await docs.create(TENANT, inspectionId, { kind: 'inspector', ref: 'u1', name: 'Inspector' },
             { filename: 'shared.pdf', contentType: 'application/pdf', category: 'other', visibility: 'client_visible', label: null, sizeBytes: 1 },
             new Uint8Array([1]));
-        const list = await (await app.request(`/api/public/inspections/${inspectionId}/documents?token=${clientToken}`, {}, reqEnv())).json();
+        const list = await (await app.request(`/api/public/inspections/${inspectionId}/documents?token=${clientToken}`, {}, reqEnv())).json<DocList>();
         const names = list.data.map((d: { filename: string }) => d.filename).sort();
         expect(names).toEqual(['shared.pdf']);
         // r2Key must never be leaked.
@@ -193,7 +200,7 @@ describe('client document routes (token-gated)', () => {
     it('client can delete own but not another uploader file', async () => {
         const { app, inspectionId, clientToken, otherClientToken } = await seedInspectionWithClientToken();
         const put = await (await app.request(`/api/public/inspections/${inspectionId}/documents?filename=a.pdf&category=other&token=${clientToken}`,
-            { method: 'PUT', headers: { 'content-type': 'application/pdf', 'content-length': '1' }, body: new Uint8Array([1]) }, reqEnv())).json();
+            { method: 'PUT', headers: { 'content-type': 'application/pdf', 'content-length': '1' }, body: new Uint8Array([1]) }, reqEnv())).json<DocOne>();
         const id = put.data.id;
         const forbidden = await app.request(`/api/public/inspections/${inspectionId}/documents/${id}?token=${otherClientToken}`, { method: 'DELETE' }, reqEnv());
         expect([403, 404]).toContain(forbidden.status);
@@ -212,7 +219,7 @@ describe('client document routes (token-gated)', () => {
             headers: { cookie: '__Host-portal_session=' + cookie },
         }, reqEnv());
         expect(res.status).toBe(200);
-        const list = await res.json();
+        const list = await res.json<DocList>();
         expect(list.data.length).toBe(1);
         expect(list.data[0].filename).toBe('mine.pdf');
     });
@@ -227,12 +234,12 @@ describe('client document routes (token-gated)', () => {
             const up = await authedInspectorRequest(`/api/inspections/${inspectionId}/documents?filename=internal.pdf&category=other&visibility=internal`,
                 { method: 'PUT', headers: { 'content-type': 'application/pdf', 'content-length': '1' }, body: new Uint8Array([1]) });
             expect(up.status).toBe(200);
-            const upBody = await up.json();
+            const upBody = await up.json<DocOne>();
             expect(upBody.data.visibility).toBe('internal');
 
             // Inspector list = ALL rows (no visibility filter).
             const inspRes = await authedInspectorRequest(`/api/inspections/${inspectionId}/documents`);
-            const inspList = await inspRes.json();
+            const inspList = await inspRes.json<DocList>();
             expect(inspList.data.length).toBe(2);
             // r2Key must never leak.
             expect(inspList.data.every((d: Record<string, unknown>) => !('r2Key' in d))).toBe(true);
@@ -240,7 +247,7 @@ describe('client document routes (token-gated)', () => {
             expect(inspList.data.every((d: Record<string, unknown>) => 'uploadedByRef' in d)).toBe(true);
 
             // Client list = client_visible only → just the client upload.
-            const cliList = await (await app.request(`/api/public/inspections/${inspectionId}/documents?token=${clientToken}`, {}, reqEnv())).json();
+            const cliList = await (await app.request(`/api/public/inspections/${inspectionId}/documents?token=${clientToken}`, {}, reqEnv())).json<DocList>();
             expect(cliList.data.length).toBe(1);
             const clientDocId = cliList.data[0].id;
 
@@ -253,7 +260,7 @@ describe('client document routes (token-gated)', () => {
             // Inspector can delete ANY row (here: the client's upload).
             const del = await authedInspectorRequest(`/api/inspections/${inspectionId}/documents/${clientDocId}`, { method: 'DELETE' });
             expect(del.status).toBe(200);
-            const after = await (await authedInspectorRequest(`/api/inspections/${inspectionId}/documents`)).json();
+            const after = await (await authedInspectorRequest(`/api/inspections/${inspectionId}/documents`)).json<DocList>();
             expect(after.data.length).toBe(1);
         });
 

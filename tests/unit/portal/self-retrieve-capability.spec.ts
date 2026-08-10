@@ -5,6 +5,7 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { HonoConfig } from '../../../server/types/hono';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { asD1Db } from '../helpers/test-db';
 
 // find-my-report discovery + hub exchange must derive "can this grant
 // self-retrieve the report" from the role-profile KIND's selfRetrieveReport
@@ -61,7 +62,7 @@ describe('find-my-report discovery — capability-driven role filter', () => {
         const s = createTestDb(); testDb = s.db; sqlite = s.sqlite; await setupSchema(sqlite);
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
         await testDb.insert(schema.tenants).values({ id: TENANT, name: 'Acme', slug: 'acme-cap', createdAt: new Date() } as never);
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
         await seedCustomRoles(testDb, TENANT);
         await testDb.insert(schema.inspectionAccessTokens).values([
             { id: 'g-client', tenantId: TENANT, inspectionId: 'i1', recipientEmail: 'jane@x.com', role: 'client', token: 'tok1', createdAt: new Date() },
@@ -126,7 +127,7 @@ describe('PortalService.listRecipientInspections — capability-driven role filt
             id: TENANT, name: 'Acme', slug: 'acme-cap2', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as never);
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
         await seedCustomRoles(testDb, TENANT);
         svc = new PortalService({} as D1Database, { getSectionProgress: async () => { throw new Error('unused in this suite'); } });
     });
@@ -222,7 +223,7 @@ describe('GET /api/portal/:tenant/exchange — capability-driven role gate', () 
             id: TENANT, name: 'Acme', slug: 'acme-cap3', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as never);
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
         await seedCustomRoles(testDb, TENANT);
     });
 

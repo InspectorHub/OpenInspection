@@ -19,12 +19,14 @@ import {
     SendAgreementSchema,
     AgreementListResponseSchema,
     AgreementResponseSchema,
+    AgreementUpdateResponseSchema,
+    AgreementDeleteResponseSchema,
     InspectorSignSchema,
 } from '../../lib/validations/admin.schema';
+import { withAgreementWriteEffects } from '../../lib/agreement-write-effects';
 import { applyInspectorPreSign } from '../../services/agreement.service';
 import { SigningKeyService } from '../../services/signing-key.service';
 import { AuditLogService } from '../../services/audit-log.service';
-import { SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { emailSignersTheirLinks } from '../../lib/agreement-send';
 
@@ -103,14 +105,18 @@ const updateAgreementRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: AgreementResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AgreementUpdateResponseSchema.describe('The updated template, plus what the save revoked'),
                 },
             },
             description: 'Success',
         },
     },
     operationId: "updateTenantAgreement",
-    description: "Auto-generated placeholder for updateTenantAgreement (PUT /agreements/{id}, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Update an agreement template's name and/or body. Every save increments the template version, "
+        + "identical content included. If this template is the one the workspace confirmed contains its "
+        + "cancellation clause, saving revokes that confirmation and cancellation fees stop being chargeable "
+        + "until it is confirmed again. The response always reports this as "
+        + "`effects.cancellationFeeAttestationRevoked`; tell the user when it is true."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -127,14 +133,18 @@ const deleteAgreementRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AgreementDeleteResponseSchema.describe('Confirmation, plus what the deletion revoked'),
                 },
             },
             description: 'Success',
         },
     },
     operationId: "deleteTenantAgreement",
-    description: "Auto-generated placeholder for deleteTenantAgreement (DELETE /agreements/{id}, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Delete an agreement template. Services and booking pages that attach it stop attaching an "
+        + "agreement; agreements already sent keep their own signed copy. If this template is the one the "
+        + "workspace confirmed contains its cancellation clause, deleting it revokes that confirmation and "
+        + "cancellation fees stop being chargeable until another template is confirmed. The response always "
+        + "reports this as `effects.cancellationFeeAttestationRevoked`; tell the user when it is true."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -197,20 +207,33 @@ const adminAgreementsRoutes = createApiRouter()
         const agreement = await agreementService.createAgreement(tenantId, body.name, body.content);
         return c.json({ success: true, data: { agreement: agreement } }, 201);
     })
+    // #84 — both writes below can silently switch cancellation-fee charging off,
+    // and both are MCP tools whose caller sees nothing but this body. The
+    // `effects` block is OBSERVED around the write by the shared helper, never
+    // recomputed from the id, and is serialised BEFORE `data` so it survives the
+    // MCP result slice on a workspace with a long agreement.
     .openapi(updateAgreementRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         const body = c.req.valid('json');
         const agreementService = c.var.services.agreement;
-        const agreement = await agreementService.updateAgreement(id, tenantId, body.name, body.content);
-        return c.json({ success: true, data: { agreement: agreement } }, 200);
+        const { result: agreement, effects } = await withAgreementWriteEffects(
+            c.var.services.branding,
+            tenantId,
+            () => agreementService.updateAgreement(id, tenantId, body.name, body.content),
+        );
+        return c.json({ success: true as const, effects, data: { agreement } }, 200);
     })
     .openapi(deleteAgreementRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         const agreementService = c.var.services.agreement;
-        await agreementService.deleteAgreement(id, tenantId);
-        return c.json({ success: true }, 200);
+        const { effects } = await withAgreementWriteEffects(
+            c.var.services.branding,
+            tenantId,
+            () => agreementService.deleteAgreement(id, tenantId),
+        );
+        return c.json({ success: true as const, effects }, 200);
     })
     .openapi(sendAgreementRoute, async (c) => {
         const tenantId = getTenantId(c);

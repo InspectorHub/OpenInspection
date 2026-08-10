@@ -22,7 +22,7 @@ export function MobileAppBar({ sectionTitle, itemLabel, onBack, onMore }: Mobile
                 aria-label={m.common_back()}
             ><Icon name="back" size={18} /></IconButton>
             <div className="flex-1 min-w-0">
-                <div className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-4 truncate">{sectionTitle}</div>
+                <div className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-3 truncate">{sectionTitle}</div>
                 <div className="text-[13px] font-bold truncate">{itemLabel}</div>
             </div>
             <IconButton

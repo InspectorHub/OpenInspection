@@ -15,6 +15,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
@@ -42,7 +43,7 @@ beforeEach(async () => {
         id: TENANT, name: 'Acme', slug: 'acme-d2b0', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
-    await seedRoleProfiles(db, TENANT, new Date(1));
+    await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
     svc = new AutomationService({} as D1Database);
     vi.spyOn(svc, 'ensureSeeds').mockResolvedValue();
 });
@@ -99,8 +100,10 @@ function makeReportDelivery(opts: { pdfBytes?: ArrayBuffer | null } = {}) {
 }
 
 function makeEmailSvc(opts: { pdfDelivered?: boolean; readyDelivered?: boolean } = {}) {
-    const sendInspectionReportPdf = vi.fn(async () => opts.pdfDelivered ?? true);
-    const sendReportReady = vi.fn(async () => opts.readyDelivered ?? true);
+    const sendInspectionReportPdf = vi.fn(
+        async (_to: string, _address: string, _linkUrl: string) => opts.pdfDelivered ?? true);
+    const sendReportReady = vi.fn(
+        async (_to: string, _address: string, _linkUrl: string) => opts.readyDelivered ?? true);
     const sendEmail = vi.fn(async () => ({ delivered: true }));
     const emailFor = async (_tid: string) =>
         ({ sendInspectionReportPdf, sendReportReady, sendEmail } as unknown as EmailService);
@@ -143,7 +146,7 @@ describe('AutomationService.flush — report.published PDF-email delivery (Spec 
 
         expect(getOrRender).toHaveBeenCalledTimes(1); // render-once memo, not once-per-recipient
         expect(sendInspectionReportPdf).toHaveBeenCalledTimes(2);
-        const links = sendInspectionReportPdf.mock.calls.map((c) => c[2] as string);
+        const links = sendInspectionReportPdf.mock.calls.map((c) => c[2]);
         expect(new Set(links).size).toBe(2); // distinct tokens per recipient
     });
 

@@ -69,7 +69,7 @@ export function ReportDeliveryList({
 
   return (
     <div className="pb-3">
-      <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-ih-fg-4 pt-1 pb-1.5">
+      <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-ih-fg-3 pt-1 pb-1.5">
         {m.comm_report_delivery_heading()}
       </p>
       <ul className="space-y-1.5" data-testid="report-delivery-list">
@@ -90,7 +90,7 @@ export function ReportDeliveryList({
         ))}
       </ul>
       {anyOpened && (
-        <p className="mt-2 text-[11px] leading-relaxed text-ih-fg-4">
+        <p className="mt-2 text-[11px] leading-relaxed text-ih-fg-3">
           {m.comm_report_delivery_caveat()}
         </p>
       )}

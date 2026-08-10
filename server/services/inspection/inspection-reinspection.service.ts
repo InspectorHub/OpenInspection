@@ -8,7 +8,6 @@ import { createPrimaryReport } from '../../lib/inspection/reports';
 import { findingKey, DEFAULT_UNIT } from '../../lib/finding-key';
 import { parseReinspectionStatuses, isOpenStatus } from '../../lib/reinspection-status';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
-import type { Inspection } from './shared';
 import type { ScopedDB } from '../../lib/db/scoped';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
@@ -20,6 +19,22 @@ import { InspectionSubService } from './base';
 function parseSnapshotData(snapshotJson: string): { data?: Record<string, Record<string, unknown>> } {
     return JSON.parse(snapshotJson) as { data?: Record<string, Record<string, unknown>> };
 }
+
+/**
+ * What `createReinspection` actually hands back: the whole freshly inserted
+ * `inspections` row, with `reinspectionRound` narrowed to a number.
+ *
+ * The narrow `Inspection` DTO (`z.infer<typeof InspectionSchema>`) is a nine-field
+ * response projection and carries none of the #119 linkage columns, so declaring
+ * this method `Promise<Inspection>` described neither `reinspectionRound` nor
+ * `sourceInspectionId`/`rootInspectionId` — the callers that read them were only
+ * compiling because the declaration was reached through a cast. The column is
+ * nullable (NULL on originals), but a row created HERE always carries the round
+ * this method just computed, which is why it is non-nullable on the way out: the
+ * API route must not need a `?? 1` fallback that would silently report review
+ * for a third or fourth round.
+ */
+export type CreatedReinspection = typeof inspections.$inferSelect & { reinspectionRound: number };
 
 /**
  * #119 — RE-INSPECTION ROUNDS: creating a follow-up round over a published
@@ -62,8 +77,8 @@ export class InspectionReinspectionService extends InspectionSubService {
     async createReinspection(
         tenantId: string,
         baselineId: string,
-        opts: { selectedItemIds: string[]; inspectorId?: string },
-    ): Promise<Inspection> {
+        opts: { selectedItemIds: string[]; inspectorId?: string | undefined },
+    ): Promise<CreatedReinspection> {
         const db = this.getDrizzle();
 
         const baseline = await db.select().from(inspections)
@@ -177,7 +192,11 @@ export class InspectionReinspectionService extends InspectionSubService {
         }
 
         const created = await db.select().from(inspections).where(eq(inspections.id, id)).get();
-        return created as unknown as Inspection;
+        if (!created) throw new Error('Re-inspection row disappeared immediately after insert');
+        // `round` — not the re-read column — is the authority on the way out. It is
+        // the value this method just wrote, so the caller can never see NULL and
+        // never has to guess a default.
+        return { ...created, reinspectionRound: round };
     }
 
     /**

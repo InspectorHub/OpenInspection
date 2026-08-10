@@ -16,6 +16,7 @@ import { eq } from 'drizzle-orm';
 import { TeamService } from '../../../server/services/team.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
+import type { Role } from '../../../server/lib/auth/roles';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -27,7 +28,7 @@ const OWNER_2 = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2';
 const MANAGER = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1';
 const INSPECTOR = 'cccccccc-cccc-cccc-cccc-ccccccccccc1';
 
-function userRow(id: string, role: string, email: string) {
+function userRow(id: string, role: Role, email: string) {
   return { id, tenantId: TENANT, email, name: email, role, passwordHash: 'x', createdAt: new Date() };
 }
 

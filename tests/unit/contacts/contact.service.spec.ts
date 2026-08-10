@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ContactService } from '../../../server/services/contact.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { asD1Db } from '../helpers/test-db';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -40,8 +41,8 @@ describe('ContactService.listContacts inspectionCount', () => {
             { id: TENANT_A, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
             { id: TENANT_B, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        await seedRoleProfiles(testDb, TENANT_A, new Date(1));
-        await seedRoleProfiles(testDb, TENANT_B, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT_A, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT_B, new Date(1));
         await testDb.insert(schema.contacts).values([
             { id: CLIENT_JANE, tenantId: TENANT_A, type: 'client', name: 'Jane', email: 'jane@test.com', createdAt: new Date() },
             { id: CLIENT_NO_EMAIL, tenantId: TENANT_A, type: 'client', name: 'NoEmail', email: null, createdAt: new Date() },

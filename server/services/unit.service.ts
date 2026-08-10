@@ -197,7 +197,10 @@ export class UnitService {
             .all();
     }
 
-    async update(tenantId: string, unitId: string, patch: { name?: string; sortOrder?: number }): Promise<void> {
+    // `| undefined` on both keys: the caller is a Zod `.optional()` PATCH body, so
+    // the values arrive as `T | undefined`, and drizzle's `.set()` drops undefined
+    // entries — an omitted key and an undefined one both leave the column alone.
+    async update(tenantId: string, unitId: string, patch: { name?: string | undefined; sortOrder?: number | undefined }): Promise<void> {
         const db = this.getDrizzle();
         await db.update(inspectionUnits).set(patch)
             .where(and(eq(inspectionUnits.id, unitId), eq(inspectionUnits.tenantId, tenantId)));

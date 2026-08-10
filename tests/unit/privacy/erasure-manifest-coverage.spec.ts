@@ -185,6 +185,28 @@ const HEURISTIC_BLIND_SPOTS = [
     // Free text on the accountability ledger whose email sibling WAS declared.
     'erasure_log.identity_basis',
     'erasure_log.response_note',
+    // #275 — the buyer's requested remedy per line item. Added to the schema and
+    // to `erasure-out-of-scope.ts` in the same change, with nothing red on either
+    // side of that: the gate pattern matches no part of `repair_action_tag`, so
+    // the only thing standing between it and silence is this line.
+    'repair_request_items.repair_action_tag',
+    // #61 — AI content review evidence. `reviewed_by` is a user id and
+    // `artifact_id` is the only route from a review row back to an inspection,
+    // and the gate pattern matches neither, so the whole table was invisible to
+    // `lint:erasure` from the moment it was written. Only these two of the
+    // table's seven columns are pinned: the rest are an opaque key, a scope key,
+    // a pointer discriminator and a timestamp, where losing the declaration
+    // changes no answer. These two are where a wrong or missing answer would —
+    // one names a person, the other names the record the person acted on.
+    'ai_content_reviews.reviewed_by',
+    'ai_content_reviews.artifact_id',
+    // The inspector's report-level narrative. Free prose a person composes about
+    // a named person's property — the exact population
+    // `docs/compliance/erasure-heuristic-limits.md` says the pattern cannot
+    // reach — and it went in with nothing red, the same way
+    // `repair_action_tag` did. Its rule is `anonymize`, and the next test pins
+    // that it is a rule rather than an exclusion.
+    'reports.inspector_narrative',
 ];
 
 describe('columns the PII heuristic cannot see', () => {
@@ -207,6 +229,28 @@ describe('columns the PII heuristic cannot see', () => {
             stillCovered,
             `these columns now MATCH the gate pattern, so listing them here is a duplicate: ${stillCovered.join(', ')}`,
         ).toHaveLength(0);
+    });
+
+    it('reports.inspector_narrative is cleared on erasure, not excused', () => {
+        // Being DECIDED is not enough for this one. It is the only column on
+        // `reports` a human composes, and the cheapest way to green would have
+        // been an out-of-scope line calling it "the inspector's professional
+        // opinion, not the subject's data" — which is true of the words and
+        // false of what they contain. Sibling `title` looked exactly like this
+        // and its stated reason turned out to be wrong in both halves.
+        const rule = ERASURE_MANIFEST.find(
+            (r) => r.table === 'reports' && r.column === 'inspector_narrative',
+        );
+        expect(rule, 'reports.inspector_narrative has no manifest rule').toBeTruthy();
+        expect(rule!.action).toBe('anonymize');
+        expect(rule!.legalBasis).toBe('art_17_3_e');
+        expect(
+            ERASURE_OUT_OF_SCOPE.some(
+                (e) => e.table === 'reports' && e.column === 'inspector_narrative',
+            ),
+            'the narrative is declared out of scope. That option was rejected: it is free prose ' +
+            'about a named person\'s property, and the PII heuristic can never see it.',
+        ).toBe(false);
     });
 });
 

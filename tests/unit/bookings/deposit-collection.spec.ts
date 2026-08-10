@@ -16,6 +16,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { asD1Db } from '../helpers/test-db';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import {
@@ -51,12 +53,20 @@ const FAKE_EXEC_CTX = {
 } as ExecutionContext;
 
 let db: BetterSQLite3Database<typeof schema>;
+/**
+ * The same handle presented to the payment-ledger helpers, whose `AnyDb`
+ * parameter is the `Record<string, unknown>` schema-generic form of
+ * `DrizzleD1Database` (Drizzle's schema generic is invariant, so the bare
+ * `asD1Db(db)` return does not satisfy it).
+ */
+let ledgerDb: DrizzleD1Database<Record<string, unknown>>;
 let sqlite: ReturnType<typeof createTestDb>['sqlite'];
 let svc: BookingService;
 
 beforeEach(async () => {
     const setup = createTestDb();
     db = setup.db as BetterSQLite3Database<typeof schema>;
+    ledgerDb = asD1Db<Record<string, unknown>>(db);
     sqlite = setup.sqlite;
     await setupSchema(sqlite);
     (mockDrizzle as ReturnType<typeof vi.fn>).mockReturnValue(db);
@@ -91,7 +101,7 @@ beforeEach(async () => {
 
 afterEach(() => sqlite.close());
 
-async function setTenantDeposit(policy: schema.TenantConfig['depositPolicy'] | null) {
+async function setTenantDeposit(policy: typeof schema.tenantConfigs.$inferInsert['depositPolicy'] | null) {
     await db.insert(tenantConfigs)
         .values({ tenantId: TENANT_ID, updatedAt: new Date(), defaultTimezone: 'UTC', depositPolicy: policy })
         .onConflictDoUpdate({ target: tenantConfigs.tenantId, set: { depositPolicy: policy } });
@@ -178,7 +188,7 @@ describe('POST /book with a deposit configured', () => {
         expect(row!.depositOverridden).toBe(false);
 
         // Owed, not collected. Nothing may write this row but the webhook.
-        expect(await getHeldDepositCents(db, TENANT_ID, 'insp-a')).toBe(0);
+        expect(await getHeldDepositCents(ledgerDb, TENANT_ID, 'insp-a')).toBe(0);
         const ledger = await db.select().from(orderPayments).where(eq(orderPayments.tenantId, TENANT_ID)).all();
         expect(ledger).toHaveLength(0);
     });
@@ -191,7 +201,7 @@ describe('POST /book with a deposit configured', () => {
 
         const row = await db.select().from(inspections).where(eq(inspections.id, 'insp-a')).get();
         expect(row!.depositRequiredCents).toBe(9000);
-        const owed = await outstandingDepositCents(db, TENANT_ID, 'insp-a');
+        const owed = await outstandingDepositCents(asD1Db(db), TENANT_ID, 'insp-a');
         expect(owed!.outstandingCents).toBe(9000);
     });
 
@@ -245,15 +255,15 @@ describe('the deposit becomes real only when Stripe says so', () => {
     });
 
     const settle = (providerRef: string, amountCents = 9000) =>
-        recordPayment(db, TENANT_ID, {
+        recordPayment(ledgerDb, TENANT_ID, {
             inspectionId: 'insp-a', invoiceId: null, kind: 'deposit',
             amountCents, method: 'card', provider: 'stripe', providerRef,
         });
 
     it('records it on webhook confirmation, held against the order with no invoice', async () => {
-        expect(await getHeldDepositCents(db, TENANT_ID, 'insp-a')).toBe(0);
+        expect(await getHeldDepositCents(ledgerDb, TENANT_ID, 'insp-a')).toBe(0);
         await settle('pi_1');
-        expect(await getHeldDepositCents(db, TENANT_ID, 'insp-a')).toBe(9000);
+        expect(await getHeldDepositCents(ledgerDb, TENANT_ID, 'insp-a')).toBe(9000);
 
         const row = await db.select().from(orderPayments).where(eq(orderPayments.providerRef, 'pi_1')).get();
         expect(row!.invoiceId).toBeNull();
@@ -265,17 +275,17 @@ describe('the deposit becomes real only when Stripe says so', () => {
         // Null is the contract for "already recorded", and it is what the
         // handler keys its "did anything happen" decision on.
         expect(await settle('pi_1')).toBeNull();
-        expect(await getHeldDepositCents(db, TENANT_ID, 'insp-a')).toBe(9000);
+        expect(await getHeldDepositCents(ledgerDb, TENANT_ID, 'insp-a')).toBe(9000);
     });
 
     it('nets what has landed against what is owed', async () => {
         await settle('pi_partial', 4000);
-        const owed = await outstandingDepositCents(db, TENANT_ID, 'insp-a');
+        const owed = await outstandingDepositCents(asD1Db(db), TENANT_ID, 'insp-a');
         expect(owed).toEqual({ requiredCents: 9000, heldCents: 4000, outstandingCents: 5000 });
     });
 
     it('does not go negative when more lands than was asked for', async () => {
         await settle('pi_big', 15000);
-        expect((await outstandingDepositCents(db, TENANT_ID, 'insp-a'))!.outstandingCents).toBe(0);
+        expect((await outstandingDepositCents(asD1Db(db), TENANT_ID, 'insp-a'))!.outstandingCents).toBe(0);
     });
 });

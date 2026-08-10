@@ -22,6 +22,7 @@ import type { EmailService } from '../../../server/services/email.service';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { asD1Db } from '../helpers/test-db';
 
 const T1 = '00000000-0000-0000-0000-0000000000c1';
 const CLIENT = 'contact-client-concierge-resolve';
@@ -44,7 +45,7 @@ describe('ConciergeService.resolveToken — primary-client sourcing (Task 9c)', 
             id: T1, name: 'Acme', slug: 'acme-resolve', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, T1, new Date(1));
+        await seedRoleProfiles(asD1Db(db), T1, new Date(1));
         await db.insert(schema.contacts).values({
             id: CLIENT, tenantId: T1, type: 'client', name: 'Jane Client',
             email: 'jane@example.com', createdAt: new Date(),
@@ -54,7 +55,6 @@ describe('ConciergeService.resolveToken — primary-client sourcing (Task 9c)', 
         // inspection_people carries the primary client for this inspection.
         await db.insert(schema.inspections).values({
             id: INSP, tenantId: T1, propertyAddress: '1 Main St',
-            clientName: null, clientEmail: null,
             date: '2026-06-15', status: 'scheduled', paymentStatus: 'unpaid', price: 0,
             paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         });

@@ -14,7 +14,7 @@ export function ItemPreviewPanel({ selectedItem, categoryColor }: ItemPreviewPan
     <div className="space-y-2">
       <p className="text-[13px] font-bold text-ih-fg-1">{selectedItem.label}</p>
       {selectedItem.description && <p className="text-[11px] text-ih-fg-3">{selectedItem.description}</p>}
-      <div className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-3 inline-block">{selectedItem.type}</div>
+      <div className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-2 inline-block">{selectedItem.type}</div>
       {selectedItem.type === "rich" && selectedItem.ratingOptions && (
         <div className="flex flex-wrap gap-1 mt-2">
           {selectedItem.ratingOptions.map((opt) => (
@@ -29,7 +29,7 @@ export function ItemPreviewPanel({ selectedItem, categoryColor }: ItemPreviewPan
             if (entries.length === 0) return null;
             return (
               <div key={tab}>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1 capitalize">{tab}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1 capitalize">{tab}</p>
                 {entries.map((c) => (
                   <CannedCommentRow
                     key={c.id}

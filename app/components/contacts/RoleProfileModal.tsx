@@ -179,7 +179,7 @@ export function RoleProfileModal({
         />
 
         <fieldset className="space-y-2 border-t border-ih-border pt-3">
-          <legend className="text-xs font-semibold uppercase tracking-wide text-ih-fg-muted pb-1">
+          <legend className="text-xs font-semibold uppercase tracking-wide text-ih-fg-3 pb-1">
             {m.contacts_roles_modal_caps_heading()}
           </legend>
           <Checkbox
@@ -203,7 +203,7 @@ export function RoleProfileModal({
               onChange={(e) => setCaps({ ...caps, canHaveAccount: e.target.checked })}
             />
             {accountUnavailable && (
-              <p className="text-xs text-ih-fg-muted pl-6">{m.contacts_roles_modal_cap_account_unavailable()}</p>
+              <p className="text-xs text-ih-fg-3 pl-6">{m.contacts_roles_modal_cap_account_unavailable()}</p>
             )}
           </div>
           <Checkbox

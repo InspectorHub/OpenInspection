@@ -1,9 +1,10 @@
-// Report lifecycle sub-router: complete, publish-readiness gate, confirm /
-// cancel / uncancel, publish, re-inspection create + candidates, the report
-// review state machine (submit / return / unpublish), and the PDF render
-// pipeline (refresh + download). The read/delivery side (report-data, repair
-// list, recipients, people, hub, send-pdf, agent share) lives in
-// ./report-delivery.ts; the agreement signing envelope lives in ./agreements.ts.
+// Report lifecycle sub-router: complete, publish-readiness gate, confirm,
+// publish, re-inspection create + candidates, the report review state machine
+// (submit / return / unpublish), and the PDF render pipeline (refresh +
+// download). The read/delivery side (report-data, repair list, recipients,
+// people, hub, send-pdf, agent share) lives in ./report-delivery.ts; the
+// agreement signing envelope lives in ./agreements.ts; the cancellation axis in
+// both directions (cancel / uncancel / quote) lives in ./cancellation.ts.
 // Behavior-preserving extraction from inspections.ts — handler bodies + route
 // definitions are byte-identical to the original (only their location changed).
 import { createRoute, z } from '@hono/zod-openapi';
@@ -20,6 +21,7 @@ import { inspections as inspectionTable } from '../../lib/db/schema';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation } from '../../services/inspection/shared';
+import { refuseLeaveCancelledViaStatusWrite } from './cancel-write-path';
 import { eq, and } from 'drizzle-orm';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
@@ -45,9 +47,10 @@ const completeInspectionRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
+        400: { description: 'The inspection is cancelled. Bring it back with POST /{id}/uncancel first (#81).' },
     },
     operationId: "completeInspection",
-    description: "Auto-generated placeholder for completeInspection (POST /{id}/complete, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -294,6 +297,15 @@ const publishRoutes = createApiRouter()
             return c.json({ success: true }, 200);
         }
 
+        // #81 — a fourth way out of `cancelled`, and it leaked the same way the
+        // bulk one did: straight to `completed` with `cancel_reason` still
+        // attached. `confirmInspection` has always refused a cancelled
+        // inspection; this route is the same claim about the same axis ("the
+        // visit happened") and had no guard at all. Recovery goes through
+        // `POST /:id/uncancel` first, then the visit can be marked complete.
+        const leaveRefusal = refuseLeaveCancelledViaStatusWrite(inspection.status);
+        if (leaveRefusal) return c.json({ success: false as const, error: leaveRefusal }, 400);
+
         const db = getDrizzle(c);
         await db.update(inspectionTable).set({ status: INSPECTION_STATUS.COMPLETED }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
@@ -340,22 +352,10 @@ const publishRoutes = createApiRouter()
         await c.var.services.inspection.confirmInspection(tenantId, id);
         return c.json({ success: true });
     })
-    // POST /{id}/cancel MOVED to ./cancellation.ts, which owns the whole
-    // cancellation surface: the quote, the fee acknowledgement, and the refund.
-    .openapi(createRoute(withMcpMetadata({
-        method: 'post', path: '/{id}/uncancel',
-        tags: ["inspections"], summary: "Create inspection uncancel for current tenant",
-        middleware: [requireRole('owner', 'manager')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
-        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Uncancelled' } },
-        operationId: "createInspectionUncancel",
-        description: "Auto-generated placeholder for createInspectionUncancel (POST /{id}/uncancel, inspections domain). TODO: replace with a real description sourced from the handler."
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        await c.var.services.inspection.uncancelInspection(tenantId, id);
-        return c.json({ success: true });
-    })
+    // POST /{id}/cancel AND POST /{id}/uncancel both live in ./cancellation.ts,
+    // which owns the cancellation axis in both directions: the quote, the fee
+    // acknowledgement, the refund, and the one door back (#81). Neither is a
+    // report-lifecycle event, which is what this file is for.
     .openapi(publishRoute, async (c) => {
         const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');
@@ -463,7 +463,7 @@ const publishRoutes = createApiRouter()
                 selectedItemIds: body.selectedItemIds,
                 inspectorId: body.inspectorId,
             });
-            return c.json({ success: true, data: { id: created.id, reinspectionRound: created.reinspectionRound ?? 1 } }, 200);
+            return c.json({ success: true, data: { id: created.id, reinspectionRound: created.reinspectionRound } }, 200);
         } catch (err) {
             return c.json({ success: false, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to create re-inspection' } }, 400);
         }

@@ -23,7 +23,7 @@ interface SegmentedControlProps {
 /**
  * Generic single-select segmented control. A rounded track (`bg-ih-bg-muted`)
  * holding segment buttons; the selected segment lifts onto a card surface
- * (`bg-ih-bg-card text-ih-primary shadow-ih-card`). Not theme-coupled — works
+ * (`bg-ih-bg-card text-ih-primary-text shadow-ih-card`). Not theme-coupled — works
  * for any option set (view mode, filters, theme, …).
  *
  * Accessibility follows the WAI-ARIA radiogroup pattern: `role="radiogroup"`
@@ -107,7 +107,7 @@ export function SegmentedControl({
                 // popover or card the control read as four plain words with one
                 // of them coloured — the strongest cue, the surface change,
                 // cancelled out against its own container.
-                ? "bg-ih-bg-card text-ih-primary shadow-ih-card ring-1 ring-ih-border"
+                ? "bg-ih-bg-card text-ih-primary-text shadow-ih-card ring-1 ring-ih-border"
                 : "bg-transparent text-ih-fg-3 hover:text-ih-fg-1"
             }`}
           >

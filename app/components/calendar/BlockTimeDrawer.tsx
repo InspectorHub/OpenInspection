@@ -116,7 +116,7 @@ export function BlockTimeDrawer({
                 type="button"
                 onClick={() => setConfirmDelete(true)}
                 disabled={submitting}
-                className="mr-auto h-9 px-3 rounded-md border border-ih-bad text-[13px] font-bold text-ih-bad-fg hover:bg-ih-bad-tint disabled:opacity-50"
+                className="mr-auto h-9 px-3 rounded-md border border-ih-bad text-[13px] font-bold text-ih-bad-fg hover:bg-ih-bad-bg disabled:opacity-50"
               >
                 {m.common_delete()}
               </button>

@@ -14,6 +14,7 @@ import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import {
     REPORT_NOTIFY_COALESCE_WINDOW_MS,
     shouldCoalesceNotification,
@@ -78,7 +79,7 @@ beforeEach(async () => {
         id: TENANT, name: 'Coalesce Co', slug: 'coalesce-co', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(T0),
     } as never);
-    await seedRoleProfiles(db, TENANT, new Date(T0));
+    await seedRoleProfiles(asD1Db(db), TENANT, new Date(T0));
     await db.insert(schema.inspections).values({
         id: INSPECTION, tenantId: TENANT, propertyAddress: '9 Coalesce Court',
         date: '2026-08-03', status: 'completed', reportStatus: 'in_progress',

@@ -77,7 +77,7 @@ export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
   };
 
   return (
-    <div className="border border-ih-border rounded-lg p-4 bg-ih-bg-1">
+    <div className="border border-ih-border rounded-lg p-4 bg-ih-bg-card">
       <canvas
         ref={canvasRef}
         width={400}

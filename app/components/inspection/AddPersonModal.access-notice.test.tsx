@@ -15,6 +15,7 @@ import { render, fireEvent } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
 import { AddPersonModal } from "./AddPersonModal";
+import { asSelect } from "../../../tests/helpers/dom";
 
 const ROLES = [
   { id: "r-agent", key: "buyer_agent", label: "Buyer's Agent", kind: "agent", active: true },
@@ -54,7 +55,7 @@ describe("AddPersonModal — access notice (IA-102)", () => {
 
   it("warns when the chosen role hands over the report", async () => {
     const { findByLabelText, findByText } = renderModal();
-    const select = (await findByLabelText(/role/i)) as HTMLSelectElement;
+    const select = asSelect(await findByLabelText(/role/i), "the role picker");
 
     fireEvent.change(select, { target: { value: "r-agent" } });
     expect(await findByText(NOTICE)).toBeTruthy();
@@ -66,7 +67,7 @@ describe("AddPersonModal — access notice (IA-102)", () => {
     // on the tenant-custom roles most likely to be misconfigured.
     for (const roleId of ["r-client", "r-other"]) {
       const { findByLabelText, findByText, unmount } = renderModal();
-      const select = (await findByLabelText(/role/i)) as HTMLSelectElement;
+      const select = asSelect(await findByLabelText(/role/i), "the role picker");
       fireEvent.change(select, { target: { value: roleId } });
       expect(await findByText(NOTICE)).toBeTruthy();
       unmount();
@@ -75,7 +76,7 @@ describe("AddPersonModal — access notice (IA-102)", () => {
 
   it("never implies an account, a sign-up, or a portal", async () => {
     const { findByLabelText, container } = renderModal();
-    const select = (await findByLabelText(/role/i)) as HTMLSelectElement;
+    const select = asSelect(await findByLabelText(/role/i), "the role picker");
     fireEvent.change(select, { target: { value: "r-agent" } });
 
     const text = container.textContent ?? "";
@@ -89,7 +90,7 @@ describe("AddPersonModal — access notice (IA-102)", () => {
 
   it("points at where the access can be taken back", async () => {
     const { findByLabelText, container } = renderModal();
-    const select = (await findByLabelText(/role/i)) as HTMLSelectElement;
+    const select = asSelect(await findByLabelText(/role/i), "the role picker");
     fireEvent.change(select, { target: { value: "r-agent" } });
 
     // A warning with no remedy is just anxiety — IA-100 built the revoke list.

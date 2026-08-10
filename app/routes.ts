@@ -84,6 +84,10 @@ export default [
   route("ui", "routes/docs.tsx"),
   // BFF resource routes (no UI) — Token-Relay endpoints for editor hooks
   // (Track H / C-12: client code never fetches /api directly).
+  // #61 — AI writing assistance on an inspection note, and the record that a
+  // person reviewed the result before it became one. The API endpoints predate
+  // this route by a long way and had no caller in `app/` at all.
+  route("resources/ai-assist", "routes/resources/ai-assist.tsx"),
   route("resources/comments-library", "routes/resources/comments-library.tsx"),
   route("resources/defect-categories", "routes/resources/defect-categories.tsx"),
   route("resources/repair-items", "routes/resources/repair-items.tsx"),
@@ -100,7 +104,15 @@ export default [
   route("resources/agent-notices", "routes/resources/agent-notices.tsx"),
   route("resources/staff-notices", "routes/resources/staff-notices.tsx"),
   route("resources/inspection-communication", "routes/resources/inspection-communication.tsx"),
+  // #67 — the cancellation quote (loader) and the cancel itself (action). Both
+  // API endpoints shipped with the fee ladder and had no caller anywhere in
+  // app/; this is the only front door to them.
+  route("resources/inspection-cancellation", "routes/resources/inspection-cancellation.tsx"),
+  // #81 — the way back, and the same story: POST /:id/uncancel had no caller
+  // either. One door, shared by the hub's Lifecycle card and the list row.
+  route("resources/inspection-restore", "routes/resources/inspection-restore.tsx"),
   route("resources/agreement-signers", "routes/resources/agreement-signers.tsx"),
+  route("resources/agreement-templates", "routes/resources/agreement-templates.tsx"),
   route("resources/team-members", "routes/resources/team-members.tsx"),
   route("resources/contact-access", "routes/resources/contact-access.tsx"),
   route("resources/template-search", "routes/resources/template-search.tsx"),
@@ -137,6 +149,14 @@ export default [
     // is a full-screen work surface with its own chrome.) The hub had been
     // reproducing this layout's container by hand, which is now removed.
     route("inspections/:id", "routes/inspector-portal.tsx"),
+    // #69 — the Repair Request Log, entered from the hub's Report card. Its own
+    // page rather than a card on the hub: it lists every repair request built
+    // for the order, each with its items, which is more than a hub block can
+    // hold. Inside the auth layout for the same reason the hub is — walking out
+    // of the hub into it must not drop the workspace nav. The static
+    // `repair-requests` segment outranks nothing: `inspections/:id` is a leaf,
+    // not a layout, so this is a sibling path and there is no collision.
+    route("inspections/:id/repair-requests", "routes/inspection-repair-requests.tsx"),
     route("calendar", "routes/calendar.tsx"),
     // Day-centric dispatch board. Static `dispatch` sits under the calendar
     // path but is its own route, not a mode of /calendar: the audience is

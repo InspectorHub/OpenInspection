@@ -307,5 +307,20 @@ export default defineConfig({
         // Verifies real-browser wiring + graceful degradation (no external keys
         // locally). Uses the shared editor-seed admin + inspection.
         { name: 'address-autofill', testMatch: 'address-autofill.spec.ts', dependencies: ['editor-seed'] },
+        {
+            // #99 — what a public visitor pays for the 419-zone timezone table.
+            // A MEASUREMENT HARNESS, not a gate: it prints a table and asserts
+            // only that its own instrument works. Env-gated off by default for
+            // two reasons that both matter. It costs several throttled page
+            // loads for numbers nobody reads on a normal run; and a wall-clock
+            // threshold on a shared runner is a coin flip, so wiring it into CI
+            // would buy flake rather than signal. Same `.never.ts` shape as the
+            // `cloud` project — a project matching nothing is otherwise a fresh
+            // way to report green over zero tests.
+            name: 'timezone-perf',
+            testMatch: process.env.TZ_PERF
+                ? 'public-timezone-hydration-cost.spec.ts'
+                : 'public-timezone-hydration-cost.never.ts',
+        },
     ],
 });

@@ -43,7 +43,7 @@ export function FooterBar({ connected = false, status, roster = [] }: FooterBarP
 
         {shortcutsOpen && (
           <div className="absolute bottom-full left-0 mb-2 w-[320px] bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover z-50 p-3">
-            <h4 className="text-[9px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-2">{m.editor_shortcuts_heading()}</h4>
+            <h4 className="text-[9px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-2">{m.editor_shortcuts_heading()}</h4>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
               {SHORTCUTS.map((s, i) => (
                 <div key={i} className="flex items-center gap-2">

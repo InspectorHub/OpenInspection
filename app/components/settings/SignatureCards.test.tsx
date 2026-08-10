@@ -32,7 +32,10 @@ vi.mock("~/components/media-studio/PhotoCropper", () => ({
  * used for RENDERING only — never for an auth assertion, which it cannot make
  * (it does not run middleware).
  */
-function renderInRouter(ui: React.ReactElement, action = vi.fn(() => ({ success: true }))) {
+function renderInRouter(
+  ui: React.ReactElement,
+  action = vi.fn((_args: { request: Request }) => ({ success: true })),
+) {
   const Stub = createRoutesStub([{ path: "/", Component: () => ui, action }]);
   return { ...render(<Stub initialEntries={["/"]} />), action };
 }

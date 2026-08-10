@@ -19,9 +19,34 @@ import {
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { syncInspectionAssignmentsBatch } from '../../lib/db/assignment-links';
 import { findScheduleConflicts } from '../../lib/schedule-conflicts';
+import { refuseCancelViaStatusWrite, refuseLeaveCancelledViaStatusWrite } from './cancel-write-path';
+import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { eq, inArray, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
+import { safeISODate } from '../../lib/date';
+
+/**
+ * `getDashboardBuckets` hands back raw `inspections` rows, whose `created_at` /
+ * `confirmed_at` are `timestamp_ms` columns — drizzle materialises them as `Date`
+ * instances. `DashboardResponseSchema` says those two fields are ISO strings, and
+ * the schema is the one telling the truth: it is the published OpenAPI/MCP
+ * contract, `app/lib/dashboard-schema.ts` declares `confirmedAt?: string | null`,
+ * and JSON has no Date — `JSON.stringify` was already emitting exactly
+ * `Date#toISOString()` on the wire. So the handler was the wrong side: it fed
+ * `c.json()` a value the response type never described.
+ *
+ * Serialising here (per the D1 date-safety rule in CLAUDE.md) is byte-identical
+ * on the wire — `safeISODate(Date)` IS `toISOString()`. `null` is passed through
+ * rather than run through `safeISODate`, which would turn it into `''` and
+ * genuinely change the payload.
+ */
+const toWireDates = <T extends { createdAt: Date; confirmedAt: Date | null }>(rows: T[]) =>
+    rows.map((row) => ({
+        ...row,
+        createdAt:   safeISODate(row.createdAt),
+        confirmedAt: row.confirmedAt === null ? null : safeISODate(row.confirmedAt),
+    }));
 
 // --- GET /api/inspections/dashboard — Spec 3A ---
 const dashboardRoute = createRoute(withMcpMetadata({
@@ -133,6 +158,7 @@ const bulkUpdateRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
+        400: { description: 'Missing action argument; a request to cancel — cancellation is writable only through POST /{id}/cancel, one inspection at a time, so the fee and refund cannot be skipped (#78); or a batch containing an already-cancelled inspection, which only POST /{id}/uncancel may move (#81)' },
     },
     operationId: "bulkInspection"
 }, { scopes: ['write'], tier: 'extended', capability: 'scheduleOthers' }));
@@ -210,7 +236,19 @@ const bulkRoutes = createApiRouter()
                 error: err instanceof Error ? err.message : String(err),
             });
         }
-        return c.json({ success: true, data: { ...buckets, conciergePending } });
+        return c.json({
+            success: true,
+            data: {
+                ...buckets,
+                needsAttention: toWireDates(buckets.needsAttention),
+                today:          toWireDates(buckets.today),
+                thisWeek:       toWireDates(buckets.thisWeek),
+                later:          toWireDates(buckets.later),
+                recentReports:  toWireDates(buckets.recentReports),
+                cancelled:      toWireDates(buckets.cancelled),
+                conciergePending,
+            },
+        });
     })
     .openapi(listInspectionsRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -271,6 +309,35 @@ const bulkRoutes = createApiRouter()
             });
         } else {
             if (!body.status) throw Errors.BadRequest('status is required for updateStatus.');
+
+            // #78 — the surface the cancel route's own comment predicted. A
+            // bulk cancel is not one confirmation covering N jobs: each has its
+            // own price, its own notice window and its own fee, so there is no
+            // single figure a caller could have acknowledged. See
+            // ./cancel-write-path.
+            const cancelRefusal = refuseCancelViaStatusWrite(body.status);
+            if (cancelRefusal) return c.json({ success: false as const, error: cancelRefusal }, 400);
+
+            // #81 — and the other direction, which was the WORSE of the two here.
+            // This write never consulted the row it was overwriting, so a bulk
+            // move of a cancelled inspection back to `scheduled` left
+            // `cancel_reason = 'no_show'` attached to a live job: the one lie the
+            // single PATCH went out of its way to prevent. Recovery is
+            // per-inspection anyway — it is a decision about one mis-click, not a
+            // batch operation — so the whole batch is refused rather than the
+            // cancelled members silently skipped.
+            const stuck = await db.select({ id: inspectionTable.id }).from(inspectionTable)
+                .where(and(
+                    inArray(inspectionTable.id, body.ids),
+                    eq(inspectionTable.tenantId, tenantId),
+                    eq(inspectionTable.status, INSPECTION_STATUS.CANCELLED),
+                ))
+                .limit(1).get();
+            const leaveRefusal = refuseLeaveCancelledViaStatusWrite(
+                stuck ? INSPECTION_STATUS.CANCELLED : null,
+            );
+            if (leaveRefusal) return c.json({ success: false as const, error: leaveRefusal }, 400);
+
             await db.update(inspectionTable).set({ status: body.status })
                 .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
 

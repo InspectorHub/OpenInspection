@@ -11,6 +11,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq, isNull, and } from 'drizzle-orm';
@@ -134,7 +135,7 @@ describe('manual SMS send (A3.4/A3.5)', () => {
             smsMode: 'platform',
             updatedAt: new Date(),
         } as never);
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values([
             { id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane', email: 'j@x.com', phone: '+15551110001', createdAt: new Date() },
             { id: CO_CLIENT, tenantId: TENANT, type: 'client', name: 'John', email: 'h@x.com', phone: '+15551110002', createdAt: new Date() },

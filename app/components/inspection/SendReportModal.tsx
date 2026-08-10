@@ -136,14 +136,14 @@ export function SendReportModal({
             {m.inspections_hub_send_report_people_label()}
           </p>
           {groups.length === 0 ? (
-            <p className="text-[12px] text-ih-fg-4">{m.inspections_hub_people_empty_title()}</p>
+            <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_people_empty_title()}</p>
           ) : (
             <div className="space-y-3">
               {groups.map((group) => (
                 <div key={group.kind}>
                   <p
                     data-testid={`people-group-${group.kind}`}
-                    className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1"
+                    className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3 mb-1"
                   >
                     {groupLabel(group.kind)}
                   </p>

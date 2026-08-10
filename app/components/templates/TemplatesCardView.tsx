@@ -32,7 +32,7 @@ export function TemplatesCardView({
             </>
           ) : (
             <>
-              <div className="w-12 h-12 rounded-xl bg-ih-primary-tint flex items-center justify-center text-ih-primary">
+              <div className="w-12 h-12 rounded-xl bg-ih-primary-tint flex items-center justify-center text-ih-primary-text">
                 <TemplateIcon size="lg" />
               </div>
               <div className="text-center">
@@ -68,15 +68,15 @@ export function TemplatesCardView({
               className="bg-ih-bg-card border border-ih-border rounded-lg p-3 flex flex-col gap-2 hover:border-ih-primary transition-colors"
             >
               <div>
-                <Link to={`/templates/${t.id}/edit`} className="text-[14px] font-bold text-ih-fg-1 hover:text-ih-primary transition-colors">
+                <Link to={`/templates/${t.id}/edit`} className="text-[14px] font-bold text-ih-fg-1 hover:text-ih-primary-text transition-colors">
                   {t.name}
                 </Link>
                 {t.description && (
                   <p className="text-[11px] text-ih-fg-3 line-clamp-2 mt-1">{t.description}</p>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-[10px] font-mono text-ih-fg-4">
-                <span className="inline-flex items-center rounded border border-ih-primary/20 px-1.5 py-0.5 bg-ih-primary-tint text-ih-primary">
+              <div className="flex items-center gap-2 text-[10px] font-mono text-ih-fg-3">
+                <span className="inline-flex items-center rounded border border-ih-primary/20 px-1.5 py-0.5 bg-ih-primary-tint text-ih-primary-text">
                   v{t.version || 1}.0
                 </span>
                 <span>{m.templates_row_items({ count: items })}</span>
@@ -86,13 +86,13 @@ export function TemplatesCardView({
                 )}
               </div>
               <div className="flex items-center gap-3 pt-1 border-t border-ih-border mt-auto">
-                <Link to={`/templates/${t.id}/edit`} className="text-[11px] font-bold text-ih-primary hover:text-ih-primary transition-colors">
+                <Link to={`/templates/${t.id}/edit`} className="text-[11px] font-bold text-ih-primary-text hover:text-ih-primary-text transition-colors">
                   {m.common_edit()}
                 </Link>
-                <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary transition-colors">
+                <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary-text transition-colors">
                   {m.templates_action_duplicate()}
                 </button>
-                <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-4 hover:text-ih-bad-fg transition-colors ml-auto">
+                <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-bad-fg transition-colors ml-auto">
                   {m.common_delete()}
                 </button>
               </div>

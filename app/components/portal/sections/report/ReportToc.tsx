@@ -32,7 +32,7 @@ export function ReportToc({
       className="mb-8 print:break-after-page"
       aria-label={m.pca_toc_aria()}
     >
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-ih-fg-4">
+      <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-ih-fg-3">
         {m.pca_toc_title()}
       </h2>
       <ol className="space-y-1">
@@ -46,7 +46,7 @@ export function ReportToc({
           >
             <a
               href={`#${entry.id}`}
-              className="hover:text-ih-primary transition-colors"
+              className="hover:text-ih-primary-text transition-colors"
               onClick={(ev) => {
                 // RR scrollRestoration='manual' — a bare href doesn't scroll.
                 ev.preventDefault();

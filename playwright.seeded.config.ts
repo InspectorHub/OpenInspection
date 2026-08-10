@@ -40,5 +40,13 @@ export default defineConfig({
             name: 'subsystem-e-flows',
             testMatch: 'subsystem-e-flows.spec.ts',
         },
+        // The client's repair-request builder. It belongs to THIS config for the
+        // same reason the two above do — it is reached with a seeded portal token
+        // on the seeded delivered inspection, and those rows cannot coexist with
+        // the default run's fresh-setup assertion.
+        {
+            name: 'repair-builder-client-link',
+            testMatch: 'repair-builder-client-link.spec.ts',
+        },
     ],
 });

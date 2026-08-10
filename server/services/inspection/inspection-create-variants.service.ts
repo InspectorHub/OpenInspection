@@ -5,6 +5,7 @@ import { safeISODate } from '../../lib/date';
 import { logger } from '../../lib/logger';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { getInspectionRoster } from '../../lib/inspection/roster';
+import type { ServiceSelection } from '../../lib/inspection/service-snapshot';
 import type { Inspection, CreateInspectionData } from './shared';
 import type { ScopedDB } from '../../lib/db/scoped';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
@@ -57,7 +58,7 @@ export class InspectionCreateVariantsService extends InspectionSubService {
     async applyServicePriceOverrides(
         inspectionId: string,
         tenantId: string,
-        selections: Array<{ serviceId: string; priceOverrideCents?: number }>,
+        selections: ServiceSelection[],
     ): Promise<void> {
         const db = this.getDrizzle();
         for (const sel of selections) {

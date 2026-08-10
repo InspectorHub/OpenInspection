@@ -12,6 +12,7 @@ vi.mock('../../../server/lib/pdf', () => ({
     generatePdfWithTocPages: vi.fn(async () => new ArrayBuffer(4096)),
 }));
 import { generatePdfFromUrl, generatePdfWithTocPages } from '../../../server/lib/pdf';
+import type { BrowserRun } from '../../../server/types/hono';
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
 const INSP_1   = '00000000-0000-0000-0000-0000000000b1';
@@ -23,7 +24,10 @@ async function seed(testDb: BetterSQLite3Database<typeof schema>) {
     });
 }
 
-const mockBrowser = { fetch: vi.fn() } as unknown as Fetcher;
+// The binding is a Browser Run Quick Actions handle, not a Fetcher: the
+// service only ever hands it to `generatePdfWithTocPages`, which is mocked, so
+// `quickAction` is never invoked — but the shape has to be the real one.
+const mockBrowser: BrowserRun = { quickAction: vi.fn<BrowserRun['quickAction']>() };
 const mockR2 = { put: vi.fn(async () => undefined) } as unknown as R2Bucket;
 
 describe('ReportPdfService', () => {

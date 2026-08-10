@@ -18,8 +18,16 @@ import { m } from "~/paraglide/messages";
  */
 export function seedQuickPhrases(): string[] {
   return [
-    m.repair_quick_phrase_default_repair(),
-    m.repair_quick_phrase_default_replace(),
+    // ⚠️ These used to be "Repair requested" / "Replacement requested", which
+    // #275 turned into a duplicate: the structured REQUESTED ACTION field now
+    // owns what the buyer is asking for, so a phrase that also states it lets
+    // the same request be made twice, in two places, with nothing reconciling
+    // them. The note's remaining job is the RATIONALE — conditions on how the
+    // work is done and what evidence is wanted, which no structured field
+    // carries. Two phrases, so the "[] means the tenant switched them off"
+    // distinction below still has a non-empty default to be distinct from.
+    m.repair_quick_phrase_default_licensed(),
+    m.repair_quick_phrase_default_invoice(),
   ];
 }
 

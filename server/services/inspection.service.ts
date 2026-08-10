@@ -134,8 +134,8 @@ export class InspectionService {
     async createReinspection(
         tenantId: string,
         baselineId: string,
-        opts: { selectedItemIds: string[]; inspectorId?: string },
-    ): Promise<Inspection> {
+        opts: { selectedItemIds: string[]; inspectorId?: string | undefined },
+    ): ReturnType<InspectionCoreService['createReinspection']> {
         return this.core.createReinspection(tenantId, baselineId, opts);
     }
 
@@ -174,7 +174,7 @@ export class InspectionService {
     async applyServicePriceOverrides(
         inspectionId: string,
         tenantId: string,
-        selections: Array<{ serviceId: string; priceOverrideCents?: number }>,
+        selections: Array<{ serviceId: string; priceOverrideCents?: number | undefined }>,
     ): Promise<void> {
         return this.core.applyServicePriceOverrides(inspectionId, tenantId, selections);
     }

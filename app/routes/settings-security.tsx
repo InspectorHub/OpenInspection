@@ -238,11 +238,11 @@ export default function SettingsSecurityPage() {
         <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_security_account_details_heading()}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">{m.settings_security_email_label()}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_security_email_label()}</p>
             <p className="text-[13px] text-ih-fg-1 font-medium">{user.email || m.settings_security_not_set()}</p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">{m.settings_security_name_label()}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_security_name_label()}</p>
             <p className="text-[13px] text-ih-fg-1 font-medium">{user.name || m.settings_security_not_set()}</p>
           </div>
         </div>
@@ -279,7 +279,7 @@ export default function SettingsSecurityPage() {
       <section id="sessions" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4 scroll-mt-12">
         <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_security_sessions_heading()}</h3>
         <div className="flex items-center gap-3 p-3 rounded-md bg-ih-bg-muted border border-ih-border">
-          <div className="w-8 h-8 rounded-full bg-ih-primary-tint text-ih-primary flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-ih-primary-tint text-ih-primary-text flex items-center justify-center">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>

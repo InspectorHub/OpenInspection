@@ -6,8 +6,16 @@ import { resolve } from 'node:path';
 // and must reference the template-id fields. (Renders SSR-only; a source-level
 // assertion is the cheapest reliable signal that the body editors were removed.)
 // The editor form was extracted into AutomationEditorModal for the file-size
-// gate (Spec 2 Task 0), so the editor-content assertions read the modal source.
-const src = readFileSync(resolve(__dirname, './settings-automations.tsx'), 'utf8');
+// gate (Spec 2 Task 0), so the "references the template-id fields" assertions
+// read the modal source.
+//
+// The MUST-NOT-BIND half deliberately reads BOTH. The extraction moved the form
+// out of the route, and for a while these assertions moved with it — which left
+// the route free to grow a body input again with nothing watching. "The editor
+// does not render an embedded body editor" is a claim about the whole editor
+// surface, so both files have to answer it, wherever the form happens to live
+// after the next split.
+const routeSrc = readFileSync(resolve(__dirname, './settings-automations.tsx'), 'utf8');
 const modalSrc = readFileSync(
   resolve(__dirname, '../components/settings/AutomationEditorModal.tsx'),
   'utf8',
@@ -15,9 +23,11 @@ const modalSrc = readFileSync(
 
 describe('logic-only automation editor', () => {
   it('no longer binds a bodyTemplate / smsBody editor input', () => {
-    expect(modalSrc).not.toMatch(/name=["']bodyTemplate["']/);
-    expect(modalSrc).not.toMatch(/name=["']smsBody["']/);
-    expect(modalSrc).not.toMatch(/name=["']subjectTemplate["']/);
+    for (const [name, source] of [['route', routeSrc], ['modal', modalSrc]] as const) {
+      expect(source, `${name} source binds bodyTemplate`).not.toMatch(/name=["']bodyTemplate["']/);
+      expect(source, `${name} source binds smsBody`).not.toMatch(/name=["']smsBody["']/);
+      expect(source, `${name} source binds subjectTemplate`).not.toMatch(/name=["']subjectTemplate["']/);
+    }
   });
   it('references the template-id fields and the templates hub link', () => {
     expect(modalSrc).toMatch(/emailTemplateId/);

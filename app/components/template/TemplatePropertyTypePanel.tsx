@@ -22,7 +22,7 @@ export function TemplatePropertyTypePanel({ propertyType, commercialSubtype, onC
   return (
     <div className="flex items-center gap-4" data-testid="template-property-type-panel">
       <label className="flex items-center gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">{m.templates_property_type_label()}</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">{m.templates_property_type_label()}</span>
         <select
           data-testid="template-property-type"
           value={propertyType ?? ""}
@@ -39,7 +39,7 @@ export function TemplatePropertyTypePanel({ propertyType, commercialSubtype, onC
       </label>
       {isCommercial && (
         <label className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">{m.templates_subtype_label()}</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">{m.templates_subtype_label()}</span>
           <select
             data-testid="template-commercial-subtype"
             value={commercialSubtype ?? ""}

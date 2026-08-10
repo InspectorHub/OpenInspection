@@ -24,7 +24,7 @@ describe('attachPhotoToDefectState', () => {
   });
 
   it('creates the state row (included=true) when the defect has no row yet', () => {
-    const result = { rating: 'Defect' };
+    const result: Record<string, unknown> = { rating: 'Defect' };
     const next = attachPhotoToDefectState(result, 'd9', 'k1');
     const rows = (next.tabs as { defects: Array<{ cannedId: string; included: boolean; photos: Array<{ key: string }> }> }).defects;
     expect(rows).toHaveLength(1);

@@ -11,6 +11,7 @@ import { buildToolInput, toZodInputSchema, type ToolInput } from '../lib/mcp/res
 import { registerGrantedPrompts } from '../lib/mcp/prompts';
 import { callApiAsUser } from '../lib/mcp/identity-bridge';
 import { extendedToolsEnabled } from '../lib/mcp/flag';
+import { MCP_MAX_RESULT_BYTES } from '../lib/mcp/result-limits';
 import type { AppEnv } from '../types/hono';
 
 // `Env` is the global interface from worker-configuration.d.ts (extends Cloudflare.Env),
@@ -33,8 +34,10 @@ export interface McpProps extends Record<string, unknown> {
 }
 
 /** Tool results larger than this are truncated so a single call cannot blow the
- * model's context window. The marker tells the model the payload was clipped. */
-const MAX_RESULT_BYTES = 48 * 1024;
+ * model's context window. The marker tells the model the payload was clipped.
+ * Lives in `lib/mcp/result-limits` so a handler that must keep a field inside
+ * the slice can assert against the same number instead of copying it. */
+const MAX_RESULT_BYTES = MCP_MAX_RESULT_BYTES;
 
 /** OpenAPI document config — MUST match the snapshot generator / route-metadata
  * spec so the `components.schemas` resolved here line up with the snapshot. */

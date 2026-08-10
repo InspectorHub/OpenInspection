@@ -50,6 +50,63 @@ const SCOPE_VAR_PATTERN =
 const METHOD_PATTERN =
     /^\s{2,}(?:(?:public|private|protected|static|readonly|async|get|set|override|\*)\s+)*(\w+)\s*\([^)]*\)\s*(?::\s*[^={;]+)?\{\s*$/;
 
+// The SAME declaration when its parameter list WRAPS — the line ends at the
+// open paren and the params live below.
+//
+// ⚠️ THIS IS NOT A COMPLETENESS NICETY. Without it the backward walk sails past
+// the declaration and names the PREVIOUS method, so a hit keeps its position
+// but changes its baseline key — and a key that moved is reported as a NEW
+// violation. Merely widening a return type until Prettier wraps the signature
+// is therefore enough to fail this gate, pointing at a method that contains no
+// query at all. That happened: `ai.service.ts::generateInspectionSummary` grew
+// `Promise<{ summary: string; aiCallId: string | null }>`, wrapped, and its
+// unscoped select was re-reported under `generateProfessionalComment`.
+//
+// The whole point of the symbol scheme over line numbers is that unrelated
+// edits must not move a key. A formatting-sensitive resolver gives that up
+// quietly, in the direction of false alarms — which is the direction that
+// teaches people to run `--update` without reading.
+//
+// ⚠️ THE LINE SHAPE ALONE IS NOT ENOUGH, and assuming it was made this worse
+// before it made it better. `and(` / `or(` on their own line — drizzle
+// predicates with wrapped arguments — match this pattern perfectly, so a
+// regex-only version renamed a dozen baseline keys to `::and::` and `::or::`.
+// Every candidate is therefore confirmed by `opensMethodBody`, which reads
+// forward to the matching `)` and requires a `{` after it. A call closes with
+// `)`, `),` or `);` and is rejected there.
+const METHOD_OPEN_PATTERN =
+    /^\s{2,}(?:(?:public|private|protected|static|readonly|async|get|set|override|\*)\s+)*(\w+)\s*\(\s*$/;
+
+/**
+ * Confirms the wrapped parameter list opening at `lines[i]` belongs to a
+ * DECLARATION: balance parens forward and require the closing line to end in
+ * `{`. A call closes with `)`, `),` or `);` and is rejected.
+ *
+ * ⚠️ THE TEST IS "ENDS WITH `{`", NOT A RETURN-TYPE PATTERN. The obvious
+ * `(?::\s*[^={;]+)?\{$` refuses a `{` inside the return type — and this
+ * codebase returns inline object types constantly
+ * (`): Promise<{ annotatedKey: string }> {`), so that version rejected real
+ * signatures and the walk fell back to naming the `constructor`. Keywords are
+ * filtered by the caller, which is what keeps `if (`/`for (`/`while (` from
+ * matching here; nothing else at this indent both wraps and ends in `{`.
+ *
+ * Only ever called for lines before the hit, so the closing paren is always
+ * inside the slice. Bounded at 40 lines — beyond that it is not a signature.
+ */
+function opensMethodBody(lines, i) {
+    let depth = 0;
+    for (let j = i; j < lines.length && j < i + 40; j++) {
+        const line = lines[j];
+        for (let k = 0; k < line.length; k++) {
+            if (line[k] === '(') depth++;
+            else if (line[k] === ')' && --depth === 0) {
+                return line.slice(k + 1).trimEnd().endsWith('{');
+            }
+        }
+    }
+    return false;
+}
+
 /**
  * Returns the name of the nearest declaration at or before `index`, or
  * `<module>` if the hit precedes any declaration. Deterministic and
@@ -76,6 +133,8 @@ export function enclosingSymbol(source, index) {
         }
         const mm = line.match(METHOD_PATTERN);
         if (mm && !KEYWORDS.has(mm[1])) return mm[1];
+        const mo = line.match(METHOD_OPEN_PATTERN);
+        if (mo && !KEYWORDS.has(mo[1]) && opensMethodBody(lines, i)) return mo[1];
     }
     return '<module>';
 }

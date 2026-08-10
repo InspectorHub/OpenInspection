@@ -22,14 +22,16 @@ const TENANT = '00000000-0000-0000-0000-000000000001';
 let db: BetterSQLite3Database<typeof schema>;
 let sqlite: InstanceType<typeof Database>;
 
-function makeUser(id: string, email: string, deletedAt: number | null = null) {
+// Return type annotated so the literal is contextually typed: without it
+// `role` widens to `string` and the enum column rejects the whole row.
+function makeUser(id: string, email: string, deletedAt: number | null = null): typeof schema.users.$inferInsert {
     return {
         id,
         tenantId: TENANT,
         name: 'Test User',
         email,
         passwordHash: 'hash',
-        role: 'admin',
+        role: 'owner',
         slug: id, // use id as slug to keep it unique across inserts
         createdAt: new Date(1_700_000_000_000),
         deletedAt: deletedAt === null ? null : new Date(deletedAt),

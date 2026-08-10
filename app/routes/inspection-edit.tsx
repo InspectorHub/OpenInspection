@@ -1487,6 +1487,8 @@ export default function InspectionEditPage() {
  <ItemEditor
  item={state.activeItem || undefined}
  sectionTitle={state.currentSection?.title}
+ /* #61 — the artifact an AI content-review row cites. */
+ resultId={loaderData.resultId}
  result={
  state.activeItemId
  ? findings.getResult(
@@ -1634,7 +1636,7 @@ export default function InspectionEditPage() {
  <p className="text-[13px]">
  {m.editor_route_select_item_hint()}
  </p>
- <p className="text-[11px] mt-2 text-ih-fg-4">
+ <p className="text-[11px] mt-2 text-ih-fg-3">
  {m.editor_route_navigate_hint_press()} <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">J</kbd> / <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">K</kbd> {m.editor_route_navigate_hint_navigate()}
  </p>
  </div>

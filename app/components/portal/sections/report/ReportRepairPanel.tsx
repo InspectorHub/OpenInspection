@@ -51,7 +51,7 @@ export function ReportRepairPanel({ selectedRepairList, onClose }: ReportRepairP
                     {item.label}
                   </span>
                   {item.recommendation && (
-                    <span className="text-xs text-ih-fg-4 ml-2">
+                    <span className="text-xs text-ih-fg-3 ml-2">
                       -- {item.recommendation}
                     </span>
                   )}

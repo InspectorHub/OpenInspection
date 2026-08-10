@@ -8,13 +8,14 @@ import { describe, it, expect } from "vitest";
 import { computeOverrideDiff, CAP_LABELS } from "~/components/modals/InviteSeatDrawer";
 import { getCapabilities, TOGGLEABLE } from "../../../server/lib/auth/capabilities";
 
-describe("CAP_LABELS — the four advanced-permission toggles", () => {
+describe("CAP_LABELS — the advanced-permission toggles", () => {
     it("labels every toggleable capability and only those", () => {
         expect(Object.keys(CAP_LABELS).sort()).toEqual([...TOGGLEABLE].sort());
         expect(CAP_LABELS.publish).toBe("Publish reports");
         expect(CAP_LABELS.scheduleOthers).toBe("Schedule for others");
         expect(CAP_LABELS.financial).toBe("Financial data");
         expect(CAP_LABELS.manageContacts).toBe("Manage contacts");
+        expect(CAP_LABELS.viewCommunication).toBe("View sent messages & notices");
     });
 });
 

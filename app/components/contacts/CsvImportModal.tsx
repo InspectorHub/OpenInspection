@@ -129,7 +129,7 @@ export function CsvImportModal({ open, onClose }: { open: boolean; onClose: () =
             hint={m.contacts_csv_hint()}
             onClear={clearFile}
           />
-          <div className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-ih-fg-4">
+          <div className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-ih-fg-3">
             <span className="h-px flex-1 bg-ih-border" />
             {m.contacts_csv_or_paste()}
             <span className="h-px flex-1 bg-ih-border" />

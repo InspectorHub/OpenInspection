@@ -14,6 +14,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 
 import { RepairDefectRow } from "./RepairDefectRow";
+import type { RepairActionTag } from "~/lib/repair-action-tag";
 import type { Defect } from "../RepairBuilderSection";
 
 const DEFECT = {
@@ -30,7 +31,13 @@ const DEFECT = {
   trade: null,
 } as Defect;
 
-function renderRow(opts: { phrases?: string[]; note?: string; onUpdateNote?: () => void }) {
+function renderRow(opts: {
+  phrases?: string[];
+  note?: string;
+  onUpdateNote?: () => void;
+  actionTag?: RepairActionTag | null;
+  onUpdateTag?: () => void;
+}) {
   // isSelected MUST be true: the note field (and therefore the buttons) lives
   // behind `{isSelected && …}`, so a collapsed row makes every query null and
   // an assertion about absence pass for the wrong reason.
@@ -38,12 +45,14 @@ function renderRow(opts: { phrases?: string[]; note?: string; onUpdateNote?: () 
     <RepairDefectRow
       defect={DEFECT}
       isSelected
-      draft={{ requestedCreditCents: null, note: opts.note ?? "" }}
+      draft={{ requestedCreditCents: null, note: opts.note ?? "", actionTag: opts.actionTag ?? null }}
       creditCents={null}
+      actionTag={opts.actionTag ?? null}
       phrases={opts.phrases}
       onToggle={() => {}}
       onUpdateCredit={() => {}}
       onUpdateNote={opts.onUpdateNote ?? (() => {})}
+      onUpdateTag={opts.onUpdateTag ?? (() => {})}
     />,
   );
 }
@@ -135,11 +144,17 @@ describe("<RepairDefectRow> credit field carries no supplied number", () => {
       <RepairDefectRow
         defect={PRICED}
         isSelected
-        draft={{ requestedCreditCents: null, note: "" }}
+        draft={{ requestedCreditCents: null, note: "", actionTag: "fund" }}
         creditCents={null}
+        // #275 — the credit input is now revealed only by the `fund` tag, so this
+        // fixture must carry it. Without the tag the input never renders and every
+        // "the row prints no supplied price" assertion below would pass against a
+        // row that has no money control at all.
+        actionTag="fund"
         onToggle={() => {}}
         onUpdateCredit={() => {}}
         onUpdateNote={() => {}}
+        onUpdateTag={() => {}}
       />,
     );
   }
@@ -149,7 +164,12 @@ describe("<RepairDefectRow> credit field carries no supplied number", () => {
 
     // The credit input must still be on screen — otherwise this assertion
     // would pass simply because the expanded block never rendered.
-    expect(screen.getByLabelText(/Shingles/i)).toBeTruthy();
+    //
+    // ⚠️ Matched on the CREDIT label specifically, not on the item name. `/Shingles/i`
+    // alone was satisfied by the #275 action select ("Requested action for
+    // Shingles") the moment that control landed, so this guard went on passing
+    // while the credit input it is guarding had stopped rendering entirely.
+    expect(screen.getByLabelText(/credit request for Shingles/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /estimate/i })).toBeNull();
   });
 
@@ -166,5 +186,59 @@ describe("<RepairDefectRow> credit field carries no supplied number", () => {
     }
     // No digits at all beyond what the defect prose carries.
     expect(text).not.toMatch(/\d[\d,]{2,}/);
+  });
+});
+
+describe("<RepairDefectRow> the requested action gates the credit", () => {
+  /**
+   * #275 Q2b. Asking for a repair and naming a figure are different requests,
+   * and the row used to offer both at once — so a credit could be attached to an
+   * item where nobody wanted money.
+   *
+   * ⚠️ The gate is why the column migration BACKFILLED every pre-existing credit
+   * to `fund`. Without that, this condition would hide figures buyers had already
+   * entered, with nothing on screen looking wrong.
+   */
+  const credit = () => screen.queryByLabelText(/credit request for Shingles/i);
+  const actionSelect = () => screen.getByLabelText(/requested action for Shingles/i);
+
+  it("hides the amount until the buyer asks for money", () => {
+    renderRow({ actionTag: null });
+    expect(actionSelect()).toBeTruthy();
+    expect(credit()).toBeNull();
+  });
+
+  it.each(["repair", "replace", "other"] as const)(
+    "keeps the amount hidden for %s",
+    (tag) => {
+      // The three non-money answers. Asserted individually rather than as "not
+      // fund", because a gate written as `!== 'repair'` would pass a test that
+      // only ever tried one of them.
+      renderRow({ actionTag: tag });
+      expect(credit()).toBeNull();
+    },
+  );
+
+  it("reveals the amount for fund", () => {
+    renderRow({ actionTag: "fund" });
+    expect(credit()).toBeTruthy();
+  });
+
+  it("reports a chosen action as its enum value", () => {
+    const onUpdateTag = vi.fn();
+    renderRow({ actionTag: null, onUpdateTag: onUpdateTag as unknown as () => void });
+    fireEvent.change(actionSelect(), { target: { value: "replace" } });
+    expect(onUpdateTag).toHaveBeenCalledWith(expect.anything(), "replace");
+  });
+
+  it("reports NO PREFERENCE as null, not as an empty string", () => {
+    // The clear path, and the reason it matters: the route forwards the field
+    // only when the form carries it, and `parseRepairActionTag` maps anything
+    // unrecognised to null. An empty string reaching the draft as "" would read
+    // as a tag on screen and clear nothing on the server.
+    const onUpdateTag = vi.fn();
+    renderRow({ actionTag: "fund", onUpdateTag: onUpdateTag as unknown as () => void });
+    fireEvent.change(actionSelect(), { target: { value: "" } });
+    expect(onUpdateTag).toHaveBeenCalledWith(expect.anything(), null);
   });
 });

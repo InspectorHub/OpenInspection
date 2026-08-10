@@ -147,10 +147,12 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
       >
         {closures.length > 0 && (
           <div className="flex flex-wrap gap-2 border-b border-ih-border bg-ih-bg-muted px-3 py-2">
+            {/* bg-ih-fg-3, not fg-4: inverse text on fg-4 is 2.56:1 in light
+                and 3.75:1 in dark. On fg-3 the same pill is 4.76:1 / 6.96:1. */}
             {closures.map((closure) => (
               <span
                 key={closure.id}
-                className="rounded-full bg-ih-fg-4 px-3 py-1 text-[11px] font-bold text-ih-fg-inverse"
+                className="rounded-full bg-ih-fg-3 px-3 py-1 text-[11px] font-bold text-ih-fg-inverse"
               >
                 {m.dispatch_closed_prefix()}: {closure.title}
               </span>
@@ -181,7 +183,7 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
                   is a list, and a list cannot show two people's 10:00 at once,
                   which is the entire reason to open this page. Say so, once,
                   where the gesture is needed. */}
-              <p className="px-2 py-1 text-[11px] text-ih-fg-4 lg:hidden">
+              <p className="px-2 py-1 text-[11px] text-ih-fg-3 lg:hidden">
                 {m.dispatch_scroll_hint()}
               </p>
               <div className="flex min-w-max">

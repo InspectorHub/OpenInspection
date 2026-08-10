@@ -28,6 +28,10 @@ describe('resolvePcaNarrative', () => {
   it('seed has all 8 keys, each non-empty', () => {
     const keys = Object.keys(PCA_NARRATIVE_SEED);
     expect(keys).toHaveLength(9); // 8 free-prose + additionalConsiderations
-    for (const k of keys) expect((PCA_NARRATIVE_SEED as Record<string, string>)[k].length).toBeGreaterThan(0);
+    // Spread rather than cast: `PcaNarrative` is a closed shape with no index
+    // signature, and the assertion is precisely that every key it does have
+    // carries prose.
+    const seed: Record<string, string> = { ...PCA_NARRATIVE_SEED };
+    for (const k of keys) expect(seed[k].length).toBeGreaterThan(0);
   });
 });

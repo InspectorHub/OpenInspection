@@ -3,6 +3,7 @@
 // sections-shaped fixture (mirrors what getReportData passes post-assembly).
 import { describe, it, expect } from 'vitest';
 import { assignPhotoNumbers, derivePhotoMode } from '../../../server/lib/report-photos';
+import { stampedPhotoNo } from '../helpers/report-photos';
 
 describe('report payload photo appendix shaping', () => {
   it('produces a numbered appendix + appendix mode for a full_pca report', () => {
@@ -16,7 +17,7 @@ describe('report payload photo appendix shaping', () => {
     expect(appendix).toEqual([
       { photoNo: 1, key: 'a', url: '/p/a', caption: 'tile', sectionId: 's1', sectionTitle: 'Roof', itemId: 'i1', itemLabel: 'Covering' },
     ]);
-    expect((numbered[0].items[0].photos as Array<{ photoNo: number }>)[0].photoNo).toBe(1);
+    expect(stampedPhotoNo(numbered[0].items[0].photos[0])).toBe(1);
   });
 
   it('defaults to inline mode (no override, non-full_pca tier) while still numbering photos', () => {

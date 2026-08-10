@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ItemEditor } from "../../../app/components/editor/ItemEditor";
+import { asSelect } from "../../../tests/helpers/dom";
 
 // Minimal no-op prop bag; ItemEditor tolerates omitted optional callbacks.
 const base = {
@@ -67,7 +68,7 @@ describe("ItemEditor — non-rich FormField inputs", () => {
         onValue={vi.fn()}
       />
     );
-    const select = screen.getByRole("combobox") as HTMLSelectElement;
+    const select = asSelect(screen.getByRole("combobox"));
     expect(select.value).toBe("Tile");
     expect(screen.getByRole("option", { name: "Shingle" })).toBeTruthy();
   });

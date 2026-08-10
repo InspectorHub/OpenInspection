@@ -61,6 +61,38 @@ export const reports = sqliteTable('reports', {
     // ties when several rows are written in the same millisecond, which is
     // exactly what generation does.
     sortOrder:    integer('sort_order').notNull().default(0),
+    // The inspector's own prose about this deliverable AS A WHOLE — the
+    // paragraph a reader meets before the section-by-section findings. Until
+    // this column existed the residential report had no report-level narrative
+    // anywhere: every word of prose belonged to one item, so there was nothing
+    // that spoke about the property as a single thing.
+    //
+    // ⚠️ NOT NAMED `summary`, and the reason is two tables away.
+    // `report_versions.summary` already exists and does NOT mean "a summary of
+    // the report" — it is the per-publish AMENDMENT REASON, surfaced as
+    // `reason` in the amendment trail on the client report page
+    // (`inspection-report.service.ts`: "Reason reuses report_versions.summary").
+    // A second column called `summary`, one join away, meaning something else
+    // entirely, is a name that reads as correct at every call site that gets it
+    // wrong. `inspector_` says WHO writes it, which is the fact that actually
+    // constrains the field: it carries professional liability, so a model may
+    // draft it but may never BE it. `narrative` says what it is — continuous
+    // prose, not a computed roll-up of the findings.
+    //
+    // ⚠️ NOT AN ITEM, either. `ItemType` has nine members and none is a
+    // narrative type; a `textarea` item would be the closest fit and is the
+    // wrong home, because items ARE the inspection's data points — they feed
+    // the rating statistics and the defect filters
+    // (`inspection-analytics.service.ts` counts an item as captured once it has
+    // a rating or a value). Prose about the whole report stored as an item
+    // would be counted as one more thing that was inspected.
+    //
+    // Nullable: a report with no narrative is the normal starting state, and an
+    // empty string would be indistinguishable from one the inspector cleared.
+    // Model-assisted drafts are evidenced in `ai_content_reviews` with
+    // `artifact_type = 'report'` and this row's id — see `schema/ai.ts`.
+    // Appended at table end for D1 rebuild safety.
+    inspectorNarrative: text('inspector_narrative'),
 }, (t) => [
     index('idx_reports_inspection').on(t.inspectionId),
     index('idx_reports_tenant').on(t.tenantId),

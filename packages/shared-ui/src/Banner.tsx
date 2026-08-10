@@ -24,7 +24,7 @@ const toneClasses: Record<BannerTone, string> = {
   warn: "bg-ih-watch-bg border-ih-watch text-ih-watch-fg",
   danger: "bg-ih-bad-bg border-ih-bad text-ih-bad-fg",
   success: "bg-ih-ok-bg border-ih-ok text-ih-ok-fg",
-  brand: "bg-ih-primary-tint border-ih-primary text-ih-primary",
+  brand: "bg-ih-primary-tint border-ih-primary text-ih-primary-text",
 };
 
 /**

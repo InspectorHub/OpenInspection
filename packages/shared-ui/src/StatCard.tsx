@@ -16,7 +16,7 @@ const toneAccent: Record<PillTone, { border: string; label: string }> = {
   np: { border: "border-ih-border-strong", label: "text-ih-fg-4" },
   info: { border: "border-ih-info", label: "text-ih-info-fg" },
   gen: { border: "border-ih-border-strong", label: "text-ih-fg-3" },
-  primary: { border: "border-ih-primary", label: "text-ih-primary" },
+  primary: { border: "border-ih-primary", label: "text-ih-primary-text" },
   neutral: { border: "border-ih-border-strong", label: "text-ih-fg-3" },
   warning: { border: "border-ih-watch", label: "text-ih-watch-fg" },
 };

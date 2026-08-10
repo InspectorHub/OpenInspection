@@ -25,7 +25,7 @@ describe('BookingService tenant aggregation (IA-26)', () => {
         svc = new BookingService({} as any);
 
         await db.insert(tenants).values({ id: 't1', name: 'Acme', slug: 'acme', createdAt: new Date() });
-        const u = (id: string, role: string) => ({
+        const u = (id: string, role: NonNullable<(typeof users.$inferInsert)['role']>) => ({
             id, tenantId: 't1', email: `${id}@x.com`, passwordHash: 'h', role, name: id, createdAt: new Date(),
         });
         await db.insert(users).values([u('u1', 'owner'), u('u2', 'inspector'), u('u3', 'inspector')]);

@@ -16,6 +16,9 @@ vi.mock("~/lib/api-client.server", () => ({
 }));
 
 import { action } from "./marketplace-install";
+import { routeArgs } from "../../../tests/helpers/route-args";
+/** Minimal AppLoadContext stub — the route only forwards it to createApi. */
+const CONTEXT = {} as Parameters<typeof action>[0]["context"];
 
 function post(fields: Record<string, string>) {
   const body = new URLSearchParams(fields);
@@ -24,8 +27,7 @@ function post(fields: Record<string, string>) {
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: body.toString(),
   });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return action({ request, params: {}, context: {} as any });
+  return action(routeArgs(request, { params: {}, context: CONTEXT }));
 }
 
 describe("marketplace-install action", () => {

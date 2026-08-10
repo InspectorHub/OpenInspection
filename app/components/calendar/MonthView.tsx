@@ -38,7 +38,7 @@ export function MonthView({
     <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           <div className="grid grid-cols-7">
             {WEEKDAY_HEADERS.map(({ key, label }) => (
-              <div key={key} className="py-2 px-3 text-center text-[11px] font-bold uppercase tracking-wide text-ih-fg-4 border-b border-ih-border">
+              <div key={key} className="py-2 px-3 text-center text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 border-b border-ih-border">
                 {label()}
               </div>
             ))}
@@ -81,7 +81,7 @@ export function MonthView({
                       </button>
                     ))}
                     {dayEvents.length > 3 && (
-                      <span className="text-[10px] text-ih-fg-4 font-bold">+{dayEvents.length - 3} more</span>
+                      <span className="text-[10px] text-ih-fg-3 font-bold">+{dayEvents.length - 3} more</span>
                     )}
                   </div>
                 </div>

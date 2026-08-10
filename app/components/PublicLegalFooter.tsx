@@ -13,7 +13,7 @@ export function PublicLegalFooter({
   if (!privacyUrl && !termsUrl) return null;
   return (
     <footer
-      className={`mt-10 pt-6 border-t border-ih-border text-center text-[11px] text-ih-fg-4 ${className}`}
+      className={`mt-10 pt-6 border-t border-ih-border text-center text-[11px] text-ih-fg-3 ${className}`}
     >
       {privacyUrl && (
         <a href={privacyUrl} target="_blank" rel="noreferrer" className="hover:underline hover:text-ih-fg-3">

@@ -15,6 +15,8 @@ import { createTestDb, setupSchema } from '../db';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { seedStarterContent } from '../../../server/services/starter-content.service';
+import { CONTRACTOR_TYPES } from '../../../server/services/starter-content/fixtures/contractor-types';
+import { DEFECT_TRADES } from '../../../server/types/defect-fields';
 
 describe('seedStarterContent', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
@@ -60,7 +62,10 @@ describe('seedStarterContent', () => {
         expect(result.recommendationsSeeded).toBeGreaterThan(0);
         expect(result.ratingSystemsSeeded).toBeGreaterThan(0);
         expect(result.marketplaceLibrariesSeeded).toBeGreaterThan(0);
-        expect(result.contractorTypesSeeded).toBe(10);
+        // Derived, not a literal: the seed is computed from `DEFECT_TRADES` now,
+        // so a hard-coded count would have to be edited every time the trade
+        // vocabulary grows — which is the coupling this change removed.
+        expect(result.contractorTypesSeeded).toBe(CONTRACTOR_TYPES.length);
     });
 
     it('is idempotent — calling twice does not duplicate rows', async () => {
@@ -122,20 +127,50 @@ describe('seedStarterContent', () => {
         expect(colorByName['Follow-up needed']).toBe('blue');
     });
 
-    it('seeds the 10 standard contractor types in order', async () => {
+    it('seeds a contractor type per canonical trade, carrying its slug', async () => {
+        // Was ten hand-written names in a literal here. The seed is DERIVED from
+        // `DEFECT_TRADES` now (#277), so pinning the names again would recreate
+        // exactly the copy the derivation removed — assert the DERIVATION held
+        // instead. The fixture's own shape is covered in
+        // starter-content-contractor-types.spec.ts.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await seedStarterContent({} as any, tenantId);
-        const rows = await testDb.select({ name: schema.contractorTypes.name, sortOrder: schema.contractorTypes.sortOrder })
+        const rows = await testDb.select({
+            name: schema.contractorTypes.name,
+            sortOrder: schema.contractorTypes.sortOrder,
+            tradeSlug: schema.contractorTypes.tradeSlug,
+        })
             .from(schema.contractorTypes)
             .where(eq(schema.contractorTypes.tenantId, tenantId))
             .all();
-        const ordered = rows
-            .sort((a, b) => (a.sortOrder as number) - (b.sortOrder as number))
-            .map(r => r.name as string);
-        expect(ordered).toEqual([
-            'Licensed Electrician', 'Plumber', 'Roofer', 'HVAC Technician',
-            'General Contractor', 'Structural Engineer', 'Foundation Specialist',
-            'Pest/Termite', 'Chimney Sweep', 'Grading/Drainage',
-        ]);
+        const ordered = rows.sort((a, b) => (a.sortOrder as number) - (b.sortOrder as number));
+
+        expect(ordered).toEqual(CONTRACTOR_TYPES.map((c) => ({
+            name: c.name, sortOrder: c.sortOrder, tradeSlug: c.tradeSlug,
+        })));
+        // The slug is what survives a rename, so its ABSENCE on a canonical row
+        // is the failure that matters — a null here silently un-maps a trade.
+        expect(ordered.filter((r) => r.tradeSlug !== null)).toHaveLength(DEFECT_TRADES.length);
+    });
+
+    it('does not re-seed a canonical type the tenant has RENAMED', async () => {
+        // The reason the seed matches on slug rather than name. There is no
+        // unique index on this table, so a name-keyed seed would insert a second
+        // row for a trade the workspace already has and nothing would object.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await seedStarterContent({} as any, tenantId);
+        await testDb.update(schema.contractorTypes)
+            .set({ name: 'Our Sparky' })
+            .where(eq(schema.contractorTypes.tradeSlug, 'licensed-electrician'))
+            .run();
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await seedStarterContent({} as any, tenantId);
+        const electricians = await testDb.select({ name: schema.contractorTypes.name })
+            .from(schema.contractorTypes)
+            .where(eq(schema.contractorTypes.tradeSlug, 'licensed-electrician'))
+            .all();
+        expect(electricians).toHaveLength(1);
+        expect(electricians[0]?.name).toBe('Our Sparky');
     });
 });

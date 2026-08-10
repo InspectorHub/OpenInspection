@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
+import { asAnyDb } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import {
     auditLogs,
@@ -110,7 +111,7 @@ describe('runLogRetentionSweep', () => {
     it('scrubs an aged audit row — actor AND free text — but keeps the row', async () => {
         await seedAuditLog({ id: 'a-old', createdAt: daysAgo(AUDIT_WINDOW_DAYS + 1) });
 
-        const summary = await runLogRetentionSweep(db, NOW);
+        const summary = await runLogRetentionSweep(asAnyDb(db), NOW);
         expect(summary.perTable.audit_logs).toBe(1);
 
         const row = await getAudit('a-old');
@@ -130,7 +131,7 @@ describe('runLogRetentionSweep', () => {
     it('leaves an audit row inside its window untouched', async () => {
         await seedAuditLog({ id: 'a-new', createdAt: daysAgo(AUDIT_WINDOW_DAYS - 1) });
 
-        const summary = await runLogRetentionSweep(db, NOW);
+        const summary = await runLogRetentionSweep(asAnyDb(db), NOW);
         expect(summary.perTable.audit_logs ?? 0).toBe(0);
 
         const row = await getAudit('a-new');
@@ -152,7 +153,7 @@ describe('runLogRetentionSweep', () => {
             { eventId: 'c-new', cmdType: 'io.inspectorhub.cmd.tenant.update', processedAt: daysAgo(DEDUP_LOG_RETENTION_DAYS - 1) },
         ]);
 
-        const summary = await runLogRetentionSweep(db, NOW);
+        const summary = await runLogRetentionSweep(asAnyDb(db), NOW);
         expect(summary.perTable.processed_webhook_events).toBe(1);
         expect(summary.perTable.processed_cmd_events).toBe(1);
 
@@ -172,7 +173,7 @@ describe('runLogRetentionSweep', () => {
             { id: 'p-mid', envelope: '{"type":null}', reason: 'parse-failed', receivedAt: daysAgo(DEDUP_LOG_RETENTION_DAYS - 1) },
         ]);
 
-        const summary = await runLogRetentionSweep(db, NOW);
+        const summary = await runLogRetentionSweep(asAnyDb(db), NOW);
         expect(summary.perTable.parked_cmd_events).toBe(2);
 
         const parked = await db.select().from(parkedCmdEvents).all();
@@ -201,7 +202,7 @@ describe('runLogRetentionSweep', () => {
         await seedOutbox('o-fail-old', 'failed', daysAgo(SYNC_OUTBOX_RETENTION_DAYS + 1));
         await seedOutbox('o-pub-new', 'published', daysAgo(SYNC_OUTBOX_RETENTION_DAYS - 1));
 
-        const summary = await runLogRetentionSweep(db, NOW);
+        const summary = await runLogRetentionSweep(asAnyDb(db), NOW);
         expect(summary.perTable.sync_outbox).toBe(2);
 
         const rows = await db.select().from(syncOutbox).all();
@@ -217,7 +218,7 @@ describe('runLogRetentionSweep', () => {
         // A pending row this old is an incident, and the row is its evidence.
         await seedOutbox('o-pending-ancient', 'pending', daysAgo(SYNC_OUTBOX_RETENTION_DAYS * 10));
 
-        await runLogRetentionSweep(db, NOW);
+        await runLogRetentionSweep(asAnyDb(db), NOW);
 
         const rows = await db.select().from(syncOutbox).all();
         expect(rows.map((r) => r.id)).toEqual(['o-pending-ancient']);
@@ -234,7 +235,7 @@ describe('runLogRetentionSweep', () => {
         await seedOutbox('o-above-deadletter', 'published', daysAgo(DEAD_LETTER_RETENTION_DAYS + 1));
         await seedOutbox('o-below-dedup', 'published', daysAgo(DEDUP_LOG_RETENTION_DAYS - 1));
 
-        await runLogRetentionSweep(db, NOW);
+        await runLogRetentionSweep(asAnyDb(db), NOW);
 
         const rows = await db.select().from(syncOutbox).all();
         expect(rows.map((r) => r.id)).toEqual(['o-above-deadletter']);
@@ -268,7 +269,7 @@ describe('runLogRetentionSweep', () => {
         // exception, so a CPU kill or a mid-request deploy leaves this forever.
         await seedIdemKey('k-stuck', old, ttl(old), 'in_flight');
 
-        const summary = await runLogRetentionSweep(db, NOW);
+        const summary = await runLogRetentionSweep(asAnyDb(db), NOW);
         expect(summary.perTable.idempotency_keys).toBe(2);
 
         const rows = await db.select().from(idempotencyKeys).all();
@@ -290,7 +291,7 @@ describe('runLogRetentionSweep', () => {
         await seedIdemKey('k-old-created', daysAgo(IDEMPOTENCY_REPLAY_RETENTION_DAYS + 1), daysAgo(-3650));
         await seedIdemKey('k-expired-yesterday', daysAgo(0), daysAgo(1));
 
-        await runLogRetentionSweep(db, NOW);
+        await runLogRetentionSweep(asAnyDb(db), NOW);
 
         const rows = await db.select().from(idempotencyKeys).all();
         expect(rows.map((r) => r.key)).toEqual(['k-expired-yesterday']);
@@ -322,7 +323,7 @@ describe('runLogRetentionSweep', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
 
-        await runLogRetentionSweep(db, NOW);
+        await runLogRetentionSweep(asAnyDb(db), NOW);
 
         expect((await db.select().from(smsConsentLog).all()).length).toBe(1);
         expect((await db.select().from(esignAuditLogs).all()).length).toBe(1);
@@ -334,11 +335,11 @@ describe('runLogRetentionSweep', () => {
             id: 'p-old', envelope: '{}', reason: 'parse-failed', receivedAt: daysAgo(DEAD_LETTER_RETENTION_DAYS + 1),
         });
 
-        const first = await runLogRetentionSweep(db, NOW);
+        const first = await runLogRetentionSweep(asAnyDb(db), NOW);
         expect(first.total).toBe(2);
         const afterFirst = await getAudit('a-old');
 
-        const second = await runLogRetentionSweep(db, NOW);
+        const second = await runLogRetentionSweep(asAnyDb(db), NOW);
         // Count-only summaries are the whole reporting surface, so a re-run
         // that re-anonymizes already-anonymized rows would report work it did
         // not do — and a cron logging phantom purges is worse than a silent one.
@@ -366,7 +367,7 @@ describe('runLogRetentionSweep', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
 
-        const summary = await runLogRetentionSweep(db, NOW);
+        const summary = await runLogRetentionSweep(asAnyDb(db), NOW);
         expect(summary.total).toBe(0);
         expect((await db.select().from(auditLogs).all()).length).toBe(37);
         expect((await db.select().from(processedCmdEvents).all()).length).toBe(14);
@@ -374,7 +375,7 @@ describe('runLogRetentionSweep', () => {
 
     it('reports counts only — no row content reaches the summary', async () => {
         await seedAuditLog({ id: 'a-old', createdAt: daysAgo(AUDIT_WINDOW_DAYS + 1) });
-        const summary = await runLogRetentionSweep(db, NOW);
+        const summary = await runLogRetentionSweep(asAnyDb(db), NOW);
         const serialized = JSON.stringify(summary);
         expect(serialized).not.toContain('example.com');
         expect(serialized).not.toContain('u-123');

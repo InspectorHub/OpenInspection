@@ -74,7 +74,7 @@ export function WizardLayout({
                                 </div>
                                 <span
                                     className={`text-[11px] font-medium hidden sm:inline ${
-                                        i <= stepIdx ? "text-ih-primary" : "text-ih-fg-4"
+                                        i <= stepIdx ? "text-ih-primary-text" : "text-ih-fg-4"
                                     }`}
                                 >
                                     {stepLabel(s)}

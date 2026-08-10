@@ -75,8 +75,6 @@ async function seedInspection(
         id:              INSP_ID,
         tenantId:        TENANT,
         propertyAddress: '1 Main St',
-        clientName:      'Test Client',
-        clientEmail:     'client@example.com',
         date:            '2026-06-01',
         status:          'completed',
         paymentStatus:   'unpaid',

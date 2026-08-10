@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
@@ -84,17 +85,19 @@ describe('POST /api/invoices/request-payment — primary-client resolution (Task
             id: TENANT, name: 'Acme', slug: SLUG, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values({
             id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane Client',
             email: 'jane@example.com', phone: '+15551234567', createdAt: new Date(),
         });
 
-        // Legacy client columns are intentionally NULL — only inspection_people
-        // carries the primary client for this inspection.
+        // Only inspection_people carries the primary client for this inspection.
+        // (The seed used to also NULL out `clientName`/`clientEmail` to say so
+        // explicitly; those columns have since been dropped from `inspections`
+        // — see schema/inspection/core.ts — so there is nothing left to null.)
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT,
-            propertyAddress: '1 Main St', clientName: null, clientEmail: null,
+            propertyAddress: '1 Main St',
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });

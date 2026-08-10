@@ -1,25 +1,14 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { repairRequests, repairRequestItems } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { SHARE_TOKEN_TTL_MS, isTokenRevokedOrExpired } from '../lib/token-ttl';
+import type { Creator, ItemInput, RepairRequestWithItems } from './repair-request.types';
 
-export type Creator = { kind: 'client' | 'agent' | 'inspector'; ref: string };
+// Re-exported: these were declared here before the file hit its size ceiling,
+// and callers import them from the service by name.
+export type { Creator, ItemInput, RepairRequestWithItems };
 
-type ItemInput = {
-    findingKey: string;
-    sectionTitle: string;
-    itemLabel: string;
-    // IA-55 — snapshots captured at add time (stable after report changes).
-    defectTitle?: string | null;
-    location?: string | null;
-    category?: string | null;
-    // IA-57 — resolved trade label ("licensed roofer"), snapshotted at add time.
-    trade?: string | null;
-    commentSnapshot?: string | null;
-    requestedCreditCents?: number | null;
-    note?: string | null;
-};
 
 export class RepairRequestService {
     constructor(
@@ -86,6 +75,43 @@ export class RepairRequestService {
             }),
         );
         return results;
+    }
+
+    /**
+     * EVERY list on this inspection, whoever built it (#69, Repair Request Log).
+     * Unlike `listMine` it takes no `Creator` — deliberately, so it can never be
+     * mistaken for an authoring read. That makes the tenant filter its ONLY
+     * isolation boundary; route-level RBAC is what keeps it staff-only. Newest
+     * list first; items keep the buyer's order. One item query, not one per list.
+     */
+    async listForInspection(tenantId: string, inspectionId: string): Promise<RepairRequestWithItems[]> {
+        const rows = await this.d()
+            .select()
+            .from(repairRequests)
+            .where(and(
+                eq(repairRequests.tenantId, tenantId),
+                eq(repairRequests.inspectionId, inspectionId),
+            ))
+            .orderBy(desc(repairRequests.createdAt))
+            .all();
+        if (rows.length === 0) return [];
+        const items = await this.d()
+            .select()
+            .from(repairRequestItems)
+            .where(and(
+                eq(repairRequestItems.tenantId, tenantId),
+                inArray(repairRequestItems.repairRequestId, rows.map((r) => r.id)),
+            ))
+            .orderBy(asc(repairRequestItems.sortOrder))
+            .all();
+
+        const byRequest = new Map<string, typeof items>();
+        for (const item of items) {
+            const bucket = byRequest.get(item.repairRequestId);
+            if (bucket) bucket.push(item);
+            else byRequest.set(item.repairRequestId, [item]);
+        }
+        return rows.map((rr) => ({ ...rr, items: byRequest.get(rr.id) ?? [] }));
     }
 
     /**
@@ -185,6 +211,11 @@ export class RepairRequestService {
                 commentSnapshot:      input.commentSnapshot ?? null,
                 requestedCreditCents: input.requestedCreditCents ?? null,
                 note:                 input.note ?? null,
+                // #275 — this patch object is written out field by field, so an
+                // omission here silently discards the tag on the IDEMPOTENT
+                // re-add path (toggle a defect off and on, reload the builder)
+                // while the insert below looks perfectly correct.
+                repairActionTag:      input.repairActionTag ?? null,
             };
             await this.d()
                 .update(repairRequestItems)
@@ -214,6 +245,7 @@ export class RepairRequestService {
             requestedCreditCents: input.requestedCreditCents ?? null,
             note: input.note ?? null,
             sortOrder: 0,
+            repairActionTag: input.repairActionTag ?? null,
         };
         await this.d().insert(repairRequestItems).values(item);
         await this.touch(tenantId, repairRequestId);
@@ -231,7 +263,9 @@ export class RepairRequestService {
         inspectionId: string,
         repairRequestId: string,
         itemId: string,
-        patch: Partial<Pick<ItemInput, 'requestedCreditCents' | 'note'>> & { sortOrder?: number },
+        // A CLOSED allow-list: a field not named here cannot be PATCHed however
+        // willing every other layer is. #275 added `repairActionTag`.
+        patch: Partial<Pick<ItemInput, 'requestedCreditCents' | 'note' | 'repairActionTag'>> & { sortOrder?: number },
     ) {
         // Guard: confirm the RR belongs to this (tenant, inspection) before mutating.
         const rr = await this.d()

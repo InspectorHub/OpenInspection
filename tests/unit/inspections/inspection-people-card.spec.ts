@@ -3,6 +3,7 @@ import { InspectionService } from '../../../server/services/inspection.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -34,7 +35,7 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
         await testDb.insert(schema.tenants).values([
             { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
     });
 
     it('returns inspector + client + agents grouped by role', async () => {
@@ -58,11 +59,8 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
             tenantId:          TENANT,
             inspectorId:       'user-insp',
             propertyAddress:   '1 Main St',
-            clientName:        'Jane Buyer',
-            clientEmail:       'jane@example.com',
-            clientPhone:       '+15551234567',
-            referredByAgentId: 'agent-buyer-1',
-            sellingAgentId:    'agent-listing-1',
+
+
             date:              '2026-06-01',
             status:            'completed',
             paymentStatus:     'unpaid',
@@ -94,9 +92,7 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
             id:                'insp-bare',
             tenantId:          TENANT,
             propertyAddress:   '1 Main St',
-            clientName:        null,
-            clientEmail:       null,
-            clientPhone:       null,
+
             date:              '2026-06-01',
             status:            'requested',
             paymentStatus:     'unpaid',
@@ -120,7 +116,7 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
         });
         await testDb.insert(schema.inspections).values({
             id: 'insp-other', tenantId: OTHER,
-            propertyAddress: 'X', clientName: null, clientEmail: null, clientPhone: null,
+            propertyAddress: 'X',
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
             price: 0, paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         });
@@ -137,10 +133,8 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
             id:                'insp-counts',
             tenantId:          TENANT,
             propertyAddress:   '1 Main St',
-            clientName:        'Jane',
-            clientEmail:       'jane@example.com',
-            clientPhone:       null,
-            referredByAgentId: 'agent-buyer-1',
+
+
             date:              '2026-06-01',
             status:            'requested',
             paymentStatus:     'unpaid',

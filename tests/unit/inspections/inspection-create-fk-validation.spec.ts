@@ -12,6 +12,7 @@ import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
@@ -37,7 +38,7 @@ async function seedFixtures(db: BetterSQLite3Database<typeof schema>) {
     // Task 13 — client/agent identity is persisted ONLY via inspection_people
     // now; createInspection's Task 7 people-write resolves role profile ids
     // by key, so the role profiles must exist for the write to land.
-    await seedRoleProfiles(db, T1, new Date());
+    await seedRoleProfiles(asD1Db(db), T1, new Date());
 }
 
 const BASE_DATA = {

@@ -12,6 +12,7 @@ import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { ProfilePicker } from "~/components/settings/ProfilePicker";
 import { ReportStylePreview } from "~/components/settings/ReportStylePreview";
+import { BrandContrastNotice } from "~/components/settings/BrandContrastNotice";
 import { makeWorkspaceSchema } from "~/lib/forms/settings.schema";
 import { brandingUpdateBody } from "~/lib/forms/branding-body";
 import { ReportFeaturesPanel } from "~/components/settings/ReportFeaturesPanel";
@@ -21,9 +22,11 @@ import { ReportPdfPanel } from "~/components/settings/ReportPdfPanel";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Select } from "@core/shared-ui";
-import { TIMEZONE_SELECT_OPTIONS, getBrowserTimeZone, onboardingTzPrefill } from "~/lib/timezones";
+import { getBrowserTimeZone, onboardingTzPrefill } from "~/lib/timezones";
+import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezone-options";
 import { LOCALE_OPTIONS, CURRENCY_OPTIONS } from "~/lib/locales";
 import { DateTimeFormatFields } from "~/components/settings/DateTimeFormatFields";
+import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -118,6 +121,7 @@ export default function SettingsWorkspacePage() {
   const branding: Branding = "forbidden" in data ? {} : data.branding;
   const [color, setColor] = useState(branding.primaryColor ?? "#6366f1");
   const [profile, setProfile] = useState(branding.defaultProfileId ?? "signature");
+  const displayLocale = useDisplayLocale();
 
   const logoFetcher = useFetcher<{ success: boolean; intent?: string; logoUrl?: string | null }>();
   const [logoUrl, setLogoUrl] = useState<string | null>(branding.logoUrl ?? null);
@@ -230,11 +234,18 @@ export default function SettingsWorkspacePage() {
                   onChange={(e) => setColor(e.target.value)}
                   className="h-10 w-16 rounded-md border border-ih-border p-1 cursor-pointer bg-ih-bg-card" />
                 <input type="text" readOnly value={color}
-                  className="flex-1 px-3 py-2 rounded-md border border-ih-border bg-ih-bg-muted text-ih-fg-3 font-mono text-[13px] cursor-default" />
+                  className="flex-1 px-3 py-2 rounded-md border border-ih-border bg-ih-bg-muted text-ih-fg-2 font-mono text-[13px] cursor-default" />
               </div>
               {fields.primaryColor.errors && (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.primaryColor.errors[0]}</p>
               )}
+              {/* #91 — the fill role keeps the tenant's exact hex, so for the
+                  6.7% of sRGB where no foreground clears AA on it there is
+                  nothing left to derive. Say so, with the number, and still
+                  let them save it. Reads `color`, which is seeded from the
+                  stored value, so the notice is live while picking AND still
+                  here on the next visit. */}
+              <BrandContrastNotice color={color} locale={displayLocale} />
             </div>
           </div>
 
@@ -273,7 +284,7 @@ export default function SettingsWorkspacePage() {
               options={TIMEZONE_SELECT_OPTIONS}
             />
             {tzPrefilled && (
-              <p className="mt-2 text-[12px] text-ih-primary">
+              <p className="mt-2 text-[12px] text-ih-primary-text">
                 {m.settings_workspace_timezone_detected()}
               </p>
             )}

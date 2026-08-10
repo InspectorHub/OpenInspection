@@ -30,6 +30,7 @@
  */
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -136,7 +137,7 @@ describe('OI #271 — report view confirmation', () => {
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(testDb, TENANT);
+        await seedRoleProfiles(asD1Db(testDb), TENANT);
         await testDb.insert(schema.inspections).values({
             id: INSP, tenantId: TENANT, propertyAddress: '1 Main St', date: '2026-06-01',
             status: 'completed', reportStatus: 'published', paymentStatus: 'unpaid',

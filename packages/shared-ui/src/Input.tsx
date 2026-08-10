@@ -47,7 +47,10 @@ export function Input({
           {error ?? ""}
         </p>
       )}
-      {!error && !reserveErrorSpace && hint && <p className="text-[11px] text-ih-fg-4 mt-1">{hint}</p>}
+      {/* fg-3, not fg-4: at 11px this is normal-size text and needs 4.5:1.
+          fg-4 is 2.56:1 on a light card and 3.07:1 on a dark one. See
+          `npm run lint:contrast`. */}
+      {!error && !reserveErrorSpace && hint && <p className="text-[11px] text-ih-fg-3 mt-1">{hint}</p>}
     </div>
   );
 }

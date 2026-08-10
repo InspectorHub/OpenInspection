@@ -29,6 +29,7 @@ import { PortalAccessService } from '../../../server/services/portal-access.serv
 import { idempotencyMiddleware } from '../../../server/lib/middleware/idempotency';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const USER_ID = '00000000-0000-0000-0000-000000000300';
@@ -97,15 +98,14 @@ beforeEach(async () => {
         id: TENANT, name: 'Acme', slug: SLUG, status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
-    await seedRoleProfiles(db, TENANT, new Date(1));
+    await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
     await db.insert(schema.contacts).values({
         id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane',
         email: 'jane@example.com', phone: null, createdAt: new Date(),
     });
     for (const id of [INSP_ID, INSP_ID_2]) {
         await db.insert(schema.inspections).values({
-            id, tenantId: TENANT, propertyAddress: '1 Main St',
-            clientName: null, clientEmail: null, date: '2026-06-01',
+            id, tenantId: TENANT, propertyAddress: '1 Main St', date: '2026-06-01',
             status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });

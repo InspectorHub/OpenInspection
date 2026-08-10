@@ -9,7 +9,7 @@ const catalogWithThanksgiving = new Map([['2026-11-26', 'Thanksgiving Day']]);
 describe('apply-holiday-policy', () => {
     it('public block returns block effect when date in catalog', () => {
         expect(getHolidayPublicEffect(
-            { holidayRegion: 'US', holidayPublicPolicy: 'block', holidayInternalPolicy: 'advisory' },
+            { holidayRegion: 'US', holidayPublicPolicy: 'block' },
             '2026-11-26',
             catalogWithThanksgiving,
         )).toBe('block');
@@ -17,7 +17,7 @@ describe('apply-holiday-policy', () => {
 
     it('public advisory returns advisory when date in catalog', () => {
         expect(getHolidayPublicEffect(
-            { holidayRegion: 'US', holidayPublicPolicy: 'advisory', holidayInternalPolicy: 'advisory' },
+            { holidayRegion: 'US', holidayPublicPolicy: 'advisory' },
             '2026-11-26',
             catalogWithThanksgiving,
         )).toBe('advisory');
@@ -25,7 +25,7 @@ describe('apply-holiday-policy', () => {
 
     it('public open ignores catalog', () => {
         expect(getHolidayPublicEffect(
-            { holidayRegion: 'US', holidayPublicPolicy: 'open', holidayInternalPolicy: 'advisory' },
+            { holidayRegion: 'US', holidayPublicPolicy: 'open' },
             '2026-11-26',
             catalogWithThanksgiving,
         )).toBe('none');
@@ -33,7 +33,7 @@ describe('apply-holiday-policy', () => {
 
     it('null region is always none', () => {
         expect(getHolidayPublicEffect(
-            { holidayRegion: null, holidayPublicPolicy: 'block', holidayInternalPolicy: 'block' },
+            { holidayRegion: null, holidayPublicPolicy: 'block' },
             '2026-11-26',
             catalogWithThanksgiving,
         )).toBe('none');
@@ -41,7 +41,7 @@ describe('apply-holiday-policy', () => {
 
     it('date not in catalog is none', () => {
         expect(getHolidayPublicEffect(
-            { holidayRegion: 'US', holidayPublicPolicy: 'block', holidayInternalPolicy: 'advisory' },
+            { holidayRegion: 'US', holidayPublicPolicy: 'block' },
             '2026-11-25',
             catalogWithThanksgiving,
         )).toBe('none');
@@ -49,7 +49,7 @@ describe('apply-holiday-policy', () => {
 
     it('internal block returns block when date in catalog', () => {
         expect(getHolidayInternalEffect(
-            { holidayRegion: 'US', holidayPublicPolicy: 'open', holidayInternalPolicy: 'block' },
+            { holidayRegion: 'US', holidayInternalPolicy: 'block' },
             '2026-11-26',
             catalogWithThanksgiving,
         )).toBe('block');
@@ -57,7 +57,7 @@ describe('apply-holiday-policy', () => {
 
     it('internal advisory returns advisory when date in catalog', () => {
         expect(getHolidayInternalEffect(
-            { holidayRegion: 'US', holidayPublicPolicy: 'open', holidayInternalPolicy: 'advisory' },
+            { holidayRegion: 'US', holidayInternalPolicy: 'advisory' },
             '2026-11-26',
             catalogWithThanksgiving,
         )).toBe('advisory');

@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
@@ -42,7 +43,7 @@ beforeEach(async () => {
     id: TENANT, name: 'Acme', slug: 'acme', status: 'active', phone: '+15550001111',
     deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
   } as never);
-  await seedRoleProfiles(db, TENANT, new Date(1));
+  await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
   svc = new AutomationService({} as D1Database);
 });
 
@@ -170,7 +171,7 @@ describe('CHARACTERIZATION — automation delivery (freeze before SP-ENG refacto
   });
 
   it('SMS branch: client without consent → skipped "no sms consent"', async () => {
-    const insp = await seedInspection({ clientContactId: 'c1', clientPhone: '+15551234567' });
+    const insp = await seedInspection({ clientContactId: 'c1' });
     const logId = await seedRuleAndLog({ channel: 'sms', smsBody: 'Hi {{client_name}}', inspectionId: insp });
     await new SmsConsentService({} as D1Database).publishDisclosure('disclosure');
     await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
@@ -189,7 +190,7 @@ describe('CHARACTERIZATION — automation delivery (freeze before SP-ENG refacto
   // exposure, different string.
 
   it('SMS branch: CO-CLIENT without consent → skipped, not sent', async () => {
-    const insp = await seedInspection({ clientContactId: 'c1', clientPhone: '+15551234567' });
+    const insp = await seedInspection({ clientContactId: 'c1' });
     await new SmsConsentService({} as D1Database).publishDisclosure('disclosure');
     // Addressed to a DIFFERENT contact in a co_client role — the shape the old
     // gate let straight through.
@@ -209,7 +210,7 @@ describe('CHARACTERIZATION — automation delivery (freeze before SP-ENG refacto
     // The old gate looked up inspections.client_contact_id regardless of who
     // the log was for, so the primary client's consent silently authorised a
     // text to someone who had never granted anything.
-    const insp = await seedInspection({ clientContactId: 'c1', clientPhone: '+15551234567' });
+    const insp = await seedInspection({ clientContactId: 'c1' });
     const consent = new SmsConsentService({} as D1Database);
     await consent.publishDisclosure('disclosure');
     await consent.record(TENANT, 'c1', 'granted', 'admin', {});  // primary ONLY
@@ -224,7 +225,7 @@ describe('CHARACTERIZATION — automation delivery (freeze before SP-ENG refacto
   });
 
   it('SMS branch: co-client WITH their own consent → sent', async () => {
-    const insp = await seedInspection({ clientContactId: 'c1', clientPhone: '+15551234567' });
+    const insp = await seedInspection({ clientContactId: 'c1' });
     const consent = new SmsConsentService({} as D1Database);
     await consent.publishDisclosure('disclosure');
     await consent.record(TENANT, 'c2', 'granted', 'admin', {});
@@ -244,7 +245,7 @@ describe('CHARACTERIZATION — automation delivery (freeze before SP-ENG refacto
     // fallback, so those keep working across the deploy. For a co-client there
     // is nobody to look up — and the primary client's consent is emphatically
     // not theirs — so skipping is the only safe answer.
-    const insp = await seedInspection({ clientContactId: 'c1', clientPhone: '+15551234567' });
+    const insp = await seedInspection({ clientContactId: 'c1' });
     const consent = new SmsConsentService({} as D1Database);
     await consent.publishDisclosure('disclosure');
     await consent.record(TENANT, 'c1', 'granted', 'admin', {});   // primary ONLY
@@ -262,7 +263,7 @@ describe('CHARACTERIZATION — automation delivery (freeze before SP-ENG refacto
     // Rows predating recipientRoleKey could only ever have been the primary
     // client. Failing those closed would drop every already-queued send at
     // deploy time for no safety gain.
-    const insp = await seedInspection({ clientContactId: 'c1', clientPhone: '+15551234567' });
+    const insp = await seedInspection({ clientContactId: 'c1' });
     const consent = new SmsConsentService({} as D1Database);
     await consent.publishDisclosure('disclosure');
     await consent.record(TENANT, 'c1', 'granted', 'admin', {});
@@ -276,7 +277,7 @@ describe('CHARACTERIZATION — automation delivery (freeze before SP-ENG refacto
   });
 
   it('SMS branch: client with granted consent → sent via provider', async () => {
-    const insp = await seedInspection({ clientContactId: 'c1', clientPhone: '+15551234567' });
+    const insp = await seedInspection({ clientContactId: 'c1' });
     const consent = new SmsConsentService({} as D1Database);
     await consent.publishDisclosure('disclosure');
     await consent.record(TENANT, 'c1', 'granted', 'admin', {});

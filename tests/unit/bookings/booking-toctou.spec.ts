@@ -14,6 +14,7 @@ import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
+import { INSPECTION_STATUS, type InspectionStatus } from '../../../server/lib/status/inspection-status';
 
 /**
  * B-28 — public booking TOCTOU (slot read and inspection insert are not
@@ -99,7 +100,7 @@ describe('B-28 booking TOCTOU', () => {
     /** Seed a competing booking (request + inspection + link row). */
     async function seedCompetitor(opts: {
         id: string; requestId: string | null; createdAt: Date;
-        dateIso?: string; status?: string;
+        dateIso?: string; status?: InspectionStatus;
     }) {
         if (opts.requestId) {
             await db.insert(inspectionRequests).values({
@@ -112,9 +113,12 @@ describe('B-28 booking TOCTOU', () => {
         }
         await db.insert(inspections).values({
             id: opts.id, tenantId: TENANT_ID, inspectorId: 'insp-1',
-            propertyAddress: '9 Other St', clientName: 'Rival',
+            propertyAddress: '9 Other St',
             date: opts.dateIso ?? SLOT_ISO,
-            status: (opts.status ?? 'draft') as any,
+            // Matches what the public booking path actually writes
+            // (`fulfill-booking.ts` → INSPECTION_STATUS.REQUESTED); the only
+            // status this suite distinguishes is 'cancelled'.
+            status: opts.status ?? INSPECTION_STATUS.REQUESTED,
             paymentStatus: 'unpaid', price: 0,
             requestId: opts.requestId, createdAt: opts.createdAt,
         });

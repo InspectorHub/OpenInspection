@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `uq_contractor_types_tenant_trade` ON `contractor_types` (`tenant_id`,`trade_slug`) WHERE trade_slug IS NOT NULL;
