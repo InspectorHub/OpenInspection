@@ -38,6 +38,12 @@ const SCRIPT_GATES = [
     { key: 'filesize', label: 'Large-file ratchet', script: 'check-file-size.mjs', fix: 'npm run lint:filesize' },
     { key: 'tz', label: 'Calendar timezone-safety', script: 'check-tz-safety.mjs', fix: 'npm run lint:tz' },
     { key: 'idempotency', label: 'Mutating-route retry safety', script: 'check-idempotency-coverage.mjs', fix: 'npm run lint:idempotency' },
+    // Pre-commit and not CI because a collision is created at exactly one moment
+    // -- when a file is added or renamed -- and this is the rung that sees that
+    // moment. It is also the rung where the fix is free: renaming a file nobody
+    // has pulled yet costs nothing, renaming one after it lands costs everyone a
+    // merge. An fs walk of ~2765 files, no parsing; among the cheapest here.
+    { key: 'extcollide', label: 'Extension collisions (files invisible to tsc)', script: 'check-extension-collisions.mjs', fix: 'npm run lint:ext-collisions' },
     // Belongs at pre-commit rather than CI: what it catches is a CAPABILITY
     // being added -- a money column, a money field on the inspection record, a
     // money input on a new screen. By the time CI sees one it is written and
