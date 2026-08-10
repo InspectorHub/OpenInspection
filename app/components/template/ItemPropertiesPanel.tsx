@@ -13,15 +13,15 @@ export function ItemPropertiesPanel({ selectedItem, updateItem, choicesText, set
   return (
     <>
       <div>
-        <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">{m.templates_item_label()}</label>
+        <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.templates_item_label()}</label>
         <input value={selectedItem.label} onChange={(e) => updateItem(selectedItem.id, { label: e.target.value })} className="w-full h-8 px-2 rounded border border-ih-border text-[12px] bg-transparent outline-none" />
       </div>
       <div>
-        <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">{m.templates_item_description()}</label>
+        <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.templates_item_description()}</label>
         <textarea value={selectedItem.description || ""} onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })} rows={2} className="w-full px-2 py-1 rounded border border-ih-border text-[12px] bg-transparent outline-none" />
       </div>
       <div>
-        <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">{m.templates_item_type()}</label>
+        <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.templates_item_type()}</label>
         <select value={selectedItem.type} onChange={(e) => updateItem(selectedItem.id, { type: e.target.value })} className="w-full h-8 px-2 rounded border border-ih-border text-[12px] bg-transparent outline-none">
           {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
@@ -36,7 +36,7 @@ export function ItemPropertiesPanel({ selectedItem, updateItem, choicesText, set
       </label>
       {(selectedItem.type === "select" || selectedItem.type === "multi_select") && (
         <div>
-          <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">{m.templates_item_choices()}</label>
+          <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.templates_item_choices()}</label>
           <textarea
             value={choicesText}
             onChange={(e) => {
@@ -53,17 +53,17 @@ export function ItemPropertiesPanel({ selectedItem, updateItem, choicesText, set
       {selectedItem.type === "number" && (
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">{m.templates_item_min()}</label>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.templates_item_min()}</label>
             <input type="number" value={selectedItem.options?.min ?? ""} onChange={(e) => updateItem(selectedItem.id, { options: { ...selectedItem.options, min: e.target.value ? Number(e.target.value) : null } })} className="w-full h-8 px-2 rounded border border-ih-border text-[12px] bg-transparent outline-none" />
           </div>
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">{m.templates_item_max()}</label>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.templates_item_max()}</label>
             <input type="number" value={selectedItem.options?.max ?? ""} onChange={(e) => updateItem(selectedItem.id, { options: { ...selectedItem.options, max: e.target.value ? Number(e.target.value) : null } })} className="w-full h-8 px-2 rounded border border-ih-border text-[12px] bg-transparent outline-none" />
           </div>
         </div>
       )}
       <div>
-        <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">{m.templates_item_default_recommendation()}</label>
+        <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.templates_item_default_recommendation()}</label>
         <input value={selectedItem.defaultRecommendation || ""} onChange={(e) => updateItem(selectedItem.id, { defaultRecommendation: e.target.value })} className="w-full h-8 px-2 rounded border border-ih-border text-[12px] bg-transparent outline-none" />
       </div>
     </>

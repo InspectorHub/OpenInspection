@@ -87,7 +87,7 @@ export default function ResetPasswordPage() {
       >
         <a
           href="/forgot-password"
-          className="inline-block text-sm font-bold text-ih-primary hover:underline"
+          className="inline-block text-sm font-bold text-ih-primary-text hover:underline"
         >
           {m.auth_reset_request_new_link()}
         </a>
@@ -103,7 +103,7 @@ export default function ResetPasswordPage() {
       >
         <a
           href="/login"
-          className="inline-block text-sm font-bold text-ih-primary hover:underline"
+          className="inline-block text-sm font-bold text-ih-primary-text hover:underline"
         >
           {m.auth_reset_go_to_login()}
         </a>

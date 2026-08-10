@@ -205,6 +205,7 @@ export const InspectionHubSchema = z.object({
     publishedAt: z.string().nullable().describe('ISO instant THIS deliverable went out; null while unpublished'),
     versionCount: z.number().describe('Signed versions this report owns — part of what deleting it would destroy'),
     hasContent: z.boolean().describe('Whether its document has been written into ("information you already filled out")'),
+    hasNarrative: z.boolean().describe("Whether the inspector has written the report-level narrative (reports.inspector_narrative). The FLAG, not the prose — the text is unbounded free text and comes from GET /{id}/reports/{reportId}/narrative."),
     canDelete: z.boolean().describe('Decided server-side by the same function the DELETE endpoint enforces, so the UI cannot offer an action the API refuses'),
     deleteBlockedReason: z.enum(['primary', 'published']).nullable().describe('Why deletion is refused, for the disabled control reason; null when it is allowed'),
   })).describe("The order's deliverables. One order, several reports — each with its own document, signature chain and notification."),
@@ -337,6 +338,24 @@ const InspectionListItemSchema = z.object({
     cancelReason: z.string().nullable().optional().describe('TODO describe cancelReason field for the OpenInspection MCP integration'),
     cancelNotes:  z.string().nullable().optional().describe('TODO describe cancelNotes field for the OpenInspection MCP integration'),
     createdAt:    z.string().nullable().optional().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+
+    /**
+     * The four keys `decorate()` adds in `inspection-analytics.service.ts`.
+     * They were reaching the wire through `.passthrough()` — sent, but
+     * undocumented in the published contract.
+     *
+     * They are `nullable`, not `optional`, and that is not a style preference.
+     * Passthrough's index signature is `JSONValue`, and every property of the
+     * value being returned must satisfy it — including declared ones. `JSONValue`
+     * cannot express "this key may be absent", so an optional property is not
+     * assignable to it, and the handler could not be typed against its own
+     * response schema at all. The service therefore emits these keys always,
+     * null when they do not apply.
+     */
+    agentName:     z.string().nullable().describe('Listing agent, else buyer agent, on this inspection. Null when neither is recorded.'),
+    inspectorName: z.string().nullable().describe('Display name of the assigned inspector. Null when unassigned.'),
+    requestId:     z.string().nullable().describe('Multi-inspection request this booking belongs to. Null for a standalone booking.'),
+    siblingCount:  z.number().nullable().describe('How many inspections share this `requestId`, including this one. Null when there is no request.'),
 }).passthrough().openapi('InspectionListItem');
 
 // Sub-spec B Task 5 (B-4) — portfolio defectStats aggregated per top card.

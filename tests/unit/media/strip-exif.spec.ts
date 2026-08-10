@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { stripExifOnIngest, type ImagesBinding } from '../../../server/lib/media/strip-exif';
 
-function fakeImages(outBytes: Uint8Array): ImagesBinding {
+function fakeImages(outBytes: Uint8Array<ArrayBuffer>): ImagesBinding {
   return {
     input: () => ({
       transform: () => ({
         output: async () => ({
+          // `Uint8Array<ArrayBuffer>`, not the default `Uint8Array<ArrayBufferLike>`:
+          // only the former satisfies `BodyInit`.
           response: () => new Response(outBytes, { headers: { 'content-type': 'image/jpeg' } }),
         }),
       }),

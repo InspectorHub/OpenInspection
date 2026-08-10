@@ -3,6 +3,7 @@ import { MessageService } from '../../../server/services/message.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import { inspectionMessages, inspections, tenants, contacts } from '../../../server/lib/db/schema';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -97,7 +98,7 @@ describe('MessageService', () => {
         const roleProfileId = (key: string) => `crp_t1_${key}`;
 
         beforeEach(async () => {
-            await seedRoleProfiles(testDb, 't1', new Date(1));
+            await seedRoleProfiles(asD1Db(testDb), 't1', new Date(1));
             await testDb.insert(contacts).values({
                 id: 'contact-client-1', tenantId: 't1', type: 'client', name: 'Jane Client',
                 email: 'jane@example.com', phone: null, createdAt: new Date(),
@@ -135,7 +136,7 @@ describe('MessageService', () => {
         const roleProfileId = (key: string) => `crp_t1_${key}`;
 
         beforeEach(async () => {
-            await seedRoleProfiles(testDb, 't1', new Date(1));
+            await seedRoleProfiles(asD1Db(testDb), 't1', new Date(1));
             await testDb.insert(contacts).values([
                 { id: 'contact-client-1', tenantId: 't1', type: 'client', name: 'Jane Client', email: 'jane@example.com', phone: null, createdAt: new Date() },
                 { id: 'contact-coclient-1', tenantId: 't1', type: 'client', name: 'Joe Spouse', email: 'joe@example.com', phone: null, createdAt: new Date() },

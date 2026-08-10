@@ -258,7 +258,12 @@ export class ContactService {
      */
     async upsertClientContact(
         tenantId: string,
-        input: { name: string; email?: string; phone?: string; type: 'client' | 'agent'; locale?: string | null },
+        // `?: T | undefined` rather than `?: T`: under exactOptionalPropertyTypes the
+        // bare form refuses an explicitly-passed `undefined`, and every caller builds
+        // this object out of Zod `.optional()` fields, which are exactly `T | undefined`.
+        // The body below reads each of these through a truthiness check or `?? null`,
+        // so an omitted key and an undefined one are already the same input.
+        input: { name: string; email?: string | undefined; phone?: string | undefined; type: 'client' | 'agent'; locale?: string | null | undefined },
     ): Promise<{ id: string; created: boolean }> {
         const db = this.getDrizzle();
         const normalizedEmail = input.email ? input.email.toLowerCase().trim() : undefined;

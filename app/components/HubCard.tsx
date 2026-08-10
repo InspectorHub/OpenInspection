@@ -14,7 +14,7 @@ export function HubCard({ to, title, desc, icon }: HubCardProps) {
       className="group p-4 bg-ih-bg-card border border-ih-border rounded-lg hover:shadow-ih-popover hover:border-ih-border transition-all"
     >
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-lg bg-ih-primary-tint text-ih-primary flex items-center justify-center flex-shrink-0">
+        <div className="w-10 h-10 rounded-lg bg-ih-primary-tint text-ih-primary-text flex items-center justify-center flex-shrink-0">
           <svg
             className="w-5 h-5"
             fill="none"
@@ -30,7 +30,7 @@ export function HubCard({ to, title, desc, icon }: HubCardProps) {
           </svg>
         </div>
         <div>
-          <h3 className="font-bold text-[14px] text-ih-fg-1 group-hover:text-ih-primary">
+          <h3 className="font-bold text-[14px] text-ih-fg-1 group-hover:text-ih-primary-text">
             {title}
           </h3>
           <p className="text-[12px] text-ih-fg-3 mt-0.5">{desc}</p>

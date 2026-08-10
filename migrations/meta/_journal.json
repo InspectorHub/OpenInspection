@@ -358,6 +358,48 @@
       "when": 1786107182084,
       "tag": "0050_damp_rawhide_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "6",
+      "when": 1786190721854,
+      "tag": "0051_tranquil_bloodstorm",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "6",
+      "when": 1786193210511,
+      "tag": "0052_repair_action_tag",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1786202265112,
+      "tag": "0053_curved_elektra",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1786243406649,
+      "tag": "0054_smart_zodiak",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "6",
+      "when": 1786247564991,
+      "tag": "0055_dazzling_namor",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "6",
+      "when": 1786256609273,
+      "tag": "0056_fluffy_fenris",
+      "breakpoints": true
     }
   ]
 }

@@ -108,7 +108,7 @@ export function CredentialsEditor({
       </div>
 
       {credentials.length === 0 && (
-        <p className="text-[12px] text-ih-fg-4">{m.settings_profile_credentials_empty()}</p>
+        <p className="text-[12px] text-ih-fg-3">{m.settings_profile_credentials_empty()}</p>
       )}
 
       {credentials.map((c, i) => (
@@ -188,7 +188,7 @@ export function CredentialsEditor({
         </div>
       ))}
 
-      <button type="button" onClick={onAdd} className="text-[13px] font-bold text-ih-primary hover:underline">
+      <button type="button" onClick={onAdd} className="text-[13px] font-bold text-ih-primary-text hover:underline">
         {m.settings_profile_credentials_add()}
       </button>
 

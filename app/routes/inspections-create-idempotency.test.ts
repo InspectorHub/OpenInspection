@@ -40,6 +40,9 @@ vi.mock("~/lib/api-client.server", () => ({
 }));
 
 import { action } from "~/routes/inspections";
+import { routeArgs } from "../../tests/helpers/route-args";
+/** Minimal AppLoadContext stub — the action only forwards it to createApi. */
+const CONTEXT = {} as Parameters<typeof action>[0]["context"];
 
 let db: ReturnType<typeof createTestDb>["db"];
 let created: Record<string, unknown>[] = [];
@@ -50,7 +53,7 @@ let created: Record<string, unknown>[] = [];
  * every create it is asked to perform.
  */
 function buildApiApp() {
-    const app = new Hono();
+    const app = new Hono<{ Variables: { tenantId: string } }>();
     app.use("*", async (c, next) => {
         c.set("tenantId", "t1");
         await next();
@@ -77,8 +80,7 @@ function submit(key: string, overrides: Record<string, string> = {}) {
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: body.toString(),
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return action({ request, params: {}, context: {} as any }) as Promise<Response>;
+    return action(routeArgs(request, { params: {}, context: CONTEXT })) as Promise<Response>;
 }
 
 describe("POST /inspections (create) — idempotency key hand-off", () => {
@@ -88,7 +90,7 @@ describe("POST /inspections (create) — idempotency key hand-off", () => {
         db = t.db;
         created = [];
         const api = buildApiApp();
-        seam.post = (args, options) =>
+        seam.post = async (args, options) =>
             api.request("/api/inspections", {
                 method: "POST",
                 headers: { "content-type": "application/json", ...(options?.headers ?? {}) },

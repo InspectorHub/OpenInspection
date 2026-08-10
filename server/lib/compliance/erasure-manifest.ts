@@ -251,6 +251,18 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     //     that quietly deletes a mistake is worth less than one that shows the
     //     mistake was found and corrected.
     { table: 'reports', column: 'title', category: 'user.address', action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    // `inspector_narrative` IS what the title turned out not to be: prose a person
+    // composes about this property for this client, so it can carry names and
+    // occupancy detail, none of it machine-detectable — the population
+    // `docs/compliance/erasure-heuristic-limits.md` says the gate cannot reach.
+    // Cleared WHOLESALE, the `audit_logs.metadata` call: identifiers cannot be
+    // stripped out of prose. The ROW survives (spine of a signed document).
+    // ⚠️ Safe for the integrity chain only because the narrative is NOT in
+    // `report_versions.snapshot_json` (`report-version.service.ts` captures the
+    // inspections row, results, units, inspectors, style profile — not `reports`).
+    // Put it in the snapshot and this rule must be re-decided: an erasure would
+    // then either leave the prose inside a signed blob or break its signature.
+    { table: 'reports', column: 'inspector_narrative', category: 'user.freetext', action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y' },
 
     // ── audit_logs (#276) ─────────────────────────────────────────────────────
     // Free-form JSON a caller composes; it MAY embed names/emails/phones/

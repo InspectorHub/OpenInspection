@@ -8,7 +8,9 @@ afterEach(cleanup);
 test("link variant renders borderless text action", () => {
   render(<Button variant="link">Browse library</Button>);
   const btn = screen.getByRole("button", { name: "Browse library" });
-  expect(btn.className).toContain("text-ih-primary");
+  // The TEXT role token, not the fill: a link-variant button is glyphs on the
+  // page surface, so it takes the readability-derived brand colour.
+  expect(btn.className).toContain("text-ih-primary-text");
   expect(btn.className).toContain("hover:underline");
   expect(btn.className).not.toContain("bg-ih-primary");
 });

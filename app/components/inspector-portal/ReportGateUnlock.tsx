@@ -65,7 +65,7 @@ export function ReportGateUnlock({
                     type="button"
                     disabled={busy}
                     onClick={() => fetcher.submit({ intent: "relock-report" }, { method: "post" })}
-                    className="mt-2 text-[12px] font-bold text-ih-primary hover:underline disabled:opacity-50"
+                    className="mt-2 text-[12px] font-bold text-ih-primary-text hover:underline disabled:opacity-50"
                 >
                     {m.hub_gate_relock_action()}
                 </button>

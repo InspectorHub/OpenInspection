@@ -129,7 +129,7 @@ export function MessageThread({
             {/* Day separator */}
             <div className="flex items-center gap-3 my-3" role="separator" aria-label={dayLabel(day.dayKey, today, yesterday, locale)}>
               <span className="flex-1 border-t border-ih-border" aria-hidden="true" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-ih-fg-4">
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-ih-fg-3">
                 {dayLabel(day.dayKey, today, yesterday, locale)}
               </span>
               <span className="flex-1 border-t border-ih-border" aria-hidden="true" />

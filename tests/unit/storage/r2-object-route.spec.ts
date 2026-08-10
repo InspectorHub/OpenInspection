@@ -148,7 +148,7 @@ function makeD1Stub(rows: PoolRow[]): D1Database {
                     },
                     run: async () => ({ meta: {}, success: true }),
                 }),
-            } as ReturnType<D1Database['prepare']>;
+            };
         },
         exec: async () => ({ count: 0, duration: 0 }),
         batch: async () => [],

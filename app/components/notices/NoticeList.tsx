@@ -100,7 +100,7 @@ export function NoticeList({
 
               {n.body && <p className="mt-0.5 text-[12px] text-ih-fg-3 leading-snug">{n.body}</p>}
 
-              <p className="mt-0.5 text-[11px] text-ih-fg-4">
+              <p className="mt-0.5 text-[11px] text-ih-fg-3">
                 {showCompany && n.companyName ? `${n.companyName} · ` : ""}
                 {formatRelativeTime(n.createdAt, { locale })}
               </p>

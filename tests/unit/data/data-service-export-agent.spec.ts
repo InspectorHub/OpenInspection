@@ -15,6 +15,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DataService } from '../../../server/services/data.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { asD1Db } from '../helpers/test-db';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -45,25 +46,23 @@ describe('DataService.exportInspectionsCSV — buyer_agent sourcing (Task 9c-X3)
             id: TENANT, name: 'Acme', slug: 'acme-export-agent', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values({
             id: AGENT, tenantId: TENANT, type: 'agent', name: 'Jane Agent',
             email: 'jane@realty.example', agency: 'Realty Co', createdAt: new Date(),
         });
 
-        // Legacy referredByAgentId column intentionally NULL — only
-        // inspection_people carries the buyer_agent for INSP_WITH_AGENT;
+        // The legacy referredByAgentId column is GONE (schema/inspection/core.ts):
+        // only inspection_people carries the buyer_agent for INSP_WITH_AGENT;
         // INSP_NO_AGENT has neither (degenerate — no buyer's agent at all).
         await db.insert(schema.inspections).values([
             {
                 id: INSP_WITH_AGENT, tenantId: TENANT, propertyAddress: '1 Main St',
-                referredByAgentId: null,
                 date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
                 paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             },
             {
                 id: INSP_NO_AGENT, tenantId: TENANT, propertyAddress: '2 Oak Ave',
-                referredByAgentId: null,
                 date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 0,
                 paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             },

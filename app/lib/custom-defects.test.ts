@@ -53,6 +53,9 @@ describe('makeCustomDefect', () => {
       { title: 'Exposed wiring', category: 'safety', location: 'NE corner' },
       () => 'cd_2',
     );
+    // makeCustomDefect returns null for a blank title; this input has one, and
+    // saying so here is what lets the two assertions below read the fields.
+    if (!d) throw new Error('makeCustomDefect returned null for a titled defect');
     expect(d.category).toBe('safety');
     expect(d.location).toBe('NE corner');
   });

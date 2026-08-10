@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -54,14 +55,14 @@ describe('IA-44 — checkout mints the signer a portal token', () => {
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT);
+        await seedRoleProfiles(asD1Db(db), TENANT);
         await db.insert(schema.tenantConfigs).values({
             tenantId: TENANT, companyName: 'Acme Inspections', primaryColor: '#ff5500',
-            createdAt: new Date(), updatedAt: new Date(),
+            updatedAt: new Date(),
         });
         await db.insert(schema.inspections).values({
-            id: INSP, tenantId: TENANT, propertyAddress: '1 Main St', clientName: 'Jane',
-            clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested',
+            id: INSP, tenantId: TENANT, propertyAddress: '1 Main St',
+            date: '2026-06-01', status: 'requested',
             paymentStatus: 'unpaid', price: 50000, agreementRequired: true,
             paymentRequired: true, createdAt: new Date(),
         });

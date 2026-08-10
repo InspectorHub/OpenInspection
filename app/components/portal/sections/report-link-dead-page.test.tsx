@@ -18,12 +18,24 @@ import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { ErrorState } from "../../ErrorState";
 import { ReportView, reportViewProps } from "./ReportView";
+import { EMPTY_BRAND } from "~/lib/brand";
 
 afterEach(cleanup);
 
-/** Render the report surface as a loader that failed would hand it over. */
-function renderReport(loader: Record<string, unknown>) {
-  return render(<ReportView {...(reportViewProps(loader as never) as never)} />);
+type ReportLoaderData = Parameters<typeof reportViewProps>[0];
+
+/**
+ * Render the report surface as a loader that FAILED would hand it over.
+ *
+ * The payload is deliberately PARTIAL — that is the case under test.
+ * `reportViewProps` is written for it (every field it reads is `?? default`),
+ * but its parameter type still asks for the whole success payload, so the gap
+ * is bridged once, here. `Partial<ReportLoaderData>` rather than the `as never`
+ * this used to carry: a key the loader result does not have is still an error,
+ * which is what caught nothing before.
+ */
+function renderReport(loader: Partial<ReportLoaderData>) {
+  return render(<ReportView {...reportViewProps(loader as ReportLoaderData)} />);
 }
 
 const BRAND = {
@@ -36,7 +48,12 @@ describe("404 and 410 are the same screen to the reader", () => {
   // Whatever this copy becomes, the two cases must not diverge. The assertions
   // below compare the two renders against each OTHER rather than against a
   // fixed string, so rewording the page cannot quietly re-split them.
-  const brand = { companyName: BRAND.companyName, supportEmail: BRAND.supportEmail, companyPhone: null };
+  const brand = {
+    ...EMPTY_BRAND,
+    companyName: BRAND.companyName,
+    supportEmail: BRAND.supportEmail,
+    companyPhone: null,
+  };
 
   it("a 404 and a 410 produce identical text", () => {
     const { container: notFound } = renderReport({ error: "Report not found", brand });

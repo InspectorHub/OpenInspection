@@ -1,12 +1,22 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { loader } from '../../../app/routes/public/report-card-stack';
+import { createLoadContext } from '~/lib/load-context';
 
-function fakeCtx() {
-  // Bare context: getApiUrl() falls back to a real http://localhost:8788 base,
-  // so the loader's brand/report fetches would otherwise hit the network.
-  return {} as any;
-}
+type LoaderArgs = Parameters<typeof loader>[0];
+
+// A real, EMPTY load context rather than `{} as any`. It is the same thing the
+// worker hands a loader with no env bound, so `getApiUrl()` still falls back to
+// http://localhost:8788 and the brand/report fetches still take the stubbed
+// path below — but the shape is now the one the loader actually declares, so a
+// change to LoaderArgs shows up here instead of being absorbed by the cast.
+const loaderArgs = (url: string): LoaderArgs => ({
+  params: { tenant: 't', id: 'i' },
+  request: new Request(url),
+  url: new URL(url),
+  pattern: '/report-view/:tenant/:id',
+  context: createLoadContext(),
+});
 
 beforeEach(() => {
   // initialFilter is derived purely from the request URL; the loader's
@@ -20,19 +30,14 @@ afterEach(() => {
 
 describe('report-card-stack loader summary mode', () => {
   it('defaults initialFilter to "summary" when ?summary=1', async () => {
-    const res: any = await loader({
-      params: { tenant: 't', id: 'i' },
-      request: new Request('https://x/report-view/t/i?summary=1'),
-      context: fakeCtx(),
-    } as any);
+    // Not `const res: any` — the loader's two return paths both `satisfies
+    // LoaderResult`, so `res.initialFilter` is a typed read. Under `any` it was
+    // not: `res.initialFilterr` would have compiled and asserted undefined.
+    const res = await loader(loaderArgs('https://x/report-view/t/i?summary=1'));
     expect(res.initialFilter).toBe('summary');
   });
   it('defaults initialFilter to "all" otherwise', async () => {
-    const res: any = await loader({
-      params: { tenant: 't', id: 'i' },
-      request: new Request('https://x/report-view/t/i'),
-      context: fakeCtx(),
-    } as any);
+    const res = await loader(loaderArgs('https://x/report-view/t/i'));
     expect(res.initialFilter).toBe('all');
   });
 });

@@ -42,12 +42,12 @@ export function ReportDefectCard({ item, mediaVisible, renderMediaTile, showPhot
                 <DefectCategoryChip category={d.effectiveCategory} color={d.categoryColor} />
               )}
               {d.isCustom && (
-                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-primary-tint text-ih-primary">
+                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-primary-tint text-ih-primary-text">
                   {m.pca_defect_card_inspector_added()}
                 </span>
               )}
               {d.effectiveLocation && (
-                <span className="text-[11px] text-ih-fg-4">@ {d.effectiveLocation}</span>
+                <span className="text-[11px] text-ih-fg-3">@ {d.effectiveLocation}</span>
               )}
             </div>
             {d.effectiveComment && (
@@ -58,7 +58,7 @@ export function ReportDefectCard({ item, mediaVisible, renderMediaTile, showPhot
             {(d.effectiveTrade || d.effectiveTimeframe) && (
               <div
                 data-defect-meta
-                className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-ih-fg-4"
+                className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-ih-fg-3"
               >
                 {d.effectiveTrade && (
                   <span>

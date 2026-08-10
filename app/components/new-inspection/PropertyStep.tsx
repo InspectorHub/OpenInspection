@@ -44,7 +44,7 @@ export function PropertyStep({
         <div className="flex gap-2">
           {PROPERTY_TYPES.map((pt) => (
             <button key={pt.value} onClick={() => setPropertyType(pt.value)}
-              className={`flex-1 py-2 rounded-md text-[12px] font-bold border transition-colors ${propertyType === pt.value ? "border-ih-primary bg-ih-primary-tint text-ih-primary" : "border-ih-border text-ih-fg-3"}`}
+              className={`flex-1 py-2 rounded-md text-[12px] font-bold border transition-colors ${propertyType === pt.value ? "border-ih-primary bg-ih-primary-tint text-ih-primary-text" : "border-ih-border text-ih-fg-3"}`}
             >{pt.label()}</button>
           ))}
         </div>

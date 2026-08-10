@@ -28,8 +28,6 @@ function makeInspection(overrides: Partial<typeof schema.inspections.$inferInser
     return {
         tenantId:          TENANT,
         propertyAddress:   '1 Main St',
-        clientName:        'Test Client',
-        clientEmail:       'test@example.com',
         date:              '2026-06-01',
         status:            INSPECTION_STATUS.COMPLETED,
         reportStatus:      REPORT_STATUS.IN_PROGRESS,

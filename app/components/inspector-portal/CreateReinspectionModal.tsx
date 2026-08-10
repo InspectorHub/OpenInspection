@@ -84,7 +84,7 @@ export function CreateReinspectionModal({
             </div>
           </>
         ) : (
-          <p className="text-[13px] text-ih-fg-4">
+          <p className="text-[13px] text-ih-fg-3">
             {m.hub_reinspect_empty()}
           </p>
         )}

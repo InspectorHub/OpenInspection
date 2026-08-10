@@ -46,6 +46,15 @@ export function ReportsCard({
     reports: ReportRow[];
     canManage: boolean;
     formatDate: (iso: string) => string;
+    /**
+     * #69 — where to read what clients asked for after these reports went out,
+     * or null while the order is unpublished.
+     *
+     * A HREF, not a boolean: publication is the order-wide `reportStatus`, and
+     * this card only knows each deliverable's own `publishedAt`. Re-deriving
+     * the rule from those would give a second, subtly different answer to
+     * "is this order published" — so the route decides and this card renders.
+     */
 }) {
     const deleteFetcher = useFetcher<typeof action>();
     const [deleting, setDeleting] = useState<ReportRow | null>(null);
@@ -116,6 +125,7 @@ export function ReportsCard({
             )}
 
             {error && <p className="text-[12px] text-ih-bad-fg mt-3">{error}</p>}
+
 
             {/* Names the report AND what is destroyed with it. A report is not a
                 row: it carries the content somebody filled in and its own

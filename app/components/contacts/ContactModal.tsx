@@ -70,7 +70,7 @@ export function ContactModal({
         {isEdit && <input type="hidden" name="id" value={contact.id} />}
 
           <div>
-            <label htmlFor={fields.type.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_modal_type_label()}</label>
+            <label htmlFor={fields.type.id} className="block text-[10px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1.5">{m.contacts_modal_type_label()}</label>
             <select
               id={fields.type.id}
               name={fields.type.name}
@@ -87,7 +87,7 @@ export function ContactModal({
           </div>
 
           <div>
-            <label htmlFor={fields.name.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_modal_name_label()}</label>
+            <label htmlFor={fields.name.id} className="block text-[10px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1.5">{m.contacts_modal_name_label()}</label>
             <input
               id={fields.name.id}
               name={fields.name.name}
@@ -104,7 +104,7 @@ export function ContactModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor={fields.email.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_field_email()}</label>
+              <label htmlFor={fields.email.id} className="block text-[10px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1.5">{m.contacts_field_email()}</label>
               <input
                 id={fields.email.id}
                 name={fields.email.name}
@@ -118,13 +118,13 @@ export function ContactModal({
                 }`}
               />
               {isEdit && contact?.type === "agent" ? (
-                <p className="mt-1 text-xs text-ih-fg-4">{m.contacts_agent_email_locked_hint()}</p>
+                <p className="mt-1 text-xs text-ih-fg-3">{m.contacts_agent_email_locked_hint()}</p>
               ) : fields.email.errors ? (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.email.errors[0]}</p>
               ) : null}
             </div>
             <div>
-              <label htmlFor={fields.phone.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_field_phone()}</label>
+              <label htmlFor={fields.phone.id} className="block text-[10px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1.5">{m.contacts_field_phone()}</label>
               <input
                 id={fields.phone.id}
                 name={fields.phone.name}
@@ -137,7 +137,7 @@ export function ContactModal({
           </div>
 
           <div>
-            <label htmlFor={fields.agency.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_field_agency()}</label>
+            <label htmlFor={fields.agency.id} className="block text-[10px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1.5">{m.contacts_field_agency()}</label>
             <input
               id={fields.agency.id}
               name={fields.agency.name}
@@ -159,7 +159,7 @@ export function ContactModal({
               picker in Settings, from one table (`app/lib/locales.ts`), over
               the same list of tags the server accepts. */}
           <div>
-            <label htmlFor={fields.locale.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_field_language()}</label>
+            <label htmlFor={fields.locale.id} className="block text-[10px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1.5">{m.contacts_field_language()}</label>
             <select
               id={fields.locale.id}
               name={fields.locale.name}

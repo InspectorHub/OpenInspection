@@ -4,11 +4,12 @@ import { resolvePortalAccess } from '../../../server/lib/public-access';
 import { PortalAccessService } from '../../../server/services/portal-access.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { hashToken, deadTokenSentinel } from '../../../server/lib/token-hash';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-const live = { inspectionId: 'insp1', tenantId: 't1', role: 'client' as const, recipientEmail: 'a@b.com', revokedAt: null, expiresAt: null };
+const live = { id: 'tok1', inspectionId: 'insp1', tenantId: 't1', role: 'client' as const, recipientEmail: 'a@b.com', revokedAt: null, expiresAt: null };
 
 describe('resolvePortalAccess', () => {
     it('null when no token', async () => {
@@ -26,9 +27,13 @@ describe('resolvePortalAccess', () => {
     it('null when expired', async () => {
         expect(await resolvePortalAccess({ resolveToken: async () => ({ ...live, expiresAt: 1 }) }, 'x', 'insp1', 2)).toBeNull();
     });
-    it('returns {tenantId, role, recipientEmail} when live + matching', async () => {
+    // The grant carries `accessTokenId` too (public-access.ts:66). The fixture
+    // used to omit `id`, so that key came back `undefined` and `toEqual` skipped
+    // it — the case named three fields and checked three of four. A real row
+    // always has an id, so the fourth is now asserted.
+    it('returns {accessTokenId, tenantId, role, recipientEmail} when live + matching', async () => {
         expect(await resolvePortalAccess({ resolveToken: async () => live }, 'x', 'insp1', 0)).toEqual({
-            tenantId: 't1', role: 'client', recipientEmail: 'a@b.com',
+            accessTokenId: 'tok1', tenantId: 't1', role: 'client', recipientEmail: 'a@b.com',
         });
     });
 });
@@ -58,7 +63,7 @@ describe('PortalAccessService — token hash-at-rest (tier-2)', () => {
         // issueToken validates `role` against the tenant's active role
         // profiles — seed the defaults so the (unqualified) 'client' role
         // used throughout this suite resolves.
-        await seedRoleProfiles(testDb, TENANT);
+        await seedRoleProfiles(asD1Db(testDb), TENANT);
         svc = new PortalAccessService({} as D1Database, { jwtSecret: JWT });
     });
 

@@ -69,7 +69,7 @@ export function KeyboardHud({ onClose }: { onClose: () => void }) {
         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {COLUMNS.map((col) => (
             <div key={col.title}>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-3">{col.title}</h3>
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-3">{col.title}</h3>
               <ul className="space-y-2">
                 {col.rows.map((row) => (
                   <li key={row.key} className="flex items-center justify-between gap-3 text-xs">
@@ -81,7 +81,7 @@ export function KeyboardHud({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </div>
-        <footer className="px-6 py-3 border-t border-ih-border text-[10px] text-ih-fg-4 italic">
+        <footer className="px-6 py-3 border-t border-ih-border text-[10px] text-ih-fg-3 italic">
           {m.editor_hud_footer()}
         </footer>
       </div>

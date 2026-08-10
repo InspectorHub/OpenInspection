@@ -86,9 +86,9 @@ class ProbeQbo extends withInvoiceSync(QBOServiceBase) {
     constructor(private readonly tenantTz?: string) {
         super({} as never, 'cid', 'secret', 'whsec', 'jwt');
     }
-    protected override getDrizzle() { return stubDb(this.tenantTz) as never; }
-    protected override async getQBOCustomerIdForInvoice(): Promise<string | null> { return 'QBO-CUST-9'; }
-    protected override async apiCall<T>(
+    public override getDrizzle() { return stubDb(this.tenantTz) as never; }
+    public override async getQBOCustomerIdForInvoice(): Promise<string | null> { return 'QBO-CUST-9'; }
+    public override async apiCall<T>(
         _tenantId: string, method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown,
     ): Promise<T> {
         this.calls.push({ method, path, body });
@@ -162,8 +162,8 @@ class DbQbo extends withInvoiceSync(QBOServiceBase) {
     constructor(private readonly realDb: unknown) {
         super({} as never, 'cid', 'secret', 'whsec', 'jwt');
     }
-    protected override getDrizzle() { return this.realDb as never; }
-    protected override async apiCall<T>(
+    public override getDrizzle() { return this.realDb as never; }
+    public override async apiCall<T>(
         _tenantId: string, method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown,
     ): Promise<T> {
         this.calls.push({ method, path, body });
@@ -340,9 +340,11 @@ describe('a cancellation refund reaches QuickBooks', () => {
             }),
         });
         const env = { DB: {}, JWT_SECRET: 'test-jwt-secret', QBO_CLIENT_ID: 'qbo-client', ...(opts.env ?? {}) };
-        return app.fetch(req, env as never, {
+        // Promise.resolve normalises `app.fetch`'s `Response | Promise<Response>`
+        // return — the union has no `.then`.
+        return Promise.resolve(app.fetch(req, env as never, {
             waitUntil: (p: Promise<unknown>) => { settled.push(p); }, passThroughOnException: () => {},
-        } as never).then(async (res) => { await Promise.allSettled(settled); return res; });
+        } as never)).then(async (res) => { await Promise.allSettled(settled); return res; });
     }
 
     const refundRow = () => db.select().from(schema.orderPayments)

@@ -84,7 +84,7 @@ export function TemplateCombobox({
 
     if (templates.length === 0) {
         return (
-            <p className="text-[12px] text-ih-fg-4 px-1 py-2">{m.newinsp_property_no_templates()}</p>
+            <p className="text-[12px] text-ih-fg-3 px-1 py-2">{m.newinsp_property_no_templates()}</p>
         );
     }
 
@@ -148,7 +148,7 @@ export function TemplateCombobox({
                     className="z-50 overflow-y-auto rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover"
                 >
                     {matches.length === 0 ? (
-                        <li className="px-3 py-2 text-[12px] text-ih-fg-4">
+                        <li className="px-3 py-2 text-[12px] text-ih-fg-3">
                             {m.newinsp_property_no_match({ query: query.trim() })}
                         </li>
                     ) : (
@@ -167,7 +167,7 @@ export function TemplateCombobox({
                                 >
                                     <span className={t.id === templateId ? "font-bold" : "font-medium"}>{t.name}</span>
                                     {typeof t.itemCount === "number" && (
-                                        <span className="ml-2 text-[11px] text-ih-fg-4">
+                                        <span className="ml-2 text-[11px] text-ih-fg-3">
                                             {t.itemCount === 1
                                                 ? m.newinsp_property_item_one({ count: t.itemCount })
                                                 : m.newinsp_property_item_many({ count: t.itemCount })}

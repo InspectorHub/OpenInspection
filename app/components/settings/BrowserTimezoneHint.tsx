@@ -39,12 +39,12 @@ export function BrowserTimezoneHint({
   if (!browserTz || browserTz === effectiveValue || !TIMEZONE_OPTIONS.includes(browserTz)) return null;
 
   return (
-    <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ih-fg-4">
+    <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ih-fg-3">
       <span>{m.settings_timezone_browser_hint({ zone: timeZoneLabel(browserTz) })}</span>
       <button
         type="button"
         onClick={() => onUse(browserTz)}
-        className="font-semibold text-ih-primary rounded-sm hover:underline focus:outline-none focus-visible:shadow-ih-focus"
+        className="font-semibold text-ih-primary-text rounded-sm hover:underline focus:outline-none focus-visible:shadow-ih-focus"
       >
         {m.settings_timezone_browser_use()}
       </button>

@@ -132,6 +132,8 @@
   "settings_workspace_branding_heading": "Marca",
   "settings_workspace_company_name_label": "Nombre de la empresa",
   "settings_workspace_primary_color_label": "Color principal",
+  "settings_workspace_color_contrast_warning": "El texto sobre los botones rellenos con este color solo alcanza {ratio}:1. WCAG AA exige {aa}:1, y sobre este relleno no lo logra ni el texto blanco ni el casi negro.",
+  "settings_workspace_color_contrast_scope": "El texto y los enlaces en color de marca no se ven afectados: se derivan para mantenerse legibles. Son los controles rellenos —botones, insignias, barras de acento— los que costará leer. Al guardar, su color se conserva tal como lo eligió.",
   "settings_workspace_logo_label": "Logotipo de la empresa",
   "settings_workspace_timezone_heading": "Zona horaria",
   "settings_workspace_timezone_subtitle": "Los informes, los recordatorios y los eventos del calendario usan esta zona horaria. Cada usuario puede cambiar en su perfil la forma en que se le muestran las horas.",

@@ -19,19 +19,24 @@ import { createRoutesStub } from "react-router";
 
 import BookingPage from "~/routes/public/booking";
 
+type DepositPolicy = { type: "none" | "percent" | "fixed"; percent?: number; amountCents?: number } | null;
+type BookingService = { id: string; name: string; price: number; duration: number; depositPolicy: DepositPolicy };
+
+const BASE_SERVICES: BookingService[] = [
+  { id: "svc-1", name: "Full Inspection", price: 45000, duration: 180, depositPolicy: null },
+  { id: "svc-2", name: "Radon", price: 9500, duration: 60, depositPolicy: null },
+];
+
 const BASE_PROFILE = {
   company: "Acme Inspections",
-  services: [
-    { id: "svc-1", name: "Full Inspection", price: 45000, duration: 180, depositPolicy: null },
-    { id: "svc-2", name: "Radon", price: 9500, duration: 60, depositPolicy: null },
-  ],
+  services: BASE_SERVICES,
   inspectors: [],
   allowInspectorChoice: false,
   bookingOpen: true,
   turnstileSiteKey: null,
   conciergeReviewRequired: false,
   currency: "USD",
-  depositPolicy: null as { type: "none" | "percent" | "fixed"; percent?: number; amountCents?: number } | null,
+  depositPolicy: null as DepositPolicy,
 };
 
 function renderBooking(profile: Partial<typeof BASE_PROFILE> = {}) {

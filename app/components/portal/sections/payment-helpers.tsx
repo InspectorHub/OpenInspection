@@ -67,7 +67,7 @@ export const STATUS_TONE: Record<InvoiceData["status"], PillTone> = {
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-0.5">{label}</p>
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-ih-fg-3 mb-0.5">{label}</p>
       <p className="text-[13px] text-ih-fg-1 font-medium truncate">{children}</p>
     </div>
   );

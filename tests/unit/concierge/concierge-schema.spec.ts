@@ -65,7 +65,10 @@ describe('concierge schema — A3', () => {
             tenantId: TENANT,
             propertyAddress: '1 Main St',
             date: '2026-06-15',
-            status: 'pending',
+            // Scaffolding only: this row exists so the concierge token below
+            // has a parent. 'requested' is the schema default and the state the
+            // concierge intake path actually writes.
+            status: 'requested',
             paymentStatus: 'unpaid',
             createdAt: new Date(),
         });

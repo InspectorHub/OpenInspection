@@ -227,7 +227,7 @@ export function CommunicationSection({
             {messagesOpen && (
                 <div className="pb-3">
                     {payload.state === "loading" && !loaded ? (
-                        <p className="text-[12px] text-ih-fg-4 py-4 text-center">{m.comm_loading()}</p>
+                        <p className="text-[12px] text-ih-fg-3 py-4 text-center">{m.comm_loading()}</p>
                     ) : (
                         <MessageThread
                             messages={[...messages, ...pendingSends]}
@@ -238,7 +238,7 @@ export function CommunicationSection({
                             emptyBody={m.comm_messages_empty_body()}
                             composeExtra={threadOptions.length > 0 ? (
                                 <div className="mb-2 flex items-center gap-2">
-                                    <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-[0.1em]">{m.comm_compose_to()}</span>
+                                    <span className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-[0.1em]">{m.comm_compose_to()}</span>
                                     <select
                                         value={effectiveRecipient}
                                         onChange={(e) => setRecipientId(e.target.value)}
@@ -275,7 +275,7 @@ export function CommunicationSection({
                 </button>
                 {outboxOpen && (
                     payload.state === "loading" && !loaded ? (
-                        <p className="text-[12px] text-ih-fg-4 py-4 text-center">{m.comm_loading()}</p>
+                        <p className="text-[12px] text-ih-fg-3 py-4 text-center">{m.comm_loading()}</p>
                     ) : (
                         <>
                             {/* OI #271 — "did the report reach them, and did they
@@ -293,7 +293,7 @@ export function CommunicationSection({
                             {groups.length > 0 ? (
                                 <OutboxList groups={groups} onGetConsent={onGetConsent} onResend={handleResend} />
                             ) : (
-                                <p className="text-[12px] text-ih-fg-4 py-4 text-center">{outboxEmpty}</p>
+                                <p className="text-[12px] text-ih-fg-3 py-4 text-center">{outboxEmpty}</p>
                             )}
                         </>
                     )

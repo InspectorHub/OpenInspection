@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -103,7 +104,7 @@ describe('POST /api/inspections/:id/send-report-pdf — multi-recipient, role-ke
             id: TENANT, name: 'Acme', slug: SLUG, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values([
             { id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane Client', email: 'jane@example.com', phone: '+15551234567', createdAt: new Date() },
             { id: BUYER_AGENT, tenantId: TENANT, type: 'agent', name: 'Bob Agent', email: 'bob@brokerage.example.com', phone: '+15559876543', createdAt: new Date() },

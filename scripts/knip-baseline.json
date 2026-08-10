@@ -1,1 +1,4 @@
-[]
+[
+  "files:server/lib/legal/non-translatable-manifest.ts",
+  "files:server/lib/legal/non-translatable-out-of-scope.ts"
+]

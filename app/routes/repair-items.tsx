@@ -148,7 +148,7 @@ export default function RepairItemsPage() {
                 )}
               </div>
               <div className="mt-3 flex gap-3">
-                <button onClick={() => openEdit(it)} className="text-[12px] text-ih-primary hover:underline font-bold">{m.common_edit()}</button>
+                <button onClick={() => openEdit(it)} className="text-[12px] text-ih-primary-text hover:underline font-bold">{m.common_edit()}</button>
                 <button onClick={() => setPendingDelete(it)} className="text-[12px] text-ih-bad-fg hover:underline font-bold">{m.common_delete()}</button>
               </div>
             </Card>

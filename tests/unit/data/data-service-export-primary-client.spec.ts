@@ -14,6 +14,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DataService } from '../../../server/services/data.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { asD1Db } from '../helpers/test-db';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -44,25 +45,24 @@ describe('DataService.exportInspectionsCSV — primary-client sourcing (Task 9c)
             id: TENANT, name: 'Acme', slug: 'acme-export', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values({
             id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane Client',
             email: 'jane@example.com', phone: '+15551234567', createdAt: new Date(),
         });
 
-        // Legacy client columns intentionally NULL — only inspection_people
-        // carries the primary client for INSP_WITH_CLIENT; INSP_NO_CLIENT has
-        // neither (degenerate — no primary client at all).
+        // The legacy clientName/clientEmail/clientPhone columns are GONE
+        // (schema/inspection/core.ts): only inspection_people carries the primary
+        // client for INSP_WITH_CLIENT; INSP_NO_CLIENT has neither (degenerate —
+        // no primary client at all).
         await db.insert(schema.inspections).values([
             {
                 id: INSP_WITH_CLIENT, tenantId: TENANT, propertyAddress: '1 Main St',
-                clientName: null, clientEmail: null, clientPhone: null,
                 date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
                 paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             },
             {
                 id: INSP_NO_CLIENT, tenantId: TENANT, propertyAddress: '2 Oak Ave',
-                clientName: null, clientEmail: null, clientPhone: null,
                 date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 0,
                 paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             },

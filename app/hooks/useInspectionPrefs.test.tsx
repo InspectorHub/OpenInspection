@@ -38,8 +38,8 @@ vi.mock("react-router", async () => {
     useFetcher: vi.fn(() => {
       const isLoad = fetcherIndex++ % 2 === 0;
       return isLoad
-        ? { get state() { return loadState; }, get data() { return loadData; }, load: vi.fn(), submit: vi.fn(), Form: () => null }
-        : { get state() { return patchState; }, get data() { return patchData; }, load: vi.fn(), submit, Form: () => null };
+        ? { get state() { return loadState; }, get data() { return loadData; }, load: vi.fn(), submit: vi.fn(), Form: (): null => null }
+        : { get state() { return patchState; }, get data() { return patchData; }, load: vi.fn(), submit, Form: (): null => null };
     }),
   };
 });

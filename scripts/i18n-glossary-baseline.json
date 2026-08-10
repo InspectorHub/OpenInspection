@@ -1,0 +1,62 @@
+{
+  "sections": {
+    "Authentication": {
+      "rows": 7,
+      "banned": 3
+    },
+    "Commercial PCA (ASTM E2018)": {
+      "rows": 12,
+      "banned": 0
+    },
+    "Communication, billing and compliance settings": {
+      "rows": 12,
+      "banned": 1
+    },
+    "Product nouns": {
+      "rows": 33,
+      "banned": 5
+    },
+    "Ratings and severity": {
+      "rows": 12,
+      "banned": 1
+    },
+    "Recurring UI verbs and states": {
+      "rows": 30,
+      "banned": 2
+    },
+    "Register enforcement": {
+      "rows": 8,
+      "banned": 16
+    },
+    "Roles and parties": {
+      "rows": 14,
+      "banned": 0
+    },
+    "Scheduling, providers and integration panels": {
+      "rows": 12,
+      "banned": 2
+    },
+    "Settings, account and team": {
+      "rows": 27,
+      "banned": 1
+    },
+    "Status labels": {
+      "rows": 17,
+      "banned": 0
+    },
+    "The client portal, invoices and verification": {
+      "rows": 21,
+      "banned": 0
+    },
+    "The editor and field workflow": {
+      "rows": 17,
+      "banned": 0
+    },
+    "The services / event-types catalogue": {
+      "rows": 9,
+      "banned": 0
+    }
+  },
+  "literals": 35,
+  "divergences": 10
+}

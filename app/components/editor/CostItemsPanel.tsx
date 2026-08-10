@@ -168,7 +168,7 @@ export function CostItemsPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[13px] font-bold uppercase tracking-widest text-ih-fg-4">{m.editor_cost_items_title()}</h2>
+        <h2 className="text-[13px] font-bold uppercase tracking-widest text-ih-fg-3">{m.editor_cost_items_title()}</h2>
         <div className="flex items-center gap-3">
           {/* Export the current Opinion of Cost — only worth offering once at
               least one line exists (empty exports are just a header row). */}
@@ -183,15 +183,15 @@ export function CostItemsPanel({
         {rows.length > 0 && (
           <div className="grid grid-cols-3 gap-3 text-[12px] mb-2 pb-2 border-b border-ih-border">
             <div>
-              <div className="text-ih-fg-4 uppercase tracking-wide text-[10px] font-bold">{m.editor_cost_total_immediate()}</div>
+              <div className="text-ih-fg-3 uppercase tracking-wide text-[10px] font-bold">{m.editor_cost_total_immediate()}</div>
               <div className="tabular-nums text-ih-fg-1 font-bold">{formatDollars(bucketTotals.immediate)}</div>
             </div>
             <div>
-              <div className="text-ih-fg-4 uppercase tracking-wide text-[10px] font-bold">{m.editor_cost_total_short_term()}</div>
+              <div className="text-ih-fg-3 uppercase tracking-wide text-[10px] font-bold">{m.editor_cost_total_short_term()}</div>
               <div className="tabular-nums text-ih-fg-1 font-bold">{formatDollars(bucketTotals.short_term)}</div>
             </div>
             <div>
-              <div className="text-ih-fg-4 uppercase tracking-wide text-[10px] font-bold">{m.editor_cost_total_long_term()}</div>
+              <div className="text-ih-fg-3 uppercase tracking-wide text-[10px] font-bold">{m.editor_cost_total_long_term()}</div>
               <div className="tabular-nums text-ih-fg-1 font-bold">{formatDollars(bucketTotals.long_term)}</div>
             </div>
           </div>
@@ -377,7 +377,7 @@ function CostItemRow({
 
         {reserveEnabled && (
           <div className="col-span-12 rounded-md border border-ih-border bg-ih-bg-muted/40 p-2.5">
-            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-ih-fg-4">
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
               {m.editor_cost_reserve_schedule()}
             </div>
             <div className="grid grid-cols-3 gap-3">

@@ -17,6 +17,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { asD1Db } from '../helpers/test-db';
 
 const T1 = '00000000-0000-0000-0000-000000000001';
 const AGENT_USER = '00000000-0000-0000-0000-000000000a01';
@@ -39,7 +40,7 @@ async function seedCommon() {
         id: T1, name: 'Acme Inspections', slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
-    await seedRoleProfiles(db, T1, new Date(1));
+    await seedRoleProfiles(asD1Db(db), T1, new Date(1));
     await db.insert(schema.users).values([
         { id: AGENT_USER, tenantId: null, email: 'jane@realty.com', role: 'agent', name: 'Jane', createdAt: new Date(), passwordHash: 'h' },
         { id: OTHER_AGENT_USER, tenantId: null, email: 'other@realty.com', role: 'agent', name: 'Other', createdAt: new Date(), passwordHash: 'h' },
@@ -66,7 +67,7 @@ describe('accessToInspection — buyer_agent via inspection_people (Task 9c)', (
         await db.insert(schema.inspections).values({
             id: 'i-1', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '1 Main',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid',
-            price: 0, referredByAgentId: null, createdAt: new Date(),
+            price: 0, createdAt: new Date(),
         });
         const people = new PeopleService({ DB: {} as D1Database });
         await people.addPerson(T1, 'i-1', AGENT_CONTACT, roleProfileId(T1, 'buyer_agent'));
@@ -79,7 +80,7 @@ describe('accessToInspection — buyer_agent via inspection_people (Task 9c)', (
         await db.insert(schema.inspections).values({
             id: 'i-2', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '2 Oak',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid',
-            price: 0, referredByAgentId: null, createdAt: new Date(),
+            price: 0, createdAt: new Date(),
         });
         const result = await accessToInspection({} as D1Database, AGENT_USER, 'i-2');
         expect(result).toBeNull();
@@ -89,7 +90,7 @@ describe('accessToInspection — buyer_agent via inspection_people (Task 9c)', (
         await db.insert(schema.inspections).values({
             id: 'i-3', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '3 Elm',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid',
-            price: 0, referredByAgentId: null, createdAt: new Date(),
+            price: 0, createdAt: new Date(),
         });
         const people = new PeopleService({ DB: {} as D1Database });
         await people.addPerson(T1, 'i-3', OTHER_CONTACT, roleProfileId(T1, 'buyer_agent'));
@@ -120,7 +121,7 @@ describe('listRecommendationsForAgent — buyer_agent via inspection_people (Tas
         await db.insert(schema.inspections).values({
             id: 'i-1', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '1 Main',
             date: '2026-06-01', status: 'completed', reportStatus: REPORT_STATUS.PUBLISHED, paymentStatus: 'paid',
-            price: 0, referredByAgentId: null, createdAt: new Date(),
+            price: 0, createdAt: new Date(),
             templateSnapshot,
         });
         await db.insert(schema.inspectionResults).values({
@@ -138,7 +139,7 @@ describe('listRecommendationsForAgent — buyer_agent via inspection_people (Tas
         await db.insert(schema.inspections).values({
             id: 'i-2', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '2 Oak',
             date: '2026-06-01', status: 'completed', reportStatus: REPORT_STATUS.PUBLISHED, paymentStatus: 'paid',
-            price: 0, referredByAgentId: null, createdAt: new Date(),
+            price: 0, createdAt: new Date(),
             templateSnapshot,
         });
         await db.insert(schema.inspectionResults).values({
@@ -158,7 +159,7 @@ describe('referralsByDay — buyer_agent via inspection_people (Task 9c)', () =>
         await db.insert(schema.inspections).values({
             id: 'i-1', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '1 Main',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid',
-            price: 0, referredByAgentId: null, createdAt: today,
+            price: 0, createdAt: today,
         });
         const people = new PeopleService({ DB: {} as D1Database });
         await people.addPerson(T1, 'i-1', AGENT_CONTACT, roleProfileId(T1, 'buyer_agent'));
@@ -174,7 +175,7 @@ describe('referralsByDay — buyer_agent via inspection_people (Task 9c)', () =>
         await db.insert(schema.inspections).values({
             id: 'i-2', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '2 Oak',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid',
-            price: 0, referredByAgentId: null, createdAt: today,
+            price: 0, createdAt: today,
         });
         const { created } = await referralsByDay({} as D1Database, AGENT_USER, 7);
         expect(created.reduce((a, b) => a + b, 0)).toBe(0);

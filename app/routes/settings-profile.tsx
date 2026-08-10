@@ -10,7 +10,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeProfileSchema, overrideFieldFromForm } from "~/lib/forms/settings.schema";
 import { Select } from "@core/shared-ui";
-import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
+import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezone-options";
 import { LOCALE_OPTIONS } from "~/lib/locales";
 import { DateTimeFormatFields } from "~/components/settings/DateTimeFormatFields";
 import { SectionNav } from "~/components/settings/SectionNav";

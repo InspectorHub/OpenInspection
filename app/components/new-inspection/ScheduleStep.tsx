@@ -50,7 +50,7 @@ export function ScheduleStep({
       <div>
         <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_schedule_time_label()}</label>
         <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
-        <p className="mt-1.5 text-[11px] text-ih-fg-4">{m.newinsp_schedule_time_zone_hint({ zone: timeZone })}</p>
+        <p className="mt-1.5 text-[11px] text-ih-fg-3">{m.newinsp_schedule_time_zone_hint({ zone: timeZone })}</p>
       </div>
       {holidayEffect === "advisory" && holidayName && (
         <Banner tone="warn">

@@ -16,6 +16,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app } from '../../../server/index';
 import { reduceOpenApiDoc } from '../../../server/lib/mcp/snapshot-helpers';
+import { plainPaths } from '../helpers/openapi-doc';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SNAPSHOT_PATH = resolve(__dirname, '../../../server/lib/mcp/openapi-snapshot.json');
@@ -29,9 +30,7 @@ describe.runIf(process.env['GENERATE_SNAPSHOT'] === 'true')(
                 openapi: '3.0.0',
                 info: { version: 'snapshot', title: 'OpenInspection Core API' },
             });
-            const entries = reduceOpenApiDoc(
-                doc as { paths?: Record<string, Record<string, unknown>> },
-            );
+            const entries = reduceOpenApiDoc({ paths: plainPaths(doc) });
             expect(entries.length, 'snapshot must be non-empty').toBeGreaterThan(0);
             expect(entries.every((e) => e.operationId !== ''), 'every entry must have operationId').toBe(
                 true,

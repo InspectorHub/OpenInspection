@@ -292,7 +292,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
               onClick={() => setCarrier("twilio")}
               className={`flex-1 h-9 rounded-md border text-[13px] font-bold transition-colors ${
                 carrier === "twilio"
-                  ? "border-ih-primary bg-ih-primary/5 text-ih-primary"
+                  ? "border-ih-primary bg-ih-primary/5 text-ih-primary-text"
                   : "border-ih-border bg-ih-bg-card text-ih-fg-2 hover:border-ih-primary/40"
               }`}
             >
@@ -304,14 +304,14 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
               onClick={() => setCarrier("telnyx")}
               className={`flex-1 h-9 rounded-md border text-[13px] font-bold transition-colors ${
                 carrier === "telnyx"
-                  ? "border-ih-primary bg-ih-primary/5 text-ih-primary"
+                  ? "border-ih-primary bg-ih-primary/5 text-ih-primary-text"
                   : "border-ih-border bg-ih-bg-card text-ih-fg-2 hover:border-ih-primary/40"
               }`}
             >
               {m.settings_sms_provider_telnyx()}
             </button>
           </div>
-          <p className="text-[11px] text-ih-fg-4">
+          <p className="text-[11px] text-ih-fg-3">
             {m.settings_mcw_carrier_note()}
           </p>
         </div>
@@ -484,7 +484,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
                 placeholder="415"
                 className={inputCls}
               />
-              <p className="text-[11px] text-ih-fg-4 mt-1">
+              <p className="text-[11px] text-ih-fg-3 mt-1">
                 {m.settings_mcw_areacode_hint()}
               </p>
             </div>

@@ -10,7 +10,7 @@ const toneClasses: Record<PillTone, string> = {
   np: "bg-ih-bg-muted text-ih-fg-4",
   info: "bg-ih-info-bg text-ih-info-fg",
   gen: "bg-ih-bg-muted text-ih-fg-3",
-  primary: "bg-ih-primary-tint text-ih-primary",
+  primary: "bg-ih-primary-tint text-ih-primary-text",
   neutral: "bg-ih-bg-muted text-ih-fg-3",
   warning: "bg-ih-watch-bg text-ih-watch-fg",
 };

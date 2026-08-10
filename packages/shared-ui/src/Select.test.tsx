@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup, fireEvent, screen } from "@testing-library/react";
 import { Select } from "@core/shared-ui";
+import { asSelect } from "../../../tests/helpers/dom";
 
 afterEach(cleanup);
 
@@ -42,13 +43,13 @@ describe("Select", () => {
 
   it("reflects the value prop", () => {
     render(<Select label="Fruit" options={OPTS} value="a" onChange={() => {}} />);
-    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("a");
+    expect(asSelect(screen.getByRole("combobox")).value).toBe("a");
   });
 
   it("fires onChange with the selected value", () => {
     const onChange = vi.fn();
     render(<Select label="Fruit" options={OPTS} defaultValue="a" onChange={onChange} />);
-    const select = screen.getByRole("combobox") as HTMLSelectElement;
+    const select = asSelect(screen.getByRole("combobox"));
     fireEvent.change(select, { target: { value: "b" } });
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange.mock.calls[0][0].target.value).toBe("b");
@@ -56,7 +57,7 @@ describe("Select", () => {
 
   it("supports multiple selection", () => {
     render(<Select label="Fruit" options={OPTS} multiple />);
-    const select = screen.getByRole("listbox") as HTMLSelectElement;
+    const select = asSelect(screen.getByRole("listbox"));
     expect(select.multiple).toBe(true);
   });
 

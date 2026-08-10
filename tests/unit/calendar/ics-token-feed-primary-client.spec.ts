@@ -24,6 +24,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 // eslint-disable-next-line import/order
 import icsRoutes from '../../../server/api/ics';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT = '00000000-0000-0000-0000-000000000d1';
 const CLIENT = 'contact-client-ics';
@@ -58,7 +59,7 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
         await db.insert(schema.tenantConfigs).values({
             tenantId: TENANT, icsToken: TOKEN, updatedAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values({
             id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane Client',
             email: 'jane@example.com', createdAt: new Date(),
@@ -66,8 +67,7 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
         // Legacy clientName column intentionally NULL — only inspection_people
         // carries the primary client for this inspection.
         await db.insert(schema.inspections).values({
-            id: INSP, tenantId: TENANT, propertyAddress: '1 Main St',
-            clientName: null, clientEmail: null, price: 25000,
+            id: INSP, tenantId: TENANT, propertyAddress: '1 Main St', price: 25000,
             date: tomorrowStr(), status: 'confirmed', paymentStatus: 'unpaid',
             paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         });

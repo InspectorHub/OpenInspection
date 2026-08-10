@@ -85,7 +85,7 @@ describe('voidInvoice — mapped invoice', () => {
         await seedMapping();
 
         // Spy on apiCall BEFORE calling voidInvoice.
-        const apiCallSpy = vi.spyOn(svc as never, 'apiCall').mockResolvedValue({
+        const apiCallSpy = vi.spyOn(svc, 'apiCall').mockResolvedValue({
             Invoice: { Id: QBO_ID, SyncToken: '4' },
         });
 
@@ -104,7 +104,7 @@ describe('voidInvoice — mapped invoice', () => {
     it('updates qboSyncToken in qboEntityMap after a successful void', async () => {
         await seedMapping();
 
-        vi.spyOn(svc as never, 'apiCall').mockResolvedValue({
+        vi.spyOn(svc, 'apiCall').mockResolvedValue({
             Invoice: { Id: QBO_ID, SyncToken: '99' },
         });
 
@@ -119,7 +119,7 @@ describe('voidInvoice — mapped invoice', () => {
 describe('voidInvoice — unmapped invoice', () => {
     it('returns without calling apiCall when no qboEntityMap row exists', async () => {
         // No seedMapping() call — no row in DB.
-        const apiCallSpy = vi.spyOn(svc as never, 'apiCall');
+        const apiCallSpy = vi.spyOn(svc, 'apiCall');
 
         await expect(svc.voidInvoice(TENANT, INV_ID)).resolves.toBeUndefined();
         expect(apiCallSpy).not.toHaveBeenCalled();
@@ -130,7 +130,7 @@ describe('voidInvoice — QBO API error swallowed', () => {
     it('resolves (does not throw) when apiCall rejects, preserving OI consistency', async () => {
         await seedMapping();
 
-        vi.spyOn(svc as never, 'apiCall').mockRejectedValue(
+        vi.spyOn(svc, 'apiCall').mockRejectedValue(
             Object.assign(new Error('QBO 500'), { status: 500 }),
         );
 
@@ -141,7 +141,7 @@ describe('voidInvoice — QBO API error swallowed', () => {
     it('writes a qboSyncErrors row when apiCall rejects', async () => {
         await seedMapping();
 
-        vi.spyOn(svc as never, 'apiCall').mockRejectedValue(new Error('QBO 503'));
+        vi.spyOn(svc, 'apiCall').mockRejectedValue(new Error('QBO 503'));
 
         await svc.voidInvoice(TENANT, INV_ID);
 

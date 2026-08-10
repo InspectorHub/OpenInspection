@@ -15,7 +15,7 @@ export function TurnstilePanel({ value, fieldError, saving }: TurnstilePanelProp
       <p className="text-[13px] text-ih-fg-3">
         {m.settings_turnstile_desc()}{" "}
         <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener noreferrer"
-          className="text-ih-primary hover:underline">
+          className="text-ih-primary-text hover:underline">
           {m.settings_turnstile_dashboard_link()}
         </a>.
       </p>

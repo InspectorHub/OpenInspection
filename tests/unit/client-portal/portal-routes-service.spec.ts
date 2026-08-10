@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PortalService } from '../../../server/services/portal.service';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -30,7 +31,7 @@ describe('PortalService', () => {
         // listRecipientInspections now derives its role filter from each active
         // role profile's selfRetrieveReport capability (client/co_client by
         // default) instead of a hard-coded literal list — seed the defaults.
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
         svc = new PortalService({} as D1Database, inspStub);
     });
 

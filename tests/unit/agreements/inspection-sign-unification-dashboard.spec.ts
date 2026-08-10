@@ -33,10 +33,10 @@ describe('signedByClient + dashboard truth read from the envelope (Track I-a Tas
             deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
         } as any);
         await db.insert(schema.inspections).values({
-            id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', clientName: 'Jane',
-            clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+            id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St',
+            date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
             price: 50000, agreementRequired: true, paymentRequired: false, createdAt: new Date(),
-        } as any);
+        });
         await db.insert(schema.agreements).values({
             id: AGR_ID, tenantId: TENANT_ID, name: 'Standard Agreement',
             content: 'ORIGINAL agreement text', version: 1, createdAt: new Date(),

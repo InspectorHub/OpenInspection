@@ -116,7 +116,7 @@ export function IcsSubscribePanel({ links }: { links: IcsLinks }) {
           href="https://support.google.com/calendar/answer/37100"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-ih-primary font-semibold hover:underline"
+          className="text-ih-primary-text font-semibold hover:underline"
         >
           {m.settings_schedlinks_ics_learn()}
         </a>

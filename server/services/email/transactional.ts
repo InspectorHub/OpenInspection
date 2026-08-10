@@ -171,7 +171,17 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             recipient: 'client' | 'inspector',
             inspectionId: string,
             message: { body: string; fromName?: string | null },
-            deps: { db: D1Database; kv?: KVNamespace; baseUrl: string; clientViewUrl?: string; contactEmail?: string },
+            // `clientViewUrl` / `contactEmail` are `?: T | undefined`, not `?: T`.
+            // Both callers compute them from something nullable (`thread.email ??
+            // undefined`, a deep-link that may have failed to mint), so they pass the
+            // key with an undefined value rather than omitting it. That is not a
+            // second meaning: below, `contactEmail` is read as
+            // `deps.contactEmail ?? client?.email ?? null` and `clientViewUrl` as
+            // `deps.clientViewUrl || ${baseUrl}/portal`, so an absent key and an
+            // undefined one take the same fallback. Widening here is the honest
+            // description; forcing the callers to strip the keys would only hide
+            // that they never knew the value.
+            deps: { db: D1Database; kv?: KVNamespace; baseUrl: string; clientViewUrl?: string | undefined; contactEmail?: string | undefined },
         ): Promise<void> {
             if (!this.apiKey) return;
             const throttleKey = `msg_notify:${inspectionId}:${recipient}`;

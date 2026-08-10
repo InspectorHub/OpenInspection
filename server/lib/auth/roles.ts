@@ -43,6 +43,13 @@ export function isRole(value: unknown): value is Role {
  * comment described itself as "mirroring" this module. A mirror is a copy, and
  * copies drift.
  *
+ * An EIGHTH copy surfaced later, in `api/availability.ts`, written as
+ * `![ROLE.MANAGER, ROLE.OWNER].includes(userRole)` — four times. It survived the
+ * consolidation above for a reason worth knowing: `c.get('userRole')` was `any`
+ * at the time (a route middleware annotated with hono's bare `Context` collapsed
+ * every handler's Env), so `Array<'owner'|'manager'>.includes(any)` type-checked
+ * happily. The copy was invisible to a compiler that had stopped asking.
+ *
  * Note this is DIFFERENT from `getCapabilities(...).manageContacts` and friends:
  * this is the coarse role tier, capabilities are the per-user overrides layered
  * on top. Gating something on "is an admin" when you mean "may manage contacts"

@@ -10,7 +10,12 @@ describe('singleKeyShortcutsAllowed', () => {
         expect(singleKeyShortcutsAllowed(document.body, true)).toBe(false);
     });
     it('blocks inside inputs/textareas/selects/contentEditable', () => {
-        for (const tag of ['input', 'textarea', 'select'] as const) {
+        // Deliberately NOT `as const`: the literal-tag overload of
+        // `createElement` returns `HTMLSelectElement` for 'select', and in this
+        // program that type is not assignable to `Element` (see
+        // tests/helpers/dom.ts for why). The generic overload returns
+        // `HTMLElement`, which is all this loop needs.
+        for (const tag of ['input', 'textarea', 'select']) {
             const el = document.createElement(tag);
             document.body.appendChild(el);
             expect(singleKeyShortcutsAllowed(el, false)).toBe(false);

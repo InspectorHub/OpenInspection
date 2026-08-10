@@ -79,7 +79,7 @@ export function FindATimeModal({
             type="date"
             value={date}
             onChange={(event) => setDate(event.target.value)}
-            className="h-9 rounded-lg border border-ih-border bg-ih-bg-input px-2 text-[13px] font-normal text-ih-fg-1"
+            className="h-9 rounded-lg border border-ih-border bg-ih-bg-card px-2 text-[13px] font-normal text-ih-fg-1"
           />
         </label>
 

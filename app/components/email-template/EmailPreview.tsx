@@ -55,7 +55,7 @@ export function EmailPreview({ subject, blocks }: { trigger: string; subject: st
           <span className="h-2.5 w-2.5 rounded-full bg-ih-border" />
         </div>
         <div className="px-4 py-2.5 border-b border-ih-border bg-white">
-          <p className="text-[11px] text-ih-fg-4">{m.email_preview_to()}</p>
+          <p className="text-[11px] text-ih-fg-3">{m.email_preview_to()}</p>
           <p className="text-[13px] font-semibold text-ih-fg-1 truncate">{renderedSubject || "—"}</p>
         </div>
         <iframe title={m.email_preview_iframe_title()} srcDoc={html} sandbox="" className="w-full h-[520px] bg-white" />

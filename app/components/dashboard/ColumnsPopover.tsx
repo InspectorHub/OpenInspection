@@ -49,7 +49,7 @@ export function ColumnsPopover({
               />
               <span className="text-[13px] text-ih-fg-2">
                 {col.label}
-                {ALWAYS_ON.has(col.id) && <span className="ml-1 text-[10px] text-ih-fg-4">{m.dashboard_columns_required()}</span>}
+                {ALWAYS_ON.has(col.id) && <span className="ml-1 text-[10px] text-ih-fg-3">{m.dashboard_columns_required()}</span>}
               </span>
             </label>
           ))}

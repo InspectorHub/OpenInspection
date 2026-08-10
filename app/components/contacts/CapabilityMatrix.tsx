@@ -49,10 +49,10 @@ export function CapabilityMatrix({ roles }: { roles: RoleProfile[] }) {
         <table className="text-xs w-full">
           <thead>
             <tr>
-              <th className="text-left font-semibold text-ih-fg-muted pr-2 pb-1" />
+              <th className="text-left font-semibold text-ih-fg-3 pr-2 pb-1" />
               {capKeys.map((key) => (
                 <th key={key} data-capability={key} scope="col"
-                    className="text-left font-semibold text-ih-fg-muted px-2 pb-1 align-bottom">
+                    className="text-left font-semibold text-ih-fg-3 px-2 pb-1 align-bottom">
                   {CAP_LABEL[key]?.() ?? key}
                 </th>
               ))}
@@ -73,7 +73,7 @@ export function CapabilityMatrix({ roles }: { roles: RoleProfile[] }) {
           </tbody>
         </table>
       </div>
-      <ul className="space-y-1 text-xs text-ih-fg-muted">
+      <ul className="space-y-1 text-xs text-ih-fg-3">
         {capKeys.map((key) => (
           <li key={key}>
             <span className="font-medium text-ih-fg-2">{CAP_LABEL[key]?.() ?? key}</span>

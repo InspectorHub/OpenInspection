@@ -60,7 +60,7 @@ describe('TenantPurgeService.purge', () => {
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.users).values({
-            id: 'u-1', tenantId: TENANT, email: 'a@x.com', passwordHash: 'x', role: 'admin', createdAt: new Date(),
+            id: 'u-1', tenantId: TENANT, email: 'a@x.com', passwordHash: 'x', role: 'owner', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
             id: 'i-1', tenantId: TENANT, propertyAddress: '1 St', date: '2026-06-01',

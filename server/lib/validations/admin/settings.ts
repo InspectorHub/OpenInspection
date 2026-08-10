@@ -210,6 +210,34 @@ export const StripeConnectAccountSchema = z.object({
     accountId: z.string().regex(/^acct_[a-zA-Z0-9]{10,}$/, 'Invalid Stripe account ID — must look like acct_xxxxx').openapi({ example: 'acct_1AbCdEfGhIjKlMnO' }).describe('TODO describe accountId field for the OpenInspection MCP integration'),
 }).openapi('StripeConnectAccount');
 
+/**
+ * What the settings panel needs to know about the cancellation attestation.
+ *
+ * `current` is NOT a stored column. It is
+ * `BrandingService.getCancellationAttestation() !== null`, which re-checks the
+ * attested version against the agreement's version at the moment it is asked —
+ * so an agreement edited after the attestation reads as no longer attested.
+ *
+ * ⚠️ It is computed on the SERVER and shipped, rather than left for the panel to
+ * derive from the raw columns plus the agreement list. Deriving it client-side
+ * would put a second copy of the invalidation rule somewhere that has to
+ * remember to run it, which is exactly what the service comment says this design
+ * avoids: the check cannot be forgotten because it is evaluated where the answer
+ * is used. Two copies of it would eventually disagree, and the one the fee gate
+ * reads is not the one the panel shows.
+ *
+ * `everAttested` is the raw timestamp being present, and it is a separate fact:
+ * together the two distinguish "never confirmed" from "confirmed, then the
+ * agreement changed" — which need different words in front of a person.
+ */
+/* Not exported: only `BrandingResponseSchema` below composes it, and an exported
+   symbol nothing imports is what `lint:deadcode` counts. */
+const CancellationClauseStateSchema = z.object({
+    current: z.boolean().describe('The attestation exists AND still matches the agreement version.'),
+    everAttested: z.boolean().describe('An attestation was recorded at some point, valid or not.'),
+    agreementId: z.string().nullable().describe('Agreement template the attestation names, if any.'),
+}).openapi('CancellationClauseState');
+
 export const BrandingResponseSchema = createApiResponseSchema(z.object({
     branding: z.object({
         companyName: z.string().describe('TODO describe companyName field for the OpenInspection MCP integration'),
@@ -224,6 +252,10 @@ export const BrandingResponseSchema = createApiResponseSchema(z.object({
         timeFormat: z.string().describe('Tenant default clock (12h|24h); 12h when unset.'),
         archiveRevokesAccess: z.boolean().optional()
             .describe('Whether archiving a contact also revokes the report links they still hold. False by default: archiving is list hygiene, not offboarding.'),
+        cancellationPolicy: CancellationPolicySchema.nullable().optional()
+            .describe('The tenant cancellation ladder, or null when none is configured.'),
+        cancellationClause: CancellationClauseStateSchema.optional()
+            .describe('Whether the agreement-clause attestation the fee gate reads is currently valid.'),
     }).describe('TODO describe branding field for the OpenInspection MCP integration'),
 })).openapi('BrandingResponse');
 

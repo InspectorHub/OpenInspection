@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { SendgridProvider } from '../../../server/lib/email/providers/sendgrid';
 import { PostmarkProvider } from '../../../server/lib/email/providers/postmark';
 import { MailgunProvider } from '../../../server/lib/email/providers/mailgun';
+import { recordingFetch } from '../helpers/fetch-mock';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -10,7 +11,7 @@ afterEach(() => vi.restoreAllMocks());
 // ---------------------------------------------------------------------------
 describe('SendgridProvider', () => {
   it('POSTs v3/mail/send with bearer + personalizations (single to)', async () => {
-    const fetchMock = vi.fn(async () => new Response('', { status: 202 }));
+    const fetchMock = recordingFetch(async () => new Response('', { status: 202 }));
     vi.stubGlobal('fetch', fetchMock);
     const res = await new SendgridProvider({ apiKey: 'SG.x' }).sendEmail({
       from: 'a@x.com',
@@ -19,7 +20,7 @@ describe('SendgridProvider', () => {
       html: '<p>h</p>',
     });
     expect(res).toEqual({ ok: true });
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://api.sendgrid.com/v3/mail/send');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer SG.x');
     const body = JSON.parse(init.body as string);
@@ -30,7 +31,7 @@ describe('SendgridProvider', () => {
   });
 
   it('normalizes array to recipients in personalizations', async () => {
-    const fetchMock = vi.fn(async () => new Response('', { status: 202 }));
+    const fetchMock = recordingFetch(async () => new Response('', { status: 202 }));
     vi.stubGlobal('fetch', fetchMock);
     await new SendgridProvider({ apiKey: 'SG.x' }).sendEmail({
       from: 'a@x.com',
@@ -38,13 +39,13 @@ describe('SendgridProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0];
     const body = JSON.parse(init.body as string);
     expect(body.personalizations[0].to).toEqual([{ email: 'b@y.com' }, { email: 'c@z.com' }]);
   });
 
   it('includes reply_to only when replyTo is set', async () => {
-    const fetchMock = vi.fn(async () => new Response('', { status: 202 }));
+    const fetchMock = recordingFetch(async () => new Response('', { status: 202 }));
     vi.stubGlobal('fetch', fetchMock);
     await new SendgridProvider({ apiKey: 'SG.x' }).sendEmail({
       from: 'a@x.com',
@@ -53,13 +54,13 @@ describe('SendgridProvider', () => {
       html: '<p>h</p>',
       replyTo: 'reply@x.com',
     });
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0];
     const body = JSON.parse(init.body as string);
     expect(body.reply_to).toEqual({ email: 'reply@x.com' });
   });
 
   it('omits reply_to when replyTo is absent', async () => {
-    const fetchMock = vi.fn(async () => new Response('', { status: 202 }));
+    const fetchMock = recordingFetch(async () => new Response('', { status: 202 }));
     vi.stubGlobal('fetch', fetchMock);
     await new SendgridProvider({ apiKey: 'SG.x' }).sendEmail({
       from: 'a@x.com',
@@ -67,13 +68,13 @@ describe('SendgridProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0];
     const body = JSON.parse(init.body as string);
     expect('reply_to' in body).toBe(false);
   });
 
   it('returns ok:false with error message on non-2xx', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = recordingFetch(async () =>
       new Response(JSON.stringify({ errors: [{ message: 'Invalid API key' }] }), { status: 401 }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -87,7 +88,7 @@ describe('SendgridProvider', () => {
   });
 
   it('falls back to SendGrid <status> when error body is unparseable', async () => {
-    const fetchMock = vi.fn(async () => new Response('not json', { status: 500 }));
+    const fetchMock = recordingFetch(async () => new Response('not json', { status: 500 }));
     vi.stubGlobal('fetch', fetchMock);
     const res = await new SendgridProvider({ apiKey: 'SG.x' }).sendEmail({
       from: 'a@x.com',
@@ -99,7 +100,7 @@ describe('SendgridProvider', () => {
   });
 
   it('returns ok:false on network error', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network failure'); }));
+    vi.stubGlobal('fetch', recordingFetch(async () => { throw new Error('network failure'); }));
     const res = await new SendgridProvider({ apiKey: 'SG.x' }).sendEmail({
       from: 'a@x.com',
       to: 'b@y.com',
@@ -110,23 +111,23 @@ describe('SendgridProvider', () => {
   });
 
   it('validateCredentials GETs /v3/scopes and returns ok:true on 200', async () => {
-    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    const fetchMock = recordingFetch(async () => new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const res = await new SendgridProvider({ apiKey: 'SG.x' }).validateCredentials!();
     expect(res).toEqual({ ok: true });
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://api.sendgrid.com/v3/scopes');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer SG.x');
   });
 
   it('validateCredentials returns ok:false on non-2xx', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 403 })));
+    vi.stubGlobal('fetch', recordingFetch(async () => new Response('', { status: 403 })));
     const res = await new SendgridProvider({ apiKey: 'SG.x' }).validateCredentials!();
     expect(res).toEqual({ ok: false, error: 'SendGrid 403' });
   });
 
   it('forwards attachments as SendGrid attachment objects', async () => {
-    const fetchMock = vi.fn(async () => new Response(null, { status: 202 }));
+    const fetchMock = recordingFetch(async () => new Response(null, { status: 202 }));
     vi.stubGlobal('fetch', fetchMock);
     const provider = new SendgridProvider({ apiKey: 'SG.test' });
     const res = await provider.sendEmail({
@@ -134,19 +135,19 @@ describe('SendgridProvider', () => {
       attachments: [{ filename: 'report.pdf', content: 'YmFzZTY0', content_type: 'application/pdf' }],
     });
     expect(res).toEqual({ ok: true });
-    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(body.attachments).toEqual([
       { content: 'YmFzZTY0', filename: 'report.pdf', type: 'application/pdf', disposition: 'attachment' },
     ]);
   });
 
   it('omits attachments field when none are present', async () => {
-    const fetchMock = vi.fn(async () => new Response(null, { status: 202 }));
+    const fetchMock = recordingFetch(async () => new Response(null, { status: 202 }));
     vi.stubGlobal('fetch', fetchMock);
     await new SendgridProvider({ apiKey: 'SG.test' }).sendEmail({
       from: 'a@x.com', to: 'b@y.com', subject: 'S', html: '<p>h</p>',
     });
-    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect('attachments' in body).toBe(false);
   });
 });
@@ -156,7 +157,7 @@ describe('SendgridProvider', () => {
 // ---------------------------------------------------------------------------
 describe('PostmarkProvider', () => {
   it('POSTs to /email with server-token header (single to)', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = recordingFetch(async () =>
       new Response(JSON.stringify({ MessageID: 'msg-123' }), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -167,7 +168,7 @@ describe('PostmarkProvider', () => {
       html: '<p>h</p>',
     });
     expect(res).toEqual({ ok: true, id: 'msg-123' });
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://api.postmarkapp.com/email');
     expect((init.headers as Record<string, string>)['X-Postmark-Server-Token']).toBe('pm-token');
     expect((init.headers as Record<string, string>).Accept).toBe('application/json');
@@ -179,7 +180,7 @@ describe('PostmarkProvider', () => {
   });
 
   it('normalizes array to comma-separated To', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = recordingFetch(async () =>
       new Response(JSON.stringify({ MessageID: 'msg-456' }), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -189,13 +190,13 @@ describe('PostmarkProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0];
     const body = JSON.parse(init.body as string);
     expect(body.To).toBe('b@y.com,c@z.com');
   });
 
   it('includes ReplyTo only when replyTo is set', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = recordingFetch(async () =>
       new Response(JSON.stringify({ MessageID: 'msg-789' }), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -206,13 +207,13 @@ describe('PostmarkProvider', () => {
       html: '<p>h</p>',
       replyTo: 'reply@x.com',
     });
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0];
     const body = JSON.parse(init.body as string);
     expect(body.ReplyTo).toBe('reply@x.com');
   });
 
   it('omits ReplyTo when replyTo is absent', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = recordingFetch(async () =>
       new Response(JSON.stringify({ MessageID: 'msg-abc' }), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -222,13 +223,13 @@ describe('PostmarkProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0];
     const body = JSON.parse(init.body as string);
     expect('ReplyTo' in body).toBe(false);
   });
 
   it('returns ok:false with Message field on non-2xx', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = recordingFetch(async () =>
       new Response(JSON.stringify({ Message: 'Bad token', ErrorCode: 10 }), { status: 422 }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -242,7 +243,7 @@ describe('PostmarkProvider', () => {
   });
 
   it('falls back to Postmark <status> when error body is unparseable', async () => {
-    const fetchMock = vi.fn(async () => new Response('not json', { status: 500 }));
+    const fetchMock = recordingFetch(async () => new Response('not json', { status: 500 }));
     vi.stubGlobal('fetch', fetchMock);
     const res = await new PostmarkProvider({ apiKey: 'pm-x' }).sendEmail({
       from: 'a@x.com',
@@ -254,7 +255,7 @@ describe('PostmarkProvider', () => {
   });
 
   it('returns ok:false on network error', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('connection refused'); }));
+    vi.stubGlobal('fetch', recordingFetch(async () => { throw new Error('connection refused'); }));
     const res = await new PostmarkProvider({ apiKey: 'pm-x' }).sendEmail({
       from: 'a@x.com',
       to: 'b@y.com',
@@ -265,43 +266,43 @@ describe('PostmarkProvider', () => {
   });
 
   it('validateCredentials GETs /server and returns ok:true on 200', async () => {
-    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    const fetchMock = recordingFetch(async () => new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const res = await new PostmarkProvider({ apiKey: 'pm-token' }).validateCredentials!();
     expect(res).toEqual({ ok: true });
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://api.postmarkapp.com/server');
     expect((init.headers as Record<string, string>)['X-Postmark-Server-Token']).toBe('pm-token');
   });
 
   it('validateCredentials returns ok:false on non-2xx', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 401 })));
+    vi.stubGlobal('fetch', recordingFetch(async () => new Response('', { status: 401 })));
     const res = await new PostmarkProvider({ apiKey: 'pm-x' }).validateCredentials!();
     expect(res).toEqual({ ok: false, error: 'Postmark 401' });
   });
 
   it('forwards attachments as Postmark Attachment objects (PascalCase)', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ MessageID: 'm1' }), { status: 200 }));
+    const fetchMock = recordingFetch(async () => new Response(JSON.stringify({ MessageID: 'm1' }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const provider = new PostmarkProvider({ apiKey: 'pm-test' });
     await provider.sendEmail({
       from: 'a@x.com', to: 'b@y.com', subject: 'S', html: '<p>h</p>',
       attachments: [{ filename: 'invite.ics', content: 'aWNz', content_type: 'text/calendar' }],
     });
-    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(body.Attachments).toEqual([
       { Name: 'invite.ics', Content: 'aWNz', ContentType: 'text/calendar' },
     ]);
   });
 
   it('defaults Postmark ContentType to application/octet-stream when content_type absent', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ MessageID: 'm2' }), { status: 200 }));
+    const fetchMock = recordingFetch(async () => new Response(JSON.stringify({ MessageID: 'm2' }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     await new PostmarkProvider({ apiKey: 'pm-test' }).sendEmail({
       from: 'a@x.com', to: 'b@y.com', subject: 'S', html: '<p>h</p>',
       attachments: [{ filename: 'blob.bin', content: 'YmluYXJ5' }],
     });
-    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(body.Attachments).toEqual([
       { Name: 'blob.bin', Content: 'YmluYXJ5', ContentType: 'application/octet-stream' },
     ]);
@@ -313,7 +314,7 @@ describe('PostmarkProvider', () => {
 // ---------------------------------------------------------------------------
 describe('MailgunProvider', () => {
   it('POSTs form-encoded to v3/<domain>/messages with Basic auth (single to)', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = recordingFetch(async () =>
       new Response(JSON.stringify({ id: '<mg-abc@domain>', message: 'Queued. Thank you.' }), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -324,7 +325,7 @@ describe('MailgunProvider', () => {
       html: '<p>h</p>',
     });
     expect(res).toEqual({ ok: true, id: '<mg-abc@domain>' });
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://api.mailgun.net/v3/mg.example.com/messages');
     const expectedAuth = `Basic ${btoa('api:key-mg')}`;
     expect((init.headers as Record<string, string>).Authorization).toBe(expectedAuth);
@@ -337,7 +338,7 @@ describe('MailgunProvider', () => {
   });
 
   it('appends one to entry per address in array', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = recordingFetch(async () =>
       new Response(JSON.stringify({ id: '<mg-def@domain>' }), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -347,13 +348,13 @@ describe('MailgunProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0];
     const params = new URLSearchParams(init.body as string);
     expect(params.getAll('to')).toEqual(['b@y.com', 'c@z.com']);
   });
 
   it('includes h:Reply-To only when replyTo is set', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = recordingFetch(async () =>
       new Response(JSON.stringify({ id: '<mg-ghi@domain>' }), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -364,13 +365,13 @@ describe('MailgunProvider', () => {
       html: '<p>h</p>',
       replyTo: 'reply@x.com',
     });
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0];
     const params = new URLSearchParams(init.body as string);
     expect(params.get('h:Reply-To')).toBe('reply@x.com');
   });
 
   it('omits h:Reply-To when replyTo is absent', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = recordingFetch(async () =>
       new Response(JSON.stringify({ id: '<mg-jkl@domain>' }), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -380,13 +381,13 @@ describe('MailgunProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0];
     const params = new URLSearchParams(init.body as string);
     expect(params.has('h:Reply-To')).toBe(false);
   });
 
   it('returns ok:false with message field on non-2xx', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = recordingFetch(async () =>
       new Response(JSON.stringify({ message: 'Forbidden. Provide valid API credentials.' }), { status: 401 }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -400,7 +401,7 @@ describe('MailgunProvider', () => {
   });
 
   it('falls back to Mailgun <status> when error body is unparseable', async () => {
-    const fetchMock = vi.fn(async () => new Response('not json', { status: 500 }));
+    const fetchMock = recordingFetch(async () => new Response('not json', { status: 500 }));
     vi.stubGlobal('fetch', fetchMock);
     const res = await new MailgunProvider({ apiKey: 'key-mg', domain: 'mg.example.com' }).sendEmail({
       from: 'a@x.com',
@@ -412,7 +413,7 @@ describe('MailgunProvider', () => {
   });
 
   it('returns ok:false on network error', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('timeout'); }));
+    vi.stubGlobal('fetch', recordingFetch(async () => { throw new Error('timeout'); }));
     const res = await new MailgunProvider({ apiKey: 'key-mg', domain: 'mg.example.com' }).sendEmail({
       from: 'a@x.com',
       to: 'b@y.com',
@@ -423,30 +424,30 @@ describe('MailgunProvider', () => {
   });
 
   it('validateCredentials GETs /v3/<domain> with Basic auth and returns ok:true', async () => {
-    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    const fetchMock = recordingFetch(async () => new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const res = await new MailgunProvider({ apiKey: 'key-mg', domain: 'mg.example.com' }).validateCredentials!();
     expect(res).toEqual({ ok: true });
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://api.mailgun.net/v3/mg.example.com');
     expect((init.headers as Record<string, string>).Authorization).toBe(`Basic ${btoa('api:key-mg')}`);
   });
 
   it('validateCredentials returns ok:false on non-2xx', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 401 })));
+    vi.stubGlobal('fetch', recordingFetch(async () => new Response('', { status: 401 })));
     const res = await new MailgunProvider({ apiKey: 'key-mg', domain: 'mg.example.com' }).validateCredentials!();
     expect(res).toEqual({ ok: false, error: 'Mailgun 401' });
   });
 
   it('sends attachments via multipart FormData (not urlencoded)', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: 'mg1' }), { status: 200 }));
+    const fetchMock = recordingFetch(async () => new Response(JSON.stringify({ id: 'mg1' }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const provider = new MailgunProvider({ apiKey: 'k', domain: 'mg.example.com' });
     await provider.sendEmail({
       from: 'a@x.com', to: 'b@y.com', subject: 'S', html: '<p>h</p>',
       attachments: [{ filename: 'report.pdf', content: 'YmFzZTY0', content_type: 'application/pdf' }],
     });
-    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const init = fetchMock.mock.calls[0][1];
     expect(init.body).toBeInstanceOf(FormData);
     const form = init.body as FormData;
     expect(form.get('subject')).toBe('S');
@@ -458,11 +459,11 @@ describe('MailgunProvider', () => {
   });
 
   it('keeps urlencoded body when there are no attachments', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: 'mg2' }), { status: 200 }));
+    const fetchMock = recordingFetch(async () => new Response(JSON.stringify({ id: 'mg2' }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const provider = new MailgunProvider({ apiKey: 'k', domain: 'mg.example.com' });
     await provider.sendEmail({ from: 'a@x.com', to: 'b@y.com', subject: 'S', html: '<p>h</p>' });
-    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const init = fetchMock.mock.calls[0][1];
     expect(typeof init.body).toBe('string'); // URLSearchParams string
   });
 });

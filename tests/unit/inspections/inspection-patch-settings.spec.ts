@@ -82,7 +82,7 @@ describe('PATCH /api/inspections/:id — settings save (B-22 follow-up)', () => 
         } as never);
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT,
-            propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@x',
+            propertyAddress: '1 Main St',
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });

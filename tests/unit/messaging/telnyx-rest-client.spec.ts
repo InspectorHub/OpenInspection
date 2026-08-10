@@ -13,15 +13,10 @@
 // numberOrders.create stay WRAPPED (the client returns the envelope as-is).
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createTelnyxRestClient } from '../../../server/lib/messaging/telnyx-rest-client';
+import { recordingFetch, stubFetchJson as mockFetchOnce } from '../helpers/fetch-mock';
 
 const API_KEY = 'KEY0123456789';
 const BEARER = `Bearer ${API_KEY}`;
-
-function mockFetchOnce(status: number, body: unknown) {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify(body), { status }));
-    vi.stubGlobal('fetch', fetchMock);
-    return fetchMock;
-}
 
 describe('createTelnyxRestClient — messaging10dlc.brand', () => {
     afterEach(() => vi.restoreAllMocks());
@@ -223,7 +218,7 @@ describe('createTelnyxRestClient — error path without a JSON error body', () =
     afterEach(() => vi.restoreAllMocks());
 
     it('falls back to a generic "Telnyx {status}" message when the error body has no detail', async () => {
-        vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 500 })));
+        vi.stubGlobal('fetch', recordingFetch(async () => new Response('', { status: 500 })));
         const client = createTelnyxRestClient(API_KEY);
         await expect(client.messaging10dlc.brand.create({ country: 'US' })).rejects.toThrow('Telnyx 500');
     });

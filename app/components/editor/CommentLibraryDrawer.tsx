@@ -45,7 +45,7 @@ export function CommentLibraryDrawer({ open, comments, state, serverComments, on
  {/* Sort + Filter mode header */}
  <div className="flex items-center gap-3 px-3 py-2 border-b border-ih-border">
  <div className="flex items-center gap-1.5">
- <span className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-4">{m.editor_comment_library_filter_label()}</span>
+ <span className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-3">{m.editor_comment_library_filter_label()}</span>
  <select
  value={comments.filterMode}
  onChange={e => comments.setFilterMode(e.target.value as 'auto' | 'all')}
@@ -56,7 +56,7 @@ export function CommentLibraryDrawer({ open, comments, state, serverComments, on
  </select>
  </div>
  <div className="flex items-center gap-1.5 ml-auto">
- <span className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-4">{m.editor_comment_library_sort_label()}</span>
+ <span className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-3">{m.editor_comment_library_sort_label()}</span>
  <select
  value={comments.sort}
  onChange={e => comments.setSort(e.target.value)}
@@ -129,7 +129,7 @@ export function CommentLibraryDrawer({ open, comments, state, serverComments, on
  }}
  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[12px]"
  />
- <p className="text-[10px] text-ih-fg-4 mt-1">
+ <p className="text-[10px] text-ih-fg-3 mt-1">
  {m.editor_comment_library_count({ count: serverComments.length })}
  </p>
  </div>

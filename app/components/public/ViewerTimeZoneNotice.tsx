@@ -1,5 +1,5 @@
 import { useViewerTimeZoneControls } from "~/lib/viewer-timezone";
-import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
+import { publicTimezoneOptions } from "~/lib/timezone-options-public";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -20,10 +20,15 @@ export function ViewerTimeZoneNotice({ className }: { className?: string }) {
   if (!detected) return null;
 
   const usingDetected = tz === detected;
+  // Curated list, plus the viewer's own zone when it is not one of them. A
+  // <select> whose value matches no <option> renders the FIRST one instead, so
+  // omitting it would tell a viewer in an uncurated zone that their times are on
+  // some other clock — silently, with nothing to notice.
+  const options = publicTimezoneOptions(tz);
 
   return (
     <div
-      className={`print:hidden text-[12px] text-ih-fg-4 ${className ?? ""}`}
+      className={`print:hidden text-[12px] text-ih-fg-3 ${className ?? ""}`}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span>{m.public_viewer_tz_label()}</span>
@@ -33,7 +38,7 @@ export function ViewerTimeZoneNotice({ className }: { className?: string }) {
           onChange={(e) => setTz(e.target.value)}
           className="rounded-md border border-ih-border bg-ih-bg-card px-2 py-1 text-[12px] text-ih-fg-2 focus:outline-none focus-visible:shadow-ih-focus"
         >
-          {TIMEZONE_SELECT_OPTIONS.map((o) => (
+          {options.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>

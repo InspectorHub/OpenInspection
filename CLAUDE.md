@@ -267,8 +267,8 @@ DB design policies (2026-06-04 DBA review). These apply to ALL new tables/column
 Pre-commit and CI run the same logical checks; CI's `verify` job is the authoritative gate (wire it up as a required status check). The pre-commit hook is a fast local guard — bypass only with `--no-verify` (discouraged). Mechanism, steps, and Node version are aligned across the superproject and the portal/cms submodules.
 
 - **Hook mechanism**: `.githooks/pre-commit`, activated by the `prepare` npm script (`git config core.hooksPath .githooks`) on `npm install`/`npm ci` — native git hooks, **no husky**.
-- **Pre-commit** (`.githooks/pre-commit`): tiered type-check (scoped to staged files — skip / api-only / full) → `lint-staged` (eslint --fix) → DS-token conformance (`lint:ds`) → migration-ref hygiene (`lint:migrefs`) → Worker bundle-size (gated to bundle-affecting changes). Docs/tests-only commits skip the heavy steps.
-- **CI** (`.github/workflows/ci.yml`, Node 22): `npm ci` → `gen-version` → `type-check` → `npm run lint` (eslint + `lint:ds` + `lint:erasure` + `lint:migrefs`) → `db:check` (migration drift) → `test:unit` → `test:workers` → `test:web` → `build` → bundle-size gate. CodeQL runs separately (`codeql.yml`).
+- **Pre-commit** (`.githooks/pre-commit`): tiered type-check (scoped to staged files — skip / api-only / full) → `lint-staged` (eslint --fix) → DS-token conformance (`lint:ds`) → small-text contrast (`lint:contrast`) → migration-ref hygiene (`lint:migrefs`) → Worker bundle-size (gated to bundle-affecting changes). Docs/tests-only commits skip the heavy steps.
+- **CI** (`.github/workflows/ci.yml`, Node 22): `npm ci` → `gen-version` → `type-check` → `npm run lint` (eslint + `lint:ds` + `lint:contrast` + `lint:erasure` + `lint:migrefs`) → `db:check` (migration drift) → `test:unit` → `test:workers` → `test:web` → `build` → bundle-size gate. CodeQL runs separately (`codeql.yml`).
 
 ## Comment Rules
 

@@ -15,6 +15,7 @@ import type { Route } from "./+types/repair-builder.$tenant.$id";
 import { createApi } from "~/lib/api-client.server";
 import { getToken } from "~/lib/session.server";
 import { PublicNotice } from "~/components/PublicNotice";
+import { parseRepairActionTag, type RepairActionTag } from "~/lib/repair-action-tag";
 import {
   RepairBuilderSection,
   builderCreditTotal,
@@ -140,6 +141,10 @@ export async function action({
       const creditRaw = form.get("requestedCreditCents");
       const requestedCreditCents = creditRaw !== null && creditRaw !== "" ? Number(creditRaw) : null;
       const note = (form.get("note") as string | null) ?? null;
+      // #275 — one of TWO branches that must read this key. The update-item
+      // branch below is the other; a field parsed in only one of them writes
+      // null on that path and nothing type-checks the pair.
+      const repairActionTag = parseRepairActionTag(form.get("repairActionTag"));
 
       const res = await api.repairBuilder["repair-builder"][":tenant"][":id"].lists[":rrId"].items.$post({
         param: { tenant, id, rrId },
@@ -155,6 +160,7 @@ export async function action({
           commentSnapshot,
           requestedCreditCents,
           note,
+          repairActionTag,
         },
       });
       if (!res.ok) return { ok: false as const, error: m.repair_builder_error_add_item() };
@@ -166,9 +172,18 @@ export async function action({
       const itemId = String(form.get("itemId") ?? "");
       const creditRaw = form.get("requestedCreditCents");
       const noteRaw = form.get("note");
-      const patch: { requestedCreditCents?: number; note?: string } = {};
+      const tagRaw = form.get("repairActionTag");
+      const patch: {
+        requestedCreditCents?: number;
+        note?: string;
+        repairActionTag?: RepairActionTag | null;
+      } = {};
       if (creditRaw !== null && creditRaw !== "") patch.requestedCreditCents = Number(creditRaw);
       if (noteRaw !== null) patch.note = String(noteRaw);
+      // #275 — the key's ABSENCE must leave the stored tag alone (this branch
+      // also carries credit-only and note-only submits), so the presence check
+      // comes first; an empty string is the client clearing the tag.
+      if (tagRaw !== null) patch.repairActionTag = parseRepairActionTag(tagRaw);
 
       const res = await api.repairBuilder["repair-builder"][":tenant"][":id"].lists[":rrId"].items[":itemId"].$patch({
         param: { tenant, id, rrId, itemId },

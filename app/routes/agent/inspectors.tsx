@@ -77,7 +77,7 @@ export default function AgentInspectorsPage() {
                   <p className="text-[15px] font-bold text-ih-fg-1 truncate">
                     {row.inspectorName || row.tenantName}
                   </p>
-                  <p className="text-[11px] font-semibold text-ih-fg-4 uppercase tracking-widest">
+                  <p className="text-[11px] font-semibold text-ih-fg-3 uppercase tracking-widest">
                     {row.tenantName}
                   </p>
                 </div>
@@ -94,7 +94,7 @@ export default function AgentInspectorsPage() {
                   {m.agent_portal_inspectors_copy_link()}
                 </button>
               ) : (
-                <p className="text-[12px] text-ih-fg-4 mt-auto">
+                <p className="text-[12px] text-ih-fg-3 mt-auto">
                   {m.agent_portal_inspectors_no_slug()}
                 </p>
               )}

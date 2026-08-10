@@ -352,6 +352,25 @@ export class ConciergeService {
         const expMs = toMs(row.expiresAt);
         if (expMs <= Date.now()) throw Errors.BadRequest('Token has expired');
 
+        // #81 — a fifth way out of `cancelled`, reachable by someone who is not
+        // signed in. The link is minted BEFORE the client confirms, so the
+        // inspection can be cancelled while it is sitting in their inbox;
+        // redeeming it then resurrected the job as `confirmed`, with
+        // `cancel_reason` still on the row and no staff member involved.
+        //
+        // Deliberately NOT the shared USE_UNCANCEL_ENDPOINT refusal: that one
+        // names an API endpoint, and the audience here is a client following a
+        // link from an email. What they need to know is that the appointment is
+        // off and who to talk to, not which route the office should call.
+        const current = await db
+            .select({ status: inspections.status })
+            .from(inspections)
+            .where(and(eq(inspections.id, row.inspectionId), eq(inspections.tenantId, row.tenantId)))
+            .get();
+        if (current?.status === INSPECTION_STATUS.CANCELLED) {
+            throw Errors.BadRequest('This inspection was cancelled. Contact the inspection company to rebook.');
+        }
+
         // Flip inspection state.
         await db
             .update(inspections)

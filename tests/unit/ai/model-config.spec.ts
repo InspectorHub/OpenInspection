@@ -19,7 +19,7 @@ const OWN_CONFIRMED_KEY = { source: 'byo', tenantKeyAttested: true } as const;
 /** The chokepoint refuses to run without somewhere to record the call. Supplied
  *  wherever a case is meant to REACH the provider; the fail-closed cases below
  *  are refused earlier, on the model, and say so. */
-const PROVENANCE = { record: async () => {} };
+const PROVENANCE = { record: async () => 'ai-call-row' };
 
 describe('AIService — model configuration', () => {
     const fetchMock = vi.fn();
@@ -100,6 +100,6 @@ describe('AIService — model configuration', () => {
         // being absent, and a missing model does not widen it.
         const svc = new AIService({} as D1Database, '', 'standalone', '');
         const out = await svc.rewriteComment(REWRITE_INPUT);
-        expect(out).toMatch(/^\[DEV\] /);
+        expect(out.rewritten).toMatch(/^\[DEV\] /);
     });
 });

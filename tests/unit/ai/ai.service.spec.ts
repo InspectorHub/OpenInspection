@@ -17,7 +17,7 @@ const OWN_CONFIRMED_KEY = { source: 'byo', tenantKeyAttested: true } as const;
 /** The chokepoint records every call and refuses to run when it cannot, so a
  *  construction that reaches a provider must supply a sink. What it writes is
  *  covered in `provenance.spec.ts`; here it only has to exist. */
-const PROVENANCE = { record: async () => {} };
+const PROVENANCE = { record: async () => 'ai-call-row' };
 
 describe('Spec 5B P2B — AIService.rewriteComment', () => {
     const fetchMock = vi.fn();
@@ -55,8 +55,11 @@ describe('Spec 5B P2B — AIService.rewriteComment', () => {
             itemLabel: 'Roof', sectionTitle: 'Roof', tab: 'defects',
             originalComment: 'Old text', instruction: 'shorten',
         });
-        expect(out).toMatch(/^\[DEV\] /);
-        expect(out).toContain('Old text');
+        expect(out.rewritten).toMatch(/^\[DEV\] /);
+        expect(out.rewritten).toContain('Old text');
+        // No model ran, so there is no call to cite. A dev mock that arrived
+        // with a provenance id would be citable as reviewed model output.
+        expect(out.aiCallId).toBeNull();
     });
 
     it('returns the rewritten text with surrounding quotes stripped', async () => {
@@ -67,7 +70,8 @@ describe('Spec 5B P2B — AIService.rewriteComment', () => {
             originalComment: 'Cracks observed.', instruction: 'add NW corner detail',
             category: 'safety', location: 'NW corner',
         });
-        expect(out).toBe('Major cracking observed at NW corner; recommend evaluation.');
+        expect(out.rewritten).toBe('Major cracking observed at NW corner; recommend evaluation.');
+        expect(out.aiCallId).toBe('ai-call-row');
         expect(fetchMock).toHaveBeenCalledOnce();
     });
 

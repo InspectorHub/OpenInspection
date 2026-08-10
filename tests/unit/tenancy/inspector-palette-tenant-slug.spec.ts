@@ -32,7 +32,7 @@ function makeApp(opts: {
     };
     const app = new Hono<HonoConfig>();
     app.use('*', async (c, next) => {
-        (c as { env: Record<string, unknown> }).env = { DB: {}, TENANT_CACHE: kv };
+        Object.defineProperty(c, 'env', { value: { DB: {}, TENANT_CACHE: kv }, configurable: true });
         c.set('user', { sub: 'u1', role: 'owner', tenantId: 't1' } as never);
         c.set('tenantId', 't1' as never);
         c.set('branding', { companyName: 'X', primaryColor: '#fff' } as never);

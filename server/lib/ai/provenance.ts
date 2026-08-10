@@ -39,7 +39,20 @@ interface AiProvenanceEntry {
 }
 
 export interface AiProvenanceSink {
-    record(entry: AiProvenanceEntry): Promise<void>;
+    /**
+     * Writes the row and returns its `ai_call_provenance.id`.
+     *
+     * It used to return `Promise<void>` and mint the id inline, which made the
+     * ledger unciteable: a row existed for every call and no caller could name
+     * which row was theirs, so review evidence had nothing to point at. The id
+     * is returned rather than accepted as an argument so there is still exactly
+     * one place it is minted.
+     *
+     * REJECTS RATHER THAN RETURNING AN ID FOR A ROW THAT DOES NOT EXIST — the
+     * insert is awaited before the return. A caller that holds an id is holding
+     * a fact, and the chokepoint refuses the send when this throws.
+     */
+    record(entry: AiProvenanceEntry): Promise<string>;
 }
 
 /**
@@ -66,8 +79,9 @@ export function buildAiProvenanceSink(args: {
 
     return {
         record: async (entry) => {
+            const id = crypto.randomUUID();
             await drizzle(db).insert(aiCallProvenance).values({
-                id: crypto.randomUUID(),
+                id,
                 tenantId,
                 capability: entry.capability,
                 provider: entry.provider,
@@ -76,6 +90,7 @@ export function buildAiProvenanceSink(args: {
                 promptVersion: entry.promptVersion,
                 createdAt: new Date(),
             });
+            return id;
         },
     };
 }

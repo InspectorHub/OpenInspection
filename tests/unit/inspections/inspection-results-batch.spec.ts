@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { asD1Db, type TestDb } from '../helpers/test-db';
 import { eq } from 'drizzle-orm';
 import { applyResultsBatch } from '../../../server/services/inspection-results.service';
 import { inspections, inspectionResults, tenants } from '../../../server/lib/db/schema';
@@ -16,8 +16,8 @@ import { inspections, inspectionResults, tenants } from '../../../server/lib/db/
  */
 
 describe('applyResultsBatch', () => {
-    let db: BetterSQLite3Database;
-    let sqlite: any;
+    let db: TestDb;
+    let sqlite: ReturnType<typeof createTestDb>['sqlite'];
 
     beforeEach(async () => {
         const setup = createTestDb();
@@ -64,7 +64,7 @@ describe('applyResultsBatch', () => {
         expect(JSON.stringify(value)).toContain('150000');
         expect(JSON.stringify(value)).toContain('250000');
 
-        const result = await applyResultsBatch(db, 'i-1', [
+        const result = await applyResultsBatch(asD1Db(db), 'i-1', [
             { itemId: 'item-a', sectionId: 'sec-1', field: 'defectFields', value },
         ], { tenantId: 't-1' });
         expect(result.applied).toBe(1);
@@ -81,7 +81,7 @@ describe('applyResultsBatch', () => {
     });
 
     it('inserts a new results row when none exists', async () => {
-        const result = await applyResultsBatch(db, 'i-1', [
+        const result = await applyResultsBatch(asD1Db(db), 'i-1', [
             { itemId: 'item-a', sectionId: 'sec-1', field: 'rating', value: 'good' },
             { itemId: 'item-b', sectionId: 'sec-1', field: 'notes', value: 'hello' },
         ], { tenantId: 't-1' });
@@ -95,10 +95,10 @@ describe('applyResultsBatch', () => {
     });
 
     it('updates an existing row in place and overwrites the same key', async () => {
-        await applyResultsBatch(db, 'i-1', [
+        await applyResultsBatch(asD1Db(db), 'i-1', [
             { itemId: 'item-a', sectionId: 'sec-1', field: 'rating', value: 'good' },
         ], { tenantId: 't-1' });
-        const result = await applyResultsBatch(db, 'i-1', [
+        const result = await applyResultsBatch(asD1Db(db), 'i-1', [
             { itemId: 'item-a', sectionId: 'sec-1', field: 'rating', value: 'defect' },
             { itemId: 'item-a', sectionId: 'sec-1', field: 'notes', value: 'cracked' },
         ], { tenantId: 't-1' });
@@ -112,7 +112,7 @@ describe('applyResultsBatch', () => {
     });
 
     it('bumps inspections.dataVersion so offline queues notice changes', async () => {
-        await applyResultsBatch(db, 'i-1', [
+        await applyResultsBatch(asD1Db(db), 'i-1', [
             { itemId: 'item-a', sectionId: 'sec-1', field: 'rating', value: 'good' },
         ], { tenantId: 't-1' });
         const insp = await db.select().from(inspections).where(eq(inspections.id, 'i-1')).get();
@@ -120,7 +120,7 @@ describe('applyResultsBatch', () => {
     });
 
     it('records provenance fields on each patched entry', async () => {
-        await applyResultsBatch(db, 'i-1', [
+        await applyResultsBatch(asD1Db(db), 'i-1', [
             { itemId: 'item-a', sectionId: 'sec-1', field: 'rating', value: 'good' },
         ], { tenantId: 't-1', userId: 'user-99' });
         const row = await db.select().from(inspectionResults).get();
@@ -130,7 +130,7 @@ describe('applyResultsBatch', () => {
     });
 
     it('returns applied=0 for an empty patch list without touching the DB', async () => {
-        const result = await applyResultsBatch(db, 'i-1', [], { tenantId: 't-1' });
+        const result = await applyResultsBatch(asD1Db(db), 'i-1', [], { tenantId: 't-1' });
         expect(result.applied).toBe(0);
         const rows = await db.select().from(inspectionResults).all();
         expect(rows).toHaveLength(0);

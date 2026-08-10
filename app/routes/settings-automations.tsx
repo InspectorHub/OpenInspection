@@ -216,7 +216,7 @@ export default function SettingsAutomations() {
         <p className="text-[11px] text-ih-fg-3">{m.settings_automations_review_hint()}</p>
         <div className="flex gap-2">
           <input id="reviewUrl" name="reviewUrl" type="url" defaultValue={reviewUrl} placeholder={m.settings_automations_review_placeholder()}
-            className="flex-1 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1" />
+            className="flex-1 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1" />
           <button type="submit" disabled={nav.state !== "idle"}
             className="h-9 px-4 rounded-md bg-ih-bg-muted text-ih-fg-1 font-semibold text-[13px] border border-ih-border">{m.common_save()}</button>
         </div>
@@ -232,12 +232,12 @@ export default function SettingsAutomations() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-[13px] font-bold text-ih-fg-1">{rule.name}</p>
-                    {rule.isDefault && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-3 rounded uppercase tracking-widest">{m.settings_automations_default_badge()}</span>}
-                    {(rule.channels ?? []).includes("sms") &&<span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-3 rounded uppercase">{m.settings_channel_sms()}</span>}
+                    {rule.isDefault && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-2 rounded uppercase tracking-widest">{m.settings_automations_default_badge()}</span>}
+                    {(rule.channels ?? []).includes("sms") &&<span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-2 rounded uppercase">{m.settings_channel_sms()}</span>}
                   </div>
                   <p className="text-[11px] text-ih-fg-3 mt-0.5">{TRIGGER_LABELS[rule.trigger] || rule.trigger} &rarr; {recipientLabel(rule, roleProfiles)}</p>
                 </div>
-                <button onClick={() => setEditing(rule)} className="text-[12px] text-ih-primary font-semibold">{m.common_edit()}</button>
+                <button onClick={() => setEditing(rule)} className="text-[12px] text-ih-primary-text font-semibold">{m.common_edit()}</button>
                 <Form method="post" className="shrink-0">
                   <input type="hidden" name="intent" value="toggle" />
                   <input type="hidden" name="id" value={rule.id} />
@@ -262,7 +262,7 @@ export default function SettingsAutomations() {
             {recentLogs.map((l) => (
               <div key={l.id} className="flex items-center gap-3 px-5 py-2.5 text-[12px]">
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
-                  l.channel === "sms" ? "bg-ih-primary-tint text-ih-primary" : "bg-ih-bg-muted text-ih-fg-3"}`}>{l.channel ?? "email"}</span>
+                  l.channel === "sms" ? "bg-ih-primary-tint text-ih-primary-text" : "bg-ih-bg-muted text-ih-fg-3"}`}>{l.channel ?? "email"}</span>
                 <span className="text-ih-fg-2 flex-1 min-w-0 truncate">{l.recipient}</span>
                 <span className="text-ih-fg-3">{formatDateTime(l.sendAt, { locale, timeZone: displayTz })}</span>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${

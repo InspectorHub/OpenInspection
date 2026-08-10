@@ -26,6 +26,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { EmailService } from '../../../server/services/email.service';
 // eslint-disable-next-line import/order
 import { buildNotificationPreferences } from '../../../server/lib/notifications/preference-port';
+import { recordingEmailProvider } from '../helpers/email-provider';
 
 const TENANT = 't-agent-prefs';
 const AGENT_EMAIL = 'jane@realty.com';
@@ -89,7 +90,7 @@ function service() {
     return new EmailService(
         're_test', 'from@acme.com', 'Acme',
         undefined, undefined, undefined,
-        { sendEmail: async (m: { to: string[] }) => { sent.push(m.to); return { ok: true as const, id: 'm1' }; } },
+        recordingEmailProvider(sent),
         undefined, undefined,
         buildNotificationPreferences(rawDb, TENANT),
     );

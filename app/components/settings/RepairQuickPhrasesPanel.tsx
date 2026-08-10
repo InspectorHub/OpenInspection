@@ -67,7 +67,7 @@ export function RepairQuickPhrasesPanel({
             {preview.length > 0 ? (
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                 {preview.map((phrase) => (
-                  <span key={phrase} className="text-[11px] font-bold text-ih-primary">{phrase}</span>
+                  <span key={phrase} className="text-[11px] font-bold text-ih-primary-text">{phrase}</span>
                 ))}
               </div>
             ) : (

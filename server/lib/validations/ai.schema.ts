@@ -17,10 +17,33 @@ export const AutoSummarySchema = z.object({
 }).openapi('AutoSummaryRequest');
 
 /**
+ * WHY EVERY AI RESPONSE BELOW CARRIES `aiCallId`.
+ *
+ * It is the `ai_call_provenance.id` of the call that produced the text, and the
+ * only thing an `ai_content_reviews` row can cite. Until the chokepoint returned
+ * it, the ledger recorded every call and no response could say which row was
+ * its own — so a review of this output had nothing to point at, and the AI call
+ * and its acceptance stayed two events with nothing linking them.
+ *
+ * ⚠️ IT IS NOT `model` AND `promptVersion`, AND THAT IS THE DESIGN. Both are
+ * already on the provenance row. Shipping them here would put deployment
+ * configuration in a client payload and create a second pair of values that has
+ * to agree with the first; they are read through this id instead.
+ *
+ * NULLABLE WHERE A NON-AI ARM EXISTS, required where none does. Three arms
+ * return prose no model wrote — the standalone dev mocks, the "no defects
+ * observed" literal, and the empty suggestion list a runtime failure degrades to
+ * — and an id on any of those would be evidence of a review of model output
+ * that was never generated. `null` means "there is nothing here to review". The
+ * comment-assist path has no such arm, so its id is always a real row.
+ */
+
+/**
  * Response for the comment assistance.
  */
 export const CommentAssistResponseSchema = createApiResponseSchema(z.object({
     text: z.string().openapi({ example: 'The roof covering shows signs of significant wear and deterioration.' }).describe('TODO describe text field for the OpenInspection MCP integration'),
+    aiCallId: z.string().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('The ai_call_provenance row id for this call — what a content-review record cites.'),
 })).openapi('CommentAssistResponse');
 
 /**
@@ -28,6 +51,7 @@ export const CommentAssistResponseSchema = createApiResponseSchema(z.object({
  */
 export const AutoSummaryResponseSchema = createApiResponseSchema(z.object({
     summary: z.string().openapi({ example: 'The inspection revealed critical defects in the roofing and plumbing systems.' }).describe('TODO describe summary field for the OpenInspection MCP integration'),
+    aiCallId: z.string().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('The ai_call_provenance row id, or null when the summary is the system "no defects observed" literal rather than model output.'),
 })).openapi('AutoSummaryResponse');
 
 /**
@@ -55,10 +79,17 @@ export const SuggestCommentSchema = z.object({
 
 /**
  * Response for the AI comment suggestion.
+ *
+ * `data` is an OBJECT and used to be the bare array. An array cannot carry the
+ * provenance id, and the id is what a review of an accepted suggestion cites —
+ * so the wrapper is the change, not an extra field on an existing one. Nothing
+ * in `app/` consumes this endpoint (the AI routes are reached only by MCP/API
+ * clients and the E2E suite today), so there is no client to migrate.
  */
-export const SuggestCommentResponseSchema = createApiResponseSchema(
-    z.array(z.string()).openapi({ example: ['Comment 1.', 'Comment 2.', 'Comment 3.'] })
-).openapi('SuggestCommentResponse');
+export const SuggestCommentResponseSchema = createApiResponseSchema(z.object({
+    suggestions: z.array(z.string()).openapi({ example: ['Comment 1.', 'Comment 2.', 'Comment 3.'] }).describe('The suggested comments, in the order the model returned them.'),
+    aiCallId: z.string().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('The ai_call_provenance row id, or null when the suggestions are dev mocks or the list is empty because nothing usable came back.'),
+})).openapi('SuggestCommentResponse');
 
 /**
  * Spec 5B P2B — Input for the AI comment-rewrite request.
@@ -80,6 +111,7 @@ export const CommentEditSchema = z.object({
 
 export const CommentEditResponseSchema = createApiResponseSchema(z.object({
     rewritten: z.string().openapi({ example: 'Major cracking observed at the NW corner of the roof field; recommend evaluation by a licensed roofer.' }).describe('TODO describe rewritten field for the OpenInspection MCP integration'),
+    aiCallId: z.string().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('The ai_call_provenance row id, or null when the rewrite is a standalone dev mock rather than model output.'),
 })).openapi('CommentEditResponse');
 
 /**
@@ -101,3 +133,34 @@ export const AiKeyAttestationSchema = z.object({
     understandsProviderProcessing: z.boolean().openapi({ example: true })
         .describe('They understand inspection content is processed by that provider.'),
 }).openapi('AiKeyAttestation');
+
+/**
+ * Input for recording that a person reviewed model-assisted text (#61).
+ *
+ * `aiCallId` is REQUIRED and there is no "unknown" arm. A review that cannot
+ * name the call it reviewed is not evidence of anything — it would assert that
+ * someone looked at something, with no way to establish what. The four AI
+ * responses carry the id precisely so this field can be filled; where they
+ * return null they returned no model output, and there is nothing to review.
+ */
+export const AiContentReviewSchema = z.object({
+    artifactType: z.enum(['inspection_result', 'report']).openapi({ example: 'inspection_result' })
+        .describe("Which table holds the row that received the text: 'inspection_result' for per-item prose (inspection_results.data), 'report' for the inspector's report-level narrative (reports.inspector_narrative)."),
+    artifactId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' })
+        .describe('Primary key of the row that received the text.'),
+    aiCallId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' })
+        .describe('The ai_call_provenance row id this review is about.'),
+}).openapi('AiContentReviewRequest');
+
+/**
+ * Response for a recorded review.
+ *
+ * Deliberately says nothing about whether a row was INSERTED. The write is
+ * idempotent on (person, artifact, call), so a retry is a no-op — and a caller
+ * that could tell an insert from a no-op would eventually branch on it, which
+ * is exactly the distinction the idempotency is there to erase.
+ */
+export const AiContentReviewResponseSchema = createApiResponseSchema(z.object({
+    reviewed: z.literal(true).openapi({ example: true })
+        .describe('The review is on file. True for both a fresh record and a retry.'),
+})).openapi('AiContentReviewResponse');

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AdminService } from '../../../server/services/admin.service';
-import { MockKV } from '../mocks';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
@@ -61,7 +60,10 @@ describe('AdminService.getMembers — calendar sync metadata', () => {
             connection('conn-2', TENANT, NEVER_SYNCED, null),
         ]);
 
-        adminService = new AdminService({} as unknown as D1Database, new MockKV() as unknown as KVNamespace);
+        // AdminService's optional 2nd parameter is an IntegrationProvider, read
+        // only by the tenant-update path (admin.service.ts:282). getMembers never
+        // consults it, so there is nothing for a stand-in to stand in for.
+        adminService = new AdminService({} as unknown as D1Database);
     });
 
     afterEach(() => sqlite.close());

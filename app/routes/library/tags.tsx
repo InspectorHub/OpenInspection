@@ -71,7 +71,7 @@ export default function TagsPage() {
                 label: m.library_tags_col_actions(),
                 align: "right",
                 cell: () => (
-                  <button className="text-[13px] text-ih-primary hover:opacity-80 font-semibold">
+                  <button className="text-[13px] text-ih-primary-text hover:opacity-80 font-semibold">
                     {m.common_edit()}
                   </button>
                 ),

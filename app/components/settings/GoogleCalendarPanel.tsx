@@ -38,7 +38,7 @@ export function GoogleCalendarPanel({
 
       <div className="rounded-md border border-ih-border bg-ih-primary-tint p-3 text-[13px] text-ih-fg-2">
         {m.settings_gcal_inspectors_connect_prefix()}{" "}
-        <Link to="/settings/schedule" className="font-bold text-ih-primary hover:underline">
+        <Link to="/settings/schedule" className="font-bold text-ih-primary-text hover:underline">
           {m.settings_gcal_my_schedule()}
         </Link>
         .
@@ -58,7 +58,7 @@ export function GoogleCalendarPanel({
           {/* No hidden input here: the toggle radios were never inside the
               form. The save Form below carries the value via its own
               hidden `googleOAuthMode` input. */}
-          <p className="text-[11px] text-ih-fg-4">
+          <p className="text-[11px] text-ih-fg-3">
             {oauthMode === "platform"
               ? m.settings_gcal_mode_platform_desc()
               : m.settings_gcal_mode_own_desc()}
@@ -76,7 +76,7 @@ export function GoogleCalendarPanel({
           </Form>
         </div>
       ) : (
-        <p className="text-[13px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
+        <p className="text-[13px] text-ih-fg-2 bg-ih-bg-muted border border-ih-border rounded-md p-3">
           {m.settings_gcal_selfhost_note()}
         </p>
       )}
@@ -89,7 +89,7 @@ export function GoogleCalendarPanel({
               href="https://console.cloud.google.com/apis/credentials"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-ih-primary hover:underline"
+              className="text-ih-primary-text hover:underline"
             >
               {m.settings_gcal_cloud_console()}
             </a>

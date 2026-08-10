@@ -22,7 +22,11 @@ function bytesToHex(bytes: Uint8Array): string {
   return hex;
 }
 
-async function hmacSha256(keyBytes: Uint8Array, message: string): Promise<Uint8Array> {
+// `Uint8Array<ArrayBuffer>`: since TS 5.7 the element-buffer is a type parameter
+// and `BufferSource` (what `importKey` takes) admits only the `ArrayBuffer`
+// instantiation, not the `ArrayBufferLike` default that could be a
+// `SharedArrayBuffer`. Callers already pass that narrower type.
+async function hmacSha256(keyBytes: Uint8Array<ArrayBuffer>, message: string): Promise<Uint8Array<ArrayBuffer>> {
   const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
   return new Uint8Array(sig);
@@ -245,7 +249,7 @@ describe('MailgunProvider.verifyWebhookSignature (HMAC-SHA256 hex)', () => {
   const tsSeconds = Math.floor(FIXED_NOW / 1000);
   const token = 'tok_abc123';
 
-  async function makeBody(ts: number, tok: string, key: Uint8Array): Promise<string> {
+  async function makeBody(ts: number, tok: string, key: Uint8Array<ArrayBuffer>): Promise<string> {
     const sigHex = bytesToHex(await hmacSha256(key, `${ts}${tok}`));
     return JSON.stringify({
       signature: { timestamp: String(ts), token: tok, signature: sigHex },

@@ -331,7 +331,7 @@ function TemplateList({
                 <p className="text-[11px] text-ih-fg-3 mt-0.5 truncate">{m.settings_msgtpl_subject_prefix({ subject: t.subject })}</p>
               )}
               {t.variables.length > 0 && (
-                <p className="text-[11px] text-ih-fg-4 mt-0.5">
+                <p className="text-[11px] text-ih-fg-3 mt-0.5">
                   {m.settings_msgtpl_variables_prefix({ vars: t.variables.map((v) => `{{${v}}}`).join(", ") })}
                 </p>
               )}
@@ -383,10 +383,10 @@ function VariantRow({
     <div className="mt-2 flex items-center gap-1.5 flex-wrap">
       <span className="text-[11px] text-ih-fg-3 mr-0.5">{m.settings_msgtpl_languages_label()}</span>
       {group.variants.map((v) => (
-        <span key={v.id} className="inline-flex items-center rounded-md border border-ih-border bg-ih-bg-input">
+        <span key={v.id} className="inline-flex items-center rounded-md border border-ih-border bg-ih-bg-card">
           <button
             onClick={() => onEdit(v)}
-            className="text-[11px] px-2 py-0.5 font-semibold text-ih-primary hover:underline"
+            className="text-[11px] px-2 py-0.5 font-semibold text-ih-primary-text hover:underline"
           >
             {localeLabel(v.locale)}
           </button>
@@ -506,7 +506,7 @@ function ComplianceSmsSection() {
           <p className="text-[13px] font-semibold text-ih-fg-1 mb-1">{m.settings_msgtpl_optin_heading()}</p>
           <p className="text-[12px] text-ih-fg-3">
             {m.settings_msgtpl_optin_desc_before()}{" "}
-            <Link to="/settings/communication" className="text-ih-primary hover:underline">
+            <Link to="/settings/communication" className="text-ih-primary-text hover:underline">
               {m.settings_msgtpl_optin_link()}
             </Link>{" "}
             {m.settings_msgtpl_optin_desc_after()}

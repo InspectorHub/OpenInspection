@@ -29,7 +29,7 @@ const sizeClasses: Record<IconButtonSize, string> = {
 export function IconButton({
   variant = "ghost", size = "md", selected, className = "", children, ref, ...props
 }: IconButtonProps & { ref?: React.Ref<HTMLButtonElement> }) {
-    const selectedClass = selected ? "ring-2 ring-ih-primary ring-inset text-ih-primary" : "";
+    const selectedClass = selected ? "ring-2 ring-ih-primary ring-inset text-ih-primary-text" : "";
     return (
       <button
         ref={ref}

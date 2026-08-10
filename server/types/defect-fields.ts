@@ -10,6 +10,12 @@
  * Vocabularies are append-only — never remove or renumber ids without a
  * data backfill of existing inspection_results rows. Adding a new id is
  * always safe (old data simply doesn't reference it).
+ *
+ * This module SHIPS IN THE CLIENT BUNDLE: `app/lib/defect-fields.ts`
+ * re-exports it so the editor dropdowns cannot drift from the list the write
+ * path sanitizes against. Keep it import-free — no db, no env, no Hono, not
+ * even a type-only import. Plain data and pure predicates only, so pulling it
+ * into the browser stays free.
  */
 
 export const DEFECT_TRADES = [

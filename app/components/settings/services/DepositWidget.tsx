@@ -123,7 +123,7 @@ export function DepositWidget({ serviceId, policy, companyDefault }: DepositWidg
                     <button
                         type="button"
                         onClick={() => setOpen(true)}
-                        className="text-[12px] font-semibold text-ih-primary hover:underline"
+                        className="text-[12px] font-semibold text-ih-primary-text hover:underline"
                     >
                         {m.settings_deposit_change_link()}
                     </button>

@@ -16,6 +16,7 @@ import { eq } from 'drizzle-orm';
 import { PortalAccessService } from '../../../server/services/portal-access.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { hashToken } from '../../../server/lib/token-hash';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -62,7 +63,7 @@ beforeEach(async () => {
             id, name: 'Acme', slug: `acme-${id.slice(-2)}`, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(testDb, id);
+        await seedRoleProfiles(asD1Db(testDb), id);
     }
     svc = new PortalAccessService({} as D1Database, { jwtSecret: JWT });
 });

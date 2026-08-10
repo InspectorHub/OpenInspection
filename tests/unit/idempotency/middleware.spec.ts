@@ -10,6 +10,7 @@ import { createTestDb, setupSchema } from '../db';
 import { idempotencyMiddleware } from '../../../server/lib/middleware/idempotency';
 import { claimKey } from '../../../server/lib/idempotency/store';
 import { fingerprint } from '../../../server/lib/idempotency/fingerprint';
+import type { HonoConfig } from '../../../server/types/hono';
 
 let db: ReturnType<typeof createTestDb>['db'];
 let ran = 0;
@@ -19,7 +20,9 @@ const BODY = { address: '123 Main' };
 type Handler = () => { status: number; body: unknown } | Promise<{ status: number; body: unknown }>;
 
 function buildApp(handler: Handler, tenantId = 't1') {
-    const app = new Hono();
+    // Typed with HonoConfig so `c.set('tenantId', ...)` resolves against the
+    // same Variables map `idempotencyMiddleware` reads it from.
+    const app = new Hono<HonoConfig>();
     app.use('*', async (c, next) => {
         c.set('tenantId', tenantId);
         await next();
@@ -32,7 +35,7 @@ function buildApp(handler: Handler, tenantId = 't1') {
     return app;
 }
 
-function post(app: Hono, key?: string, body: unknown = BODY) {
+function post(app: ReturnType<typeof buildApp>, key?: string, body: unknown = BODY) {
     return app.request('/thing', {
         method: 'POST',
         headers: {

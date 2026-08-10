@@ -8,6 +8,22 @@
  * holds `__Host-inspector_token` and NO `__Host-portal_session`, so a `/portal/`
  * path handed to an agent is the exact confusion the agent branch was built to
  * prevent (server/api/portal.ts redeemRoute).
+ *
+ * ⚠️ THE FILENAME IS LOAD-BEARING, and it is not a style preference. This was
+ * `portal-auth.test.tsx`, sitting beside `portal-auth.test.ts`. TypeScript's
+ * `include` expansion resolves a directory entry by base path and keeps ONE
+ * extension per base — `.ts` outranks `.tsx` — so the `.tsx` twin was silently
+ * dropped from the program and type-checked by nothing. vitest collected and
+ * ran it, so it looked covered. eslint's type-aware parser was the only thing
+ * that ever said so, with "file not found in any of the provided project(s)".
+ *
+ * `scripts/check-tests-tsconfig.mjs` could not catch it either: that gate
+ * compares tsconfig.json's `exclude` array against a baseline, and this file
+ * was never excluded by anything — it lost a name collision. A gate that checks
+ * a declaration cannot see an object that declares nothing.
+ *
+ * Do not rename this back to `<something>.test.tsx` while a `<something>.test.ts`
+ * exists next to it.
  */
 import { describe, it, expect } from "vitest";
 import { redeemDestination } from "./portal-auth";

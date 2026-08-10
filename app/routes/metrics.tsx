@@ -144,7 +144,7 @@ export default function MetricsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {kpis.map((kpi) => (
             <Card key={kpi.label} className="p-5">
-              <p className="text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{kpi.label}</p>
+              <p className="text-[10px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1">{kpi.label}</p>
               <p className="text-xl font-bold text-ih-fg-1">{kpi.value}</p>
             </Card>
           ))}
@@ -171,7 +171,7 @@ export default function MetricsPage() {
                     className="w-full bg-ih-primary rounded-t"
                     style={{ height: `${Math.max(pct, 4)}%` }}
                   />
-                  <span className="text-[10px] text-ih-fg-4">{mo.month.slice(5)}</span>
+                  <span className="text-[10px] text-ih-fg-3">{mo.month.slice(5)}</span>
                 </div>
               );
             })}
@@ -198,7 +198,7 @@ export default function MetricsPage() {
                     className="w-full bg-ih-ok rounded-t"
                     style={{ height: `${Math.max(pct, 4)}%` }}
                   />
-                  <span className="text-[10px] text-ih-fg-4">{mo.month.slice(5)}</span>
+                  <span className="text-[10px] text-ih-fg-3">{mo.month.slice(5)}</span>
                 </div>
               );
             })}
@@ -215,7 +215,7 @@ export default function MetricsPage() {
           unstated start is not a measurement. */}
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1">{m.metrics_by_inspector()}</p>
-        <p className="text-[12px] text-ih-fg-4 mb-4">
+        <p className="text-[12px] text-ih-fg-3 mb-4">
           {data?.byInspector?.some((r) => r.turnaroundBasis !== "no_data")
             ? m.metrics_turnaround_basis()
             : m.metrics_turnaround_no_basis()}
@@ -279,14 +279,14 @@ export default function MetricsPage() {
                 <span className="font-medium text-ih-fg-1">
                   {agent.agentName}
                   {agent.kind === "source" && (
-                    <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
+                    <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">
                       {m.metrics_referrer_source_tag()}
                     </span>
                   )}
                 </span>
                 <div className="text-right">
                   <span className="font-bold text-ih-fg-1">{m.metrics_agent_count({ count: agent.count })}</span>
-                  <span className="text-ih-fg-4 ml-2 text-[12px]">{fmt(agent.revenue)}</span>
+                  <span className="text-ih-fg-3 ml-2 text-[12px]">{fmt(agent.revenue)}</span>
                 </div>
               </div>
             ))}

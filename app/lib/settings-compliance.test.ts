@@ -46,6 +46,7 @@ vi.mock('~/lib/api-client.server', () => ({
 }));
 
 import { loader, action } from '~/routes/settings-compliance';
+import { granted } from '../../tests/helpers/loader-data';
 
 type LoaderArgs = Parameters<typeof loader>[0];
 type ActionArgs = Parameters<typeof action>[0];
@@ -107,7 +108,7 @@ describe('settings-compliance loader (G4 BFF)', () => {
     });
 
     it('returns the erasure-log rows from the compliance endpoint', async () => {
-        const data = await loader(loaderArgs());
+        const data = granted(await loader(loaderArgs()));
         expect(getErasureLog).toHaveBeenCalled();
         expect(data.erasureLog).toHaveLength(1);
         expect(data.erasureLog[0].subjectEmail).toBe('client@example.com');

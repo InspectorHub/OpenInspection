@@ -10,12 +10,19 @@ import { m } from "~/paraglide/messages";
  * not look like ten omissions, it looks like one.
  */
 export function ConfirmDialog({
-  open, title, message, confirmLabel, tone = "danger", busy = false, onConfirm, onCancel,
+  open, title, message, confirmLabel, cancelLabel, tone = "danger", busy = false, onConfirm, onCancel,
 }: {
   open: boolean;
   title: string;
   message: string;
   confirmLabel?: string;
+  /**
+   * Overrides the dismiss button's label. Defaults to the generic "Cancel",
+   * which is the right word almost everywhere and exactly the wrong one when
+   * the dialog is itself about cancelling something — "Cancel" beside "Cancel
+   * the inspection" makes the safe choice read as the destructive one.
+   */
+  cancelLabel?: string;
   tone?: "danger" | "default";
   busy?: boolean;
   onConfirm: () => void;
@@ -38,7 +45,7 @@ export function ConfirmDialog({
             onClick={onCancel}
             className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
           >
-            {m.common_cancel()}
+            {cancelLabel ?? m.common_cancel()}
           </button>
           <button
             type="button"

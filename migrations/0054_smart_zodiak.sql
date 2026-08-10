@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `uq_ai_content_reviews_person_call` ON `ai_content_reviews` (`tenant_id`,`artifact_type`,`artifact_id`,`ai_call_id`,`reviewed_by`);

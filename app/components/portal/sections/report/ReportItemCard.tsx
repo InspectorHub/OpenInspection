@@ -68,7 +68,7 @@ export function ReportItemCard({
           item.value !== null &&
           item.value !== "" && (
             <p className="mt-2 text-sm font-semibold text-ih-fg-1">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mr-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mr-2">
                 {item.type}
               </span>
               {Array.isArray(item.value)

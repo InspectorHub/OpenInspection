@@ -80,7 +80,7 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
   }
 
   const inputCls = "w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:shadow-ih-focus focus:border-ih-primary outline-none";
-  const labelCls = "block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5";
+  const labelCls = "block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-3 mb-1.5";
 
   return (
     <Modal open={open} onClose={onClose} title={editing ? m.comment_editor_title_edit() : m.comment_editor_title_new()} size="lg"

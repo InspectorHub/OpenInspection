@@ -136,7 +136,7 @@ export function EmailSecretsPanel({
           <>
             <p className="text-[13px] text-ih-fg-3">
               {m.settings_emailsecrets_get_key_at()}{" "}
-              <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">resend.com</a>.
+              <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-ih-primary-text hover:underline">resend.com</a>.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <SecretField

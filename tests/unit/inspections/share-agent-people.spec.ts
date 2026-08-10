@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -78,7 +79,7 @@ describe('POST /api/inspections/:id/share-agent — buyer_agent via inspection_p
             id: TENANT, name: 'Acme', slug: SLUG, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values({
             id: AGENT_CONTACT, tenantId: TENANT, type: 'agent', name: 'Jane Agent',
             email: 'jane@realty.com', createdAt: new Date(),
@@ -86,7 +87,7 @@ describe('POST /api/inspections/:id/share-agent — buyer_agent via inspection_p
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'unpaid',
-            price: 0, inspectorId: null, referredByAgentId: null, createdAt: new Date(),
+            price: 0, inspectorId: null, createdAt: new Date(),
         });
     });
 

@@ -128,7 +128,7 @@ export default function SettingsInspectionPage() {
             <p className="text-[13px] text-ih-fg-3">{m.settings_inspection_intro()}</p>
 
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_clone_heading()}</h2>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-3">{m.settings_inspection_clone_heading()}</h2>
                 <RadioGroup
                     name="cloneDefault"
                     value={prefs.cloneDefault}
@@ -142,7 +142,7 @@ export default function SettingsInspectionPage() {
             </section>
 
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_autoadvance_heading()}</h2>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-3">{m.settings_inspection_autoadvance_heading()}</h2>
                 <RadioGroup
                     name="autoAdvance"
                     value={prefs.autoAdvance}
@@ -170,7 +170,7 @@ export default function SettingsInspectionPage() {
             </section>
 
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_required_heading()}</h2>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-3">{m.settings_inspection_required_heading()}</h2>
                 <p className="text-[12px] text-ih-fg-3 mb-2">{m.settings_inspection_required_help()}</p>
                 <RadioGroup
                     name="requireDefectFields"
@@ -186,7 +186,7 @@ export default function SettingsInspectionPage() {
             </section>
 
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_agent_repair_heading()}</h2>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-3">{m.settings_inspection_agent_repair_heading()}</h2>
                 <p className="text-[12px] text-ih-fg-3 mb-2">{m.settings_inspection_agent_repair_hint()}</p>
                 <RadioGroup
                     name="agentRepairAccess"
@@ -205,7 +205,7 @@ export default function SettingsInspectionPage() {
                 re-dated by changing this. To act on an inspection's existing
                 links, use the same control on its People card. */}
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_report_link_heading()}</h2>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-3">{m.settings_inspection_report_link_heading()}</h2>
                 <p className="text-[12px] text-ih-fg-3 mb-2">{m.settings_inspection_report_link_help()}</p>
                 <LinkExpiryControl
                     value={prefs.reportLinkTtl}
@@ -240,7 +240,7 @@ export default function SettingsInspectionPage() {
             </section>
 
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_pinned_heading({ count: prefs.pinnedTagIds.length })}</h2>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-3">{m.settings_inspection_pinned_heading({ count: prefs.pinnedTagIds.length })}</h2>
                 <p className="text-[12px] text-ih-fg-3 mb-3">{m.settings_inspection_pinned_help()}</p>
                 <ul className="space-y-1">
                     {tags.map(tag => {
@@ -265,7 +265,7 @@ export default function SettingsInspectionPage() {
                         );
                     })}
                 </ul>
-                <a href="/library/tags" className="text-[12px] text-ih-primary hover:underline mt-3 inline-flex items-center gap-1">{m.settings_inspection_manage_tags()} <Icon name="arrowR" size={12} /></a>
+                <a href="/library/tags" className="text-[12px] text-ih-primary-text hover:underline mt-3 inline-flex items-center gap-1">{m.settings_inspection_manage_tags()} <Icon name="arrowR" size={12} /></a>
             </section>
         </div>
     );

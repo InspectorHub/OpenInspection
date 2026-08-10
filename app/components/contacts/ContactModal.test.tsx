@@ -14,6 +14,7 @@ import { createRoutesStub } from "react-router";
 
 import { ContactModal } from "./ContactModal";
 import type { Contact } from "./contacts-helpers";
+import { asSelect } from "../../../tests/helpers/dom";
 
 const BASE: Contact = {
   id: "c1",
@@ -37,7 +38,7 @@ function renderModal(contact: Contact | null) {
 describe("ContactModal — preferred language", () => {
   it("offers 'not set' first, so a language can be taken back off", async () => {
     const { findByLabelText } = renderModal({ ...BASE, locale: "es-419" });
-    const select = (await findByLabelText("Preferred language")) as HTMLSelectElement;
+    const select = asSelect(await findByLabelText("Preferred language"), "the language picker");
 
     const [first, ...rest] = Array.from(select.options);
     expect(first.value).toBe("");
@@ -47,7 +48,7 @@ describe("ContactModal — preferred language", () => {
 
   it("shows what the contact already asked for", async () => {
     const { findByLabelText } = renderModal({ ...BASE, locale: "es-419" });
-    const select = (await findByLabelText("Preferred language")) as HTMLSelectElement;
+    const select = asSelect(await findByLabelText("Preferred language"), "the language picker");
 
     expect(select.value).toBe("es-419");
     expect(within(select).getByRole("option", { selected: true })).toHaveTextContent(
@@ -59,13 +60,13 @@ describe("ContactModal — preferred language", () => {
 
   it("sits on 'not set' for a contact who has never said", async () => {
     const { findByLabelText } = renderModal({ ...BASE, locale: null });
-    const select = (await findByLabelText("Preferred language")) as HTMLSelectElement;
+    const select = asSelect(await findByLabelText("Preferred language"), "the language picker");
     expect(select.value).toBe("");
   });
 
   it("sits on 'not set' for a brand-new contact", async () => {
     const { findByLabelText } = renderModal(null);
-    const select = (await findByLabelText("Preferred language")) as HTMLSelectElement;
+    const select = asSelect(await findByLabelText("Preferred language"), "the language picker");
     expect(select.value).toBe("");
   });
 });

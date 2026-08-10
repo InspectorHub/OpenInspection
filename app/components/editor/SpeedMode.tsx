@@ -147,7 +147,7 @@ export function SpeedMode({
           {...gesture}
         >
           <h2 className="text-2xl font-bold text-ih-fg-1 mb-2 text-center">{item.label}</h2>
-          <p className="text-[11px] text-ih-fg-4 uppercase tracking-wide">
+          <p className="text-[11px] text-ih-fg-3 uppercase tracking-wide">
             {m.editor_speedmode_gesture_hint()}
           </p>
         </div>
@@ -249,7 +249,7 @@ export function SpeedMode({
                                 setShowJumpTo(false);
                               }}
                               className={`w-full text-left px-3 py-2 rounded hover:bg-ih-bg-muted ${
-                                isActive ? 'bg-ih-bg-muted font-bold text-ih-primary' : 'text-ih-fg-1'
+                                isActive ? 'bg-ih-bg-muted font-bold text-ih-primary-text' : 'text-ih-fg-1'
                               }`}
                             >
                               {itLabel}

@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq, isNull, and } from 'drizzle-orm';
@@ -91,7 +92,7 @@ describe('manual send logging (A2.2)', () => {
             id: TENANT, name: 'Acme', slug: SLUG, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values([
             { id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane', email: 'jane@x.com', phone: null, createdAt: new Date() },
             { id: NO_EMAIL, tenantId: TENANT, type: 'client', name: 'No Email', email: null, phone: null, createdAt: new Date() },

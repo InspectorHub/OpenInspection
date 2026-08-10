@@ -26,7 +26,10 @@
 import type { Locator, Page } from '@playwright/test';
 
 /** Where the gesture's DataTransfer lives while the drag is in flight. */
-const STASH = '__e2eHtml5DragDataTransfer';
+// `as const` is load-bearing: without it this is `string`, so the computed key in
+// `Win` below produces no literal property and `w[stash]` is an untyped index
+// (TS7015). Nothing caught it because `tsconfig.playwright.json` was never run.
+const STASH = '__e2eHtml5DragDataTransfer' as const;
 
 interface Point {
     clientX: number;

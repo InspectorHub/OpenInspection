@@ -53,7 +53,7 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                                 onChange={e => onChange(itemId, attr.id, e.target.checked)}
                                 className="w-4 h-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
                             />
-                            <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">{attr.name}</label>
+                            <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-ih-fg-3">{attr.name}</label>
                         </div>
                     );
                 }

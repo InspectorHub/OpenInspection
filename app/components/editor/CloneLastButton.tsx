@@ -66,7 +66,7 @@ export function CloneLastButton({ defaultScope, onClone, disabled }: CloneLastBu
                             key={s}
                             onClick={() => pick(s)}
                         >
-                            <span className={`w-3 inline-block ${s === sessionScope ? 'text-ih-primary' : 'text-transparent'}`}>✓</span>
+                            <span className={`w-3 inline-block ${s === sessionScope ? 'text-ih-primary-text' : 'text-transparent'}`}>✓</span>
                             {SCOPE_LABELS[s]}
                         </MenuItem>
                     ))}

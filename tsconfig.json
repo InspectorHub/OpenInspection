@@ -26,7 +26,31 @@
     "strict": true,
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client", "@cloudflare/workers-types"],
+    // ⚠️ THE LAST TWO ARE FOR THE CO-LOCATED SPECS, and each was measured
+    // rather than assumed (each entry removed, program recompiled, errors
+    // counted):
+    //
+    //   `vitest/globals` — vitest.config.ts sets `globals: true`, and 201 of
+    //     the 352 specs use `describe`/`it`/`expect` without importing them.
+    //     Same call `tsconfig.tests.json` already makes for the same reason.
+    //   `@testing-library/jest-dom/vitest` — the SUBPATH, which is what carries
+    //     the `Assertion` augmentation for `toBeChecked()`/`toBeDisabled()`/
+    //     `toHaveTextContent()`. Without it: 19 x TS2339. It is loaded at
+    //     runtime by `tests/setup-web.ts`, which is in the tests program, not
+    //     this one — so the augmentation had no way in.
+    //
+    // `@types/node` is deliberately NOT here. Four specs read fixtures through
+    // `node:fs`/`node:path`/`node:url`, which looks like it needs it — measured,
+    // it does not: `worker-configuration.d.ts` is generated with
+    // `nodejs_compat` and already declares those modules. Adding it anyway
+    // would put `NodeJS.Timeout` into ~685 browser source files' `setTimeout`,
+    // which is a loosening this program has no reason to buy.
+    "types": [
+      "vite/client",
+      "@cloudflare/workers-types",
+      "vitest/globals",
+      "@testing-library/jest-dom/vitest"
+    ],
     "paths": {
       "~/*": ["./app/*"],
       "@core/shared-ui": ["./packages/shared-ui/src/index.ts"]
@@ -53,16 +77,49 @@
     // is visible when the worker entry re-exports DOs that use it (e.g. InspectorMcp
     // extends McpAgent<Env>). McpAgent constrains its Env param to `extends Cloudflare.Env`,
     // and only the global `Env` satisfies that after Cloudflare.Env is augmented by this file.
-    "worker-configuration.d.ts"
+    "worker-configuration.d.ts",
+    // packages/shared-ui SOURCES already reached this program transitively, via
+    // the `@core/shared-ui` path alias every app route imports. Its 19
+    // co-located specs did not — nothing imports a spec — so they belonged to no
+    // program at all, the same hole `app/**/*.test.*` was in. Listing the tree
+    // explicitly also brings in any component that no route happens to import
+    // yet, which is the state a new one starts in.
+    //
+    // ⚠️ `packages/shared-ui/tsconfig.json` is an ORPHAN: no config references
+    // it, no npm script runs it, no tool reads it. It is NOT what checks these
+    // files, and editing it will not affect anything. This is.
+    "packages/shared-ui/src/**/*.ts",
+    "packages/shared-ui/src/**/*.tsx"
   ],
-  "exclude": [
-    "node_modules",
-    "build",
-    "dist",
-    // Co-located frontend tests (tests-reorg R2) — no vitest/@testing-library
-    // types in this tsc program; keep them out of the app tsc pass (they were
-    // never type-checked pre-move, when they lived under tests/web/unit/).
-    "app/**/*.test.ts",
-    "app/**/*.test.tsx"
-  ]
+  // ⚠️ NO SPEC EXCLUSIONS, AND THAT IS LOAD-BEARING.
+  //
+  // `app/**/*.test.ts(x)` used to be excluded here, justified by "no vitest /
+  // @testing-library types in this tsc program". That was true and fixable: the
+  // two `types` entries added above are the whole fix. What the exclusion cost
+  // was 333 co-located specs + 19 under packages/shared-ui compiled by ZERO tsc
+  // programs — vitest strips types with esbuild and never checks them, and
+  // eslint skips them for the matching reason (see the `ignores` note in
+  // eslint.config.js, whose stated premise this change retires).
+  //
+  // Cost of taking them, measured COLD (build-info deleted, which is the only
+  // honest way — pre-commit runs warm, CI always runs cold): the program goes
+  // 2612 -> 3038 files and 1,203,400 -> 1,279,085 instantiations (+6.3%), and
+  // the heap FLOOR does not move at all: 1024 MB OOMs and 1280 MB passes, both
+  // before and after. Wall clock +4s.
+  //
+  // The alternative that was measured and rejected was a separate program
+  // REFERENCING this one (the shape tsconfig.tests.json uses for api). It needs
+  // this project to be `composite` and emit declarations, and declaration emit
+  // over app/** does not come free: 30 x TS6307 (a composite project must list
+  // every input, so packages/shared-ui had to be enumerated anyway) plus 3 x
+  // TS2742 and 1 x TS4058 that can only be fixed by ANNOTATING app source — a
+  // tax every future hook returning a react-router internal type would pay, in
+  // exchange for saving 4 seconds.
+  //
+  // `scripts/check-tests-tsconfig.mjs` pins this array: an entry added here
+  // that is not in `scripts/tests-tsconfig-baseline.json` fails the gate. That
+  // list is EMPTY on purpose. Excluding a spec is not a fix, and the reason
+  // this program exists is that "temporarily" excluded specs are how the last
+  // 352 got here.
+  "exclude": ["node_modules", "build", "dist"]
 }

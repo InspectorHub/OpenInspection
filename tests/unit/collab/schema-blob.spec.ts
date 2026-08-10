@@ -7,11 +7,11 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { TestDb } from '../helpers/test-db';
 import { inspections, inspectionResults, tenants } from '../../../server/lib/db/schema';
 
 describe('inspection_results.ydoc_state blob round-trip', () => {
-    let db: BetterSQLite3Database;
+    let db: TestDb;
     let sqlite: any;
 
     beforeEach(async () => {

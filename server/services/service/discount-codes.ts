@@ -18,9 +18,25 @@ import type { CreateDiscountCodeSchema } from '../../lib/validations/service.sch
 
 type CreateDiscountData = z.infer<typeof CreateDiscountCodeSchema>;
 
-/** `expiresAt` arrives as an ISO string on the wire and a Date in the column. */
-export type DiscountCodePatch =
-    Partial<Omit<typeof discountCodes.$inferInsert, 'expiresAt'>> & { expiresAt?: string | null };
+/**
+ * The editable surface of a discount code, as `UpdateDiscountCodeSchema` parses
+ * it off the wire. `expiresAt` arrives as an ISO string and is a Date in the
+ * column, hence the divergence from `$inferInsert`.
+ *
+ * Every key spells `| undefined` explicitly: Zod `.optional()` infers
+ * `T | undefined`, and `exactOptionalPropertyTypes` will not assign that to a
+ * plain `k?: T`. Listing the six editable columns rather than
+ * `Partial<$inferInsert>` also keeps `id`, `tenantId`, `usesCount` and
+ * `createdAt` out of a caller-supplied UPDATE.
+ */
+export type DiscountCodePatch = {
+    code?:      string | undefined;
+    type?:      'fixed' | 'percent' | undefined;
+    value?:     number | undefined;
+    maxUses?:   number | null | undefined;
+    expiresAt?: string | null | undefined;
+    active?:    boolean | undefined;
+};
 
 export interface DiscountValidation {
     valid: boolean;
@@ -58,9 +74,13 @@ export async function updateDiscountCode(
     id: string,
     data: DiscountCodePatch,
 ) {
-    const { expiresAt, ...rest } = data;
-    const patch: Partial<typeof discountCodes.$inferInsert> = { ...rest };
-    if (expiresAt !== undefined) patch.expiresAt = expiresAt ? new Date(expiresAt) : null;
+    const patch: Partial<typeof discountCodes.$inferInsert> = {};
+    if (data.code      !== undefined) patch.code      = data.code;
+    if (data.type      !== undefined) patch.type      = data.type;
+    if (data.value     !== undefined) patch.value     = data.value;
+    if (data.maxUses   !== undefined) patch.maxUses   = data.maxUses;
+    if (data.active    !== undefined) patch.active    = data.active;
+    if (data.expiresAt !== undefined) patch.expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
     const updated = await db.update(discountCodes)
         .set(patch)
         .where(and(eq(discountCodes.id, id), eq(discountCodes.tenantId, tenantId)))

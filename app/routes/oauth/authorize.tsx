@@ -299,7 +299,7 @@ export function ConsentForm({
               <button
                 type="button"
                 onClick={selectAllRead}
-                className="font-semibold text-ih-primary hover:underline"
+                className="font-semibold text-ih-primary-text hover:underline"
               >
                 {m.oauth_authorize_select_all_read()}
               </button>

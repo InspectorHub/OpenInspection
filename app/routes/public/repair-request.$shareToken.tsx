@@ -3,6 +3,7 @@ import type { Route } from "./+types/repair-request.$shareToken";
 import { createApi } from "~/lib/api-client.server";
 import { PublicNotice } from "~/components/PublicNotice";
 import { formatCents } from "~/lib/money";
+import type { RepairActionTag } from "~/lib/repair-action-tag";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -26,6 +27,9 @@ interface ShareItem {
   commentSnapshot: string | null;
   requestedCreditCents: number | null;
   note: string | null;
+  // #275 — what the buyer asked for on this line. Optional because every item
+  // added before the column existed has none, and an untagged item is valid.
+  repairActionTag?: RepairActionTag | null;
 }
 
 interface ShareApiData {
@@ -46,6 +50,11 @@ export interface ShareViewRow {
   comment: string;
   note: string | null;
   creditDisplay: string;
+  /** #275 — kept as the raw enum value, not a label. `sharePriorityLabel`
+   *  resolves `category` at RENDER time so the paraglide locale scope is the
+   *  request's; baking a string in here would freeze whichever locale the view
+   *  model was built under. */
+  actionTag: RepairActionTag | null;
 }
 
 export interface ShareViewModel {
@@ -74,6 +83,7 @@ export function shareViewModel(data: ShareApiData): ShareViewModel {
       item.requestedCreditCents == null
         ? "—"
         : formatCents(item.requestedCreditCents),
+    actionTag: item.repairActionTag ?? null,
   }));
   return {
     state: "ok",
@@ -93,6 +103,19 @@ function sharePriorityLabel(category: string): string {
     case "recommendation": return m.portal_repair_category_recommendation();
     case "maintenance": return m.portal_repair_category_maintenance();
     default: return category;
+  }
+}
+
+/** #275 — localize the action tag. Resolved at call time for the paraglide
+ *  locale scope, exactly like `sharePriorityLabel` above. The switch is
+ *  exhaustive over `RepairActionTag`, so adding a value to the vocabulary
+ *  fails the type-check here rather than rendering a raw enum word. */
+function shareActionTagLabel(tag: RepairActionTag): string {
+  switch (tag) {
+    case "repair": return m.repair_request_action_tag_repair();
+    case "replace": return m.repair_request_action_tag_replace();
+    case "fund": return m.repair_request_action_tag_fund();
+    case "other": return m.repair_request_action_tag_other();
   }
 }
 
@@ -177,7 +200,7 @@ export default function RepairRequestSharePage() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 print:py-4">
       {/* Header */}
       <header className="mb-6">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">
           {m.repair_request_eyebrow()}
         </p>
         <h1 className="text-[24px] sm:text-[28px] font-semibold tracking-tight text-ih-fg-1 leading-tight">
@@ -200,7 +223,7 @@ export default function RepairRequestSharePage() {
       ) : (
         <div className="rounded-lg border border-ih-border overflow-hidden mb-8">
           {/* Table header */}
-          <div className="grid grid-cols-[1fr_1fr_2fr_auto_1fr_auto] gap-0 bg-ih-bg-muted border-b border-ih-border px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-4">
+          <div className="grid grid-cols-[1fr_1fr_2fr_auto_1fr_auto] gap-0 bg-ih-bg-muted border-b border-ih-border px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-2">
             <span>{m.repair_request_col_section()}</span>
             <span>{m.repair_request_col_item()}</span>
             <span>{m.repair_request_col_finding()}</span>
@@ -225,7 +248,7 @@ export default function RepairRequestSharePage() {
                   <span className="block font-semibold text-ih-fg-1">{row.defectTitle}</span>
                 )}
                 {row.location && (
-                  <span className="block text-[11px] text-ih-fg-4">
+                  <span className="block text-[11px] text-ih-fg-3">
                     {m.repair_request_col_location_prefix()} {row.location}
                   </span>
                 )}
@@ -236,7 +259,7 @@ export default function RepairRequestSharePage() {
                 {row.trade && (
                   <span
                     data-testid="share-row-trade"
-                    className="block text-[11px] text-ih-fg-4"
+                    className="block text-[11px] text-ih-fg-3"
                   >
                     <span className="font-bold uppercase tracking-wider">
                       {m.repair_request_col_trade_prefix()}
@@ -247,12 +270,34 @@ export default function RepairRequestSharePage() {
               </span>
               <span className="pr-3">
                 {row.category && (
-                  <span className="inline-flex items-center h-5 px-2 rounded bg-ih-bg-muted text-ih-fg-3 text-[10px] font-bold uppercase tracking-wider">
+                  <span className="inline-flex items-center h-5 px-2 rounded bg-ih-bg-muted text-ih-fg-2 text-[10px] font-bold uppercase tracking-wider">
                     {sharePriorityLabel(row.category)}
                   </span>
                 )}
               </span>
-              <span className="text-ih-fg-3 pr-3 leading-snug">{row.note ?? ""}</span>
+              {/* #275 — the requested action sits in the NOTE cell, beside the
+                  buyer's own prose and one column from their credit, NOT in the
+                  Finding cell with the defect title, comment and recommended
+                  trade. Everything in that cell is inspector-authored; the tag
+                  is the buyer's ask, and a seller reading "Replace" under the
+                  inspector's content would read it as the inspector's call. The
+                  amount attribution below says whose numbers these are — this
+                  keeps the layout saying the same thing.
+
+                  NOT inside any `print:hidden` region: the PDF is this page
+                  re-rendered through the print stylesheet, so a hidden element
+                  is absent from the file the seller actually receives. */}
+              <span className="text-ih-fg-3 pr-3 leading-snug">
+                {row.actionTag && (
+                  <span data-testid="share-row-action-tag" className="block text-[11px] text-ih-fg-3">
+                    <span className="font-bold uppercase tracking-wider">
+                      {m.repair_request_action_tag_prefix()}
+                    </span>{" "}
+                    {shareActionTagLabel(row.actionTag)}
+                  </span>
+                )}
+                {row.note ?? ""}
+              </span>
               <span className="text-right font-mono tabular-nums text-ih-fg-1 min-w-[80px]">
                 {row.creditDisplay}
               </span>
@@ -288,13 +333,13 @@ export default function RepairRequestSharePage() {
           repair-request-share-attribution.test.tsx. */}
       <p
         data-testid="amount-attribution"
-        className="mt-8 text-[11px] leading-relaxed text-ih-fg-4"
+        className="mt-8 text-[11px] leading-relaxed text-ih-fg-3"
       >
         {m.repair_request_amount_attribution()}
       </p>
 
       {/* Footer */}
-      <footer className="print:hidden mt-10 pt-6 border-t border-ih-border text-[11px] text-ih-fg-4 text-center">
+      <footer className="print:hidden mt-10 pt-6 border-t border-ih-border text-[11px] text-ih-fg-3 text-center">
         {m.repair_request_footer_1()}{" "}
         <strong className="text-ih-fg-3">OpenInspection</strong>{m.repair_request_footer_2()}
       </footer>

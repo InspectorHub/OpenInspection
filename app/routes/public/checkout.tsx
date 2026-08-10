@@ -163,7 +163,7 @@ export default function CheckoutPage() {
         <CheckoutShell brandStyle={brandStyle} companyName={checkout.branding.companyName}>
             {/* Progress header */}
             <div className="px-6 pt-6 sm:px-8 border-b border-ih-border pb-5">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary mb-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary-text mb-2">
                     {m.checkout_progress_eyebrow()}
                 </p>
                 <h1 className="text-lg font-bold text-ih-fg-1 tracking-tight">{checkout.agreement.name}</h1>

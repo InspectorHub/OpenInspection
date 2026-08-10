@@ -55,6 +55,26 @@ export const UpdateDiscountCodeSchema = z.object({
     active:    z.boolean().optional().describe('TODO describe active field for the OpenInspection MCP integration'),
 }).openapi('UpdateDiscountCode');
 
+// The row as it goes over the wire. `GET /api/services/discount-codes` and
+// `PUT /api/services/discount-codes/{id}` both used to declare the generic
+// SuccessResponseSchema (`data?: { success: boolean }`), which described
+// nothing they actually send — a copy-paste of the no-payload envelope.
+const DiscountCodeSchema = z.object({
+    id:        z.string().describe('Discount code id.'),
+    tenantId:  z.string().describe('Owning tenant.'),
+    code:      z.string().describe('The redeemable code. Stored upper-cased; matching is case-insensitive.'),
+    type:      z.enum(['fixed', 'percent']).describe('fixed = a flat amount off; percent = a share of the subtotal off.'),
+    value:     z.number().int().describe('Integer cents when type is fixed, whole percent when type is percent.'),
+    maxUses:   z.number().int().nullable().describe('Redemption cap; null means unlimited.'),
+    usesCount: z.number().int().describe('Redemptions consumed so far.'),
+    expiresAt: z.string().nullable().describe('ISO 8601 expiry, or null when the code never expires.'),
+    active:    z.boolean().describe('False disables the code without deleting it or losing its usesCount.'),
+    createdAt: z.string().describe('ISO 8601 creation time.'),
+}).openapi('DiscountCode');
+
+export const DiscountCodeListResponseSchema = createApiResponseSchema(z.array(DiscountCodeSchema));
+export const DiscountCodeResponseSchema     = createApiResponseSchema(DiscountCodeSchema);
+
 export const ValidateDiscountSchema = z.object({
     code:     z.string().min(1).describe('TODO describe code field for the OpenInspection MCP integration'),
     subtotal: z.number().int().min(0).describe('TODO describe subtotal field for the OpenInspection MCP integration'),

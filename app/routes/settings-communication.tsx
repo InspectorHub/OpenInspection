@@ -745,10 +745,10 @@ export default function SettingsCommunication() {
         <div className="flex items-baseline justify-between">
           <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_comms_email_templates_heading()}</h3>
           <div className="flex items-center gap-3">
-            <Link to="/settings/communication/templates" className="inline-flex items-center gap-1 text-[12px] text-ih-primary font-semibold hover:underline">
+            <Link to="/settings/communication/templates" className="inline-flex items-center gap-1 text-[12px] text-ih-primary-text font-semibold hover:underline">
               {m.settings_comms_manage_templates_link()} <Icon name="arrowR" size={12} />
             </Link>
-            <span className="text-[11px] text-ih-fg-4">{m.settings_comms_templates_count({ count: emailTemplates.length })}</span>
+            <span className="text-[11px] text-ih-fg-3">{m.settings_comms_templates_count({ count: emailTemplates.length })}</span>
           </div>
         </div>
         {emailTemplates.length === 0 ? (

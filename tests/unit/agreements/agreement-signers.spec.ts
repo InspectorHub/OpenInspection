@@ -185,7 +185,10 @@ describe('AgreementService — signer-level envelope state machine', () => {
 
         // one — second inspection/envelope to keep them separate
         const INSP2 = '00000000-0000-0000-0000-000000000011';
-        await testDb.insert(schema.inspections).values({ id: INSP2, tenantId: TENANT_A, propertyAddress: '2 Main', clientName: 'X', clientEmail: 'x@test.com', date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 1, createdAt: new Date() });
+        // No clientName/clientEmail: those columns were DROPPED from `inspections`
+        // (schema/inspection/core.ts). Nothing here needs a default signer —
+        // findOrCreate below is given both signers explicitly.
+        await testDb.insert(schema.inspections).values({ id: INSP2, tenantId: TENANT_A, propertyAddress: '2 Main', date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 1, createdAt: new Date() });
         const rOne = await svc.findOrCreate(TENANT_A, INSP2, {
             signers: [{ name: 'Jane', email: 'jane@test.com' }, { name: 'John', email: 'john@test.com' }],
             completionPolicy: 'one',

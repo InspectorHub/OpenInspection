@@ -83,7 +83,7 @@ export default function ForgotPasswordPage() {
         </p>
         <a
           href="/forgot-password"
-          className="mt-6 inline-block text-sm font-bold text-ih-primary hover:underline"
+          className="mt-6 inline-block text-sm font-bold text-ih-primary-text hover:underline"
         >
           {m.auth_forgot_sent_different_email()}
         </a>
@@ -96,7 +96,7 @@ export default function ForgotPasswordPage() {
       heading={m.auth_forgot_heading()}
       subtitle={m.auth_forgot_subtitle()}
       footer={
-        <a href="/login" className="font-bold text-ih-primary hover:underline">
+        <a href="/login" className="font-bold text-ih-primary-text hover:underline">
           {m.auth_forgot_back_to_login()}
         </a>
       }

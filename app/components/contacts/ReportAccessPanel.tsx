@@ -98,7 +98,7 @@ export function ReportAccessPanel({
                 <div className="min-w-0">
                   <Link
                     to={`/inspections/${a.inspectionId}`}
-                    className="text-[13px] font-medium text-ih-fg-1 hover:text-ih-primary hover:underline"
+                    className="text-[13px] font-medium text-ih-fg-1 hover:text-ih-primary-text hover:underline"
                   >
                     {a.propertyAddress || a.inspectionId.slice(0, 8)}
                   </Link>
@@ -108,7 +108,7 @@ export function ReportAccessPanel({
                       the same data — so this should read through it. Left as-is
                       here because the fix belongs with IA-107's consolidation of
                       the three competing role vocabularies, not ahead of it. */}
-                  <p className="text-[11px] text-ih-fg-4">{a.role}</p>
+                  <p className="text-[11px] text-ih-fg-3">{a.role}</p>
                 </div>
                 <revokeFetcher.Form method="post">
                   <input type="hidden" name="intent" value="revoke-access" />

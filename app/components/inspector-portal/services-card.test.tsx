@@ -12,6 +12,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { ServicesCard, type ServiceLine, type CatalogService } from "./ServicesCard";
+import { asSelect } from "../../../tests/helpers/dom";
 
 vi.mock("react-router", () => ({
   useFetcher: () => ({ state: "idle", data: undefined, submit: vi.fn(), Form: "form" }),
@@ -57,7 +58,7 @@ describe("ServicesCard", () => {
     render(<ServicesCard services={LINES} catalog={CATALOG} canManage />);
     fireEvent.click(screen.getByRole("button", { name: "Add service" }));
 
-    const select = screen.getByTestId("hub-add-service-select") as HTMLSelectElement;
+    const select = asSelect(screen.getByTestId("hub-add-service-select"));
     const values = Array.from(select.options).map((o) => o.value).filter(Boolean);
     expect(values).toEqual(["s3"]);
   });

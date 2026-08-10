@@ -22,11 +22,13 @@ describe("DefectCategoryChip", () => {
     expect(out).toContain(">recommendation<");
   });
 
-  it("maps maintenance / any other value to the muted tokens (fg-3, canonical)", () => {
+  it("maps maintenance / any other value to the muted tokens (fg-2, canonical)", () => {
+    // fg-2, not fg-3: this pill is 9px on --ih-bg-muted, where light fg-3 is
+    // 4.34:1 — under the AA floor for normal-size text. See DEFAULT_TOKENS.
     const out = html("maintenance");
     expect(out).toContain("bg-ih-bg-muted");
-    expect(out).toContain("text-ih-fg-3");
-    expect(out).not.toContain("text-ih-fg-2");
+    expect(out).toContain("text-ih-fg-2");
+    expect(out).not.toContain("text-ih-fg-3");
     expect(out).toContain(">maintenance<");
   });
 
@@ -40,7 +42,7 @@ describe("DefectCategoryChip", () => {
   it("a data-driven color wins over the category tokens (allowed user-color exemption)", () => {
     const out = html("maintenance", undefined, "#ff8800");
     expect(out).toContain("color:#ff8800");
-    expect(out).not.toContain("text-ih-fg-3");
+    expect(out).not.toContain("text-ih-fg-2");
     expect(out).toContain("bg-ih-bg-muted");
   });
 

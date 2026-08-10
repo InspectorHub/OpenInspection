@@ -15,9 +15,18 @@
   --color-ih-primary-tint: var(--ih-primary-tint);
   --color-ih-primary-glow: var(--ih-primary-glow);
   /* Readable foreground for content on `bg-ih-primary`. Defaults to white
-     (the stock primary is dark); brandTokens() re-points it per surface via
-     a YIQ contrast pick so a bright brand color flips to dark text. */
+     (the stock primary is dark); brandTokens() re-points it per surface by
+     measuring both candidate WCAG ratios, so a bright brand color flips to
+     dark text. */
   --color-ih-primary-fg: var(--ih-primary-fg, #ffffff);
+  /* The brand as TEXT — a different role from the brand as FILL. A tenant's
+     "my colour" means buttons and accent bars, and `--ih-primary` keeps their
+     exact hex for those; this one may move along the lightness axis until it
+     clears 4.5:1 on the card, because 63.6% of sRGB fails AA as text on white
+     and one token cannot promise both fidelity and readability. Glyphs take
+     `text-ih-primary-text`; `text-ih-primary` is only for a brand FILL
+     (e.g. a checkbox accent). */
+  --color-ih-primary-text: var(--ih-primary-text);
 
   /* ── Foreground / text ── */
   --color-ih-fg-1: var(--ih-fg-1);
@@ -86,11 +95,20 @@
 
 /* ── CSS custom properties: light mode (default) ── */
 :root {
-  --ih-primary: #6366f1;
+  /* #6366f1 (indigo-500) measured 4.47:1 on the white card — 0.03 short, and
+     symmetric, so the same 4.47 governed an indigo link AND white label text
+     on a filled indigo button. #6265f0 is one step of 1/255 per channel and
+     measures 4.53:1: below the threshold of vision, a correctness fix rather
+     than a visual one, and it retires 193 `lint:contrast` reports. */
+  --ih-primary: #6265f0;
   --ih-primary-600: #4f46e5;
   --ih-primary-700: #4338ca;
   --ih-primary-tint: rgba(99, 102, 241, 0.10);
   --ih-primary-glow: rgba(99, 102, 241, 0.25);
+  /* Equal to --ih-primary because the fixed default already clears 4.5:1 on
+     --ih-bg-card; a tenant colour that does not is moved down the lightness
+     axis by brandTokens() until it does. */
+  --ih-primary-text: #6265f0;
 
   --ih-fg-1: #0f172a;
   --ih-fg-2: #475569;
@@ -120,7 +138,11 @@
   --ih-status-watch: #f59e0b;
   --ih-status-watch-bg: #fffbeb;
   --ih-status-watch-fg: #b45309;
-  --ih-status-bad: #ef4444;
+  /* red-600, not red-500. `--ih-status-bad` is a FILL: five destructive
+     buttons put white text on it, and on #ef4444 that is 3.76:1. #dc2626
+     measures 4.83:1. This one IS visible — a deeper red — and is deliberate;
+     a danger colour that cannot carry its own label is not a danger colour. */
+  --ih-status-bad: #dc2626;
   --ih-status-bad-bg: #fef2f2;
   --ih-status-bad-fg: #be123c;
   --ih-status-info: #0ea5e9;
@@ -146,6 +168,10 @@ html[data-color-scheme="dark"], html[data-color-scheme="field"], .dark {
   --ih-primary-700: #4f46e5;
   --ih-primary-tint: rgba(129, 140, 248, 0.10);
   --ih-primary-glow: rgba(129, 140, 248, 0.25);
+  /* 4.90:1 on the dark card — already clears, so text and fill agree here.
+     The derivation's direction reverses in dark: a failing brand colour is
+     moved UP the lightness axis, not down. */
+  --ih-primary-text: #818cf8;
 
   --ih-fg-1: #f1f5f9;
   --ih-fg-2: #cbd5e1;
@@ -174,6 +200,13 @@ html[data-color-scheme="dark"], html[data-color-scheme="field"], .dark {
   --ih-status-ok-fg: #34d399;
   --ih-status-watch-bg: rgba(245, 158, 11, 0.10);
   --ih-status-watch-fg: #fbbf24;
+  /* Stays red-500 while light moved to red-600, because `--ih-fg-inverse` is
+     not the same colour in the two themes: light puts WHITE on this fill and
+     needs it darker (#dc2626 = 4.83:1, #ef4444 was 3.76:1), dark/field put
+     near-black #0f172a on it and need it LIGHTER (4.74:1 vs 3.70:1). Until
+     this line the token was declared once in `:root` and inherited here, so
+     darkening it for light silently broke both dark themes. */
+  --ih-status-bad: #ef4444;
   --ih-status-bad-bg: rgba(239, 68, 68, 0.10);
   --ih-status-bad-fg: #f87171;
   --ih-status-info-bg: rgba(14, 165, 233, 0.10);
@@ -192,6 +225,9 @@ html[data-color-scheme="dark"], html[data-color-scheme="field"], .dark {
    from the dark block above. */
 html[data-color-scheme="field"] {
   font-size: 18px;
+
+  /* Restated (field's card is darker, #0f172a): 5.99:1 here. */
+  --ih-primary-text: #818cf8;
 
   --ih-fg-1: #ffffff;
   --ih-fg-2: #e2e8f0;
@@ -285,6 +321,45 @@ html[data-color-scheme="field"] {
 .ih-pill--monitor { background: var(--ih-status-watch-bg); color: var(--ih-status-watch-fg); }
 .ih-pill--defect { background: var(--ih-status-bad-bg); color: var(--ih-status-bad-fg); }
 .ih-pill--ni { background: var(--ih-bg-muted); color: var(--ih-fg-3); }
+
+/* ── Agreement body typography (#67) ──
+   The ONE place the shape of an agreement is described, shared by the editor
+   (`AgreementRichText`) and by every surface that renders a stored agreement,
+   so an author and a signer see the same document.
+
+   It exists because those render surfaces asked for `prose prose-sm`, and
+   `@tailwindcss/typography` is not installed — the classes matched no rule at
+   all. Under Tailwind's preflight reset that left `<h2>` and `<h3>` at body
+   size and weight and `<ul>`/`<ol>` with no marker and no indent, so an
+   agreement's headings and lists were invisible on the very page a client signs
+   it, while both sanitizers went on carefully permitting those tags.
+
+   Kept to exactly the tags `sanitizeAgreementHtml()` allows: adding a rule here
+   for anything else would describe markup that cannot survive to the page. */
+.ih-agreement-prose > * + * { margin-top: 0.75em; }
+.ih-agreement-prose h2 {
+  font-size: 1.125em;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ih-fg-1);
+}
+.ih-agreement-prose h3 {
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ih-fg-1);
+}
+.ih-agreement-prose h2 + *,
+.ih-agreement-prose h3 + * { margin-top: 0.35em; }
+.ih-agreement-prose ul,
+.ih-agreement-prose ol { padding-left: 1.5em; }
+.ih-agreement-prose ul { list-style: disc; }
+.ih-agreement-prose ol { list-style: decimal; }
+.ih-agreement-prose li { display: list-item; }
+.ih-agreement-prose li + li { margin-top: 0.25em; }
+.ih-agreement-prose strong { font-weight: 700; }
+.ih-agreement-prose em { font-style: italic; }
+.ih-agreement-prose u { text-decoration: underline; }
 
 /* ── Row hover-reveal pattern §3.6 ── */
 .ih-row .ih-row__hover { opacity: 0; transition: opacity 140ms; }

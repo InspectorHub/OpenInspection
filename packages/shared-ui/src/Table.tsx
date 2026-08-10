@@ -29,8 +29,13 @@ const alignClass: Record<TableAlign, string> = {
   center: "text-center",
 };
 
+// `text-ih-fg-3`, not fg-4: at 10px this is normal-size text for WCAG (the
+// large-text exemption starts at 18.66px bold), and fg-4 measures 2.56:1 on a
+// light card and 3.07:1 on a dark one against a 4.5:1 requirement. fg-3 is
+// 4.76:1 / 5.71:1. This is the column header of every table in the product, so
+// the token is pinned by Table.test.tsx as well as by `npm run lint:contrast`.
 const HEADER_CLASS =
-  "py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4";
+  "py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-3";
 
 export function Table<T>({
   columns,

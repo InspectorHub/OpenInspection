@@ -89,9 +89,10 @@ async function syncFromQbo(inv: Omit<InvoiceSummary, 'SyncToken'> & { SyncToken?
     await qbo['applyInvoiceStatusFromQBO'](
         TENANT,
         { SyncToken: '1', ...inv },
-        (invoiceId, tenantId) => invoiceSvc.markPaid(invoiceId, tenantId, 'qbo'),
-        (invoiceId, amountPaidCents, tenantId) =>
-            invoiceSvc.markPartial(invoiceId, tenantId, 'qbo', amountPaidCents),
+        async (invoiceId, tenantId) => { await invoiceSvc.markPaid(invoiceId, tenantId, 'qbo'); },
+        async (invoiceId, amountPaidCents, tenantId) => {
+            await invoiceSvc.markPartial(invoiceId, tenantId, 'qbo', amountPaidCents);
+        },
     );
 }
 

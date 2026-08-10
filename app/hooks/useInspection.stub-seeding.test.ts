@@ -41,6 +41,7 @@ describe("useInspectionState — Phase U stub seeding", () => {
         inspection,
         schema,
         results: { "u1:s1:i1": { rating: "good", notes: "n", photos: [] } },
+        locale: "en-US",
         activeUnitId: "u1",
       }),
     );

@@ -71,7 +71,25 @@ export interface AppEnv {
     // Communication
     RESEND_API_KEY: string;
     SENDER_EMAIL: string;
-    
+    /**
+     * BYO email provider credentials (#195) — SendGrid / Postmark / Mailgun.
+     *
+     * These are NEVER wrangler bindings. They are members of
+     * `INTEGRATION_SECRET_KEYS` (lib/secrets-catalog.ts), so they are saved
+     * encrypted into `tenant_configs.secrets_enc` and merged into `c.env` in
+     * place at request time by `integrationSecretsMiddleware` — the same path
+     * that already supplies RESEND_API_KEY / TWILIO_* / TELNYX_* for a
+     * bring-your-own tenant.
+     *
+     * Optional, because a tenant that has not configured a BYO provider has
+     * none of them. Every reader must fail closed (503) rather than assume a
+     * value; see POST /api/integrations/email/validate.
+     */
+    SENDGRID_API_KEY?: string;
+    POSTMARK_SERVER_TOKEN?: string;
+    MAILGUN_API_KEY?: string;
+    MAILGUN_DOMAIN?: string;
+
     // System Defaults
     APP_NAME: string;
     PRIMARY_COLOR: string;

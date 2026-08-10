@@ -360,7 +360,7 @@ export default function InvoicesPage() {
         />
       </Card>
 
-      <p className="text-[12px] text-ih-fg-4">
+      <p className="text-[12px] text-ih-fg-3">
         {m.invoices_footer_note()}
       </p>
     </div>

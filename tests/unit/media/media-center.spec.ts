@@ -74,10 +74,13 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
             id:               INSPECTION_ID,
             tenantId:         TENANT,
             propertyAddress:  '1 Main St',
-            clientName:       'Test Client',
-            clientEmail:      'c@example.com',
+            // clientName/clientEmail were DROPPED from `inspections`.
             date:             '2026-06-01',
-            status:           'in_progress',
+            // Was 'in_progress', which is a REPORT status, not an inspection one
+            // (INSPECTION_STATUSES = requested|scheduled|confirmed|completed|
+            // cancelled). getMediaCenter reads neither, so this row's status is
+            // scaffolding — but it has to be a status that can exist.
+            status:           'confirmed',
             paymentStatus:    'unpaid',
             price:            0,
             paymentRequired:  false,

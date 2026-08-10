@@ -44,7 +44,7 @@ export function EmbedWidgetPanel({ tenant }: { tenant: string | null | undefined
             onClick={() => setStyle(s.id)}
             className={`h-9 px-4 rounded-md border-2 text-[13px] font-bold transition-colors ${
               style === s.id
-                ? "border-ih-primary text-ih-primary bg-ih-primary-tint"
+                ? "border-ih-primary text-ih-primary-text bg-ih-primary-tint"
                 : "border-ih-border text-ih-fg-2 hover:border-ih-border"
             }`}
           >

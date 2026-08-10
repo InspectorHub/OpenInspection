@@ -11,7 +11,11 @@ import {
     SuggestCommentResponseSchema,
     CommentEditSchema,
     CommentEditResponseSchema,
+    AiContentReviewSchema,
+    AiContentReviewResponseSchema,
 } from '../lib/validations/ai.schema';
+import { recordContentReview } from '../lib/ai/content-review';
+import { Errors } from '../lib/errors';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
 /**
@@ -130,21 +134,52 @@ const suggestCommentRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createAiSuggestComment (POST /suggest-comment, ai domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
+// Each handler returns the service result AS ITS `data`, rather than picking
+// fields out of it. The service already shapes the payload — text/summary/
+// rewritten/suggestions plus the `aiCallId` a content-review record cites — and
+// a handler that re-listed those fields is exactly where the next field gets
+// dropped on the way out.
+/**
+ * POST /api/ai/reviews
+ *
+ * Records that a person reviewed model-assisted text before publication (#61).
+ * NOT "accept": counsel refused the reading that a user clicking confirm
+ * absolves the platform, so the verb here and in every label is `review`.
+ */
+const contentReviewRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/reviews',
+    tags: ["ai"],
+    summary: 'Record a human review of AI-assisted content',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        body: { content: { 'application/json': { schema: AiContentReviewSchema } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: AiContentReviewResponseSchema } },
+            description: 'The review is on file',
+        },
+    },
+    operationId: "createAiContentReview",
+    description: "Record that a named user reviewed the output of one AI call attached to one artifact. Idempotent on (person, artifact, call): a retry is a no-op, and a second REVIEWER is a second row rather than a duplicate.",
+}, { scopes: ['write'], tier: 'extended' }));
+
 const aiRoutes = createApiRouter()
     .openapi(commentAssistRoute, async (c) => {
         const { text, context } = c.req.valid('json');
         const service = c.var.services.ai;
 
-        const professionalText = await service.generateProfessionalComment(text, context);
-        return c.json({ success: true, data: { text: professionalText } }, 200);
+        const data = await service.generateProfessionalComment(text, context);
+        return c.json({ success: true, data }, 200);
     })
     .openapi(autoSummaryRoute, async (c) => {
         const { inspectionId } = c.req.valid('json');
         const tenantId = c.get('tenantId');
         const service = c.var.services.ai;
 
-        const summary = await service.generateInspectionSummary(tenantId, inspectionId);
-        return c.json({ success: true, data: { summary } }, 200);
+        const data = await service.generateInspectionSummary(tenantId, inspectionId);
+        return c.json({ success: true, data }, 200);
     })
     .openapi(commentEditRoute, async (c) => {
         await checkRateLimit(c, 'ai-comment-edit');
@@ -159,13 +194,43 @@ const aiRoutes = createApiRouter()
             ...(input.category !== undefined ? { category: input.category } : {}),
             ...(input.location !== undefined ? { location: input.location } : {}),
         };
-        const rewritten = await c.var.services.ai.rewriteComment(payload);
-        return c.json({ success: true, data: { rewritten } }, 200);
+        const data = await c.var.services.ai.rewriteComment(payload);
+        return c.json({ success: true, data }, 200);
     })
     .openapi(suggestCommentRoute, async (c) => {
-        const params = c.req.valid('json');
-        const suggestions = await c.var.services.ai.suggestComment(params);
-        return c.json({ success: true, data: suggestions });
+        const input = c.req.valid('json');
+        // Same strip as rewriteComment above. `SuggestCommentPromptArgs` declares
+        // rating/yearBuilt/sqft as ABSENT-able, and the prompt renderer tests them
+        // for truthiness — so an omitted field and an explicitly-undefined one
+        // produce the identical prompt. Build the argument without the keys the
+        // caller did not send rather than widening the prompt contract.
+        const params = {
+            itemName:    input.itemName,
+            sectionName: input.sectionName,
+            ...(input.rating    !== undefined ? { rating:    input.rating }    : {}),
+            ...(input.yearBuilt !== undefined ? { yearBuilt: input.yearBuilt } : {}),
+            ...(input.sqft      !== undefined ? { sqft:      input.sqft }      : {}),
+        };
+        const data = await c.var.services.ai.suggestComment(params);
+        return c.json({ success: true, data });
+    })
+    .openapi(contentReviewRoute, async (c) => {
+        const body = c.req.valid('json');
+        // The reviewer is WHOEVER IS AUTHENTICATED, never a field in the body.
+        // A client-supplied reviewer id would let one account file a review in
+        // another person's name, and naming the person IS the claim this row
+        // exists to make.
+        const reviewedBy = (c.get('user') as { sub?: string } | undefined)?.sub;
+        if (!reviewedBy) throw Errors.Unauthorized('A review must name the person who made it.');
+        await recordContentReview({
+            db: c.env.DB,
+            tenantId: c.get('tenantId'),
+            artifactType: body.artifactType,
+            artifactId: body.artifactId,
+            reviewedBy,
+            aiCallId: body.aiCallId,
+        });
+        return c.json({ success: true, data: { reviewed: true as const } }, 200);
     });
 
 export type AiApi = typeof aiRoutes;

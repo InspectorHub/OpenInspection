@@ -24,7 +24,7 @@ async function seedTenant(testDb: BetterSQLite3Database<typeof schema>) {
     });
     await testDb.insert(schema.users).values({
         id: ADMIN, tenantId: TENANT, email: 'admin@acme.test',
-        passwordHash: 'x', role: 'admin', createdAt: new Date(),
+        passwordHash: 'x', role: 'owner', createdAt: new Date(),
     });
 }
 
@@ -57,15 +57,17 @@ describe('TeamService.createInvite — canonical roles', () => {
         expect(JSON.parse(row?.assignedSectionIds ?? '[]')).toEqual([]);
     });
 
-    it('creates an admin invite', async () => {
+    // 'manager' is the administrator-tier role that is not the account owner
+    // (server/lib/auth/roles.ts). 'admin' has never been a member of ROLES.
+    it('creates a manager invite', async () => {
         const out = await svc.createInvite({
             tenantId: TENANT,
             email:    'office@acme.test',
-            role:     'admin',
+            role:     'manager',
         });
         const row = await testDb.select().from(schema.tenantInvites)
             .where(eq(schema.tenantInvites.id, out.token)).get();
-        expect(row?.role).toBe('admin');
+        expect(row?.role).toBe('manager');
         expect(row?.mentorId).toBeNull();
         expect(JSON.parse(row?.assignedSectionIds ?? '[]')).toEqual([]);
     });

@@ -43,7 +43,7 @@ export function ReportSummaryStats({ sections, total }: { sections: ReportSectio
         {summaryCards.map((s) => (
           <div key={s.label} className={`bg-ih-bg-card border border-ih-border rounded-lg p-4 text-center ${PRINT_CARD_CLASS}`}>
             <div className={`text-2xl font-bold ${s.color ? "" : "text-ih-fg-1"}`} style={s.color ? { color: s.color } : undefined}>{s.value}</div>
-            <div className="text-[11px] text-ih-fg-4 uppercase tracking-widest mt-1">
+            <div className="text-[11px] text-ih-fg-3 uppercase tracking-widest mt-1">
               {s.label}
             </div>
           </div>

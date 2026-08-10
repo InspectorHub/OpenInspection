@@ -246,7 +246,7 @@ export default function TeamPage() {
                           <resendFetcher.Form method="post" className="inline">
                             <input type="hidden" name="intent" value="resend-invite" />
                             <input type="hidden" name="token" value={member.token} />
-                            <button type="submit" disabled={resendFetcher.state !== "idle"} className="text-[12px] font-medium text-ih-primary hover:underline disabled:opacity-50">
+                            <button type="submit" disabled={resendFetcher.state !== "idle"} className="text-[12px] font-medium text-ih-primary-text hover:underline disabled:opacity-50">
                               {m.settings_team_resend_invite()}
                             </button>
                           </resendFetcher.Form>

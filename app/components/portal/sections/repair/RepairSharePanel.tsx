@@ -42,7 +42,7 @@ export function RepairSharePanel({
   const pdf = usePdfExport();
   return (
     <div className="bg-ih-bg-card border border-ih-border rounded-xl p-5 space-y-4">
-      <p className="text-[12px] font-bold text-ih-fg-4 uppercase tracking-widest">{m.repair_share_heading()}</p>
+      <p className="text-[12px] font-bold text-ih-fg-3 uppercase tracking-widest">{m.repair_share_heading()}</p>
       <div className="flex flex-wrap gap-3">
         {shareUrl && (
           <>
@@ -73,7 +73,7 @@ export function RepairSharePanel({
       {/* Email form */}
       {shareToken && !emailSent && (
         <div className="space-y-2 pt-2 border-t border-ih-border">
-          <p className="text-[12px] font-bold text-ih-fg-4 uppercase tracking-widest">
+          <p className="text-[12px] font-bold text-ih-fg-3 uppercase tracking-widest">
             {m.repair_share_email_heading()}
           </p>
           <input

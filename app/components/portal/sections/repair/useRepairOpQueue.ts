@@ -66,8 +66,38 @@ export function useRepairOpQueue({
         const fk = String(next.get("_findingKey") ?? "");
         const itemId = fk ? itemIdsRef.current[fk] : (next.get("itemId") as string | null);
         if (!itemId) {
-          // Item not on the server (e.g. added+removed before its add resolved,
-          // or never persisted) — nothing to do; skip and continue draining.
+          // ⚠️ TWO DIFFERENT SITUATIONS LOOK IDENTICAL HERE, and treating them the
+          // same lost the client's edits.
+          //
+          // This branch used to drop the op unconditionally, justified by one
+          // case — "added and removed before its add resolved". But it also
+          // caught the case where the add is STILL IN FLIGHT and about to
+          // succeed, which is the ordinary path: tick a defect, then immediately
+          // choose an action or type a note. The op was discarded with the row
+          // still showing the choice, no error, and the column left NULL.
+          //
+          // It is reachable because `drainQueue`'s own `state !== "idle"` guard
+          // reads a value CAPTURED at render, while a click handler can hold a
+          // closure from before the add was submitted. `inFlightAddKeyRef` is a
+          // ref, so it reads the truth at call time — which is why the check
+          // below uses it rather than the fetcher state.
+          const addPending =
+            inFlightAddKeyRef.current === fk ||
+            opQueueRef.current.some(
+              (op) => op.get("_intent") === "add-item" && String(op.get("findingKey") ?? "") === fk,
+            );
+          if (addPending) {
+            // Put it back at the FRONT and stop draining. The settle effect
+            // drains again once the add resolves, and by then the id is known.
+            // Order matters: a later update for the same item must not overtake
+            // this one.
+            opQueueRef.current.unshift(next);
+            return;
+          }
+          // No add pending, so this item will never exist on the server —
+          // genuinely nothing to do. This also bounds the deferral: a FAILED add
+          // clears the ref, so the next drain reaches here and drops instead of
+          // requeueing forever.
           next = opQueueRef.current.shift();
           continue;
         }

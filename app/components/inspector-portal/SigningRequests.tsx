@@ -42,7 +42,7 @@ function ProgressBadge({ req }: { req: HubAgreementRequest }) {
 }
 
 function EvidenceLinks({ id }: { id: string }) {
-  const cls = "text-[12px] text-ih-primary hover:opacity-80 font-semibold";
+  const cls = "text-[12px] text-ih-primary-text hover:opacity-80 font-semibold";
   return (
     <div className="flex flex-wrap gap-3">
       <a className={cls} href={`/api/admin/agreement-requests/${id}/pdf`} target="_blank" rel="noopener noreferrer">
@@ -107,7 +107,7 @@ export function SigningRequests({
                     {req.status === "pending" && (
                       <button
                         type="button"
-                        className="text-[12px] text-ih-primary hover:opacity-80 font-semibold"
+                        className="text-[12px] text-ih-primary-text hover:opacity-80 font-semibold"
                         onClick={() => onPreSign(req.id)}
                       >
                         {m.agreement_request_sign_now()}
@@ -116,7 +116,7 @@ export function SigningRequests({
                     {canManageSigners && (
                       <button
                         type="button"
-                        className="text-[12px] text-ih-primary hover:opacity-80 font-semibold"
+                        className="text-[12px] text-ih-primary-text hover:opacity-80 font-semibold"
                         onClick={() => setExpandedId((cur) => (cur === req.id ? null : req.id))}
                         aria-expanded={expanded}
                       >

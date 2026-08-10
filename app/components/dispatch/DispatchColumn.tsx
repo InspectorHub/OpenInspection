@@ -30,7 +30,7 @@ export function TimeGutter({ hours, axisPx }: { hours: number[]; axisPx: number 
       {/* Two spacers, not one: the gutter has to line up with BOTH the column
           heading and the all-day strip, or every card sits an all-day row off. */}
       <div className="h-10 border-b border-ih-border" />
-      <div className="h-10 border-b border-ih-border pr-2 pt-2 text-right text-[10px] font-bold text-ih-fg-4">
+      <div className="h-10 border-b border-ih-border pr-2 pt-2 text-right text-[10px] font-bold text-ih-fg-3">
         {m.calendar_all_day()}
       </div>
       <div className="relative" style={{ height: `${axisPx}px` }}>
@@ -93,7 +93,7 @@ export function InspectorColumn({
         <span className="truncate text-[12px] font-bold text-ih-fg-1" title={inspectorLabel(inspector)}>
           {inspectorLabel(inspector)}
         </span>
-        <span className="ml-auto shrink-0 text-[11px] text-ih-fg-4">{timed.length + untimed.length}</span>
+        <span className="ml-auto shrink-0 text-[11px] text-ih-fg-3">{timed.length + untimed.length}</span>
       </div>
 
       <div className="h-10 space-y-1 overflow-y-auto border-b border-ih-border p-1">
@@ -146,7 +146,7 @@ export function InspectorColumn({
         )}
 
         {timed.length === 0 && untimed.length === 0 && (
-          <p className="absolute inset-x-0 top-4 text-center text-[11px] text-ih-fg-4">
+          <p className="absolute inset-x-0 top-4 text-center text-[11px] text-ih-fg-3">
             {m.dispatch_empty_day()}
           </p>
         )}

@@ -112,7 +112,7 @@ export function SecretField({
         )}
       </div>
       {hint && (
-        <p className="text-[11px] text-ih-fg-4">{hint}</p>
+        <p className="text-[11px] text-ih-fg-3">{hint}</p>
       )}
       {error && <p className="text-[11px] text-ih-bad-fg">{error}</p>}
     </div>

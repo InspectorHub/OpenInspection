@@ -74,13 +74,13 @@ function ContractorTypeRow({ t, idx, count, onMove, onRequestDelete }: { t: Cont
           <input type="hidden" name="intent" value="rename" />
           <input type="hidden" name="id" value={t.id} />
           <input name="name" value={name} onChange={(e) => setName(e.target.value)} autoFocus className={`flex-1 ${INPUT} py-1.5`} />
-          <button type="submit" disabled={!name.trim()} className="text-[12px] text-ih-primary font-bold disabled:opacity-50">{m.common_save()}</button>
+          <button type="submit" disabled={!name.trim()} className="text-[12px] text-ih-primary-text font-bold disabled:opacity-50">{m.common_save()}</button>
           <button type="button" onClick={() => { setEditing(false); setName(t.name); }} className="text-[12px] text-ih-fg-3">{m.common_cancel()}</button>
         </fetcher.Form>
       ) : (
         <>
           <span className="flex-1 font-bold text-[13px] text-ih-fg-1">{t.name}</span>
-          <button onClick={() => { setEditing(true); setName(t.name); }} className="text-[12px] text-ih-primary hover:underline font-bold">{m.settings_contractor_types_rename()}</button>
+          <button onClick={() => { setEditing(true); setName(t.name); }} className="text-[12px] text-ih-primary-text hover:underline font-bold">{m.settings_contractor_types_rename()}</button>
           <button onClick={onRequestDelete} aria-label={m.settings_contractor_types_delete_aria({ name: t.name })} className="text-[12px] text-ih-bad-fg hover:underline font-bold">{m.common_delete()}</button>
         </>
       )}

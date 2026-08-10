@@ -21,6 +21,7 @@ vi.mock('../../../server/lib/jwt-keyring', async (importOriginal) => {
 import portalRoutes from '../../../server/api/portal';
 import { PortalService } from '../../../server/services/portal.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { asD1Db } from '../helpers/test-db';
 
 /**
  * Spec 3 Task 7 — GET /api/portal/:tenant/redeem (find-my-report magic-link
@@ -88,7 +89,7 @@ describe('GET /api/portal/:tenant/redeem — find-my-report agent destination', 
             id: TENANT, name: 'Acme', slug: 'acme-fmr', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as never);
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
     });
 
     afterEach(() => {

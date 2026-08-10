@@ -5,7 +5,7 @@ import { availability, availabilityOverrides } from '../lib/db/schema';
 import { safeISODate } from '../lib/date';
 import { Errors } from '../lib/errors';
 import { requireRole } from '../lib/middleware/rbac';
-import { ROLE } from '../lib/auth/roles';
+import { isAdminRole } from '../lib/auth/roles';
 import {
     AvailabilitySchema,
     OverrideSchema,
@@ -173,7 +173,7 @@ export const availabilityRoutes = createApiRouter()
         const userRole = c.get('userRole');
         const { inspectorId: queryId } = c.req.valid('query');
 
-        if (queryId && queryId !== user.sub && ![ROLE.MANAGER, ROLE.OWNER].includes(userRole)) {
+        if (queryId && queryId !== user.sub && !isAdminRole(userRole)) {
             throw Errors.Forbidden('Can only view your own availability');
         }
 
@@ -200,7 +200,7 @@ export const availabilityRoutes = createApiRouter()
 
         const inspectorId = body.inspectorId || user.sub;
 
-        if (inspectorId !== user.sub && ![ROLE.MANAGER, ROLE.OWNER].includes(userRole)) {
+        if (inspectorId !== user.sub && !isAdminRole(userRole)) {
             throw Errors.Forbidden('Can only manage your own availability');
         }
 
@@ -216,7 +216,7 @@ export const availabilityRoutes = createApiRouter()
         const userRole = c.get('userRole');
         const { inspectorId: queryId } = c.req.valid('query');
 
-        if (queryId && queryId !== user.sub && ![ROLE.MANAGER, ROLE.OWNER].includes(userRole)) {
+        if (queryId && queryId !== user.sub && !isAdminRole(userRole)) {
             throw Errors.Forbidden('Can only view your own availability');
         }
 
@@ -241,7 +241,7 @@ export const availabilityRoutes = createApiRouter()
         const body = c.req.valid('json');
 
         const inspectorId = body.inspectorId || user.sub;
-        if (inspectorId !== user.sub && ![ROLE.MANAGER, ROLE.OWNER].includes(userRole)) {
+        if (inspectorId !== user.sub && !isAdminRole(userRole)) {
             throw Errors.Forbidden('Can only manage your own availability');
         }
 

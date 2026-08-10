@@ -64,7 +64,7 @@ test('fill mode: active overview entry sets aria-current and active styling', ()
   );
   const entry = screen.getByTestId('inspection-details-entry');
   expect(entry.getAttribute('aria-current')).toBe('true');
-  expect(entry.className).toContain('text-ih-primary');
+  expect(entry.className).toContain('text-ih-primary-text');
 });
 
 test('author section has a drag handle when onReorderSection is wired', () => {

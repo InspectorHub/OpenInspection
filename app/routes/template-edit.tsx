@@ -481,13 +481,13 @@ export default function TemplateEditPage() {
       {/* Toolbar */}
       <header className="flex items-center justify-between h-12 px-4 border-b border-ih-border bg-ih-bg-card shrink-0">
         <div className="flex items-center gap-3">
-          <Link to="/library/templates" className="inline-flex items-center gap-1 text-ih-fg-4 hover:text-ih-fg-2 text-[13px]"><Icon name="chevL" size={14} /> {m.templates_breadcrumb_current()}</Link>
+          <Link to="/library/templates" className="inline-flex items-center gap-1 text-ih-fg-3 hover:text-ih-fg-2 text-[13px]"><Icon name="chevL" size={14} /> {m.templates_breadcrumb_current()}</Link>
           <input
             value={templateName}
             onChange={(e) => setTemplateName(e.target.value)}
             className="text-[14px] font-bold bg-transparent border-b border-transparent focus:border-ih-primary outline-none text-ih-fg-1 w-48"
           />
-          <span className="text-[10px] font-mono text-ih-fg-4">v{initialVersion}</span>
+          <span className="text-[10px] font-mono text-ih-fg-3">v{initialVersion}</span>
         </div>
         <div className="flex items-center gap-2">
           {/* Shared theme control (xl+; this bare route has no mobile drawer). */}
@@ -576,7 +576,7 @@ export default function TemplateEditPage() {
               />
             )
           ) : (
-            <div className="flex-1 flex items-center justify-center text-[13px] text-ih-fg-4">{m.templates_edit_empty_add_section()}</div>
+            <div className="flex-1 flex items-center justify-center text-[13px] text-ih-fg-3">{m.templates_edit_empty_add_section()}</div>
           )}
         </div>
 

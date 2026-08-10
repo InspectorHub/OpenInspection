@@ -17,6 +17,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { AutomationService } from '../../../server/services/automation.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT = '00000000-0000-0000-0000-00000000a5a5';
 let db: BetterSQLite3Database<typeof schema>;
@@ -34,7 +35,7 @@ beforeEach(async () => {
     // ensureSeeds resolves recipientRoleKey -> contact_role_profiles.id, so
     // role profiles must be seeded first (same order as /setup and
     // seedStarterContent: role profiles, then automations).
-    await seedRoleProfiles(db, TENANT, new Date(1));
+    await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
     svc = new AutomationService({} as D1Database);
 });
 

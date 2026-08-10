@@ -38,7 +38,7 @@ export function ReportSignatureBlock({ isPublished, signature, ownerPreview, tim
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-8 mb-4">
       <div className="border border-ih-border rounded-xl p-6 bg-ih-bg-card">
-        <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-4">
+        <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-4">
           {m.pca_signature_signed_by()}
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
@@ -57,24 +57,24 @@ export function ReportSignatureBlock({ isPublished, signature, ownerPreview, tim
           <div className="text-sm text-ih-fg-2 space-y-0.5">
             <div className="font-semibold text-ih-fg-1">{sig.inspectorName}</div>
             {sig.license && (
-              <div className="text-ih-fg-4 text-xs">{m.pca_signature_license({ license: sig.license })}</div>
+              <div className="text-ih-fg-3 text-xs">{m.pca_signature_license({ license: sig.license })}</div>
             )}
             {credentialBadgeUrl && (
               <img src={credentialBadgeUrl} alt={m.pca_signature_credential_alt()} className="h-8 w-auto mt-1" />
             )}
             {sig.signedAt != null && (
-              <div className="text-ih-fg-4 text-xs">{m.pca_signed_date({ date: formatEpochMs(sig.signedAt, timeZone) })}</div>
+              <div className="text-ih-fg-3 text-xs">{m.pca_signed_date({ date: formatEpochMs(sig.signedAt, timeZone) })}</div>
             )}
             {sig.signedAt != null && (
-              <div className="text-[10px] text-ih-fg-4">{m.pca_signature_timezone_note({ tz: timeZone.replace(/_/g, " ") })}</div>
+              <div className="text-[10px] text-ih-fg-3">{m.pca_signature_timezone_note({ tz: timeZone.replace(/_/g, " ") })}</div>
             )}
             {sig.variant === "typed" && (
-              <div className="text-[10px] text-ih-fg-4">{m.pca_signature_electronically_signed({ name: sig.inspectorName ?? "" })}</div>
+              <div className="text-[10px] text-ih-fg-3">{m.pca_signature_electronically_signed({ name: sig.inspectorName ?? "" })}</div>
             )}
           </div>
         </div>
         {sig.showNudge && (
-          <div className="print:hidden mt-4 text-xs text-ih-fg-4 border-t border-ih-border pt-3">
+          <div className="print:hidden mt-4 text-xs text-ih-fg-3 border-t border-ih-border pt-3">
             {m.pca_signature_nudge_before()}<strong>{m.pca_signature_nudge_strong()}</strong>{m.pca_signature_nudge_after()}
           </div>
         )}

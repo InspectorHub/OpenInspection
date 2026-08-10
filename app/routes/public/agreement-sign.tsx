@@ -107,7 +107,7 @@ export default function AgreementSignPage() {
                     actionPath={actionPath}
                 />
 
-                <p className="text-center text-[11px] text-ih-fg-4 mt-6">{m.checkout_powered_by()}</p>
+                <p className="text-center text-[11px] text-ih-fg-3 mt-6">{m.checkout_powered_by()}</p>
             </div>
         </div>
     );

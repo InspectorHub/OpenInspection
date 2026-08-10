@@ -105,7 +105,7 @@ export function FindingsBySection({ findings }: { findings: FindingsData | null 
             ]}
           />
           {hidden > 0 && (
-            <p className="mt-3 text-[12px] text-ih-fg-4">{m.metrics_findings_other_systems({ count: hidden })}</p>
+            <p className="mt-3 text-[12px] text-ih-fg-3">{m.metrics_findings_other_systems({ count: hidden })}</p>
           )}
         </>
       ) : (

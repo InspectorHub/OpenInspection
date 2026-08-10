@@ -36,6 +36,7 @@ function renderEditor(over: Partial<Parameters<typeof CredentialsEditor>[0]>) {
       onAdd={vi.fn()}
       onUpdate={vi.fn()}
       onDelete={vi.fn()}
+      onReorder={vi.fn()}
       {...over}
     />,
   );
@@ -56,6 +57,7 @@ function setup(uploadError: { id: string; message: string } | null) {
       onAdd={vi.fn()}
       onUpdate={vi.fn()}
       onDelete={vi.fn()}
+      onReorder={vi.fn()}
     />,
   );
 }

@@ -194,7 +194,7 @@ export function AgreementSection({
       <div className="bg-ih-bg-card rounded-lg shadow-ih-popover overflow-hidden">
         {/* Title bar */}
         <div className="px-6 py-6 sm:px-10 sm:py-8 border-b border-ih-border">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary mb-2">{m.portal_agreement_eyebrow()}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary-text mb-2">{m.portal_agreement_eyebrow()}</p>
           <h1 className="text-xl font-bold text-ih-fg-1 tracking-tight">{agreement.agreementName}</h1>
           <p className="text-[13px] text-ih-fg-3 mt-1">
             {m.portal_agreement_for_signer({ name: agreement.signer.name })}
@@ -203,7 +203,7 @@ export function AgreementSection({
             )}
           </p>
           {multiSigner && (
-            <p className="text-[12px] text-ih-fg-4 mt-1.5">
+            <p className="text-[12px] text-ih-fg-3 mt-1.5">
               {m.portal_agreement_signature_x_of_y({ current: Math.min(myIndex, progress.total), total: progress.total })}
               {agreement.completionPolicy === "one" && m.portal_agreement_any_one_completes()}
             </p>
@@ -215,8 +215,13 @@ export function AgreementSection({
           data-testid="agreement-body"
           className="px-6 py-6 sm:px-10 sm:py-8 border-b border-ih-border max-h-96 overflow-y-auto"
         >
+          {/* `ih-agreement-prose`, not `prose prose-sm`: this project has no
+              @tailwindcss/typography, so those two classes matched no rule and
+              the agreement's headings and lists rendered flat — on the page
+              where a client signs it. The shared class is defined once in
+              app/styles/tailwind.css and used by the editor too. */}
           <SanitizedHtml
-            className="prose prose-sm max-w-none text-ih-fg-3 leading-relaxed"
+            className="ih-agreement-prose max-w-none text-ih-fg-3 leading-relaxed"
             html={agreement.agreementContent}
           />
         </div>
@@ -251,21 +256,21 @@ export function AgreementSection({
               </svg>
               {m.portal_agreement_download_pdf()}
             </button>
-            <p className="text-[11px] text-ih-fg-4 italic mt-3">
+            <p className="text-[11px] text-ih-fg-3 italic mt-3">
               {m.portal_agreement_print_hint()}
             </p>
             {agreement.envelopeId && (
               <div className="mt-6 border-t border-ih-border pt-5">
                 <a
                   href={`/verify/${agreement.envelopeId}`}
-                  className="inline-flex items-center gap-1.5 text-[13px] font-bold text-ih-primary hover:underline"
+                  className="inline-flex items-center gap-1.5 text-[13px] font-bold text-ih-primary-text hover:underline"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   {m.portal_agreement_verify_link()}
                 </a>
-                <p className="text-[11px] text-ih-fg-4 mt-1.5">
+                <p className="text-[11px] text-ih-fg-3 mt-1.5">
                   {m.portal_agreement_verify_hint()}
                 </p>
               </div>

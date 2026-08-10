@@ -75,7 +75,7 @@ export function ReportHeader({
               </svg>
             </div>
           )}
-          <span className="text-xs font-semibold tracking-widest uppercase text-ih-fg-4">
+          <span className="text-xs font-semibold tracking-widest uppercase text-ih-fg-3">
             {brand.companyName ? m.report_view_cert_with_company({ company: brand.companyName }) : m.report_view_cert()}
           </span>
         </div>

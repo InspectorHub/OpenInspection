@@ -32,7 +32,7 @@ export function DateOverridesPanel({
       </h3>
       <p className="text-[12px] text-ih-fg-3">
         {m.settings_dateoverrides_use_prefix()}{" "}
-        <Link to="/calendar" className="text-ih-primary font-semibold hover:underline">
+        <Link to="/calendar" className="text-ih-primary-text font-semibold hover:underline">
           {m.settings_dateoverrides_link()}
         </Link>{" "}
         {m.settings_dateoverrides_use_suffix()}

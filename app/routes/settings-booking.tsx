@@ -33,6 +33,9 @@ import {
   parseServiceAreaBody,
 } from "~/lib/settings/booking-routing-data";
 import { parseDepositPolicy } from "~/lib/deposit-policy-form";
+import { saveDepositFromForm, handleCancellationPolicyIntent } from "~/lib/settings/booking-policy-actions";
+import { CancellationPolicyPanel, readCancellationSettings, readClauseAgreements, type ClauseState } from "~/components/settings/CancellationPolicyPanel";
+import type { CancellationPolicy } from "../../server/lib/billing/cancellation-policy";
 import type { DepositPolicy } from "../../server/lib/billing/deposit-policy";
 import { m } from "~/paraglide/messages";
 
@@ -80,7 +83,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const api = createApi(context, { token });
 
-  const [configRes, membersRes, holidaysRes, brandingRes, routingRes, areasRes] = await Promise.all([
+  const [configRes, membersRes, holidaysRes, brandingRes, routingRes, areasRes, agreementsRes] = await Promise.all([
     api.admin["tenant-config"].$get().catch(() => null),
     api.admin.members.$get().catch(() => null),
     (api.admin as unknown as {
@@ -92,6 +95,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     api.adminBranding.branding.$get().catch(() => null),
     api.admin["booking-routing"].$get().catch(() => null),
     api.admin["service-areas"].all.$get().catch(() => null),
+    // The cancellation panel names the agreement that carries the clause, so it
+    // needs the templates by name. Read here rather than in the panel: a
+    // component that fetches is a component that cannot be server-rendered.
+    api.admin.agreements.$get().catch(() => null),
   ]);
 
   let config: TenantConfig = {
@@ -121,10 +128,22 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     };
   }
 
+  let cancellationPolicy: CancellationPolicy | null = null;
+  // Fail-closed default: with no branding payload the clause reads as never
+  // confirmed, which is the state that REFUSES fees. An optimistic default here
+  // would let the panel offer a save the server is bound to reject.
+  let clause: ClauseState = { current: false, everAttested: false, agreementId: null };
   if (brandingRes?.ok) {
     const body = (await brandingRes.json()) as { data?: { branding?: Record<string, unknown> } };
     config.depositPolicy = parseDepositPolicy(body.data?.branding?.depositPolicy);
+    const cancellation = readCancellationSettings(body.data?.branding);
+    cancellationPolicy = cancellation.policy;
+    clause = cancellation.clause;
   }
+
+  const clauseAgreements = agreementsRes?.ok
+    ? readClauseAgreements(await agreementsRes.json())
+    : [];
 
   let members: Member[] = [];
   if (membersRes?.ok) {
@@ -153,6 +172,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     origins: parsed.origins,
     areasByUser,
     config,
+    cancellationPolicy,
+    clause,
+    clauseAgreements,
     members,
     customHolidays,
     holidayDataMaxYear: getHolidayDataCoverage().maxYear,
@@ -174,6 +196,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   const routed = await handleBookingRoutingIntent(api, form, intent);
   if (routed) return routed;
 
+  const cancellation = await handleCancellationPolicyIntent(api, form, intent);
+  if (cancellation) return cancellation;
+
   if (intent === "policies-save") {
     const res = await api.admin["tenant-config"].$patch({
       json: {
@@ -190,29 +215,11 @@ export async function action({ request, context }: Route.ActionArgs) {
       return { ok: false, intent, message };
     }
     // One panel, two endpoints: the deposit default is the only booking policy
-    // that lives behind branding. Sent only when the form carried it, because
-    // an absent key must leave a configured deposit alone (the API schema has
-    // no default for exactly that reason) — never as an implicit clear.
-    if (form.has("depositPolicy")) {
-      let raw: unknown = null;
-      try {
-        raw = JSON.parse(String(form.get("depositPolicy") ?? "null"));
-      } catch {
-        // Unparseable is not a clear-the-deposit instruction; it is a bad
-        // request. Reported through the panel's own failure line.
-        return { ok: false, intent, message: m.settings_holiday_save_failed() };
-      }
-      const depositRes = await api.adminBranding.branding.$post({
-        json: { depositPolicy: parseDepositPolicy(raw) },
-      } as unknown as Parameters<typeof api.adminBranding.branding.$post>[0]);
-      if (!depositRes.ok) {
-        const err = await depositRes.json().catch(() => null);
-        const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as
-          | string
-          | undefined;
-        return { ok: false, intent, message };
-      }
-    }
+    // in this panel that lives behind branding. It shares its "an absent key
+    // must not read as a clear" rule with the cancellation ladder, so both live
+    // in ~/lib/settings/booking-policy-actions.
+    const deposit = await saveDepositFromForm(api, form);
+    if (deposit && !deposit.ok) return { ok: false, intent, message: deposit.message };
     return { ok: res.ok, intent };
   }
 
@@ -346,6 +353,7 @@ export default function SettingsBookingPage() {
       </div>
       <div id="booking-policies" className="scroll-mt-12">
         <BookingPoliciesPanel initialConfig={data.config} />
+        <CancellationPolicyPanel policy={data.cancellationPolicy} clause={data.clause} agreements={data.clauseAgreements} />
       </div>
       <div id="holidays" className="scroll-mt-12">
         <HolidayClosedPanel

@@ -1,9 +1,10 @@
 import { Link } from "react-router";
 import { formatInspectionDateTime } from "~/lib/format-date";
-import { isReportPublished, statusTone } from "~/lib/status";
+import { INSPECTION_STATUS, isReportPublished, statusTone } from "~/lib/status";
 import { reportStateLabel } from "~/lib/dashboard-filters";
 import { REPORT_STATE_TONE, type Inspection } from "~/lib/dashboard-schema";
 import { Pill, Icon } from "@core/shared-ui";
+import { RestoreInspectionAction } from "~/components/RestoreInspectionAction";
 import { m } from "~/paraglide/messages";
 import { formatDollars } from "~/lib/money";
 import { useDisplayLocale, useDisplayCurrency, useTenantFormatPrefs } from "~/hooks/useSessionContext";
@@ -38,6 +39,7 @@ export function DashboardInspectionRow({
   const currency = useDisplayCurrency();
   const shape = useTenantFormatPrefs();
   const isSelected = selectedIds.has(insp.id);
+  const cancelled = insp.status === INSPECTION_STATUS.CANCELLED;
   const showReportLink =
     reportView && tenantSlug && isReportPublished(insp.reportStatus);
   return (
@@ -139,19 +141,60 @@ export function DashboardInspectionRow({
             <Icon name="share" size={14} />
           </Link>
         )}
-        <select
-          value={insp.status}
-          onChange={(e) => transitionStatus(insp.id, e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          className="h-6 px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-3 border-0 outline-none cursor-pointer"
-        >
-          <option value="requested">{m.dashboard_row_status_requested()}</option>
-          <option value="scheduled">{m.dashboard_row_status_scheduled()}</option>
-          <option value="confirmed">{m.dashboard_row_status_confirmed()}</option>
-          <option value="completed">{m.dashboard_row_status_completed()}</option>
-          <option value="cancelled">{m.dashboard_row_status_cancelled()}</option>
-        </select>
+        {/* #78 — NO "Cancelled" TO PICK. This dropdown PATCHes the status
+            straight onto the inspection, which skips the fee ladder, the
+            refund and the recorded reason that only `POST /:id/cancel`
+            performs — so a cancellation taken from here left the money saying
+            the job was still on. Cancelling lives on the inspection's own
+            Lifecycle card, behind the priced confirmation. The API refuses this
+            write regardless; the option is gone so the UI stops offering a door
+            the server has closed.
+
+            #81 — AND A CANCELLED ROW GETS NO DROPDOWN AT ALL, for the mirror
+            reason. Leaving `cancelled` used to be a plain status write here,
+            which was the product's ONLY recovery and did less than the endpoint
+            built for the job: `POST /:id/uncancel` also restores the calendar
+            entry. That endpoint is the one door now and this write refuses, so
+            the cancelled cluster below shows the status and offers the button
+            instead of four options the server would reject. */}
+        {!cancelled && (
+          <select
+            value={insp.status}
+            onChange={(e) => transitionStatus(insp.id, e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="h-6 px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-2 border-0 outline-none cursor-pointer"
+          >
+            <option value="requested">{m.dashboard_row_status_requested()}</option>
+            <option value="scheduled">{m.dashboard_row_status_scheduled()}</option>
+            <option value="confirmed">{m.dashboard_row_status_confirmed()}</option>
+            <option value="completed">{m.dashboard_row_status_completed()}</option>
+          </select>
+        )}
       </div>
+      {/* OUTSIDE the hover group, and that is load-bearing twice over. The
+          restore control carries a confirmation Modal, which renders INLINE
+          rather than through a portal — an ancestor at `opacity-0` would both
+          hide it and become the containing block its `fixed inset-0` backdrop
+          resolves against, so the dialog would vanish the moment the pointer
+          left the row. It is also the point of #81 that recovery is findable:
+          a hover-only affordance is what made the old one undiscoverable. */}
+      {cancelled && (
+        <div className="shrink-0 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <select
+            value={insp.status}
+            disabled
+            aria-label={m.dashboard_row_status_cancelled()}
+            className="h-6 px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-2 border-0 outline-none disabled:opacity-100"
+          >
+            <option value="cancelled">{m.dashboard_row_status_cancelled()}</option>
+          </select>
+          <RestoreInspectionAction
+            inspectionId={insp.id}
+            variant="ghost"
+            className="h-6 px-1.5 text-[10px]"
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -81,12 +81,12 @@ export function AutomationEditorModal({
         {rule && <input type="hidden" name="id" value={rule.id} />}
 
         <input name="name" required defaultValue={rule?.name ?? ""} placeholder={m.settings_automations_name_placeholder()}
-          className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]" />
+          className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px]" />
 
         <fieldset className="space-y-2">
           <legend className="text-[12px] font-bold text-ih-fg-2 uppercase tracking-wide">{m.settings_automations_when_legend()}</legend>
           <select name="trigger" defaultValue={rule?.trigger ?? "report.published"}
-            className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]">
+            className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px]">
             {Object.entries(TRIGGER_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </fieldset>
@@ -132,20 +132,20 @@ export function AutomationEditorModal({
             </div>
             <select name="recipientKind" value={recipientKind}
               onChange={(e) => setRecipientKind(e.target.value as RecipientKindOption)}
-              className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]">
+              className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px]">
               {(Object.keys(RECIPIENT_KIND_LABELS) as Array<keyof typeof RECIPIENT_KIND_LABELS>).map((k) => (
                 <option key={k} value={k}>{RECIPIENT_KIND_LABELS[k]}</option>
               ))}
             </select>
             {recipientKind === "role" && (
               <select name="recipientRoleProfileId" defaultValue={rule?.recipientRoleProfileId ?? clientProfile?.id ?? ""}
-                className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]">
+                className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px]">
                 <option value="">{m.settings_automations_select_role()}</option>
                 {activeRoleProfiles.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
               </select>
             )}
             <input name="delayMinutes" type="number" min={0} defaultValue={rule?.delayMinutes ?? 0}
-              className="w-24 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]" title={m.settings_automations_delay_title()} />
+              className="w-24 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px]" title={m.settings_automations_delay_title()} />
           </div>
           {recipientKind === "all" && (
             <p className="text-[11px] text-ih-watch-fg" data-testid="automation-all-recipients-warning">
@@ -162,12 +162,12 @@ export function AutomationEditorModal({
               <p className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.settings_channel_email()}</p>
               <label className="block text-[12px] font-semibold text-ih-fg-2" htmlFor="emailTemplateId">{m.settings_automations_template_label()}</label>
               <select id="emailTemplateId" name="emailTemplateId" defaultValue={rule?.emailTemplateId ?? ""}
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]">
+                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px]">
                 <option value="">{m.settings_automations_select_template()}</option>
                 {emailTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
               <Link to="/settings/communication/templates"
-                className="inline-flex items-center gap-1 text-[12px] text-ih-primary hover:underline mt-0.5">
+                className="inline-flex items-center gap-1 text-[12px] text-ih-primary-text hover:underline mt-0.5">
                 {m.settings_automations_edit_new_template()} <Icon name="arrowR" size={12} />
               </Link>
             </div>
@@ -179,12 +179,12 @@ export function AutomationEditorModal({
               <p className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.settings_channel_sms()}</p>
               <label className="block text-[12px] font-semibold text-ih-fg-2" htmlFor="smsTemplateId">{m.settings_automations_template_label()}</label>
               <select id="smsTemplateId" name="smsTemplateId" defaultValue={rule?.smsTemplateId ?? ""}
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]">
+                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px]">
                 <option value="">{m.settings_automations_select_template()}</option>
                 {smsTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
               <Link to="/settings/communication/templates"
-                className="inline-flex items-center gap-1 text-[12px] text-ih-primary hover:underline mt-0.5">
+                className="inline-flex items-center gap-1 text-[12px] text-ih-primary-text hover:underline mt-0.5">
                 {m.settings_automations_edit_new_template()} <Icon name="arrowR" size={12} />
               </Link>
             </div>

@@ -237,13 +237,13 @@ export default function CommentsPage() {
                     {c.severity && (
                       <Pill tone={SEVERITY_TONE[c.severity]}>{SEVERITY_LABEL[c.severity]}</Pill>
                     )}
-                    {c.section && <span className="text-[10px] font-bold uppercase tracking-wide text-ih-fg-4">{c.section}</span>}
+                    {c.section && <span className="text-[10px] font-bold uppercase tracking-wide text-ih-fg-3">{c.section}</span>}
                   </div>
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => { setEditing(c); setEditorOpen(true); }}
-                      className="text-[11px] font-bold text-ih-primary hover:text-ih-primary-600"
+                      className="text-[11px] font-bold text-ih-primary-text hover:text-ih-primary-600"
                     >
                       {m.common_edit()}
                     </button>

@@ -19,6 +19,7 @@ import type { EmailService } from '../../../server/services/email.service';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { asD1Db } from '../helpers/test-db';
 
 const T1     = '00000000-0000-0000-0000-0000000000b1';
 const AGENT_CONTACT = 'contact-agent-confirm-notify';
@@ -41,7 +42,7 @@ describe('ConciergeService.confirmByClient — buyer_agent notify sourcing (Task
             id: T1, name: 'Acme', slug: 'acme-confirm-notify', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(db, T1, new Date(1));
+        await seedRoleProfiles(asD1Db(db), T1, new Date(1));
         await db.insert(schema.contacts).values({
             id: AGENT_CONTACT, tenantId: T1, type: 'agent', name: 'Jane Agent',
             email: 'jane-agent@example.com', createdAt: new Date(),
@@ -50,7 +51,7 @@ describe('ConciergeService.confirmByClient — buyer_agent notify sourcing (Task
         // Legacy referredByAgentId is intentionally NULL — only
         // inspection_people carries the buyer_agent for this inspection.
         await db.insert(schema.inspections).values({
-            id: INSP, tenantId: T1, propertyAddress: '1 Main St', referredByAgentId: null,
+            id: INSP, tenantId: T1, propertyAddress: '1 Main St',
             date: '2026-06-15', status: 'scheduled', conciergeStatus: 'awaiting_client',
             paymentStatus: 'unpaid', price: 0, paymentRequired: false, agreementRequired: false,
             createdAt: new Date(),

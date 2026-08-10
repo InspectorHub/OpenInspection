@@ -41,8 +41,8 @@ describe('InspectionService.updatePropertyFacts (G1)', () => {
             { id: TENANT_B, name: 'Globex', slug: 'globex', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await testDb.insert(schema.inspections).values([
-            { id: 'insp-A', tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'A', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0, paymentRequired: false, agreementRequired: false, createdAt: new Date() },
-            { id: 'insp-B', tenantId: TENANT_B, propertyAddress: '2 Elm Rd',  clientName: 'B', date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 0, paymentRequired: false, agreementRequired: false, createdAt: new Date() },
+            { id: 'insp-A', tenantId: TENANT_A, propertyAddress: '1 Main St', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0, paymentRequired: false, agreementRequired: false, createdAt: new Date() },
+            { id: 'insp-B', tenantId: TENANT_B, propertyAddress: '2 Elm Rd', date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 0, paymentRequired: false, agreementRequired: false, createdAt: new Date() },
         ]);
     });
 

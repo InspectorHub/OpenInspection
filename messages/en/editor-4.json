@@ -152,5 +152,14 @@
   "editor_pca_block_scope": "2.2 Scope of Work (methodology folds in here)",
   "editor_pca_block_limitations": "2.3 Limitations & Exceptions",
   "editor_pca_block_reconnaissance": "2.4 General Property Reconnaissance",
-  "editor_pca_block_additional": "Additional Considerations"
+  "editor_pca_block_additional": "Additional Considerations",
+  "editor_ai_assist_improve": "Improve wording",
+  "editor_ai_assist_working": "Improving…",
+  "editor_ai_assist_draft_eyebrow": "Model-assisted draft",
+  "editor_ai_assist_reviewed_label": "I reviewed this text",
+  "editor_ai_assist_reviewed_help": "Your review is recorded with your name and the time. Model-assisted text is not a finding until you review it.",
+  "editor_ai_assist_discard": "Discard",
+  "editor_ai_assist_use": "Use reviewed text",
+  "editor_ai_assist_recording": "Recording your review…",
+  "editor_ai_assist_note_unchanged": "Your note was not changed."
 }

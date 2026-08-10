@@ -32,12 +32,12 @@ export function TabStrip({ tabs, activeId, onChange, orientation = "horizontal" 
             vertical
               ? `inline-flex items-center gap-1.5 px-3.5 py-2 border-l-2 -ml-px text-[13px] font-bold transition-all text-left ${
                   activeId === tab.id
-                    ? "border-ih-primary text-ih-primary"
+                    ? "border-ih-primary text-ih-primary-text"
                     : "border-transparent text-ih-fg-3 hover:text-ih-fg-1"
                 }`
               : `inline-flex items-center gap-1.5 px-3.5 py-2.5 border-b-2 text-[13px] font-bold transition-all ${
                   activeId === tab.id
-                    ? "border-ih-primary text-ih-primary"
+                    ? "border-ih-primary text-ih-primary-text"
                     : "border-transparent text-ih-fg-3 hover:text-ih-fg-1"
                 }`
           }
@@ -46,7 +46,7 @@ export function TabStrip({ tabs, activeId, onChange, orientation = "horizontal" 
           {tab.count !== undefined && (
             <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold tabular-nums ${
               activeId === tab.id
-                ? "bg-ih-primary-tint text-ih-primary"
+                ? "bg-ih-primary-tint text-ih-primary-text"
                 : "bg-ih-bg-muted text-ih-fg-4"
             }`}>
               {tab.count}

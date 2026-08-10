@@ -98,7 +98,7 @@ export function FileDropzone({
   const borderColor = error
     ? "text-ih-bad"
     : dragOver
-      ? "text-ih-primary"
+      ? "text-ih-primary-text"
       : "text-ih-border-strong";
 
   return (
@@ -167,8 +167,10 @@ export function FileDropzone({
             <span className="text-[13px] font-bold text-ih-fg-2" title={fileName ?? undefined}>
               {truncateMiddle(fileName ?? "", 34)}
             </span>
+            {/* fg-3 like the `hint` line below — same 11px normal-size text,
+                same 4.5:1 requirement (see lint:contrast). */}
             {typeof fileSize === "number" && (
-              <span className="text-[11px] text-ih-fg-4">{formatFileSize(fileSize)}</span>
+              <span className="text-[11px] text-ih-fg-3">{formatFileSize(fileSize)}</span>
             )}
             {onClear && (
               <button
@@ -188,7 +190,7 @@ export function FileDropzone({
           <div className="flex flex-col items-center gap-1.5 text-center">
             <div className="flex items-center gap-2 text-[13px] text-ih-fg-2">
               <svg
-                className={`h-4 w-4 transition-transform ${dragOver ? "-translate-y-0.5 text-ih-primary" : "text-ih-fg-4"}`}
+                className={`h-4 w-4 transition-transform ${dragOver ? "-translate-y-0.5 text-ih-primary-text" : "text-ih-fg-4"}`}
                 viewBox="0 0 16 16"
                 fill="none"
                 aria-hidden="true"

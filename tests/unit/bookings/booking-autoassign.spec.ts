@@ -35,6 +35,7 @@ vi.mock('../../../server/lib/rate-limit', () => ({
 
 // eslint-disable-next-line import/order
 import { bookingsRoutes } from '../../../server/api/bookings';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 // 2026-06-08 is a Monday (dayOfWeek = 1) — mirrors booking-aggregation.spec.ts.
 // Must stay future-dated if a past-date guard ever lands in the booking handler.
@@ -77,10 +78,7 @@ function makeServiceStubs(bookingSvc: BookingService) {
 }
 
 /** Mock ExecutionContext — passed as the 4th arg to app.request(). */
-const FAKE_EXEC_CTX: ExecutionContext = {
-    waitUntil: vi.fn(),
-    passThroughOnException: vi.fn(),
-};
+const FAKE_EXEC_CTX: ExecutionContext = makeExecutionContext().ctx;
 
 function buildApp(
     db: BetterSQLite3Database<typeof schema>,

@@ -18,7 +18,7 @@ import * as schema from '../../../server/lib/db/schema';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 // eslint-disable-next-line import/order
-import { grantSms, readSmsConsent, revokeChannel, type ConsentRecorder } from '../../../server/lib/notifications/channel-consent';
+import { grantSms, readSmsConsent, revokeChannel, type ConsentRecorder, type SmsConsentBlock } from '../../../server/lib/notifications/channel-consent';
 
 const TENANT = 't-consent';
 let db: BetterSQLite3Database<typeof schema>;
@@ -43,13 +43,26 @@ beforeEach(async () => {
 });
 afterEach(() => sqlite.close());
 
-const block = (subjects: Array<{ kind: 'contact' | 'user'; id: string }>) =>
-    ({ phone: null, state: 'none' as const, at: null, capturedVia: null, subjects, disclosure: null });
+/**
+ * `mode` is threaded from the audience rather than hard-coded because
+ * `loadSmsConsentBlock` derives it exactly this way
+ * (server/lib/notifications/channel-consent.ts). Nothing under test reads the
+ * field — it is an OUTPUT of the loader, not an input to grant/revoke — but a
+ * fixture that contradicts its producer is a trap for the next reader.
+ */
+const block = (
+    subjects: Array<{ kind: 'contact' | 'user'; id: string }>,
+    audience: 'client' | 'agent' | 'staff',
+): SmsConsentBlock => ({
+    phone: null, state: 'none', at: null, capturedVia: null,
+    mode: audience === 'client' ? 'express' : 'implied',
+    subjects, disclosure: null,
+});
 
 describe('who may enter the consent ledger', () => {
     it('records a STAFF stop against a users subject', async () => {
         const { rec, rows } = recorder();
-        await revokeChannel(rec, TENANT, 'sms', block([{ kind: 'user', id: 'u1' }]), 'staff');
+        await revokeChannel(rec, TENANT, 'sms', block([{ kind: 'user', id: 'u1' }], 'staff'), 'staff');
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ action: 'revoked', subjectKind: 'user', recipientType: 'staff' });
     });
@@ -59,7 +72,7 @@ describe('who may enter the consent ledger', () => {
         // reachable. Stamping everyone 'client' would make the evidence wrong
         // in the one direction a carrier audit cares about.
         const { rec, rows } = recorder();
-        await revokeChannel(rec, TENANT, 'sms', block([{ kind: 'contact', id: 'c1' }]), 'agent');
+        await revokeChannel(rec, TENANT, 'sms', block([{ kind: 'contact', id: 'c1' }], 'agent'), 'agent');
         expect(rows[0]).toMatchObject({ recipientType: 'agent' });
     });
 
@@ -68,14 +81,14 @@ describe('who may enter the consent ledger', () => {
         // stopped could never start again. The separation belongs in the
         // `recipient_type` column, not in the absence of the row.
         const { rec, rows } = recorder();
-        await grantSms(rec, TENANT, block([{ kind: 'user', id: 'u1' }]), 'staff', {});
+        await grantSms(rec, TENANT, block([{ kind: 'user', id: 'u1' }], 'staff'), 'staff', {});
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ action: 'granted', recipientType: 'staff', subjectKind: 'user' });
     });
 
     it('lets an AGENT resume, recorded as an agent', async () => {
         const { rec, rows } = recorder();
-        await grantSms(rec, TENANT, block([{ kind: 'contact', id: 'c1' }]), 'agent', {});
+        await grantSms(rec, TENANT, block([{ kind: 'contact', id: 'c1' }], 'agent'), 'agent', {});
         expect(rows[0]).toMatchObject({ action: 'granted', recipientType: 'agent' });
     });
 
@@ -84,14 +97,14 @@ describe('who may enter the consent ledger', () => {
         // opt-in evidence filters `recipient_type = 'client'`, so a staff or
         // agent row stamped 'client' is the one mistake that would corrupt it.
         const { rec, rows } = recorder();
-        await grantSms(rec, TENANT, block([{ kind: 'user', id: 'u1' }]), 'staff', {});
-        await grantSms(rec, TENANT, block([{ kind: 'contact', id: 'c1' }]), 'agent', {});
+        await grantSms(rec, TENANT, block([{ kind: 'user', id: 'u1' }], 'staff'), 'staff', {});
+        await grantSms(rec, TENANT, block([{ kind: 'contact', id: 'c1' }], 'agent'), 'agent', {});
         expect(rows.some((r) => r.recipientType === 'client')).toBe(false);
     });
 
     it('DOES record a grant for a client, with the evidence fields', async () => {
         const { rec, rows } = recorder();
-        await grantSms(rec, TENANT, block([{ kind: 'contact', id: 'c1' }]), 'client', {
+        await grantSms(rec, TENANT, block([{ kind: 'contact', id: 'c1' }], 'client'), 'client', {
             ip: '203.0.113.7', userAgent: 'Mozilla/5.0',
         });
         expect(rows[0]).toMatchObject({
@@ -104,7 +117,7 @@ describe('who may enter the consent ledger', () => {
         // Email has no consent artifact — only deliverability suppression,
         // which is a different fact. Its "off" is the preference cascade alone.
         const { rec, rows } = recorder();
-        await revokeChannel(rec, TENANT, 'email', block([{ kind: 'contact', id: 'c1' }]), 'client');
+        await revokeChannel(rec, TENANT, 'email', block([{ kind: 'contact', id: 'c1' }], 'client'), 'client');
         expect(rows).toEqual([]);
     });
 });

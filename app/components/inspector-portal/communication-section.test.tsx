@@ -35,6 +35,7 @@ const PAYLOAD: CommunicationPayload = {
       sendAt: Date.UTC(2026, 6, 29, 14), deliveredAt: null,
     },
   ],
+  reportLinks: [],
 };
 
 function renderSection(counts: CommunicationCounts, payload: CommunicationPayload, opts?: { rulesActive?: number; reportPublished?: boolean }) {
@@ -100,7 +101,7 @@ describe("CommunicationSection", () => {
   });
 
   it("shows three DISTINCT Outbox empty states", async () => {
-    const empty: CommunicationPayload = { messages: [], deliveries: [] };
+    const empty: CommunicationPayload = { messages: [], deliveries: [], reportLinks: [] };
 
     // ① No rules at all → point at Settings.
     const a = renderSection({ ...COUNTS_CLEAN, delivered: 0, rulesActive: 0 }, empty);
@@ -121,7 +122,7 @@ describe("CommunicationSection", () => {
   });
 
   it("Messages has its own empty state, separate from the Outbox's", async () => {
-    const { getByText, findByText } = renderSection(COUNTS_CLEAN, { messages: [], deliveries: [] });
+    const { getByText, findByText } = renderSection(COUNTS_CLEAN, { messages: [], deliveries: [], reportLinks: [] });
     fireEvent.click(getByText("Messages"));
     await findByText(/No messages yet/i);
   });

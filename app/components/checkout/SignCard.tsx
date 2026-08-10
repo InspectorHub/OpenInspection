@@ -118,7 +118,7 @@ export function SignCard({
     return (
         <section className="border-b border-ih-border">
             <div className="px-6 py-5 sm:px-8 border-b border-ih-border">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">{m.checkout_sign_step_label()}</p>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-3">{m.checkout_sign_step_label()}</p>
                 <h2 className="text-[15px] font-bold text-ih-fg-1 mt-0.5">{agreementName}</h2>
                 {progress.total > 1 && (
                     <p className="text-[12px] text-ih-fg-3 mt-0.5">
@@ -134,7 +134,11 @@ export function SignCard({
                 className="px-6 py-5 sm:px-8 border-b border-ih-border max-h-72 overflow-y-auto"
             >
                 <SanitizedHtml
-                    className="prose prose-sm max-w-none text-ih-fg-3 leading-relaxed"
+                    // `ih-agreement-prose`, not the `prose prose-sm` that was
+                    // here: @tailwindcss/typography is not installed, so those
+                    // classes matched nothing and the agreement's headings and
+                    // lists rendered flat. Shared with the editor.
+                    className="ih-agreement-prose max-w-none text-ih-fg-3 leading-relaxed"
                     html={content}
                 />
             </div>

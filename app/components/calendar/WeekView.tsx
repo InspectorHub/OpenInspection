@@ -32,17 +32,17 @@ export function WeekView({
             <div className="py-2 px-1" />
             {weekDays.map((d) => (
               <div key={civilDateOf(d.getFullYear(), d.getMonth(), d.getDate())} className={`py-2 px-2 text-center border-l border-ih-border ${isSameDay(d, today) ? "bg-ih-primary-tint" : ""}`}>
-                <span className="text-[10px] font-bold uppercase text-ih-fg-4 block">
+                <span className="text-[10px] font-bold uppercase text-ih-fg-3 block">
                   {d.toLocaleDateString(locale, { weekday: "short" })}
                 </span>
-                <span className={`text-[14px] font-bold ${isSameDay(d, today) ? "text-ih-primary" : "text-ih-fg-2"}`}>
+                <span className={`text-[14px] font-bold ${isSameDay(d, today) ? "text-ih-primary-text" : "text-ih-fg-2"}`}>
                   {d.getDate()}
                 </span>
               </div>
             ))}
           </div>
           <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-ih-border min-h-[42px]">
-            <div className="text-[10px] font-bold text-ih-fg-4 text-right pr-2 pt-2">{m.calendar_all_day()}</div>
+            <div className="text-[10px] font-bold text-ih-fg-3 text-right pr-2 pt-2">{m.calendar_all_day()}</div>
             {weekDays.map((d) => {
               const dateStr = civilDateOf(d.getFullYear(), d.getMonth(), d.getDate());
               const allDayEvents = getEventsForDate(dateStr).filter((ev) => ev.extendedProps?.allDay === true);
@@ -71,7 +71,7 @@ export function WeekView({
           <div className="max-h-[500px] overflow-y-auto">
             {hours.map((h) => (
               <div key={h} className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-ih-border min-h-[48px]">
-                <div className="text-[10px] font-bold text-ih-fg-4 text-right pr-2 pt-1">
+                <div className="text-[10px] font-bold text-ih-fg-3 text-right pr-2 pt-1">
                   {h > 12 ? h - 12 : h}{h >= 12 ? "pm" : "am"}
                 </div>
                 {weekDays.map((d) => {

@@ -20,6 +20,8 @@
  * notice.
  */
 
+import type { AiOutputClassification } from './output-classification';
+
 /**
  * A prompt that knows its own version.
  *
@@ -31,6 +33,17 @@
  */
 export interface VersionedPrompt<A> {
     readonly version: string;
+    /**
+     * What KIND of statement this prompt asks the model to produce, which is
+     * what decides whether it may run at all and what it is subject to. See
+     * `output-classification.ts`.
+     *
+     * Required, and that is the enforcement: the chokepoint takes a
+     * `VersionedPrompt`, so a new capability that never says what it writes
+     * does not compile. A gate cannot be the first line here — it would only
+     * run after someone had already shipped the prompt.
+     */
+    readonly classification: AiOutputClassification;
     readonly render: (args: A) => string;
 }
 
@@ -76,6 +89,10 @@ export interface SuggestCommentPromptArgs {
 export const AI_PROMPTS = {
     professionalComment: {
         version: 'professional-comment.v1',
+        // Rewriting ONE observation the inspector already made. It restates a
+        // finding rather than reaching a new one, which is why it is not a
+        // summary and not maintenance guidance.
+        classification: 'finding_explanation',
         // `context?: string | undefined`, not `context?: string`: under
         // exactOptionalPropertyTypes the caller's optional parameter arrives as
         // an explicit `undefined`, which a bare `?:` refuses.
@@ -89,6 +106,9 @@ Professional Comment:`,
 
     inspectionSummary: {
         version: 'inspection-summary.v1',
+        // Condenses defects that already exist in the report. The one prompt
+        // here whose output spans the whole inspection rather than one item.
+        classification: 'summary',
         render: (args: { defects: string }): string =>
             `You are a professional home inspector. Analyze the following list of defects found during an inspection and provide a high-level summary (2-3 sentences) focusing on the most critical issues for the home buyer.
 Defects:
@@ -98,6 +118,9 @@ Summary:`,
 
     rewriteComment: {
         version: 'rewrite-comment.v1',
+        // Reworks one existing comment to an inspector's instruction. Same
+        // class as `professionalComment` — different input, same kind of output.
+        classification: 'finding_explanation',
         render: (args: RewriteCommentPromptArgs): string => {
             const ctxLines = [
                 `Item: "${args.itemLabel}"`,
@@ -124,6 +147,12 @@ Return only the rewritten comment text — no preamble, no quotes, no markdown.`
 
     suggestComment: {
         version: 'suggest-comment.v1',
+        // ⚠️ The closest of the four to a boundary. It drafts candidate wording
+        // for an item the inspector is filling in, so the inspector still
+        // chooses what the finding says — that keeps it an explanation. If a
+        // future version ever proposed upkeep advice or a remedy, it would be
+        // `maintenance_suggestion` and would carry that class's extra labelling.
+        classification: 'finding_explanation',
         render: (args: SuggestCommentPromptArgs): string => {
             const context = [
                 args.rating    ? `Rating: ${args.rating}` : null,
@@ -138,4 +167,4 @@ Each comment must be 1-2 sentences, factual, and in standard inspection report s
 Return only a JSON array of 3 strings, no other text. Example: ["Comment 1.", "Comment 2.", "Comment 3."]`;
         },
     },
-} as const;
+} as const satisfies Record<string, VersionedPrompt<never>>;

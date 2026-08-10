@@ -16,6 +16,7 @@ import { InspectionService } from '../../../server/services/inspection.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
@@ -41,7 +42,7 @@ beforeEach(async () => {
         id: TENANT, name: 'Results Co', slug: 'results-co', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
-    await seedRoleProfiles(testDb, TENANT, new Date());
+    await seedRoleProfiles(asD1Db(testDb), TENANT, new Date());
 
     inspectionSvc = new InspectionService({} as D1Database, undefined, sdb);
 });

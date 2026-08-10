@@ -79,7 +79,7 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, portalToken, just
       <div className="px-7 pt-7 pb-5 border-b border-ih-border">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">{m.portal_invoice_eyebrow()}</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ih-fg-3">{m.portal_invoice_eyebrow()}</p>
             <h1 className="font-serif text-[26px] leading-tight font-semibold tracking-tight text-ih-fg-1 mt-0.5">
               {invoice.number}
             </h1>
@@ -99,11 +99,11 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, portalToken, just
 
       {/* Line items */}
       <div className="px-7 py-5">
-        <div className="flex items-baseline justify-between pb-2 mb-1 border-b border-ih-border text-[10px] font-bold uppercase tracking-[0.14em] text-ih-fg-4">
+        <div className="flex items-baseline justify-between pb-2 mb-1 border-b border-ih-border text-[10px] font-bold uppercase tracking-[0.14em] text-ih-fg-3">
           <span>{m.portal_invoice_col_description()}</span>
           <span>{m.portal_invoice_col_amount()}</span>
         </div>
-        {items.length === 0 && <p className="py-3 text-[13px] text-ih-fg-4">{m.portal_invoice_no_line_items()}</p>}
+        {items.length === 0 && <p className="py-3 text-[13px] text-ih-fg-3">{m.portal_invoice_no_line_items()}</p>}
         {items.map((item, i) => (
           <div key={i} className="flex items-baseline justify-between py-2.5 border-b border-ih-border/60 last:border-b-0">
             <span className={`text-[13px] ${item.amount < 0 ? "text-ih-ok-fg" : "text-ih-fg-1"}`}>{item.description}</span>
@@ -120,7 +120,7 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, portalToken, just
           <Row label={m.portal_invoice_total()} value={money(total, cur)} strong />
           {settled && <Row label={m.portal_invoice_amount_paid()} value={`−${money(amountPaid, cur)}`} muted tone="ok" />}
           <div className="flex items-baseline justify-between pt-2 mt-1 border-t border-ih-border">
-            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4">{settled ? m.portal_invoice_balance() : m.portal_invoice_balance_due()}</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-3">{settled ? m.portal_invoice_balance() : m.portal_invoice_balance_due()}</span>
             {processing ? (
               // The amount is deliberately absent: the balance is not zero until
               // the webhook says so, and restating "$450" here is exactly the

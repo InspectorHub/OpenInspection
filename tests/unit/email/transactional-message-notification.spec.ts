@@ -1,16 +1,30 @@
 /**
  * Task 9c (people-role-profiles) — TransactionalEmailMixin.sendMessageNotification
- * must resolve the client's email/name from the inspection_people primary-client
- * join (PeopleService.getPrimaryClient), not the legacy inspections.client_email/
- * client_name columns, which survive GDPR erasure as a stale denormalized cache
- * and were leaking the erased subject's contact details (email recipient AND the
- * "from <name>" fallback shown to the inspector).
+ * resolves the client's email/name from the inspection_people primary-client join
+ * (PeopleService.getPrimaryClient).
+ *
+ * ⚠️ WHAT THIS SPEC USED TO CLAIM, AND WHY IT NO LONGER CAN. It was written while
+ * `inspections` still carried denormalized `client_name` / `client_email` columns
+ * that GDPR erasure never cleared. Each case seeded a divergent sentinel there and
+ * asserted the sentinel did NOT reach the recipient. Those columns have since been
+ * DROPPED — `server/lib/db/schema/inspection/core.ts` says so at the site where
+ * they used to be declared: "the former denormalized clientContactId/clientName/
+ * clientEmail/clientPhone columns were DROPPED (superseded by inspection_people)
+ * — do not reintroduce them here". Drizzle silently discards unknown keys in
+ * `.values()`, so the sentinels were never written, could never be read back, and
+ * every `.not.toContain(sentinel)` was passing on a value with no way to exist.
+ *
+ * Those seeds and those assertions are gone. What remains is the half that still
+ * has a subject: the recipient and the "from <name>" fallback come from
+ * inspection_people, and once those rows are erased no client email is addressed
+ * at all and the inspector sees a generic label.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EmailService } from '../../../server/services/email.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -45,7 +59,7 @@ describe('TransactionalEmailMixin.sendMessageNotification — client sourcing (T
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
         await testDb.insert(schema.users).values({
             id: INSPECTOR, tenantId: TENANT, email: 'inspector@acme.com',
             passwordHash: 'x', name: 'Sam Inspector', role: 'inspector', createdAt: new Date(),
@@ -59,16 +73,13 @@ describe('TransactionalEmailMixin.sendMessageNotification — client sourcing (T
         });
     });
 
-    it('emails the client at the inspection_people primary-client\'s address, not the legacy inspections.client_email column', async () => {
+    it('emails the client at the inspection_people primary-client\'s address', async () => {
         await testDb.insert(schema.contacts).values({
             id: CLIENT_CONTACT, tenantId: TENANT, type: 'client', name: 'Jane Client',
             email: 'jane@example.com', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
             id: 'insp-1', tenantId: TENANT, inspectorId: INSPECTOR, propertyAddress: '1 Main St',
-            // Legacy columns intentionally diverge from inspection_people — proves
-            // the read is NOT falling back to them.
-            clientName: 'STALE-LEGACY-NAME', clientEmail: 'stale-legacy@example.com',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
         });
         const people = new PeopleService({ DB: {} as D1Database });
@@ -80,17 +91,15 @@ describe('TransactionalEmailMixin.sendMessageNotification — client sourcing (T
 
         expect(sent).toHaveLength(1);
         expect(sent[0]?.to).toEqual(['jane@example.com']);
-        expect(sent[0]?.to).not.toContain('stale-legacy@example.com');
     });
 
-    it('inspector-recipient fromName fallback uses the inspection_people client\'s name, not the legacy inspections.client_name column', async () => {
+    it('inspector-recipient fromName fallback uses the inspection_people client\'s name', async () => {
         await testDb.insert(schema.contacts).values({
             id: CLIENT_CONTACT, tenantId: TENANT, type: 'client', name: 'Jane Client',
             email: 'jane@example.com', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
             id: 'insp-2', tenantId: TENANT, inspectorId: INSPECTOR, propertyAddress: '2 Oak Ave',
-            clientName: 'STALE-LEGACY-NAME', clientEmail: 'stale-legacy@example.com',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
         });
         const people = new PeopleService({ DB: {} as D1Database });
@@ -102,17 +111,12 @@ describe('TransactionalEmailMixin.sendMessageNotification — client sourcing (T
 
         expect(sent).toHaveLength(1);
         expect(sent[0]?.html).toContain('Jane Client');
-        expect(sent[0]?.html).not.toContain('STALE-LEGACY-NAME');
     });
 
-    it('ANTI-LEAK (Task 9c) — after GDPR erasure deletes the client\'s inspection_people + contacts rows, ' +
-        'no email is sent to the stale legacy inspections.client_email column', async () => {
+    it('after GDPR erasure deletes the client\'s inspection_people + contacts rows, ' +
+        'no client email is addressed at all', async () => {
         await testDb.insert(schema.inspections).values({
             id: 'insp-erased', tenantId: TENANT, inspectorId: INSPECTOR, propertyAddress: '3 Elm St',
-            // Mirrors erasure-orchestrator.ts: the legacy columns are a
-            // denormalized cache the erasure job never touches — they retain
-            // the subject's PII after contacts + inspection_people are deleted.
-            clientName: 'LEAKED-PII-NAME', clientEmail: 'leaked-pii@example.com',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
         });
         // No inspection_people client row — simulates post-erasure state.
@@ -124,11 +128,9 @@ describe('TransactionalEmailMixin.sendMessageNotification — client sourcing (T
         expect(sent).toHaveLength(0);
     });
 
-    it('ANTI-LEAK (Task 9c) — inspector-recipient fromName falls back to a generic label, ' +
-        'not the erased subject\'s stale legacy name', async () => {
+    it('inspector-recipient fromName falls back to a generic label once the client rows are erased', async () => {
         await testDb.insert(schema.inspections).values({
             id: 'insp-erased-2', tenantId: TENANT, inspectorId: INSPECTOR, propertyAddress: '4 Pine St',
-            clientName: 'LEAKED-PII-NAME', clientEmail: 'leaked-pii@example.com',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
         });
 
@@ -138,6 +140,5 @@ describe('TransactionalEmailMixin.sendMessageNotification — client sourcing (T
 
         expect(sent).toHaveLength(1);
         expect(sent[0]?.html).toContain('your client');
-        expect(sent[0]?.html).not.toContain('LEAKED-PII-NAME');
     });
 });

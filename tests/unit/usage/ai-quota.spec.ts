@@ -192,7 +192,7 @@ describe('AI quota + metering', () => {
             return new AIService(
                 {} as D1Database, 'a-key', 'saas', 'a-model', meter,
                 { source: 'byo', tenantKeyAttested: true },
-                { record: async () => {} },
+                { record: async () => 'ai-call-row' },
             );
         }
 
@@ -221,7 +221,8 @@ describe('AI quota + metering', () => {
                 ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'kept' }] } }] }),
             } as Response);
             const record = vi.fn(async () => { throw new Error('d1 down'); });
-            await expect(service({ record }).generateProfessionalComment('note')).resolves.toBe('kept');
+            await expect(service({ record }).generateProfessionalComment('note'))
+                .resolves.toMatchObject({ text: 'kept' });
         });
     });
 

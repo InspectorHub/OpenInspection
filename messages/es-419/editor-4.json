@@ -152,5 +152,14 @@
   "editor_pca_block_scope": "2.2 Alcance del trabajo (la metodología se incluye aquí)",
   "editor_pca_block_limitations": "2.3 Limitaciones y excepciones",
   "editor_pca_block_reconnaissance": "2.4 Reconocimiento general de la propiedad",
-  "editor_pca_block_additional": "Consideraciones adicionales"
+  "editor_pca_block_additional": "Consideraciones adicionales",
+  "editor_ai_assist_improve": "Mejorar la redacción",
+  "editor_ai_assist_working": "Mejorando…",
+  "editor_ai_assist_draft_eyebrow": "Borrador asistido por modelo",
+  "editor_ai_assist_reviewed_label": "Revisé este texto",
+  "editor_ai_assist_reviewed_help": "Su revisión se registra con su nombre y la hora. El texto asistido por modelo no es un hallazgo hasta que usted lo revise.",
+  "editor_ai_assist_discard": "Descartar",
+  "editor_ai_assist_use": "Usar el texto revisado",
+  "editor_ai_assist_recording": "Registrando su revisión…",
+  "editor_ai_assist_note_unchanged": "Su nota no se modificó."
 }

@@ -5,7 +5,7 @@ export type EyebrowColor = "slate" | "indigo" | "emerald" | "amber" | "rose";
 
 const colorClasses: Record<EyebrowColor, string> = {
   slate: "bg-ih-bg-muted text-ih-fg-3",
-  indigo: "bg-ih-primary-tint text-ih-primary",
+  indigo: "bg-ih-primary-tint text-ih-primary-text",
   emerald: "bg-ih-ok-bg text-ih-ok-fg",
   amber: "bg-ih-watch-bg text-ih-watch-fg",
   rose: "bg-ih-bad-bg text-ih-bad-fg",

@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TwilioClient } from '../../../server/lib/messaging/twilio';
+import { recordingFetch } from '../helpers/fetch-mock';
 
 describe('TwilioClient.messages.create', () => {
     afterEach(() => vi.restoreAllMocks());
 
     it('POSTs to the Account Messages endpoint with basic auth + form body', async () => {
-        const fetchMock = vi.fn(async () => new Response(JSON.stringify({ sid: 'SM1' }), { status: 201 }));
+        const fetchMock = recordingFetch(async () => new Response(JSON.stringify({ sid: 'SM1' }), { status: 201 }));
         vi.stubGlobal('fetch', fetchMock);
         const client = new TwilioClient({ sid: 'AC123', token: 'tok' });
 
@@ -21,7 +22,7 @@ describe('TwilioClient.messages.create', () => {
     });
 
     it('passes MessagingServiceSid instead of From when given', async () => {
-        const fetchMock = vi.fn(async () => new Response('{}', { status: 201 }));
+        const fetchMock = recordingFetch(async () => new Response('{}', { status: 201 }));
         vi.stubGlobal('fetch', fetchMock);
         await new TwilioClient({ sid: 'AC1', token: 't' }).messages.create({ from: '+1', to: '+15551112222', body: 'x', messagingServiceSid: 'MG9' });
         expect((fetchMock.mock.calls[0][1].body as string)).toContain('MessagingServiceSid=MG9');
@@ -30,7 +31,7 @@ describe('TwilioClient.messages.create', () => {
     it('uses API-key SID for Basic auth but accountSid in the path (managed-pool path)', async () => {
         // When authSid is supplied the Basic-auth USERNAME is the API Key SID, not the
         // Account SID. The REST path must still use the Account SID (ACmain).
-        const fetchMock = vi.fn(async () => new Response('{}', { status: 201 }));
+        const fetchMock = recordingFetch(async () => new Response('{}', { status: 201 }));
         vi.stubGlobal('fetch', fetchMock);
         await new TwilioClient({ sid: 'ACmain', authSid: 'SKkey', token: 'sec' })
             .messages.create({ from: '', to: '+15551112222', body: 'x', messagingServiceSid: 'MG1' });
@@ -42,7 +43,7 @@ describe('TwilioClient.messages.create', () => {
     it('without authSid, sid is the Basic-auth username (own/platform behavior unchanged)', async () => {
         // Regression: existing own/platform callers that omit authSid must behave exactly
         // as before — Account SID as username, auth token as password.
-        const fetchMock = vi.fn(async () => new Response('{}', { status: 201 }));
+        const fetchMock = recordingFetch(async () => new Response('{}', { status: 201 }));
         vi.stubGlobal('fetch', fetchMock);
         await new TwilioClient({ sid: 'ACmain', token: 'tok' })
             .messages.create({ from: '+1', to: '+15551112222', body: 'x' });
@@ -56,13 +57,13 @@ describe('TwilioClient.tollfree', () => {
 
     it('tollfree.list returns verifications from the messaging API', async () => {
         const body = JSON.stringify({ verifications: [{ sid: 'HH1', status: 'TWILIO_APPROVED', tollfree_phone_number_sid: 'PN1' }] });
-        vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 200 })));
+        vi.stubGlobal('fetch', recordingFetch(async () => new Response(body, { status: 200 })));
         const out = await new TwilioClient({ sid: 'AC1', token: 't' }).tollfree.list();
         expect(out[0]).toMatchObject({ sid: 'HH1', status: 'TWILIO_APPROVED' });
     });
 
     it('tollfree.create POSTs to Tollfree/Verifications and returns sid+status', async () => {
-        const fetchMock = vi.fn(async () =>
+        const fetchMock = recordingFetch(async () =>
             new Response(JSON.stringify({ sid: 'HV1', status: 'PENDING_REVIEW' }), { status: 201 }),
         );
         vi.stubGlobal('fetch', fetchMock);
@@ -83,7 +84,7 @@ describe('TwilioClient.tollfree', () => {
     });
 
     it('tollfree.create throws with Twilio error message on non-ok response', async () => {
-        vi.stubGlobal('fetch', vi.fn(async () =>
+        vi.stubGlobal('fetch', recordingFetch(async () =>
             new Response(JSON.stringify({ message: 'Invalid phone number' }), { status: 400 }),
         ));
         await expect(
@@ -104,7 +105,7 @@ describe('TwilioClient.trusthub', () => {
     afterEach(() => vi.restoreAllMocks());
 
     it('trusthub.createSecondaryProfile POSTs to trusthub CustomerProfiles and returns sid+status', async () => {
-        const fetchMock = vi.fn(async () =>
+        const fetchMock = recordingFetch(async () =>
             new Response(JSON.stringify({ sid: 'BU1', status: 'draft' }), { status: 201 }),
         );
         vi.stubGlobal('fetch', fetchMock);
@@ -121,7 +122,7 @@ describe('TwilioClient.trusthub', () => {
     });
 
     it('trusthub.createSecondaryProfile throws on non-ok response', async () => {
-        vi.stubGlobal('fetch', vi.fn(async () =>
+        vi.stubGlobal('fetch', recordingFetch(async () =>
             new Response(JSON.stringify({ message: 'Missing required field' }), { status: 422 }),
         ));
         await expect(
@@ -139,13 +140,13 @@ describe('TwilioClient.brands', () => {
 
     it('brands.list GETs BrandRegistrations from messaging API', async () => {
         const body = JSON.stringify({ data: [{ sid: 'BN1', status: 'APPROVED' }] });
-        vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 200 })));
+        vi.stubGlobal('fetch', recordingFetch(async () => new Response(body, { status: 200 })));
         const out = await new TwilioClient({ sid: 'AC1', token: 't' }).brands.list();
         expect(out[0]).toMatchObject({ sid: 'BN1', status: 'APPROVED' });
     });
 
     it('brands.createSoleProprietor POSTs to a2p/BrandRegistrations and returns sid+status', async () => {
-        const fetchMock = vi.fn(async () =>
+        const fetchMock = recordingFetch(async () =>
             new Response(JSON.stringify({ sid: 'BNx', status: 'PENDING' }), { status: 201 }),
         );
         vi.stubGlobal('fetch', fetchMock);
@@ -164,7 +165,7 @@ describe('TwilioClient.brands', () => {
     });
 
     it('brands.createSoleProprietor throws on non-ok response', async () => {
-        vi.stubGlobal('fetch', vi.fn(async () =>
+        vi.stubGlobal('fetch', recordingFetch(async () =>
             new Response(JSON.stringify({ message: 'Bundle not approved' }), { status: 400 }),
         ));
         await expect(
@@ -181,7 +182,7 @@ describe('TwilioClient.campaigns', () => {
     afterEach(() => vi.restoreAllMocks());
 
     it('campaigns.create POSTs to Services/{msSid}/Compliance/Usa2p and returns sid+status', async () => {
-        const fetchMock = vi.fn(async () =>
+        const fetchMock = recordingFetch(async () =>
             new Response(JSON.stringify({ sid: 'QE1', status: 'PENDING' }), { status: 201 }),
         );
         vi.stubGlobal('fetch', fetchMock);
@@ -203,7 +204,7 @@ describe('TwilioClient.campaigns', () => {
     });
 
     it('campaigns.create throws on non-ok response', async () => {
-        vi.stubGlobal('fetch', vi.fn(async () =>
+        vi.stubGlobal('fetch', recordingFetch(async () =>
             new Response(JSON.stringify({ message: 'Brand not approved' }), { status: 400 }),
         ));
         await expect(
@@ -225,7 +226,7 @@ describe('TwilioClient.messagingServices', () => {
     afterEach(() => vi.restoreAllMocks());
 
     it('messagingServices.create POSTs to /v1/Services and returns sid', async () => {
-        const fetchMock = vi.fn(async () =>
+        const fetchMock = recordingFetch(async () =>
             new Response(JSON.stringify({ sid: 'MG2', friendly_name: 'Test Service' }), { status: 201 }),
         );
         vi.stubGlobal('fetch', fetchMock);
@@ -240,7 +241,7 @@ describe('TwilioClient.messagingServices', () => {
     });
 
     it('messagingServices.create throws on non-ok response', async () => {
-        vi.stubGlobal('fetch', vi.fn(async () =>
+        vi.stubGlobal('fetch', recordingFetch(async () =>
             new Response(JSON.stringify({ message: 'FriendlyName is required' }), { status: 400 }),
         ));
         await expect(
@@ -249,7 +250,7 @@ describe('TwilioClient.messagingServices', () => {
     });
 
     it('messagingServices.attachSender POSTs PhoneNumberSid to Service PhoneNumbers', async () => {
-        const fetchMock = vi.fn(async () =>
+        const fetchMock = recordingFetch(async () =>
             new Response(JSON.stringify({ sid: 'PN2' }), { status: 201 }),
         );
         vi.stubGlobal('fetch', fetchMock);
@@ -263,7 +264,7 @@ describe('TwilioClient.messagingServices', () => {
     });
 
     it('messagingServices.attachSender throws on non-ok response', async () => {
-        vi.stubGlobal('fetch', vi.fn(async () =>
+        vi.stubGlobal('fetch', recordingFetch(async () =>
             new Response(JSON.stringify({ message: 'Phone number not found' }), { status: 404 }),
         ));
         await expect(
@@ -272,7 +273,7 @@ describe('TwilioClient.messagingServices', () => {
     });
 
     it('messagingServices.attachCompliance with tfvSid POSTs to the tollfree verification', async () => {
-        const fetchMock = vi.fn(async () =>
+        const fetchMock = recordingFetch(async () =>
             new Response(JSON.stringify({ sid: 'HV1' }), { status: 200 }),
         );
         vi.stubGlobal('fetch', fetchMock);
@@ -286,7 +287,7 @@ describe('TwilioClient.messagingServices', () => {
     });
 
     it('messagingServices.attachCompliance with tfvSid throws on a non-ok response', async () => {
-        const fetchMock = vi.fn(async () =>
+        const fetchMock = recordingFetch(async () =>
             new Response(JSON.stringify({ message: 'bad tfv' }), { status: 400 }),
         );
         vi.stubGlobal('fetch', fetchMock);
@@ -318,7 +319,7 @@ describe('TwilioClient.numbers', () => {
                 { phone_number: '+18005550002' },
             ],
         });
-        const fetchMock = vi.fn(async () => new Response(body, { status: 200 }));
+        const fetchMock = recordingFetch(async () => new Response(body, { status: 200 }));
         vi.stubGlobal('fetch', fetchMock);
         const r = await new TwilioClient({ sid: 'AC1', token: 't' }).numbers.search('tollfree');
         expect(r).toEqual([{ phoneNumber: '+18005550001' }, { phoneNumber: '+18005550002' }]);
@@ -329,7 +330,7 @@ describe('TwilioClient.numbers', () => {
 
     it("numbers.search('local') GETs Local available numbers", async () => {
         const body = JSON.stringify({ available_phone_numbers: [{ phone_number: '+15125550001' }] });
-        const fetchMock = vi.fn(async () => new Response(body, { status: 200 }));
+        const fetchMock = recordingFetch(async () => new Response(body, { status: 200 }));
         vi.stubGlobal('fetch', fetchMock);
         const r = await new TwilioClient({ sid: 'AC1', token: 't' }).numbers.search('local');
         expect(r).toEqual([{ phoneNumber: '+15125550001' }]);
@@ -340,7 +341,7 @@ describe('TwilioClient.numbers', () => {
 
     it("numbers.search with areaCode passes AreaCode query param", async () => {
         const body = JSON.stringify({ available_phone_numbers: [{ phone_number: '+18005550003' }] });
-        const fetchMock = vi.fn(async () => new Response(body, { status: 200 }));
+        const fetchMock = recordingFetch(async () => new Response(body, { status: 200 }));
         vi.stubGlobal('fetch', fetchMock);
         await new TwilioClient({ sid: 'AC1', token: 't' }).numbers.search('tollfree', '800');
         const [url] = fetchMock.mock.calls[0];
@@ -349,7 +350,7 @@ describe('TwilioClient.numbers', () => {
 
     it("numbers.search('local') with areaCode passes AreaCode query param and uses Local catalog", async () => {
         const body = JSON.stringify({ available_phone_numbers: [{ phone_number: '+15125550004' }] });
-        const fetchMock = vi.fn(async () => new Response(body, { status: 200 }));
+        const fetchMock = recordingFetch(async () => new Response(body, { status: 200 }));
         vi.stubGlobal('fetch', fetchMock);
         await new TwilioClient({ sid: 'AC1', token: 't' }).numbers.search('local', '512');
         const [url] = fetchMock.mock.calls[0];
@@ -358,7 +359,7 @@ describe('TwilioClient.numbers', () => {
     });
 
     it('numbers.buy POSTs PhoneNumber to IncomingPhoneNumbers and returns sid+phoneNumber', async () => {
-        const fetchMock = vi.fn(async () =>
+        const fetchMock = recordingFetch(async () =>
             new Response(JSON.stringify({ sid: 'PN9', phone_number: '+18005550001' }), { status: 201 }),
         );
         vi.stubGlobal('fetch', fetchMock);
@@ -371,7 +372,7 @@ describe('TwilioClient.numbers', () => {
     });
 
     it('numbers.buy throws on non-ok response', async () => {
-        vi.stubGlobal('fetch', vi.fn(async () =>
+        vi.stubGlobal('fetch', recordingFetch(async () =>
             new Response(JSON.stringify({ message: 'Phone number unavailable' }), { status: 400 }),
         ));
         await expect(

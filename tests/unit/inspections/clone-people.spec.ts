@@ -18,6 +18,7 @@ import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profil
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { logger } from '../../../server/lib/logger';
 import { createTestDb, setupSchema } from '../db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -51,7 +52,7 @@ describe('InspectionService.cloneInspection — writes inspection_people (Task 7
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
 
         await testDb.insert(schema.contacts).values([
             { id: CLIENT_CONTACT, tenantId: TENANT, type: 'client', name: 'Jane Buyer', email: 'jane@example.com', createdAt: new Date() },
@@ -60,9 +61,8 @@ describe('InspectionService.cloneInspection — writes inspection_people (Task 7
 
         await testDb.insert(schema.inspections).values({
             id: SOURCE, tenantId: TENANT,
-            propertyAddress: '1 Main St', clientContactId: CLIENT_CONTACT,
-            clientName: 'Jane Buyer', clientEmail: 'jane@example.com',
-            referredByAgentId: AGENT_CONTACT,
+            propertyAddress: '1 Main St',
+
             date: '2026-06-01', status: 'completed', paymentStatus: 'unpaid', price: 0,
             paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         });

@@ -117,7 +117,9 @@ export function RadioCardGroup({
         );
       })}
       {error && <p className="text-[11px] text-ih-bad-fg mt-1">{error}</p>}
-      {!error && hint && <p className="text-[11px] text-ih-fg-4 mt-1">{hint}</p>}
+      {/* fg-3, matching the option descriptions above — 11px is normal-size
+          text and needs 4.5:1 (see lint:contrast). */}
+      {!error && hint && <p className="text-[11px] text-ih-fg-3 mt-1">{hint}</p>}
     </fieldset>
   );
 }

@@ -47,7 +47,7 @@ describe('GET /api/__test__/last-email — fail-closed gate', () => {
     });
     const res = await call({ E2E_EMAIL_SINK: '1', TENANT_CACHE: kv });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as { data: { subject: string; html: string } };
     expect(body.data.subject).toBe('Reset your password');
     expect(body.data.html).toContain('token=xyz-1');
   });

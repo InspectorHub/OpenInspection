@@ -41,7 +41,7 @@ export function ContactSuggestions<T extends SuggestedContact>({
             className="z-50 rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover overflow-y-auto"
         >
             {loading ? (
-                <p className="px-3 py-2 text-[12px] text-ih-fg-4">{m.newinsp_people_searching()}</p>
+                <p className="px-3 py-2 text-[12px] text-ih-fg-3">{m.newinsp_people_searching()}</p>
             ) : contacts && contacts.length > 0 ? (
                 contacts.map((c) => (
                     <button
@@ -53,12 +53,12 @@ export function ContactSuggestions<T extends SuggestedContact>({
                         className="w-full text-left px-3 py-2 text-[13px] hover:bg-ih-bg-muted border-b border-ih-border last:border-b-0"
                     >
                         <span className="font-medium">{c.name}</span>
-                        {c.email ? <span className="ml-2 text-ih-fg-4 text-[12px]">{c.email}</span> : null}
+                        {c.email ? <span className="ml-2 text-ih-fg-3 text-[12px]">{c.email}</span> : null}
                     </button>
                 ))
             ) : contacts ? (
                 <div className="px-3 py-2">
-                    <p className="text-[12px] text-ih-fg-4">{emptyLabel}</p>
+                    <p className="text-[12px] text-ih-fg-3">{emptyLabel}</p>
                     {emptyAction}
                 </div>
             ) : null}

@@ -25,6 +25,7 @@ import * as path from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { asAnyDb } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { recordPayment, recomputeInvoicePaymentState } from '../../../server/services/payment-ledger.service';
 
@@ -87,7 +88,7 @@ async function countLedgerRows(invoiceId = INV_ID) {
 
 describe('payment ledger — recording', () => {
     it('stamps the row with the order the invoice belongs to', async () => {
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 45000, method: 'card', occurredAt: T1 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 45000, method: 'card', occurredAt: T1 });
         const [row] = await ledgerRows();
         expect(row.inspectionId).toBe(INSPECTION);
         expect(row.amountCents).toBe(45000);   // always positive; direction is in `kind`
@@ -95,22 +96,22 @@ describe('payment ledger — recording', () => {
     });
 
     it('records a payment against a standalone invoice that has no order', async () => {
-        await recordPayment(db, TENANT, { invoiceId: STANDALONE_INV, kind: 'balance', amountCents: 20000, method: 'check', occurredAt: T1 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: STANDALONE_INV, kind: 'balance', amountCents: 20000, method: 'check', occurredAt: T1 });
         const [row] = await ledgerRows(STANDALONE_INV);
         expect(row.inspectionId).toBeNull();
         expect((await getInvoice(STANDALONE_INV)).paidAt).not.toBeNull();
     });
 
     it('refuses a row that points at neither an order nor an invoice', async () => {
-        await expect(recordPayment(db, TENANT, { kind: 'deposit', amountCents: 100, method: 'cash' }))
+        await expect(recordPayment(asAnyDb(db), TENANT, { kind: 'deposit', amountCents: 100, method: 'cash' }))
             .rejects.toThrow();
         expect(await countLedgerRows()).toBe(0);
     });
 
     it('refuses a negative or zero amount — direction belongs in `kind`', async () => {
-        await expect(recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'refund', amountCents: -100, method: 'card' }))
+        await expect(recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'refund', amountCents: -100, method: 'card' }))
             .rejects.toThrow();
-        await expect(recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 0, method: 'card' }))
+        await expect(recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 0, method: 'card' }))
             .rejects.toThrow();
         expect(await countLedgerRows()).toBe(0);
     });
@@ -118,7 +119,7 @@ describe('payment ledger — recording', () => {
 
 describe('payment ledger — the derived invoice state', () => {
     it('derives paid-in-full from the ledger', async () => {
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 45000, method: 'card', occurredAt: T1 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 45000, method: 'card', occurredAt: T1 });
 
         const inv = await getInvoice();
         expect(inv.paidAt).not.toBeNull();
@@ -129,8 +130,8 @@ describe('payment ledger — the derived invoice state', () => {
     it('derives partial from two rows that do not yet total the invoice', async () => {
         // Adverse order: the LATER payment is appended FIRST, so a "read the last
         // row" implementation would report 10000 and stamp the wrong instant.
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 15000, method: 'card', occurredAt: T3 });
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'deposit', amountCents: 10000, method: 'cash', occurredAt: T1 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 15000, method: 'card', occurredAt: T3 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'deposit', amountCents: 10000, method: 'cash', occurredAt: T1 });
 
         const inv = await getInvoice();
         expect(inv.amountPaidCents).toBe(25000);
@@ -139,10 +140,10 @@ describe('payment ledger — the derived invoice state', () => {
     });
 
     it('subtracts refunds and can move an invoice back out of paid', async () => {
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 45000, method: 'card', occurredAt: T1 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 45000, method: 'card', occurredAt: T1 });
         expect((await getInvoice()).paidAt).not.toBeNull();
 
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'refund', amountCents: 20000, method: 'card', occurredAt: T2 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'refund', amountCents: 20000, method: 'card', occurredAt: T2 });
 
         const inv = await getInvoice();
         expect(inv.amountPaidCents).toBe(25000);
@@ -151,8 +152,8 @@ describe('payment ledger — the derived invoice state', () => {
     });
 
     it('lands on nothing received when the whole payment is refunded', async () => {
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 45000, method: 'card', occurredAt: T1 });
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'refund', amountCents: 45000, method: 'card', occurredAt: T2 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 45000, method: 'card', occurredAt: T1 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'refund', amountCents: 45000, method: 'card', occurredAt: T2 });
 
         const inv = await getInvoice();
         expect(inv.amountPaidCents).toBe(0);       // 0 received is a FACT; null would mean "unknown"
@@ -161,8 +162,8 @@ describe('payment ledger — the derived invoice state', () => {
     });
 
     it('counts an adjustment towards the total like any other receipt', async () => {
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'deposit', amountCents: 40000, method: 'cash', occurredAt: T1 });
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'adjustment', amountCents: 5000, method: 'other', occurredAt: T2 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'deposit', amountCents: 40000, method: 'cash', occurredAt: T1 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'adjustment', amountCents: 5000, method: 'other', occurredAt: T2 });
 
         expect((await getInvoice()).paidAt).not.toBeNull();
     });
@@ -173,7 +174,7 @@ describe('payment ledger — the derived invoice state', () => {
         await db.update(schema.invoices).set({ paidAt: T1, paymentMethod: 'check' })
             .where(eq(schema.invoices.id, INV_ID));
 
-        await recomputeInvoicePaymentState(db, TENANT, INV_ID);
+        await recomputeInvoicePaymentState(asAnyDb(db), TENANT, INV_ID);
 
         const inv = await getInvoice();
         expect(inv.paidAt?.getTime()).toBe(T1.getTime());
@@ -181,8 +182,8 @@ describe('payment ledger — the derived invoice state', () => {
     });
 
     it('never reaches across tenants', async () => {
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 45000, method: 'card', occurredAt: T1 });
-        await recomputeInvoicePaymentState(db, 'some-other-tenant', INV_ID);
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 45000, method: 'card', occurredAt: T1 });
+        await recomputeInvoicePaymentState(asAnyDb(db), 'some-other-tenant', INV_ID);
 
         expect((await getInvoice()).amountPaidCents).toBe(45000);   // untouched
     });
@@ -227,8 +228,8 @@ describe('payment ledger — idempotency', () => {
             invoiceId: INV_ID, kind: 'balance' as const, amountCents: 45000, method: 'card' as const,
             provider: 'stripe' as const, providerRef: 'pi_123', occurredAt: T1,
         };
-        const first = await recordPayment(db, TENANT, entry);
-        const second = await recordPayment(db, TENANT, entry);   // webhook redelivery
+        const first = await recordPayment(asAnyDb(db), TENANT, entry);
+        const second = await recordPayment(asAnyDb(db), TENANT, entry);   // webhook redelivery
 
         // The return value is the appended ROW, because an external book of
         // record has to be told the amount that moved and keyed on the fact —
@@ -243,8 +244,8 @@ describe('payment ledger — idempotency', () => {
     it('never lets two offline rows collide', async () => {
         // provider/providerRef are NULL for both; SQLite's NULL-distinct semantics
         // must NOT be relied on to dedupe these, and must not block them either.
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'deposit', amountCents: 100, method: 'cash', occurredAt: T1 });
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'deposit', amountCents: 100, method: 'cash', occurredAt: T1 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'deposit', amountCents: 100, method: 'cash', occurredAt: T1 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'deposit', amountCents: 100, method: 'cash', occurredAt: T1 });
 
         expect(await countLedgerRows()).toBe(2);
         expect((await getInvoice()).amountPaidCents).toBe(200);
@@ -260,8 +261,8 @@ describe('payment ledger — idempotency', () => {
             lineItems: [], sentAt: T1, createdAt: T1, currency: 'USD',
         });
 
-        await recordPayment(db, TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 100, method: 'card', provider: 'stripe', providerRef: 'pi_shared', occurredAt: T1 });
-        const other = await recordPayment(db, 'tenant-two', { invoiceId: 'inv-other', kind: 'balance', amountCents: 100, method: 'card', provider: 'stripe', providerRef: 'pi_shared', occurredAt: T1 });
+        await recordPayment(asAnyDb(db), TENANT, { invoiceId: INV_ID, kind: 'balance', amountCents: 100, method: 'card', provider: 'stripe', providerRef: 'pi_shared', occurredAt: T1 });
+        const other = await recordPayment(asAnyDb(db), 'tenant-two', { invoiceId: 'inv-other', kind: 'balance', amountCents: 100, method: 'card', provider: 'stripe', providerRef: 'pi_shared', occurredAt: T1 });
 
         expect(other).toMatchObject({ amountCents: 100 });
     });

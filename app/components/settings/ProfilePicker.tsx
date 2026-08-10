@@ -27,7 +27,7 @@ export function ProfilePicker({
             onChange={() => onChange?.(p.id)}
             className="sr-only peer"
           />
-          <div className="p-4 rounded-md border-2 text-center transition-all border-ih-border bg-ih-bg-card text-ih-fg-2 peer-checked:border-ih-primary peer-checked:bg-ih-primary-tint peer-checked:text-ih-primary">
+          <div className="p-4 rounded-md border-2 text-center transition-all border-ih-border bg-ih-bg-card text-ih-fg-2 peer-checked:border-ih-primary peer-checked:bg-ih-primary-tint peer-checked:text-ih-primary-text">
             <div
               className="text-[15px] tracking-[0.06em]"
               style={{

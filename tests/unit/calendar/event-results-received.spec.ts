@@ -23,6 +23,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { asD1Db } from '../helpers/test-db';
 
 const TENANT = '00000000-0000-0000-0000-000000000098';
 const CLIENT = 'contact-client-rr';
@@ -62,14 +63,13 @@ describe('EventService — event.results_received', () => {
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
         await testDb.insert(schema.contacts).values({
             id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane Client',
             email: 'jane@example.com', phone: null, createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
             id: INSP, tenantId: TENANT, propertyAddress: '1 Main St',
-            clientName: null, clientEmail: null, clientPhone: null,
             date: '2026-08-01', status: 'confirmed', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });

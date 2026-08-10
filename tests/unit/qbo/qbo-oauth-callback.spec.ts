@@ -49,7 +49,16 @@ function makeKv() {
 }
 
 const qboService = {
-    saveConnection:      vi.fn(async () => {}),
+    // Typed against the real `withConnection` method so `.mock.calls[0][0]` is
+    // the input object rather than an empty tuple.
+    saveConnection:      vi.fn(async (_input: {
+        tenantId: string;
+        realmId: string;
+        companyName: string | null;
+        accessToken: string;
+        refreshToken: string;
+        refreshTokenExpiresIn: number;
+    }) => {}),
     bootstrapDefaultItem: vi.fn(async () => {}),
 };
 
@@ -174,7 +183,7 @@ describe('QBO OAuth callback authorization', () => {
         );
 
         const call = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
-            .find(([u]: [unknown]) => hostOf(u) === INTUIT_TOKEN_HOST);
+            .find((args: unknown[]) => hostOf(args[0]) === INTUIT_TOKEN_HOST);
         const body = new URLSearchParams(String((call![1] as RequestInit).body));
         expect(body.get('redirect_uri')).toBe(qboRedirectUri(APP_BASE_URL));
         expect(body.get('redirect_uri')).toBe(`${APP_BASE_URL}/api/integrations/qbo/callback`);

@@ -166,7 +166,7 @@ export default function SetupPage() {
               <>
                 <span className="font-medium text-ih-fg-2">{m.auth_setup_code_help_required()}</span>{" "}
                 {m.auth_setup_code_help_enter_prefix()}{" "}
-                <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-3 font-mono text-[10px]">SETUP_CODE</code>{" "}
+                <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-2 font-mono text-[10px]">SETUP_CODE</code>{" "}
                 {m.auth_setup_code_help_middle()}{" "}
                 <span className="font-medium text-ih-fg-2">{m.auth_setup_code_help_settings_path()}</span>{" "}
                 {m.auth_setup_code_help_suffix()}{" "}
@@ -174,7 +174,7 @@ export default function SetupPage() {
                   href="https://developers.cloudflare.com/workers/configuration/environment-variables/#add-environment-variables-via-the-dashboard"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-ih-primary hover:text-ih-primary-600 underline underline-offset-2"
+                  className="text-ih-primary-text hover:text-ih-primary-600 underline underline-offset-2"
                 >
                   {m.auth_setup_code_help_link()}
                 </a>

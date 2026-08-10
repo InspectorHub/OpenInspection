@@ -70,7 +70,11 @@ export function RepairDefectRowView({
   // Spans throughout: the client builder nests this inside a <button>, where
   // block-level elements are invalid HTML.
   return (
-    <span className="flex-1 min-w-0 flex items-start gap-3">
+    // The testid marks the SHARED region in every portal that renders a defect,
+    // so cross-portal-reuse.test.tsx can compare what a reader sees without
+    // also comparing each portal's own surrounding affordances (the client's
+    // checkbox, the staff log's "asked for" strip).
+    <span data-testid="repair-defect-view" className="flex-1 min-w-0 flex items-start gap-3">
       <span className="flex-1 min-w-0">
         {/* IA-55 — the defect's own title distinguishes two defects on one
             item; the item + section give context, and location helps a
@@ -82,12 +86,12 @@ export function RepairDefectRowView({
           {itemLabel} &middot; {sectionTitle}
         </span>
         {location && (
-          <span className="block text-[12px] text-ih-fg-4 mt-0.5">
+          <span className="block text-[12px] text-ih-fg-3 mt-0.5">
             {m.repair_defect_location_prefix()} {location}
           </span>
         )}
         {comment && (
-          <span className="block text-[12px] text-ih-fg-4 mt-0.5 line-clamp-2">{comment}</span>
+          <span className="block text-[12px] text-ih-fg-3 mt-0.5 line-clamp-2">{comment}</span>
         )}
         {photos && photos.length > 0 && (
           <span className={`mt-2 ${DEFECT_PHOTO_GRID_CLASS}`}>
@@ -105,7 +109,7 @@ export function RepairDefectRowView({
       </span>
       <span className="flex items-center gap-1.5 shrink-0 ml-2">
         {isCustom && (
-          <span className="inline-flex items-center h-5 px-1.5 rounded text-[10px] font-bold uppercase tracking-wide bg-ih-bg-muted text-ih-fg-3">
+          <span className="inline-flex items-center h-5 px-1.5 rounded text-[10px] font-bold uppercase tracking-wide bg-ih-bg-muted text-ih-fg-2">
             {m.agent_portal_repair_inspector_added()}
           </span>
         )}

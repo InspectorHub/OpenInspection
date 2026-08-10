@@ -31,7 +31,7 @@ export function CompanyBookingLinksPanel({
           href={companyUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-ih-fg-3 hover:text-ih-primary transition-colors shrink-0"
+          className="text-ih-fg-3 hover:text-ih-primary-text transition-colors shrink-0"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path

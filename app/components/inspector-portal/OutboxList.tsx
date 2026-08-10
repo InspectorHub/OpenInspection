@@ -104,7 +104,7 @@ export function OutboxList({
                 {g.recipients[0]?.automationName
                   ?? (g.recipients[0]?.source === "manual" ? m.comm_notice_manual() : m.comm_notice_automation())}
               </span>
-              <span className="text-[12px] text-ih-fg-4 tabular-nums shrink-0">{when(g.sendAt)}</span>
+              <span className="text-[12px] text-ih-fg-3 tabular-nums shrink-0">{when(g.sendAt)}</span>
               <svg className={`w-3 h-3 shrink-0 text-ih-fg-4 transition-transform ${open ? "rotate-180" : ""}`} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                 <path d="M3 4.5 6 7.5 9 4.5" />
               </svg>

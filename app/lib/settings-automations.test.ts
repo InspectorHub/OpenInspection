@@ -66,6 +66,7 @@ vi.mock('~/lib/api-client.server', () => ({
 }));
 
 import { loader, action, TRIGGER_LABELS, buildConditions } from '~/routes/settings-automations';
+import { granted } from '../../tests/helpers/loader-data';
 
 type LoaderArgs = Parameters<typeof loader>[0];
 type ActionArgs = Parameters<typeof action>[0];
@@ -161,7 +162,7 @@ describe('settings-automations buildConditions (Only if)', () => {
 
 describe('settings-automations loader (BFF fan-out)', () => {
     it('surfaces rules, services, recentLogs, reviewUrl, emailTemplates, smsTemplates, roleProfiles', async () => {
-        const data = await loader(loaderArgs());
+        const data = granted(await loader(loaderArgs()));
         expect(getAutomations).toHaveBeenCalled();
         expect(getServices).toHaveBeenCalled();
         expect(getRecentLogs).toHaveBeenCalled();

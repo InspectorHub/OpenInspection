@@ -159,7 +159,7 @@ export default function SettingsInspectionTypes() {
       {/* Platform subtypes */}
       <section className="space-y-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">
             {m.settings_inspection_types_platform_eyebrow()}
           </p>
           <p className="text-[12px] text-ih-fg-3 mt-0.5">
@@ -200,7 +200,7 @@ export default function SettingsInspectionTypes() {
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">
               {m.settings_inspection_types_org_eyebrow()}
             </p>
             <p className="text-[12px] text-ih-fg-3 mt-0.5">
@@ -235,7 +235,7 @@ export default function SettingsInspectionTypes() {
                         {ot.name}
                       </p>
                       {!ot.enabled && (
-                        <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ih-bg-muted text-ih-fg-3 flex-shrink-0">
+                        <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ih-bg-muted text-ih-fg-2 flex-shrink-0">
                           {m.settings_inspection_types_status_disabled()}
                         </span>
                       )}
@@ -254,7 +254,7 @@ export default function SettingsInspectionTypes() {
                   <div className="flex flex-col gap-1">
                     <button
                       onClick={() => openEdit(ot)}
-                      className="text-[12px] text-ih-primary hover:underline font-bold"
+                      className="text-[12px] text-ih-primary-text hover:underline font-bold"
                     >
                       {m.common_edit()}
                     </button>

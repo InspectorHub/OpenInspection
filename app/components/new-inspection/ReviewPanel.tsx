@@ -38,7 +38,7 @@ function ReviewRow({
             className="w-full flex items-start justify-between gap-3 py-2 text-left group hover:bg-ih-bg-card px-2 -mx-2 rounded"
         >
             <span className="text-[12px] text-ih-fg-3 shrink-0">{label}</span>
-            <span className="text-[12px] text-ih-fg-1 text-right group-hover:text-ih-primary">{value}</span>
+            <span className="text-[12px] text-ih-fg-1 text-right group-hover:text-ih-primary-text">{value}</span>
         </button>
     );
 }
@@ -101,7 +101,7 @@ export function ReviewPanel({
             {/* Before anything has been entered, the panel is a heading over one
                 row — say what it is for instead of looking broken. */}
             {!summary.address && !summary.template && !summary.client && !summary.services && (
-                <p className="mt-2 text-[12px] text-ih-fg-4">{m.newinsp_review_empty_hint()}</p>
+                <p className="mt-2 text-[12px] text-ih-fg-2">{m.newinsp_review_empty_hint()}</p>
             )}
         </aside>
     );

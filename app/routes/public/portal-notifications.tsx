@@ -133,7 +133,7 @@ export default function PortalNotificationsPage() {
       <div style={brandTokens(data.brand.primaryColor)} className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-4 mb-1">
+            <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-3 mb-1">
               {data.brand.companyName ?? m.portal_brand_eyebrow_fallback()}
             </p>
             <p className="text-[13px] text-ih-fg-3">
@@ -171,7 +171,7 @@ export default function PortalNotificationsPage() {
   return (
     <div style={brandTokens(data.brand.primaryColor)} className="max-w-md mx-auto px-4 py-12">
       <div className="mb-6">
-        <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-4 mb-1">
+        <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-3 mb-1">
           {data.brand.companyName ?? m.portal_brand_eyebrow_fallback()}
         </p>
         <h1 className="text-2xl font-bold text-ih-fg-1">{m.portal_notif_signin_heading()}</h1>

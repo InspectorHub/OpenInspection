@@ -101,7 +101,7 @@ export function CalendarReadSetPicker({ picker }: { picker: CalendarPickerData }
                   />
                   <span>{c.summary}</span>
                   {locked && (
-                    <span className="text-[10px] text-ih-fg-4">
+                    <span className="text-[10px] text-ih-fg-3">
                       {m.settings_calpicker_primary_locked()}
                     </span>
                   )}
@@ -131,7 +131,7 @@ export function CalendarReadSetPicker({ picker }: { picker: CalendarPickerData }
                 </option>
               ))}
             </select>
-            <p className="text-[10px] text-ih-fg-4">{m.settings_calpicker_write_only_editable()}</p>
+            <p className="text-[10px] text-ih-fg-3">{m.settings_calpicker_write_only_editable()}</p>
           </div>
 
           <div className="flex items-center gap-2">

@@ -35,44 +35,44 @@ describe('RecommendationService', () => {
 
     it('creates a recommendation and returns it', async () => {
         const r = await svc.create(TENANT_A, {
-            category: 'Roof', name: 'Active leak', severity: 'defect',
+            category: 'Roof', name: 'Active leak', severity: 'significant',
             defaultRepairSummary: 'Recommend evaluation by licensed roofer.',
             createdByUserId: USER_1,
         });
         expect(r.id).toBeTruthy();
         expect(r.tenantId).toBe(TENANT_A);
-        expect(r.severity).toBe('defect');
+        expect(r.severity).toBe('significant');
     });
 
     it('lists only the calling tenant\'s recommendations', async () => {
-        await svc.create(TENANT_A, { category: 'Roof', name: 'A1', severity: 'defect', defaultRepairSummary: 'x' });
-        await svc.create(TENANT_B, { category: 'Roof', name: 'B1', severity: 'defect', defaultRepairSummary: 'x' });
+        await svc.create(TENANT_A, { category: 'Roof', name: 'A1', severity: 'significant', defaultRepairSummary: 'x' });
+        await svc.create(TENANT_B, { category: 'Roof', name: 'B1', severity: 'significant', defaultRepairSummary: 'x' });
         const rows = await svc.listByTenant(TENANT_A);
         expect(rows.map(r => r.name)).toEqual(['A1']);
     });
 
     it('filters by category and severity', async () => {
-        await svc.create(TENANT_A, { category: 'Roof', name: 'A', severity: 'defect',  defaultRepairSummary: 'x' });
-        await svc.create(TENANT_A, { category: 'Roof', name: 'B', severity: 'monitor', defaultRepairSummary: 'x' });
-        await svc.create(TENANT_A, { category: 'Wall', name: 'C', severity: 'defect',  defaultRepairSummary: 'x' });
-        const onlyRoofDefects = await svc.listByTenant(TENANT_A, { category: 'Roof', severity: 'defect' });
+        await svc.create(TENANT_A, { category: 'Roof', name: 'A', severity: 'significant',  defaultRepairSummary: 'x' });
+        await svc.create(TENANT_A, { category: 'Roof', name: 'B', severity: 'marginal', defaultRepairSummary: 'x' });
+        await svc.create(TENANT_A, { category: 'Wall', name: 'C', severity: 'significant',  defaultRepairSummary: 'x' });
+        const onlyRoofDefects = await svc.listByTenant(TENANT_A, { category: 'Roof', severity: 'significant' });
         expect(onlyRoofDefects.map(r => r.name)).toEqual(['A']);
     });
 
     it('updates a recommendation', async () => {
-        const r = await svc.create(TENANT_A, { category: 'Roof', name: 'X', severity: 'defect', defaultRepairSummary: 'x' });
+        const r = await svc.create(TENANT_A, { category: 'Roof', name: 'X', severity: 'significant', defaultRepairSummary: 'x' });
         const updated = await svc.update(r.id, TENANT_A, { name: 'X-renamed', defaultRepairSummary: 'y' });
         expect(updated.name).toBe('X-renamed');
         expect(updated.defaultRepairSummary).toBe('y');
     });
 
     it('refuses cross-tenant update', async () => {
-        const r = await svc.create(TENANT_A, { category: 'Roof', name: 'X', severity: 'defect', defaultRepairSummary: 'x' });
+        const r = await svc.create(TENANT_A, { category: 'Roof', name: 'X', severity: 'significant', defaultRepairSummary: 'x' });
         await expect(svc.update(r.id, TENANT_B, { name: 'Y' })).rejects.toThrow();
     });
 
     it('deletes a recommendation', async () => {
-        const r = await svc.create(TENANT_A, { category: 'Roof', name: 'X', severity: 'defect', defaultRepairSummary: 'x' });
+        const r = await svc.create(TENANT_A, { category: 'Roof', name: 'X', severity: 'significant', defaultRepairSummary: 'x' });
         await svc.delete(r.id, TENANT_A);
         const fetched = await svc.getById(r.id, TENANT_A);
         expect(fetched).toBeNull();

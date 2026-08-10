@@ -32,11 +32,18 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 /** Gates that are plain node scripts in this repo. */
 const SCRIPT_GATES = [
     { key: 'ds', label: 'DS token conformance', script: 'check-ds-tokens.mjs', fix: 'npm run lint:ds' },
+    { key: 'contrast', label: 'Small-text WCAG AA contrast', script: 'check-contrast.mjs', fix: 'npm run lint:contrast' },
     { key: 'svg', label: 'SVG dimensions', script: 'check-svg-dimensions.mjs', fix: 'npm run lint:svg' },
     { key: 'migrefs', label: 'Migration-reference hygiene', script: 'check-migration-refs.mjs', fix: 'npm run lint:migrefs' },
     { key: 'filesize', label: 'Large-file ratchet', script: 'check-file-size.mjs', fix: 'npm run lint:filesize' },
     { key: 'tz', label: 'Calendar timezone-safety', script: 'check-tz-safety.mjs', fix: 'npm run lint:tz' },
     { key: 'idempotency', label: 'Mutating-route retry safety', script: 'check-idempotency-coverage.mjs', fix: 'npm run lint:idempotency' },
+    // Pre-commit and not CI because a collision is created at exactly one moment
+    // -- when a file is added or renamed -- and this is the rung that sees that
+    // moment. It is also the rung where the fix is free: renaming a file nobody
+    // has pulled yet costs nothing, renaming one after it lands costs everyone a
+    // merge. An fs walk of ~2765 files, no parsing; among the cheapest here.
+    { key: 'extcollide', label: 'Extension collisions (files invisible to tsc)', script: 'check-extension-collisions.mjs', fix: 'npm run lint:ext-collisions' },
     // Belongs at pre-commit rather than CI: what it catches is a CAPABILITY
     // being added -- a money column, a money field on the inspection record, a
     // money input on a new screen. By the time CI sees one it is written and
@@ -50,6 +57,19 @@ const SCRIPT_GATES = [
     // price gate -- the most expensive entry in this set, and still small next
     // to the eslint and tsc steps around it.
     { key: 'zerotrack', label: 'Zero client-side tracking', script: 'check-zero-tracking.mjs', fix: 'npm run lint:zero-tracking' },
+    // Third entry with the same justification, and the clearest case of it: what
+    // it catches is an AI capability arriving with nobody having said what kind
+    // of statement it produces, or reaching a model without going through the
+    // one method that asks. The compiler already refuses an unclassified prompt;
+    // this covers the second route to a provider, which no type can see. 0.4s,
+    // between the price gate and the tracking gate.
+    { key: 'aiclass', label: 'AI output classification', script: 'check-ai-classification.mjs', fix: 'npm run lint:ai-classification' },
+    // Two file reads and a set comparison -- the cheapest gate in this list by an
+    // order of magnitude, and the one whose failure is most easily argued away
+    // later. It belongs at pre-commit for the same reason the price and tracking
+    // gates do: what it catches is a spec being written OFF the type-check, and
+    // the moment to question that is while the line is being typed.
+    { key: 'teststsconfig', label: 'tests tsconfig exclude ratchet', script: 'check-tests-tsconfig.mjs', fix: 'npm run lint:tests-tsconfig' },
 ];
 
 const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup' };

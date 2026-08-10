@@ -100,6 +100,16 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // B-17: the endpoint nests the map under data.results — unwrap via the
  // shared helper so persisted ratings survive a reload.
  const results = unwrapResultsResponse(resultsBody) as ResultMap;
+ // The `inspection_results` row id, read straight off the envelope rather than
+ // through `unwrapResultsResponse` — that helper's whole job is to return the
+ // MAP across three historical shapes, and widening it to also carry a sibling
+ // field would put the two on one return value where only one of them has the
+ // legacy-shape problem.
+ //
+ // It is what an `ai_content_reviews` row cites (#61). Null on legacy
+ // inspections created before every inspection got a results row; the review
+ // surface fails closed there rather than recording against a guessed id.
+ const resultId = ((resultsBody as { data?: { resultId?: string | null } }).data?.resultId) ?? null;
 
  let tagLibrary: Array<{ id: string; name: string; color: string }> = [];
  if (tagsRes?.ok) {
@@ -216,5 +226,5 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
    if (key.startsWith("commercial:")) commercialPresets[key] = fields;
  }
 
- return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets };
+ return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets };
 }

@@ -19,7 +19,7 @@
  * literals. So the lists are asserted against the DRIZZLE COLUMN ENUMS here,
  * which is the one place the accepted values are actually defined.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { getTableColumns } from 'drizzle-orm';
 import { automations, automationLogs } from '../../server/lib/db/schema';
 
@@ -28,9 +28,26 @@ function columnEnum(column: unknown): string[] {
     return ((column as { enumValues?: string[] }).enumValues ?? []).slice();
 }
 
+/**
+ * Loaded ONCE, in `beforeAll`, and not inside an `it()` — #88/#89.
+ *
+ * This module's import graph reaches `~/paraglide/messages`, whose generated
+ * `_index.js` is ~3.7 MB and is transformed on the single main thread every
+ * vitest worker shares. Inside a test body that wait is billed against the
+ * 5000 ms `testTimeout`, so the FIRST test of the file becomes the victim
+ * whenever the machine is busy: measured 2774 ms solo and an outright timeout
+ * under `--maxWorkers=16`. `beforeAll` has no such budget, and loading a
+ * fixture is what it is for.
+ */
+let RECIPIENT_KIND_LABELS: Record<string, unknown>;
+let TRIGGER_LABELS: Record<string, unknown>;
+
+beforeAll(async () => {
+    ({ RECIPIENT_KIND_LABELS, TRIGGER_LABELS } = await import('./settings-automations'));
+});
+
 describe('Automations editor covers the schema', () => {
-    it('every recipient kind the column accepts has a label', async () => {
-        const { RECIPIENT_KIND_LABELS } = await import('./settings-automations');
+    it('every recipient kind the column accepts has a label', () => {
         const schemaKinds = columnEnum(getTableColumns(automations).recipientKind);
         expect(schemaKinds.length).toBeGreaterThan(0);
         for (const kind of schemaKinds) {
@@ -39,8 +56,7 @@ describe('Automations editor covers the schema', () => {
         }
     });
 
-    it('every trigger the column accepts has a label', async () => {
-        const { TRIGGER_LABELS } = await import('./settings-automations');
+    it('every trigger the column accepts has a label', () => {
         const schemaTriggers = columnEnum(getTableColumns(automations).trigger);
         expect(schemaTriggers.length).toBeGreaterThan(0);
         for (const trigger of schemaTriggers) {

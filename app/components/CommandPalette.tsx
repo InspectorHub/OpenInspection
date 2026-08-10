@@ -326,12 +326,12 @@ export function CommandPalette({
             placeholder={m.command_palette_search_placeholder()}
             className="flex-1 bg-transparent text-[14px] text-ih-fg-1 outline-none placeholder:text-ih-fg-4"
           />
-          <kbd className="hidden sm:inline px-1.5 py-0.5 rounded bg-ih-bg-muted text-[10px] font-bold text-ih-fg-4">ESC</kbd>
+          <kbd className="hidden sm:inline px-1.5 py-0.5 rounded bg-ih-bg-muted text-[10px] font-bold text-ih-fg-2">ESC</kbd>
         </div>
 
         {/* Prefix hints */}
         {!query && (
-          <div className="flex gap-3 px-4 py-1.5 border-b border-ih-border text-[10px] text-ih-fg-4">
+          <div className="flex gap-3 px-4 py-1.5 border-b border-ih-border text-[10px] text-ih-fg-3">
             <span><kbd className="font-bold">&gt;</kbd> {m.command_palette_prefix_actions()}</span>
             <span><kbd className="font-bold">@</kbd> {m.command_palette_prefix_people()}</span>
           </div>
@@ -340,11 +340,11 @@ export function CommandPalette({
         {/* Results */}
         <div className="max-h-[300px] overflow-y-auto py-2">
           {flatFiltered.length === 0 ? (
-            <p className="px-4 py-6 text-center text-[13px] text-ih-fg-4">{m.command_palette_no_results()}</p>
+            <p className="px-4 py-6 text-center text-[13px] text-ih-fg-3">{m.command_palette_no_results()}</p>
           ) : (
             [...groups.entries()].map(([group, actions]) => (
               <div key={group}>
-                <p className="px-4 py-1 text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4">{group}</p>
+                <p className="px-4 py-1 text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3">{group}</p>
                 {actions.map((action) => {
                   const idx = flatFiltered.indexOf(action);
                   return (
@@ -352,12 +352,12 @@ export function CommandPalette({
                       key={action.id}
                       onClick={() => executeAction(action)}
                       onMouseEnter={() => setActiveIdx(idx)}
-                      className={`w-full flex items-center gap-3 px-4 py-2 text-[13px] transition-colors ${idx === safeIdx ? "bg-ih-primary-tint text-ih-primary" : "text-ih-fg-3"}`}
+                      className={`w-full flex items-center gap-3 px-4 py-2 text-[13px] transition-colors ${idx === safeIdx ? "bg-ih-primary-tint text-ih-primary-text" : "text-ih-fg-3"}`}
                     >
                       <PaletteIcon type={action.icon} />
                       <span className="font-medium flex-1 text-left truncate">{action.label}</span>
                       {action.hint && (
-                        <span className="text-[10px] text-ih-fg-4 shrink-0">{action.hint}</span>
+                        <span className="text-[10px] text-ih-fg-3 shrink-0">{action.hint}</span>
                       )}
                     </button>
                   );
@@ -368,7 +368,7 @@ export function CommandPalette({
         </div>
 
         {/* Footer hint */}
-        <div className="flex items-center gap-4 px-4 py-2 border-t border-ih-border text-[10px] text-ih-fg-4">
+        <div className="flex items-center gap-4 px-4 py-2 border-t border-ih-border text-[10px] text-ih-fg-3">
           <span><kbd className="font-bold">&uarr;&darr;</kbd> {m.command_palette_footer_navigate()}</span>
           <span><kbd className="font-bold">Enter</kbd> {m.command_palette_footer_select()}</span>
           <span><kbd className="font-bold">Esc</kbd> {m.command_palette_footer_close()}</span>

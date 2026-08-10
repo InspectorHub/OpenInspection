@@ -83,7 +83,7 @@ export function SmsSecretsPanel({
             <>
               <p className="text-[13px] text-ih-fg-3">
                 {m.settings_smssecrets_twilio_intro()}{" "}
-                <a href="https://www.twilio.com/docs/messaging/compliance/a2p-10dlc" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">{m.settings_smssecrets_a2p_link()}</a>{" "}
+                <a href="https://www.twilio.com/docs/messaging/compliance/a2p-10dlc" target="_blank" rel="noopener noreferrer" className="text-ih-primary-text hover:underline">{m.settings_smssecrets_a2p_link()}</a>{" "}
                 {m.settings_smssecrets_twilio_intro_suffix()}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -105,7 +105,7 @@ export function SmsSecretsPanel({
             <>
               <p className="text-[13px] text-ih-fg-3">
                 {m.settings_smssecrets_telnyx_intro()}{" "}
-                <a href="https://portal.telnyx.com/" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">{m.settings_smssecrets_telnyx_portal_link()}</a>{m.settings_smssecrets_telnyx_intro_suffix()}
+                <a href="https://portal.telnyx.com/" target="_blank" rel="noopener noreferrer" className="text-ih-primary-text hover:underline">{m.settings_smssecrets_telnyx_portal_link()}</a>{m.settings_smssecrets_telnyx_intro_suffix()}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <SecretField name="TELNYX_API_KEY" label={m.settings_smssecrets_telnyx_key_label()}
@@ -139,7 +139,7 @@ export function SmsSecretsPanel({
             <div className="flex items-center gap-2">
               <input
                 type="text" readOnly value={inboundUrl || m.settings_smssecrets_inbound_placeholder()}
-                className="flex-1 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-muted text-[11px] font-mono text-ih-fg-3 outline-none"
+                className="flex-1 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-muted text-[11px] font-mono text-ih-fg-2 outline-none"
               />
               <button type="button" disabled={!inboundUrl}
                 onClick={() => { if (inboundUrl) void navigator.clipboard.writeText(inboundUrl); }}
@@ -147,7 +147,7 @@ export function SmsSecretsPanel({
                 {m.common_copy()}
               </button>
             </div>
-            <p className="text-[11px] text-ih-fg-4">
+            <p className="text-[11px] text-ih-fg-3">
               {provider === "telnyx"
                 ? m.settings_smssecrets_inbound_note_telnyx()
                 : m.settings_smssecrets_inbound_note_twilio()}
