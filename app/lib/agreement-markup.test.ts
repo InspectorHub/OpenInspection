@@ -219,15 +219,22 @@ describe("plain-text agreements (every seeded template is one)", () => {
             }
         });
 
-        it("finds no words left in nested or malformed tags", () => {
-            // The strip loops to a fixed point. For the current regex one pass is
-            // already complete — a surviving `<` can have no `>` after it, or it
-            // would have matched — so these assert the property, not a difference
-            // between one pass and many. They exist so that narrowing the regex
-            // later fails here instead of silently leaving markup behind.
-            for (const s of ["<<p>>", "<p<p>>", "<scr<script>ipt>", "<<>>", "<<<x>>>"]) {
-                const stripped = s.replace(/<[^>]*>/g, "");
-                expect(stripped, `${s} still holds a complete tag`).not.toMatch(/<[^>]*>/);
+        it("still sees the words inside nested or malformed tags", () => {
+            // Asserted through the real function, not by reimplementing its strip
+            // — an earlier version of this test inlined the regex, which tested
+            // the pattern rather than the behaviour (and tripped CodeQL on the
+            // test file, fairly).
+            //
+            // The direction that matters to a user is this one: markup they did
+            // not write cleanly must not make their words disappear, because
+            // "empty" here means the save is refused.
+            for (const s of [
+                "<p<p>>hello",
+                "<scr<script>ipt>hello</p>",
+                "<<p>>text<<>>",
+                "<p>a</p<p>>",
+            ]) {
+                expect(agreementHtmlIsEmpty(s), `${s} reads as empty`).toBe(false);
             }
         });
     });
