@@ -36,9 +36,16 @@ function formatOffset(min: number): string {
 }
 
 /** Mainstream-style picker label, e.g. `(UTC+08:00) Asia/Shanghai`. The stored
- *  value stays the raw IANA id; only the display text carries the offset. */
-export function timeZoneLabel(tz: string): string {
-  return `(${formatOffset(timeZoneOffsetMinutes(tz))}) ${tz.replace(/_/g, ' ')}`;
+ *  value stays the raw IANA id; only the display text carries the offset.
+ *
+ *  `offsetMin` lets a caller that has ALREADY computed the offset pass it in.
+ *  Resolving a zone costs an `Intl.DateTimeFormat` construction plus a
+ *  `formatToParts`, and `TIMEZONE_SELECT_OPTIONS` below needs the offset twice
+ *  (once to sort, once to label) for all 419 zones. Omitting it keeps the old
+ *  one-argument behaviour for every other caller. */
+export function timeZoneLabel(tz: string, offsetMin?: number): string {
+  const off = offsetMin ?? timeZoneOffsetMinutes(tz);
+  return `(${formatOffset(off)}) ${tz.replace(/_/g, ' ')}`;
 }
 
 /** The viewer's own IANA timezone as reported by the runtime, or null if it
@@ -77,8 +84,15 @@ export function onboardingTzPrefill(opts: {
 /** `{ value, label }` options for the settings `<Select>`, sorted west→east by
  *  current UTC offset (then name) so the list reads like mainstream tz pickers.
  *  `value` is the IANA id (persisted); `label` shows the offset. */
+/*  The `offset` computed for the sort is threaded into the label rather than
+ *  recomputed there. It used to be destructured away, so every zone resolved
+ *  twice — 838 `Intl.DateTimeFormat` constructions for 419 zones, at module
+ *  scope, on both the server and (via the route chunk) in the browser during
+ *  hydration. Measured in Chromium at a 6x CPU throttle, a cold build of this
+ *  table costs ~1.5s; the duplicate half of it bought nothing. See
+ *  tests/e2e/public-timezone-hydration-cost.spec.ts (#99) for the harness. */
 export const TIMEZONE_SELECT_OPTIONS: { value: string; label: string }[] =
   TIMEZONE_OPTIONS
     .map((tz) => ({ tz, offset: timeZoneOffsetMinutes(tz) }))
     .sort((a, b) => a.offset - b.offset || a.tz.localeCompare(b.tz))
-    .map(({ tz }) => ({ value: tz, label: timeZoneLabel(tz) }));
+    .map(({ tz, offset }) => ({ value: tz, label: timeZoneLabel(tz, offset) }));

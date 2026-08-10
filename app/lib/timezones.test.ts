@@ -41,6 +41,15 @@ describe('timeZoneLabel', () => {
     expect(timeZoneLabel('America/New_York')).toContain('America/New York');
     expect(timeZoneLabel('America/New_York')).not.toContain('_');
   });
+
+  it('a passed-in offset produces the same text as resolving it again', () => {
+    // The whole point of the second parameter. If these two ever disagree, the
+    // optimisation below has changed what users read, which is the one thing it
+    // is not allowed to do.
+    for (const tz of ['UTC', 'Asia/Shanghai', 'America/New_York', 'Asia/Kolkata', 'Pacific/Chatham']) {
+      expect(timeZoneLabel(tz, timeZoneOffsetMinutes(tz)), tz).toBe(timeZoneLabel(tz));
+    }
+  });
 });
 
 describe('TIMEZONE_SELECT_OPTIONS', () => {
@@ -52,6 +61,21 @@ describe('TIMEZONE_SELECT_OPTIONS', () => {
   it('covers every id in TIMEZONE_OPTIONS exactly once', () => {
     expect(TIMEZONE_SELECT_OPTIONS.length).toBe(TIMEZONE_OPTIONS.length);
     expect(new Set(TIMEZONE_SELECT_OPTIONS.map((o) => o.value)).size).toBe(TIMEZONE_OPTIONS.length);
+  });
+
+  it('every label matches what recomputing the offset would produce', () => {
+    // The table threads the offset it computed for the sort into the label
+    // instead of resolving each zone a second time. That halves the
+    // `Intl.DateTimeFormat` constructions this module performs at import — a
+    // cost paid on the server per isolate AND in the browser during hydration
+    // of any route whose chunk graph reaches here.
+    //
+    // The saving is only allowed to be invisible. This checks ALL of them, not
+    // a sample: a mismatch would be one zone reading wrong in the picker, which
+    // is exactly the kind of thing three spot-checks miss.
+    for (const o of TIMEZONE_SELECT_OPTIONS) {
+      expect(o.label, o.value).toBe(timeZoneLabel(o.value));
+    }
   });
 
   it('is sorted west→east by current UTC offset', () => {
