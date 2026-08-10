@@ -1,7 +1,7 @@
 import type { CalendarCredentialPayload } from './credentials';
 
 export type CalendarProviderId = 'google' | 'microsoft' | 'apple';
-export type CalendarAuthType = 'oauth' | 'caldav';
+type CalendarAuthType = 'oauth' | 'caldav';
 export type CalendarCapability = 'availability_read' | 'events_read_write';
 
 export interface BusyBlock {
@@ -52,12 +52,12 @@ export interface PkceChallenge {
 }
 
 /** How a provider's connect is driven. The UI branches on `kind`. */
-export type CalendarConnectFlow =
+type CalendarConnectFlow =
     | { kind: 'redirect' }   // OAuth: navigate a popup, land on oauth-popup-landing
     | { kind: 'form' };      // CalDAV: collect fields in-page, never open a popup
 
 /** OAuth: the code and the verifier. CalDAV: what the user typed. */
-export type CalendarConnectSubmission =
+type CalendarConnectSubmission =
     | { kind: 'oauth_code'; code: string; verifier: string; redirectUri: string }
     | { kind: 'credentials'; username: string; password: string; url?: string };
 

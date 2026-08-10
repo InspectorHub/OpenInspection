@@ -1,7 +1,7 @@
 import { sealSecrets, openSecrets } from '../config-crypto';
 
 /** OAuth refresh/access tokens + granted scopes (Google / Microsoft). */
-export interface CalendarOAuthCredentials {
+interface CalendarOAuthCredentials {
     refreshToken: string;
     accessToken?: string;
     expiresAt?: string;
@@ -15,7 +15,7 @@ export interface CalendarOAuthCredentials {
  * authenticates on it, and it is not derivable from `url`, which names the
  * discovered calendar home and already has one meaning.
  */
-export interface CalendarCalDavCredentials {
+interface CalendarCalDavCredentials {
     username: string;
     appPassword: string;
     url: string;

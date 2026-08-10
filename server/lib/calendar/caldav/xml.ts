@@ -37,7 +37,7 @@ export const PROPFIND_CALENDARS = `${XML_HEAD}
 </d:propfind>`;
 
 /** The five XML entities, and nothing else. */
-export function escapeXml(value: string): string {
+function escapeXml(value: string): string {
     return value
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')

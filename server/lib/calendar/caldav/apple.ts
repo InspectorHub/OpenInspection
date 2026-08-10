@@ -41,7 +41,7 @@ interface AppleAuthMaterial {
  * provider id is a routing bug, and it must be loud rather than silently
  * half-working against credentials that mean nothing here.
  */
-export function appleMaterialOf(auth: CalendarAuth): AppleAuthMaterial {
+function appleMaterialOf(auth: CalendarAuth): AppleAuthMaterial {
     if (auth.provider !== 'apple') {
         throw new Error(`Calendar auth handle for '${auth.provider}' handed to the apple provider`);
     }
