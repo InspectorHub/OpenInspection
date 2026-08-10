@@ -75,7 +75,16 @@ async function throttle(page: Page, rate: number) {
  * identical, so the difference between them is the duplicate work and nothing
  * else.
  */
-function buildTable({ variant, reps }: { variant: 'one' | 'two'; reps: number }) {
+function buildTable({
+    variant,
+    reps,
+    limit,
+}: {
+    variant: 'one' | 'two';
+    reps: number;
+    /** Keep only the first N zones — models a curated list of that size. */
+    limit?: number;
+}) {
     const offsetMinutes = (tz: string): number => {
         try {
             const parts = new Intl.DateTimeFormat('en-US', {
@@ -101,7 +110,13 @@ function buildTable({ variant, reps }: { variant: 'one' | 'two'; reps: number })
     const supported =
         (Intl as unknown as { supportedValuesOf?: (k: string) => string[] })
             .supportedValuesOf?.('timeZone') ?? [];
-    const ids = supported.includes('UTC') ? supported : ['UTC', ...supported];
+    const all = supported.includes('UTC') ? supported : ['UTC', ...supported];
+    // A curated list is modelled by its SIZE, not its contents: the per-zone
+    // work is one Intl construction either way, and a friendlier label ("Central
+    // Time" instead of "America/Chicago") is data, not computation. Slicing is
+    // therefore a faithful stand-in for curating, and avoids pretending some
+    // invented 86-zone list is the one we would ship.
+    const ids = limit ? all.slice(0, limit) : all;
 
     const samples: number[] = [];
     let built = 0;
@@ -246,6 +261,103 @@ test.describe('timezone table — what a public visitor pays', () => {
                 .toBeGreaterThan(0);
         });
     }
+
+    /**
+     * How much does CURATING the list buy? (#99, follow-up)
+     *
+     * The mainstream React component ships ~86 hand-picked zones with human
+     * labels rather than the ~419 raw IANA ids, and computes every offset
+     * eagerly over that smaller set. Note its offset+DST de-duplication runs on
+     * the curated file, NOT on the full list — de-duplicating 419 zones would
+     * require resolving all 419 first, which is the cost being avoided. So
+     * curation has to be static data.
+     *
+     * A curated list is modelled here by SIZE alone (see buildTable): the label
+     * text is data and costs nothing to change. What this sweep is really for is
+     * the FLOOR — ICU's one-time initialisation does not shrink with the list,
+     * so the saving is not linear and a naive "86/419 = 20% of the cost"
+     * estimate is wrong. Each size gets a FRESH page so its first pass is cold,
+     * and the sweep is run in both directions because warm-up favours whatever
+     * runs later.
+     */
+    for (const rate of [1, 6] as const) {
+        test(`list-size sweep @ CPU ${rate}x`, async ({ page }) => {
+            test.setTimeout(120_000 + rate * 60_000);
+            const context = page.context();
+            const sizes = [419, 200, 86, 40];
+            const out: string[] = [];
+
+            for (const direction of ['ascending', 'descending'] as const) {
+                const order = direction === 'ascending' ? [...sizes].reverse() : sizes;
+                for (const n of order) {
+                    const p = await context.newPage();
+                    const cdp = await context.newCDPSession(p);
+                    await cdp.send('Emulation.setCPUThrottlingRate', { rate });
+                    await p.goto('about:blank');
+                    const r = await p.evaluate(buildTable, {
+                        variant: 'one' as const,
+                        reps: REPS,
+                        limit: n === 419 ? undefined : n,
+                    });
+                    const mount = await p.evaluate(mountOptions, { count: r.built, reps: REPS });
+                    out.push(
+                        `${direction.padEnd(10)} | ${String(r.built).padStart(5)} zones` +
+                            ` | cold ${String(round(r.samples[0])).padStart(8)}` +
+                            ` | warm ${String(round(median(r.samples))).padStart(8)}` +
+                            ` | mount ${String(round(median(mount))).padStart(6)}`,
+                    );
+                    await p.close();
+                }
+            }
+            console.log(`\nlist-size sweep @ ${rate}x (one call/zone, fresh page each), ms\n` +
+                out.join('\n') + '\n');
+            expect(out.length).toBe(sizes.length * 2);
+        });
+    }
+
+    test('a visitor who cannot see the control never downloads it', async ({ page }) => {
+        // The decisive check, and the one that does not flake. Timing said the
+        // longest blocking task got shorter but total blocking did not move —
+        // too noisy to conclude from. Whether the browser REQUESTS the chunk is
+        // a fact, and it is the whole point of gating the import on loader data
+        // the server already has.
+        //
+        // Before the split this page fetched /assets/timezones-*.js even for a
+        // bogus envelope id, because `viewer-timezone` imported two cheap
+        // helpers out of the same module the 419-zone table lived in.
+        const assets: string[] = [];
+        page.on('request', (r) => {
+            const u = new URL(r.url()).pathname;
+            if (u.startsWith('/assets/')) assets.push(u);
+        });
+
+        await page.goto('/verify/no-such-envelope-99', { waitUntil: 'load' });
+        await page.waitForLoadState('networkidle');
+
+        // Anti-vacuity: if no assets were captured at all, the listener is the
+        // thing being tested and it would "pass" by observing nothing.
+        expect(assets.length, 'captured no /assets/ requests — the listener is broken')
+            .toBeGreaterThan(3);
+
+        // POSITIVE CONTROL. The cheap primitives module SHOULD load: this page
+        // renders dates, so it reaches the timezone code path. Without this, the
+        // absence below could mean the split worked or could mean the page never
+        // touches timezones at all, and the test would read as a pass either way.
+        expect(
+            assets.filter((u) => /\/timezones-/.test(u)),
+            'the cheap timezone module did not load — this page is not exercising the path',
+        ).not.toEqual([]);
+
+        // The costly chunks: the control itself (which carries the curated list)
+        // and the full 419-zone table. `LazyViewerTimeZoneNotice-` is excluded on
+        // purpose — the route imports the ~1.6KB wrapper statically, because that
+        // is what lets it decide NOT to fetch the rest.
+        const costly = assets.filter((u) => /\/(ViewerTimeZoneNotice|timezone-options)[-.]/.test(u));
+        expect(
+            costly,
+            `a visitor with an invalid link downloaded the zone picker: ${costly.join(', ')}`,
+        ).toEqual([]);
+    });
 
     test('long tasks during a real /verify hydration @ CPU 6x', async ({ page }) => {
         await throttle(page, 6);
