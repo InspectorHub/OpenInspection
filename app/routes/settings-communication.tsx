@@ -23,6 +23,7 @@ import { SectionNav } from "~/components/settings/SectionNav";
 import { parseTestResults } from "~/lib/connection-test";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
+import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 
 export function meta() {
   return [{ title: m.settings_comms_meta_title() }];
@@ -377,13 +378,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent, ok: true, error: null, field: null, test: { sent: true } };
   }
 
-  // ─── Managed SMS compliance provisioning (SaaS-only, Task 9) ───────────────
+  // ─── Managed SMS compliance provisioning (platform-operated) ──────────────
   if (intent === "sms-compliance-provision" || intent === "sms-compliance-resubmit") {
-    // Gate: SaaS only. The API endpoint also enforces this (403 in standalone),
-    // but we short-circuit a direct POST here so standalone never reaches the API.
-    const isSaasAction =
-      getCloudflareEnv(context)?.APP_MODE === "saas";
-    if (!isSaasAction) {
+    // Gate: a platform must exist to file the 10DLC brand/campaign on the
+    // operator's behalf. The API endpoint also enforces this (403 otherwise),
+    // but we short-circuit a direct POST here. Capability, not mode (OI #308).
+    const profile = getDeploymentProfile(getCloudflareEnv(context));
+    if (!profile.hasManagedCompliance) {
       return { intent, ok: false as const, error: m.settings_comms_managed_saas_only(), field: null, test: null };
     }
 

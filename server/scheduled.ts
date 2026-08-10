@@ -8,7 +8,7 @@ import type { EmailServiceEnv } from './lib/email/build-email-service';
 import { PlanQuotaGuard, readTenantTier } from './features/plan-quota/guard';
 import { tenantAiCapsLoader } from './features/plan-quota/ai-caps';
 import { getDeploymentProfile } from './lib/deployment-profile';
-import type { AppEnv, BrowserRun } from './types/hono';
+import type { BrowserRun } from './types/hono';
 import { QBOService } from './services/qbo.service';
 import { InvoiceService } from './services/invoice.service';
 import { qboConnections } from './lib/db/schema/qbo';
@@ -190,18 +190,16 @@ export async function scheduled(
                 ? { TWILIO_SHARED_MESSAGING_SERVICE_SID: env.TWILIO_SHARED_MESSAGING_SERVICE_SID }
                 : {}),
         };
-        // Free-tier pre-flight (2026-07): cron has no Hono context/profile.
-        // ScheduledEnv is a narrower hand-picked subset of AppEnv (doesn't
-        // declare every binding) but the runtime object IS the full worker Env,
-        // so cast through getDeploymentProfile — the single env->capability seam
-        // (server/lib/deployment-profile.ts) — rather than reading the portal
-        // base-url binding here directly (see tests/portal-isolation.spec.ts).
+        // Free-tier pre-flight (2026-07): cron has no Hono context/profile, so
+        // it reads the env->capability seam directly — the sanctioned form for
+        // context-free code (OI #308 §6.1). ScheduledEnv satisfies ProfileEnv
+        // structurally; the cast this needed before #308 is gone.
         // The per-tenant tier is resolved inside the flush() email factory,
         // which memoizes one EmailService per tenantId per flush() call, so
         // this is one lookup per tenant per tick, not per log row. The SMS
         // branch (deliverSms) reads tier straight off the already-joined
         // `tenant.tier` column — no extra lookup needed there.
-        const profile = getDeploymentProfile(env as unknown as AppEnv);
+        const profile = getDeploymentProfile(env);
         const quotaGuard = profile.hasUsageQuota
             ? new PlanQuotaGuard(env.DB, { enforced: true, billingPortalUrl: profile.billingPortalUrl, aiCaps: tenantAiCapsLoader(env.DB) })
             : undefined;

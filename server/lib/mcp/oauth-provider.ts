@@ -3,6 +3,7 @@ import { InspectorMcp } from '../../durable-objects/inspector-mcp';
 import type { McpProps } from '../../durable-objects/inspector-mcp';
 import { mcpEnabled } from './flag';
 import { assertCompanySlugMatches, companySlugFromMcpPath, stripCompanyPrefix } from './identity-bridge';
+import { getDeploymentProfile, type ProfileEnv } from '../deployment-profile';
 
 /**
  * Loose fetch signature used for both the app handler and the returned handler.
@@ -17,14 +18,15 @@ type FetchFn = (req: Request, env: any, ctx: ExecutionContext) => Response | Pro
  * worker-configuration.d.ts; regenerate with `wrangler types` once OAUTH_KV /
  * INSPECTOR_MCP are confirmed provisioned to update the global Env type.
  */
-type McpFlagEnv = { MCP_ENABLED?: string; APP_MODE?: string };
+type McpFlagEnv = { MCP_ENABLED?: string } & ProfileEnv;
 
 /**
  * Wraps `appFetch` with an OAuthProvider when the MCP_ENABLED flag is set.
  * Returns `{ fetch: appFetch }` unchanged when the flag is off — the caller
  * is unaffected and the OAuth surface is not mounted at all.
  *
- * apiRoute strategy (docs/developers/mcp-oauth-notes.md §4 / §11.3):
+ * apiRoute strategy (docs/developers/mcp-oauth-notes.md §4 / §11.3), read from
+ * profile.mcpApiRoute:
  *   - standalone: '/mcp'        — single fixed endpoint
  *   - saas:       '/company/'   — broad literal prefix; per-workspace /company/{slug}/mcp
  *
@@ -42,18 +44,20 @@ export function buildOAuthHandler(
     if (!mcpEnabled(env)) return { fetch: appFetch };
 
     // '/company/' is a broad literal prefix — all /company/* requests go through
-    // token auth. Slug validation (spec §6) is applied in the saas wrapper below.
-    const apiRoute = env.APP_MODE === 'saas' ? '/company/' : '/mcp';
+    // token auth. Slug validation (spec §6) is applied in the wrapper below.
+    const apiRoute = getDeploymentProfile(env).mcpApiRoute;
 
     // McpAgent.serve() internal path is always '/mcp'; 'INSPECTOR_MCP' overrides
     // McpAgent's default MCP_OBJECT binding name (see wrangler.jsonc DO bindings).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const baseServeHandler = InspectorMcp.serve('/mcp', { binding: 'INSPECTOR_MCP' }) as any;
 
-    // Saas only: wrap with spec §6 slug guard. Standalone path is byte-identical
-    // (no /company/ prefix, so companySlugFromMcpPath always returns null there).
+    // The slug guard is needed exactly when the mount path carries the company
+    // prefix — derived from the route, not re-tested against the mode, so the
+    // two cannot drift (OI #308). The standalone path is byte-identical:
+    // companySlugFromMcpPath always returns null with no /company/ prefix.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const apiHandler: any = env.APP_MODE === 'saas'
+    const apiHandler: any = apiRoute === '/company/'
         ? {
             fetch(
                 req: Request,

@@ -17,6 +17,7 @@ import {
 } from "../../../server/lib/mcp/tag-catalog";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
+import { getDeploymentProfile } from "../../../server/lib/deployment-profile";
 import type { WorkerEnv } from "../../../workers/env";
 
 export function meta() {
@@ -25,12 +26,10 @@ export function meta() {
 
 /**
  * Env the shared `WorkerEnv` omits on purpose. OAUTH_PROVIDER: wrapper-injected,
- * never a binding, sole consumer. PORTAL_API_URL: the SaaS-portal isolation gate
- * confines it to integration-boundary files, so it must not sit on a shared env.
+ * never a binding, sole consumer.
  */
 interface AuthorizeEnv {
   OAUTH_PROVIDER?: OAuthHelpers;
-  PORTAL_API_URL?: string;
 }
 
 /** Resolved end-user identity backing an OAuth grant. */
@@ -116,10 +115,10 @@ export function isRegisteredRedirectUri(
  * path: a form POST from a client-side navigation).
  */
 function loginRedirect(env: WorkerEnv & AuthorizeEnv, url: URL): Response {
-  if (env.APP_MODE === "saas" && env.PORTAL_API_URL) {
+  const { loginRedirectBase } = getDeploymentProfile(env);
+  if (loginRedirectBase) {
     // Cross-origin bounce to the portal — send the absolute authorize URL.
-    const base = env.PORTAL_API_URL.replace(/\/$/, "");
-    return redirect(`${base}/login?returnTo=${encodeURIComponent(url.href)}`);
+    return redirect(`${loginRedirectBase}/login?returnTo=${encodeURIComponent(url.href)}`);
   }
   // Standalone: relative path back to this same authorize URL (incl. query).
   const here = `${url.pathname}${url.search}`;

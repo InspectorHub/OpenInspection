@@ -34,9 +34,53 @@ describe('SaaS-Portal isolation', () => {
     'workers/app.ts',                       // entry-level APP_MODE 404 guard
   ];
   it('PORTAL_API_URL appears only in allowed files', () => {
-    const hits = gitGrepFiles('PORTAL_API_URL', 'server', 'workers');
+    // OI #308 — `app` was outside this pathspec, which is the whole reason four
+    // routes could reimplement loginRedirectBase while the gate stayed green.
+    // workers/env.ts:52-62 declines to spell the literal even inside a comment
+    // because the gate reads it there; app/routes/login.tsx wrote it five times
+    // across four files because the gate did not. Same repo, opposite outcomes,
+    // decided by a pathspec.
+    const hits = gitGrepFiles('PORTAL_API_URL', 'server', 'workers', 'app')
+      .filter(f => !/\.(test|spec)\.tsx?$/.test(f));
     const stray = hits.filter(f => !ALLOWED.some(a => f.startsWith(a)));
+    // eslint-disable-next-line no-console
+    console.log(`[gate] PORTAL_API_URL — ${hits.length} non-test files matched, ${stray.length} stray`);
+    expect(hits.length, 'scan matched nothing — pattern or pathspec is broken').toBeGreaterThan(0);
     expect(stray, `stray PORTAL_API_URL references: ${stray.join(', ')}`).toEqual([]);
+  });
+
+  // OI #308 — mode-dependent BEHAVIOUR must be read through the capability
+  // seam, never off env.APP_MODE. The pattern is a property READ (`.APP_MODE`),
+  // not the bare word: `APP_MODE?: string` on an env interface is a
+  // declaration, not a branch, and there are seven of those that are fine.
+  //
+  // Three files may read it, and no more:
+  //   deployment-profile.ts  the seam itself — this IS the one derivation
+  //   di.ts                  composition point #3 (see integration.module.ts:1-5)
+  //   workers/app.ts         the entry-level /api/integration/* 404 guard
+  const APP_MODE_READERS = [
+    'server/lib/deployment-profile.ts',
+    'server/lib/middleware/di.ts',
+    'workers/app.ts',
+  ];
+
+  // Empty, and it stays empty. An entry here means a new violation shipped.
+  const APP_MODE_STRAYS: string[] = [];
+
+  it('env.APP_MODE is read only through the capability seam', () => {
+    const hits = gitGrepFiles('\\.APP_MODE', 'server', 'workers', 'app')
+      // Tests legitimately construct envs in both modes to exercise the seam.
+      .filter(f => !/\.(test|spec)\.tsx?$/.test(f));
+    const stray = hits.filter(
+      f => !APP_MODE_READERS.includes(f) && !APP_MODE_STRAYS.includes(f),
+    );
+    // Both numbers, always: a gate that scanned nothing must not read as a
+    // pass. Zero hits means the pattern or the pathspec broke, not that the
+    // codebase is clean — there are three legitimate readers at all times.
+    // eslint-disable-next-line no-console
+    console.log(`[gate] .APP_MODE — ${hits.length} non-test files matched, ${stray.length} stray, ${APP_MODE_STRAYS.length} awaiting migration`);
+    expect(hits.length, 'scan matched nothing — pattern or pathspec is broken').toBeGreaterThan(0);
+    expect(stray, `APP_MODE read outside the seam: ${stray.join(', ')}`).toEqual([]);
   });
 
   it('the retired PORTAL_SERVICE binding is referenced in no CODE file (hono.ts carries the retirement note; markdown docs are exempt)', () => {

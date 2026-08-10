@@ -1,7 +1,7 @@
 import {} from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { and, eq } from 'drizzle-orm';
-import { users, tenantConfigs, tenants } from '../lib/db/schema';
+import { users, tenantConfigs } from '../lib/db/schema';
 import { getSeatUsage } from '../features/seat-quota';
 import { resolveLocale } from '../lib/locale';
 import {
@@ -19,6 +19,7 @@ import { isRole } from '../lib/auth/roles';
 import { getDrizzle } from '../lib/route-helpers';
 import { getBaseUrl } from '../lib/url';
 import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
+import { resolveVideoProvider, videoStreamServiceable } from '../services/video/resolve';
 
 /**
  * Session context endpoint for the React Router v7 frontend layout.
@@ -150,46 +151,16 @@ const sessionContextRoutes = createApiRouter()
 
         // Resolve the video backend provider for this tenant. Used by the
         // inspection editor to render the correct VideoCapture/VideoPlayer branch.
+        //
+        // Calls the same resolver the media-studio API uses. This used to be a
+        // 40-line copy annotated "Mirror resolveVideoBackend" — which it did not:
+        // on a misconfigured stream tenant the copy reported 'r2' while the API
+        // threw 503, so the editor offered a capture path every upload refused.
         let videoProvider: 'r2' | 'stream' = 'r2';
         if (tenantId) {
             try {
-                const db = getDrizzle(c);
-                const isSaas = c.env.APP_MODE === 'saas';
-                if (isSaas) {
-                    const tenantRow = await db
-                        .select({ tier: tenants.tier, status: tenants.status })
-                        .from(tenants)
-                        .where(eq(tenants.id, tenantId))
-                        .get();
-                    const tier = tenantRow?.tier ?? 'free';
-                    const status = tenantRow?.status ?? 'pending';
-                    const paid = (tier === 'pro' || tier === 'enterprise') && status !== 'trial';
-                    videoProvider = paid ? 'stream' : 'r2';
-                } else {
-                    const cfgRow = await db
-                        .select({ videoMode: tenantConfigs.videoMode, integrationConfig: tenantConfigs.integrationConfig })
-                        .from(tenantConfigs)
-                        .where(eq(tenantConfigs.tenantId, tenantId))
-                        .get();
-                    const videoModeRaw = (cfgRow?.videoMode as 'r2' | 'stream' | null) ?? null;
-                    if (videoModeRaw === 'stream' && !!c.env.STREAM) {
-                        // Mirror resolveVideoBackend: also require a non-empty
-                        // streamCustomerSubdomain, otherwise create-upload throws 503.
-                        let streamSubdomain = '';
-                        const rawCfg = (cfgRow as unknown as { integrationConfig?: string | null } | null)?.integrationConfig ?? null;
-                        if (rawCfg) {
-                            try {
-                                const parsed = JSON.parse(rawCfg) as Record<string, unknown>;
-                                if (typeof parsed.streamCustomerSubdomain === 'string') {
-                                    streamSubdomain = parsed.streamCustomerSubdomain;
-                                }
-                            } catch { /* ignore parse error — treat as empty */ }
-                        }
-                        videoProvider = streamSubdomain ? 'stream' : 'r2';
-                    } else {
-                        videoProvider = 'r2';
-                    }
-                }
+                const resolved = await resolveVideoProvider(c, tenantId, getDrizzle(c));
+                videoProvider = videoStreamServiceable(resolved) ? 'stream' : 'r2';
             } catch (e) {
                 logger.warn('[session-context] videoProvider resolution failed', { error: (e as Error).message });
             }

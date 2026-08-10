@@ -19,6 +19,7 @@
 
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenants, tenantConfigs } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
@@ -35,28 +36,40 @@ export interface ResolvedVideoBackend {
     streamSubdomain: string | null;
 }
 
+/** What the tenant's configuration asks for, plus whether it can be served. */
+export interface ResolvedVideoProvider {
+    provider: 'r2' | 'stream';
+    streamSubdomain: string | null;
+    streamBindingPresent: boolean;
+}
+
 /**
- * Resolve the appropriate VideoBackend for the current request.
+ * Whether a `stream` request can actually be served.
  *
- * Reads `c.env.APP_MODE` to determine deployment mode, then:
- * - SaaS: loads `tenants.tier`/`status` and applies the plan gate.
- * - Self-host: loads `tenant_configs.videoMode` (default 'r2') and
- *   optionally `integrationConfig.streamCustomerSubdomain`.
- *
- * Throws `ServiceUnavailable` (503) when provider='stream' but the
- * required STREAM binding or customer subdomain is absent.
+ * Single source for a rule that used to live in two places and disagree:
+ * resolveVideoBackend threw 503 on a misconfigured stream tenant while
+ * session-context quietly reported 'r2', so the editor rendered the R2 capture
+ * path against an API that refused every call (OI #308 Task 4).
  */
-export async function resolveVideoBackend(c: Context<HonoConfig>): Promise<ResolvedVideoBackend> {
-    const isSaas = c.env.APP_MODE === 'saas';
-    const tenantId = c.get('tenantId');
-    const db = drizzle(c.env.DB);
-    const baseUrl = getBaseUrl(c);
+export function videoStreamServiceable(r: ResolvedVideoProvider): boolean {
+    return r.provider === 'stream' && r.streamBindingPresent && !!r.streamSubdomain;
+}
 
-    let provider: 'r2' | 'stream';
-    let streamSubdomain: string | null;
+/**
+ * Resolve the video provider the tenant's configuration asks for.
+ *
+ * The deployment decides WHO chooses (`profile.videoBackendManaged`): in saas
+ * the platform plan-gates it off tenants.tier/status; in standalone the
+ * operator sets tenant_configs.videoMode. Never branch on APP_MODE here.
+ */
+export async function resolveVideoProvider(
+    c: Context<HonoConfig>,
+    tenantId: string,
+    db: DrizzleD1Database,
+): Promise<ResolvedVideoProvider> {
+    const streamBindingPresent = !!c.env.STREAM;
 
-    if (isSaas) {
-        // SaaS: plan gate — paid tenants (pro/enterprise, non-trial) get Stream.
+    if (c.var.profile.videoBackendManaged) {
         const tenantRow = await db
             .select({ tier: tenants.tier, status: tenants.status })
             .from(tenants)
@@ -67,67 +80,68 @@ export async function resolveVideoBackend(c: Context<HonoConfig>): Promise<Resol
         const status = tenantRow?.status ?? 'pending';
         const paid = (tier === 'pro' || tier === 'enterprise') && status !== 'trial';
 
-        if (paid) {
-            provider = 'stream';
-            streamSubdomain = c.env.STREAM_CUSTOMER_SUBDOMAIN ?? null;
-        } else {
-            provider = 'r2';
-            streamSubdomain = null;
-        }
-
-        logger.info('resolveVideoBackend: saas resolution', {
-            tenantId,
-            tier,
-            status,
-            paid,
-            provider,
-        });
-    } else {
-        // Self-host: per-tenant videoMode (default 'r2').
-        const cfgRow = await db
-            .select({ videoMode: tenantConfigs.videoMode, integrationConfig: tenantConfigs.integrationConfig })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
-
-        const videoMode = cfgRow?.videoMode ?? 'r2';
-
-        if (videoMode === 'stream') {
-            provider = 'stream';
-            const rawCfg = cfgRow?.integrationConfig;
-            let parsed: Record<string, unknown> = {};
-            if (rawCfg) {
-                try {
-                    parsed = JSON.parse(rawCfg) as Record<string, unknown>;
-                } catch {
-                    logger.error('resolveVideoBackend: failed to parse integrationConfig JSON', {
-                        tenantId,
-                    });
-                }
-            }
-            streamSubdomain = typeof parsed.streamCustomerSubdomain === 'string'
-                ? parsed.streamCustomerSubdomain
-                : null;
-        } else {
-            provider = 'r2';
-            streamSubdomain = null;
-        }
-
-        logger.info('resolveVideoBackend: standalone resolution', {
-            tenantId,
-            videoMode,
-            provider,
-        });
+        logger.info('resolveVideoProvider: managed resolution', { tenantId, tier, status, paid });
+        return paid
+            ? { provider: 'stream', streamSubdomain: c.env.STREAM_CUSTOMER_SUBDOMAIN ?? null, streamBindingPresent }
+            : { provider: 'r2', streamSubdomain: null, streamBindingPresent };
     }
 
-    // Fail closed: if Stream was selected but config is incomplete, throw 503.
-    if (provider === 'stream') {
-        if (!c.env.STREAM || !streamSubdomain) {
-            throw Errors.ServiceUnavailable(
-                'Stream video is enabled but not configured (missing subdomain or STREAM binding).',
-            );
-        }
+    const cfgRow = await db
+        .select({ videoMode: tenantConfigs.videoMode, integrationConfig: tenantConfigs.integrationConfig })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .get();
 
+    const videoMode = cfgRow?.videoMode ?? 'r2';
+    logger.info('resolveVideoProvider: self-host resolution', { tenantId, videoMode });
+
+    if (videoMode !== 'stream') {
+        return { provider: 'r2', streamSubdomain: null, streamBindingPresent };
+    }
+
+    let parsed: Record<string, unknown> = {};
+    const rawCfg = cfgRow?.integrationConfig;
+    if (rawCfg) {
+        try {
+            parsed = JSON.parse(rawCfg) as Record<string, unknown>;
+        } catch {
+            logger.error('resolveVideoProvider: failed to parse integrationConfig JSON', { tenantId });
+        }
+    }
+    const streamSubdomain = typeof parsed.streamCustomerSubdomain === 'string'
+        ? parsed.streamCustomerSubdomain
+        : null;
+
+    return { provider: 'stream', streamSubdomain, streamBindingPresent };
+}
+
+/**
+ * Resolve the appropriate VideoBackend for the current request.
+ *
+ * Reads `profile.videoBackendManaged` to determine who chooses the backend, then:
+ * - SaaS: loads `tenants.tier`/`status` and applies the plan gate.
+ * - Self-host: loads `tenant_configs.videoMode` (default 'r2') and
+ *   optionally `integrationConfig.streamCustomerSubdomain`.
+ *
+ * Throws `ServiceUnavailable` (503) when provider='stream' but the
+ * required STREAM binding or customer subdomain is absent.
+ */
+export async function resolveVideoBackend(c: Context<HonoConfig>): Promise<ResolvedVideoBackend> {
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB);
+    const baseUrl = getBaseUrl(c);
+
+    const resolved = await resolveVideoProvider(c, tenantId, db);
+    const { provider, streamSubdomain } = resolved;
+
+    // Fail closed: stream was asked for but cannot be served.
+    if (provider === 'stream' && !videoStreamServiceable(resolved)) {
+        throw Errors.ServiceUnavailable(
+            'Stream video is enabled but not configured (missing subdomain or STREAM binding).',
+        );
+    }
+
+    if (provider === 'stream') {
         const backend: VideoBackend = new StreamVideoBackend(
             c.env.STREAM,
             tenantId,

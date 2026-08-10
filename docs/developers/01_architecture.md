@@ -161,6 +161,22 @@ the request to `profile.fixedTenantId` (`resolve-by-fixed-tenant.ts`).
 
 > A SaaS overlay (`server/portal/`, active only when `APP_MODE=saas`) integrates the engine with the InspectorHub control plane. It is out of scope for self-hosting — standalone builds execute none of it. See the super-project `docs/saas-ops/`.
 
+### Reading a deployment capability
+
+Mode-dependent behaviour comes from `server/lib/deployment-profile.ts` — the one
+place that reads `env.APP_MODE`. Read a capability; never branch on the mode
+yourself. Three sanctioned readers, by what you are holding:
+
+| You hold | You read |
+|---|---|
+| a Hono handler / middleware | `c.var.profile.<capability>` |
+| only an env (RR loader or action, cron, Workflow, queue consumer) | `getDeploymentProfile(env).<capability>` |
+| a client component | `isSaas` / `deployment.mode` from the session context |
+
+`getDeploymentProfile` takes `ProfileEnv` (the three fields it reads), not
+`AppEnv`, so every env shape in the worker satisfies it with no cast.
+`tests/unit/sync/portal-isolation.spec.ts` enforces the rule.
+
 ## Authentication
 
 - Login → server signs JWT (ES256 with `kid` header, includes `iat` claim) → sets `__Host-inspector_token` HttpOnly cookie
