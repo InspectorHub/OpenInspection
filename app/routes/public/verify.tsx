@@ -5,7 +5,7 @@ import { formatDateTime } from "~/lib/format";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
 import { AgreementLanguageDisclosure } from "~/components/agreements/AgreementLanguageDisclosure";
 import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
-import { ViewerTimeZoneNotice } from "~/components/public/ViewerTimeZoneNotice";
+import { LazyViewerTimeZoneNotice } from "~/components/public/LazyViewerTimeZoneNotice";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -210,7 +210,7 @@ function VerifyBody() {
         )}
       </div>
 
-      {result.signers.some((s) => s.signedAt) && <ViewerTimeZoneNotice className="mt-4" />}
+      {result.signers.some((s) => s.signedAt) && <LazyViewerTimeZoneNotice className="mt-4" />}
     </div>
   );
 }

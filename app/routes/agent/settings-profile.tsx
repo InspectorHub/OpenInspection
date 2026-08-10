@@ -8,7 +8,7 @@ import { PageHeader, Input, Button, Select, Checkbox } from "@core/shared-ui";
 import { BrowserTimezoneHint } from "~/components/settings/BrowserTimezoneHint";
 import { NotificationSettings } from "~/components/notifications/NotificationSettings";
 import type { AlwaysSentItem, ChannelId, ChoiceRow } from "~/components/notifications/NotificationPreferences";
-import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
+import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezone-options";
 import type { SmsConsent } from "~/components/notifications/SmsConsentBlock";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";

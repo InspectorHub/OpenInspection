@@ -4,7 +4,7 @@ import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { ErrorState } from "~/components/ErrorState";
 import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
-import { ViewerTimeZoneNotice } from "~/components/public/ViewerTimeZoneNotice";
+import { LazyViewerTimeZoneNotice } from "~/components/public/LazyViewerTimeZoneNotice";
 import { m } from "~/paraglide/messages";
 import { getLocale } from "~/paraglide/runtime";
 
@@ -156,7 +156,7 @@ function ConciergeConfirmBody() {
           </button>
         </Form>
 
-        {view.inspection.date && <ViewerTimeZoneNotice className="mt-5" />}
+        {view.inspection.date && <LazyViewerTimeZoneNotice className="mt-5" />}
       </main>
     </div>
   );

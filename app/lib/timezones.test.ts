@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   TIMEZONE_OPTIONS,
-  TIMEZONE_SELECT_OPTIONS,
   timeZoneLabel,
   timeZoneOffsetMinutes,
   onboardingTzPrefill,
 } from './timezones';
+// The 419-entry table moved out of `timezones.ts` so that importing a cheap
+// helper stops building it (#99). Its own specs stay here — the split changed
+// where it lives, not what it must produce.
+import { TIMEZONE_SELECT_OPTIONS } from './timezone-options';
 
 describe('TIMEZONE_OPTIONS', () => {
   it('is a non-empty list including common US zones', () => {

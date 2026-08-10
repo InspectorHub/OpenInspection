@@ -27,6 +27,13 @@ export function timeZoneOffsetMinutes(tz: string, at: Date = new Date()): number
   }
 }
 
+/** `UTC+08:00` / `UTC-05:00` — the offset prefix both pickers share. Exported so
+ *  the public curated list can build `(UTC-06:00) Central Time` without picking
+ *  the offset back out of a formatted label with string surgery. */
+export function formatUtcOffset(min: number): string {
+  return formatOffset(min);
+}
+
 function formatOffset(min: number): string {
   const sign = min < 0 ? '-' : '+';
   const abs = Math.abs(min);
@@ -81,18 +88,16 @@ export function onboardingTzPrefill(opts: {
   return b;
 }
 
-/** `{ value, label }` options for the settings `<Select>`, sorted west→east by
- *  current UTC offset (then name) so the list reads like mainstream tz pickers.
- *  `value` is the IANA id (persisted); `label` shows the offset. */
-/*  The `offset` computed for the sort is threaded into the label rather than
- *  recomputed there. It used to be destructured away, so every zone resolved
- *  twice — 838 `Intl.DateTimeFormat` constructions for 419 zones, at module
- *  scope, on both the server and (via the route chunk) in the browser during
- *  hydration. Measured in Chromium at a 6x CPU throttle, a cold build of this
- *  table costs ~1.5s; the duplicate half of it bought nothing. See
- *  tests/e2e/public-timezone-hydration-cost.spec.ts (#99) for the harness. */
-export const TIMEZONE_SELECT_OPTIONS: { value: string; label: string }[] =
-  TIMEZONE_OPTIONS
-    .map((tz) => ({ tz, offset: timeZoneOffsetMinutes(tz) }))
-    .sort((a, b) => a.offset - b.offset || a.tz.localeCompare(b.tz))
-    .map(({ tz, offset }) => ({ value: tz, label: timeZoneLabel(tz, offset) }));
+/* NOTHING EXPENSIVE MAY BE ADDED AT MODULE SCOPE BELOW THIS LINE.
+ *
+ * This module is imported by `viewer-timezone.tsx`, which every public report
+ * page pulls in. Everything above is a function declaration or a single cheap
+ * `Intl.supportedValuesOf` call, so importing one helper costs nothing.
+ *
+ * The 419-entry `TIMEZONE_SELECT_OPTIONS` table used to live here, and because a
+ * module's scope runs in full for any import of it, `getBrowserTimeZone` alone
+ * was enough to build all 419 — during hydration, on pages that never showed a
+ * picker. It now lives in `timezone-options.ts` (Settings) and
+ * `timezone-options-public.ts` (curated, public), which are separate modules so
+ * that neither drags the other. `timezone-module-boundaries.test.ts` fails if
+ * that boundary is crossed again. */
