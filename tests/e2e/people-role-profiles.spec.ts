@@ -64,6 +64,16 @@ async function selectContactInAddPersonModal(page: Page, searchTerm: string, rol
 }
 
 test.describe.serial('People / Role Profiles (Plan 1B)', () => {
+  // Every test here re-logs-in through the UI in beforeEach, and the hook
+  // spends the TEST's budget: page load + form fill + a login POST that runs
+  // PBKDF2 on the one shared wrangler-dev worker. Nine other projects are
+  // released the instant `editor-seed` finishes, three at a time, and one of
+  // them (workspace-pages-responsive) opens by POSTing 25 contacts at that
+  // same worker. The default 30s was a login budget and a test budget at once.
+  // Precedent for the size: workspace-pages-responsive already allows 60s just
+  // for the worker to answer /status at all.
+  test.describe.configure({ timeout: 90_000 });
+
   test.beforeAll(async ({ request }) => {
     const seed = readEditorSeed();
     test.skip(!seed, 'editor-seed handoff missing — run with the editor-seed setup project.');
@@ -92,7 +102,17 @@ test.describe.serial('People / Role Profiles (Plan 1B)', () => {
         data: { type: 'client', name: fixture.name, email: fixture.email },
         headers: auth,
       });
-      expect(res.status(), `contact fixture "${fixture.name}" must be created`).toBe(201);
+      // Interpolate the BODY, not only the name. This assertion used to report
+      // a bare status, so when it returned 503 the cause had to be guessed by
+      // grepping for a message that could produce one — and the message that
+      // got picked (tenant-routing's "Tenant not found or system not
+      // initialized") is unreachable in standalone: resolveByFixedTenant sets
+      // tenantId unconditionally, so the guard that emits it cannot fire. Let
+      // the next failure say what actually answered instead of being attributed.
+      expect(
+        res.status(),
+        `contact fixture "${fixture.name}" -> ${res.status()} ${await res.text()}`,
+      ).toBe(201);
     }
   });
 
@@ -101,7 +121,10 @@ test.describe.serial('People / Role Profiles (Plan 1B)', () => {
     await page.fill('input[name=email]', adminEmail);
     await page.fill('input[name=password]', adminPassword);
     await page.click('button[type=submit]');
-    await page.waitForURL('**/inspections');
+    // Explicit budget rather than inheriting the test timeout: the redirect is
+    // produced server-side by the login action, so this wait measures the
+    // shared worker's queue depth, not this page's readiness.
+    await page.waitForURL('**/inspections', { timeout: 60_000 });
   });
 
   test('Step 1-2: admin-only Inspection roles page; create a custom "other" role profile', async ({ page }) => {
