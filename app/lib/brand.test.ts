@@ -111,7 +111,7 @@ describe("contrastForeground over the sRGB cube", () => {
       }
     });
 
-    console.log(
+    console.info(
       `contrastForeground over ${n} colours: chosen-foreground fails AA ` +
         `${pct(chosenFail, n)} (worst ${worstChosen.r.toFixed(3)} @ ${worstChosen.hex}); ` +
         `unwinnable residual band ${pct(residual, n)} ` +
@@ -163,7 +163,7 @@ describe("brandTextColor over the sRGB cube", () => {
         if (shift > biggestShift.shift) biggestShift = { shift, hex, got };
       });
 
-      console.log(
+      console.info(
         `brandTextColor on the ${surface.name} (${surface.hex}) over ${n} colours: ` +
           `${failures} below AA; ${pct(unchanged, n)} already cleared and were ` +
           `returned untouched; worst ${worst.r.toFixed(3)} (${worst.hex} -> ${worst.got}); ` +

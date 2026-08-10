@@ -46,7 +46,9 @@ describe('shareViewModel', () => {
   });
 
   it('not_published flag renders a not-published state', () => {
-    const m = shareViewModel({ notPublished: true } as any);
+    // Uncast: every field on ShareApiData is optional, so this is already a
+    // legal argument — and the other five calls in this file pass one.
+    const m = shareViewModel({ notPublished: true });
     expect(m.state).toBe('not_published');
   });
 

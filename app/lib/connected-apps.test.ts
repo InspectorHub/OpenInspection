@@ -17,6 +17,8 @@
  *   - Admin section renders for owner/manager; absent for inspector.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 
@@ -84,13 +86,17 @@ vi.mock('~/hooks/useSessionContext', () => ({
 
 import { loader, action } from '~/routes/settings-connected-apps';
 import SettingsConnectedApps from '~/routes/settings-connected-apps';
-import { useLoaderData, useFetcher } from 'react-router';
+import { useLoaderData } from 'react-router';
 import { useSessionContext } from '~/hooks/useSessionContext';
 import { createApi } from '~/lib/api-client.server';
 import { getCapabilities } from '../../server/lib/auth/capabilities';
 
 type LoaderArgs = Parameters<typeof loader>[0];
 type ActionArgs = Parameters<typeof action>[0];
+
+/** The route's own source — see the ConfirmDialog assertion for why markup cannot answer it. */
+const routeSource = () =>
+    readFileSync(join(import.meta.dirname, '../routes/settings-connected-apps.tsx'), 'utf8');
 
 const SAMPLE_GRANT = {
     id: 'g1',
@@ -365,12 +371,20 @@ describe('SettingsConnectedApps component render', () => {
         renderToStaticMarkup(createElement(SettingsConnectedApps));
         // Rendering alone (no user interaction) must never trigger a confirm dialog.
         expect(mockConfirm).not.toHaveBeenCalled();
-        // Verify ConfirmDialog renders a modal instead (the ConfirmDialog element is in the tree).
-        const html = renderToStaticMarkup(createElement(SettingsConnectedApps));
-        // ConfirmDialog with open=false still renders the modal element in static markup
-        // (Modal controls visibility via CSS; confirm via plain DOM is never invoked).
-        expect(mockConfirm).not.toHaveBeenCalled();
         delete (globalThis as Record<string, unknown>)['confirm'];
+
+        // The half above is also true of a route that offers no revoke at all,
+        // so it needs the other half: the replacement is really there.
+        //
+        // It is a SOURCE assertion, not a markup one, and that is not laziness.
+        // This spec used to render a second time into an unused `html` binding
+        // under a comment reading "ConfirmDialog with open=false still renders
+        // the modal element in static markup (Modal controls visibility via
+        // CSS)". That is false — shared-ui's <Modal> early-returns null when
+        // !open — and `open` here is `!!pendingRevoke`, which is false on a
+        // first render. The assertion the comment described was never written,
+        // and would have failed if it had been.
+        expect(routeSource()).toMatch(/<ConfirmDialog\b/);
     });
 
     it('renders the feature-off empty state when loader returns mcpEnabled=false', () => {

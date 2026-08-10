@@ -26,9 +26,6 @@ afterEach(() => {
   container = null;
 });
 
-function $(sel: string): HTMLElement | null {
-  return container!.querySelector(sel);
-}
 function $$(sel: string): HTMLElement[] {
   return Array.from(container!.querySelectorAll(sel));
 }

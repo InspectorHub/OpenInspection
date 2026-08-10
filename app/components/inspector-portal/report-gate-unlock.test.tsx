@@ -9,7 +9,7 @@
  * released it, when, and their words. A control that quietly forgot the reason
  * after the fact would satisfy the API and defeat the point.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 

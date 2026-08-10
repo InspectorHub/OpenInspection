@@ -73,12 +73,12 @@ describe('verifyResultModel', () => {
   });
 
   it('notPublished overrides to a not_published state', () => {
-    const m = verifyResultModel({ legacy: false, hashValid: true, signatureValid: true, chainValid: true, notPublished: true } as any);
+    const m = verifyResultModel({ legacy: false, hashValid: true, signatureValid: true, chainValid: true, notPublished: true });
     expect(m.state).toBe('not_published');
   });
 
   it('published verified report still verifies', () => {
-    const m = verifyResultModel({ legacy: false, hashValid: true, signatureValid: true, chainValid: true, notPublished: false } as any);
+    const m = verifyResultModel({ legacy: false, hashValid: true, signatureValid: true, chainValid: true, notPublished: false });
     expect(m.state).toBe('verified');
   });
 });

@@ -65,24 +65,70 @@ export default tseslint.config(
         // type-aware parser can't resolve them. They don't need type-aware
         // linting — ignore them rather than widen the tsconfig projects.
         //
-        // `app/**/*.test.{ts,tsx}` and `packages/shared-ui/src/**/*.test.{ts,tsx}`
-        // are the co-located frontend tests (tests-reorg R2). Ignoring them here
-        // preserves the pre-move state: they lived under `tests/**` (also ignored
-        // below) and were never linted.
-        //
-        // ⚠️ THE ORIGINAL REASON NO LONGER HOLDS, and acting on it would be a
-        // mistake. It used to read "excluded from tsconfig.json, so the
-        // type-aware parser can't place them in any TS project". #63 Phase 0.5
-        // removed that exclusion — all 352 of these files are now IN the app
-        // program (`tsc -b tsconfig.json` checks them, and `types` carries
-        // `vitest/globals` + `@testing-library/jest-dom/vitest` for them). So
-        // this is now a SCOPE decision with nothing forcing it: un-ignoring them
-        // is a real option and a change of its own size, not a one-line diff.
         // `.types/**` is tsc project-reference output (the .d.ts tsconfig.api.json
         // emits for the app program). Generated, gitignored, and in no lintable
         // TS project — leaving it in produced 803 "file not found in any of the
         // provided project(s)" parse errors.
-        ignores: ['dist/**', 'dist-check/**', 'build/**', '.types/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'app/paraglide/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'app/**/*.test.ts', 'app/**/*.test.tsx', 'packages/shared-ui/src/**/*.test.ts', 'packages/shared-ui/src/**/*.test.tsx', 'scripts/**'],
+        //
+        // ── THE CO-LOCATED SPECS ARE NO LONGER IGNORED (#98) ────────────────
+        //
+        // `app/**/*.test.{ts,tsx}` and `packages/shared-ui/src/**/*.test.{ts,tsx}`
+        // used to sit in this list, justified by "excluded from tsconfig.json, so
+        // the type-aware parser can't place them in any TS project". #63 Phase 0.5
+        // retired that: all 352 are in the app program now. Measured before
+        // removing them, in BOTH gate shapes, and the two agree exactly because
+        // every error-level rule here is syntactic:
+        //
+        //     ESLINT_FAST=1 (the pre-commit shape)   33 errors, 19 warnings
+        //     type-aware    (the `npm run lint` CI shape)  33 errors, 332 warnings
+        //
+        //     20 no-explicit-any · 10 no-unused-vars · 2 no-console
+        //     1 no-require-imports — across 15 of 352 files.
+        //
+        // The 332 warnings do not gate anything: no invocation of eslint in this
+        // repo passes `--max-warnings` (see the FAST note at the top), so warnings
+        // are output to read, and every type-aware rule below is 'warn'.
+        //
+        // Cost of including them in CI's type-aware pass is rule evaluation only,
+        // NOT program construction: tsconfig.json already contains these 352 files
+        // whether or not eslint lints them, so the program was being built for them
+        // already.
+        //
+        // ── `tests/**` STAYS, and NOT for the old reason ────────────────────
+        //
+        // tsconfig.tests.json now exists, so "belongs to no TS project" is dead
+        // there too — but it was never the operative fact and un-ignoring is not a
+        // one-line diff. What is actually in the way, measured under ESLINT_FAST:
+        //
+        //   1581 errors across 364 of 856 files, of which
+        //     970  no-restricted-syntax — 813 role literals + 135 status literals.
+        //          These are the FIXTURE case the override block below already
+        //          says is exempt ("Exempt: roles.ts itself, test files, …") and
+        //          never actually listed, because tests were ignored when it was
+        //          written. Listing them is the honest fix and belongs with a
+        //          reading of what a role literal means in a fixture, not here.
+        //      463 no-explicit-any — `as any` on partial fixtures. eslint flags a
+        //          CAST, not just a declaration (verified: `} as any,` reports at
+        //          the `any`), so this is the same 700-odd casts the tests/unit
+        //          suppression burn-down is already working through. Relaxing the
+        //          rule for specs would delete the only mechanical pointer at the
+        //          failure it keeps finding — a cast that hides a dead fixture,
+        //          leaving an assertion that cannot fail.
+        //       83 import/order + import/first — "Definition for rule … was not
+        //          found": stale `eslint-disable` comments naming
+        //          eslint-plugin-import, which this repo does not use (it uses
+        //          import-x). Deleting the comments is the fix.
+        //
+        // Two more things block the type-aware half specifically: `tests/**` is not
+        // in `parserOptions.project` (tsconfig.tests.json would have to be added),
+        // and even then `tests/e2e/**` plus the three files on tsconfig.tests.json's
+        // burn-down ratchet belong to no project in that list and would be fatal
+        // parse errors. So `tests/**` waits on that ratchet reaching zero.
+        //
+        // Note `tests/**` is not in `.lintstagedrc`'s glob either
+        // (`{server,app,workers,packages}/**`), so un-ignoring it would change
+        // nothing at commit time and land all 1581 in CI at once.
+        ignores: ['dist/**', 'dist-check/**', 'build/**', '.types/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'app/paraglide/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'scripts/**'],
     },
     {
         files: ['**/*.ts', '**/*.tsx'],
