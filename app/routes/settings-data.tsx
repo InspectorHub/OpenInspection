@@ -128,7 +128,7 @@ export default function SettingsData() {
             {!installResult.ok
               ? m.settings_data_bundled_result_error()
               : installResult.added
-                ? m.settings_data_bundled_result_added({ count: installResult.added })
+                ? m.settings_data_bundled_result_added({ count: installResult.added, plural: installResult.added === 1 ? "" : "s" })
                 : m.settings_data_bundled_result_none()}
           </Banner>
         )}
