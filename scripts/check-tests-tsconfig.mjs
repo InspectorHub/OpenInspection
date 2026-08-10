@@ -2,8 +2,21 @@
 /**
  * scripts/check-tests-tsconfig.mjs
  *
- * Ratchet for `tsconfig.tests.json`'s `exclude` array — the burn-down list of
- * spec files that do not yet type-check.
+ * Ratchet for the `exclude` arrays of the two programs that compile specs — the
+ * burn-down lists of spec files that do not yet type-check.
+ *
+ *   tsconfig.tests.json  → `tests/**` (server-side specs). Baseline key
+ *                          `excluded`. 3 entries left, all blocked on a
+ *                          `server/` signature rather than on the spec.
+ *   tsconfig.json        → `app/**` + `packages/shared-ui/src/**` (the
+ *                          co-located web suite). Baseline key `appExcluded`.
+ *                          EMPTY, and meant to stay empty: this program took
+ *                          the whole tree in one go with nothing carved out, so
+ *                          the first entry anyone adds is the regression.
+ *
+ * The gate is the same in both cases and so is the rule: the array may only
+ * SHRINK. Two programs share one script because they share one failure mode —
+ * the cheapest way past a red type-check is one more line in `exclude`.
  *
  * WHY A GATE AND NOT A COMMENT. `tsconfig.tests.json` is the first program that
  * ever compiled `tests/**`, and it landed with 198 files carved out of it. An
@@ -59,7 +72,6 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const TSCONFIG = 'tsconfig.tests.json';
 const BASELINE = 'scripts/tests-tsconfig-baseline.json';
 
 /**
@@ -68,8 +80,30 @@ const BASELINE = 'scripts/tests-tsconfig-baseline.json';
  *   node_modules / dist / .types — build output and dependencies.
  *   tests/e2e/**                 — owned by tsconfig.playwright.json, which
  *                                  holds a deliberately tight 2048 MB cap.
+ *
+ * This is tsconfig.tests.json's list. It stays exported under this name because
+ * the gate's own spec pins it; per-program lists live in `PROGRAMS` below.
  */
 export const STRUCTURAL = ['node_modules', 'dist', '.types', 'tests/e2e/**'];
+
+/**
+ * The programs this gate watches, and the structural entries each is allowed.
+ *
+ * ⚠️ A structural entry is a claim that some OTHER program owns those files. It
+ * is true for `tests/e2e/**` (tsconfig.playwright.json) and for build output.
+ * It would NOT be true of a source glob, so do not add one here to quiet a
+ * failing check — that converts the ratchet into a rubber stamp for the exact
+ * thing it exists to catch.
+ */
+export const PROGRAMS = [
+    { tsconfig: 'tsconfig.tests.json', key: 'excluded', structural: STRUCTURAL, label: 'tests' },
+    {
+        tsconfig: 'tsconfig.json',
+        key: 'appExcluded',
+        structural: ['node_modules', 'build', 'dist'],
+        label: 'app + shared-ui',
+    },
+];
 
 /**
  * Strip `//` line comments from JSONC.
@@ -111,14 +145,14 @@ export function diffRatchet(current, baseline) {
  * The whole verdict, as data. Takes an `exists` predicate rather than touching
  * the filesystem so the spec can drive it with a fake tree.
  */
-export function evaluate({ current, baseline, exists }) {
+export function evaluate({ current, baseline, exists, tsconfig = 'tsconfig.tests.json' }) {
     const { added, removed } = diffRatchet(current, baseline);
     const missing = current.filter((e) => !e.includes('*') && !exists(e)).sort();
     const violations = [];
 
     if (added.length) {
         violations.push(
-            `${added.length} file(s) ADDED to tsconfig.tests.json's exclude. The list may only shrink.\n` +
+            `${added.length} file(s) ADDED to ${tsconfig}'s exclude. The list may only shrink.\n` +
                 added.map((e) => `    + ${e}`).join('\n') +
                 `\n  Fix the types instead. If a file genuinely cannot be checked yet, that is a\n` +
                 `  decision to argue for in review, not one to make with a one-line diff.`,
@@ -152,10 +186,10 @@ export function parseTscErrors(log) {
 }
 
 // ── CLI ───────────────────────────────────────────────────────────────────
-function readRatchet() {
-    const raw = readFileSync(path.join(ROOT, TSCONFIG), 'utf8');
+function readRatchet(program = PROGRAMS[0]) {
+    const raw = readFileSync(path.join(ROOT, program.tsconfig), 'utf8');
     const parsed = JSON.parse(stripJsonc(raw));
-    return splitExclude(parsed.exclude ?? []).ratchet;
+    return splitExclude(parsed.exclude ?? [], program.structural).ratchet;
 }
 
 function readBaseline() {
@@ -191,34 +225,53 @@ function main() {
         return;
     }
 
-    const current = readRatchet();
     const baseline = readBaseline();
 
     if (argv.includes('--update')) {
-        const { added } = diffRatchet(current, baseline.excluded);
-        if (added.length) {
-            console.error(
-                '--update refuses to record growth. The ratchet only shrinks.\n' +
-                    added.map((e) => `    + ${e}`).join('\n'),
-            );
-            process.exit(1);
+        const next = { ...baseline };
+        for (const program of PROGRAMS) {
+            const current = readRatchet(program);
+            const { added } = diffRatchet(current, baseline[program.key] ?? []);
+            if (added.length) {
+                console.error(
+                    `--update refuses to record growth in ${program.tsconfig}. The ratchet only shrinks.\n` +
+                        added.map((e) => `    + ${e}`).join('\n'),
+                );
+                process.exit(1);
+            }
+            next[program.key] = current;
         }
-        writeBaseline({ ...baseline, excluded: current });
-        console.log(`tests-tsconfig baseline updated: ${current.length} file(s) still excluded.`);
+        writeBaseline(next);
+        console.log(
+            `tests-tsconfig baseline updated: ${PROGRAMS.map(
+                (p) => `${p.tsconfig} ${next[p.key].length}`,
+            ).join(', ')} file(s) still excluded.`,
+        );
         return;
     }
 
-    const result = evaluate({
-        current,
-        baseline: baseline.excluded,
-        exists: (p) => existsSync(path.join(ROOT, p)),
-    });
-
-    if (!result.ok) {
-        console.error(`tsconfig.tests.json exclude ratchet:\n  ${result.violations.join('\n  ')}`);
-        process.exit(1);
+    let failed = false;
+    const summary = [];
+    for (const program of PROGRAMS) {
+        const current = readRatchet(program);
+        const result = evaluate({
+            current,
+            // `?? []` and not `?? current`: a baseline key that is absent must read
+            // as "nothing is forgiven", so a missing key FAILS on the first entry
+            // rather than silently adopting whatever the tsconfig says today.
+            baseline: baseline[program.key] ?? [],
+            exists: (p) => existsSync(path.join(ROOT, p)),
+            tsconfig: program.tsconfig,
+        });
+        if (!result.ok) {
+            failed = true;
+            console.error(`${program.tsconfig} exclude ratchet:\n  ${result.violations.join('\n  ')}`);
+        }
+        summary.push(`${program.label} ${current.length}`);
     }
-    console.log(`tests tsconfig ratchet OK — ${current.length} file(s) still excluded from type-check:tests`);
+
+    if (failed) process.exit(1);
+    console.log(`tests tsconfig ratchet OK — still excluded: ${summary.join(', ')}`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

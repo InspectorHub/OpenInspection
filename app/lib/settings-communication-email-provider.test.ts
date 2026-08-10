@@ -51,6 +51,7 @@ vi.mock('~/lib/api-client.server', () => ({
 }));
 
 import { loader, action } from '~/routes/settings-communication';
+import { granted } from '../../tests/helpers/loader-data';
 
 type LoaderArgs = Parameters<typeof loader>[0];
 type ActionArgs = Parameters<typeof action>[0];
@@ -145,7 +146,7 @@ describe('settings-communication loader — emailByoProvider', () => {
                 MAILGUN_DOMAIN: 'mg.example.com',
             },
         }));
-        const data = await loader(loaderArgs());
+        const data = granted(await loader(loaderArgs()));
         expect(data.secrets.SENDGRID_API_KEY).toBe('SG.••••');
         expect(data.secrets.POSTMARK_SERVER_TOKEN).toBe('pm_••••');
         expect(data.secrets.MAILGUN_API_KEY).toBe('mg_••••');

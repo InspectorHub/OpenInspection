@@ -46,6 +46,7 @@ vi.mock('~/lib/api-client.server', () => ({
 }));
 
 import { loader, action } from '~/routes/settings-communication';
+import { granted } from '../../tests/helpers/loader-data';
 
 type LoaderArgs = Parameters<typeof loader>[0];
 type ActionArgs = Parameters<typeof action>[0];
@@ -86,7 +87,7 @@ beforeEach(() => {
 
 describe('settings-communication loader — SMS config (Part D)', () => {
     it('surfaces the SMS effective source + company phone (no secrets leaked)', async () => {
-        const data = await loader(loaderArgs());
+        const data = granted(await loader(loaderArgs()));
         expect(getSmsConfig).toHaveBeenCalled();
         expect(data.smsConfig).toEqual({ mode: 'own', effectiveSource: 'own' });
         expect(data.companyPhone).toBe('+15551112222');

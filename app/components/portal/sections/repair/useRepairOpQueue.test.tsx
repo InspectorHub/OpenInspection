@@ -16,11 +16,11 @@
  * drive the hook through a FAKE fetcher whose state they control, rather than
  * hoping a real one lands in the window.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, type Mock } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 
 /** The single fake fetcher pair the hook sees, with state under test control. */
-const fetchers: { state: string; data: unknown; submit: ReturnType<typeof vi.fn> }[] = [];
+const fetchers: { state: string; data: unknown; submit: Mock<(fd: FormData) => void> }[] = [];
 
 vi.mock("react-router", () => ({
   useFetcher: () => {
@@ -68,8 +68,8 @@ function op(intent: string, findingKey: string) {
 }
 
 /** The op bodies actually submitted, in order, as plain intents+keys. */
-function submitted(f: { submit: ReturnType<typeof vi.fn> }) {
-  return f.submit.mock.calls.map(([fd]: [FormData]) => ({
+function submitted(f: { submit: Mock<(fd: FormData) => void> }) {
+  return f.submit.mock.calls.map(([fd]) => ({
     intent: fd.get("_intent"),
     key: fd.get("findingKey") ?? fd.get("_findingKey"),
     itemId: fd.get("itemId"),

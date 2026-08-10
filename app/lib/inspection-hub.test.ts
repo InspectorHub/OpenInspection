@@ -32,6 +32,26 @@ function hub(overrides: {
     } as HubPayload;
 }
 
+type AgreementRequest = HubPayload['agreementRequests'][number];
+
+/**
+ * One agreement request. Only `status` (and, for the signed cases, `signedAt`)
+ * changes between the branches below; everything else is scenery that
+ * `deriveBlockStates` does not read.
+ */
+function request(over: Partial<AgreementRequest> & Pick<AgreementRequest, 'status'>): AgreementRequest {
+    return {
+        id: 'a',
+        clientEmail: 'c@x.com',
+        signedAt: null,
+        createdAt: null,
+        agreementName: 'Standard Inspection Agreement',
+        signersTotal: 1,
+        signersSigned: 0,
+        ...over,
+    };
+}
+
 describe('deriveBlockStates — agreement block', () => {
     it('no requests & not required → neutral / Not required', () => {
         const s = deriveBlockStates(hub({ inspection: { agreementRequired: false } }));
@@ -45,42 +65,42 @@ describe('deriveBlockStates — agreement block', () => {
 
     it('newest request pending → monitor / Awaiting signature', () => {
         const s = deriveBlockStates(hub({
-            agreementRequests: [{ id: 'a', status: 'pending', clientEmail: 'c@x.com', signedAt: null, createdAt: null }],
+            agreementRequests: [request({ status: 'pending' })],
         }));
         expect(s.agreement).toEqual({ tone: 'monitor', label: 'Awaiting signature' });
     });
 
     it('newest request sent → monitor / Awaiting signature', () => {
         const s = deriveBlockStates(hub({
-            agreementRequests: [{ id: 'a', status: 'sent', clientEmail: 'c@x.com', signedAt: null, createdAt: null }],
+            agreementRequests: [request({ status: 'sent' })],
         }));
         expect(s.agreement).toEqual({ tone: 'monitor', label: 'Awaiting signature' });
     });
 
     it('newest request viewed → monitor / Viewed', () => {
         const s = deriveBlockStates(hub({
-            agreementRequests: [{ id: 'a', status: 'viewed', clientEmail: 'c@x.com', signedAt: null, createdAt: null }],
+            agreementRequests: [request({ status: 'viewed' })],
         }));
         expect(s.agreement).toEqual({ tone: 'monitor', label: 'Viewed' });
     });
 
     it('newest request signed → sat / Signed', () => {
         const s = deriveBlockStates(hub({
-            agreementRequests: [{ id: 'a', status: 'signed', clientEmail: 'c@x.com', signedAt: '2026-01-01', createdAt: null }],
+            agreementRequests: [request({ status: 'signed', signedAt: '2026-01-01', signersSigned: 1 })],
         }));
         expect(s.agreement).toEqual({ tone: 'sat', label: 'Signed' });
     });
 
     it('newest request declined → defect / Declined', () => {
         const s = deriveBlockStates(hub({
-            agreementRequests: [{ id: 'a', status: 'declined', clientEmail: 'c@x.com', signedAt: null, createdAt: null }],
+            agreementRequests: [request({ status: 'declined' })],
         }));
         expect(s.agreement).toEqual({ tone: 'defect', label: 'Declined' });
     });
 
     it('newest request expired → warning / Expired', () => {
         const s = deriveBlockStates(hub({
-            agreementRequests: [{ id: 'a', status: 'expired', clientEmail: 'c@x.com', signedAt: null, createdAt: null }],
+            agreementRequests: [request({ status: 'expired' })],
         }));
         expect(s.agreement).toEqual({ tone: 'warning', label: 'Expired' });
     });
@@ -89,8 +109,8 @@ describe('deriveBlockStates — agreement block', () => {
         // Payload is documented newest-first; derive must read index 0.
         const s = deriveBlockStates(hub({
             agreementRequests: [
-                { id: 'new', status: 'signed', clientEmail: 'c@x.com', signedAt: '2026-02-01', createdAt: null },
-                { id: 'old', status: 'declined', clientEmail: 'c@x.com', signedAt: null, createdAt: null },
+                request({ id: 'new', status: 'signed', signedAt: '2026-02-01', signersSigned: 1 }),
+                request({ id: 'old', status: 'declined' }),
             ],
         }));
         expect(s.agreement).toEqual({ tone: 'sat', label: 'Signed' });

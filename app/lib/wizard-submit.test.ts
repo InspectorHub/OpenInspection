@@ -108,7 +108,7 @@ describe("buildWizardCreatePayload", () => {
             ...base,
             addressSel: {
                 placeId: "p1",
-                description: "Null Island",
+                formatted: "Null Island",
                 street: "1 Equator St",
                 city: "",
                 state: "",
@@ -116,7 +116,7 @@ describe("buildWizardCreatePayload", () => {
                 county: "",
                 lat: 0,
                 lng: 0,
-            } as WizardCreateState["addressSel"],
+            },
         });
         expect(payload.addressLat).toBe("0");
         expect(payload.addressLng).toBe("0");

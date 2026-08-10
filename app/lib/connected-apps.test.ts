@@ -68,8 +68,13 @@ vi.mock('react-router', async () => {
 
 vi.mock('~/hooks/useSessionContext', () => ({
     useSessionContext: vi.fn(() => ({
-        user: { role: 'inspector', name: 'Alice', email: 'alice@example.com', initials: 'A', timezone: null },
-        branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC' },
+        user: {
+            role: 'inspector', name: 'Alice', email: 'alice@example.com', initials: 'A',
+            timezone: null, locale: null, dateFormat: null, timeFormat: null,
+            capabilities: getCapabilities('inspector', null),
+        },
+        branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
+                defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h' },
         deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false },
         seatUsage: null,
     })),
@@ -82,6 +87,7 @@ import SettingsConnectedApps from '~/routes/settings-connected-apps';
 import { useLoaderData, useFetcher } from 'react-router';
 import { useSessionContext } from '~/hooks/useSessionContext';
 import { createApi } from '~/lib/api-client.server';
+import { getCapabilities } from '../../server/lib/auth/capabilities';
 
 type LoaderArgs = Parameters<typeof loader>[0];
 type ActionArgs = Parameters<typeof action>[0];
@@ -141,8 +147,13 @@ beforeEach(() => {
     );
     vi.mocked(useLoaderData).mockReturnValue({ mcpEnabled: true, self: [SAMPLE_GRANT], all: null, role: 'inspector', isSaas: false } as never);
     vi.mocked(useSessionContext).mockReturnValue({
-        user: { role: 'inspector', name: 'Alice', email: 'alice@example.com', initials: 'A', timezone: null },
-        branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC' },
+        user: {
+            role: 'inspector', name: 'Alice', email: 'alice@example.com', initials: 'A',
+            timezone: null, locale: null, dateFormat: null, timeFormat: null,
+            capabilities: getCapabilities('inspector', null),
+        },
+        branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
+                defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h' },
         deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true },
         seatUsage: null,
     });
@@ -283,8 +294,13 @@ describe('SettingsConnectedApps component render', () => {
             isSaas: false,
         } as never);
         vi.mocked(useSessionContext).mockReturnValue({
-            user: { role: 'owner', name: 'Admin', email: 'admin@example.com', initials: 'A' },
-            branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC' },
+            user: {
+                role: 'owner', name: 'Admin', email: 'admin@example.com', initials: 'A',
+                timezone: null, locale: null, dateFormat: null, timeFormat: null,
+                capabilities: getCapabilities('owner', null),
+            },
+            branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
+                defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h' },
             deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true },
             seatUsage: null,
         });

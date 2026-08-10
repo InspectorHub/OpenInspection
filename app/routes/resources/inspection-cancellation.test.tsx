@@ -35,6 +35,9 @@ vi.mock("~/lib/api-client.server", () => ({
 }));
 
 import { loader, action } from "./inspection-cancellation";
+import { routeArgs } from "../../../tests/helpers/route-args";
+/** Minimal AppLoadContext stub — the route only forwards it to createApi. */
+const CONTEXT = {} as Parameters<typeof loader>[0]["context"];
 
 const QUOTE = {
     feeCents: 12500,
@@ -53,8 +56,7 @@ const json = (body: unknown, status = 200) =>
 
 function get(query: Record<string, string>) {
     const url = `https://x/resources/inspection-cancellation?${new URLSearchParams(query)}`;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return loader({ request: new Request(url), params: {}, context: {} as any });
+    return loader(routeArgs(new Request(url), { params: {}, context: CONTEXT }));
 }
 
 function post(fields: Record<string, string>) {
@@ -63,8 +65,7 @@ function post(fields: Record<string, string>) {
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams(fields).toString(),
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return action({ request, params: {}, context: {} as any });
+    return action(routeArgs(request, { params: {}, context: CONTEXT }));
 }
 
 beforeEach(() => {

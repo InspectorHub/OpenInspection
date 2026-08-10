@@ -20,6 +20,7 @@ import { render } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
 import ContactsPage from "~/routes/contacts";
+import { asSelect } from "../../tests/helpers/dom";
 
 const AGENT = {
   id: "c1",
@@ -64,7 +65,7 @@ describe("/contacts — IA-96", () => {
 
   it("offers 'other' as a filter — the role vocabulary's third kind", async () => {
     const { findByLabelText } = renderContacts([AGENT, CLIENT, OTHER]);
-    const select = (await findByLabelText(/type/i)) as HTMLSelectElement;
+    const select = asSelect(await findByLabelText(/type/i), "the contact-type picker");
 
     const values = [...select.options].map((o) => o.value);
     expect(values).toEqual(["", "agent", "client", "other"]);

@@ -66,12 +66,18 @@ export default tseslint.config(
         // linting — ignore them rather than widen the tsconfig projects.
         //
         // `app/**/*.test.{ts,tsx}` and `packages/shared-ui/src/**/*.test.{ts,tsx}`
-        // are the co-located frontend tests (tests-reorg R2). They are excluded
-        // from tsconfig.json (no vitest/@testing-library types in the app tsc
-        // program), so the type-aware parser can't place them in any TS project —
-        // and they carry no product code. Ignoring them here preserves the
-        // pre-move state: they lived under `tests/**` (also ignored below) and
-        // were never linted.
+        // are the co-located frontend tests (tests-reorg R2). Ignoring them here
+        // preserves the pre-move state: they lived under `tests/**` (also ignored
+        // below) and were never linted.
+        //
+        // ⚠️ THE ORIGINAL REASON NO LONGER HOLDS, and acting on it would be a
+        // mistake. It used to read "excluded from tsconfig.json, so the
+        // type-aware parser can't place them in any TS project". #63 Phase 0.5
+        // removed that exclusion — all 352 of these files are now IN the app
+        // program (`tsc -b tsconfig.json` checks them, and `types` carries
+        // `vitest/globals` + `@testing-library/jest-dom/vitest` for them). So
+        // this is now a SCOPE decision with nothing forcing it: un-ignoring them
+        // is a real option and a change of its own size, not a one-line diff.
         // `.types/**` is tsc project-reference output (the .d.ts tsconfig.api.json
         // emits for the app program). Generated, gitignored, and in no lintable
         // TS project — leaving it in produced 803 "file not found in any of the

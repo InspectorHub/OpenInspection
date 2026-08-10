@@ -4,9 +4,17 @@
     // infra they import (`tests/{db,mocks,setup-client}.ts`, `tests/helpers/`,
     // `tests/unit/{helpers,stubs}/`).
     //
+    // ⚠️ SCOPE NOTE (kept current): this program is `tests/**` ONLY. The
+    // co-located web suite — `app/**/*.test.*` and
+    // `packages/shared-ui/src/**/*.test.*` — is compiled by tsconfig.json
+    // itself, not from here. Folding it in was measured and rejected: this
+    // program consumes api's `.d.ts`, and app specs import app SOURCE, which
+    // would drag `app/**` in as source and make this a second full app compile.
+    //
     // ⚠️ BEFORE THIS FILE, NOTHING TYPE-CHECKED ANY OF IT. 753 files / ~101k
-    // lines were compiled by exactly zero tsc programs: tsconfig.json excludes
-    // `app/**/*.test.*` and never mentioned `tests/`, tsconfig.api.json's
+    // lines were compiled by exactly zero tsc programs: tsconfig.json excluded
+    // `app/**/*.test.*` (it no longer does) and never mentioned `tests/`,
+    // tsconfig.api.json's
     // include is `server/**` only, tsconfig.playwright.json is deliberately
     // scoped to `tests/e2e`, and tsconfig.tests-typecheck.json takes only the
     // four `*.spec-d.ts`. vitest strips types with esbuild and never checks

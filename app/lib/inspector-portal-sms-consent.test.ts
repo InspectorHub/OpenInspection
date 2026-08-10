@@ -102,7 +102,11 @@ describe('inspector-portal action — attest-sms (Part E)', () => {
     it('intent=attest-sms surfaces the API error (never unconditional ok)', async () => {
         postAttest.mockResolvedValue(jsonRes({ error: { message: 'no client to attest' } }, false));
         const res = await action(actionArgs({ intent: 'attest-sms' }));
+        // Narrowing on the intent, not just on `ok`: one branch of this action
+        // ('search-contacts') answers with a contact list and no `ok` at all, so
+        // asserting the dispatch landed on attest-sms is part of the assertion.
+        if (res.intent !== 'attest-sms') throw new Error(`action dispatched to ${String(res.intent)}`);
         expect(res.ok).toBe(false);
-        if (!res.ok) expect(res.error).toMatch(/no client to attest/i);
+        expect(res.error).toMatch(/no client to attest/i);
     });
 });

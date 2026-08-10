@@ -5,6 +5,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { ViewerTimeZoneProvider } from "~/lib/viewer-timezone";
 import { ViewerTimeZoneNotice } from "./ViewerTimeZoneNotice";
+import { asSelect } from "../../../tests/helpers/dom";
 
 /** Pin Intl's resolved timezone so the post-mount detection is deterministic. */
 function mockBrowserZone(zone: string) {
@@ -40,7 +41,7 @@ describe("ViewerTimeZoneNotice", () => {
     const { getByText, getByRole } = renderNotice();
 
     expect(getByText(/Times shown in/i)).toBeTruthy();
-    const select = getByRole("combobox") as HTMLSelectElement;
+    const select = asSelect(getByRole("combobox"));
     expect(select.value).toBe("America/Chicago");
 
     fireEvent.change(select, { target: { value: "America/New_York" } });

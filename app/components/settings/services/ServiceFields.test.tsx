@@ -3,6 +3,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 import { ServiceFields, type ServiceFieldMetas } from "./ServiceFields";
+import { asSelect } from "../../../../tests/helpers/dom";
 
 afterEach(cleanup);
 
@@ -53,13 +54,13 @@ describe("ServiceFields — the template's cost is stated at the choice", () => 
 
     it("preselects the only template there is — that is not a choice to make", () => {
         renderFields([TWO[0]]);
-        expect((screen.getByLabelText(/report template/i) as HTMLSelectElement).value).toBe("tpl-1");
+        expect(asSelect(screen.getByLabelText(/report template/i)).value).toBe("tpl-1");
         expect(screen.queryByText(/cannot book online/i)).toBeNull();
     });
 
     it("keeps the service's own template when editing, over the only-one rule", () => {
         renderFields(TWO, "tpl-2");
-        expect((screen.getByLabelText(/report template/i) as HTMLSelectElement).value).toBe("tpl-2");
+        expect(asSelect(screen.getByLabelText(/report template/i)).value).toBe("tpl-2");
     });
 
     it("points at where to make one when the workspace has none", () => {

@@ -29,7 +29,7 @@ describe("ref reaches the host element", () => {
 
   it("IconButton forwards to the <button>", () => {
     const ref = createRef<HTMLButtonElement>();
-    render(<IconButton ref={ref} aria-label="Close" icon={<span />} />);
+    render(<IconButton ref={ref} aria-label="Close"><span /></IconButton>);
     expect(ref.current).toBeInstanceOf(HTMLButtonElement);
   });
 

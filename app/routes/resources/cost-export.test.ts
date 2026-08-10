@@ -3,6 +3,7 @@ import { vi, beforeEach } from "vitest";
 import { loader } from "./cost-export";
 import { getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { routeArgs } from "../../../tests/helpers/route-args";
 
 vi.mock("~/lib/session.server", () => ({ getToken: vi.fn() }));
 vi.mock("~/lib/api-client.server", () => ({ createApi: vi.fn() }));
@@ -41,14 +42,14 @@ describe("cost-export relay loader", () => {
 
   it("returns 401 without ever calling the API when there is no session token", async () => {
     getTokenMock.mockResolvedValue(null);
-    const res = await loader({ request: req("?inspectionId=i1&format=csv"), context: CONTEXT, params: {} });
+    const res = await loader(routeArgs(req("?inspectionId=i1&format=csv"), { context: CONTEXT, params: {} }));
     expect(res.status).toBe(401);
     expect(createApiMock).not.toHaveBeenCalled();
   });
 
   it("returns 400 when inspectionId is missing", async () => {
     getTokenMock.mockResolvedValue("jwt");
-    const res = await loader({ request: req("?format=csv"), context: CONTEXT, params: {} });
+    const res = await loader(routeArgs(req("?format=csv"), { context: CONTEXT, params: {} }));
     expect(res.status).toBe(400);
     expect(createApiMock).not.toHaveBeenCalled();
   });
@@ -64,7 +65,7 @@ describe("cost-export relay loader", () => {
     });
     const { csvGet, xlsxGet } = stubApi(upstream, "csv");
 
-    const res = await loader({ request: req("?inspectionId=i1&format=csv"), context: CONTEXT, params: {} });
+    const res = await loader(routeArgs(req("?inspectionId=i1&format=csv"), { context: CONTEXT, params: {} }));
 
     expect(csvGet).toHaveBeenCalledWith({ param: { id: "i1" } }, { headers: { "x-token-relay": "1" } });
     expect(xlsxGet).not.toHaveBeenCalled();
@@ -86,7 +87,7 @@ describe("cost-export relay loader", () => {
     });
     const { csvGet, xlsxGet } = stubApi(upstream, "xlsx");
 
-    const res = await loader({ request: req("?inspectionId=i1&format=xlsx"), context: CONTEXT, params: {} });
+    const res = await loader(routeArgs(req("?inspectionId=i1&format=xlsx"), { context: CONTEXT, params: {} }));
 
     expect(xlsxGet).toHaveBeenCalledWith({ param: { id: "i1" } }, { headers: { "x-token-relay": "1" } });
     expect(csvGet).not.toHaveBeenCalled();
@@ -104,7 +105,7 @@ describe("cost-export relay loader", () => {
     });
     stubApi(upstream, "csv");
 
-    const res = await loader({ request: req("?inspectionId=i1"), context: CONTEXT, params: {} });
+    const res = await loader(routeArgs(req("?inspectionId=i1"), { context: CONTEXT, params: {} }));
     expect(res.status).toBe(403);
   });
 
@@ -113,7 +114,7 @@ describe("cost-export relay loader", () => {
     const upstream = new Response("h\n", { status: 200, headers: { "Content-Type": "text/csv" } });
     const { csvGet, xlsxGet } = stubApi(upstream, "csv");
 
-    await loader({ request: req("?inspectionId=i1&format=pdf"), context: CONTEXT, params: {} });
+    await loader(routeArgs(req("?inspectionId=i1&format=pdf"), { context: CONTEXT, params: {} }));
     expect(csvGet).toHaveBeenCalledTimes(1);
     expect(xlsxGet).not.toHaveBeenCalled();
   });
