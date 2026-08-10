@@ -30,6 +30,16 @@ const CLIENT = 'contact-client-rr';
 const INSP   = 'insp-event-rr';
 
 describe('EventService — event.results_received', () => {
+    // This file times out at the 5s default under full-suite load while passing
+    // in isolation, which reads like a flake but is not one. Measured alone:
+    // 2769ms for the FIRST test and ~200ms for the other two — the first pays
+    // one-time warm-up (better-sqlite3's native addon, the drizzle module
+    // graph) that the per-test budget is charged for. The suite runs one fork
+    // per spec file on 8 cores, so that warm-up roughly doubles under
+    // contention and crosses 5s, and which file loses the race is chance.
+    // The budget is the wrong size, not the test.
+    vi.setConfig({ testTimeout: 30_000 });
+
     let svc: EventService;
     let testDb: BetterSQLite3Database<typeof schema>;
     let eventTypeId: string;
