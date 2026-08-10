@@ -3,6 +3,8 @@ import { useFetcher, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/marketplace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { getCloudflareEnv } from "~/lib/load-context";
+import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination, Banner } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { usePagination } from "~/hooks/usePagination";
@@ -14,6 +16,25 @@ export function meta() {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
+  // SaaS-only surface. In standalone the catalogue is empty and there is no
+  // path by which anything reaches it, so a 404 is the honest answer — the
+  // alternative is the "Marketplace is empty" screen this spec exists because
+  // of. Checked before auth: the page does not exist in this mode, which is
+  // true regardless of who is asking.
+  //
+  // The API handlers (`server/api/marketplace.ts`) are deliberately left
+  // ungated — harmless once nothing links to them, and the marketplace
+  // unification work (OI #293) reuses them.
+  //
+  // Read through the capability seam rather than the raw deployment-mode var
+  // (see server/lib/deployment-profile.ts). This route and the #308 gate landed
+  // in the same round, and the first draft branched on the mode directly, which
+  // is the exact pattern that gate now forbids. The capability states what is
+  // actually being asked — does this surface exist here — instead of naming the
+  // deployment that happens to imply it today.
+  if (!getDeploymentProfile(getCloudflareEnv(context)).hasContentMarketplace) {
+    throw new Response("Not Found", { status: 404 });
+  }
   const token = await requireToken(context, request);
   const url = new URL(request.url);
   const page     = url.searchParams.get("page")     ?? "1";

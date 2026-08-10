@@ -46,6 +46,29 @@ D1 migrations in this project are **forward-only**, matching the schema-first Dr
 
 ---
 
+## What an upgrade carries — and what it does not
+
+An upgrade moves three things automatically. Starter content is the fourth thing, and it is **not** one of them:
+
+| on upgrade | carried? |
+|---|---|
+| database schema | yes — `db:migrate:remote` is in the deploy chain |
+| worker code and UI | yes |
+| required secrets | yes — `jwt:ensure`, `setup-code:ensure` |
+| **starter content** | **no — use Settings → Data → Install what's new** |
+
+Starter content — inspection templates, the agreement template, canned comments, event types, tags, repair items, rating systems, contractor types, services — is seeded when a workspace is **created**, and `/setup` refuses to run again once a user exists. So a release that ships a new template does not deliver it to a workspace that already exists. After upgrading, an **owner** picks it up from **Settings → Data → Install what's new** (`POST /api/admin/data/install-bundled-content`). This works in both deployment modes.
+
+The action **adds; it never updates**. Items are matched by name, so:
+
+- content this release ships that your workspace does not have is inserted;
+- anything already present is left exactly as it is — a revised bundled template does **not** overwrite your copy;
+- a bundled item you **renamed** no longer matches, so it comes back as a second copy under its original name.
+
+Running it twice is safe: the second run inserts nothing.
+
+---
+
 ## Verify
 
 After the deploy finishes, hit the Worker's health endpoint and confirm the new `version` field reports the semver you just deployed:

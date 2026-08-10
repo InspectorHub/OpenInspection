@@ -40,7 +40,7 @@ Migrations are applied with wrangler (`wrangler d1 migrations apply`), not `driz
 | `invoices` | Billing with optional QuickBooks sync |
 | `agreements` / `agreement_requests` | E-sign workflow with Ed25519 audit chain |
 | `comments` | Canned comment library (250+ seed comments) |
-| `templates` / `marketplace_templates` | Local + community template marketplace |
+| `templates` / `marketplace_templates` | Tenant-owned templates, plus a curated first-party catalogue (not community-contributed; the browsing UI is SaaS-only) |
 | `availability` / `availability_overrides` | Inspector scheduling (weekly + date overrides) |
 | `tenant_configs` | Per-tenant settings, encrypted integration secrets |
 | `audit_logs` / `esign_audit_logs` | Immutable audit trail |

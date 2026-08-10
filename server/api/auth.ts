@@ -511,11 +511,11 @@ const coreAuthRoutes = createApiRouter()
         });
 
         // Auto-seed the FULL starter content library for the new tenant in one
-        // idempotent pass: inspection templates, agreement templates, 250 canned
-        // comments, event types, tags, recommendations, rating systems, and the
-        // global marketplace libraries. This is the same canonical seeder the
-        // admin "seed starter content" endpoint uses, so /setup yields a fully
-        // populated workspace (no separate post-deploy seed step needed).
+        // idempotent pass (templates, agreements, canned comments, event types, tags,
+        // recommendations, rating systems, marketplace libraries) — the same canonical
+        // seeder `POST /api/admin/data/install-bundled-content` uses, so /setup yields
+        // a fully populated NEW workspace (no separate post-deploy seed step needed).
+        // Not an EXISTING one — `already_initialized` above refuses forever once a user exists, so content a later release ships arrives only via that route.
         try {
             const { seedStarterContent } = await import('../services/starter-content.service');
             const seeded = await seedStarterContent(c.env.DB, tenantId);

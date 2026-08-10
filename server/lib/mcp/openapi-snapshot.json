@@ -9283,6 +9283,22 @@
     "description": "Spec 5H D1 — optional inspector pre-sign. Allowed only while envelope is pending."
   },
   {
+    "operationId": "installBundledContent",
+    "method": "POST",
+    "pathTemplate": "/api/admin/data/install-bundled-content",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Install the starter content this release ships that the workspace lacks",
+    "description": "Idempotently adds the bundled starter content (templates, agreements, canned comments, event types, tags, repair items, rating systems, contractor types, services) this workspace does not already have. Matching is by name, so existing rows are never updated and a renamed row is re-added under its original name."
+  },
+  {
     "operationId": "inviteTeam",
     "method": "POST",
     "pathTemplate": "/api/team/invite",

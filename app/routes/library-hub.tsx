@@ -1,11 +1,17 @@
 import { HubCard, HUB_GRID_CLASS } from "~/components/HubCard";
+import { useSessionContext } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
 // SVG path `d` values mirror the icons previously used in Sidebar's
 // LIBRARY_ITEMS so the hub tiles match each module's established glyph.
 // A function (not a module const) so the `m.*()` titles/descriptions resolve
 // inside the per-request paraglide locale scope, not once at import time.
-function getTiles() {
+//
+// `isSaas` drops the Marketplace tile in standalone: there is no catalogue in
+// that mode and no path by which one arrives, so the tile only ever led to an
+// empty page. One line to revert if the marketplace unification work (OI #293)
+// makes the catalogue meaningful in standalone.
+function getTiles(isSaas: boolean) {
   return [
   {
     to: "/library/templates",
@@ -49,19 +55,26 @@ function getTiles() {
     desc: m.library_hub_defect_categories_desc(),
     icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
   },
-  {
-    to: "/library/marketplace",
-    title: m.library_hub_marketplace_title(),
-    desc: m.library_hub_marketplace_desc(),
-    icon: "M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z",
-  },
+  ...(isSaas
+    ? [
+        {
+          to: "/library/marketplace",
+          title: m.library_hub_marketplace_title(),
+          desc: m.library_hub_marketplace_desc(),
+          icon: "M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z",
+        },
+      ]
+    : []),
   ];
 }
 
 export default function LibraryHub() {
+  // Fail closed: no session context (fetch failed) hides the SaaS-only tile
+  // rather than offering a door that 404s.
+  const isSaas = useSessionContext()?.branding.isSaas === true;
   return (
     <div className={HUB_GRID_CLASS}>
-      {getTiles().map((t) => (
+      {getTiles(isSaas).map((t) => (
         <HubCard key={t.to} to={t.to} title={t.title} desc={t.desc} icon={t.icon} />
       ))}
     </div>

@@ -24,6 +24,7 @@ import adminEsignRoutes from './admin/admin-esign';
 import adminCommentsRoutes from './admin/admin-comments';
 import adminDataRoutes from './admin/admin-data';
 import adminDataImportRoutes from './admin/admin-data-import';
+import adminContentInstallRoutes from './admin/admin-content-install';
 import adminSettingsRoutes from './admin/admin-settings';
 import adminConfigRoutes from './admin/admin-config';
 import adminHolidayRoutes from './admin/admin-holidays';
@@ -36,6 +37,7 @@ const adminRoutes = createApiRouter()
     .route('/', adminCommentsRoutes)
     .route('/', adminDataRoutes)
     .route('/', adminDataImportRoutes)
+    .route('/', adminContentInstallRoutes)
     .route('/', adminSettingsRoutes)
     .route('/', adminConfigRoutes)
     .route('/', adminHolidayRoutes)

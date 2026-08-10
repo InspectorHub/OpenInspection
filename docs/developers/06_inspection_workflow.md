@@ -96,7 +96,7 @@ Both call Gemini 1.5 Flash. Temperature 0.2.
 | `DELETE /api/inspections/templates/:id` | admin/owner | Delete (409 if in use) |
 | `POST /api/inspections/templates/import-spectora` | admin/owner | Import from Spectora export |
 
-**Marketplace**: Community templates available via `GET /api/marketplace/templates` with one-click install.
+**Marketplace**: a curated catalogue of first-party template packs, served by `GET /api/marketplace/templates` with one-click install. It is **not** community-contributed content, and the browsing UI is **SaaS-only** — in the default `standalone` deployment mode nothing populates the catalogue, so `/library/marketplace` returns 404 and the Library hub does not offer the tile. The API handlers remain mounted in both modes. To pick up starter content a release ships, use Settings → Data → **Install what's new** (`POST /api/admin/data/install-bundled-content`).
 
 ## 7. Availability & Booking
 

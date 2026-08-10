@@ -1,7 +1,11 @@
 import { useLoaderData } from "react-router";
+import { Banner, Button } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-data";
 import { requireAdminLoader } from "~/lib/access.server";
+import { requireToken } from "~/lib/session.server";
+import { createApi } from "~/lib/api-client.server";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { AccessDenied } from "~/components/AccessDenied";
 import { m } from "~/paraglide/messages";
 
@@ -14,8 +18,27 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return { forbidden };
 }
 
+/** The install-what's-new section's submit. Owner-only is enforced server-side. */
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
+  try {
+    const api = createApi(context, { token });
+    const res = await api.admin.data["install-bundled-content"].$post();
+    if (!res.ok) return { ok: false as const };
+    const body = (await res.json()) as { data?: Record<string, number> };
+    // One number, not ten: the operator's question is "did anything arrive?".
+    // Zero is a real answer and the copy says so rather than looking inert.
+    const added = Object.values(body.data ?? {}).reduce((sum, n) => sum + n, 0);
+    return { ok: true as const, added };
+  } catch {
+    return { ok: false as const };
+  }
+}
+
 export default function SettingsData() {
   const { forbidden } = useLoaderData<typeof loader>();
+  const install = useGuardedSubmit<{ ok: boolean; added?: number }>();
+  const installResult = install.fetcher.data;
   if (forbidden) return <AccessDenied />;
   return (
     <div className="space-y-ih-list">
@@ -89,6 +112,33 @@ export default function SettingsData() {
             {m.settings_data_cleanup_gdpr_export()}
           </button>
         </div>
+      </section>
+
+      {/* Install what's new — the bundled starter content this release ships.
+          ADDS only; the rename caveat is stated ABOVE the button because an
+          operator would otherwise discover it by pressing the button. */}
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
+        <div>
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_data_bundled_heading()}</h3>
+          <p className="text-[12px] text-ih-fg-3 mt-1">{m.settings_data_bundled_subtitle()}</p>
+          <p className="text-[12px] text-ih-fg-3 mt-1">{m.settings_data_bundled_rename_note()}</p>
+        </div>
+        {installResult && (
+          <Banner tone={!installResult.ok ? "danger" : installResult.added ? "success" : "info"}>
+            {!installResult.ok
+              ? m.settings_data_bundled_result_error()
+              : installResult.added
+                ? m.settings_data_bundled_result_added({ count: installResult.added })
+                : m.settings_data_bundled_result_none()}
+          </Banner>
+        )}
+        <Button
+          variant="secondary"
+          disabled={install.busy}
+          onClick={() => install.submit({ intent: "install-bundled-content" }, { method: "post" })}
+        >
+          {install.busy ? m.settings_data_bundled_button_busy() : m.settings_data_bundled_button()}
+        </Button>
       </section>
     </div>
   );
