@@ -108,9 +108,12 @@ function findStatusLiterals(source, { statusKeys, members }) {
             }
 
             // Union-type guard: `status: 'a' | 'b'` is a type declaration, not a
-            // status write — skip when the literal is immediately followed by `|`.
+            // status write — skip when the literal is immediately followed by a
+            // SINGLE `|`. `[^|]` is what makes it single: a logical `||` is a
+            // real comparison, and treating it as a union hid every branch of an
+            // `||` chain except the last one.
             const after = source.slice(index + m[0].length);
-            if (/^\s*\|/.test(after)) continue;
+            if (/^\s*\|[^|]/.test(after)) continue;
 
             const lineEnd = source.indexOf('\n', index);
             const context = source.slice(lineStart, lineEnd === -1 ? source.length : lineEnd).trim();
