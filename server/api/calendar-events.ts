@@ -4,7 +4,7 @@ import { z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lt } from 'drizzle-orm';
 import { inspections } from '../lib/db/schema/inspection';
-import { loadOpenGoogleConnection } from '../lib/calendar/connection';
+import { loadOpenCalendarConnection } from '../lib/calendar/connection';
 import {
     loadGoogleOAuthMode,
     resolveGoogleOAuthCredentials,
@@ -120,14 +120,22 @@ const calendarEventsRoutes = createApiRouter()
     const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
     if (jwtUser?.sub && oauthCreds) {
         try {
-            const open = await loadOpenGoogleConnection(
+            const open = await loadOpenCalendarConnection(
                 c.env.DB,
                 tenantId,
                 jwtUser.sub,
                 c.env.JWT_SECRET,
                 c.env.JWT_SECRET_PREVIOUS,
             );
-            if (open?.credentials.refreshToken) {
+            // This view wants event TITLES, which the provider contract's
+            // `listBusy` deliberately does not carry, so it still speaks to
+            // Google directly. That makes it the one remaining caller outside
+            // `calendar/google.ts` that touches OAuth material — narrow the
+            // stored payload to the OAuth member rather than casting, so a
+            // CalDAV connection simply contributes no events here instead of
+            // producing a request with an undefined refresh token.
+            const oauthPayload = open && 'refreshToken' in open.credentials ? open.credentials : null;
+            if (open && oauthPayload?.refreshToken) {
                 const cacheKey = `gcal_access:${jwtUser.sub}`;
                 let accessToken: string | null = c.env.TENANT_CACHE
                     ? await c.env.TENANT_CACHE.get(cacheKey)
@@ -136,7 +144,7 @@ const calendarEventsRoutes = createApiRouter()
                     accessToken = await refreshGoogleToken(
                         oauthCreds.clientId,
                         oauthCreds.clientSecret,
-                        open.credentials.refreshToken,
+                        oauthPayload.refreshToken,
                     );
                     if (c.env.TENANT_CACHE) {
                         await c.env.TENANT_CACHE.put(cacheKey, accessToken, { expirationTtl: 3500 });

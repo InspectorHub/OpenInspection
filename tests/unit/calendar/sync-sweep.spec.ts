@@ -17,12 +17,20 @@ vi.mock('../../../server/lib/calendar/sync-engine', () => ({
 const openConn = vi.fn();
 vi.mock('../../../server/lib/calendar/connection', async (orig) => ({
     ...(await orig<Record<string, unknown>>()),
-    loadOpenGoogleConnection: (...a: unknown[]) => openConn(...a),
+    loadOpenCalendarConnection: (...a: unknown[]) => openConn(...a),
 }));
 
 vi.mock('../../../server/lib/calendar/resolve-google-oauth', () => ({
     loadGoogleOAuthMode: async () => 'platform',
     resolveGoogleOAuthCredentials: async () => ({ clientId: 'cid', clientSecret: 'sec' }),
+}));
+
+// The sweep asks the registry for each row's OWN provider. Stubbed so the
+// suite exercises the due-query and the failure bookkeeping rather than any
+// one provider's implementation.
+const resolveAuth = vi.fn(async () => ({ provider: 'google', material: {} }));
+vi.mock('../../../server/lib/calendar/registry', () => ({
+    getCalendarProvider: () => ({ resolveAuth }),
 }));
 
 import {
@@ -42,9 +50,14 @@ describe('sweepCalendarSyncs', () => {
     let sqlite: ReturnType<typeof createTestDb>['sqlite'];
     let env: Parameters<typeof sweepCalendarSyncs>[0];
 
-    async function addConnection(id: string, userId: string, lastSyncAt: Date | null) {
+    async function addConnection(
+        id: string,
+        userId: string,
+        lastSyncAt: Date | null,
+        provider: 'google' | 'apple' = 'google',
+    ) {
         await db.insert(schema.calendarConnections).values({
-            id, tenantId: TENANT, userId, provider: 'google', authType: 'oauth',
+            id, tenantId: TENANT, userId, provider, authType: provider === 'apple' ? 'caldav' : 'oauth',
             credentialsEnc: 'x', credentialsDekEnc: 'x',
             capabilities: 'events_read_write', calendarId: 'primary',
             connectedAt: new Date(NOW - 90 * 60 * 1000),
@@ -84,6 +97,19 @@ describe('sweepCalendarSyncs', () => {
 
     it('syncs a connection that has never synced', async () => {
         await addConnection('c1', 'u1', null);
+        const out = await sweepCalendarSyncs(env, NOW);
+        expect(out).toMatchObject({ attempted: 1, succeeded: 1, failed: 0 });
+        expect(importBusy).toHaveBeenCalledTimes(1);
+    });
+
+    /**
+     * The sweep is the only thing that keeps a connection fresh without anyone
+     * pressing a button. A `provider = 'google'` filter on the due query means a
+     * CalDAV connection is never swept at all — and nothing reports that,
+     * because a connection that is never attempted also never fails.
+     */
+    it('attempts a due non-Google connection', async () => {
+        await addConnection('c1', 'u1', null, 'apple');
         const out = await sweepCalendarSyncs(env, NOW);
         expect(out).toMatchObject({ attempted: 1, succeeded: 1, failed: 0 });
         expect(importBusy).toHaveBeenCalledTimes(1);

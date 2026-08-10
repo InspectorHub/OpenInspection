@@ -30,22 +30,21 @@ import { resolveTenantTimeZone, wallClockToEpochMs } from '../tz';
 import { logger } from '../logger';
 import { INSPECTION_STATUS } from '../status/inspection-status';
 import { canPushEvents, ExternalEventGoneError } from './provider';
+import type { CalendarAuth, CalendarProviderEnv, CalendarProviderId } from './provider';
 import { getCalendarProvider } from './registry';
-import { loadOpenGoogleConnection } from './connection';
-import { loadGoogleOAuthMode, resolveGoogleOAuthCredentials } from './resolve-google-oauth';
-import { getLink, upsertLink, deleteLink, type CalendarLinkEntityType } from './external-links';
+import { loadOpenCalendarConnection } from './connection';
+import {
+    getLink,
+    findEntityLink,
+    upsertLink,
+    deleteLink,
+    type CalendarLinkEntityType,
+} from './external-links';
 
 /** Re-export so callers hook up against one module rather than two. */
 export type CalendarLinkEntityTypeAlias = CalendarLinkEntityType;
 
-export interface CalendarExportEnv {
-    DB: D1Database;
-    TENANT_CACHE: KVNamespace;
-    JWT_SECRET: string;
-    JWT_SECRET_PREVIOUS?: string;
-    GOOGLE_CLIENT_ID?: string;
-    GOOGLE_CLIENT_SECRET?: string;
-}
+export type CalendarExportEnv = CalendarProviderEnv;
 
 /**
  * Why a push did not happen. Every one of these is a state a user can be in
@@ -77,8 +76,6 @@ export interface PushOutcome {
  */
 const DEFAULT_DURATION_MIN = 180;
 
-const PROVIDER = 'google' as const;
-
 async function tenantTimeZone(db: DrizzleD1Database, tenantId: string): Promise<string> {
     const row = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
         .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
@@ -108,10 +105,14 @@ function resolveStartMs(
 }
 
 interface WriteHandle {
-    clientId: string;
-    clientSecret: string;
-    refreshToken: string;
+    auth: CalendarAuth;
     calendarId: string;
+}
+
+/** The write target plus the provider that owns it — the link key needs both. */
+interface ResolvedWrite {
+    handle: WriteHandle;
+    provider: CalendarProviderId;
 }
 
 /**
@@ -123,20 +124,24 @@ async function resolveWriteHandle(
     env: CalendarExportEnv,
     tenantId: string,
     userId: string,
-): Promise<{ handle: WriteHandle } | { reason: PushSkipReason }> {
-    const open = await loadOpenGoogleConnection(
+): Promise<ResolvedWrite | { reason: PushSkipReason }> {
+    const open = await loadOpenCalendarConnection(
         env.DB, tenantId, userId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
     );
     if (!open) return { reason: 'NOT_CONNECTED' };
     if (!canPushEvents(open.connection.capabilities)) return { reason: 'NO_WRITE_CAPABILITY' };
-    const mode = await loadGoogleOAuthMode(env.DB, tenantId);
-    const creds = await resolveGoogleOAuthCredentials(env, tenantId, mode);
-    if (!creds) return { reason: 'OAUTH_NOT_CONFIGURED' };
+    // A null handle means this connection cannot be authenticated at all —
+    // no OAuth client on the deployment, or a stored payload the provider
+    // cannot use. Both were already OAUTH_NOT_CONFIGURED, so the reason set
+    // this function can return is unchanged.
+    const auth = await getCalendarProvider(open.connection.provider).resolveAuth({
+        tenantId, credentials: open.credentials, env,
+    });
+    if (!auth) return { reason: 'OAUTH_NOT_CONFIGURED' };
     return {
+        provider: open.connection.provider,
         handle: {
-            clientId: creds.clientId,
-            clientSecret: creds.clientSecret,
-            refreshToken: open.credentials.refreshToken,
+            auth,
             // Single-write: the read set is for busy import; the write always
             // goes to the connection's nominated calendar.
             calendarId: open.connection.calendarId,
@@ -160,13 +165,14 @@ interface EventShape {
 async function writeThroughLink(
     env: CalendarExportEnv,
     db: DrizzleD1Database,
-    handle: WriteHandle,
+    resolved: ResolvedWrite,
     key: { tenantId: string; entityType: CalendarLinkEntityType; entityId: string },
     userId: string,
     event: EventShape,
 ): Promise<PushOutcome> {
-    const provider = getCalendarProvider(PROVIDER);
-    const linkKey = { ...key, provider: PROVIDER };
+    const { handle, provider: providerId } = resolved;
+    const provider = getCalendarProvider(providerId);
+    const linkKey = { ...key, provider: providerId };
     const existing = await getLink(db, linkKey);
 
     // A reassignment leaves the entry on the PREVIOUS person's calendar. Take
@@ -246,7 +252,7 @@ export async function pushInspectionToGoogle(
         : startMs + (row.durationMin ?? DEFAULT_DURATION_MIN) * 60_000;
 
     return writeThroughLink(
-        env, db, resolved.handle,
+        env, db, resolved,
         { tenantId, entityType: 'inspection', entityId: inspectionId },
         lead.id,
         {
@@ -286,7 +292,7 @@ export async function pushBlockToGoogle(
     const endMs = wallClockToEpochMs(row.date, endHm, tz);
 
     return writeThroughLink(
-        env, db, resolved.handle,
+        env, db, resolved,
         { tenantId, entityType: 'calendar_block', entityId: blockId },
         row.userId,
         {
@@ -314,14 +320,18 @@ export async function deleteExternalForEntity(
     entityId: string,
 ): Promise<void> {
     const db = drizzle(env.DB);
-    const linkKey = { tenantId, provider: PROVIDER, entityType, entityId };
-    const link = await getLink(db, linkKey);
+    // The provider comes off the LINK ROW, which is the only thing that knows
+    // which calendar this event was written to. Re-deriving it from the user's
+    // current connection would aim the DELETE at the wrong calendar for anyone
+    // who reconnected under a different provider.
+    const link = await findEntityLink(db, { tenantId, entityType, entityId });
     if (!link) return;
+    const linkKey = { tenantId, provider: link.provider, entityType, entityId };
 
     const resolved = await resolveWriteHandle(env, tenantId, link.userId);
     if (!('reason' in resolved)) {
         try {
-            await getCalendarProvider(PROVIDER).deleteEvent({
+            await getCalendarProvider(link.provider).deleteEvent({
                 ...resolved.handle, externalId: link.externalId,
             });
         } catch (e) {

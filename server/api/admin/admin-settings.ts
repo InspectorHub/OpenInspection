@@ -670,11 +670,14 @@ const adminSettingsRoutes = createApiRouter()
             } catch { /* no decryptable secrets — leave false */ }
         }
         const icsToken = cfg.icsToken as string | null | undefined;
+        // Any provider: these fields report whether THIS user has a calendar
+        // connected at all. `googleOAuthConfigured` below is the one that is
+        // genuinely Google-specific — it gates the Google button.
         const googleCalendarConnected = user?.sub
-            ? await userHasCalendarConnection(c.env.DB, tenantId, user.sub, 'google')
+            ? await userHasCalendarConnection(c.env.DB, tenantId, user.sub)
             : false;
         const calendarRow = user?.sub && googleCalendarConnected
-            ? await getCalendarConnection(c.env.DB, tenantId, user.sub, 'google')
+            ? await getCalendarConnection(c.env.DB, tenantId, user.sub)
             : null;
         const integrationCfg = await c.var.services.branding.getIntegrationConfig(tenantId);
         const googleOAuthMode: 'platform' | 'own' = integrationCfg.googleOAuthMode === 'own' ? 'own' : 'platform';

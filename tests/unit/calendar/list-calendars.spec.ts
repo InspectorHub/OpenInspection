@@ -11,6 +11,14 @@ vi.mock('../../../server/lib/google-calendar', async (importOriginal) => {
 });
 
 import { googleCalendarProvider } from '../../../server/lib/calendar/google';
+import type { CalendarAuth } from '../../../server/lib/calendar/provider';
+
+// The data plane takes one opaque provider-minted handle; `refreshAccessToken`
+// is mocked above, so what rides inside it is never read here.
+const auth = {
+    provider: 'google',
+    material: { clientId: 'c', clientSecret: 's', refreshToken: 'r' },
+} as CalendarAuth;
 
 describe('googleCalendarProvider.listCalendars', () => {
     afterEach(() => vi.restoreAllMocks());
@@ -29,9 +37,7 @@ describe('googleCalendarProvider.listCalendars', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
 
-        const cals = await googleCalendarProvider.listCalendars({
-            clientId: 'c', clientSecret: 's', refreshToken: 'r',
-        });
+        const cals = await googleCalendarProvider.listCalendars({ auth });
 
         expect(cals).toEqual([
             { id: 'primary', summary: 'Me', accessRole: 'owner', primary: true },
@@ -48,7 +54,7 @@ describe('googleCalendarProvider.listCalendars', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 401 } as any);
         await expect(
-            googleCalendarProvider.listCalendars({ clientId: 'c', clientSecret: 's', refreshToken: 'r' }),
+            googleCalendarProvider.listCalendars({ auth }),
         ).rejects.toThrow(/Failed to fetch Google calendar list/);
     });
 });

@@ -16,21 +16,15 @@
  *    difference, and the inspector is the only one who can fix a revoked token.
  */
 import { drizzle } from 'drizzle-orm/d1';
-import { and, asc, eq, isNull, lt, or } from 'drizzle-orm';
+import { asc, isNull, lt, or } from 'drizzle-orm';
 import { calendarConnections } from '../db/schema';
 import { logger } from '../logger';
 import { importBusyForConnection } from './sync-engine';
-import { loadOpenGoogleConnection, markCalendarSynced, markCalendarSyncFailed } from './connection';
-import { loadGoogleOAuthMode, resolveGoogleOAuthCredentials } from './resolve-google-oauth';
+import { loadOpenCalendarConnection, markCalendarSynced, markCalendarSyncFailed } from './connection';
+import { getCalendarProvider } from './registry';
+import type { CalendarProviderEnv } from './provider';
 
-export interface CalendarSweepEnv {
-    DB: D1Database;
-    TENANT_CACHE: KVNamespace;
-    JWT_SECRET: string;
-    JWT_SECRET_PREVIOUS?: string;
-    GOOGLE_CLIENT_ID?: string;
-    GOOGLE_CLIENT_SECRET?: string;
-}
+export type CalendarSweepEnv = CalendarProviderEnv;
 
 /** A connection is due when its last success is older than this. */
 export const SYNC_INTERVAL_MS = 15 * 60 * 1000;
@@ -60,14 +54,17 @@ export async function sweepCalendarSyncs(
     // Stalest first, never-synced ahead of everything. This is the fairness
     // mechanism: it spreads work across tenants without a per-tenant loop,
     // because a tenant swept this tick sorts to the back for the next.
+    //
+    // Every connection, whatever its provider. A `provider = 'google'` filter
+    // here would mean a non-Google connection is never attempted at all — and a
+    // row that is never attempted also never fails, so nothing would report it.
     const due = await db.select().from(calendarConnections)
-        .where(and(
-            eq(calendarConnections.provider, 'google'),
+        .where(
             or(
                 isNull(calendarConnections.lastSyncAt),
                 lt(calendarConnections.lastSyncAt, dueBefore),
             ),
-        ))
+        )
         .orderBy(asc(calendarConnections.lastSyncAt))
         .limit(MAX_CONNECTIONS_PER_TICK)
         .all();
@@ -79,7 +76,7 @@ export async function sweepCalendarSyncs(
             // Re-open through the normal path so a connection whose credentials
             // no longer decrypt is treated as not-connected rather than as a
             // sync failure that would be retried forever.
-            const open = await loadOpenGoogleConnection(
+            const open = await loadOpenCalendarConnection(
                 env.DB, row.tenantId, row.userId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
             );
             if (!open) {
@@ -91,19 +88,16 @@ export async function sweepCalendarSyncs(
                 continue;
             }
 
-            const mode = await loadGoogleOAuthMode(env.DB, row.tenantId);
-            const creds = await resolveGoogleOAuthCredentials(env, row.tenantId, mode);
-            if (!creds) {
+            const auth = await getCalendarProvider(row.provider).resolveAuth({
+                tenantId: row.tenantId, credentials: open.credentials, env,
+            });
+            if (!auth) {
                 // A deployment-level gap, not this inspector's problem — do not
                 // stamp an error they cannot act on.
                 continue;
             }
 
-            await importBusyForConnection(db, open.connection, {
-                clientId: creds.clientId,
-                clientSecret: creds.clientSecret,
-                refreshToken: open.credentials.refreshToken,
-            }, nowMs);
+            await importBusyForConnection(db, open.connection, auth, nowMs);
 
             await markCalendarSynced(env.DB, row.tenantId, row.userId);
             result.succeeded++;

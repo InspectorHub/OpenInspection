@@ -15,13 +15,16 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 const pushEvent = vi.fn<CalendarProvider['pushEvent']>(async () => 'gcal-new');
 const patchEvent = vi.fn<CalendarProvider['patchEvent']>(async () => undefined);
 const deleteEvent = vi.fn<CalendarProvider['deleteEvent']>(async () => undefined);
+const resolveAuth = vi.fn<CalendarProvider['resolveAuth']>(
+    async () => ({ provider: 'google', material: { clientId: 'cid', clientSecret: 'csec', refreshToken: 'rt' } }),
+);
 vi.mock('../../../server/lib/calendar/registry', () => ({
-    getCalendarProvider: () => ({ pushEvent, patchEvent, deleteEvent }),
+    getCalendarProvider: () => ({ resolveAuth, pushEvent, patchEvent, deleteEvent }),
 }));
 
 const openConnection = vi.fn();
 vi.mock('../../../server/lib/calendar/connection', () => ({
-    loadOpenGoogleConnection: (...a: unknown[]) => openConnection(...a),
+    loadOpenCalendarConnection: (...a: unknown[]) => openConnection(...a),
 }));
 vi.mock('../../../server/lib/calendar/resolve-google-oauth', () => ({
     loadGoogleOAuthMode: async () => 'platform',
@@ -44,7 +47,8 @@ const env = { DB: {} as D1Database, TENANT_CACHE: {} as any, JWT_SECRET: 's' };
 
 function connection(capability: 'events_read_write' | 'availability_read') {
     return {
-        connection: { id: 'c1', calendarId: 'primary', capabilities: capability },
+        // `provider` is now read off the row rather than assumed by the module.
+        connection: { id: 'c1', provider: 'google', calendarId: 'primary', capabilities: capability },
         credentials: { refreshToken: 'rt' },
     };
 }

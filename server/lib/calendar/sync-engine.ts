@@ -17,13 +17,13 @@ import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../db/schema';
 import { resolveTenantTimeZone } from '../tz';
 import { logger } from '../logger';
-import { syncGoogleBusyOverrides } from './sync-busy';
+import { syncProviderBusyOverrides, isBusyOverrideSource } from './sync-busy';
 import { resolveReadCalendarIds } from './read-set';
 import { getCalendarProvider } from './registry';
 import { listOwnExternalIds } from './external-links';
 import { filterImportableBlocks, type ImportSkipReason } from './google-import';
 import type { CalendarConnectionRow } from './connection';
-import type { BusyBlock } from './provider';
+import type { BusyBlock, CalendarAuth } from './provider';
 
 /**
  * How far ahead a sync looks. Thirty days is the shipped behaviour; the plan's
@@ -41,27 +41,25 @@ export interface ImportResult {
     skipped: Record<ImportSkipReason, number>;
 }
 
-export interface ImportDeps {
-    clientId: string;
-    clientSecret: string;
-    refreshToken: string;
-}
-
 /**
  * Pull one connection's busy time into `availability_overrides`.
  *
  * Throws only when the PROVIDER fails; callers decide whether that is a 500, a
  * logged cron failure, or a `last_sync_error`. Everything else is reported in
  * the result.
+ *
+ * `auth` is an opaque handle the provider minted; this module never looks
+ * inside it and does not know whether it holds an OAuth token or an app
+ * password.
  */
 export async function importBusyForConnection(
     db: DrizzleD1Database,
     connection: CalendarConnectionRow,
-    deps: ImportDeps,
+    auth: CalendarAuth,
     nowMs: number = Date.now(),
 ): Promise<ImportResult> {
     const tenantId = connection.tenantId;
-    const provider = getCalendarProvider('google');
+    const provider = getCalendarProvider(connection.provider);
 
     const from = new Date(nowMs);
     const to = new Date(nowMs + SYNC_WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -74,9 +72,7 @@ export async function importBusyForConnection(
 
     const perCalendar = await Promise.all(readCalendarIds.map((calendarId) =>
         provider.listBusy({
-            clientId: deps.clientId,
-            clientSecret: deps.clientSecret,
-            refreshToken: deps.refreshToken,
+            auth,
             calendarId,
             range: { from, to },
             capability: connection.capabilities,
@@ -85,7 +81,7 @@ export async function importBusyForConnection(
     const blocks: BusyBlock[] = perCalendar.flat();
 
     const ownExternalIds = await listOwnExternalIds(db, {
-        tenantId, userId: connection.userId, provider: 'google',
+        tenantId, userId: connection.userId, provider: connection.provider,
     });
     const connectedAtMs = connection.connectedAt instanceof Date
         ? connection.connectedAt.getTime()
@@ -100,7 +96,16 @@ export async function importBusyForConnection(
         .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
     const tenantTz = resolveTenantTimeZone(tzRow?.defaultTimezone);
 
-    const { upserted } = await syncGoogleBusyOverrides(
+    // `availability_overrides.source` admits the providers that can actually
+    // sync busy time. `microsoft` is in the provider id union but has no
+    // implementation, so no connection row can carry it — guard rather than
+    // cast, so the day someone adds one this fails loudly instead of writing a
+    // value the slot map's enum does not know.
+    if (!isBusyOverrideSource(connection.provider)) {
+        throw new Error(`Calendar provider cannot record busy overrides: ${connection.provider}`);
+    }
+
+    const { upserted } = await syncProviderBusyOverrides(
         db,
         {
             tenantId,
@@ -108,6 +113,9 @@ export async function importBusyForConnection(
             tenantTz,
             rangeFromMs: from.getTime(),
             rangeToMs: to.getTime(),
+            // The connection's own provider, so one provider's sync can never
+            // clear another's rows in the same range.
+            source: connection.provider,
         },
         keep,
     );

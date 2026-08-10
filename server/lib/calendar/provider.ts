@@ -1,5 +1,7 @@
+import type { CalendarCredentialPayload } from './credentials';
+
 export type CalendarProviderId = 'google' | 'microsoft' | 'apple';
-type CalendarAuthType = 'oauth' | 'caldav';
+export type CalendarAuthType = 'oauth' | 'caldav';
 export type CalendarCapability = 'availability_read' | 'events_read_write';
 
 export interface BusyBlock {
@@ -49,53 +51,129 @@ export interface PkceChallenge {
     challenge: string;
 }
 
-export interface OAuthExchangeResult {
-    credentials: {
-        refreshToken: string;
-        accessToken?: string;
-        expiresAt?: string;
-    };
-    scopes: string[];
+/** How a provider's connect is driven. The UI branches on `kind`. */
+export type CalendarConnectFlow =
+    | { kind: 'redirect' }   // OAuth: navigate a popup, land on oauth-popup-landing
+    | { kind: 'form' };      // CalDAV: collect fields in-page, never open a popup
+
+/** OAuth: the code and the verifier. CalDAV: what the user typed. */
+export type CalendarConnectSubmission =
+    | { kind: 'oauth_code'; code: string; verifier: string; redirectUri: string }
+    | { kind: 'credentials'; username: string; password: string; url?: string };
+
+export interface CalendarConnectResult {
+    credentials: CalendarCredentialPayload;   // the CALLER seals it
     calendarId: string;
+    authType: CalendarAuthType;
+    /**
+     * The capability to record on the row.
+     *
+     * For an OAuth provider this is DERIVED: it is what the provider actually
+     * granted, read back off the scopes on the token response. The provider
+     * enforces it — a read-only grant cannot write even if we tried.
+     *
+     * For CalDAV it is DECLARED: an app-specific password is all-or-nothing
+     * and the server reports no scopes at all, so this is the capability the
+     * USER selected and it is a promise WE keep. Nothing on the far side
+     * stops a bug here from writing to a calendar the user marked read-only.
+     *
+     * Same column, two different guarantees. A reader who does not know that
+     * will treat it as uniform, which is why it is written down here.
+     */
+    capability: CalendarCapability;
+}
+
+/**
+ * A connect failure the USER can act on — a rejected credential, a grant that
+ * came back without what we need, an address with no calendar home behind it.
+ *
+ * Its `message` is shown to the user verbatim, so it must never carry
+ * credential material: no app password, no refresh token, no Basic header.
+ * Anything else that goes wrong is a plain Error and gets a generic message.
+ */
+export class CalendarConnectError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'CalendarConnectError';
+    }
+}
+
+/**
+ * The bindings any provider may need to authenticate. Same shape the Google
+ * OAuth resolver already takes; named here so callers stop assembling it
+ * per-file.
+ */
+export interface CalendarProviderEnv {
+    DB: D1Database;
+    TENANT_CACHE: KVNamespace;
+    JWT_SECRET: string;
+    JWT_SECRET_PREVIOUS?: string;
+    GOOGLE_CLIENT_ID?: string;
+    GOOGLE_CLIENT_SECRET?: string;
+}
+
+/**
+ * A provider-minted authentication handle.
+ *
+ * Deliberately opaque. Callers move it from `resolveAuth` to a data-plane
+ * method and never read a field off it, because what is inside differs by
+ * auth type: an OAuth client plus a refresh token for Google, an Apple ID
+ * plus an app-specific password plus a discovered home URL for CalDAV.
+ * Making it readable is precisely how `clientId` came to appear in ten files
+ * that have no business knowing OAuth exists.
+ */
+export interface CalendarAuth<TMaterial = unknown> {
+    readonly provider: CalendarProviderId;
+    /** Provider-private. Only the provider that minted this may read it. */
+    readonly material: TMaterial;
+}
+
+export interface CalendarAuthInput {
+    tenantId: string;
+    /** The decrypted payload from `openCredentials` — union, NOT cast. */
+    credentials: CalendarCredentialPayload;
+    env: CalendarProviderEnv;
 }
 
 /** Normalized calendar provider contract (Google impl now; Microsoft/Apple later). */
 export interface CalendarProvider {
     id: CalendarProviderId;
     authType: CalendarAuthType;
-    getAuthUrl(params: {
-        clientId: string;
+    /**
+     * Mint the handle every data-plane method takes, or null when this
+     * connection cannot be authenticated at all — a Google connection on a
+     * deployment with no OAuth client, or a stored payload of the wrong
+     * shape. Null is the caller's OAUTH_NOT_CONFIGURED / NOT_CONNECTED; it
+     * is not an error to log.
+     */
+    resolveAuth(input: CalendarAuthInput): Promise<CalendarAuth | null>;
+    connectFlow: CalendarConnectFlow;
+    /** Only meaningful for `kind: 'redirect'`. Absent on form providers. */
+    startConnect?(params: {
+        clientId?: string;
         redirectUri: string;
         state: string;
         pkce: PkceChallenge;
         capability: CalendarCapability;
     }): URL;
-    exchangeCode(params: {
-        clientId: string;
-        clientSecret: string;
-        redirectUri: string;
-        code: string;
-        verifier: string;
-    }): Promise<OAuthExchangeResult>;
+    completeConnect(params: {
+        tenantId: string;
+        env: CalendarProviderEnv;
+        submission: CalendarConnectSubmission;
+        /** What the user asked for at connect; the floor for a declared capability. */
+        requestedCapability: CalendarCapability;
+    }): Promise<CalendarConnectResult>;
     listBusy(params: {
-        clientId: string;
-        clientSecret: string;
-        refreshToken: string;
+        auth: CalendarAuth;
         calendarId: string;
         range: { from: Date; to: Date };
         capability: CalendarCapability;
     }): Promise<BusyBlock[]>;
     // A-polish 10b — the user's calendars, for choosing the multi-read set and
     // the single write target.
-    listCalendars(params: {
-        clientId: string;
-        clientSecret: string;
-        refreshToken: string;
-    }): Promise<CalendarListEntry[]>;
+    listCalendars(params: { auth: CalendarAuth }): Promise<CalendarListEntry[]>;
     pushEvent(params: {
-        clientId: string;
-        clientSecret: string;
-        refreshToken: string;
+        auth: CalendarAuth;
         calendarId: string;
         event: CalendarPushEventInput;
     }): Promise<string>;
@@ -106,17 +184,13 @@ export interface CalendarProvider {
      * their notification state and any guest responses.
      */
     patchEvent(params: {
-        clientId: string;
-        clientSecret: string;
-        refreshToken: string;
+        auth: CalendarAuth;
         calendarId: string;
         externalId: string;
         event: CalendarPushEventInput;
     }): Promise<void>;
     deleteEvent(params: {
-        clientId: string;
-        clientSecret: string;
-        refreshToken: string;
+        auth: CalendarAuth;
         calendarId: string;
         externalId: string;
     }): Promise<void>;
@@ -130,29 +204,10 @@ export class ExternalEventGoneError extends Error {
     }
 }
 
-const GOOGLE_SCOPES: Record<CalendarCapability, string[]> = {
-    availability_read: [
-        'https://www.googleapis.com/auth/calendar.freebusy',
-        'https://www.googleapis.com/auth/calendar.readonly',
-    ],
-    events_read_write: [
-        'https://www.googleapis.com/auth/calendar.events',
-    ],
-};
-
-export function capabilityToScopes(provider: CalendarProviderId, capability: CalendarCapability): string[] {
-    if (provider === 'google') return GOOGLE_SCOPES[capability];
-    throw new Error(`Unsupported calendar provider: ${provider}`);
-}
-
-/** Derive stored capability from OAuth scopes granted at callback. */
-export function capabilityFromScopes(scopes: string[]): CalendarCapability {
-    const normalized = scopes.map((s) => s.toLowerCase());
-    if (normalized.some((s) => s.includes('calendar.events'))) {
-        return 'events_read_write';
-    }
-    return 'availability_read';
-}
+// Scope mapping used to live here behind a `provider` parameter that threw for
+// everything but google. That was a Google fact wearing a generic signature —
+// CalDAV has no concept of a scope at all — so it now lives in `google.ts` as
+// `googleCapabilityScopes` / `capabilityFromScopes`.
 
 export function canPushEvents(capability: CalendarCapability): boolean {
     return capability === 'events_read_write';

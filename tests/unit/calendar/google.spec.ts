@@ -1,23 +1,33 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-    capabilityToScopes,
-    capabilityFromScopes,
     canPushEvents,
     createPkceChallenge,
     ExternalEventGoneError,
 } from '../../../server/lib/calendar/provider';
+import type { CalendarAuth } from '../../../server/lib/calendar/provider';
 import { getCalendarProvider } from '../../../server/lib/calendar/registry';
-import { googleCalendarProvider } from '../../../server/lib/calendar/google';
+import {
+    googleCalendarProvider,
+    googleCapabilityScopes,
+    capabilityFromScopes,
+} from '../../../server/lib/calendar/google';
+
+// One opaque provider-minted handle stands in for the three OAuth values the
+// data plane used to take by hand.
+const auth = {
+    provider: 'google',
+    material: { clientId: 'cid', clientSecret: 'sec', refreshToken: 'rt' },
+} as CalendarAuth;
 
 describe('CalendarProvider — Google', () => {
     it('maps availability_read to freebusy/readonly scopes', () => {
-        const scopes = capabilityToScopes('google', 'availability_read');
+        const scopes = googleCapabilityScopes('availability_read');
         expect(scopes).toContain('https://www.googleapis.com/auth/calendar.freebusy');
         expect(scopes).toContain('https://www.googleapis.com/auth/calendar.readonly');
     });
 
     it('maps events_read_write to calendar.events scope', () => {
-        const scopes = capabilityToScopes('google', 'events_read_write');
+        const scopes = googleCapabilityScopes('events_read_write');
         expect(scopes).toEqual(['https://www.googleapis.com/auth/calendar.events']);
     });
 
@@ -33,9 +43,9 @@ describe('CalendarProvider — Google', () => {
         expect(canPushEvents('availability_read')).toBe(false);
     });
 
-    it('getAuthUrl includes PKCE challenge params', async () => {
+    it('startConnect includes PKCE challenge params', async () => {
         const pkce = await createPkceChallenge();
-        const url = googleCalendarProvider.getAuthUrl({
+        const url = googleCalendarProvider.startConnect!({
             clientId: 'cid',
             redirectUri: 'https://app.example/api/calendar/callback',
             state: 'user-1',
@@ -72,9 +82,7 @@ describe('googleCalendarProvider.listBusy', () => {
             }), { status: 200 }));
 
         const blocks = await googleCalendarProvider.listBusy({
-            clientId: 'cid',
-            clientSecret: 'sec',
-            refreshToken: 'rt',
+            auth,
             calendarId: 'primary',
             range: { from: new Date('2026-07-14T00:00:00Z'), to: new Date('2026-07-15T00:00:00Z') },
             capability: 'availability_read',
@@ -107,7 +115,7 @@ describe('googleCalendarProvider.listBusy', () => {
             }), { status: 200 }));
 
         const blocks = await googleCalendarProvider.listBusy({
-            clientId: 'cid', clientSecret: 'sec', refreshToken: 'rt', calendarId: 'primary',
+            auth, calendarId: 'primary',
             range: { from: new Date('2026-07-14T00:00:00Z'), to: new Date('2026-07-15T00:00:00Z') },
             capability: 'events_read_write',
         });
@@ -133,7 +141,7 @@ describe('googleCalendarProvider write path — what goes on the wire', () => {
     beforeEach(() => { vi.stubGlobal('fetch', vi.fn()); });
     afterEach(() => { vi.stubGlobal('fetch', originalFetch); });
 
-    const creds = { clientId: 'cid', clientSecret: 'sec', refreshToken: 'rt', calendarId: 'primary' };
+    const creds = { auth, calendarId: 'primary' };
     const event = {
         summary: 'Inspection: 1 Main St',
         location: '1 Main St',

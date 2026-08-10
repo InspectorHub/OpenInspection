@@ -16,6 +16,10 @@ const listBusy = vi.fn();
 vi.mock('../../../server/lib/calendar/registry', () => ({
     getCalendarProvider: () => ({
         id: 'google',
+        resolveAuth: async () => ({
+            provider: 'google',
+            material: { clientId: 'cid', clientSecret: 'sec', refreshToken: 'rt' },
+        }),
         listBusy,
     }),
 }));
