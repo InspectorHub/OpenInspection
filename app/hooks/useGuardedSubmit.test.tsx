@@ -56,6 +56,19 @@ function renderHarness(result: { ok: boolean }) {
 const submitIt = () => fireEvent.click(screen.getByText("submit"));
 const keyNow = () => screen.getByTestId("key").textContent ?? "";
 const landed = (n: number) => waitFor(() => expect(calls.length).toBe(n));
+/**
+ * Wait on BUSY, and do not "improve" this to wait on the key span.
+ *
+ * `busy` comes from `fetcher.state`, which goes idle BEFORE the settle effect
+ * rotates the key. So a submit fired right after this resolves lands in the
+ * narrowest moment of the key lifecycle — which is exactly the moment worth
+ * testing. Waiting for the rendered key to change instead would skip past it and
+ * the rotation test would pass no matter what the hook did.
+ *
+ * That is not hypothetical: the rotation test below failed in a loaded full suite
+ * while passing alone, because the hook released its in-flight guard before the
+ * new key was reachable and the second submit went out carrying the spent one.
+ */
 const settled = () => waitFor(() => expect(screen.getByTestId("busy").textContent).toBe("false"));
 
 describe("useGuardedSubmit", () => {

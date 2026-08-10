@@ -48,23 +48,44 @@ export function useGuardedSubmit<T = unknown>() {
     const [idempotencyKey, setIdempotencyKey] = useState<string>(mintKey);
     /** Set synchronously inside the handler — the only guard a double click meets. */
     const inFlight = useRef(false);
+    /**
+     * The key a submit actually sends, updated SYNCHRONOUSLY when it rotates.
+     *
+     * Reading the state variable here left a window. The settle effect released
+     * `inFlight` and queued `setIdempotencyKey`; until React committed that
+     * render, `submit` still closed over the OLD key while both guards were
+     * open. A click landing in that window sent a duplicate request bearing the
+     * spent key, which the server treats as a replay of the first — the caller
+     * is told it worked and nothing is written, the exact failure the docblock
+     * above calls the worse of the two.
+     *
+     * The state variable stays, because the rendered value is what tests and any
+     * UI read; the ref is what the request carries.
+     */
+    const keyRef = useRef(idempotencyKey);
 
     const submit = useCallback(
         (payload: Record<string, string>, options: SubmitOptions): boolean => {
             if (inFlight.current || fetcher.state !== "idle") return false;
             inFlight.current = true;
-            fetcher.submit({ ...payload, [IDEMPOTENCY_FIELD]: idempotencyKey }, options);
+            fetcher.submit({ ...payload, [IDEMPOTENCY_FIELD]: keyRef.current }, options);
             return true;
         },
-        [fetcher, idempotencyKey],
+        [fetcher],
     );
 
     useEffect(() => {
         // Only a submit this hook started can settle it. Without the ref check
         // this would fire on mount and rotate a key nobody has used yet.
         if (fetcher.state !== "idle" || !inFlight.current) return;
+        // Rotate BEFORE releasing the guard, and into the ref first. Releasing
+        // first reopens `submit` while `keyRef` still holds the spent key.
+        if (!failed(fetcher.data)) {
+            const next = mintKey();
+            keyRef.current = next;
+            setIdempotencyKey(next);
+        }
         inFlight.current = false;
-        if (!failed(fetcher.data)) setIdempotencyKey(mintKey());
     }, [fetcher.state, fetcher.data]);
 
     return { submit, fetcher, busy: fetcher.state !== "idle", idempotencyKey };
