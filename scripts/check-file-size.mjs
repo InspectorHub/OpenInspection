@@ -41,10 +41,27 @@ const files = execSync('git ls-files "*.ts" "*.tsx"', { cwd: root, encoding: 'ut
   .filter(Boolean)
   .filter((f) => !EXCLUDE.some((re) => re.test(f)));
 
+// `git ls-files` lists what the INDEX tracks, which still includes a file
+// deleted in the working tree but not yet staged — reading it throws ENOENT and
+// takes the whole gate down. A file with no content on disk has no size to
+// measure, so it is skipped; the count is printed on every run, because a skip
+// the operator cannot see is indistinguishable from a file that passed.
 const oversized = {};
+let skippedMissing = 0;
 for (const f of files) {
-  const n = readFileSync(join(root, f), 'utf8').split('\n').length;
+  const abs = join(root, f);
+  if (!existsSync(abs)) {
+    skippedMissing += 1;
+    continue;
+  }
+  const n = readFileSync(abs, 'utf8').split('\n').length;
   if (n > MAX_LINES) oversized[f] = n;
+}
+
+if (files.length === 0) {
+  console.log('✘ File-size gate — scanned 0 files. The file list is empty, so this');
+  console.log('  run proves nothing. Check the `git ls-files` invocation.');
+  process.exit(1);
 }
 
 if (process.argv.includes('--update')) {
@@ -75,9 +92,15 @@ if (violations.length) {
 }
 
 console.log(
-  `✅ File-size gate — no new files over ${MAX_LINES} lines; ` +
+  `✅ File-size gate — scanned ${files.length - skippedMissing} file(s), ` +
+    `no new files over ${MAX_LINES} lines; ` +
     `${Object.keys(baseline).length} grandfathered (capped at current size).`,
 );
+if (skippedMissing) {
+  console.log(
+    `   ${skippedMissing} tracked file(s) skipped — deleted in the working tree, nothing to measure.`,
+  );
+}
 if (tightened.length) {
   console.log(
     `   ${tightened.length} grandfathered file(s) shrank — run \`npm run lint:filesize -- --update\` to tighten the ratchet.`,
