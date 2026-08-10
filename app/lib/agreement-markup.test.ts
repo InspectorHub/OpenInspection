@@ -26,6 +26,7 @@ import {
     normalizeAgreementHtml,
     plainTextToAgreementHtml,
     agreementContentToEditorHtml,
+    agreementHtmlIsEmpty,
 } from "./agreement-markup";
 import { sanitizeAgreementHtml } from "../../server/services/agreement/sanitizer";
 
@@ -206,5 +207,28 @@ describe("plain-text agreements (every seeded template is one)", () => {
 
     it("leaves an already-HTML template alone apart from normalising it", () => {
         expect(agreementContentToEditorHtml("<p>hello</p>")).toBe("<p>hello</p>");
+    });
+
+    describe("agreementHtmlIsEmpty", () => {
+        it("calls markup with no words empty, and words non-empty", () => {
+            for (const empty of ["", "   ", "<p></p>", "<div><span></span></div>", "<p>&nbsp;</p>"]) {
+                expect(agreementHtmlIsEmpty(empty), JSON.stringify(empty)).toBe(true);
+            }
+            for (const filled of ["hello", "<p>hello</p>", "<p>&nbsp;x</p>"]) {
+                expect(agreementHtmlIsEmpty(filled), JSON.stringify(filled)).toBe(false);
+            }
+        });
+
+        it("finds no words left in nested or malformed tags", () => {
+            // The strip loops to a fixed point. For the current regex one pass is
+            // already complete — a surviving `<` can have no `>` after it, or it
+            // would have matched — so these assert the property, not a difference
+            // between one pass and many. They exist so that narrowing the regex
+            // later fails here instead of silently leaving markup behind.
+            for (const s of ["<<p>>", "<p<p>>", "<scr<script>ipt>", "<<>>", "<<<x>>>"]) {
+                const stripped = s.replace(/<[^>]*>/g, "");
+                expect(stripped, `${s} still holds a complete tag`).not.toMatch(/<[^>]*>/);
+            }
+        });
     });
 });

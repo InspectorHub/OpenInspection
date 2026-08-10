@@ -348,7 +348,34 @@ export function agreementContentToEditorHtml(content: string): string {
     return normalizeAgreementHtml(content);
 }
 
-/** Words in the document, for the editor's "is there anything here" check. */
+/**
+ * Words in the document, for the editor's "is there anything here" check.
+ *
+ * NOT a sanitizer, and its output is never rendered — both callers use only the
+ * boolean. Rendering goes through `SanitizedHtml` + DOMPurify, which is the only
+ * thing allowed to decide what is safe markup.
+ *
+ * The strip nonetheless runs to a fixed point, and the honest reason is not the
+ * one the rule name suggests. For THIS regex a single pass is already complete:
+ * `[^>]*` cannot cross a `>`, so a match starting at `<` consumes everything up
+ * to the first following `>` — including any `<` in between. A `<` that survives
+ * therefore has no `>` after it and cannot form a tag. Checked against eleven
+ * nested and malformed constructions: looping changes nothing.
+ *
+ * So this is not a fix for an exploitable case, and it is not claimed as one. It
+ * is here because CodeQL flags the single-pass form
+ * (js/incomplete-multi-character-sanitization) on a file in the agreement-HTML
+ * family, and because the completeness argument above depends entirely on the
+ * exact regex — narrow the character class or add an alternation and one pass
+ * stops being enough, silently. The loop keeps the guarantee that the argument
+ * currently provides by hand.
+ */
 export function agreementHtmlIsEmpty(html: string): boolean {
-    return !html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+    let stripped = html;
+    let previous: string;
+    do {
+        previous = stripped;
+        stripped = stripped.replace(/<[^>]*>/g, "");
+    } while (stripped !== previous);
+    return !stripped.replace(/&nbsp;/g, " ").trim();
 }
