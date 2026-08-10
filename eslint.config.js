@@ -128,7 +128,14 @@ export default tseslint.config(
         // Note `tests/**` is not in `.lintstagedrc`'s glob either
         // (`{server,app,workers,packages}/**`), so un-ignoring it would change
         // nothing at commit time and land all 1581 in CI at once.
-        ignores: ['dist/**', 'dist-check/**', 'build/**', '.types/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'app/paraglide/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'scripts/**'],
+        // `backups/**` is the gitignored dump directory (D1 exports, and whatever
+        // scratch a measurement leaves behind). Flat config does NOT read
+        // .gitignore, so a single stray `.ts` landing here fails `npm run lint`
+        // with a parse error — locally only, since CI checks out a tree where the
+        // directory does not exist. That divergence is worse than the lint it
+        // skips: it makes the local pre-push gate disagree with the gate it exists
+        // to predict.
+        ignores: ['dist/**', 'dist-check/**', 'build/**', '.types/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'backups/**', 'app/paraglide/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'scripts/**'],
     },
     {
         files: ['**/*.ts', '**/*.tsx'],
