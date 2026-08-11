@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveAi } from '../../../server/lib/ai/resolve-provider';
+import { resolveRuntimeAiSource } from '../../../server/lib/ai/metering';
 import { RecordingAiProvider } from '../../../server/lib/ai/providers/recording';
 import type { AiProvider } from '../../../server/lib/ai/provider';
 import { SAAS_PROFILE, STANDALONE_PROFILE } from '../../../server/lib/deployment-profile';
@@ -67,6 +68,62 @@ describe('resolveAi', () => {
         const r = resolveAi({ profile: SAAS, tenantKey: 'k', managedEntitled: false, underCap: true, model: '' });
         expect(r?.provider.id).toBe('gemini');
         return expect(r!.provider.complete({ prompt: 'x' })).rejects.toThrow(/no AI model is configured/i);
+    });
+});
+
+/**
+ * The paid-tier entitlement, at the ONE place it is decided.
+ *
+ * `resolveAi` takes `managedEntitled` as a boolean and never learns what grants
+ * it — that is deliberate and unchanged. `resolveRuntimeAiSource` is the single
+ * caller that answers the boolean, so it is the only place this can be tested
+ * without inventing a second entitlement read. All four surfaces that ask
+ * "whose key would this run on" go through it: the meter's tag, the capability
+ * gate's source, the provenance row's mode, and the portal-facing provisioning
+ * console.
+ *
+ * Both directions are asserted. A suite that only checked the refusal would
+ * pass against an implementation that refuses everyone — which is precisely
+ * what the hardcoded `managedEntitled: false` was.
+ */
+describe('resolveRuntimeAiSource — paid-tier entitlement', () => {
+    const creds = { profile: SAAS_PROFILE, tenantKey: null, managedKey: 'platform-key', model: 'a-model' };
+
+    it('a paying tenant with no key of their own resolves MANAGED', () => {
+        expect(resolveRuntimeAiSource({ ...creds, plan: { tier: 'pro', status: 'active' } })).toBe('managed');
+    });
+
+    it('a free tenant resolves nothing, even with a platform key provisioned', () => {
+        expect(resolveRuntimeAiSource({ ...creds, plan: { tier: 'free', status: 'active' } })).toBeNull();
+    });
+
+    it('a trialling tenant on a paid tier is not entitled — trialling is not paying', () => {
+        expect(resolveRuntimeAiSource({ ...creds, plan: { tier: 'pro', status: 'trial' } })).toBeNull();
+    });
+
+    it('an unresolved plan is not an entitlement — fail closed, never fail open', () => {
+        // Contexts that could not read the tenant's plan (a public path, a
+        // failed lookup) must not inherit managed access by default.
+        expect(resolveRuntimeAiSource({ ...creds, plan: null })).toBeNull();
+    });
+
+    it('BYOK still wins for a paying tenant — the platform never takes over the bill', () => {
+        expect(resolveRuntimeAiSource({ ...creds, tenantKey: 'own-key', plan: { tier: 'pro', status: 'active' } })).toBe('byo');
+    });
+
+    it('standalone never resolves managed, whatever the plan row says', () => {
+        expect(resolveRuntimeAiSource({
+            ...creds, profile: STANDALONE_PROFILE, plan: { tier: 'enterprise', status: 'active' },
+        })).toBeNull();
+    });
+
+    it('an entitled tenant on a deployment with no platform key resolves nothing', () => {
+        // Production today. Entitlement is TRUE here and the answer is still
+        // null, which is why wiring entitlement moves no production number
+        // until AI_MANAGED_API_KEY is provisioned.
+        expect(resolveRuntimeAiSource({
+            ...creds, managedKey: null, plan: { tier: 'pro', status: 'active' },
+        })).toBeNull();
     });
 });
 

@@ -25,6 +25,7 @@ import { tenants, tenantConfigs } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { getBaseUrl } from '../../lib/url';
+import { isPaidPlan } from '../../features/plan-quota/policy';
 import type { HonoConfig } from '../../types/hono';
 import type { VideoBackend } from './types';
 import { StreamVideoBackend } from './stream-backend';
@@ -78,7 +79,11 @@ export async function resolveVideoProvider(
 
         const tier = tenantRow?.tier ?? 'free';
         const status = tenantRow?.status ?? 'pending';
-        const paid = (tier === 'pro' || tier === 'enterprise') && status !== 'trial';
+        // The shared predicate, not a local copy of it. "Is this tenant
+        // paying" gates every platform-funded capability — this backend and
+        // the managed AI credential — and two copies is the shape that ends
+        // with one of them believing a trialling workspace pays.
+        const paid = isPaidPlan({ tier, status });
 
         logger.info('resolveVideoProvider: managed resolution', { tenantId, tier, status, paid });
         return paid

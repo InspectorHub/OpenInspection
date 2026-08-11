@@ -8,11 +8,13 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { PlanQuotaGuard } from '../../../server/features/plan-quota/guard';
-import { FREE_TIER_CAPS } from '../../../server/features/plan-quota/policy';
+import { FREE_TIER_CAPS, type AiTierCaps } from '../../../server/features/plan-quota/policy';
+import { buildAiQuotaPreflight } from '../../../server/lib/ai/metering';
 import { MeteringService } from '../../../server/services/metering.service';
 import { aiUsageMetric } from '../../../server/lib/usage/period';
 import { resolveAi } from '../../../server/lib/ai/resolve-provider';
 import { SAAS_PROFILE } from '../../../server/lib/deployment-profile';
+import { Errors } from '../../../server/lib/errors';
 
 /**
  * Managed-AI metering and its (currently unconfigured) enforcement path.
@@ -223,6 +225,133 @@ describe('AI quota + metering', () => {
             const record = vi.fn(async () => { throw new Error('d1 down'); });
             await expect(service({ record }).generateProfessionalComment('note'))
                 .resolves.toMatchObject({ text: 'kept' });
+        });
+    });
+
+    /**
+     * ENFORCEMENT, at the same chokepoint as the meter.
+     *
+     * `checkAiQuota` was written, tested and delivered caps — and had zero
+     * production callers, so a configured allowance was inert with nothing
+     * anywhere reporting that it was. These cases pin the call itself: check
+     * BEFORE the send, meter AFTER success, and a refusal that reaches the
+     * inspector rather than dissolving into "the model had nothing to say".
+     */
+    describe('enforcement at the chokepoint', () => {
+        const fetchMock = vi.fn();
+        let originalFetch: typeof globalThis.fetch;
+
+        beforeEach(() => {
+            originalFetch = globalThis.fetch;
+            globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+            fetchMock.mockReset();
+            fetchMock.mockResolvedValue({
+                ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'x' }] } }] }),
+            } as Response);
+        });
+        afterEach(() => { globalThis.fetch = originalFetch; });
+
+        type Kind = 'translate' | 'assist';
+        function service(
+            quota?: { preflight(kind: Kind): Promise<void> },
+            record: (kind: Kind) => Promise<void> = async () => {},
+        ) {
+            return new AIService(
+                {} as D1Database, 'a-key', 'saas', 'a-model', { record },
+                { source: 'byo', tenantKeyAttested: true },
+                { record: async () => 'ai-call-row' },
+                quota,
+            );
+        }
+
+        const overAllowance = async () => {
+            throw Errors.QuotaExhausted({ metric: 'ai_assist', used: 10, cap: 10, billingPortalUrl: null });
+        };
+
+        it('runs the pre-flight on every call, and meters only after the send succeeded', async () => {
+            // The POSITIVE control, and the one that actually proves the call
+            // site exists: a suite that only asserted the refusal would pass
+            // against a chokepoint that swallowed the pre-flight entirely.
+            const preflight = vi.fn(async () => {});
+            const record = vi.fn(async () => {});
+            await expect(service({ preflight }, record).generateProfessionalComment('note'))
+                .resolves.toMatchObject({ text: 'x' });
+            expect(preflight).toHaveBeenCalledWith('assist');
+            expect(record).toHaveBeenCalledWith('assist');
+        });
+
+        it('refuses before anything leaves the process when the allowance is spent', async () => {
+            // Check before, meter after — so an over-cap tenant neither reaches
+            // the provider nor consumes a further unit of the allowance.
+            const record = vi.fn(async () => {});
+            await expect(service({ preflight: overAllowance }, record).generateProfessionalComment('note'))
+                .rejects.toMatchObject({ code: 'QUOTA_EXHAUSTED' });
+            expect(fetchMock).not.toHaveBeenCalled();
+            expect(record).not.toHaveBeenCalled();
+        });
+
+        it('a quota refusal reaches the inspector instead of degrading to an empty suggestion list', async () => {
+            // `suggestComment` turns RUNTIME failures into `[]`. A spent
+            // allowance is not a runtime failure, and an empty popover reads as
+            // "the model had nothing to say" — the same invisibility the
+            // configuration check was hoisted out of this try/catch to avoid.
+            await expect(service({ preflight: overAllowance })
+                .suggestComment({ itemName: 'Roof', sectionName: 'Exterior' }))
+                .rejects.toMatchObject({ code: 'QUOTA_EXHAUSTED' });
+        });
+
+        it('no pre-flight supplied — standalone — blocks nothing', async () => {
+            const record = vi.fn(async () => {});
+            await expect(service(undefined, record).generateProfessionalComment('note'))
+                .resolves.toMatchObject({ text: 'x' });
+            expect(record).toHaveBeenCalledWith('assist');
+        });
+    });
+
+    /**
+     * The far end of the same chain: what the chokepoint's pre-flight actually
+     * resolves to. The cases above prove `callGemini` calls it; these prove the
+     * thing it calls reads the delivered allowance for the right tier, off the
+     * right counter.
+     */
+    describe('buildAiQuotaPreflight', () => {
+        const PAID = { tier: 'pro', status: 'active' };
+
+        function guard(aiCaps?: AiTierCaps) {
+            return new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null, aiCaps });
+        }
+
+        it('checks MANAGED volume against the cap configured for the tenant own tier', async () => {
+            await seedAdversely(new MeteringService(testD1));
+            const p = buildAiQuotaPreflight({
+                guard: guard({ pro: { ai_translate: 10_000 } }), tenantId: T, source: 'managed', plan: PAID,
+            });
+            await expect(p!.preflight('translate')).rejects.toMatchObject({
+                code: 'QUOTA_EXHAUSTED',
+                details: { metric: 'ai_translate', used: 10_000, cap: 10_000 },
+            });
+            // The other workload is independent, on the same tenant and the
+            // same seeded counters — so this is not "the guard refuses
+            // everything".
+            await expect(p!.preflight('assist')).resolves.toBeUndefined();
+        });
+
+        it('builds NOTHING for bring-your-own volume — the tenant own bill has no deployment cap', async () => {
+            // Asserting absence, not a permissive answer: a pre-flight that
+            // existed and always passed would look identical from the
+            // chokepoint and would start enforcing the day someone "fixed" it.
+            expect(buildAiQuotaPreflight({
+                guard: guard({ pro: { ai_translate: 1 } }), tenantId: T, source: 'byo', plan: PAID,
+            })).toBeUndefined();
+        });
+
+        it('builds nothing without a guard (standalone) or without a resolved plan', async () => {
+            expect(buildAiQuotaPreflight({
+                guard: undefined, tenantId: T, source: 'managed', plan: PAID,
+            })).toBeUndefined();
+            expect(buildAiQuotaPreflight({
+                guard: guard({ pro: { ai_translate: 1 } }), tenantId: T, source: 'managed', plan: null,
+            })).toBeUndefined();
         });
     });
 

@@ -1,3 +1,5 @@
+import type { ManagedAiMetric } from '../../lib/usage/period';
+
 /**
  * Free-tier lifetime caps. Platform/managed sends only — bring-your-own (`*_byo`)
  * volume is uncapped and metered separately under the `sms_byo`/`email_byo`
@@ -11,8 +13,46 @@ export const FREE_TIER_CAPS = { inspections: 5, sms: 50, email: 50 } as const;
 
 /** The AI metrics a cap can be expressed against. Only the managed (platform-
  *  funded) side appears: `*_byo` volume is the tenant's own bill, so there is
- *  nothing for this deployment to limit. */
-export type AiCappedMetric = 'ai_translate' | 'ai_assist';
+ *  nothing for this deployment to limit.
+ *
+ *  An ALIAS, not a second list. The recorder derives the same two names from
+ *  `aiUsageMetric`, and two hand-maintained copies of "which metrics are the
+ *  managed ones" is precisely the prose coupling that lets the counter written
+ *  and the counter checked drift apart. */
+export type AiCappedMetric = ManagedAiMetric;
+
+/**
+ * The tenant's commercial standing, as the two columns that decide it.
+ *
+ * A pair rather than a tier string because the tier alone is not the answer: a
+ * workspace on a paid tier while still trialling has not paid for anything.
+ */
+export interface TenantPlan {
+    tier: string;
+    status: string;
+}
+
+/**
+ * Whether a tenant is on a PAYING plan right now.
+ *
+ * ONE definition, deliberately. This predicate gates platform-funded
+ * capabilities — the managed AI credential and the managed video backend — and
+ * it used to be typed out separately at each of them. Two copies of "is this
+ * tenant paying" is the shape that ends with one capability believing a
+ * trialling workspace pays and another believing it does not.
+ *
+ * `undefined` is NOT an entitlement. A context that could not read the plan
+ * (a public path, a failed lookup) gets `false`, so a platform-funded
+ * capability fails closed rather than being granted by a missing row.
+ *
+ * A capability that genuinely needs a DIFFERENT answer must add its own named
+ * predicate beside this one rather than widening this one — the moment this
+ * function grows a parameter, the single definition it exists to be is gone.
+ */
+export function isPaidPlan(plan: TenantPlan | null | undefined): boolean {
+    if (!plan) return false;
+    return (plan.tier === 'pro' || plan.tier === 'enterprise') && plan.status !== 'trial';
+}
 
 /**
  * Per-tier AI allowances, keyed by tier then metric.
