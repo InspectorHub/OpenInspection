@@ -70,6 +70,13 @@ const SCRIPT_GATES = [
     // gates do: what it catches is a spec being written OFF the type-check, and
     // the moment to question that is while the line is being typed.
     { key: 'teststsconfig', label: 'tests tsconfig exclude ratchet', script: 'check-tests-tsconfig.mjs', fix: 'npm run lint:tests-tsconfig' },
+    // Pre-commit for the same reason as the price, tracking and AI gates: what it
+    // catches is a raw `fetcher.submit` ARRIVING -- an unguarded mutation with no
+    // idempotency key and no pending affordance. That is cheapest to argue about
+    // while the line is being typed, and by the time CI sees one it is written.
+    // An fs walk of ~680 client files with two regexes; comparable to the
+    // tracking gate.
+    { key: 'submitguard', label: 'Client submit-guard coverage', script: 'check-submit-guard.mjs', fix: 'npm run lint:submit-guard' },
 ];
 
 const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup' };
