@@ -24,6 +24,10 @@ type WorkspaceFormValues = z.output<ReturnType<typeof makeWorkspaceSchema>>;
 export function brandingUpdateBody(v: WorkspaceFormValues): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   if (v.companyName !== undefined) body.companyName = v.companyName;
+  // Cleared back to blank must store NULL, not "": NULL is the honest "same as
+  // the company name" the getBrand fallback is keyed on, and a stored empty
+  // string would read as a legal entity with no name.
+  if (v.legalName !== undefined) body.legalName = v.legalName.trim() || null;
   if (v.primaryColor !== undefined) body.primaryColor = v.primaryColor;
   if (v.defaultProfileId !== undefined) body.defaultProfileId = v.defaultProfileId;
 

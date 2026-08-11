@@ -1,6 +1,7 @@
 import { useLoaderData, useParams } from "react-router";
 import type { Route } from "./+types/agreement-sign";
 import { createApi } from "~/lib/api-client.server";
+import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import {
     AgreementSection,
     type AgreementData,
@@ -11,7 +12,15 @@ export function meta() {
     return [{ title: m.agreement_sign_meta_title() }];
 }
 
-export async function loader({ params, context }: Route.LoaderArgs) {
+export async function loader({ params, request, context }: Route.LoaderArgs) {
+    // The tenant's brand for the page chrome. A client signing a binding
+    // agreement must see the entity they are contracting with, not the
+    // platform that hosts it — the SAME envelope reached through checkout
+    // already showed the tenant's name. `resolveTenantBrand` is the one
+    // loader-side brand resolver every public surface uses (A-10) and it
+    // already degrades to the platform default on any failure, so the header
+    // never blocks a signature.
+    const brand = await resolveTenantBrand(context, params.tenant, request);
     try {
         const api = createApi(context);
         // The public agreement fetch lives on the bookings router (GET
@@ -26,9 +35,10 @@ export async function loader({ params, context }: Route.LoaderArgs) {
             error: res.ok ? null : "Agreement not found",
             token: params.token ?? "",
             tenant: params.tenant ?? "",
+            brand,
         };
     } catch {
-        return { agreement: null, error: "Service unavailable", token: "", tenant: "" };
+        return { agreement: null, error: "Service unavailable", token: "", tenant: "", brand };
     }
 }
 
@@ -80,7 +90,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function AgreementSignPage() {
-    const { agreement, error } = useLoaderData<typeof loader>();
+    const { agreement, error, brand } = useLoaderData<typeof loader>();
     const params = useParams();
     const tenant = params.tenant ?? "";
     const token = params.token ?? "";
@@ -96,7 +106,12 @@ export default function AgreementSignPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                     </div>
-                    <span className="text-xl font-bold tracking-tight text-ih-fg-1">OpenInspection</span>
+                    {/* "OpenInspection" is deliberately NOT a Paraglide message:
+                        it is a proper noun, the platform's own name, and
+                        translating it would be wrong. */}
+                    <span className="text-xl font-bold tracking-tight text-ih-fg-1">
+                        {brand?.companyName?.trim() || "OpenInspection"}
+                    </span>
                 </div>
 
                 <AgreementSection

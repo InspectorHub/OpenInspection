@@ -13,6 +13,11 @@ import { z } from '@hono/zod-openapi';
  */
 export const PublicBrandSchema = z.object({
     companyName: z.string().nullable(),
+    // The registered legal entity, ALREADY RESOLVED by BrandingService.getBrand
+    // (falls back to companyName; '' only when the tenant has no config row).
+    // Public because it is the 'from' party on an invoice and the contracting
+    // party on an agreement — both already handed to every client.
+    legalName: z.string().default(''),
     primaryColor: z.string().nullable(),
     logoUrl: z.string().nullable(),
     // Tenant display timezone (IANA; 'UTC' when unset). Public/report surfaces

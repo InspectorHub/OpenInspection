@@ -301,6 +301,7 @@ const CommunicationResponseSchema = z.object({
     emailMode:               z.enum(['platform', 'own']).describe('platform = shared Resend; own = tenant Resend.'),
     senderDisplayName:       z.string().nullable().describe('From: display name (override; falls back to companyName).'),
     companyName:                z.string().nullable().describe('Canonical company name (from workspace branding).'),
+    legalName:                  z.string().describe('Registered legal entity, already resolved (falls back to companyName). Prefills the SMS compliance wizard.'),
     pointOfContact:          z.enum(['inspector', 'company']).describe('Who client-facing emails come from.'),
     resendConfigured:        z.boolean().describe('Whether a Resend API key is configured (env or tenant secret).'),
     templates:               z.array(z.object({
@@ -691,6 +692,7 @@ const adminSettingsRoutes = createApiRouter()
                 emailMode: (cfg.emailMode as 'platform' | 'own') ?? 'platform',
                 senderDisplayName: (cfg.senderDisplayName as string | null) ?? null,
                 companyName: (cfg.companyName as string | null) ?? null,
+                legalName: (await c.var.services.branding.getBrand(tenantId)).legalName,
                 pointOfContact: (cfg.pointOfContact as 'inspector' | 'company') ?? 'company',
                 resendConfigured,
                 templates: [],

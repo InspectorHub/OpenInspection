@@ -44,6 +44,7 @@
   "invoice_error_service_unavailable": "Servicio no disponible",
   "invoice_not_available": "Esta factura no está disponible.",
   "invoice_brand_logo_alt": "Logotipo",
+  "invoice_from_party": "Emitida por {entity}",
   "agreement_printable_meta_title": "Acuerdo firmado - OpenInspection",
   "agreement_printable_not_found": "Acuerdo no encontrado.",
   "agreement_printable_envelope_id": "ID del sobre: {envelopeId}",

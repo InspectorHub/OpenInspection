@@ -7,7 +7,6 @@
 import type { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
-import { AutomationService } from '../automation.service';
 import { reportVersions } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
@@ -229,28 +228,10 @@ export function sanitizeDefectStates(data: Record<string, unknown>): void {
     }
 }
 
-/**
- * Returns the trigger Promise so callers can keep the worker isolate alive
- * via `c.executionCtx.waitUntil(...)`. The previous fire-and-forget version
- * dangled the promise — CF Workers terminated the isolate after the
- * response was sent, so AutomationService.trigger never inserted the
- * automation_logs row, and report.published / inspection.confirmed /
- * inspection.cancelled / inspection.created automations never fired.
- */
-export function fireAutomation(
-    db: D1Database, tenantId: string, inspectionId: string, event: string, reportId?: string,
-): Promise<void> {
-    return new AutomationService(db)
-        .trigger({
-            tenantId, inspectionId, triggerEvent: event, companyName: '', reportBaseUrl: '',
-            // Which DELIVERABLE this is about. `report.published` dedups on a
-            // synthetic per-event key, and an inspection-only key collapses the
-            // radon report's first publish into the standard report's — for
-            // ever, not for a window.
-            ...(reportId ? { reportId } : {}),
-        })
-        .catch(err => logger.error('automation trigger failed', { event }, err instanceof Error ? err : undefined));
-}
+// `fireAutomation` moved to ./automation-fire (this file sits on the size
+// ratchet). Re-exported so every existing `from './shared'` import path — and
+// the specs that `vi.mock` this module — keep working unchanged.
+export { fireAutomation } from './automation-fire';
 
 /**
  * Which report trigger a publish should fire. The first publish of an

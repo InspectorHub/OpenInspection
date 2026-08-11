@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { tenants, tenantConfigs } from '../lib/db/schema';
+import { tenants, tenantConfigs, tenantSlugHistory } from '../lib/db/schema';
+import { SLUG_RETIREMENT_MS } from '../lib/db/schema/tenant/slug-history';
 import type { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
 import { logger } from '../lib/logger';
 import { applyAdminCredential } from './admin-credential';
@@ -50,6 +51,21 @@ export class PortalProvider implements IntegrationProvider {
             // after this sync. That seeder is idempotent, batched, and complete,
             // so we no longer partial-seed here (it used to duplicate a subset).
         } else {
+            // Same condition the KV invalidation below already uses, so this
+            // costs no extra comparison and needs no new command type. Recorded
+            // BEFORE the update for the same reason portal records before its
+            // own: once the row moves, the old value survives nowhere else.
+            if (existingTenant.slug !== slug) {
+                const now = new Date();
+                const retiredUntil = new Date(now.getTime() + SLUG_RETIREMENT_MS);
+                await db.insert(tenantSlugHistory).values({
+                    oldSlug: existingTenant.slug, tenantId: existingTenant.id,
+                    changedAt: now, retiredUntil,
+                }).onConflictDoUpdate({
+                    target: tenantSlugHistory.oldSlug,
+                    set: { tenantId: existingTenant.id, changedAt: now, retiredUntil },
+                });
+            }
             await db.update(tenants)
                 .set({
                     // Correct the slug too — heals a stale (e.g. legacy UUID) slug

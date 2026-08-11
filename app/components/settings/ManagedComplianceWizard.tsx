@@ -42,6 +42,10 @@ export interface ManagedComplianceData {
 
 interface Props {
   compliance: ManagedComplianceData;
+  /** Stored legal entity, already resolved. The field stays visible and
+   *  editable: carrier registration is an attestation, and a value the tenant
+   *  cannot see is one they cannot attest to. */
+  legalName?: string;
   /** Which carrier runs managed compliance provisioning (managed_dedicated mode).
    * Separate from smsByoProvider (the BYO send provider in 'own' mode). */
   managedProvider?: "twilio" | "telnyx";
@@ -241,7 +245,7 @@ function StatusTimeline({
  * The form id "managed-compliance-form" is referenced by the "Fix & resubmit"
  * button rendered inside StatusTimeline so it can submit the same form.
  */
-export function ManagedComplianceWizard({ compliance, managedProvider, savingManagedProvider = false, actionError, saving = false }: Props) {
+export function ManagedComplianceWizard({ compliance, legalName, managedProvider, savingManagedProvider = false, actionError, saving = false }: Props) {
   const isNotStarted = compliance.complianceStatus === "not_started";
   const isRejected = compliance.complianceStatus === "rejected";
   const showForm = isNotStarted || isRejected;
@@ -252,7 +256,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
   // Track whether the user has attempted submission (enables eager validation).
   const [attempted, setAttempted] = useState(false);
   const [fields, setFields] = useState({
-    legalName: "",
+    legalName: legalName ?? "",
     address: "",
     areaCode: "",
     repName: "",

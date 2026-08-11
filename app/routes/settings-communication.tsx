@@ -36,6 +36,8 @@ interface CommConfig {
   emailMode: "platform" | "own";
   senderDisplayName: string | null;
   companyName: string | null;
+  /** Registered legal entity, already resolved by getBrand — do NOT re-apply the fallback. */
+  legalName: string;
   pointOfContact: "inspector" | "company";
 }
 
@@ -123,6 +125,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       emailMode: (d?.emailMode as "platform" | "own") || "platform",
       senderDisplayName: (d?.senderDisplayName as string) || null,
       companyName: (d?.companyName as string) || null,
+      legalName: (d?.legalName as string) || "",
       pointOfContact: ((d?.pointOfContact as string) === "inspector" ? "inspector" : "company") as "inspector" | "company",
     } as CommConfig,
     emailTemplates,
@@ -466,6 +469,7 @@ export default function SettingsCommunication() {
   const EMPTY_CONFIG: CommConfig = {
     senderEmail: null, replyTo: null, resendConfigured: false, emailMode: "platform",
     senderDisplayName: null, companyName: null, pointOfContact: "company",
+    legalName: "",
   };
   const config = denied ? EMPTY_CONFIG : loaderResult.config;
   const emailTemplates = denied ? [] : loaderResult.emailTemplates;
@@ -710,6 +714,7 @@ export default function SettingsCommunication() {
               </p>
               <ManagedComplianceWizard
                 compliance={compliance}
+                legalName={config.legalName}
                 managedProvider={managedProvider}
                 savingManagedProvider={savingManagedProvider}
                 actionError={

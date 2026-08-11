@@ -63,6 +63,19 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     // guard so a re-run skips already-purged rows. No PII.
     purgedAt:        integer('purged_at', { mode: 'timestamp_ms' }),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // The contracting identity AS OF envelope creation. Separate columns, NOT
+    // folded into contentSnapshot: contentHash is SHA-256 over the stored
+    // snapshot string, so adding a field there would invalidate every signature
+    // ever collected.
+    //
+    // Appended at the table end — agreement_requests is FK-referenced and a
+    // mid-table add triggers a drizzle full-table rebuild (same rule as the
+    // expiresAt/revokedAt note on agreement_signers below).
+    //
+    // NULL means NOT RECORDED, and must render as such. Backfilling an old
+    // envelope with today's name asserts something untrue about what was signed.
+    signerLegalName:   text('signer_legal_name'),
+    signerCompanyName: text('signer_company_name'),
 }, (t) => [
     uniqueIndex('idx_agreement_requests_verify_token').on(t.verificationToken),
     index('idx_agreement_requests_tenant').on(t.tenantId),

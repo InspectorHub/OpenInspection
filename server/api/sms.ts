@@ -36,6 +36,7 @@ import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { createTwilioClient } from '../lib/messaging/twilio';
 import { ensureClientContact } from '../lib/sms/ensure-client-contact';
 import { resolveOptinToken } from '../lib/sms/optin-token';
+import { resolveSmsBrand } from '../lib/sms/brand-name';
 import { normalizeE164 } from '../lib/sms/phone';
 import { loadProviderForTenant, resolveTwilioSource } from '../lib/sms/resolve-twilio';
 import { resolveComplianceProvider } from '../lib/sms/resolve-compliance-provider';
@@ -82,13 +83,9 @@ function escapeXml(s: string): string {
  * the correct identity for a HELP reply on the platform shape.
  */
 async function helpReplyBrand(c: Context<HonoConfig>, scopeTenantId: string | null): Promise<string> {
-    if (scopeTenantId) {
-        const db = getDrizzle(c);
-        const t = await db.select({ name: tenants.name }).from(tenants)
-            .where(eq(tenants.id, scopeTenantId)).get().catch(() => null);
-        if (t?.name) return t.name;
-    }
-    return (c.env as { APP_NAME?: string }).APP_NAME?.trim() || 'Inspector Hub';
+    const platformFallback = (c.env as { APP_NAME?: string }).APP_NAME?.trim() || 'Inspector Hub';
+    if (!scopeTenantId) return platformFallback;
+    return resolveSmsBrand(getDrizzle(c), scopeTenantId, platformFallback);
 }
 
 // ─── Public router ───────────────────────────────────────────────────────────
@@ -137,17 +134,20 @@ export const smsPublicRoutes = createApiRouter()
         if (!resolved) throw Errors.NotFound('This opt-in link is invalid or has expired.');
 
         const db = getDrizzle(c);
-        const tenant = await db.select({ name: tenants.name }).from(tenants)
+        // The 404 is about the TOKEN resolving to a real tenant, not about the
+        // name being present — an unnamed tenant is still a valid opt-in target.
+        const tenantRow = await db.select({ slug: tenants.slug }).from(tenants)
             .where(eq(tenants.id, resolved.tenantId)).get();
-        if (!tenant) throw Errors.NotFound('This opt-in link is invalid or has expired.');
+        if (!tenantRow) throw Errors.NotFound('This opt-in link is invalid or has expired.');
+
+        // Spec 1.3 — the consent record names the entity every branded document names.
+        const companyName = await resolveSmsBrand(db, resolved.tenantId,
+            (c.env as { APP_NAME?: string }).APP_NAME?.trim() || 'Inspector Hub');
 
         const disc = await new SmsConsentService(c.env.DB).currentDisclosure();
         const disclosureText = (disc?.text ?? 'By confirming, you agree to receive appointment and report text messages. Message frequency varies by your inspection activity. Message and data rates may apply. Reply STOP to opt out, HELP for help.')
-            .replace(/\{\{\s*company_name\s*\}\}/g, tenant.name);
+            .replace(/\{\{\s*company_name\s*\}\}/g, companyName);
 
-        const tenantRow = await db.select({
-            slug: tenants.slug,
-        }).from(tenants).where(eq(tenants.id, resolved.tenantId)).get();
         const cfg = await db.select({
             legalMode: tenantConfigs.legalMode,
             customPrivacyUrl: tenantConfigs.customPrivacyUrl,
@@ -165,7 +165,7 @@ export const smsPublicRoutes = createApiRouter()
             privacyUrl = links.privacyUrl;
             termsUrl = links.termsUrl;
         }
-        return c.json({ success: true as const, data: { companyName: tenant.name, disclosureText, privacyUrl, termsUrl } }, 200);
+        return c.json({ success: true as const, data: { companyName, disclosureText, privacyUrl, termsUrl } }, 200);
     })
     .openapi(optinConfirmRoute, async (c) => {
         const { token } = c.req.valid('json');
