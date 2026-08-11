@@ -364,6 +364,27 @@ test.describe.serial('Standalone API Tests', () => {
         expect(res.status()).toBe(404);
     });
 
+    test('API-25: the content marketplace does not exist in standalone', async ({ request }) => {
+        // A hosted-only surface. `hasContentMarketplace` is false in
+        // STANDALONE_PROFILE and the loader throws 404 rather than redirecting,
+        // so a self-hosted deploy has no marketplace page at all.
+        //
+        // The token is what makes this test worth having. It is a VALID admin
+        // token, so a 404 here cannot be "not signed in" or "not allowed" — the
+        // only thing left is the capability. Sending no token would have proved
+        // nothing: the parent layout bounces an anonymous request to /login
+        // before this loader ever runs, and that 302 looks like a pass to a test
+        // that only checks "not 200".
+        //
+        // Until now NOTHING asserted this. The decision was taken twice — the
+        // gate landed with #308, and #293 Task 9 was then deliberately not built
+        // because folding the catalogue into /library/templates would have
+        // turned this 404 back into a 200 — and both times it was left resting
+        // on a mobile-layout test that asserted the opposite.
+        const res = await fetchPage(request, '/library/marketplace', adminToken);
+        expect(res.status(), 'standalone must not serve the marketplace').toBe(404);
+    });
+
     // ── Tenant Isolation ─────────────────────────────────────────────────────
     // Create a SECOND workspace and verify cross-tenant data is invisible.
 
