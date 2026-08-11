@@ -176,6 +176,7 @@
   "editor_publish_publishing": "Publishing…",
   "editor_publish_now": "Publish Now",
   "editor_publish_body": "Publishing will finalize this inspection and make the report available to clients.",
+  "editor_publish_cooling_notice": "Your company is less than a day old, so the client's report email waits until {unlockAt} and then sends itself — nothing to redo. Publishing works normally: the report goes live now and anyone with the link can open it. Connect your own email provider to send immediately.",
   "editor_publish_warning": "Warning: Only {rated} of {total} items have been rated ({pct}% complete).",
   "editor_publish_stat_items_rated": "Items rated",
   "editor_publish_stat_completion": "Completion",
