@@ -87,6 +87,26 @@ Written for auditors and counsel, not for engineers.
 
 ---
 
+## Editing these docs
+
+Two of the pages here are checked by gates rather than by eyes:
+
+- **Every relative link must resolve.** `npm run lint:doclinks` walks every
+  tracked markdown file and fails on a link to a file that does not exist. It
+  runs inside `npm run lint`, so CI enforces it. (It was written because three
+  links in `CONTRIBUTING.md` had been dead for months — one pointed at a file
+  that has never existed in this repository.)
+- **`reference/deployment-modes.md` is generated.** Edit the profile constants
+  in `server/lib/deployment-profile.ts` and the descriptions in
+  `scripts/gen-deployment-modes-doc.ts`, then run `npm run docs:modes`.
+  `tests/unit/platform/deployment-modes-doc.spec.ts` fails if the checked-in
+  table disagrees with the constants, or if a capability has no description.
+
+Everything else is ordinary prose — but prefer stating the invariant over
+recounting the history, same as in code comments.
+
+---
+
 ## Community
 
 [`community.md`](community.md) — Discussions categories and where to ask what.
