@@ -269,9 +269,14 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // existing test, or a deploy missing JWT_SECRET) falls through
                     // unchanged to the generic template path below. SMS report links
                     // stay generic — out of scope (deliverSms above is untouched).
+                    //
+                    // `automation` rides along because the WORDS are the rule's, not
+                    // this branch's — see deliverReportEmail's "whose words go out".
                     if (log.channel === 'email' && automation?.trigger === 'report.published' && reportDelivery) {
                         const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
-                        await deliverReportEmail(db, { log, inspection, tenant }, emailSvc, appBaseUrl, reportDelivery, pdfMemo);
+                        await deliverReportEmail(db, { log, automation, inspection, tenant },
+                            emailSvc, appBaseUrl, reportDelivery, pdfMemo,
+                            { rawDb: this.db, appName, appHost });
                         continue;
                     }
 

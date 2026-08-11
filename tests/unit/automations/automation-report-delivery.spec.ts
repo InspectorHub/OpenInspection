@@ -57,15 +57,31 @@ async function seedInspection(id: string, over: Partial<typeof schema.inspection
     } as never);
 }
 
-async function seedRule(opts: { recipientKind: 'role' | 'all'; recipientRoleProfileId?: string | null }) {
+async function seedRule(opts: {
+    recipientKind: 'role' | 'all';
+    recipientRoleProfileId?: string | null;
+    name?: string;
+    emailTemplateId?: string | null;
+}) {
     const ruleId = crypto.randomUUID();
     await db.insert(schema.automations).values({
-        id: ruleId, tenantId: TENANT, name: 'Report Ready', trigger: 'report.published',
+        id: ruleId, tenantId: TENANT, name: opts.name ?? 'Report Ready', trigger: 'report.published',
         recipientKind: opts.recipientKind, recipientRoleProfileId: opts.recipientRoleProfileId ?? null,
         delayMinutes: 0, subjectTemplate: 'Subj', bodyTemplate: 'Body',
+        emailTemplateId: opts.emailTemplateId ?? null,
         channels: JSON.stringify(['email']), active: true, isDefault: false, createdAt: new Date(),
     } as never);
     return ruleId;
+}
+
+async function seedTemplate(opts: { id: string; name: string; subject: string; body: string }) {
+    await db.insert(schema.messageTemplates).values({
+        id: opts.id, tenantId: TENANT, name: opts.name, channel: 'email',
+        subject: opts.subject, body: opts.body,
+        variables: JSON.stringify(['property_address', 'report_url']),
+        isSeeded: true, locale: 'en', createdAt: new Date(), updatedAt: new Date(),
+    } as never);
+    return opts.id;
 }
 
 async function seedLog(opts: { ruleId: string; inspectionId: string; recipient: string; recipientRoleKey?: string | null }) {
@@ -104,7 +120,17 @@ function makeEmailSvc(opts: { pdfDelivered?: boolean; readyDelivered?: boolean }
         async (_to: string, _address: string, _linkUrl: string) => opts.pdfDelivered ?? true);
     const sendReportReady = vi.fn(
         async (_to: string, _address: string, _linkUrl: string) => opts.readyDelivered ?? true);
-    const sendEmail = vi.fn(async () => ({ delivered: true }));
+    // Parameters spelled out (not `async () => …`) so the call tuple is typed:
+    // the rule-template assertions below read the subject, html, attachments and
+    // classId positionally, and a zero-arg mock types every one of them as a
+    // read past the end of an empty tuple.
+    const sendEmail = vi.fn(async (
+        _to: string[],
+        _subject: string,
+        _html: string,
+        _attachments?: Array<{ filename: string; content: ArrayBuffer | string }>,
+        _opts?: { classId?: string },
+    ) => ({ delivered: true }));
     const emailFor = async (_tid: string) =>
         ({ sendInspectionReportPdf, sendReportReady, sendEmail } as unknown as EmailService);
     return { emailFor, sendInspectionReportPdf, sendReportReady, sendEmail };
@@ -241,5 +267,162 @@ describe('AutomationService.flush — report.published PDF-email delivery (Spec 
         const row = await db.select().from(schema.automationLogs).where(eq(schema.automationLogs.id, logId)).get();
         expect(row?.status).toBe('skipped');
         expect(row?.deliveredAt).toBeNull();
+    });
+});
+
+/**
+ * The rule's `email_template_id` decides the copy, the same way it does on the
+ * generic path. This branch used to ignore it and render the `report-ready`
+ * catalogue default for every rule, so `report.published`'s five seeds — each
+ * aimed at a different role — arrived as the same email under the same
+ * required-class label.
+ *
+ * The shape these tests reproduce is a real one: a contact who is both the
+ * client and the buyer's agent on one order sits under two role profiles, two
+ * role-targeted rules fire, and both messages land in the same inbox. Nothing
+ * de-duplicates them (per role is the intended fan-out) — so the ONLY thing
+ * that makes them legible as two different messages is that they say two
+ * different things.
+ */
+describe('AutomationService.flush — report.published uses the RULE\'s template, per role', () => {
+    it('two role-targeted rules referencing different templates deliver two different subjects to the same inbox', async () => {
+        const insp = 'insp-two-roles-one-inbox';
+        await seedInspection(insp);
+        const clientTpl = await seedTemplate({
+            id: 'tpl-client', name: 'Report Ready — Email',
+            subject: 'Your inspection report is ready — {{property_address}}',
+            body: '<p>Your report for {{property_address}} is ready.</p>',
+        });
+        const agentTpl = await seedTemplate({
+            id: 'tpl-agent', name: "Report Ready (Buyer's Agent) — Email",
+            subject: 'Inspection report ready — {{property_address}}',
+            body: '<p>The report for {{property_address}} is ready for your client.</p>',
+        });
+        const clientRule = await seedRule({
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
+            name: 'Report Ready', emailTemplateId: clientTpl,
+        });
+        const agentRule = await seedRule({
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('buyer_agent'),
+            name: "Report Ready (Buyer's Agent)", emailTemplateId: agentTpl,
+        });
+        // One person, both seats — the production case.
+        await seedLog({ ruleId: clientRule, inspectionId: insp, recipient: 'pat@example.com', recipientRoleKey: 'client' });
+        await seedLog({ ruleId: agentRule, inspectionId: insp, recipient: 'pat@example.com', recipientRoleKey: 'buyer_agent' });
+
+        const { reportDelivery } = makeReportDelivery();
+        const { emailFor, sendEmail, sendInspectionReportPdf } = makeEmailSvc();
+
+        await svc.flush(emailFor, 'Acme', 'https://acme.example.com', undefined, 50, undefined, undefined, reportDelivery);
+
+        // The catalogue default is no longer what goes out for a rule that names
+        // its own template.
+        expect(sendInspectionReportPdf).not.toHaveBeenCalled();
+        expect(sendEmail).toHaveBeenCalledTimes(2);
+        const subjects = sendEmail.mock.calls.map((c) => c[1]);
+        expect(new Set(subjects).size).toBe(2);
+        expect(subjects).toContain('Your inspection report is ready — 1 Main St');
+        expect(subjects).toContain('Inspection report ready — 1 Main St');
+    });
+
+    it("interpolates {{report_url}} to the recipient's OWN tokenized link, and still attaches the PDF", async () => {
+        const insp = 'insp-rule-tpl-link';
+        await seedInspection(insp);
+        const tpl = await seedTemplate({
+            id: 'tpl-link', name: 'Report Ready — Email',
+            subject: 'Ready — {{property_address}}',
+            body: '<p><a href="{{report_url}}">View your report</a></p>',
+        });
+        const ruleId = await seedRule({
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('buyer_agent'),
+            name: 'Report Ready', emailTemplateId: tpl,
+        });
+        await seedLog({ ruleId, inspectionId: insp, recipient: 'agent@example.com', recipientRoleKey: 'buyer_agent' });
+
+        const { reportDelivery } = makeReportDelivery();
+        const { emailFor, sendEmail } = makeEmailSvc();
+
+        await svc.flush(emailFor, 'Acme', 'https://acme.example.com', undefined, 50, undefined, undefined, reportDelivery);
+
+        const [, , html, attachments] = sendEmail.mock.calls[0];
+        // The bare report URL 404s for a recipient with no login; the token is
+        // the entire reason this delivery path exists, so the rule's own copy
+        // must not have cost the recipient theirs.
+        expect(html).toContain(encodeURIComponent('tok-agent@example.com-buyer_agent'));
+        // "Choosing different WORDING must not change what is ENCLOSED" —
+        // the same rule the manual send learned the hard way.
+        expect(attachments).toHaveLength(1);
+    });
+
+    it('carries the Art. 13 report-view disclosure that tenant copy cannot reach (OI #271, condition 5)', async () => {
+        const insp = 'insp-rule-tpl-disclosure';
+        await seedInspection(insp);
+        // A template whose body says nothing at all — the adversarial case for a
+        // notice that is supposed to be unreachable from tenant copy.
+        const tpl = await seedTemplate({
+            id: 'tpl-empty', name: 'Report Ready — Email', subject: 'Ready', body: '',
+        });
+        const ruleId = await seedRule({
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
+            name: 'Report Ready', emailTemplateId: tpl,
+        });
+        await seedLog({ ruleId, inspectionId: insp, recipient: 'client@example.com', recipientRoleKey: 'client' });
+
+        const { reportDelivery } = makeReportDelivery();
+        const { emailFor, sendEmail } = makeEmailSvc();
+
+        await svc.flush(emailFor, 'Acme', 'https://acme.example.com', undefined, 50, undefined, undefined, reportDelivery);
+
+        const { REPORT_VIEW_DISCLOSURE } = await import('../../../server/lib/legal/report-view-disclosure');
+        const html = sendEmail.mock.calls[0][2];
+        expect(html).toContain(REPORT_VIEW_DISCLOSURE.fact);
+        expect(html).toContain(REPORT_VIEW_DISCLOSURE.limit);
+        expect(html).toContain(REPORT_VIEW_DISCLOSURE.exit);
+        expect(html).toContain(`data-disclosure-version="${REPORT_VIEW_DISCLOSURE.version}"`);
+    });
+
+    it("labels the send with the rule's OWN notification class, so a mutable seed stays mutable", async () => {
+        const insp = 'insp-rule-tpl-class';
+        await seedInspection(insp);
+        const tpl = await seedTemplate({
+            id: 'tpl-followup', name: 'Post-inspection follow-up — Email',
+            subject: 'Following up on your inspection — {{property_address}}',
+            body: '<p>How did it go?</p>',
+        });
+        // Spec §5.3: report-ready is REQUIRED, this one is not. Under the old
+        // branch both arrived stamped `report-ready`, which the preference gate
+        // fails closed on — so the recipient's switch did nothing.
+        const ruleId = await seedRule({
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
+            name: 'Post-inspection follow-up', emailTemplateId: tpl,
+        });
+        await seedLog({ ruleId, inspectionId: insp, recipient: 'client@example.com', recipientRoleKey: 'client' });
+
+        const { reportDelivery } = makeReportDelivery();
+        const { emailFor, sendEmail } = makeEmailSvc();
+
+        await svc.flush(emailFor, 'Acme', 'https://acme.example.com', undefined, 50, undefined, undefined, reportDelivery);
+
+        expect(sendEmail.mock.calls[0][4]).toEqual({ classId: 'post-inspection-followup' });
+    });
+
+    it('a rule pointing at a DELETED template falls back to the catalogue copy rather than withholding the report', async () => {
+        const insp = 'insp-rule-tpl-stale';
+        await seedInspection(insp);
+        const ruleId = await seedRule({
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
+            name: 'Report Ready', emailTemplateId: 'tpl-that-was-deleted',
+        });
+        const logId = await seedLog({ ruleId, inspectionId: insp, recipient: 'client@example.com', recipientRoleKey: 'client' });
+
+        const { reportDelivery } = makeReportDelivery();
+        const { emailFor, sendEmail, sendInspectionReportPdf } = makeEmailSvc();
+
+        await svc.flush(emailFor, 'Acme', 'https://acme.example.com', undefined, 50, undefined, undefined, reportDelivery);
+
+        expect(sendEmail).not.toHaveBeenCalled();
+        expect(sendInspectionReportPdf).toHaveBeenCalledTimes(1);
+        const row = await db.select().from(schema.automationLogs).where(eq(schema.automationLogs.id, logId)).get();
+        expect(row?.status).toBe('sent');
     });
 });
