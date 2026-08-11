@@ -400,6 +400,48 @@
       "when": 1786256609273,
       "tag": "0056_fluffy_fenris",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "6",
+      "when": 1786408968539,
+      "tag": "0057_lucky_master_chief",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1786408969539,
+      "tag": "0058_marketplace_catalogue_row_move",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1786409029072,
+      "tag": "0059_regular_jubilee",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "6",
+      "when": 1786409031072,
+      "tag": "0060_contractor_types_map_skipped_tenant",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "6",
+      "when": 1786409032072,
+      "tag": "0061_contractor_types_complete_canonical_set",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "6",
+      "when": 1786409033072,
+      "tag": "0062_backfill_template_snapshots",
+      "breakpoints": true
     }
   ]
 }

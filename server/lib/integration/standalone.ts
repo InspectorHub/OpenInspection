@@ -328,6 +328,9 @@ export class StandaloneProvider implements IntegrationProvider {
                 // couldn't tell which was the empty starter vs. the curated
                 // 40-item residential template. The "(Blank)" suffix makes
                 // it obvious this is the user's own scratch template.
+                // DELIBERATELY carries no `templateCreate` capability (#307).
+                // First-run setup runs before any user exists, so there is no
+                // acting user and no capability set to consult.
                 await db.insert(templates).values({
                     id: crypto.randomUUID(),
                     tenantId,

@@ -70,6 +70,11 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
             // inspection_people (PeopleService.getPrimaryClient /
             // contactIdForRole). The row itself carries none of them.
             templateId: 'tpl-1',
+            // #307 — getInspectionHub awaits computePublishReadiness, which now
+            // requires the inspection's own frozen structure. A row naming a
+            // template it does not carry a snapshot for fails the WHOLE hub,
+            // not just the report page.
+            templateSnapshot: { sections: [] },
             coverPhotoId: 'cover-1', date: '2026-06-01', status: 'completed',
             paymentStatus: 'unpaid', price: 35000, paymentRequired: true, agreementRequired: true,
             createdAt: new Date(),

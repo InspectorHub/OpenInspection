@@ -7220,6 +7220,34 @@
     "description": "Returns the contact record, its inspection history (newest first; clients match via clientContactId or legacy clientEmail, agents via referredByAgentId or sellingAgentId), and aggregate stats (inspection count + total paid-invoice revenue in cents)."
   },
   {
+    "operationId": "getContractorTypeDeletePreflight",
+    "method": "GET",
+    "pathTemplate": "/api/contractor-types/{id}/preflight",
+    "scopes": [
+      "read"
+    ],
+    "tag": "contractor-types",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Contractor type id the delete would target.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contractor type id the delete would target."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Count what deleting a contractor type would orphan",
+    "description": "Counts the tenant's canned comments that recommend this contractor type. Advisory only -- the delete is never blocked, because the reference is soft by design and published reports store the resolved label rather than the id."
+  },
+  {
     "operationId": "getDispatchBoard",
     "method": "GET",
     "pathTemplate": "/api/calendar/dispatch",
@@ -11122,7 +11150,7 @@
             "type": "string",
             "enum": [
               "comments",
-              "snippets"
+              "templates"
             ],
             "description": "TODO describe kind field for the OpenInspection MCP integration"
           }
@@ -11130,7 +11158,7 @@
       ],
       "body": null
     },
-    "summary": "List marketplace libraries (comment packs, snippet packs)",
+    "summary": "List marketplace catalogue entries (comment packs, templates)",
     "description": "Auto-generated placeholder for listMarketplaceLibraries (GET /libraries, marketplace domain). TODO: replace with a real description sourced from the handler."
   },
   {
@@ -11171,35 +11199,70 @@
           "name": "search",
           "in": "query",
           "required": false,
-          "description": "Free-text search over marketplace template names",
+          "description": "Free-text search over catalogue entry names",
           "schema": {
             "type": "string",
-            "description": "Free-text search over marketplace template names"
+            "description": "Free-text search over catalogue entry names"
           }
         },
         {
-          "name": "category",
+          "name": "kind",
           "in": "query",
           "required": false,
-          "description": "Filter marketplace templates by inspection category",
+          "description": "Filter the catalogue to one kind of importable content",
           "schema": {
             "type": "string",
             "enum": [
-              "residential",
-              "commercial",
-              "trec",
-              "condo",
-              "new_construction",
-              "standards_aligned"
+              "comments",
+              "templates"
             ],
-            "description": "Filter marketplace templates by inspection category"
+            "description": "Filter the catalogue to one kind of importable content"
+          }
+        },
+        {
+          "name": "propertyType",
+          "in": "query",
+          "required": false,
+          "description": "Filter templates by the property type they are written for",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "single-family",
+              "multi-unit",
+              "commercial"
+            ],
+            "description": "Filter templates by the property type they are written for"
+          }
+        },
+        {
+          "name": "jurisdiction",
+          "in": "query",
+          "required": false,
+          "description": "Filter by a jurisdiction's form standard, e.g. trec",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Filter by a jurisdiction's form standard, e.g. trec"
+          }
+        },
+        {
+          "name": "inspectionKind",
+          "in": "query",
+          "required": false,
+          "description": "Filter by inspection kind, e.g. new_construction",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Filter by inspection kind, e.g. new_construction"
           }
         }
       ],
       "body": null
     },
     "summary": "List marketplaces for current tenant",
-    "description": "Paginated list of marketplace templates for the current tenant."
+    "description": "Paginated list of marketplace catalogue entries for the current tenant."
   },
   {
     "operationId": "listMessageTemplates",

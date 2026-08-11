@@ -46,18 +46,33 @@ export async function setupSchema(sqlite: any) {
  * parameter index as a string, not by positional array — this adapter does
  * that translation so the same SQL text runs unmodified against D1 in
  * production and against better-sqlite3 in unit tests.
+ *
+ * Both placeholder styles are supported because the codebase uses both, and
+ * they need OPPOSITE binding forms in better-sqlite3: numbered `?N` takes the
+ * index-keyed object, anonymous `?` takes positional arguments and throws
+ * "Too few parameter values were provided" if handed the object. Supporting
+ * only the numbered form made this helper silently unusable for every
+ * anonymous-placeholder call site (e.g. the chunked bulk INSERT in
+ * MarketplaceService), which is why one spec had grown its own private copy.
  */
 export function toRawD1(sqlite: any): D1Database {
     return {
         prepare(query: string) {
             const stmt = sqlite.prepare(query);
+            const isNumbered = /\?\d/.test(query);
             return {
                 bind(...args: unknown[]) {
-                    const indexed: Record<number, unknown> = {};
-                    args.forEach((v, i) => { indexed[i + 1] = v; });
+                    let bound: unknown[];
+                    if (isNumbered) {
+                        const indexed: Record<number, unknown> = {};
+                        args.forEach((v, i) => { indexed[i + 1] = v; });
+                        bound = [indexed];
+                    } else {
+                        bound = args;
+                    }
                     return {
                         run: async () => {
-                            const info = stmt.run(indexed);
+                            const info = stmt.run(...bound);
                             return { meta: { changes: info.changes } };
                         },
                     };

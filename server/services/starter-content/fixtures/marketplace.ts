@@ -6,16 +6,11 @@
  * is a catalogue of importable content. Idempotency in the starter-content
  * seeder is enforced by `(name)` uniqueness; running the seed on a system
  * that already has these libraries is a no-op.
- *
- * The starter-content flow only seeds a small bootstrap catalogue. The
- * legacy `scripts/seed-marketplace.js` script remains the source of the
- * full curated template catalogue (residential, TREC, commercial, etc.)
- * and is run as a deploy-time operation.
  */
 
 export interface StarterMarketplaceLibraryFixture {
     name:      string;
-    kind:      'comments' | 'snippets';
+    kind:      'comments' | 'templates';
     semver:    string;
     schema:    unknown;
     changelog: string;

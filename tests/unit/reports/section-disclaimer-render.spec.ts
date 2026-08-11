@@ -62,6 +62,10 @@ describe('Track E2 — section disclaimer + alwaysPageBreak surfacing', () => {
         });
         await testDb.insert(schema.inspections).values({
             id: INSPECTION_ID, tenantId: TENANT, templateId: TEMPLATE_ID,
+            // #307 — the report reads the inspection's own frozen structure;
+            // there is no live-template fallback to lean on any more.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            templateSnapshot: buildTemplateSchema() as any,
             propertyAddress: '1 Main St',
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
             paymentRequired: false, agreementRequired: false, createdAt: new Date(),
@@ -88,9 +92,13 @@ describe('Track E2 — section disclaimer + alwaysPageBreak surfacing', () => {
                 { id: 's', title: 'S', disclaimerText: '   ', items: [{ id: 'i', label: 'I', type: 'text' }] },
             ],
         };
-        await testDb.update(schema.templates).set({
+        // #307 — updates the INSPECTION's snapshot, not the templates row. The
+        // report follows the structure this inspection was filled against, so
+        // editing the live template no longer changes what it renders. That
+        // distinction is the point of the change, not an inconvenience of it.
+        await testDb.update(schema.inspections).set({
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            schema: tplWithEmpty as any,
+            templateSnapshot: tplWithEmpty as any,
         });
         const report = await svc.getReportData(INSPECTION_ID, TENANT);
         expect(report.sections[0]!.disclaimerText).toBeNull();

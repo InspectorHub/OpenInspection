@@ -63,6 +63,10 @@ async function seedFixture(testDb: BetterSQLite3Database<typeof schema>) {
     });
     await testDb.insert(schema.inspections).values({
         id: INSPECTION_ID, tenantId: TENANT, templateId: TEMPLATE_ID,
+        // #307 — the report reads the inspection's OWN frozen structure and no
+        // longer falls back to the live template, so the fixture has to freeze
+        // one, exactly as every real creation path does.
+        templateSnapshot: TEMPLATE_SCHEMA,
         propertyAddress: '1 Main St',
         date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
         paymentRequired: false, agreementRequired: false, createdAt: new Date(),

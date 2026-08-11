@@ -195,6 +195,27 @@ describe('TemplateMigrationService', () => {
             expect(old).toBeUndefined();
         });
 
+        it('deleteOldTemplate leaves the old template alone when a report was generated from it', async () => {
+            // The migration service used to run its OWN delete gate, checking
+            // `inspections` and nothing else. Migrating every inspection off the
+            // old template satisfied that gate, so the delete went through and
+            // left `reports.template_id` naming a template that no longer
+            // exists. Both callers now share findTemplateBlockingReference.
+            const oldId = await seedTemplate(testDb, { itemIds: ['a'] });
+            const newId = await seedTemplate(testDb, { itemIds: ['a'] });
+            await testDb.insert(schema.reports).values({
+                id: crypto.randomUUID(), tenantId: TENANT, inspectionId: crypto.randomUUID(),
+                kind: 'primary', title: 'Delivered Report', status: 'published',
+                templateId: oldId, createdAt: new Date(),
+            } as never);
+
+            const result = await svc.migrate(oldId, newId, 'preserve_unknown', USER, { deleteOldTemplate: true });
+            expect(result.oldTemplateDeleted).toBe(false);
+
+            const old = await testDb.select().from(schema.templates).where(eq(schema.templates.id, oldId)).get();
+            expect(old).toBeTruthy();
+        });
+
         it('tryDeleteOldTemplate refuses to delete when an inspection still references the old template', async () => {
             // Drives the post-migrate delete gate directly so the concurrent-
             // insert race is reproducible. If any inspection still points at

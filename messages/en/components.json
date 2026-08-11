@@ -16,6 +16,8 @@
   "modal_invite_role_inspector": "Inspector",
   "modal_invite_role_agent": "Agent",
   "modal_invite_advanced": "Advanced permissions",
+  "modal_invite_cap_group_general": "Inspections & clients",
+  "modal_invite_cap_group_templates": "Templates",
   "modal_invite_error_failed": "Failed",
   "modal_invite_role_desc_manager": "Full access to inspections, templates, and team management.",
   "modal_invite_role_desc_inspector": "Create and edit inspections they're assigned to.",

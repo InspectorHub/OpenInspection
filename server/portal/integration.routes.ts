@@ -267,6 +267,11 @@ api.post('/backfill-default-templates', requireServiceBinding, async (c) => {
     const { drizzle } = await import('drizzle-orm/d1');
     const { tenants } = await import('../lib/db/schema');
     const { TemplateSeedService } = await import('../services/template-seed.service');
+    // DELIBERATELY carries no `templateCreate` capability (#307). This is
+    // provisioning, not a staff action: the route is authenticated by the
+    // portal M2M HMAC and runs with NO acting user, so there is no capability
+    // set to consult. Bolting one on would make tenant seeding depend on a
+    // permission nobody holds yet.
     const db = drizzle(c.env.DB);
     const allTenants = await db.select({ id: tenants.id, name: tenants.name }).from(tenants).all();
     const svc = new TemplateSeedService(c.env.DB);

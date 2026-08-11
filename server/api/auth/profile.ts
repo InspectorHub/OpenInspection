@@ -15,6 +15,7 @@ import { Errors } from '../../lib/errors';
 import { requireRole } from '../../lib/middleware/rbac';
 import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
+import { resolvedCapabilitySchema } from '../../lib/validations/admin/compliance';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
 
@@ -113,13 +114,12 @@ const meRoute = createRoute(withMcpMetadata({
                             totpEnabled: z.boolean().optional().describe('TODO describe totpEnabled field for the OpenInspection MCP integration'),
                             recoveryCodesRemaining: z.number().nullable().optional().describe('TODO describe recoveryCodesRemaining field for the OpenInspection MCP integration'),
                         }).describe('TODO describe user field for the OpenInspection MCP integration'),
-                        capabilities: z.object({
-                            publish:           z.boolean().describe('May publish and unpublish reports.'),
-                            scheduleOthers:    z.boolean().describe('May schedule inspections for other inspectors.'),
-                            financial:         z.boolean().describe('May see money on inspections, services and invoices.'),
-                            manageContacts:    z.boolean().describe('May create, edit and archive contacts and role profiles.'),
-                            viewCommunication: z.boolean().describe('May read the per-inspection Outbox, including recipient addresses.'),
-                        }).describe('The resolved capability set for this user: role defaults with their own overrides applied. The UI reads this rather than deriving capabilities from the role.')
+                        // Derived from TOGGLEABLE, not hand-listed. The five
+                        // sentences that used to sit here inline now live in
+                        // CAPABILITY_DESCRIPTIONS beside the set they describe,
+                        // so a sixth capability cannot ship under-described.
+                        capabilities: resolvedCapabilitySchema()
+                            .describe('The resolved capability set for this user: role defaults with their own overrides applied. The UI reads this rather than deriving capabilities from the role.')
                     }))
                 }
             },

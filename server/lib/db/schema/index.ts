@@ -41,8 +41,6 @@ export { invoices } from './invoice';
 export { orderPayments } from './order-payment';
 export type { OrderPayment, NewOrderPayment } from './order-payment';
 export {
-    marketplaceTemplates,
-    tenantMarketplaceImports,
     marketplaceLibraries,
     tenantLibraryImports,
     tenantMarketplaceImportHistory,

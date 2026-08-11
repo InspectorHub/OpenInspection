@@ -9,6 +9,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { AutomationService } from '../automation.service';
 import { reportVersions } from '../../lib/db/schema';
+import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { RECOMMENDATION_CATEGORIES, RECOMMENDATION_CATEGORY_IDS } from '../../lib/recommendation-categories';
 import { deleteRepairPriceKeys } from '../../lib/repair-price-keys';
@@ -18,6 +19,131 @@ import type { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchem
 import type { Severity } from '../../lib/validations/rating-system.schema';
 import type { DefectCommentState } from '../../types/inspection-item-state';
 import type { CannedDefect, TemplateSchemaV2 } from '../../types/template-schema';
+
+/**
+ * An inspection's own frozen structure — the ONE way to read it.
+ *
+ * ─── Why this exists ────────────────────────────────────────────────────────
+ * Four consumers used to fall back to the LIVE `templates.schema` when an
+ * inspection had no snapshot, each with its own spelling of the same check.
+ * That made the snapshot a convention rather than a guarantee: the next row
+ * that missed one silently re-acquired today's template structure and nothing
+ * failed. It is the `trade_slug` shape — the mechanism was correct and nothing
+ * stopped it being bypassed. A report re-derived that way is not the report the
+ * inspector filled in, and there is no signal that it happened.
+ *
+ * ─── The two ways callers use it, and why they differ ───────────────────────
+ * ⚠️ Four callers, two behaviours. Do NOT make them uniform without re-reading
+ * this: they are answering different questions.
+ *
+ *   THROW — `requireTemplateSnapshot`
+ *     `inspection-report.service.ts` and `inspection-publish.service.ts`.
+ *     They answer "what does this report contain" and "may it be published".
+ *     A wrong answer there reaches a client, so a missing snapshot is a 500
+ *     (`Errors.Internal`, server/lib/errors.ts) rather than a plausible
+ *     document nobody can vouch for. Not a 404 and not a 409: the caller did
+ *     nothing wrong, an invariant of ours was violated. The report page's error
+ *     boundary shows the failure and the structured log carries the id.
+ *
+ *   LOG AND DEGRADE — `templateSnapshotSectionsOrNone`
+ *     `inspection-photo.service.ts` and the admin bulk-import path. Both build
+ *     an item-id → label map and already degrade to using the item id as its
+ *     own label. Making them throw would turn a cosmetic degradation into a
+ *     broken drawer. Silence is what is forbidden here, not the degradation —
+ *     so they log and STOP reading the live template.
+ *
+ * See #307.
+ */
+function parseSnapshot(raw: unknown): { sections: unknown[] } | null {
+    if (!raw) return null;
+    let parsed: unknown = raw;
+    if (typeof raw === 'string') {
+        try { parsed = JSON.parse(raw); } catch { return null; }
+    }
+    if (!parsed || typeof parsed !== 'object') return null;
+    const sections = (parsed as { sections?: unknown }).sections;
+    // ⚠️ `Array.isArray`, NOT `length > 0`.
+    //
+    // All four sites tested for a NON-EMPTY sections array, but they were
+    // asking "is there anything worth preferring over the live template" — and
+    // when both were empty the answer was the same either way, so the
+    // distinction never showed. As a REQUIRED check it does show, and
+    // length-based presence is wrong: `{ sections: [] }` is what an inspection
+    // filled against the blank starter template ("My Inspection Template
+    // (Blank)", created by first-run setup in every standalone install)
+    // faithfully records. That is a real, correct snapshot of an empty
+    // structure, not a missing one, and condemning it would 500 the hub page
+    // of a freshly-installed deployment.
+    if (!Array.isArray(sections)) return null;
+    return parsed as { sections: unknown[] };
+}
+
+/**
+ * The inspection's own frozen structure, or a loud failure. See the note above.
+ *
+ * ⚠️ `templateId` is load-bearing, and the two absences it separates are NOT
+ * the same fault:
+ *
+ *   templateId SET, snapshot missing → the row NAMES a template whose structure
+ *     it no longer carries. That is the invariant violation this exists to
+ *     surface, and the only state the live-template fallback used to paper
+ *     over. It throws.
+ *
+ *   templateId NULL, snapshot missing → the inspection was never built from a
+ *     template. There is no lost structure to mourn and nothing to re-acquire;
+ *     the fallback never fired for these rows either, because there was no
+ *     template row to fall back TO. Throwing here would turn a legitimate
+ *     template-less inspection into a 500 on its own report page, which is a
+ *     regression rather than a guarantee. It logs and yields no sections,
+ *     which is byte-identical to what the old code produced.
+ */
+export function requireTemplateSnapshot(
+    inspection: { id: string; templateId?: string | null; templateSnapshot?: unknown },
+    tenantId: string,
+): TemplateSchemaV2 {
+    const snapshot = parseSnapshot(inspection.templateSnapshot);
+    if (snapshot) return snapshot as unknown as TemplateSchemaV2;
+
+    if (inspection.templateId) {
+        logger.error('inspection names a template but carries no template snapshot', {
+            inspectionId: inspection.id,
+            templateId:   inspection.templateId,
+            tenantId,
+        });
+        throw Errors.Internal('This inspection has no template snapshot, so its report structure cannot be resolved.');
+    }
+
+    logger.warn('inspection has neither a template nor a snapshot; report has no sections', {
+        inspectionId: inspection.id,
+        tenantId,
+    });
+    return { schemaVersion: 2, sections: [] } as unknown as TemplateSchemaV2;
+}
+
+/**
+ * The snapshot's sections for a label map, or an empty list plus a logged
+ * error. Never reads the live template. See the note above for which callers
+ * take this and why.
+ */
+export function templateSnapshotSectionsOrNone<T>(
+    inspection: { id: string; templateId?: string | null; templateSnapshot?: unknown },
+    tenantId: string,
+): T[] {
+    const snapshot = parseSnapshot(inspection.templateSnapshot);
+    if (snapshot) return snapshot.sections as T[];
+
+    // Same two-absence split as requireTemplateSnapshot, at a lower volume: a
+    // row naming a template it cannot honour is an error, a template-less
+    // inspection having no sections is simply true.
+    if (inspection.templateId) {
+        logger.error('inspection names a template but carries no template snapshot; labels degrade to item ids', {
+            inspectionId: inspection.id,
+            templateId:   inspection.templateId,
+            tenantId,
+        });
+    }
+    return [];
+}
 
 /**
  * Media Studio (cover crop) — resolves the cover image URL, preferring the

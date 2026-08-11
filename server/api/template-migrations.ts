@@ -2,6 +2,7 @@ import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
+import { requireCapability, capabilitiesFor } from '../lib/middleware/require-capability';
 import { Errors, AppError } from '../lib/errors';
 import { auditFromContext } from '../lib/audit';
 import { withKvLock, KvLockHeldError } from '../lib/kv-lock';
@@ -24,7 +25,14 @@ const migrateRoute = createRoute(withMcpMetadata({
     tags: ["templates"],
     summary: 'Migrate inspections from old template to new template',
     description: "Auto-generated placeholder for createTemplateMigrationMigrateTo (POST /{oldId}/migrate-to/{newId}, templates domain). TODO: replace with a real description sourced from the handler.",
-    middleware: [requireRole('owner', 'manager')] as const,
+    // ONE ROUTE, TWO VERBS. `migrate` bumps the NEW template's version (an
+    // edit) and, when `deleteOldTemplate` is set, deletes the old one.
+    // `requireCapability` expresses exactly one capability, so templateEdit is
+    // the route gate and templateDelete is checked in the handler on the
+    // branch that actually deletes. Same split as
+    // `server/api/inspections/pay-splits.ts`, and the reason `capabilitiesFor`
+    // is exported alongside `requireCapability`. See #307.
+    middleware: [requireRole('owner', 'manager'), requireCapability('templateEdit')] as const,
     request: {
         params: MigrationParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
@@ -53,11 +61,12 @@ const migrateRoute = createRoute(withMcpMetadata({
             },
             description: 'Migrated',
         },
+        403: { description: "Missing the 'templateEdit' capability, or 'templateDelete' when deleteOldTemplate is set" },
         409: { description: 'Concurrent migration in progress' },
         422: { description: 'Strategy refused — schema incompatible' },
     },
     operationId: "createTemplateMigrationMigrateTo"
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'templateEdit' }));
 
 const templateMigrationRoutes = createApiRouter()
     .openapi(migrateRoute, async (c) => {
@@ -67,6 +76,16 @@ const templateMigrationRoutes = createApiRouter()
 
         if (oldId === newId) {
             throw Errors.BadRequest('oldId and newId must differ');
+        }
+
+        if (body.deleteOldTemplate) {
+            // A delete reached through a migration is still a delete. The route
+            // gate can only express one capability, so the conditional half is
+            // checked here -- the same split `pay-splits.ts` uses. Checked
+            // BEFORE the KV lock is taken: a refusal should not park a
+            // five-minute lock on a template the caller may not touch.
+            const caps = await capabilitiesFor(c);
+            if (!caps.templateDelete) throw Errors.Forbidden("Requires the 'templateDelete' capability");
         }
 
         const lockKey = `mig_lock:${oldId}`;

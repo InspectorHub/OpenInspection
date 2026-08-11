@@ -14,6 +14,14 @@ interface TemplatesListViewProps {
   setDeleteConfirm: (id: string | null) => void;
   /** Viewer's effective zone for the audit-trail timestamps. */
   timeZone: string;
+  /** Resolved from the server's capability set by the route (#307). Duplicate
+   *  is a CREATE — it POSTs a new template — so it rides on canCreate, not on
+   *  an "edit" reading of the word. TemplatesCardView takes the same three:
+   *  a UI capability applied to one of two views is a control the other view
+   *  keeps offering. */
+  canCreate: boolean;
+  canImport: boolean;
+  canDelete: boolean;
 }
 
 export function TemplatesListView({
@@ -24,6 +32,9 @@ export function TemplatesListView({
   handleDuplicate,
   setDeleteConfirm,
   timeZone,
+  canCreate,
+  canImport,
+  canDelete,
 }: TemplatesListViewProps) {
   return (
     <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
@@ -45,19 +56,23 @@ export function TemplatesListView({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setImportOpen(true)}
-                  className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
-                >
-                  <Icon name="download" size={16} strokeWidth={1.75} />
-                  {m.templates_import_title()}
-                </button>
-                <button
-                  onClick={() => setCreateOpen(true)}
-                  className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2"
-                >
-                  {m.templates_empty_new()}
-                </button>
+                {canImport && (
+                  <button
+                    onClick={() => setImportOpen(true)}
+                    className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
+                  >
+                    <Icon name="download" size={16} strokeWidth={1.75} />
+                    {m.templates_import_title()}
+                  </button>
+                )}
+                {canCreate && (
+                  <button
+                    onClick={() => setCreateOpen(true)}
+                    className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2"
+                  >
+                    {m.templates_empty_new()}
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -102,12 +117,16 @@ export function TemplatesListView({
                 <Link to={`/templates/${t.id}/edit`} className="text-[11px] font-bold text-ih-primary-text hover:text-ih-primary-text">
                   {m.common_edit()}
                 </Link>
-                <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary-text transition-colors">
-                  {m.templates_action_duplicate()}
-                </button>
-                <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-bad-fg transition-colors">
-                  {m.common_delete()}
-                </button>
+                {canCreate && (
+                  <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary-text transition-colors">
+                    {m.templates_action_duplicate()}
+                  </button>
+                )}
+                {canDelete && (
+                  <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-bad-fg transition-colors">
+                    {m.common_delete()}
+                  </button>
+                )}
               </div>
             ),
           },
