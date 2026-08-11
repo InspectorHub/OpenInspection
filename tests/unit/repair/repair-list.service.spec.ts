@@ -80,6 +80,13 @@ async function seedFixture(testDb: BetterSQLite3Database<typeof schema>) {
         id: TEMPLATE_ID, tenantId: TENANT, name: 'Standard', schema: TEMPLATE_SCHEMA as any, version: 1, createdAt: new Date(),
     });
     await testDb.insert(schema.inspections).values({
+        // The per-inspection snapshot is REQUIRED (#307): the report path no
+        // longer falls back to the live `templates` row, so a fixture naming a
+        // template without one now throws instead of silently resolving against
+        // today's schema. Same value as the template above, which is what the
+        // old fallback would have read anyway.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        templateSnapshot: TEMPLATE_SCHEMA as any,
         id: INSPECTION_ID, tenantId: TENANT, templateId: TEMPLATE_ID,
         // clientName/clientEmail were DROPPED from `inspections`; this spec never
         // reads them (getRepairList works off results + template).
