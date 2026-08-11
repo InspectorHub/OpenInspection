@@ -30,7 +30,9 @@ import type { UserSyncEvent, UserSyncOutbox } from '../lib/integration/user-sync
 // A-21 batch 2/3: the outbox also carries command REPLIES (emitted by the cmd
 // consumer) on the same queue — widened here, NOT in the user-sync seam
 // (replies are not user-lifecycle events).
-type CmdReplyEventType = 'reply.tenant.updated' | 'reply.tenant.export_completed' | 'reply.tenant.purged';
+// P3 adds the two DSAR replies (`reply.subject.*`) to the same channel.
+type CmdReplyEventType = 'reply.tenant.updated' | 'reply.tenant.export_completed' | 'reply.tenant.purged'
+    | 'reply.subject.exported' | 'reply.subject.erased';
 /** Tenant-lifecycle events that are NOT user events (no user SID involved). */
 type TenantSyncEventType = 'io.inspectorhub.tenant.compliance_status_updated';
 export type OutboxEvent = UserSyncEvent | {

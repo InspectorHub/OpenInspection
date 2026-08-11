@@ -21,6 +21,11 @@ const KNOWN_CMD_TYPES: Record<string, readonly string[]> = {
     // (the queue has no platform-scoped command and adding one would change the
     // envelope contract both sides validate).
     'io.inspectorhub.cmd.tenant.ai_caps': ['cmd-tenant-ai-caps/v1'],
+    // Privacy P3 — DSAR fan-out for a NON-account data subject (a client /
+    // homeowner / notification recipient, never a staff account). Both await a
+    // reply correlated by `replyto: dsar:<requestId>`.
+    'io.inspectorhub.cmd.subject.export': ['cmd-subject-export/v1'],
+    'io.inspectorhub.cmd.subject.erase': ['cmd-subject-erase/v1'],
 };
 
 const cmdEnvelopeSchema = z.object({
@@ -94,6 +99,51 @@ export const cmdTenantAiCapsDataSchema = z.object({
     tier: z.string().min(1),
     caps: z.record(z.string(), z.unknown()),
 });
+
+/**
+ * Privacy P3 — subject-scoped SAR export. `r2Key` is allocated PORTAL-side so a
+ * re-dispatch overwrites the same object (idempotent, same trick as
+ * cmd.tenant.data_export); the reply nonetheless echoes back the key core
+ * actually wrote rather than the one it was told.
+ *
+ * `subjectPhone` is legitimate HERE and only here: the export assembler
+ * (`server/services/subject-export.service.ts`) genuinely queries on it —
+ * `contacts.phone`, `inspection_requests.client_phone`, and
+ * `automation_logs.recipient` (which holds an E.164 number on SMS rows).
+ *
+ * `.strict()`, unlike the tenant-command siblings above. These two are the only
+ * commands whose payload names a natural person, so an unexpected field is a
+ * sender that believes core does something it does not — which must fail at the
+ * boundary rather than be silently ignored. Both sides parse strictly; the
+ * schemas are byte-for-byte mirrors of portal's `server/lib/cmd/envelope.ts`,
+ * dataschema strings included.
+ */
+export const cmdSubjectExportDataSchema = z.object({
+    tenantId: z.string(),
+    subjectEmail: z.string(),
+    subjectPhone: z.string().optional(),
+    r2Key: z.string(),
+}).strict();
+
+/**
+ * Privacy P3 — subject-scoped erasure. NOTE THE ABSENCE OF A PHONE.
+ *
+ * `runErasure` (`server/lib/compliance/erasure-orchestrator.ts`) takes
+ * `{ tenantId, subjectEmail, retentionYears, … }` and contains no phone-keyed
+ * query — every subject-locating predicate in it matches an email column. A
+ * `subjectPhone` here would validate, ride the queue, reach the applier, and be
+ * dropped, after which portal would record a COMPLETED ERASURE for data nothing
+ * ever examined. So the field is omitted rather than optional-and-ignored, and
+ * strict parsing makes a sender that adds it anyway fail loudly.
+ *
+ * Widening this is gated on core growing a real phone axis FIRST: `RunErasureInput`
+ * + every subject-locating query + the manifest + `ERASURE_SUBJECT_AXIS` in
+ * `server/lib/compliance/erasure-coverage.ts`, which is what the reply discloses.
+ */
+export const cmdSubjectEraseDataSchema = z.object({
+    tenantId: z.string(),
+    subjectEmail: z.string(),
+}).strict();
 
 export function parseCmdEnvelope(json: unknown): CmdEnvelope | null {
     let candidate: unknown = json;

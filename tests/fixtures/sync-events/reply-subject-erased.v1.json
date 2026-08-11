@@ -1,0 +1,29 @@
+{
+  "specversion": "1.0",
+  "id": "00000000-0000-4000-8000-0000000rep02",
+  "type": "io.inspectorhub.reply.subject.erased",
+  "source": "core",
+  "time": "2026-08-10T01:00:06.000Z",
+  "dataschema": "reply-subject-erased/v1",
+  "data": {
+    "tenantId": "fixture-tenant-4",
+    "correlationId": "cmd-subject-erase-fixture-1",
+    "replyto": "dsar:dsar-fixture-2",
+    "anonymizedCount": 2,
+    "deletedCount": 3,
+    "retainedCount": 2,
+    "decisions": [
+      { "table": "agreement_signers", "action": "anonymize", "count": 1, "legalBasis": "art_17_3_e", "retentionExpiry": 1893456000000 },
+      { "table": "contacts", "action": "delete", "count": 1 }
+    ],
+    "coverage": {
+      "manifestRuleCount": 48,
+      "outOfScopeCount": 31,
+      "pendingEnforcementCount": 2,
+      "pendingRules": ["inspection_requests.property_address", "inspections.property_address"],
+      "executedTables": ["agreement_signers", "contacts"],
+      "catalogueIsAdvisory": true,
+      "subjectAxis": "email"
+    }
+  }
+}
