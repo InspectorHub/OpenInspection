@@ -1,6 +1,6 @@
 # Upgrading OpenInspection
 
-This guide covers upgrading an existing self-hosted deployment to a newer release. For a first-time deploy, see [`02_deploy.md`](02_deploy.md).
+This guide covers upgrading an existing self-hosted deployment to a newer release. For a first-time deploy, see [`deploy.md`](deploy.md).
 
 Releases are cut automatically by [release-please](https://github.com/googleapis/release-please) as GitHub Releases, each tagged `vX.Y.Z` with a generated `CHANGELOG` entry. Upgrades are always **forward-only** — you move to a newer tag, apply any new migrations, and redeploy.
 

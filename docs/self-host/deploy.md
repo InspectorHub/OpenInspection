@@ -8,7 +8,7 @@ This guide covers self-hosted production deploys — what every adopter does to 
 
 OpenInspection deploys as a single Cloudflare Worker (the cloudflare/react-router-hono-fullstack-template shape):
 
-- **`workers/app.ts`** — a Hono entry that mounts the full API (`server/`, Hono + Drizzle + D1) in-process for API-owned paths and delegates all other (page) routes to React Router v7 SSR (`app/`, React 18 + Tailwind v4).
+- **`workers/app.ts`** — a Hono entry that mounts the full API (`server/`, Hono + Drizzle + D1) in-process for API-owned paths and delegates all other (page) routes to React Router v8 SSR (`app/`, React 19 + Tailwind v4).
 - React Router loaders/actions call the API DIRECTLY through an injected in-process `API_WORKER` self-binding — no network hop, no second worker, no Service Binding between workers.
 
 One deployable; `npm run deploy` builds and ships it.
@@ -25,7 +25,7 @@ The recommended path is the one-click button in the README:
 
 For the manual flow, see the **Quick start** section in the [README](../../README.md).
 
-> **Already deployed?** To move an existing deployment to a newer release, see [`12_upgrade.md`](12_upgrade.md) — it covers backups, applying new migrations, and verifying the deployed version.
+> **Already deployed?** To move an existing deployment to a newer release, see [`upgrade.md`](upgrade.md) — it covers backups, applying new migrations, and verifying the deployed version.
 
 ### Required Cloudflare resources
 

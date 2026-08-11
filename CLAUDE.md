@@ -4,7 +4,7 @@ The open-source inspection engine. A single Cloudflare Worker (the
 cloudflare/react-router-hono-fullstack-template shape): a Hono entry that mounts the full
 API in-process and delegates page routes to React Router v8 SSR.
 
-**Docs**: `docs/developers/` (architecture, deploy, testing, API ref) · `docs/getting-started.md` (user guide)
+**Docs**: `docs/README.md` is the map — `docs/self-host/` (deploy, upgrade, configure) · `docs/develop/` (architecture, testing, design system) · `docs/reference/` (API, database, roles, deployment modes) · `docs/concepts/` (how the engine works) · `docs/user-guide/` (using the product)
 
 ## Commands
 
@@ -113,7 +113,7 @@ example). `tests/e2e/` stays flat: one spec file = one playwright project. Every
 spec must be collected by exactly one config (playwright projects must resolve).
 Fully-skipped specs need a `TODO(...)` naming their blocker. Name new specs after
 behavior, not sprints. Full rules for classification, writing, and run
-initialization: `docs/developers/05_testing.md`.
+initialization: `docs/develop/testing.md`.
 
 ## Core Architecture
 
@@ -154,7 +154,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`app/styles/tailwind.css`). Tailwind is v4-only (via `@tailwindcss/vite`); no separate server-side CSS build.
 - **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. RR v8 loader/action functions call the in-process API through the injected `API_WORKER` binding (`createApi(context)` in `app/lib/api-client.server.ts`) — no network hop.
 - **State management**: React hooks — `useInspection` (~900 LOC), `useFindings`, `useKeyboard`, `useCannedComments`, `useOfflineQueue`, `usePresence`, `useTheme`, `useUnsavedChanges`.
-- **Component library**: `packages/shared-ui/` provides 25 design-system components consumed by the frontend — Button, Pill, StatCard, Icon, Eyebrow, PageHeader, TabStrip, Input, Select, Textarea, Checkbox, Radio, RadioGroup, EmptyState, Skeleton, Card, Banner, Modal, Drawer, Popover, Pagination, FileDropzone, Table, SegmentedControl, Avatar. See `docs/developers/11_design_system.md`.
+- **Component library**: `packages/shared-ui/` provides 25 design-system components consumed by the frontend — Button, Pill, StatCard, Icon, Eyebrow, PageHeader, TabStrip, Input, Select, Textarea, Checkbox, Radio, RadioGroup, EmptyState, Skeleton, Card, Banner, Modal, Drawer, Popover, Pagination, FileDropzone, Table, SegmentedControl, Avatar. See `docs/develop/design-system.md`.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
 - **Offline**: Service Worker + `useOfflineQueue` hook for photo upload queue and field sync.
 
@@ -169,7 +169,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 | `DB` | Yes | Cloudflare D1 Database binding |
 | `PHOTOS` | Yes | Cloudflare R2 Bucket for image storage |
 | `TENANT_CACHE`| Yes | Cloudflare KV for configuration caching |
-| `INSPECTION_DOC` | No | Durable Object binding (`class_name: InspectionDocDO`) for collaborative inspection editing (#181 — Yjs CRDT host; one DO per inspection, tenant-scoped `idFromName`). Declared in `wrangler.jsonc` (committed) and must be added to `wrangler.saas.jsonc` (gitignored) with the matching `v2` SQLite-class migration. When absent the collab routes return `501` and fail closed — editing falls back to a single-client Y.Doc with no realtime sync. See `docs/developers/collab-editing.md`. |
+| `INSPECTION_DOC` | No | Durable Object binding (`class_name: InspectionDocDO`) for collaborative inspection editing (#181 — Yjs CRDT host; one DO per inspection, tenant-scoped `idFromName`). Declared in `wrangler.jsonc` (committed) and must be added to `wrangler.saas.jsonc` (gitignored) with the matching `v2` SQLite-class migration. When absent the collab routes return `501` and fail closed — editing falls back to a single-client Y.Doc with no realtime sync. See `docs/concepts/collab-editing.md`. |
 | `TURNSTILE_SECRET_KEY` | No | Server-side Turnstile verification — `POST /api/book` enforces this when set. Use test secret `1x0000000000000000000000000000000AA` for local dev. |
 | `APP_BASE_URL` | No | Public URL for OAuth and link generation |
 | `APP_BASE_URL` | No | Public origin used when building absolute links (reports, hosted `/legal/:tenant/…` Privacy & Terms). |

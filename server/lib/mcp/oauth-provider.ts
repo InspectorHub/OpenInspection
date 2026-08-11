@@ -25,7 +25,7 @@ type McpFlagEnv = { MCP_ENABLED?: string } & ProfileEnv;
  * Returns `{ fetch: appFetch }` unchanged when the flag is off — the caller
  * is unaffected and the OAuth surface is not mounted at all.
  *
- * apiRoute strategy (docs/developers/mcp-oauth-notes.md §4 / §11.3), read from
+ * apiRoute strategy (docs/develop/conventions/mcp-oauth-notes.md §4 / §11.3), read from
  * profile.mcpApiRoute:
  *   - standalone: '/mcp'        — single fixed endpoint
  *   - saas:       '/company/'   — broad literal prefix; per-workspace /company/{slug}/mcp

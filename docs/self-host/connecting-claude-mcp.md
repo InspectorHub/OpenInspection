@@ -143,9 +143,9 @@ tool is only offered to a connection when the connection's granted scope covers
 that route's required scope and module tag. Routes tagged `excluded` are never
 exposed. Routes tagged `extended` are off by default; an operator can expose
 them by setting `MCP_EXTENDED_TOOLS=true` in the deployment env (they stay
-scope-gated). See [Route Metadata Conventions](07_route_metadata.md) for how
-routes opt in, and [mcp-oauth-notes.md](mcp-oauth-notes.md) for the server's
-internal architecture.
+scope-gated). See [Route Metadata Conventions](../develop/conventions/route-metadata.md)
+for how routes opt in, and [mcp-oauth-notes.md](../develop/conventions/mcp-oauth-notes.md)
+for the server's internal architecture.
 
 ---
 

@@ -1,6 +1,6 @@
 # Architecture
 
-OpenInspection is a home inspection app deployed as a single Cloudflare Worker (the cloudflare/react-router-hono-fullstack-template shape): a Hono entry that mounts the full API in-process and delegates page routes to React Router v7 SSR. This doc covers the high-level architecture for self-hosters, contributors, and reviewers.
+OpenInspection is a home inspection app deployed as a single Cloudflare Worker (the cloudflare/react-router-hono-fullstack-template shape): a Hono entry that mounts the full API in-process and delegates page routes to React Router v8 SSR. This doc covers the high-level architecture for self-hosters, contributors, and reviewers.
 
 > Self-hosted instances run **standalone** (single-tenant) — the default in `wrangler.jsonc`. The engine is tenant-aware under the hood (every table carries `tenant_id`), but you don't manage tenants or subdomains; one fixed tenant holds all your data.
 
@@ -10,7 +10,7 @@ OpenInspection is a home inspection app deployed as a single Cloudflare Worker (
 |---|---|
 | Edge runtime | Cloudflare Workers (Free tier sufficient for solo inspectors) |
 | API routing | [Hono](https://hono.dev) + Zod OpenAPI (typed JSON API) |
-| Frontend | [React Router v7](https://reactrouter.com) + React 18 + Vite |
+| Frontend | [React Router v8](https://reactrouter.com) + React 19 + Vite |
 | ORM + DB | [Drizzle](https://orm.drizzle.team) + Cloudflare D1 (SQLite) |
 | Object storage | Cloudflare R2 (photos, future PDFs) |
 | KV cache | Cloudflare Workers KV (tenant config, signed tokens, rate-limit counters) |
@@ -26,7 +26,7 @@ OpenInspection is a home inspection app deployed as a single Cloudflare Worker (
 
 ## Single-Worker Architecture
 
-OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app that is the worker entry: it mounts the full API (`server/`) for API-owned paths and delegates everything else (page routes) to the React Router v7 SSR handler.
+OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app that is the worker entry: it mounts the full API (`server/`) for API-owned paths and delegates everything else (page routes) to the React Router v8 SSR handler.
 
 ```
                     ┌──────────────────────────────────────────┐
@@ -45,21 +45,21 @@ OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app tha
                     └──────────────────────────────────────────┘
 ```
 
-- **`workers/app.ts`** — a Hono app is the worker entry. It routes API-owned paths (`/api/*`, `/status`, `/m2m/*`, `/photos/*`, `/.well-known/*`, `/doc`, `/sso`, `/sign/*`, ICS/observe feeds) to the API app and sends everything else to the React Router v7 SSR handler. It injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding between workers).
+- **`workers/app.ts`** — a Hono app is the worker entry. It routes API-owned paths (`/api/*`, `/status`, `/m2m/*`, `/photos/*`, `/.well-known/*`, `/doc`, `/sso`, `/sign/*`, ICS/observe feeds) to the API app and sends everything else to the React Router v8 SSR handler. It injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding between workers).
 - **`server/`** — Hono + Drizzle + D1. Handles all business logic, authentication, and data access. Exposes a typed JSON API.
-- **`app/`** — React Router v7 + React 18 + Tailwind v4. Server-side renders the React UI on the edge.
+- **`app/`** — React Router v8 + React 19 + Tailwind v4. Server-side renders the React UI on the edge.
 - **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based React components (Button, Pill, Card, etc.).
 - **API Types** (`packages/api-types/`) — Re-exports the Hono app type so the web layer's `hono/client` gets full end-to-end type safety.
 
-The web layer uses a **Token Relay BFF** pattern: the React Router v7 server holds the JWT cookie and forwards it to the in-process API on every request, so the browser never sees the token directly.
+The web layer uses a **Token Relay BFF** pattern: the React Router v8 server holds the JWT cookie and forwards it to the in-process API on every request, so the browser never sees the token directly.
 
-### Why React Router v7
+### Why React Router v8
 
 - **SPA navigation**: page transitions without full reload — inspectors switch between editor/dashboard/templates frequently
-- **React 18**: future React Native app can reuse hooks and state logic (useInspection, useFindings, useSync)
+- **React 19**: future React Native app can reuse hooks and state logic (useInspection, useFindings, useSync)
 - **SSR on Workers**: full server rendering at the edge, same latency as static HTML
-- **hono/client**: Hono exports `AppType`, React Router v7 uses `hono/client` for compile-time type-safe API calls — zero handwritten API client
-- **CF Free Tier safe**: React Router v7 SSR adds ~1-3ms CPU per request, well within 10ms limit
+- **hono/client**: Hono exports `AppType`, React Router v8 uses `hono/client` for compile-time type-safe API calls — zero handwritten API client
+- **CF Free Tier safe**: React Router v8 SSR adds ~1-3ms CPU per request, well within 10ms limit
 
 ## Module map
 
@@ -87,10 +87,10 @@ apps/openinspection/
 │   │   └── ics.ts                 # iCalendar string builder
 │   ├── workflows/                 # Cloudflare Workflow durable steps (e-sign completion)
 │   └── portal/                    # SaaS-only portal integration (unused in standalone)
-├── app/                           # Web (React Router v7 + React 18 + Tailwind v4)
-│   ├── root.tsx                   # React Router v7 root layout
+├── app/                           # Web (React Router v8 + React 19 + Tailwind v4)
+│   ├── root.tsx                   # React Router v8 root layout
 │   ├── routes.ts                  # Route configuration
-│   ├── entry.server.tsx           # React Router v7 CF Workers entry
+│   ├── entry.server.tsx           # React Router v8 CF Workers entry
 │   ├── routes/                    # Route files (loader + action + component)
 │   ├── components/                # React components
 │   ├── hooks/                     # React hooks
@@ -108,14 +108,14 @@ apps/openinspection/
 
 ## Request flow
 
-### Page (React Router v7) flow
+### Page (React Router v8) flow
 
 ```
 Browser request
    ↓
 Cloudflare edge → single Worker (workers/app.ts) → Hono routes non-API paths to RR SSR
    ↓
-React Router v7 server (SSR):
+React Router v8 server (SSR):
    1. Route matched → loader() or action() executes
    2. Reads session cookie (Token Relay BFF)
    3. Calls the in-process API via the injected API_WORKER binding (hono/client) — no network hop
@@ -183,7 +183,7 @@ yourself. Three sanctioned readers, by what you are holding:
 - Each request: middleware verifies JWT signature + checks `iat >= KV[pwchanged:userId]`
 - Password change: writes `pwchanged:userId = now()` to KV → invalidates all prior tokens server-side
 - Browser JS never sees the token (HttpOnly enforced); same-origin `fetch()` sends the cookie automatically.
-- The web layer uses Token Relay BFF: the React Router v7 server reads the cookie and forwards it to the in-process API on every request.
+- The web layer uses Token Relay BFF: the React Router v8 server reads the cookie and forwards it to the in-process API on every request.
 
 ## E-signature (Spec 5H)
 
@@ -239,7 +239,7 @@ The DI proxy in `server/lib/middleware/di.ts` lazy-instantiates each service on 
 
 ## Frontend layer
 
-- **React Router v7 SSR**: Routes in `app/routes/` use `loader()` for data fetching and `action()` for mutations. Full server-side rendering on Cloudflare Workers.
+- **React Router v8 SSR**: Routes in `app/routes/` use `loader()` for data fetching and `action()` for mutations. Full server-side rendering on Cloudflare Workers.
 - **React components**: 59 components in `app/components/`, organized by domain (inspection, template, booking, etc.).
 - **Hooks**: 9 custom hooks handle complex state — `useInspection` (866 LOC), `useFindings`, `useKeyboard` (shortcuts), `useCannedComments`, `useOfflineQueue`, `usePresence` (WebSocket), `useTheme`, `useUnsavedChanges`, `useSessionContext`.
 - **Design tokens**: Tailwind v4 with Design System 0523 tokens in `app/styles/tailwind.css`.
@@ -286,4 +286,4 @@ A solo inspector doing 50 inspections/month uses approximately 1-2% of Free tier
 | D1 reads | 5M/day | — |
 | R2 storage | 10 GB | — |
 
-React Router v7 SSR adds ~1-3ms CPU per request. The combined Worker bundle stays well within limits. Browser Run (server-side PDF) is on the Free tier (10 min/day); requires `compatibility_date >= "2026-03-24"` and the `browser` binding in `wrangler.jsonc`.
+React Router v8 SSR adds ~1-3ms CPU per request. The combined Worker bundle stays well within limits. Browser Run (server-side PDF) is on the Free tier (10 min/day); requires `compatibility_date >= "2026-03-24"` and the `browser` binding in `wrangler.jsonc`.

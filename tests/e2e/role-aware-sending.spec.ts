@@ -95,7 +95,7 @@ async function loginApi(request: APIRequestContext, email: string, password: str
  * POST helper with a small retry for the known `wrangler dev` transient:
  * "Your worker restarted mid-request. Please try sending the request
  * again." (a local-only miniflare isolate-recycle hiccup, distinct from any
- * app-level error — see docs/developers/05_testing.md's flake guidance and
+ * app-level error — see docs/develop/testing.md's flake guidance and
  * playwright.config.ts's own CI-retries comment for the same class of local
  * dev-server flake). POST isn't auto-retried by the platform, so retry once
  * here rather than let a dev-server hiccup fail an otherwise-correct test.

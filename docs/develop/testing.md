@@ -1,6 +1,6 @@
 # Testing — apps/openinspection
 
-The single Worker serves both the typed JSON API and the React Router v7 UI, so
+The single Worker serves both the typed JSON API and the React Router v8 UI, so
 tests cover both surfaces. There are four suites, each pinned to a **location**:
 a spec's directory alone decides which config runs it. This document is the
 canonical reference for the three things you need to get right: **where a spec

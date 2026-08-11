@@ -114,7 +114,8 @@
     "lint:eslint": "cross-env NODE_OPTIONS=--max-old-space-size=12288 eslint . --cache --cache-strategy content",
     "lint:gates-full": "npm run lint:ds && npm run lint:contrast && npm run lint:svg && npm run lint:erasure && npm run lint:retention && npm run lint:non-translatable && npm run lint:migrefs && npm run lint:migchain && npm run lint:english && npm run lint:filesize && npm run lint:dup && npm run lint:tenant-scope && npm run lint:status-literals && npm run lint:capability-decl && npm run lint:price-capability && npm run lint:zero-tracking && npm run lint:ai-classification && npm run lint:provider-helpers && npm run lint:notification-dispatch && npm run lint:tests && npm run lint:tests-tsconfig && npm run lint:test-imports && npm run lint:deadcode && npm run lint:timestamps && npm run lint:tz && npm run lint:idempotency && npm run lint:ext-collisions && npm run lint:i18n && npm run lint:i18n-catalog && npm run lint:i18n-glossary && npm run lint:naming && npm run lint:agent-routes && npm run lint:submit-guard",
     "i18n:compile:cached": "node scripts/i18n-compile-if-changed.mjs",
-    "lint:submit-guard": "node scripts/check-submit-guard.mjs"
+    "lint:submit-guard": "node scripts/check-submit-guard.mjs",
+    "docs:modes": "tsx scripts/gen-deployment-modes-doc.ts"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^0.8.1",

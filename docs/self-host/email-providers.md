@@ -77,7 +77,7 @@ For a self-hosted (standalone) deploy, the platform-default email path is the `R
 
 This key is used for all companies in `platform` mode. Companies that configure their own provider in Settings are unaffected by this env variable.
 
-See the [environment variables table](../CLAUDE.md) or the project README for the full list of optional email-related env vars.
+See the [environment variables table](../../CLAUDE.md) or the project README for the full list of optional email-related env vars.
 
 ---
 

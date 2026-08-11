@@ -54,7 +54,7 @@ which is worse than no number at all.
 -- Query A — multilingual demand signal, by stated language. Run monthly.
 -- Undercount: only clients who booked themselves are ever asked this
 -- question; agent-placed bookings store no language at all and land in
--- '(not stated)'. See docs/developers/multilingual-demand-signal.md.
+-- '(not stated)'. See docs/concepts/multilingual-demand-signal.md.
 SELECT COALESCE(locale, '(not stated)') AS stated_language,
        COUNT(*)                         AS contacts
 FROM contacts
