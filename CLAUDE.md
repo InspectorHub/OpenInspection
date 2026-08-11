@@ -86,6 +86,7 @@ Directory = suite; a spec's location alone decides which config runs it
 | `tests/unit/<domain>/` | `test:unit` (CI) | `vitest.api.config.ts` |
 | `tests/workers/` | `test:workers` (CI) | `vitest.workers.config.ts` |
 | `tests/e2e/` | `test:e2e` (+ integration/remote modes) | `playwright.config.ts` (local, seeds D1) / `.integration` / `.remote` |
+| `tests/docs-shots/**/*.shots.ts` | `docs:shots` (NOT a test suite) | `playwright.docs-shots.config.ts` |
 
 Choosing a home for a new spec:
 1. Frontend component/unit test? → **co-locate** beside the component as
@@ -99,6 +100,15 @@ Choosing a home for a new spec:
    `globalSetup` so every E2E exercises the actual database. `*.integration.spec.ts`
    (self-resetting, serial) and remote/staging runs are just other configs
    over the same dir — not separate directories.
+
+`tests/docs-shots/` is the odd one out and deliberately so: those files are a
+**documentation build step**, not tests. They walk the real product and
+photograph it, so every screenshot in `docs/user-guide/` was produced by
+software that actually clicked the button — a UI change that breaks a documented
+step breaks the docs build instead of leaving a lie on the website. They are
+`*.shots.ts` so no other config can collect them, they carry **no copy** (every
+word lives in the markdown, joined by `<!-- shot: id | alt -->` markers), and
+`npm run lint:docs-markers` / `npm run docs:check` enforce that the two agree.
 
 Rules: `tests/unit/<domain>/` dirs are named after the `server/api/` module (or
 service family) the specs exercise — never flat specs at the root. Frontend

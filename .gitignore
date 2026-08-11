@@ -61,3 +61,6 @@ scripts/backfill-zod-descriptions.report.md
 # SDD scratch (briefs, reports, diffs, progress ledger)
 .superpowers/
 .gate-cache/
+
+# Generated user-guide captures — the published copies live in the CMS.
+.docs-shots/

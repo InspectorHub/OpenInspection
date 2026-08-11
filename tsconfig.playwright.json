@@ -52,6 +52,13 @@
     "include": [
         "worker-configuration.d.ts",
         "tests/e2e/**/*",
+        // The user-guide capture scripts. Named explicitly rather than by
+        // widening to `tests/**` — that is the change the comment above forbids,
+        // and this directory carries none of the debt that makes it expensive.
+        // It is here at all because a file no program includes is a file that
+        // type-checks vacuously forever while git and the runner both insist it
+        // exists.
+        "tests/docs-shots/**/*",
         "playwright*.config.ts"
     ],
     "exclude": ["node_modules", "dist", ".types"]
