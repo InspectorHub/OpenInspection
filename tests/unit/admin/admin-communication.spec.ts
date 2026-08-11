@@ -39,7 +39,13 @@ describe('admin communication config — ③-D (B-4)', () => {
             c.set('userRole', 'owner');
             c.set('tenantId', 't1');
             c.set('user', { sub: 'admin-1' } as HonoConfig['Variables']['user']);
-            c.set('services', { branding } as unknown as HonoConfig['Variables']['services']);
+            // getBrand is the ONLY place the legalName -> companyName fallback
+            // lives, so the communication GET now routes through it. Every stub
+            // here gets it by default rather than each test remembering to add
+            // one; a test that cares can still override via the branding arg.
+            c.set('services', {
+                branding: { getBrand: vi.fn().mockResolvedValue({ legalName: null }), ...branding },
+            } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
         app.route('/api/admin', adminRoutes);
