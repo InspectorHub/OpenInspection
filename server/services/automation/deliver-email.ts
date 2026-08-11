@@ -10,32 +10,13 @@ import { createOiTemplateStore } from './template-store';
 import { automationClassId } from '../../lib/notifications/automation-classes';
 import { oiClock, isStaffRecipient } from './shared';
 import { createRecipientLocaleResolver } from '../../lib/i18n/recipient-locale';
+import {
+    COOLING_WINDOW_SENTINEL, COOLING_WINDOW_DEFER_REASON, coolingWindowSentinelFor,
+    coolingWindowUnlockAtMs, deferUntilCoolingWindowOpens,
+} from './cooling-window';
 import type { FlushInspection } from './shared';
 import type { EmailService } from '../email.service';
 import type { automations, automationLogs as automationLogsTable, tenants } from '../../lib/db/schema';
-import { AppError, ErrorCode } from '../../lib/errors';
-
-/** Sentinel the transport adapter returns so the logger adapter can file the
- *  outcome as a SKIP; mirrors the existing `__email_not_configured__` idiom. */
-export const COOLING_WINDOW_SENTINEL = '__outbound_cooling_window__';
-
-/** What an operator actually reads in the automation log. */
-export const COOLING_WINDOW_SKIP_REASON =
-    'skipped — new company, client email unlocks 24h after signup';
-
-/**
- * Recognise the ONE refusal that is a deliberate decline rather than a fault.
- * Everything else — a dead provider, a bad key, a network error — must keep
- * reading as a failure, or the failure column stops meaning anything.
- */
-export function coolingWindowSentinelFor(err: unknown): string | null {
-    const code = err instanceof AppError
-        ? err.code
-        : (typeof err === 'object' && err !== null && 'code' in err
-            ? (err as { code?: unknown }).code
-            : undefined);
-    return code === ErrorCode.OUTBOUND_COOLING_WINDOW ? COOLING_WINDOW_SENTINEL : null;
-}
 
 /**
  * The generic templated-email path of flush(), extracted from delivery.ts for
@@ -199,6 +180,13 @@ export async function deliverTemplatedEmail(
             variables: tpl.variables,
         }),
     };
+    // The instant the cooling window opens, captured on the way past. The
+    // transport port speaks in `{ ok, error }` strings, so the refusal's own
+    // payload cannot cross that boundary — and the payload is the whole point
+    // here: it is what turns "declined" into "declined until 21:27 tomorrow",
+    // which is what the log row is re-scheduled to. Scoped to this one
+    // delivery, written on exactly one branch, read on exactly one.
+    let coolingUnlockAtMs: number | null = null;
     const transport = {
         sendEmail: async (a: { to: string; subject: string; html: string }) => {
             // The rules layer names what it is sending, like every other
@@ -219,6 +207,7 @@ export async function deliverTemplatedEmail(
                 // is a real fault and must keep propagating as one.
                 const sentinel = coolingWindowSentinelFor(err);
                 if (!sentinel) throw err;
+                coolingUnlockAtMs = coolingWindowUnlockAtMs(err);
                 return { ok: false as const, error: sentinel };
             }
             // OI maps "not delivered" (e.g. email not configured) to a
@@ -239,13 +228,23 @@ export async function deliverTemplatedEmail(
                     .where(eq(automationLogs.id, log.id));
                 return;
             }
-            // Portal #98 — same translation, different reason: a deliberate
-            // decline that resolves by itself within a day is a SKIP, not a
-            // failure.
+            // Portal #98 — NOT a translation to another terminal status. A
+            // decline that undoes itself on a known clock is the one refusal
+            // the message survives: the row is re-scheduled to the unlock
+            // instant and stays pending. See ./cooling-window.
+            //
+            // Without a usable instant there is nothing to re-schedule TO, and
+            // a guessed one parks the row where nobody looks — so that case
+            // keeps the terminal skip, which loses one message rather than
+            // hiding it.
             if (row.status === 'failed' && row.error === COOLING_WINDOW_SENTINEL) {
-                await db.update(automationLogs)
-                    .set({ status: 'skipped', error: COOLING_WINDOW_SKIP_REASON })
-                    .where(eq(automationLogs.id, log.id));
+                if (coolingUnlockAtMs !== null) {
+                    await deferUntilCoolingWindowOpens(db, log.id, coolingUnlockAtMs);
+                } else {
+                    await db.update(automationLogs)
+                        .set({ status: 'skipped', error: COOLING_WINDOW_DEFER_REASON })
+                        .where(eq(automationLogs.id, log.id));
+                }
                 return;
             }
             if (row.status === 'sent') {

@@ -27,6 +27,8 @@ import type { EmailService } from '../../../server/services/email.service';
 import type { PortalAccessService } from '../../../server/services/portal-access.service';
 import type { ReportPdfService } from '../../../server/services/report-pdf.service';
 import type { ReportDeliveryDeps } from '../../../server/services/automation/report-email';
+import { AppError, ErrorCode } from '../../../server/lib/errors';
+import { COOLING_WINDOW_DEFER_REASON } from '../../../server/services/automation/cooling-window';
 
 const TENANT = '00000000-0000-0000-0000-00000000d2b0';
 const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
@@ -404,6 +406,41 @@ describe('AutomationService.flush — report.published uses the RULE\'s template
         await svc.flush(emailFor, 'Acme', 'https://acme.example.com', undefined, 50, undefined, undefined, reportDelivery);
 
         expect(sendEmail.mock.calls[0][4]).toEqual({ classId: 'post-inspection-followup' });
+    });
+
+    it('a cooling-window refusal re-schedules the row to the unlock instant and keeps it PENDING', async () => {
+        // A company signs up and publishes their first report the same
+        // afternoon — the ordinary first day. Under a terminal status that
+        // report is never delivered and nothing retries it, because nothing in
+        // the repository moves a log back to pending.
+        const insp = 'insp-cooling';
+        await seedInspection(insp);
+        const ruleId = await seedRule({
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), name: 'Report Ready',
+        });
+        const logId = await seedLog({ ruleId, inspectionId: insp, recipient: 'client@example.com', recipientRoleKey: 'client' });
+
+        const unlockAtMs = Date.now() + 3 * 60 * 60 * 1000;
+        const { reportDelivery } = makeReportDelivery();
+        const { emailFor, sendReportReady } = makeEmailSvc();
+        const svcs = await emailFor(TENANT);
+        const refuse = () => {
+            throw new AppError(403, ErrorCode.OUTBOUND_COOLING_WINDOW, 'not yet', { unlockAtMs, windowHours: 24 });
+        };
+        (svcs as unknown as { sendInspectionReportPdf: () => never }).sendInspectionReportPdf = refuse;
+
+        await expect(
+            svc.flush(async () => svcs, 'Acme', 'https://acme.example.com', undefined, 50, undefined, undefined, reportDelivery),
+        ).resolves.not.toThrow();
+
+        // The text-only retry is NOT attempted: the gate runs before the
+        // provider request is built, so dropping the attachment cannot help.
+        expect(sendReportReady).not.toHaveBeenCalled();
+        const row = await db.select().from(schema.automationLogs).where(eq(schema.automationLogs.id, logId)).get();
+        expect(row?.status).toBe('pending');
+        expect(row?.deliveredAt).toBeNull();
+        expect(row?.error).toBe(COOLING_WINDOW_DEFER_REASON);
+        expect((row?.sendAt as Date).getTime()).toBe(unlockAtMs);
     });
 
     it('a rule pointing at a DELETED template falls back to the catalogue copy rather than withholding the report', async () => {

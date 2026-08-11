@@ -1,5 +1,6 @@
-import { eq, and, sql, desc, lte } from 'drizzle-orm';
+import { eq, and, or, sql, desc, lte } from 'drizzle-orm';
 import { automationLogs, automations, contactRoleProfiles } from '../../lib/db/schema';
+import { COOLING_WINDOW_DEFER_REASON } from './cooling-window';
 import type { Constructor } from './shared';
 import type { AutomationBase } from './shared';
 
@@ -87,7 +88,26 @@ export function AutomationLogs<TBase extends Constructor<AutomationBase>>(Base: 
                 .where(and(
                     eq(automationLogs.tenantId, tenantId),
                     eq(automationLogs.inspectionId, inspectionId),
-                    lte(automationLogs.sendAt, new Date(now)),
+                    // Not-yet-due rows are hidden because a "pending" row dated
+                    // tomorrow reads as a failure rather than as a plan — see
+                    // the method doc.
+                    //
+                    // A row HELD BY THE COOLING WINDOW is neither. It already
+                    // fired; its future `send_at` is not the operator's own
+                    // delay but the instant a platform gate lets go (Portal
+                    // #98 — see ../automation/cooling-window). The account-wide
+                    // banner tells them the window exists; without this, nothing
+                    // tells them WHICH messages are behind it, and a report
+                    // that simply never appeared is the reading §3.4 exists to
+                    // avoid. It carries its own reason string, so it explains
+                    // itself where it lands.
+                    or(
+                        lte(automationLogs.sendAt, new Date(now)),
+                        and(
+                            eq(automationLogs.status, 'pending'),
+                            eq(automationLogs.error, COOLING_WINDOW_DEFER_REASON),
+                        ),
+                    ),
                 ))
                 .orderBy(sql`${automationLogs.sendAt} desc`);
             return rows.map((r) => ({

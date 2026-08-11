@@ -9,6 +9,7 @@ import { buildBaseTemplateVars } from './template-vars';
 import { createOiTemplateStore } from './template-store';
 import { createRecipientLocaleResolver } from '../../lib/i18n/recipient-locale';
 import { automationClassId } from '../../lib/notifications/automation-classes';
+import { coolingWindowUnlockAtMs, deferUntilCoolingWindowOpens } from './cooling-window';
 import { reportDeliverySystemBlocks } from '../../lib/email-templates/renderer';
 import type { FlushInspection } from './shared';
 import type { EmailService } from '../email.service';
@@ -203,6 +204,12 @@ export async function deliverReportEmail(
                     ? await emailSvc.sendInspectionReportPdf(log.recipient, address, linkUrl, pdf, undefined, reportDelivery.renderHost)
                     : await emailSvc.sendReportReady(log.recipient, address, linkUrl, undefined, reportDelivery.renderHost);
             } catch (err) {
+                // A REFUSAL is not a render problem, so dropping the attachment
+                // and trying again cannot help: the gate runs before the
+                // provider request is built, so the retry raises the identical
+                // error, logs a second scary line about a PDF that was fine,
+                // and arrives at the same outer catch. Hand it straight up.
+                if (coolingWindowUnlockAtMs(err) !== null) throw err;
                 logger.error('AutomationService.flush: report PDF email send failed; falling back to text-only email',
                     { inspectionId: inspection.id, logId: log.id }, err instanceof Error ? err : undefined);
                 delivered = await emailSvc.sendReportReady(log.recipient, address, linkUrl, undefined, reportDelivery.renderHost);
@@ -225,6 +232,17 @@ export async function deliverReportEmail(
                 .where(eq(automationLogs.id, log.id));
         }
     } catch (err) {
+        // The cooling window DECLINED; it did not break, and it says when it
+        // stops. Recognised HERE rather than inside the two send branches
+        // because every one of them can raise it — the gate runs before the
+        // provider request is even built (EmailBaseService.performSend) — and
+        // one exit for it is what keeps the log from spending a terminal
+        // status on a clock. See ./cooling-window.
+        const unlockAtMs = coolingWindowUnlockAtMs(err);
+        if (unlockAtMs !== null) {
+            await deferUntilCoolingWindowOpens(db, log.id, unlockAtMs);
+            return;
+        }
         await db.update(automationLogs)
             .set({ status: 'failed', error: err instanceof Error ? err.message.slice(0, 500) : 'Unknown error' })
             .where(eq(automationLogs.id, log.id));
