@@ -14,31 +14,39 @@
  *
  * So this gate keeps a ledger. Every mutating route it discovers must be one of:
  *
- *   1. VERIFIED — a replay spec names the full route path as a string literal.
- *      The spec is the evidence that a retry of the route is contained (by the
- *      mounted middleware, or by the route's own dedup mechanism — the test
- *      does not care which, and neither do we).
- *   2. In `pending` — the burn-down ratchet: known-unverified routes, shrunk one
- *      commit at a time (give the route coverage, add the replay spec, delete
- *      the entry). `--update` regenerates this list.
- *   3. In `uncoveredByDesign` — hand-maintained judgement calls with a one-line
- *      reason (public endpoints whose retry story is the token itself,
- *      provider-signed webhooks with their own dedup, naturally idempotent
- *      writes). Supports a trailing `*` wildcard.
- *   4. In `knownUnreachable` — routes that permanently 401 / are not mounted;
- *      printed on every run, never silently forgotten.
+ *   verified   := the route is in the table the suite drives
+ *                 (tests/unit/idempotency/route-coverage.spec.ts, fed by THIS
+ *                 script's `collect()` — one walk, one source of paths).
+ *   byDesign   := no tenant reaches it IN SAAS, or it owns its dedup —
+ *                 hand-classified, reason required. ⚠️ In standalone
+ *                 resolveByFixedTenant stamps a tenant on every request, so
+ *                 these routes ARE guarded there; this table does not describe
+ *                 that mode.
+ *   excluded   := the table cannot drive it — `tableExclusions`, reason
+ *                 required.
+ *   unreachable:= permanently 401 / not mounted; printed on every run, never
+ *                 silently forgotten.
+ *   pending    := residual. MUST be empty.
  *
- * Anything else fails the gate. So does a stale `pending` entry (the route was
- * removed, or gained a replay spec without the entry being deleted) — a ratchet
- * that only ever grows lies about progress.
+ * ⚠️ THIS GATE ASSERTS COVERAGE, NOT CORRECT REPLAY. The table proves the guard
+ * is mounted ahead of each route and claims a key when a tenant is on the
+ * context. It does NOT prove that a replay returns the stored response — that
+ * needs a business-valid body per route, which is the expensive part and the
+ * reason this exists. The surviving end-to-end replay specs remain the proof
+ * that the mechanism works through a real route. A future reader must not
+ * mistake the weaker guarantee for the stronger one. The JWT layer is STUBBED
+ * in the suite, so tenant PRESENCE is assumed, not proved; `uncoveredByDesign`
+ * is where that judgement lives.
  *
- * EVIDENCE FILES (the divergence from portal's gate, which scans every spec in
- * its idempotency directory): here a replay spec is a file named
- * `*-replay.spec.ts` under tests/unit/idempotency/, or `*-idempotency.test.ts`
- * anywhere under app/. The mechanism's own unit specs (fingerprint/store/
- * middleware) live in that same directory and quote real route paths as sample
- * input — scanning them would mark routes verified on the strength of a hash
- * test that never calls them.
+ * WHY THE EVIDENCE IS A WIRING CHECK AND NOT A HANDSHAKE. The obvious design is
+ * an artifact handshake: the suite writes a JSON of the routes it drove and the
+ * gate reads it. That does NOT work here — CI runs `lint` BEFORE `test:unit`
+ * (.github/workflows/ci.yml), so on every clean checkout the gate would read a
+ * stale or missing artifact. Instead the gate verifies the WIRING: the suite
+ * file exists and imports `collect` from this very script, so the two cannot
+ * drift apart on which routes exist. This is weaker than a handshake and the
+ * reader should know which one they have: it proves the suite walks the same
+ * surface, not that the suite passed.
  *
  * DISCOVERY LIMITS, stated rather than left to be discovered:
  *   - Only `server/api/**` is walked, reached from the `.route()` mounts in
@@ -352,6 +360,14 @@ function parseDefaultExport(src) {
     return src.match(/^export default (\w+);/m)?.[1] ?? null;
 }
 
+/**
+ * The route walk, EXPORTED so the table-driven suite
+ * (tests/unit/idempotency/route-coverage.spec.ts) drives exactly the routes
+ * this gate classifies. One walk, one source of paths — an artifact handshake
+ * between the two would go stale, because CI runs `lint` before `test:unit`.
+ */
+export { collect };
+
 function collect() {
     const files = walkTs(API_DIR);
     const parsed = new Map();
@@ -479,22 +495,47 @@ function collect() {
     });
 }
 
-/** Route paths named as string literals in the replay-evidence specs. */
-function evidenceText() {
-    const parts = [];
-    if (existsSync(REPLAY_SPEC_DIR)) {
-        for (const f of walkTs(REPLAY_SPEC_DIR)) {
-            if (f.endsWith('-replay.spec.ts')) parts.push(read(join(REPLAY_SPEC_DIR, f)));
-        }
+/** The table-driven suite. Its existence and its import are the evidence. */
+export const SUITE_FILE = join(REPLAY_SPEC_DIR, 'route-coverage.spec.ts');
+
+/**
+ * Is the table-driven suite still wired to THIS walk?
+ *
+ * Two failures, both of which would otherwise leave every route scored
+ * `verified` on evidence that no longer exists: the file is gone (renamed,
+ * deleted), or it stopped importing `collect` from this script and now walks
+ * some other list.
+ *
+ * @param {string} suiteFile
+ * @returns {{ ok: boolean, reason: string | null }}
+ */
+export function checkSuiteWiring(suiteFile) {
+    if (!existsSync(suiteFile)) {
+        return {
+            ok: false,
+            reason:
+                `the table-driven suite is MISSING at ${suiteFile}. Every route in this gate is ` +
+                'scored on that file driving the real app; without it there is no evidence at all.',
+        };
     }
-    if (existsSync(APP_DIR)) {
-        for (const f of walkTs(APP_DIR)) {
-            if (f.endsWith('-idempotency.test.ts') || f.endsWith('-idempotency.test.tsx')) {
-                parts.push(read(join(APP_DIR, f)));
-            }
-        }
+    const src = read(suiteFile);
+    if (!src.includes('check-idempotency-coverage.mjs')) {
+        return {
+            ok: false,
+            reason:
+                `${suiteFile} no longer imports collect() from check-idempotency-coverage.mjs. ` +
+                'The gate and the suite must walk ONE source of paths; two walks drift, and the ' +
+                'drift is invisible because both sides still report a number.',
+        };
     }
-    return parts.join('\n');
+    return { ok: true, reason: null };
+}
+
+/** Baseline entries whose reason is missing or blank. */
+export function findReasonlessEntries(map) {
+    return Object.keys(map ?? {})
+        .filter((k) => !String(map[k] ?? '').trim())
+        .sort();
 }
 
 /** Hono pattern match with the trailing `*` wildcard used in the baseline. */
@@ -512,6 +553,22 @@ function routeMatches(pattern, route) {
     return pm === rm && pathMatches(pp, rp);
 }
 
+/**
+ * One route's classification. `suiteWired` is the whole population's evidence:
+ * when it is false EVERY otherwise-ordinary route falls to `pending`, which is
+ * exactly the loud failure a deleted or re-pointed suite deserves.
+ *
+ * @param {string} route  "METHOD /path"
+ * @param {{ unreachableKeys: string[], byDesignKeys: string[], exclusionKeys: string[], suiteWired: boolean }} ctx
+ * @returns {'unreachable'|'byDesign'|'excluded'|'verified'|'pending'}
+ */
+export function classifyRoute(route, { unreachableKeys, byDesignKeys, exclusionKeys, suiteWired }) {
+    if (unreachableKeys.some(p => routeMatches(p, route))) return 'unreachable';
+    if (byDesignKeys.some(p => routeMatches(p, route))) return 'byDesign';
+    if (exclusionKeys.some(p => routeMatches(p, route))) return 'excluded';
+    return suiteWired ? 'verified' : 'pending';
+}
+
 function main() {
     const update = process.argv.includes('--update');
     const routes = collect();
@@ -526,26 +583,20 @@ function main() {
         process.exit(1);
     }
 
-    const specText = evidenceText();
-    const isVerified = (route) => {
-        const path = route.split(' ')[1];
-        return specText.includes(`'${path}'`) || specText.includes(`"${path}"`);
-    };
+    const wiring = checkSuiteWiring(SUITE_FILE);
 
     const prior = existsSync(BASELINE_PATH) ? JSON.parse(read(BASELINE_PATH)) : {};
     const uncoveredByDesign = prior.uncoveredByDesign ?? {};
     const knownUnreachable = prior.knownUnreachable ?? {};
+    const tableExclusions = prior.tableExclusions ?? {};
     const priorComment = Array.isArray(prior.comment) ? prior.comment : null;
     const priorCoverage = prior.coverage ?? null;
 
     const byDesignKeys = Object.keys(uncoveredByDesign);
     const unreachableKeys = Object.keys(knownUnreachable);
-    const classify = (r) => {
-        if (unreachableKeys.some(p => routeMatches(p, r.route))) return 'unreachable';
-        if (isVerified(r.route)) return 'verified';
-        if (byDesignKeys.some(p => routeMatches(p, r.route))) return 'byDesign';
-        return 'pending';
-    };
+    const exclusionKeys = Object.keys(tableExclusions);
+    const ctx = { unreachableKeys, byDesignKeys, exclusionKeys, suiteWired: wiring.ok };
+    const classify = (r) => classifyRoute(r.route, ctx);
 
     const pendingNow = routes.filter(r => classify(r) === 'pending');
     const coverage = {
@@ -586,20 +637,23 @@ function main() {
             BASELINE_PATH,
             JSON.stringify({
                 comment: priorComment ?? [
-                    'Burn-down ledger for mutating-route retry safety. `pending` lists routes',
-                    'with NO verified idempotency story yet: to remove one, give the route',
-                    'coverage (the mounted guard already covers every tenant-authenticated',
-                    'route when the client sends Idempotency-Key; tenant-less routes need',
-                    'their own mechanism) and add a replay spec — `*-replay.spec.ts` under',
-                    'tests/unit/idempotency/, or `*-idempotency.test.ts` under app/ — that',
-                    'names the full route path as a string literal. The spec is the exit',
-                    'evidence. uncoveredByDesign holds judgement calls with reasons and',
-                    'supports a trailing `*` wildcard; knownUnreachable is printed on every',
-                    'run so it is never silently forgotten.',
+                    'Ledger for mutating-route retry safety. A route is VERIFIED when it is in',
+                    'the table tests/unit/idempotency/route-coverage.spec.ts drives — that suite',
+                    'imports collect() from this script, so both walk one source of paths. This',
+                    'is COVERAGE (the guard is mounted ahead of the route and claims a key when',
+                    'a tenant is present), NOT correct replay; the end-to-end replay specs are',
+                    'the proof that a replay returns the stored response.',
+                    'uncoveredByDesign holds hand-classified judgement calls with reasons and',
+                    'supports a trailing `*` wildcard — and it means "no tenant reaches this IN',
+                    'SAAS", because in standalone resolveByFixedTenant stamps a tenant on every',
+                    'request and these routes ARE guarded there. tableExclusions holds routes',
+                    'the table cannot drive, reason required. knownUnreachable is printed on',
+                    'every run so it is never silently forgotten. `pending` MUST be empty.',
                 ],
                 coverage,
                 knownUnreachable,
                 uncoveredByDesign,
+                tableExclusions,
                 pending: pendingNow.map(r => r.route).sort(),
             }, null, 4) + '\n',
             'utf8'
@@ -648,22 +702,65 @@ function main() {
         console.warn('');
     }
 
-    const newUncovered = pendingNow.filter(r => !pendingBaseline.includes(r.route));
-    if (newUncovered.length > 0) {
+    // THE evidence check. Every `verified` route rests on one file existing and
+    // importing this walk; if it does not, the classification above has already
+    // dropped the whole population to `pending`, and this says why.
+    if (!wiring.ok) {
+        failed = true;
+        console.error('Idempotency-coverage gate — the table-driven suite is NOT WIRED:');
+        console.error(`  x ${wiring.reason}`);
+        console.error('');
+    }
+
+    // ⚠️ WHY BOTH HAND-MAINTAINED LISTS ARE POLICED HERE, and not by `pending`.
+    //
+    // Under the old string-literal definition, deleting an `uncoveredByDesign`
+    // entry pushed its route straight into `pending` and the gate went red. That
+    // is no longer true: the table drives EVERY route the walk finds, so a route
+    // whose by-design entry is deleted simply reclassifies as `verified` and
+    // nothing complains. The judgement "no tenant reaches this in saas" would
+    // then evaporate silently — which is the failure mode this whole file exists
+    // to prevent. So the lists are policed directly: an entry must name a route
+    // that still exists, and must carry a written reason.
+    for (const [label, map, keys] of [
+        ['uncoveredByDesign', uncoveredByDesign, byDesignKeys],
+        ['tableExclusions', tableExclusions, exclusionKeys],
+    ]) {
+        const reasonless = findReasonlessEntries(map);
+        if (reasonless.length > 0) {
+            failed = true;
+            console.error(`Idempotency-coverage gate — ${label} entries with NO written reason:`);
+            for (const k of reasonless) console.error(`  x ${k}`);
+            console.error('');
+            console.error('A bare entry is indistinguishable from a forgotten one. Say WHY: no tenant');
+            console.error('reaches this route in saas, it owns its dedup, or the table cannot drive it.');
+        }
+        const staleKeys = keys.filter(k => !routes.some(r => routeMatches(k, r.route)));
+        if (staleKeys.length > 0) {
+            failed = true;
+            console.error(`Idempotency-coverage gate — STALE ${label} (route gone, or renamed):`);
+            for (const k of staleKeys) console.error(`  x ${k}`);
+            console.error('');
+            console.error('An entry that matches nothing is a judgement about a route that no longer');
+            console.error('exists. Delete it, or fix the path it names.');
+        }
+    }
+
+    if (pendingNow.length > 0) {
         failed = true;
         console.error('Idempotency-coverage gate — mutating routes with NO verified retry safety:');
-        for (const r of newUncovered) {
+        for (const r of pendingNow) {
             console.error(`  x ${r.route}  (server/api/${r.file})`);
             console.error(
-                '      the mounted guard covers this when a tenant is on the context and the ' +
-                'client sends Idempotency-Key — add a replay spec naming this path, or, if no ' +
-                'tenant reaches it, give the route its own dedup mechanism first'
+                '      the table-driven suite drives every route this walk finds, so a residual ' +
+                'here means the suite is not wired, or the route is excluded/by-design without ' +
+                'an entry saying so'
             );
         }
         console.error('');
-        console.error('Either verify the route (replay spec), or add it to "uncoveredByDesign" in');
-        console.error(`${BASELINE_PATH} with a one-line reason. Adding it back to "pending" is the`);
-        console.error('option of last resort — the list is a burn-down, not a dumping ground.');
+        console.error(`\`pending\` MUST be empty. Add the route to "uncoveredByDesign" (no tenant`);
+        console.error('reaches it in saas, or it owns its dedup) or to "tableExclusions" (the table');
+        console.error(`cannot drive it) in ${BASELINE_PATH}, with a written reason either way.`);
     }
 
     const stale = pendingBaseline.filter(p => !pendingNow.some(r => r.route === p));
@@ -677,10 +774,23 @@ function main() {
     }
 
     if (failed) process.exit(1);
+    const counts = { verified: 0, byDesign: 0, excluded: 0, unreachable: 0, pending: 0 };
+    for (const r of routes) counts[classify(r)]++;
     console.log(
-        `Idempotency-coverage gate: OK (${routes.length} mutating routes resolved, ` +
-        `${pendingBaseline.length} pending, ${routes.filter(r => classify(r) === 'verified').length} verified by replay spec).`
+        `Idempotency-coverage gate: OK (${routes.length} mutating routes resolved; ` +
+        `${counts.verified} verified by the coverage table, ${counts.byDesign} by design, ` +
+        `${counts.excluded} table-excluded, ${counts.unreachable} unreachable, ` +
+        `${counts.pending} pending). Coverage, not correct replay.`
     );
 }
 
-main();
+// Run only when executed directly, not when imported. `collect` is consumed by
+// route-coverage.spec.ts, and an unguarded main() would run the whole gate --
+// and call process.exit -- inside the test process.
+// Normalize both sides to forward-slash lowercase so Windows drive letters
+// don't break the comparison (same idiom as check-tenant-scoping.mjs).
+const _scriptPath = new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1').toLowerCase();
+const _argv1 = (process.argv[1] ?? '').replace(/\\/g, '/').toLowerCase();
+if (_scriptPath === _argv1 || _argv1.endsWith('/check-idempotency-coverage.mjs')) {
+    main();
+}
