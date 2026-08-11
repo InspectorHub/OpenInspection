@@ -5,11 +5,11 @@ import { logger } from '../lib/logger';
 import {
     parseCmdEnvelope, isKnownCmd, cmdTenantUpdateDataSchema, cmdSyncQuotaDataSchema,
     cmdSeedStarterContentDataSchema, cmdDataExportDataSchema, cmdPurgeDataSchema,
-    cmdTenantAiCapsDataSchema, cmdSubjectExportDataSchema, cmdSubjectEraseDataSchema,
+    cmdTenantAiCapsDataSchema, cmdTenantRenameDataSchema, cmdSubjectExportDataSchema, cmdSubjectEraseDataSchema,
     type CmdEnvelope,
 } from '../lib/sync-events/cmd-envelope';
 import type { SyncEnvelope } from '../lib/sync-events/envelope';
-import { applySyncQuota, applyTenantUpdate, applySeedStarterContent, applyAiCaps } from './apply-commands';
+import { applySyncQuota, applyTenantUpdate, applySeedStarterContent, applyAiCaps, applyTenantRename } from './apply-commands';
 import { applyCredentialIfFresh } from './admin-credential';
 import { parkedFingerprint } from './parked-fingerprint';
 import { OutboxService, type OutboxRow } from './outbox.service';
@@ -278,6 +278,14 @@ async function applyKnownCmd(
                 // time to land rather than writing a config row for a tenant
                 // that does not exist.
                 throw new Error(`ai_caps: tenant not found ${data.tenantId}`);
+            }
+            return;
+        }
+        case 'io.inspectorhub.cmd.tenant.rename': {
+            // Strict parse; not-found throws for sync_quota's reason.
+            const data = cmdTenantRenameDataSchema.parse(env.data);
+            if (await applyTenantRename(dbBinding, kv, data) === 'tenant-not-found') {
+                throw new Error(`tenant.rename: tenant not found ${data.tenantId}`);
             }
             return;
         }

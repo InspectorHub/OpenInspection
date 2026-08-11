@@ -21,6 +21,10 @@ const KNOWN_CMD_TYPES: Record<string, readonly string[]> = {
     // (the queue has no platform-scoped command and adding one would change the
     // envelope contract both sides validate).
     'io.inspectorhub.cmd.tenant.ai_caps': ['cmd-tenant-ai-caps/v1'],
+    // A company admin renamed their own company in portal. SEPARATE from
+    // cmd.tenant.update on purpose — see the schema below for why an
+    // initialize-only sync could not carry this.
+    'io.inspectorhub.cmd.tenant.rename': ['cmd-tenant-rename/v1'],
     // Privacy P3 — DSAR fan-out for a NON-account data subject (a client /
     // homeowner / notification recipient, never a staff account). Both await a
     // reply correlated by `replyto: dsar:<requestId>`.
@@ -99,6 +103,38 @@ export const cmdTenantAiCapsDataSchema = z.object({
     tier: z.string().min(1),
     caps: z.record(z.string(), z.unknown()),
 });
+
+/**
+ * A company admin renamed their own company. Applied UNCONDITIONALLY.
+ *
+ * Why this is not a field on `cmd.tenant.update`: that command is a provisioning
+ * SYNC, and its name write is deliberately initialize-only — it must not clobber
+ * a name during a routine state push. A rename is the opposite intent, and the
+ * two were conflated for as long as there were two name columns to hide it. The
+ * sync wrote the container name (`tenants.name`) and the rename rode along; when
+ * that column was dropped the rename had nowhere to land and became a silent
+ * no-op, which is what made a separate command necessary rather than merely
+ * tidy.
+ *
+ * The overwrite is correct because of WHO sends it. The portal endpoint is
+ * gated on the membership role from the company JWT — the company's own admin,
+ * not a platform operator. There is no third party here whose choice could be
+ * trampled; it is the tenant renaming itself in the other of the two places it
+ * can. (`docs/superpowers/specs/2026-08-04-tenant-legal-name-and-document-identity.md`
+ * §1.3 records the two columns diverging as a DEFECT, not a design.)
+ *
+ * Renames the DISPLAY name only. `legal_name` is a separate column with a
+ * separate meaning — agreements, signature certificates, the invoice "from"
+ * party and the TCPA disclosure — and nothing here may touch it.
+ *
+ * Ordering rides the shared per-tenant `tenantseq`: a rename is ordinary tenant
+ * state, so last-writer-wins under `tenants.applied_cmd_seq` is exactly right —
+ * an overtaken rename SHOULD be dropped, because a newer one already won.
+ */
+export const cmdTenantRenameDataSchema = z.object({
+    tenantId: z.string().min(1),
+    companyName: z.string().trim().min(1),
+}).strict();
 
 /**
  * Privacy P3 — subject-scoped SAR export. `r2Key` is allocated PORTAL-side so a
