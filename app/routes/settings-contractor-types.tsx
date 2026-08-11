@@ -10,7 +10,7 @@ import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { m } from "~/paraglide/messages";
 
-interface ContractorType { id: string; name: string; sortOrder: number }
+interface ContractorType { id: string; name: string; sortOrder: number; tradeSlug?: string | null }
 
 export function meta() { return [{ title: m.settings_contractor_types_meta_title() }]; }
 
@@ -46,6 +46,16 @@ export async function action({ request, context }: Route.ActionArgs) {
       const res = await api.contractorTypes[":id"].$delete({ param: { id: String(form.get("id")) } });
       return { ok: res.ok, intent };
     }
+    // Read-only: what the delete would orphan. Goes through the action rather
+    // than a client fetch because the JWT lives on the server (BFF) — a browser
+    // `fetch('/api/...')` here would be unauthenticated.
+    if (intent === "preflight") {
+      const id = String(form.get("id"));
+      const res = await api.contractorTypes[":id"].preflight.$get({ param: { id } });
+      if (!res.ok) return { ok: false, intent, id, comments: null };
+      const body = (await res.json()) as { data?: { comments?: number } };
+      return { ok: true, intent, id, comments: body.data?.comments ?? null };
+    }
     if (intent === "reorder") {
       const ids = JSON.parse(String(form.get("ids") ?? "[]")) as string[];
       const res = await api.contractorTypes.reorder.$post({ json: { ids } });
@@ -79,7 +89,12 @@ function ContractorTypeRow({ t, idx, count, onMove, onRequestDelete }: { t: Cont
         </fetcher.Form>
       ) : (
         <>
-          <span className="flex-1 font-bold text-[13px] text-ih-fg-1">{t.name}</span>
+          <span className="flex-1 font-bold text-[13px] text-ih-fg-1">
+            {t.name}
+            {t.tradeSlug && (
+              <span title={m.settings_contractor_types_canonical_hint()} className="ml-2 text-[9px] font-bold uppercase tracking-widest text-ih-info-fg bg-ih-info-bg px-1.5 py-0.5 rounded">{m.settings_contractor_types_canonical()}</span>
+            )}
+          </span>
           <button onClick={() => { setEditing(true); setName(t.name); }} className="text-[12px] text-ih-primary-text hover:underline font-bold">{m.settings_contractor_types_rename()}</button>
           <button onClick={onRequestDelete} aria-label={m.settings_contractor_types_delete_aria({ name: t.name })} className="text-[12px] text-ih-bad-fg hover:underline font-bold">{m.common_delete()}</button>
         </>
@@ -93,10 +108,31 @@ export default function SettingsContractorTypes() {
   const createFetcher = useFetcher<typeof action>();
   const reorderFetcher = useFetcher<typeof action>();
   const deleteFetcher = useFetcher<typeof action>();
+  const preflightFetcher = useFetcher<typeof action>();
   const [pendingDelete, setPendingDelete] = useState<ContractorType | null>(null);
   const [newName, setNewName] = useState("");
 
   const types: ContractorType[] = "forbidden" in data ? [] : data.types;
+
+  // Only trust a count that came back for the type currently in the dialog:
+  // the fetcher keeps its last result, and a previous type's number rendered
+  // against this one would be a confident lie.
+  const pf = preflightFetcher.data;
+  const orphanCount =
+    pendingDelete && pf && "comments" in pf && pf.id === pendingDelete.id ? pf.comments : null;
+  // While it is still in flight, say nothing rather than zero — a zero that
+  // later turns into a number is worse than an absent sentence.
+  const orphanSentence =
+    orphanCount === null || orphanCount === 0
+      ? ""
+      : orphanCount === 1
+        ? m.settings_contractor_types_delete_orphans_one({ count: orphanCount })
+        : m.settings_contractor_types_delete_orphans_many({ count: orphanCount });
+
+  function requestDelete(t: ContractorType) {
+    setPendingDelete(t);
+    preflightFetcher.submit({ intent: "preflight", id: t.id }, { method: "POST" });
+  }
 
   function move(idx: number, dir: -1 | 1) {
     if (reorderFetcher.state !== "idle") return;
@@ -129,7 +165,7 @@ export default function SettingsContractorTypes() {
       ) : (
         <div className="bg-ih-bg-card border border-ih-border rounded-lg divide-y divide-ih-border">
           {types.map((t, idx) => (
-            <ContractorTypeRow key={t.id} t={t} idx={idx} count={types.length} onMove={move} onRequestDelete={() => setPendingDelete(t)} />
+            <ContractorTypeRow key={t.id} t={t} idx={idx} count={types.length} onMove={move} onRequestDelete={() => requestDelete(t)} />
           ))}
         </div>
       )}
@@ -137,7 +173,7 @@ export default function SettingsContractorTypes() {
       <ConfirmDialog
         open={!!pendingDelete}
         title={m.settings_contractor_types_delete_title()}
-        message={pendingDelete ? m.settings_contractor_types_delete_confirm({ name: pendingDelete.name }) : ""}
+        message={pendingDelete ? `${m.settings_contractor_types_delete_confirm({ name: pendingDelete.name })}${orphanSentence ? ` ${orphanSentence}` : ""}` : ""}
         busy={deleteFetcher.state !== "idle"}
         onConfirm={() => {
           if (pendingDelete) deleteFetcher.submit({ intent: "delete", id: pendingDelete.id }, { method: "POST" });
