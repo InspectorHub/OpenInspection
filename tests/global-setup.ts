@@ -47,9 +47,33 @@ export default function globalSetup() {
     // caller explicitly asked for did not work" (fatal).
     let seedRequested = false;
 
+    // Migrations are deliberately OUTSIDE the soft-failure block below. A
+    // database that did not migrate is not "slightly stale" — every assertion
+    // after it is meaningless, so this fails the run rather than warning.
+    //
+    // 2026-08-11 is why. `execSync`'s default 1 MB `maxBuffer` overflowed on a
+    // release that added seven migrations at once; the child died with ENOBUFS,
+    // the catch below downgraded it to a WARNING, and the suite then ran against
+    // a database missing `tenant_configs.legal_name`. Result: 39 specs "passed",
+    // one failed with a 500 nobody could explain, and 151 never ran. The warning
+    // is what made a broken database look like a working one.
+    //
+    // maxBuffer is generous because migration output grows with the chain, and
+    // this failure mode stays invisible until it is expensive.
     try {
-        // Ensure all schema migrations are applied (idempotent)
-        execSync('npm run db:migrate', { cwd: appDir, stdio: 'pipe' });
+        execSync('npm run db:migrate', {
+            cwd: appDir, stdio: 'pipe', maxBuffer: 64 * 1024 * 1024,
+        });
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(
+            '[globalSetup] db:migrate FAILED — the local D1 schema is not current, so every ' +
+            'spec in this run would assert against the wrong database. Fatal on purpose.\n' + msg,
+            { cause: err },
+        );
+    }
+
+    try {
 
         // Wipe every data table, not a hand-maintained subset. The old 13-table
         // list missed the many child tables that reference inspections/tenants
