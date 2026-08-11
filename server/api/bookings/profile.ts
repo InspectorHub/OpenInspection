@@ -17,6 +17,7 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { createApiRouter } from '../../lib/openapi-router';
 import { users, services as servicesTable, tenants, availability, tenantConfigs } from '../../lib/db/schema';
+import { tenantDisplayName } from '../../lib/tenant-display-name';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { getDrizzle } from '../../lib/route-helpers';
 
@@ -39,8 +40,10 @@ const bookingProfileRoutes = createApiRouter()
         const { tenant } = c.req.param();
         const db = getDrizzle(c);
 
-        const tenantRow = await db.select({ id: tenants.id, name: tenants.name })
-            .from(tenants).where(eq(tenants.slug, tenant)).get();
+        const tenantRow = await db.select({ id: tenants.id, name: tenantDisplayName })
+            .from(tenants)
+            .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, tenants.id))
+            .where(eq(tenants.slug, tenant)).get();
         if (!tenantRow) return c.json({ success: false, error: { code: 'not_found', message: 'Tenant not found' } }, 404);
 
         const booking = c.var.services.booking;
@@ -113,8 +116,10 @@ const bookingProfileRoutes = createApiRouter()
         const db = getDrizzle(c);
 
         // Resolve tenant by slug
-        const tenantRow = await db.select({ id: tenants.id, name: tenants.name })
-            .from(tenants).where(eq(tenants.slug, tenant)).get();
+        const tenantRow = await db.select({ id: tenants.id, name: tenantDisplayName })
+            .from(tenants)
+            .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, tenants.id))
+            .where(eq(tenants.slug, tenant)).get();
         if (!tenantRow) return c.json({ success: false, error: { code: 'not_found', message: 'Tenant not found' } }, 404);
 
         // Find inspector by slug within tenant

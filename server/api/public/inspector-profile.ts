@@ -1,6 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import { tenants, tenantConfigs } from '../../lib/db/schema';
+import { tenantDisplayName } from '../../lib/tenant-display-name';
 import { createApiRouter } from '../../lib/openapi-router';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
@@ -115,8 +116,10 @@ const publicInspectorProfileRoutes = createApiRouter()
     .openapi(legalDocRoute, async (c) => {
         const { tenant, doc } = c.req.valid('param');
         const db = getDrizzle(c);
-        const row = await db.select({ id: tenants.id, name: tenants.name })
-            .from(tenants).where(eq(tenants.slug, tenant)).get();
+        const row = await db.select({ id: tenants.id, name: tenantDisplayName })
+            .from(tenants)
+            .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, tenants.id))
+            .where(eq(tenants.slug, tenant)).get();
         if (!row) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Tenant not found' } }, 404);
         const cfg = await db.select({
             companyName: tenantConfigs.companyName,
