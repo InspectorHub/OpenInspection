@@ -41,7 +41,6 @@ describe('calendar items — timezone-correct civil date bucketing', () => {
         const now = new Date();
         await testDb.insert(schema.tenants).values({
             id: TENANT,
-            name: 'Acme',
             slug: 'acme',
             status: 'active',
             deploymentMode: 'shared',

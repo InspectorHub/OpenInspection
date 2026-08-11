@@ -56,7 +56,7 @@ describe('TenantPurgeService.purge', () => {
         sqlite = fix.sqlite;
         await setupSchema(fix.sqlite);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.users).values({

@@ -80,7 +80,7 @@ const applyMigrations = () => replayMigrations(b.DB, migrationSql);
 async function seedCommercialInspection(): Promise<void> {
     const db = drizzle(b.DB);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme PCA', slug: `acme-pca-${TENANT.slice(-4)}`, status: 'active',
+        id: TENANT, slug: `acme-pca-${TENANT.slice(-4)}`, status: 'active',
         deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
     });
     const templateSchema = {
@@ -140,7 +140,7 @@ async function seedLargeCommercialInspection(
 ): Promise<void> {
     const db = drizzle(b.DB);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme PCA', slug: `acme-pca-${TENANT.slice(-4)}`, status: 'active',
+        id: TENANT, slug: `acme-pca-${TENANT.slice(-4)}`, status: 'active',
         deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
     });
     const items = Array.from({ length: photoCount }, (_, i) => ({

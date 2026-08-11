@@ -37,7 +37,6 @@ export class PortalProvider implements IntegrationProvider {
             await db.insert(tenants).values({
                 id: newTenantId,
                 slug,
-                name: name || slug,
                 status: (status as 'active' | 'suspended' | 'trial') || 'active',
                 tier: (tier as 'free' | 'pro' | 'enterprise') || 'free',
                 ...(maxUsers != null ? { maxUsers } : {}),
@@ -73,7 +72,6 @@ export class PortalProvider implements IntegrationProvider {
                     slug,
                     status: (status as 'active' | 'suspended' | 'trial') || existingTenant.status,
                     tier: (tier as 'free' | 'pro' | 'enterprise') || existingTenant.tier,
-                    name: name || existingTenant.name,
                     ...(maxUsers != null ? { maxUsers } : {}),
                 })
                 .where(eq(tenants.id, existingTenant.id));
@@ -81,22 +79,40 @@ export class PortalProvider implements IntegrationProvider {
             if (this.kv && existingTenant.slug !== slug) await this.kv.delete(`tenant:${existingTenant.slug}`);
         }
 
-        // IA-27: initialize tenant_configs.companyName from the company name so the
-        // brand never boots as the platform default. This is initialize-only —
-        // if the tenant has already chosen a site name we leave it untouched.
-        if (name) {
+        // Initialize tenant_configs.companyName so the brand never boots as the
+        // platform default. Initialize-only: if the tenant has already chosen a
+        // name in its own settings, that choice wins and is left untouched.
+        //
+        // This is now the ONLY place a name from portal can land. `tenants.name`
+        // used to take it as well, and display fell back to that column — so a
+        // rename arriving here still showed up for a tenant that had never set
+        // its own name. With the column gone the fallback is gone too, and the
+        // rule is simply: settings owns the name once settings has one.
+        //
+        // ⚠️ Consequence worth stating: a rename in portal no longer changes what
+        // core displays for a tenant whose company_name is already set — which,
+        // after the 0064 backfill, is every tenant. That was already true for 12
+        // of the 16 in production before this change; the backfill extends it to
+        // the other 4. If renames are meant to propagate, the fix is a command
+        // that says so explicitly, not a second column to fall back to.
+        //
+        // `name || slug` because the slug is the last resort a container name
+        // used to provide: a tenant provisioned without a name still needs
+        // something to render.
+        const initialName = name || slug;
+        if (initialName) {
             const finalTenantId = id || existingTenant?.id;
             if (finalTenantId) {
                 const cfg = await db.select().from(tenantConfigs).where(eq(tenantConfigs.tenantId, finalTenantId)).get();
                 if (!cfg) {
                     await db.insert(tenantConfigs).values({
                         tenantId: finalTenantId,
-                        companyName: name,
+                        companyName: initialName,
                         updatedAt: new Date(),
                     });
                 } else if (!cfg.companyName) {
                     await db.update(tenantConfigs)
-                        .set({ companyName: name, updatedAt: new Date() })
+                        .set({ companyName: initialName, updatedAt: new Date() })
                         .where(eq(tenantConfigs.tenantId, finalTenantId));
                 }
                 // companyName already set → leave it (initialize-only, never overwrite)

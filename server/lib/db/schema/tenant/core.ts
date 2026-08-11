@@ -4,9 +4,12 @@ import type { ReportLinkTtl } from '../../../report-link-ttl';
 import type { CancellationPolicy } from '../../../billing/cancellation-policy';
 import type { DepositPolicy } from '../../../billing/deposit-policy';
 
+// `name` was here — the CONTAINER name, a second column for one fact that was
+// allowed to diverge from `tenant_configs.company_name` and did: of 16
+// production tenants, 11 matched, 1 had parted ways, 4 had no settings name at
+// all. One name now, and it is company_name.
 export const tenants = sqliteTable('tenants', {
     id: text('id').primaryKey(),
-    name: text('name').notNull(),
     slug: text('slug').unique().notNull(),
     tier: text('tier', { enum: ['free','pro','enterprise'] }).notNull().default('free'),
     stripeConnectAccountId: text('stripe_connect_account_id'),

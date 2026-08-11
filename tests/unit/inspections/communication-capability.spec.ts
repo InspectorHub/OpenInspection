@@ -37,7 +37,7 @@ async function callCommunication(overrides: Record<string, boolean> | null) {
     await setupSchema(fixture.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
-    await db.insert(schema.tenants).values({ id: TENANT, name: 'T', slug: 't-viewcomm', createdAt: new Date() });
+    await db.insert(schema.tenants).values({ id: TENANT, slug: 't-viewcomm', createdAt: new Date() });
     await db.insert(schema.users).values({
         id: USER, tenantId: TENANT, email: 'i@example.com', passwordHash: 'x',
         name: 'Insp', role: 'inspector', createdAt: new Date(),

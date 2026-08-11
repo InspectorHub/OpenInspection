@@ -41,7 +41,6 @@ beforeEach(async () => {
 async function seedTenant() {
     await testDb.insert(schema.tenants).values({
         id: TENANT_ID,
-        name: 'Collab Test Co',
         slug: 'collab-test-co',
         tier: 'free',
         status: 'active',

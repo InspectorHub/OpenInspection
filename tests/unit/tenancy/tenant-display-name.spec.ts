@@ -1,17 +1,16 @@
 /**
  * Which company name an agent or a client sees.
  *
- * Two columns hold one, and they are allowed to differ: `tenants.name` is the
- * container's name (written at provisioning, kept current by portal's rename
- * sync) and `tenant_configs.company_name` is what the tenant typed into core's
- * own settings. Display follows the settings value; the container name is the
- * fallback.
+ * There is ONE name now. `tenants.name` — the container name — was dropped
+ * after a backfill gave every tenant its own `tenant_configs.company_name`.
+ * What survives is the property that column was really providing:
+ * **this expression can never render empty.**
  *
- * The fallback is the part worth pinning. Measured against production on
- * 2026-08-11: of 16 tenants, 11 match, 1 has diverged, and FOUR have no
- * company_name at all. Reading company_name without the COALESCE would render
- * those four with a blank name in the agent directory, invite emails and public
- * profiles — a worse bug than the stale name this rule exists to fix.
+ * That is why the fallback moved to `slug` rather than disappearing. `slug` is
+ * NOT NULL and unique, so there is always something to show. A slug is a poor
+ * name to put in front of a client; it is a far better one than a blank line in
+ * an invite email, which is what a plain `company_name` read would produce for
+ * a tenant whose config row is missing or blank.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq, sql } from 'drizzle-orm';
@@ -35,9 +34,9 @@ function readDisplayName(tenantId: string) {
         .get();
 }
 
-async function seedTenant(id: string, name: string, companyName?: string | null) {
+async function seedTenant(id: string, slug: string, companyName?: string | null) {
     await db.insert(schema.tenants).values({
-        id, name, slug: id, status: 'active',
+        id, slug, status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     if (companyName !== undefined) {
@@ -56,47 +55,48 @@ beforeEach(async () => {
 });
 
 describe('tenantDisplayName', () => {
-    it('prefers the settings company name over the container name', async () => {
-        // The one diverged production tenant has exactly this shape: a container
-        // name that is an email local-part, and a real company name beside it.
-        await seedTenant('t-diverged', 'important.new', 'OpenInspection');
-        expect(readDisplayName('t-diverged')?.name).toBe('OpenInspection');
+    it('shows the name the tenant set in its own settings', async () => {
+        await seedTenant('t-set', 'important-new', 'OpenInspection');
+        expect(readDisplayName('t-set')?.name).toBe('OpenInspection');
     });
 
-    it('falls back to the container name when company_name is NULL', async () => {
-        await seedTenant('t-null', 'Acme Home Inspections', null);
-        expect(readDisplayName('t-null')?.name).toBe('Acme Home Inspections');
+    it('falls back to the slug when company_name is NULL', async () => {
+        await seedTenant('t-null', 'acme-home-inspections', null);
+        expect(readDisplayName('t-null')?.name).toBe('acme-home-inspections');
     });
 
     it('falls back when company_name is whitespace, not just when it is NULL', async () => {
         // "set to spaces" and "never set" are the same thing to a reader, and
         // only one of them is NULL — which is why the rule is NULLIF(TRIM(..)).
-        await seedTenant('t-blank', 'Acme Home Inspections', '   ');
-        expect(readDisplayName('t-blank')?.name).toBe('Acme Home Inspections');
+        await seedTenant('t-blank', 'acme-home-inspections', '   ');
+        expect(readDisplayName('t-blank')?.name).toBe('acme-home-inspections');
     });
 
     it('falls back when the tenant has NO tenant_configs row at all', async () => {
         // The LEFT JOIN carries this case: an INNER JOIN would drop the tenant
-        // from the result set entirely rather than showing its container name.
-        await seedTenant('t-noconfig', 'Acme Home Inspections');
-        expect(readDisplayName('t-noconfig')?.name).toBe('Acme Home Inspections');
+        // from the result set entirely rather than showing anything.
+        await seedTenant('t-noconfig', 'acme-home-inspections');
+        expect(readDisplayName('t-noconfig')?.name).toBe('acme-home-inspections');
     });
 
-    it('never yields an empty string for a tenant that has a container name', async () => {
-        // The regression this whole rule guards: four production tenants have no
-        // company_name, and a bare read would render them blank.
+    it('never yields an empty string, whatever the config row looks like', async () => {
+        // The regression the whole expression exists to prevent. With
+        // `tenants.name` gone there is no second name column to save a blank
+        // read, so this property has to come from the slug or not at all.
         for (const [id, cfg] of [['a', null], ['b', ''], ['c', '  ']] as const) {
-            await seedTenant(`t-${id}`, `Company ${id}`, cfg);
+            await seedTenant(`t-${id}`, `company-${id}`, cfg);
             expect(readDisplayName(`t-${id}`)?.name).toBeTruthy();
         }
+        await seedTenant('t-none', 'company-none');
+        expect(readDisplayName('t-none')?.name).toBeTruthy();
     });
 
-    it('sorts on the displayed name, not the container name', async () => {
+    it('sorts on the displayed name, not on the slug', async () => {
         // The agent directory orders by this expression. Sorting on the raw
-        // column would put "important.new" under I while the row reads
-        // "OpenInspection".
-        await seedTenant('t1', 'zzz-container', 'Alpha');
-        await seedTenant('t2', 'aaa-container', 'Zulu');
+        // slug would file "zzz-co" under Z while the row on screen reads
+        // "Alpha".
+        await seedTenant('t1', 'zzz-co', 'Alpha');
+        await seedTenant('t2', 'aaa-co', 'Zulu');
         const rows = await db
             .select({ name: tenantDisplayName })
             .from(schema.tenants)

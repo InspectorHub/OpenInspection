@@ -109,7 +109,7 @@ export function buildApp(db: TestDb, stubs: Stubs = {}) {
 
 export async function seedBase(db: TestDb, opts: { withTemplate?: boolean } = {}) {
     await db.insert(schema.tenants).values({
-        id: TENANT_ID, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT_ID, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
     });
     // Task 9b (people-role-profiles) — AgreementService.findOrCreate's default

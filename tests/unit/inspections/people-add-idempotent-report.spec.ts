@@ -45,7 +45,7 @@ describe('PeopleService.addPerson — reports whether a seat was created', () =>
         svc = new PeopleService({ DB: {} as D1Database });
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'PeopleCo', slug: 'peopleco',
+            id: TENANT, slug: 'peopleco',
             status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({

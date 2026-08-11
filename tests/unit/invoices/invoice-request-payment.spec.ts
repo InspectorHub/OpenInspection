@@ -89,7 +89,7 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: SLUG, status: 'active',
+            id: TENANT, slug: SLUG, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         // Task 9a — the route resolves the client via the inspection_people
@@ -255,7 +255,7 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
 
     it('cross-tenant inspection — 404, no email', async () => {
         await db.insert(schema.tenants).values({
-            id: OTHER, name: 'Other', slug: 'other', status: 'active',
+            id: OTHER, slug: 'other', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.inspections).values({

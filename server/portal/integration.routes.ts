@@ -9,6 +9,7 @@ import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
 import { SsoHandoffSchema } from '../lib/validations/sso-handoff.schema';
 import { logger } from '../lib/logger';
 import { tenantConfigs, inspectionAccessTokens, tenants, contactRoleProfiles } from '../lib/db/schema';
+import { tenantDisplayName } from '../lib/tenant-display-name';
 import { capabilitiesForProfile, type RoleKind } from '../lib/people/capabilities';
 import { reencryptAllTenantSecrets } from '../lib/secrets-reencrypt';
 import { secretsCacheKey } from '../lib/secrets-cache';
@@ -273,7 +274,9 @@ api.post('/backfill-default-templates', requireServiceBinding, async (c) => {
     // set to consult. Bolting one on would make tenant seeding depend on a
     // permission nobody holds yet.
     const db = drizzle(c.env.DB);
-    const allTenants = await db.select({ id: tenants.id, name: tenants.name }).from(tenants).all();
+    // Operational output for a seeding caller, not a display surface.
+    const allTenants = await db.select({ id: tenants.id, name: tenantDisplayName })
+        .from(tenants).leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, tenants.id)).all();
     const svc = new TemplateSeedService(c.env.DB);
 
     const results: { tenantId: string; name: string; seeded: number; skipped: number }[] = [];

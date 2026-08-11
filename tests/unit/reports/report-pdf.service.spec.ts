@@ -19,7 +19,7 @@ const INSP_1   = '00000000-0000-0000-0000-0000000000b1';
 
 async function seed(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.tenants).values({
-        id: TENANT_A, name: 'A', slug: 'a', status: 'active',
+        id: TENANT_A, slug: 'a', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
 }

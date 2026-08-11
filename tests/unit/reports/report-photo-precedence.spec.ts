@@ -37,7 +37,7 @@ describe('getReportData photo precedence (annotatedKey || croppedKey || key)', (
         svc = new InspectionService({} as D1Database);
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme-prec', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            id: TENANT, slug: 'acme-prec', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.templates).values({
             id: TEMPLATE_ID, tenantId: TENANT, name: 'Standard', schema: TEMPLATE_SCHEMA, version: 1, createdAt: new Date(),

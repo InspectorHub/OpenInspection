@@ -31,7 +31,7 @@ describe('getReportData — public field projection (IA-33 boundary A)', () => {
         (mockDrizzle as any).mockReturnValue(testDb);
         svc = new InspectionService({} as D1Database);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({

@@ -20,8 +20,8 @@ async function seedTenants(testDb: BetterSQLite3Database<typeof schema>) {
     // signing_keys.tenant_id has a FK to tenants(id) — ensureKeypair() (called
     // by every signOff/verifySignoff) requires the tenant row to exist first.
     await testDb.insert(schema.tenants).values([
-        { id: 't1', name: 'Tenant One', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-        { id: 't2', name: 'Tenant Two', slug: 't2', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: 't1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: 't2', slug: 't2', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
 }
 

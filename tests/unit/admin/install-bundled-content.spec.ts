@@ -39,7 +39,7 @@ describe('install bundled content', () => {
     // their LAST character — so it is derived from the whole id, not a prefix.
     const seedTenantRow = (id: string) =>
         testDb.insert(tenants).values({
-            id, name: `Workspace ${id.slice(-4)}`, slug: `ws-${id}`,
+            id, slug: `ws-${id}`,
             createdAt: new Date(),
         } as typeof tenants.$inferInsert);
 

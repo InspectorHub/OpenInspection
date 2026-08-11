@@ -44,8 +44,8 @@ let db: BetterSQLite3Database<typeof schema>;
 async function seed() {
     const now = new Date();
     await db.insert(schema.tenants).values([
-        { id: TENANT_A, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now },
-        { id: TENANT_B, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now },
+        { id: TENANT_A, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now },
+        { id: TENANT_B, slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now },
     ]);
     await db.insert(schema.users).values([
         { id: STAFF_USER, tenantId: TENANT_A, email: 'staff@a.com', name: 'Staff', passwordHash: 'x', role: 'owner', createdAt: now },

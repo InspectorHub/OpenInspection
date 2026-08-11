@@ -36,7 +36,7 @@ beforeEach(async () => {
 
     // Seed tenant first (FK ordering: tenant must exist before inspection).
     await db.insert(schema.tenants).values({
-        id: T, name: 'Acme Inspections', slug: 'acme', status: 'active',
+        id: T, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
     await seedRoleProfiles(asD1Db(db), T, new Date(1));

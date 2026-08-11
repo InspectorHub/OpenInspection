@@ -197,7 +197,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
 
     async function seed(inspOver: Partial<typeof schema.inspections.$inferInsert> = {}) {
         await db.insert(schema.tenants).values({
-            id: TENANT_ID, name: 'Acme', slug: SLUG, status: 'active',
+            id: TENANT_ID, slug: SLUG, status: 'active',
             deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
         } as any);
         await db.insert(schema.tenantConfigs).values({

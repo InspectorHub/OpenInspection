@@ -21,7 +21,7 @@ beforeEach(async () => {
     await setupSchema(fx.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     // Spec 2 Task 0 — ensureSeeds now resolves each seed's recipientRoleKey to a

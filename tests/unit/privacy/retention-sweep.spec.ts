@@ -21,8 +21,8 @@ describe('runRetentionSweep', () => {
 
         // Two tenants with different retention windows.
         await testDb.insert(tenants).values([
-            { id: 't1', name: 'T1', slug: 't1', createdAt: new Date(NOW) },
-            { id: 't2', name: 'T2', slug: 't2', createdAt: new Date(NOW) },
+            { id: 't1', slug: 't1', createdAt: new Date(NOW) },
+            { id: 't2', slug: 't2', createdAt: new Date(NOW) },
         ]);
         await testDb.insert(tenantConfigs).values([
             { tenantId: 't1', agreementRetentionYears: 6, updatedAt: new Date(NOW) },
@@ -225,7 +225,7 @@ describe('runRetentionSweep', () => {
     it('applies the DEFAULT 6y when a tenant has NO tenant_configs row (leftJoin null -> coalesce 6)', async () => {
         // A third tenant with NO tenant_configs row -> years comes back null from
         // the leftJoin and the sweep must coalesce it to DEFAULT_RETENTION_YEARS (6).
-        await testDb.insert(tenants).values({ id: 't3', name: 'T3', slug: 't3', createdAt: new Date(NOW) });
+        await testDb.insert(tenants).values({ id: 't3', slug: 't3', createdAt: new Date(NOW) });
         await testDb.insert(schema.inspections).values({
             id: 'insp-t3', tenantId: 't3', propertyAddress: '3 Main', clientName: null, clientEmail: null, date: '2026-01-01', status: 'completed', paymentStatus: 'unpaid', price: 0, createdAt: new Date(NOW),
         } as any);

@@ -25,7 +25,7 @@ describe('backfillInspectionPeople (Task 13 — retired: reads dropped columns, 
   let f: ReturnType<typeof createTestDb>;
   beforeEach(async () => {
     f = createTestDb(); await setupSchema(f.sqlite);
-    await f.db.insert(schema.tenants).values({ id: 't1', name: 'T', slug: 't1', createdAt: new Date(1) } as any);
+    await f.db.insert(schema.tenants).values({ id: 't1', slug: 't1', createdAt: new Date(1) } as any);
     await seedRoleProfiles(f.db as any, 't1', new Date(1));
     await f.db.insert(schema.contacts).values([
       { id: 'client1', tenantId: 't1', type: 'client', name: 'Buyer', email: 'b@x.com', createdAt: new Date(1) },

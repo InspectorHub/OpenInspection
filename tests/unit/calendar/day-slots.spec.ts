@@ -94,7 +94,7 @@ describe('GET /api/schedule/day-slots', () => {
             slots: [{ time: '09:00', available: true, inspectorIds: [ADA] }],
         });
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.tenantConfigs).values({

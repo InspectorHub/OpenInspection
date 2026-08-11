@@ -57,7 +57,7 @@ describe('role profile capability audit', () => {
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT_ID, name: 'T', slug: 't-rpaudit', status: 'active',
+            id: TENANT_ID, slug: 't-rpaudit', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(db), TENANT_ID, new Date(1));

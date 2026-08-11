@@ -48,7 +48,7 @@
   "server/api/calendar.ts": 453,
   "app/components/portal/sections/RepairBuilderSection.tsx": 450,
   "app/components/editor/CostItemsPanel.tsx": 449,
-  "server/portal/integration.routes.ts": 446,
+  "server/portal/integration.routes.ts": 449,
   "server/api/inspections/results.ts": 445,
   "app/lib/collab/results-doc-connection.ts": 435,
   "app/routes/templates.tsx": 435,

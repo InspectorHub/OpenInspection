@@ -49,7 +49,7 @@ describe('24-hour outbound cooling window', () => {
     /** Insert a tenant whose row was written `ageMs` ago. */
     async function seedTenant(id: string, ageMs: number) {
         await testDb.insert(schema.tenants).values({
-            id, slug: id, name: id, createdAt: new Date(Date.now() - ageMs),
+            id, slug: id, createdAt: new Date(Date.now() - ageMs),
         });
     }
 

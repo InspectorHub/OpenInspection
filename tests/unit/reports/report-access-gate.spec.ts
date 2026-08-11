@@ -72,7 +72,7 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
 
     async function seedInspection(reportStatus: string) {
         await db.insert(schema.tenants).values({
-            id: TENANT_ID, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT_ID, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as any);
         await db.insert(schema.inspections).values({
@@ -179,7 +179,7 @@ describe('GET /api/public/report/:tenant/:id/photo — publish gate', () => {
 
         // Seed tenant + inspection with report_status='in_progress'
         await db.insert(schema.tenants).values({
-            id: T, name: 'Photo', slug: 'photo', status: 'active',
+            id: T, slug: 'photo', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as any);
         await db.insert(schema.inspections).values({
@@ -230,7 +230,7 @@ describe('GET /api/public/report/:tenant/:id/pdf — publish gate', () => {
 
         // Seed tenant + inspection with report_status='in_progress'
         await db.insert(schema.tenants).values({
-            id: T, name: 'Demo', slug: 'demo', status: 'active',
+            id: T, slug: 'demo', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as any);
         await db.insert(schema.inspections).values({
@@ -278,7 +278,7 @@ describe('GET /api/public/verify/report/:token — reflects current publish stat
 
         // Seed tenant + inspection with report_status='in_progress' (unpublished).
         await db.insert(schema.tenants).values({
-            id: T, name: 'Verify', slug: 'verify', status: 'active',
+            id: T, slug: 'verify', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as any);
         await db.insert(schema.inspections).values({

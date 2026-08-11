@@ -65,7 +65,7 @@ describe('tenant-routing — resolution through slug history', () => {
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fix.db);
         const seedTenant = (v: { id: string; slug: string }) =>
             fix.db.insert(tenants).values({
-                ...v, name: v.slug, tier: 'pro', status: 'active', createdAt: new Date(),
+                ...v, tier: 'pro', status: 'active', createdAt: new Date(),
             } as typeof tenants.$inferInsert);
         const seedHistory = (v: { oldSlug: string; tenantId: string; retiredUntil?: Date }) =>
             fix.db.insert(tenantSlugHistory).values({

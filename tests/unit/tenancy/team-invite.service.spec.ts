@@ -19,7 +19,7 @@ const ADMIN = '11111111-1111-1111-1111-1111111111c1';
 
 async function seedTenant(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme-c1', status: 'active',
+        id: TENANT, slug: 'acme-c1', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await testDb.insert(schema.users).values({

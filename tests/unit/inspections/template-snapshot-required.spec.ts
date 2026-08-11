@@ -126,7 +126,7 @@ describe('computePublishReadiness stops re-acquiring the live template', () => {
         (mockDrizzle as any).mockReturnValue(db);
 
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'T', slug: 'snapshot-required', createdAt: new Date(),
+            id: TENANT, slug: 'snapshot-required', createdAt: new Date(),
         } as never);
         // The LIVE template differs from what the inspection was filled
         // against. If anything still reads it, the difference shows.

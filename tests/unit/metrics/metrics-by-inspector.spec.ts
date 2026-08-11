@@ -134,7 +134,7 @@ beforeEach(async () => {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.users).values([

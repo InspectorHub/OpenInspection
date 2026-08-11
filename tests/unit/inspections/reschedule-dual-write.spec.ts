@@ -72,7 +72,7 @@ function toMs(v: unknown): number | null {
 
 async function seed(over: Partial<{ date: string; startMs: number | null; endMs: number | null }> = {}) {
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'A', slug: 's', status: 'active',
+        id: TENANT, slug: 's', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.tenantConfigs).values({

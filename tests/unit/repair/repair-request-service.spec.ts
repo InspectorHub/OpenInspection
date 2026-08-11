@@ -29,7 +29,7 @@ function makeRepairRequestService(db: BetterSQLite3Database<typeof schema>) {
 
 async function seedTenant(db: BetterSQLite3Database<typeof schema>) {
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', maxUsers: 5,
         appliedCmdSeq: 0, appliedCredSeq: 0, createdAt: new Date(),
     } as any);

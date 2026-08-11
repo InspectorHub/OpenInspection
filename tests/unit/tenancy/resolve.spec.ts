@@ -96,7 +96,6 @@ beforeEach(async () => {
 async function seedTenant(tier: string, status: string) {
     await testDb.insert(schema.tenants).values({
         id: TENANT_ID,
-        name: 'Test Co',
         slug: 'test-co',
         tier: tier as 'free' | 'pro' | 'enterprise',
         status: status as 'pending' | 'active' | 'suspended' | 'trial',
@@ -108,7 +107,6 @@ async function seedTenant(tier: string, status: string) {
 async function seedStandaloneTenant() {
     await testDb.insert(schema.tenants).values({
         id: TENANT_ID,
-        name: 'Self-Host Co',
         slug: 'self-host-co',
         tier: 'free',
         status: 'active',

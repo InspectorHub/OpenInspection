@@ -21,7 +21,7 @@ describe('resolveAutomationCompanyName', () => {
         // `tenant_configs.tenant_id` carries a real FK to `tenants`, so a config
         // row with no tenant fails the INSERT rather than the assertion.
         await testDb.insert(tenants).values({
-            id: TENANT, slug: 'acme', name: 'Acme Registration Name',
+            id: TENANT, slug: 'acme',
             status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as typeof tenants.$inferInsert);
     });

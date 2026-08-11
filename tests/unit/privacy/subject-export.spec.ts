@@ -76,8 +76,8 @@ describe('SubjectExportService', () => {
         db = fixture.db;
         await setupSchema(fixture.sqlite);
         await db.insert(schema.tenants).values([
-            { id: TENANT_A, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: TENANT_B, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_A, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_B, slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await seedRoleProfiles(asD1Db(db), TENANT_A, new Date(1));
         await seedRoleProfiles(asD1Db(db), TENANT_B, new Date(1));

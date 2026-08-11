@@ -34,7 +34,6 @@ let sqlite: any;
 async function seedTenant(id = TENANT_ID, slug = TENANT_SLUG) {
     await testDb.insert(tenants).values({
         id,
-        name: 'Acme Inspections',
         slug,
         createdAt: new Date(),
     });

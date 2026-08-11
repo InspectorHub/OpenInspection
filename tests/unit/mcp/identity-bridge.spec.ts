@@ -154,8 +154,8 @@ describe('isGrantUserActive (Fix 1 defense-in-depth)', () => {
         (mockDrizzle as any).mockReturnValue(testDb);
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', slug: 'acme-mcp', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: OTHER_TENANT, name: 'Beta', slug: 'beta-mcp', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 'acme-mcp', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: OTHER_TENANT, slug: 'beta-mcp', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await testDb.insert(schema.users).values({
             id: ACTIVE_USER, tenantId: TENANT, email: 'active@acme.test', passwordHash: 'x', role: 'inspector', createdAt: new Date(),

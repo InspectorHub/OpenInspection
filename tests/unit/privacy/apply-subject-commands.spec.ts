@@ -35,7 +35,7 @@ describe('applySubjectErase', () => {
         sqlite = fixture.sqlite as unknown as typeof sqlite;
         await setupSchema(fixture.sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT_A, name: 'A', slug: 'a', status: 'active',
+            id: TENANT_A, slug: 'a', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(db), TENANT_A, new Date(1));

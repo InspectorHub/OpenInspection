@@ -239,7 +239,7 @@ describe('PATCH /api/admin/tenant-config — legal document versions', () => {
         db = fixture.db;
         await setupSchema(fixture.sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT_ID, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT_ID, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.tenantConfigs).values({

@@ -1,0 +1,22 @@
+ALTER TABLE `tenants` DROP COLUMN `name`;
+-- Native `DROP COLUMN`, deliberately NOT a rebuild.
+--
+-- `tenants` is the FK target of roughly 30 tables, and the rule this repo
+-- carries — "D1 cannot drop a column from an FK-referenced table" — describes
+-- drizzle's generated 12-step rebuild (CREATE __new_ / INSERT SELECT / DROP
+-- TABLE / RENAME), whose `DROP TABLE` is what loses rows. SQLite's native form
+-- is a different operation: the table keeps its identity, nothing is copied, no
+-- FK is ever dangling. `0024_drop_users_license_number.sql` did exactly this
+-- against `users` (FK target of six tables) and is long since applied in
+-- production.
+--
+-- The statement above was GENERATED and then verified rather than trusted:
+-- checked for PRAGMA / __new_ / DROP TABLE / RENAME TO before being kept.
+-- drizzle can emit the rebuild for this shape; this time it did not.
+--
+-- Native DROP COLUMN is refused when the column carries an index, a UNIQUE/PK
+-- constraint, a CHECK, or a view/trigger reference. `name` was a plain NOT NULL
+-- text with none of those — `slug` holds the unique index on this table.
+--
+-- 0064 must have run first: it is what gives the four tenants with no
+-- `company_name` a name of their own before their only other one disappears.

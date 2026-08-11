@@ -77,7 +77,7 @@ describe('runLogRetentionSweep', () => {
         db = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        await db.insert(tenants).values({ id: 't1', name: 'T1', slug: 't1', createdAt: new Date(NOW) });
+        await db.insert(tenants).values({ id: 't1', slug: 't1', createdAt: new Date(NOW) });
     });
 
     afterEach(() => sqlite.close());

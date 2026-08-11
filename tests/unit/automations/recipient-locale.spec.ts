@@ -41,7 +41,7 @@ beforeEach(async () => {
 
     for (const [id, slug] of [[T, 'acme-c0de'], [OTHER_T, 'other-c0df']] as const) {
         await db.insert(schema.tenants).values({
-            id, name: 'Acme', slug, status: 'active',
+            id, slug, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as never);
     }

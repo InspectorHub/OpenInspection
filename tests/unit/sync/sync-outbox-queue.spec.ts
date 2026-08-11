@@ -165,7 +165,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
     });
 
     it('TeamService.removeMember emits user.deleted with the pre-removal email and soft-deletes the row', async () => {
-        await testDb.insert(tenants).values({ id: 't1', name: 'T1', slug: 't1', createdAt: new Date() } as typeof tenants.$inferInsert);
+        await testDb.insert(tenants).values({ id: 't1', slug: 't1', createdAt: new Date() } as typeof tenants.$inferInsert);
         await testDb.insert(users).values({
             id: 'u-victim', tenantId: 't1', email: 'victim@example.com',
             passwordHash: 'hash', role: 'inspector', createdAt: new Date(),

@@ -74,7 +74,7 @@ describe('offline field sync writes to the primary report, not to whichever resu
         (mockDrizzle as unknown as { mockReturnValue: (v: unknown) => void }).mockReturnValue(db);
 
         await db.insert(tenants).values({
-            id: TENANT_ID, name: 'Acme Inspections', slug: 'acme-test',
+            id: TENANT_ID, slug: 'acme-test',
             tier: 'free', status: 'active', maxUsers: 5,
             deploymentMode: 'shared', createdAt: new Date(),
         } as never);

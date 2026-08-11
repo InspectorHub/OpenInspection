@@ -24,7 +24,7 @@ const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
 // row alongside the (now-unread) legacy columns.
 async function seedFor(testDb: BetterSQLite3Database<typeof schema>, agreementRequired: boolean) {
     await testDb.insert(schema.tenants).values([
-        { id: TENANT, name: 'T', slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: TENANT, slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
     await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
     await testDb.insert(schema.contacts).values([

@@ -70,7 +70,7 @@ beforeEach(async () => {
     verifyWebhook.mockReset();
 
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: T1,
     });
     await db.insert(schema.inspections).values({

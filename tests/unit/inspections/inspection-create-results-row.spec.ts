@@ -39,7 +39,7 @@ beforeEach(async () => {
     const sdb = new ScopedDB(testDb as any, TENANT);
 
     await testDb.insert(schema.tenants).values({
-        id: TENANT, name: 'Results Co', slug: 'results-co', status: 'active',
+        id: TENANT, slug: 'results-co', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await seedRoleProfiles(asD1Db(testDb), TENANT, new Date());

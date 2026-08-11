@@ -36,7 +36,7 @@ beforeEach(async () => {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
     await db.insert(schema.tenants).values({
-        id: T, name: 'Acme', slug: 'acme-inapp-tpl', status: 'active',
+        id: T, slug: 'acme-inapp-tpl', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
     await db.insert(schema.inspections).values({

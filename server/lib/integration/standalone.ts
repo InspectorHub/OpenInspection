@@ -277,7 +277,6 @@ export class StandaloneProvider implements IntegrationProvider {
         if (!existingTenant) {
             await db.insert(tenants).values({
                 id: tenantId,
-                name: name || slug,
                 slug,
                 tier: tier || 'free',
                 status: (adminEmail ? 'active' : status) || 'pending',
@@ -294,26 +293,29 @@ export class StandaloneProvider implements IntegrationProvider {
             };
             if (tier) update.tier = tier;
             if (deploymentMode) update.deploymentMode = deploymentMode;
-            if (name) update.name = name;
             if (maxUsers != null) update.maxUsers = maxUsers;
+            // `update.name = name` was here. tsc named five of the six sites
+            // touching that column and missed this one: `update` is a
+            // `Record<string, …>`, so a dynamic key type-checks against anything.
 
             await db.update(tenants).set(update).where(eq(tenants.id, tenantId));
         }
 
-        // IA-27: initialize tenant_configs.companyName from the company name so the
-        // brand never boots as the platform default. Initialize-only — never
-        // overwrites a name the tenant has already chosen.
-        if (name) {
+        // Initialize companyName — initialize-only, so a name the tenant chose
+        // in settings wins. Now the ONLY place a name lands; `|| slug` keeps
+        // the last resort the container name used to provide.
+        const initialName = name || slug;
+        if (initialName) {
             const cfg = await db.select().from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
             if (!cfg) {
                 await db.insert(tenantConfigs).values({
                     tenantId,
-                    companyName: name,
+                    companyName: initialName,
                     updatedAt: new Date(),
                 });
             } else if (!cfg.companyName) {
                 await db.update(tenantConfigs)
-                    .set({ companyName: name, updatedAt: new Date() })
+                    .set({ companyName: initialName, updatedAt: new Date() })
                     .where(eq(tenantConfigs.tenantId, tenantId));
             }
             // companyName already set → leave it (initialize-only, never overwrite)

@@ -33,7 +33,7 @@ describe('InvoiceService — void exclusion from earnings', () => {
         svc = new InvoiceService({} as D1Database);
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'VoidCo', slug: 'voidco', status: 'active',
+            id: TENANT, slug: 'voidco', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
@@ -112,7 +112,7 @@ describe('InvoiceService — getStatus void variant', () => {
         svc = new InvoiceService({} as D1Database);
 
         await testDb.insert(schema.tenants).values({
-            id: T2, name: 'StatusCo', slug: 'statusco', status: 'active',
+            id: T2, slug: 'statusco', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
@@ -170,11 +170,11 @@ describe('InvoiceService — deleteInvoice voids (audit trail)', () => {
         svc = new InvoiceService({} as D1Database);
 
         await testDb.insert(schema.tenants).values({
-            id: T_VOID, name: 'AuditCo', slug: 'auditco', status: 'active',
+            id: T_VOID, slug: 'auditco', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.tenants).values({
-            id: T_OTHER, name: 'OtherCo', slug: 'otherco', status: 'active',
+            id: T_OTHER, slug: 'otherco', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
@@ -232,11 +232,11 @@ describe('InvoiceService — voidInvoice idempotency + tenant guard', () => {
         svc = new InvoiceService({} as D1Database);
 
         await testDb.insert(schema.tenants).values({
-            id: T_VOID, name: 'AuditCo', slug: 'auditco', status: 'active',
+            id: T_VOID, slug: 'auditco', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.tenants).values({
-            id: T_OTHER, name: 'OtherCo', slug: 'otherco', status: 'active',
+            id: T_OTHER, slug: 'otherco', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({

@@ -43,7 +43,6 @@ describe('PlanQuotaGuard', () => {
     async function seedTenant(id: string, opts: { tier: 'free' | 'pro' | 'enterprise' }) {
         await testDb.insert(tenants).values({
             id,
-            name: `Tenant ${id}`,
             slug: id,
             tier: opts.tier,
             createdAt: new Date(),

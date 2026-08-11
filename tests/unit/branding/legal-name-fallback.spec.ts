@@ -35,7 +35,7 @@ describe('getBrand legalName', () => {
             { put: vi.fn().mockResolvedValue(undefined) } as unknown as R2Bucket,
         );
         await testDb.insert(tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
     });

@@ -27,7 +27,7 @@ beforeEach(async () => {
 
     // Seed the tenant row required by foreign key (enforced by better-sqlite3).
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Test Tenant', slug: 'test-tenant', status: 'active',
+        id: TENANT, slug: 'test-tenant', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
 

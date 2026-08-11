@@ -26,7 +26,7 @@ describe('EventService', () => {
         (mockDrizzle as any).mockReturnValue(testDb);
         svc = new EventService({} as D1Database);
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
     });
 
@@ -57,7 +57,7 @@ describe('EventService', () => {
 
         it('respects tenant scoping — seeds only for given tenant', async () => {
             await testDb.insert(schema.tenants).values([
-                { id: 'other', name: 'Other', slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+                { id: 'other', slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
             ]);
             await svc.bulkSeed(TENANT);
             const otherTypes = await svc.listEventTypes('other');

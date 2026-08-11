@@ -23,7 +23,6 @@ async function setupFixture() {
     await setupSchema(fixture.sqlite);
     await fixture.db.insert(schema.tenants).values({
         id: TENANT,
-        name: 'Email BYO Test Co',
         slug: 'email-byo-test',
         status: 'active',
         deploymentMode: 'shared',

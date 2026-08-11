@@ -139,8 +139,8 @@ describe('PATCH /api/inspections/:id/schedule', () => {
         db = fixture.db as BetterSQLite3Database<typeof schema>;
         await setupSchema(fixture.sqlite);
         await db.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: OTHER_TENANT, name: 'Rival', slug: 'rival', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: OTHER_TENANT, slug: 'rival', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await db.insert(schema.users).values([
             { id: ACTOR, tenantId: TENANT, email: 'actor@example.com', passwordHash: 'h', createdAt: new Date() },

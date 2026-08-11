@@ -86,7 +86,7 @@ describe('GET /api/portal/:tenant/redeem — find-my-report agent destination', 
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
         signJwtMock.mockClear();
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme-fmr', status: 'active',
+            id: TENANT, slug: 'acme-fmr', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as never);
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));

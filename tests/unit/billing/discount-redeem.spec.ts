@@ -37,7 +37,6 @@ describe('discount redemption — redeemDiscountCode + createInspection gate', (
 
         await db.insert(schema.tenants).values({
             id: T1,
-            name: 'Acme',
             slug: 'acme',
             status: 'active',
             deploymentMode: 'shared',

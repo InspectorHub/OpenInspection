@@ -69,7 +69,7 @@ describe('ConciergeService.createBooking consumes the free-tier quota', () => {
         };
 
         await testDb.insert(schema.tenants).values({
-            id: T1, name: 'Acme', slug: 'acme-concierge', status: 'active',
+            id: T1, slug: 'acme-concierge', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.tenantConfigs).values({
@@ -143,7 +143,7 @@ describe('InspectionRequestService consumes the free-tier quota', () => {
         testD1 = toRawD1(sqlite);
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme-req', status: 'active',
+            id: TENANT, slug: 'acme-req', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.templates).values({
@@ -306,7 +306,7 @@ describe('POST /book consumes the free-tier quota (public self-serve booking)', 
         svc = new BookingService(testD1, guard);
 
         await testDb.insert(schema.tenants).values({
-            id: T1, name: 'Acme', slug: 'acme', tier: 'free', status: 'active',
+            id: T1, slug: 'acme', tier: 'free', status: 'active',
             maxUsers: 10, deploymentMode: 'shared', createdAt: new Date(),
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
@@ -372,7 +372,7 @@ describe('POST /book consumes the free-tier quota (public self-serve booking)', 
         // A second, freshly-seeded tenant with zero availability rows: the
         // "booking not open" Conflict fires before quota is ever touched.
         await testDb.insert(schema.tenants).values({
-            id: 'tt-empty', name: 'Empty Co', slug: 'emptyco', tier: 'free', status: 'active',
+            id: 'tt-empty', slug: 'emptyco', tier: 'free', status: 'active',
             maxUsers: 10, deploymentMode: 'shared', createdAt: new Date(),
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);

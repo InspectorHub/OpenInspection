@@ -42,7 +42,6 @@ describe('concierge schema — A3', () => {
         const TENANT = '00000000-0000-0000-0000-000000000a01';
         await fixture.db.insert(schema.tenants).values({
             id: TENANT,
-            name: 'A3 Test Co',
             slug: 'a3test',
             status: 'active',
             deploymentMode: 'shared',

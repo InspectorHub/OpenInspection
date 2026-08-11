@@ -182,7 +182,7 @@ describe('the credit memo is recorded against the refund row', () => {
         qbo = new DbQbo(db);
 
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: MOVED,
         });
         await db.insert(schema.inspections).values({
@@ -269,7 +269,7 @@ describe('a cancellation refund reaches QuickBooks', () => {
         createCreditMemo = vi.fn().mockResolvedValue(undefined);
 
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: NOW,
         });
         await db.insert(schema.tenantConfigs).values({
@@ -445,7 +445,7 @@ describe('markRefunded can be keyed on later', () => {
         db = fix.db;
         await setupSchema(fix.sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: NOW,
         });
         await db.insert(schema.inspections).values({

@@ -39,8 +39,8 @@ describe('IA-18 — ContactService.getContactDetail', () => {
         people = new PeopleService({ DB: {} as D1Database });
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: OTHER, name: 'Other', slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: OTHER, slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
     });

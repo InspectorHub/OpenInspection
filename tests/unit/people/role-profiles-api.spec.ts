@@ -54,7 +54,7 @@ describe('/api/role-profiles', () => {
         await setupSchema(sqlite);
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT_ID, name: 'Test Tenant', slug: 'test', status: 'active',
+            id: TENANT_ID, slug: 'test', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(testDb), TENANT_ID, new Date(1));

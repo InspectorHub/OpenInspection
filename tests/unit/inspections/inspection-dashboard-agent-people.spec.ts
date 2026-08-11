@@ -56,7 +56,7 @@ describe('InspectionAnalyticsService.getDashboardBuckets — agent attribution v
         );
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme-9c3', status: 'active',
+            id: TENANT, slug: 'acme-9c3', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));

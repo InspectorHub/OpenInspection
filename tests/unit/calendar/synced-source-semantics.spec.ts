@@ -99,7 +99,7 @@ describe('syncProviderBusyOverrides scopes its delete to its own source', () => 
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'A', slug: 'a', status: 'active',
+            id: TENANT, slug: 'a', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.users).values({

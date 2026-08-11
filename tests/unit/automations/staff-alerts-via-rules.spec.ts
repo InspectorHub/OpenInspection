@@ -40,7 +40,7 @@ beforeEach(async () => {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
     await db.insert(schema.tenants).values({
-        id: T, name: 'Acme', slug: 'acme-b3', status: 'active',
+        id: T, slug: 'acme-b3', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
     await seedRoleProfiles(asD1Db(db), T, new Date(1));

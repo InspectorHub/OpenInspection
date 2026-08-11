@@ -60,7 +60,6 @@ describe('calendar blocks API', () => {
 
         await testDb.insert(schema.tenants).values({
             id: TENANT,
-            name: 'Acme',
             slug: 'acme',
             status: 'active',
             deploymentMode: 'shared',

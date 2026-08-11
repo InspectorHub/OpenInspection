@@ -76,7 +76,7 @@ beforeEach(async () => {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Coalesce Co', slug: 'coalesce-co', status: 'active',
+        id: TENANT, slug: 'coalesce-co', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(T0),
     } as never);
     await seedRoleProfiles(asD1Db(db), TENANT, new Date(T0));

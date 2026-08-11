@@ -85,7 +85,7 @@ beforeEach(async () => {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'A', slug: 'a', status: 'active',
+        id: TENANT, slug: 'a', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.users).values({
@@ -127,7 +127,7 @@ describe("PUT '/api/admin/service-areas' — replay leaves one territory, not tw
 
     it('a userId from another tenant is refused, not written under ours', async () => {
         await db.insert(schema.tenants).values({
-            id: 'other', name: 'B', slug: 'b', status: 'active',
+            id: 'other', slug: 'b', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.users).values({

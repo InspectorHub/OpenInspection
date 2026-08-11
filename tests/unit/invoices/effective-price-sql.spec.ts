@@ -99,7 +99,7 @@ beforeAll(async () => {
     await setupSchema(handle.sqlite);
     const { db } = handle;
 
-    await db.insert(tenants).values({ id: T, name: 'Fixture Co', slug: 'fixture-co', createdAt: new Date(NOW) } as never);
+    await db.insert(tenants).values({ id: T, slug: 'fixture-co', createdAt: new Date(NOW) } as never);
     // inspection_services.service_id is NOT NULL — one catalog row for every line to point at.
     await db.insert(services).values({ id: 'svc-catalog', tenantId: T, name: 'Fixture Service', price: 0, createdAt: new Date(NOW) } as never);
 

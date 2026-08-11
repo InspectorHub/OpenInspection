@@ -35,7 +35,7 @@ describe('ContractorTypeSchema — trade_slug reaches the caller', () => {
         (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
         svc = new ContractorTypeService({} as D1Database);
         await testDb.insert(tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(contractorTypes).values([

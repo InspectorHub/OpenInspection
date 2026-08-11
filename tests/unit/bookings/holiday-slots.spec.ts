@@ -30,7 +30,7 @@ describe('getTenantSlots holiday policies', () => {
         (mockDrizzle as ReturnType<typeof vi.fn>).mockReturnValue(db);
         svc = new BookingService({} as D1Database);
 
-        await db.insert(tenants).values({ id: 't1', name: 'Acme', slug: 'acme', createdAt: new Date() });
+        await db.insert(tenants).values({ id: 't1', slug: 'acme', createdAt: new Date() });
         await db.insert(users).values({
             id: 'u1', tenantId: 't1', email: 'u1@x.com', passwordHash: 'h',
             role: 'owner', name: 'u1', createdAt: new Date(),

@@ -52,7 +52,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         kv = new MockKV();
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme-d1', status: 'active',
+            id: TENANT, slug: 'acme-d1', status: 'active',
             deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
         });
         await testDb.insert(schema.users).values({

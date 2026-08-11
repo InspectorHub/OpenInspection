@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { createTestDb, setupSchema } from '../db';
 import {
@@ -98,9 +99,14 @@ describe('GET /book/:tenant — company booking profile (IA-26)', () => {
 
         // Seed a tenant.
         await db.insert(tenants).values({
-            id: TENANT_ID, name: 'Acme Inspections', slug: TENANT_SLUG,
+            id: TENANT_ID, slug: TENANT_SLUG,
             tier: 'free', status: 'active', maxUsers: 5,
             deploymentMode: 'shared', createdAt: new Date(),
+        } as any);
+        // The company name lives in tenant_configs — `tenants.name` is gone, so
+        // a tenant with no config row books under its slug.
+        await db.insert(tenantConfigs).values({
+            tenantId: TENANT_ID, companyName: 'Acme Inspections', updatedAt: new Date(),
         } as any);
     });
 
@@ -165,12 +171,12 @@ describe('GET /book/:tenant — company booking profile (IA-26)', () => {
     });
 
     it('returns inspectors sorted by name when allowInspectorChoice=true', async () => {
-        // Enable allowInspectorChoice in tenant_configs.
-        await db.insert(tenantConfigs).values({
-            tenantId: TENANT_ID,
-            allowInspectorChoice: true,
-            updatedAt: new Date(),
-        } as any);
+        // Enable allowInspectorChoice. An UPDATE, not an insert: the shared
+        // setup now seeds this row for the company name, so a second insert
+        // collides on the primary key.
+        await db.update(tenantConfigs)
+            .set({ allowInspectorChoice: true, updatedAt: new Date() } as any)
+            .where(eq(tenantConfigs.tenantId, TENANT_ID));
 
         // Seed inspectors: Charlie comes after Alice alphabetically.
         await db.insert(users).values([
@@ -214,9 +220,14 @@ describe('GET /book/:tenant/:slug — route-order lock (IA-26)', () => {
         (mockDrizzle as any).mockReturnValue(db);
 
         await db.insert(tenants).values({
-            id: TENANT_ID, name: 'Acme Inspections', slug: TENANT_SLUG,
+            id: TENANT_ID, slug: TENANT_SLUG,
             tier: 'free', status: 'active', maxUsers: 5,
             deploymentMode: 'shared', createdAt: new Date(),
+        } as any);
+        // The company name lives in tenant_configs — `tenants.name` is gone, so
+        // a tenant with no config row books under its slug.
+        await db.insert(tenantConfigs).values({
+            tenantId: TENANT_ID, companyName: 'Acme Inspections', updatedAt: new Date(),
         } as any);
     });
 
@@ -261,9 +272,14 @@ describe('GET /slots — aggregated tenant slots (IA-26)', () => {
         (mockDrizzle as any).mockReturnValue(db);
 
         await db.insert(tenants).values({
-            id: TENANT_ID, name: 'Acme Inspections', slug: TENANT_SLUG,
+            id: TENANT_ID, slug: TENANT_SLUG,
             tier: 'free', status: 'active', maxUsers: 5,
             deploymentMode: 'shared', createdAt: new Date(),
+        } as any);
+        // The company name lives in tenant_configs — `tenants.name` is gone, so
+        // a tenant with no config row books under its slug.
+        await db.insert(tenantConfigs).values({
+            tenantId: TENANT_ID, companyName: 'Acme Inspections', updatedAt: new Date(),
         } as any);
     });
 

@@ -38,8 +38,8 @@ describe('ContactService.listContacts inspectionCount', () => {
         await setupSchema(fixture.sqlite);
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT_A, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: TENANT_B, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_A, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_B, slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await seedRoleProfiles(asD1Db(testDb), TENANT_A, new Date(1));
         await seedRoleProfiles(asD1Db(testDb), TENANT_B, new Date(1));

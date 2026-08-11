@@ -33,7 +33,6 @@ describe('AuthService', () => {
         // Seed a default tenant to satisfy foreign keys
         await testDb.insert(tenants).values({
             id: 't1',
-            name: 'Test Tenant',
             slug: 'test',
             createdAt: new Date(),
         });

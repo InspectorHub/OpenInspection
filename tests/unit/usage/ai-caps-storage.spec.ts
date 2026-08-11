@@ -37,7 +37,7 @@ describe('AI cap storage', () => {
         (mockDrizzle as never as { mockReturnValue: (v: unknown) => void }).mockReturnValue(testDb);
         testD1 = toRawD1(setup.sqlite);
         await testDb.insert(schema.tenants).values({
-            id: T, name: 'Caps Co', slug: 'caps-co', tier: 'pro', status: 'active', createdAt: new Date(),
+            id: T, slug: 'caps-co', tier: 'pro', status: 'active', createdAt: new Date(),
         });
     });
 

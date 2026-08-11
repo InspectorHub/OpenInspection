@@ -53,7 +53,6 @@ describe('POST /api/integration/seed-starter-content', () => {
 
         await testDb.insert(schema.tenants).values({
             id:        tenantId,
-            name:      'Test Tenant',
             slug: 'test',
             createdAt: new Date(),
         });

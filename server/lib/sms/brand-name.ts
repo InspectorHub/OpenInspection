@@ -27,10 +27,17 @@ export async function resolveSmsBrand(
     // try/catch, not `.get().catch()`: the better-sqlite3 driver the unit
     // suite runs on returns a plain value from `.get()`, so a `.catch` on it
     // throws "not a function" — and it would do so only under test.
-    let row: { configName: string | null; registrationName: string | null } | undefined;
+    // One column, one fallback. This used to read `tenants.name` as a second
+    // chance behind `company_name`; that column is gone, and every tenant was
+    // backfilled into `company_name` before it went. The slug takes the middle
+    // rung because it is NOT NULL — so an SMS brand name degrades to something
+    // identifiable rather than jumping straight to the platform default, which
+    // would tell the recipient they are hearing from Inspector Hub when they
+    // are hearing from their inspector.
+    let row: { configName: string | null; slug: string } | undefined;
     try {
         row = await db
-            .select({ configName: tenantConfigs.companyName, registrationName: tenants.name })
+            .select({ configName: tenantConfigs.companyName, slug: tenants.slug })
             .from(tenants)
             .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, tenants.id))
             .where(eq(tenants.id, tenantId))
@@ -38,5 +45,5 @@ export async function resolveSmsBrand(
     } catch {
         row = undefined;
     }
-    return row?.configName?.trim() || row?.registrationName?.trim() || platformFallback;
+    return row?.configName?.trim() || row?.slug?.trim() || platformFallback;
 }

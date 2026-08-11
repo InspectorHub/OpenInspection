@@ -41,7 +41,7 @@ describe('POST /api/agent/report-context', () => {
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
         await db.insert(schema.tenants).values({
-            id: TENANT_ID, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT_ID, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as any);
     });

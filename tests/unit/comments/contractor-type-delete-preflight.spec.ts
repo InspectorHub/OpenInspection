@@ -32,7 +32,7 @@ describe('ContractorTypeService.countReferences', () => {
         svc = new ContractorTypeService({} as D1Database);
         for (const [id, name] of [[TENANT, 'Acme'], [OTHER, 'Globex']] as const) {
             await testDb.insert(tenants).values({
-                id, name, slug: name.toLowerCase(), status: 'active',
+                id, slug: name.toLowerCase(), status: 'active',
                 deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
             });
         }

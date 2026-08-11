@@ -33,7 +33,7 @@ describe('deleteTemplate — the service catalogue reference', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(db);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'T', slug: 't', createdAt: new Date(),
+            id: TENANT, slug: 't', createdAt: new Date(),
         });
         await db.insert(schema.templates).values({
             id: TEMPLATE_ID, tenantId: TENANT, name: 'Sewer Scope Inspection',

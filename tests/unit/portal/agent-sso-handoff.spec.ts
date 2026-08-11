@@ -81,7 +81,7 @@ describe('Tenant-null SSO handoff — agent JWT via /sso (Spec 3 Task 5b)', () =
         kv = makeKv();
 
         await db.insert(schema.tenants).values({
-            id: TENANT_ID, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT_ID, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);

@@ -46,7 +46,7 @@ beforeEach(async () => {
     invoices = new InvoiceService({} as D1Database);
 
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.tenantConfigs).values({ tenantId: TENANT, updatedAt: new Date() });

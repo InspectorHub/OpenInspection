@@ -85,7 +85,7 @@ beforeEach(async () => {
     db = drizzle(fixture.sqlite, { schema }) as unknown as DrizzleD1Database;
     const now = new Date();
     await db.insert(tenants).values({
-        id: T, name: 'Acme', slug: 'acme', tier: 'free', status: 'active',
+        id: T, slug: 'acme', tier: 'free', status: 'active',
         maxUsers: 5, deploymentMode: 'shared', createdAt: now,
     }).run();
     await db.insert(inspections).values({

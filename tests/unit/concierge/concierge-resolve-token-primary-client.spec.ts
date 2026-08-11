@@ -42,7 +42,7 @@ describe('ConciergeService.resolveToken — primary-client sourcing (Task 9c)', 
         (mockDrizzle as any).mockReturnValue(db);
 
         await db.insert(schema.tenants).values({
-            id: T1, name: 'Acme', slug: 'acme-resolve', status: 'active',
+            id: T1, slug: 'acme-resolve', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(db), T1, new Date(1));

@@ -37,7 +37,7 @@ let provider: PortalProvider;
 
 const seedTenant = (v: { id: string; slug: string }) =>
     testDb.insert(tenants).values({
-        ...v, name: v.slug, tier: 'pro', status: 'active', createdAt: new Date(),
+        ...v, tier: 'pro', status: 'active', createdAt: new Date(),
     } as typeof tenants.$inferInsert);
 
 describe('PortalProvider — slug history on sync', () => {

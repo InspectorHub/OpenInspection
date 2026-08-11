@@ -77,7 +77,7 @@ describe('GET /availability — on-behalf-of read role guard (IA-26)', () => {
         (mockDrizzle as any).mockReturnValue(db);
 
         await db.insert(tenants).values({
-            id: TENANT_ID, name: 'Acme Inspections', slug: TENANT_SLUG,
+            id: TENANT_ID, slug: TENANT_SLUG,
             tier: 'free', status: 'active', maxUsers: 5,
             deploymentMode: 'shared', createdAt: new Date(),
         } as any);
@@ -132,7 +132,7 @@ describe('GET /overrides — on-behalf-of read role guard (IA-26)', () => {
         (mockDrizzle as any).mockReturnValue(db);
 
         await db.insert(tenants).values({
-            id: TENANT_ID, name: 'Acme Inspections', slug: TENANT_SLUG,
+            id: TENANT_ID, slug: TENANT_SLUG,
             tier: 'free', status: 'active', maxUsers: 5,
             deploymentMode: 'shared', createdAt: new Date(),
         } as any);

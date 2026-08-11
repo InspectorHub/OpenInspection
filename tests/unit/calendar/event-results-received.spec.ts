@@ -70,7 +70,7 @@ describe('EventService — event.results_received', () => {
         svc = new EventService({} as D1Database);
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));

@@ -50,7 +50,7 @@ beforeEach(async () => {
     sent = [];
 
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: TENANT, status: 'active',
+        id: TENANT, slug: TENANT, status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
 });

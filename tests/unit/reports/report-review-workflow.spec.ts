@@ -53,7 +53,7 @@ describe('Report review workflow (submit / publish / return / unpublish)', () =>
         svc = new InspectionService({} as D1Database);
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
     });
 

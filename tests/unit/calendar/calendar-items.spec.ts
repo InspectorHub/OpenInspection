@@ -51,7 +51,6 @@ describe('calendar items feed', () => {
         await testDb.insert(schema.tenants).values([
             {
                 id: TENANT,
-                name: 'Acme',
                 slug: 'acme',
                 status: 'active',
                 deploymentMode: 'shared',
@@ -60,7 +59,6 @@ describe('calendar items feed', () => {
             },
             {
                 id: OTHER_TENANT,
-                name: 'Other',
                 slug: 'other',
                 status: 'active',
                 deploymentMode: 'shared',

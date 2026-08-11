@@ -70,10 +70,10 @@ describe('GET /api/integration/ai-provisioning', () => {
 
   it('buckets tenants per tier by the runtime resolver; absent tier stays absent; a paying tenant with no key of their own is managed', async () => {
     await testDb.insert(schema.tenants).values([
-      { id: 't-free-nokey', name: 'F1', slug: 'f1', tier: 'free', createdAt: new Date() },
-      { id: 't-free-key', name: 'F2', slug: 'f2', tier: 'free', createdAt: new Date() },
-      { id: 't-pro-key', name: 'P1', slug: 'p1', tier: 'pro', createdAt: new Date() },
-      { id: 't-pro-nokey', name: 'P2', slug: 'p2', tier: 'pro', createdAt: new Date() },
+      { id: 't-free-nokey', slug: 'f1', tier: 'free', createdAt: new Date() },
+      { id: 't-free-key', slug: 'f2', tier: 'free', createdAt: new Date() },
+      { id: 't-pro-key', slug: 'p1', tier: 'pro', createdAt: new Date() },
+      { id: 't-pro-nokey', slug: 'p2', tier: 'pro', createdAt: new Date() },
     ] as never);
     vi.mocked(loadTenantSecrets).mockImplementation(async (_db, _kv, tenantId) =>
       tenantId === 't-free-key' || tenantId === 't-pro-key' ? { GEMINI_API_KEY: 'tenant-own-key' } : null);
@@ -100,7 +100,7 @@ describe('GET /api/integration/ai-provisioning', () => {
     // (`isPaidPlan`), so this row and the Stream plan gate cannot drift into
     // two different answers to "is this tenant on a paying plan".
     await testDb.insert(schema.tenants).values([
-      { id: 't-pro-trial', name: 'T', slug: 't', tier: 'pro', status: 'trial', createdAt: new Date() },
+      { id: 't-pro-trial', slug: 't', tier: 'pro', status: 'trial', createdAt: new Date() },
     ] as never);
 
     const res = await app().request('/api/integration/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, ENV);
@@ -115,7 +115,7 @@ describe('GET /api/integration/ai-provisioning', () => {
     // fails closed on an absent platform key. This is why wiring entitlement
     // changes no production number until the key lands.
     await testDb.insert(schema.tenants).values([
-      { id: 't-pro-nokey2', name: 'P', slug: 'p', tier: 'pro', createdAt: new Date() },
+      { id: 't-pro-nokey2', slug: 'p', tier: 'pro', createdAt: new Date() },
     ] as never);
 
     const noKeyEnv = { ...ENV, AI_MANAGED_API_KEY: undefined };
@@ -127,7 +127,7 @@ describe('GET /api/integration/ai-provisioning', () => {
 
   it('a tenant whose secrets blob cannot be decrypted counts as unconfigured — the same shape the runtime resolves it to', async () => {
     await testDb.insert(schema.tenants).values([
-      { id: 't-broken', name: 'B', slug: 'b', tier: 'free', createdAt: new Date() },
+      { id: 't-broken', slug: 'b', tier: 'free', createdAt: new Date() },
     ] as never);
     vi.mocked(loadTenantSecrets).mockRejectedValue(new Error('undecryptable'));
 

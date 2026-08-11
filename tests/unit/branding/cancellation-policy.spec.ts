@@ -58,7 +58,7 @@ describe('BrandingService — cancellation policy attestation gate', () => {
         branding = new BrandingService({} as D1Database);
         agreementSvc = new AgreementService({} as D1Database);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
     });
@@ -202,7 +202,7 @@ describe('BrandingService — cancellation policy attestation gate', () => {
 
     it('refuses to attest an agreement belonging to another tenant', async () => {
         await testDb.insert(schema.tenants).values({
-            id: 'other', name: 'Other', slug: 'other', status: 'active',
+            id: 'other', slug: 'other', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         const foreign = await agreementSvc.createAgreement('other', 'Theirs', '<p>x</p>');

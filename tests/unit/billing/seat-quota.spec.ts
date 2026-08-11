@@ -44,7 +44,6 @@ describe('getSeatUsage', () => {
     async function seedTenant(id: string, maxUsers: number) {
         await testDb.insert(tenants).values({
             id,
-            name: `Tenant ${id}`,
             slug: id,
             maxUsers,
             createdAt: new Date(),

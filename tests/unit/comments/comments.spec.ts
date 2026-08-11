@@ -27,7 +27,6 @@ describe('comments table — rating bucket + section', () => {
 
         await testDb.insert(tenants).values({
             id: 't1',
-            name: 'Test Tenant',
             slug: 'test',
             createdAt: new Date(),
         });
@@ -110,7 +109,6 @@ describe('comments table — rating bucket + section', () => {
         // enough — must always combine with tenantId.
         await testDb.insert(tenants).values({
             id: 't2',
-            name: 'Other Tenant',
             slug: 'other',
             createdAt: new Date(),
         });

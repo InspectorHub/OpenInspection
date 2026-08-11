@@ -1,10 +1,18 @@
 /**
- * Spec 1.3 + 1.6 — both TCPA-adjacent surfaces in `api/sms.ts` read the
- * COMPANY name, not the registration name.
+ * Spec 1.3 + 1.6 — both TCPA-adjacent surfaces in `api/sms.ts` name the entity
+ * the client actually deals with.
  *
- * `tenants.name` is written once at provisioning and never updated; every
- * branded document uses `tenant_configs.company_name`. A consent record and a
- * carrier HELP reply must name the entity the client actually deals with.
+ * There is ONE company name now: `tenant_configs.company_name`. This spec used
+ * to police a distinction between it and `tenants.name` — the registration name
+ * written once at provisioning and never updated — and that column is gone,
+ * backfilled into this one before it was dropped.
+ *
+ * What still matters, and matters MORE for SMS than anywhere else, is that the
+ * brand is never empty and never silently becomes the platform's. A carrier
+ * HELP reply saying "Inspector Hub" to someone who hired a local inspector is a
+ * compliance answer about the wrong company. So the fallback chain is
+ * company name -> slug -> platform, and the slug rung is what keeps the
+ * platform name genuinely last.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
@@ -32,7 +40,7 @@ describe('sms company name source', () => {
         (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
 
         await testDb.insert(tenants).values({
-            id: TENANT, slug: 'acme', name: 'Acme Registration Name',
+            id: TENANT, slug: 'acme',
             status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as typeof tenants.$inferInsert);
         await testDb.insert(tenantConfigs).values({
@@ -40,16 +48,20 @@ describe('sms company name source', () => {
         } as typeof tenantConfigs.$inferInsert);
     });
 
-    it('the HELP auto-reply brand uses companyName, not the registration name', async () => {
+    it('the HELP auto-reply brand uses the company name from settings', async () => {
         const brand = await resolveSmsBrand(testDb as never, TENANT);
         expect(brand).toBe('Acme Home Inspections LLC');
-        expect(brand).not.toBe('Acme Registration Name');
     });
 
-    it('falls back to the registration name when no companyName is set', async () => {
+    it('falls back to the slug — not to the platform — when no companyName is set', async () => {
+        // The rung that matters. Without it this jumps straight to "Inspector
+        // Hub", which tells a client they are hearing from the platform rather
+        // than from the inspector they hired.
         await testDb.update(tenantConfigs).set({ companyName: null })
             .where(eq(tenantConfigs.tenantId, TENANT));
-        expect(await resolveSmsBrand(testDb as never, TENANT)).toBe('Acme Registration Name');
+        const brand = await resolveSmsBrand(testDb as never, TENANT, 'Inspector Hub');
+        expect(brand).toBe('acme');
+        expect(brand).not.toBe('Inspector Hub');
     });
 
     it('falls back to the platform name when the tenant is unknown', async () => {

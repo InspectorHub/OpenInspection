@@ -58,8 +58,8 @@ beforeEach(async () => {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
     await db.insert(schema.tenants).values([
-        { id: TENANT, name: 'A', slug: 'a-comm', createdAt: new Date() },
-        { id: OTHER_TENANT, name: 'B', slug: 'b-comm', createdAt: new Date() },
+        { id: TENANT, slug: 'a-comm', createdAt: new Date() },
+        { id: OTHER_TENANT, slug: 'b-comm', createdAt: new Date() },
     ]);
     await db.insert(schema.inspections).values({
         id: INSP, tenantId: TENANT, propertyAddress: '1 Main', date: '2026-07-01',

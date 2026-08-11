@@ -40,7 +40,7 @@ beforeEach(async () => {
   fakeSendMessage.mockClear();
   smsRuntime.resolveProvider.mockResolvedValue({ provider: fakeProvider, from: '+1999' });
   await db.insert(schema.tenants).values({
-    id: TENANT, name: 'Acme', slug: 'acme', status: 'active', phone: '+15550001111',
+    id: TENANT, slug: 'acme', status: 'active', phone: '+15550001111',
     deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
   } as never);
   await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));

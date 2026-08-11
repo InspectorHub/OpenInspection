@@ -76,7 +76,7 @@ describe('POST /api/inspections/:id/share-agent — buyer_agent via inspection_p
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: SLUG, status: 'active',
+            id: TENANT, slug: SLUG, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));

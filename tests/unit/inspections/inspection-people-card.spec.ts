@@ -33,7 +33,7 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
         people = new PeopleService({ DB: {} as D1Database });
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
     });
@@ -112,7 +112,7 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
     it('throws NotFound for cross-tenant access', async () => {
         const OTHER = '00000000-0000-0000-0000-0000000000ff';
         await testDb.insert(schema.tenants).values({
-            id: OTHER, name: 'Other', slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            id: OTHER, slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
             id: 'insp-other', tenantId: OTHER,

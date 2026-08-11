@@ -77,7 +77,7 @@ describe('license_number backfill migration', () => {
         sqlite.exec('ALTER TABLE users ADD COLUMN license_number text');
         for (const id of [T, T2]) {
             await db.insert(schema.tenants).values({
-                id, name: 'Co ' + id, slug: 'co-' + id.slice(-2), status: 'active',
+                id, slug: 'co-' + id.slice(-2), status: 'active',
                 deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
             });
         }
