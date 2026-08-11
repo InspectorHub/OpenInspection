@@ -13,6 +13,29 @@ import { createRecipientLocaleResolver } from '../../lib/i18n/recipient-locale';
 import type { FlushInspection } from './shared';
 import type { EmailService } from '../email.service';
 import type { automations, automationLogs as automationLogsTable, tenants } from '../../lib/db/schema';
+import { AppError, ErrorCode } from '../../lib/errors';
+
+/** Sentinel the transport adapter returns so the logger adapter can file the
+ *  outcome as a SKIP; mirrors the existing `__email_not_configured__` idiom. */
+export const COOLING_WINDOW_SENTINEL = '__outbound_cooling_window__';
+
+/** What an operator actually reads in the automation log. */
+export const COOLING_WINDOW_SKIP_REASON =
+    'skipped — new company, client email unlocks 24h after signup';
+
+/**
+ * Recognise the ONE refusal that is a deliberate decline rather than a fault.
+ * Everything else — a dead provider, a bad key, a network error — must keep
+ * reading as a failure, or the failure column stops meaning anything.
+ */
+export function coolingWindowSentinelFor(err: unknown): string | null {
+    const code = err instanceof AppError
+        ? err.code
+        : (typeof err === 'object' && err !== null && 'code' in err
+            ? (err as { code?: unknown }).code
+            : undefined);
+    return code === ErrorCode.OUTBOUND_COOLING_WINDOW ? COOLING_WINDOW_SENTINEL : null;
+}
 
 /**
  * The generic templated-email path of flush(), extracted from delivery.ts for
@@ -186,9 +209,18 @@ export async function deliverTemplatedEmail(
             // exactOptionalPropertyTypes distinguishes "absent" from "present
             // and undefined", and absent is what an unclassified send means.
             const classId = automationClassId(automation);
-            const { delivered } = await emailSvc.sendEmail(
-                [a.to], a.subject, a.html, undefined, classId ? { classId } : {},
-            );
+            let delivered = false;
+            try {
+                ({ delivered } = await emailSvc.sendEmail(
+                    [a.to], a.subject, a.html, undefined, classId ? { classId } : {},
+                ));
+            } catch (err) {
+                // The cooling window DECLINED; it did not break. Anything else
+                // is a real fault and must keep propagating as one.
+                const sentinel = coolingWindowSentinelFor(err);
+                if (!sentinel) throw err;
+                return { ok: false as const, error: sentinel };
+            }
             // OI maps "not delivered" (e.g. email not configured) to a
             // SKIPPED log, not a failure. Encode that as a sentinel the
             // logger adapter below translates.
@@ -204,6 +236,15 @@ export async function deliverTemplatedEmail(
             // historical "skipped / email not configured" outcome.
             if (row.status === 'failed' && row.error === '__email_not_configured__') {
                 await db.update(automationLogs).set({ status: 'skipped', error: 'email not configured' })
+                    .where(eq(automationLogs.id, log.id));
+                return;
+            }
+            // Portal #98 — same translation, different reason: a deliberate
+            // decline that resolves by itself within a day is a SKIP, not a
+            // failure.
+            if (row.status === 'failed' && row.error === COOLING_WINDOW_SENTINEL) {
+                await db.update(automationLogs)
+                    .set({ status: 'skipped', error: COOLING_WINDOW_SKIP_REASON })
                     .where(eq(automationLogs.id, log.id));
                 return;
             }

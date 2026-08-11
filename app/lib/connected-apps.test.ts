@@ -78,7 +78,7 @@ vi.mock('~/hooks/useSessionContext', () => ({
         branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
                 defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h' },
         deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false },
-        seatUsage: null,
+        seatUsage: null, outboundCoolingWindow: null,
     })),
     useDisplayLocale: vi.fn(() => 'en-US'),
     useDisplayTimeZone: vi.fn(() => 'UTC'),
@@ -161,7 +161,7 @@ beforeEach(() => {
         branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
                 defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h' },
         deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true },
-        seatUsage: null,
+        seatUsage: null, outboundCoolingWindow: null,
     });
 });
 
@@ -308,7 +308,7 @@ describe('SettingsConnectedApps component render', () => {
             branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
                 defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h' },
             deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true },
-            seatUsage: null,
+            seatUsage: null, outboundCoolingWindow: null,
         });
         const html = renderToStaticMarkup(createElement(SettingsConnectedApps));
         expect(html).toContain('Tenant-wide');

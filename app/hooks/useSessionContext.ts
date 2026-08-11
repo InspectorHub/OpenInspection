@@ -66,6 +66,13 @@ export interface SessionContext {
     mcpEnabled: boolean;
   };
   seatUsage: { used: number; limit: number } | null;
+  /**
+   * Portal #98 — non-null ONLY while the 24-hour outbound cooling window is
+   * open, carrying the instant it closes. Null on a self-hosted deployment,
+   * once the window has elapsed, and when the server could not read the
+   * anchor. The client never computes any of that; it renders what it is told.
+   */
+  outboundCoolingWindow: { unlockAtMs: number } | null;
 }
 
 /**

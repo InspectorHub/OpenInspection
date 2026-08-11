@@ -29,6 +29,11 @@ export enum ErrorCode {
     // so the editor can surface a "elevate to Full PCA first" prompt instead
     // of a generic conflict.
     TIER_NOT_FULL_PCA = 'TIER_NOT_FULL_PCA',
+    // Portal #98 §3.2 — the first-24-hours cooling window on platform-funded
+    // outbound email. A distinct code, not a generic 403, for two readers: the
+    // UI renders the "what still works + BYO escape hatch" copy off it, and an
+    // operator reading logs can tell a deliberate refusal from a provider outage.
+    OUTBOUND_COOLING_WINDOW = 'OUTBOUND_COOLING_WINDOW',
 }
 
 /**
@@ -82,4 +87,14 @@ export const Errors = {
         ),
     TierNotFullPca: (msg: string = 'This action requires the inspection report tier to be full_pca.') =>
         new AppError(409, ErrorCode.TIER_NOT_FULL_PCA, msg),
+    // 403 rather than 402/429 deliberately: this is not a quota and not a rate
+    // limit, it is a permission that has not vested yet. The CODE, not the
+    // status, is what distinguishes it.
+    OutboundCoolingWindow: (details: { unlockAtMs: number; windowHours: number }) =>
+        new AppError(
+            403,
+            ErrorCode.OUTBOUND_COOLING_WINDOW,
+            `New companies cannot send client email on the shared sender for the first ${details.windowHours} hours. Everything else works, and connecting your own email provider removes the wait entirely.`,
+            details,
+        ),
 };

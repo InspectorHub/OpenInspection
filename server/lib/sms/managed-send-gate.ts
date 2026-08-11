@@ -32,6 +32,23 @@ export interface ManagedSendGateResult {
 }
 
 /**
+ * ⚠️ THERE IS DELIBERATELY NO 24-HOUR COOLING WINDOW ON SMS (portal #98 §3.2).
+ *
+ * The email side gained one; this file is where somebody will come looking to
+ * add the matching SMS rule, so the answer lives here rather than in a
+ * document.
+ *
+ * Platform-funded SMS already requires `complianceStatus === 'approved'`
+ * below, which means carrier registration (10DLC / TFV) with a legal business
+ * name, address and responsible party. That takes DAYS and a real business
+ * identity. A 24-hour gate in front of a multi-day gate blocks nothing that is
+ * not already blocked — it is a no-op that READS like a second defence, which
+ * is worse than no defence, because the next reader counts it as one.
+ *
+ * If the approval requirement is ever relaxed, this reasoning expires with it.
+ */
+
+/**
  * Fail-closed send gate for managed SMS tenants.
  *
  * managed_dedicated:

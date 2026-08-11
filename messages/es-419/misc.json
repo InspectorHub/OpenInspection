@@ -251,5 +251,7 @@
   "invoices_payments_error_record": "No se pudo registrar ese pago. No se cambió nada — inténtelo de nuevo.",
   "invoices_payments_error_correct": "No se pudo corregir ese pago. No se cambió nada — inténtelo de nuevo.",
   "load_failed_generic": "Esto no se pudo cargar, así que puede estar incompleto. Vuelva a cargar antes de darlo por vacío.",
-  "load_failed_named": "No se pudo cargar {what}, así que esto puede estar incompleto. Vuelva a cargar antes de darlo por vacío."
+  "load_failed_named": "No se pudo cargar {what}, así que esto puede estar incompleto. Vuelva a cargar antes de darlo por vacío.",
+  "outbound_cooling_notice": "Su empresa tiene menos de un día, así que el correo a clientes desde nuestro remitente compartido — informes, acuerdos, facturas y automatizaciones — se habilita el {unlockAt}. Todo lo demás ya funciona: inspecciones, informes, agenda, correo de inicio de sesión e invitaciones de equipo.",
+  "outbound_cooling_notice_action": "Use su propio proveedor de correo"
 }

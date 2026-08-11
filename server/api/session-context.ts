@@ -1,7 +1,7 @@
 import {} from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { and, eq } from 'drizzle-orm';
-import { users, tenantConfigs } from '../lib/db/schema';
+import { users, tenantConfigs, tenants } from '../lib/db/schema';
 import { getSeatUsage } from '../features/seat-quota';
 import { resolveLocale } from '../lib/locale';
 import {
@@ -20,6 +20,30 @@ import { getDrizzle } from '../lib/route-helpers';
 import { getBaseUrl } from '../lib/url';
 import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
 import { resolveVideoProvider, videoStreamServiceable } from '../services/video/resolve';
+import { unlockAtMs } from '../lib/email/outbound-cooling-window';
+
+/**
+ * Portal #98 item 3 — is the outbound cooling window OPEN for this viewer, and
+ * when does it close?
+ *
+ * The server answers both, and ships only the instant. If the client also
+ * decided "open", the two could disagree across a clock skew and the banner
+ * would either linger after sends work or vanish while they still fail.
+ *
+ * `null` means "nothing to say", covering three different situations on
+ * purpose: self-hosted (no window exists), elapsed (no window remains), and
+ * unreadable anchor (we do not know, and guessing would put a banner in front
+ * of someone whose sends work fine).
+ */
+export function resolveCoolingWindowForSession(input: {
+    mode: string;
+    createdAt: Date | null | undefined;
+    nowMs: number;
+}): { unlockAtMs: number } | null {
+    if (input.mode !== 'saas' || !input.createdAt) return null;
+    const unlock = unlockAtMs(input.createdAt.getTime());
+    return input.nowMs < unlock ? { unlockAtMs: unlock } : null;
+}
 
 /**
  * Session context endpoint for the React Router v7 frontend layout.
@@ -166,6 +190,38 @@ const sessionContextRoutes = createApiRouter()
             }
         }
 
+        // Portal #98 item 3 — the open outbound cooling window, so the chrome can
+        // say so before anyone presses Send.
+        //
+        // This is its OWN read of `tenants`, and that is not an oversight. The
+        // plan for this feature assumed the block above still selected the tenant
+        // row here and that `createdAt` could ride along for free; it does not —
+        // that read now lives inside `resolveVideoProvider`, which fetches
+        // tier/status only on the managed branch and owns the video question, not
+        // this one. Widening a video resolver's return type to carry an email
+        // anchor would couple two unrelated concerns to save one primary-key
+        // lookup. So: one indexed read by primary key, and only where a window
+        // can exist at all — standalone pays nothing.
+        //
+        // Fail-open, matching the send gate: an unreadable anchor leaves this
+        // null, so a D1 blip never puts a banner in front of someone whose sends
+        // work fine.
+        let outboundCoolingWindow: { unlockAtMs: number } | null = null;
+        if (tenantId && profile.mode === 'saas') {
+            try {
+                const tenantRow = await getDrizzle(c)
+                    .select({ createdAt: tenants.createdAt })
+                    .from(tenants)
+                    .where(eq(tenants.id, tenantId))
+                    .get();
+                outboundCoolingWindow = resolveCoolingWindowForSession({
+                    mode: profile.mode, createdAt: tenantRow?.createdAt, nowMs: Date.now(),
+                });
+            } catch (e) {
+                logger.warn('[session-context] cooling-window anchor read failed', { error: (e as Error).message });
+            }
+        }
+
         // Resolve the collaborative editing flag for this tenant. Plain per-tenant
         // operator toggle (not plan-gated); collab is now the default (#181 Phase 5,
         // after the photo data-loss gap was closed — every editor write routes
@@ -257,6 +313,7 @@ const sessionContextRoutes = createApiRouter()
                 },
                 seatUsage,
                 videoProvider,
+                outboundCoolingWindow,
                 collabEditing,
                 // Track D — the sidebar Messages badge. One indexed count
                 // (idx_msg_unread) per layout load; refreshes on navigation.
