@@ -31,8 +31,14 @@ import { tenants, tenantConfigs } from './db/schema';
  * with no config row must still show its container name rather than vanish from
  * the result set.
  *
- * NOT for operational output. `server/portal/integration.routes.ts` reports the
- * container name back to an M2M caller for seeding, which is not a display
- * surface and deliberately stays on tenants.name.
+ * NOT for operational output. The M2M seeding route under `server/portal/`
+ * reports the container name back to its caller; that is not a display surface
+ * and deliberately stays on `tenants.name`.
+ *
+ * Named by ROLE rather than by path on purpose. `tests/unit/sync/portal-
+ * isolation.spec.ts` greps `server/` for that route's path as a CONTENT string,
+ * so a file that merely mentions it in a comment is indistinguishable from one
+ * that imports it. This docblock spelled the path out and failed that gate; the
+ * information is worth keeping, the exact string is not.
  */
 export const tenantDisplayName = sql<string>`COALESCE(NULLIF(TRIM(${tenantConfigs.companyName}), ''), ${tenants.name})`;
