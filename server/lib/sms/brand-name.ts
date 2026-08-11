@@ -5,15 +5,17 @@ import { tenants, tenantConfigs } from '../db/schema';
 /**
  * The company name for anything a carrier or a consent record will see.
  *
- * `tenants.name` is the REGISTRATION name: written once at provisioning
- * (`lib/integration/standalone.ts`, "initialize-only") and never updated
- * afterwards, because Settings writes `tenant_configs.company_name` and nothing
- * ever writes back. The two diverge permanently the moment a tenant edits its
- * name, and a TCPA consent record is the one place that must not carry a stale
- * entity.
+ * There is ONE company name — `tenant_configs.company_name`. A separate
+ * REGISTRATION name used to sit on `tenants.name`, written once at provisioning
+ * and never updated, so the two diverged permanently the moment a tenant edited
+ * its own name; that column is gone, backfilled into this one. A TCPA consent
+ * record is the one place that must not carry a stale entity, which is why the
+ * divergence mattered here more than anywhere else.
  *
- * Falls back through the registration name to the platform name, so an
- * unconfigured or unknown tenant still yields something printable.
+ * Falls back through the SLUG to the platform name, so an unconfigured or
+ * unknown tenant still yields something printable — and the slug rung is what
+ * keeps the platform name genuinely last. A HELP reply naming Inspector Hub to
+ * someone who hired a local inspector answers for the wrong company.
  *
  * Lives here rather than in `api/sms.ts` so both readers in that file share ONE
  * resolver — the whole reason spec 1.6 exists is that the original audit cited
