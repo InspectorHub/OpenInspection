@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useLoaderData, useFetcher } from "react-router";
+import { useLoaderData } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import type { Route } from "./+types/settings-connected-apps";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -238,7 +239,7 @@ function GrantRow({
 
 export default function SettingsConnectedApps() {
   const data = useLoaderData<typeof loader>();
-  const revokeFetcher = useFetcher<typeof action>();
+  const { fetcher: revokeFetcher, submit: submitRevoke, busy: revoking } = useGuardedSubmit<typeof action>();
   const [pendingRevoke, setPendingRevoke] = useState<{
     grant: McpGrant;
     intent: "revoke" | "revoke-admin";
@@ -377,12 +378,12 @@ export default function SettingsConnectedApps() {
             : ""
         }
         confirmLabel={m.settings_apps_revoke()}
-        busy={revokeFetcher.state !== "idle"}
+        busy={revoking}
         onConfirm={() => {
           if (pendingRevoke) {
             const id = pendingRevoke.grant.id;
             setRevokedIds((prev) => new Set(prev).add(id));
-            revokeFetcher.submit(
+            submitRevoke(
               { intent: pendingRevoke.intent, id },
               { method: "POST" },
             );

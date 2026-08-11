@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLoaderData, useFetcher } from "react-router";
 import { Icon } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import type { Route } from "./+types/settings-contractor-types";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -69,15 +70,15 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 const INPUT = "px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none";
 
-function ContractorTypeRow({ t, idx, count, onMove, onRequestDelete }: { t: ContractorType; idx: number; count: number; onMove: (idx: number, dir: -1 | 1) => void; onRequestDelete: () => void }) {
+function ContractorTypeRow({ t, idx, count, reordering, onMove, onRequestDelete }: { t: ContractorType; idx: number; count: number; reordering: boolean; onMove: (idx: number, dir: -1 | 1) => void; onRequestDelete: () => void }) {
   const fetcher = useFetcher<typeof action>();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(t.name);
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex flex-col">
-        <button onClick={() => onMove(idx, -1)} disabled={idx === 0} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={m.settings_contractor_types_move_up_aria({ name: t.name })}><Icon name="chevU" size={14} /></button>
-        <button onClick={() => onMove(idx, 1)} disabled={idx === count - 1} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={m.settings_contractor_types_move_down_aria({ name: t.name })}><Icon name="chevD" size={14} /></button>
+        <button onClick={() => onMove(idx, -1)} disabled={idx === 0 || reordering} aria-busy={reordering || undefined} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={m.settings_contractor_types_move_up_aria({ name: t.name })}><Icon name="chevU" size={14} /></button>
+        <button onClick={() => onMove(idx, 1)} disabled={idx === count - 1 || reordering} aria-busy={reordering || undefined} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={m.settings_contractor_types_move_down_aria({ name: t.name })}><Icon name="chevD" size={14} /></button>
       </div>
       {editing ? (
         <fetcher.Form method="POST" className="flex-1 flex gap-2" onSubmit={() => setEditing(false)}>
@@ -106,8 +107,8 @@ function ContractorTypeRow({ t, idx, count, onMove, onRequestDelete }: { t: Cont
 export default function SettingsContractorTypes() {
   const data = useLoaderData<typeof loader>();
   const createFetcher = useFetcher<typeof action>();
-  const reorderFetcher = useFetcher<typeof action>();
-  const deleteFetcher = useFetcher<typeof action>();
+  const { fetcher: reorderFetcher, submit: submitReorder, busy: reordering } = useGuardedSubmit<typeof action>();
+  const { submit: submitDelete, busy: deletingType } = useGuardedSubmit<typeof action>();
   const preflightFetcher = useFetcher<typeof action>();
   const [pendingDelete, setPendingDelete] = useState<ContractorType | null>(null);
   const [newName, setNewName] = useState("");
@@ -140,7 +141,7 @@ export default function SettingsContractorTypes() {
     const j = idx + dir;
     if (j < 0 || j >= next.length) return;
     [next[idx], next[j]] = [next[j], next[idx]];
-    reorderFetcher.submit({ intent: "reorder", ids: JSON.stringify(next.map((t) => t.id)) }, { method: "POST" });
+    submitReorder({ intent: "reorder", ids: JSON.stringify(next.map((t) => t.id)) }, { method: "POST" });
   }
 
   if ("forbidden" in data) return <AccessDenied />;
@@ -165,7 +166,7 @@ export default function SettingsContractorTypes() {
       ) : (
         <div className="bg-ih-bg-card border border-ih-border rounded-lg divide-y divide-ih-border">
           {types.map((t, idx) => (
-            <ContractorTypeRow key={t.id} t={t} idx={idx} count={types.length} onMove={move} onRequestDelete={() => requestDelete(t)} />
+            <ContractorTypeRow key={t.id} t={t} idx={idx} count={types.length} reordering={reordering} onMove={move} onRequestDelete={() => requestDelete(t)} />
           ))}
         </div>
       )}
@@ -174,9 +175,9 @@ export default function SettingsContractorTypes() {
         open={!!pendingDelete}
         title={m.settings_contractor_types_delete_title()}
         message={pendingDelete ? `${m.settings_contractor_types_delete_confirm({ name: pendingDelete.name })}${orphanSentence ? ` ${orphanSentence}` : ""}` : ""}
-        busy={deleteFetcher.state !== "idle"}
+        busy={deletingType}
         onConfirm={() => {
-          if (pendingDelete) deleteFetcher.submit({ intent: "delete", id: pendingDelete.id }, { method: "POST" });
+          if (pendingDelete) submitDelete({ intent: "delete", id: pendingDelete.id }, { method: "POST" });
           setPendingDelete(null);
         }}
         onCancel={() => setPendingDelete(null)}

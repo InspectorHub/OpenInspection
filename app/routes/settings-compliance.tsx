@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useLoaderData, useFetcher } from "react-router";
+import { useLoaderData } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import type { Route } from "./+types/settings-compliance";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -199,11 +200,11 @@ export default function SettingsCompliancePage() {
 /* ------------------------------------------------------------------ */
 
 function RetentionWindow({ initialYears }: { initialYears: number }) {
-  const fetcher = useFetcher<typeof action>();
+  const { fetcher, submit, busy } = useGuardedSubmit<typeof action>();
   const [years, setYears] = useState(String(initialYears));
   const [dirty, setDirty] = useState(false);
 
-  const saving = fetcher.state !== "idle";
+  const saving = busy;
   const saved =
     fetcher.state === "idle" &&
     fetcher.data?.intent === "retention-save" &&
@@ -217,7 +218,7 @@ function RetentionWindow({ initialYears }: { initialYears: number }) {
 
   function handleSave() {
     setDirty(false);
-    fetcher.submit(
+    submit(
       { intent: "retention-save", retentionYears: years },
       { method: "post" },
     );
