@@ -131,7 +131,7 @@ export async function findTemplateBlockingReference<TSchema extends Record<strin
  * `tests/unit/templates/template-delete-guard.spec.ts` pins them, and a
  * reworded message is a behaviour change wearing a refactor's clothes.
  */
-export function templateBlockedError(ref: TemplateBlockingReference) {
+function templateBlockedError(ref: TemplateBlockingReference) {
     switch (ref.kind) {
         case 'inspection':
             return Errors.Conflict('Cannot delete a template that is referenced by existing inspections');

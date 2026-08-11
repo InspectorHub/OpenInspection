@@ -26,4 +26,3 @@ export const MarketplaceBrowseQuerySchema = z.object({
     inspectionKind: z.string().min(1).max(64).optional().describe('Filter by inspection kind, e.g. new_construction'),
 });
 
-export type MarketplaceBrowseQuery = z.infer<typeof MarketplaceBrowseQuerySchema>;
