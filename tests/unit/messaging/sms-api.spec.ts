@@ -279,6 +279,13 @@ describe('SMS consent API (Track L Task 8)', () => {
         } as never);
         const { mintOptinToken } = await import('../../../server/lib/sms/optin-token');
         const token = await mintOptinToken(TENANT, contactId, FAKE_ENV.JWT_SECRET);
+        // The company NAME lives in tenant_configs. Kept deliberately unlike the
+        // slug ('T-acme' vs 'acme') so the assertion below cannot be satisfied by
+        // the slug fallback — a consent disclosure that names the wrong party is
+        // the one thing this endpoint must not do.
+        await db.insert(schema.tenantConfigs).values({
+            tenantId: TENANT, companyName: 'T-acme', updatedAt: new Date(),
+        } as never);
 
         const app = buildApp(db);
         // Default hosted mode → /legal/{slug}/privacy|terms under APP_BASE_URL.
@@ -290,13 +297,14 @@ describe('SMS consent API (Track L Task 8)', () => {
         expect(body.data.privacyUrl).toBe(`${APP_BASE_URL}/legal/acme/privacy`);
         expect(body.data.termsUrl).toBe(`${APP_BASE_URL}/legal/acme/terms`);
 
-        await db.insert(schema.tenantConfigs).values({
-            tenantId: TENANT,
+        // Update, not insert: the row already exists — it is where the company
+        // name came from a few lines up.
+        await db.update(schema.tenantConfigs).set({
             legalMode: 'custom',
             customPrivacyUrl: 'https://acme.example/privacy',
             customTermsUrl: 'https://acme.example/terms',
             updatedAt: new Date(),
-        } as never);
+        } as never).where(eq(schema.tenantConfigs.tenantId, TENANT));
 
         const res2 = await app.request(`/api/public/sms/optin-resolve?token=${encodeURIComponent(token)}`, {}, FAKE_ENV, makeExecCtx());
         const body2 = await res2.json() as { data: { privacyUrl: string | null; termsUrl: string | null } };

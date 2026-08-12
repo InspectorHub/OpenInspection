@@ -3,7 +3,7 @@ import { AuthService } from '../../../server/services/auth.service';
 import { verifyPassword } from '../../../server/lib/password';
 import { MockKV } from '../mocks';
 import { createTestDb, setupSchema } from '../db';
-import { users, tenantInvites, tenants } from '../../../server/lib/db/schema';
+import { users, tenantInvites, tenants, tenantConfigs } from '../../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
@@ -35,6 +35,15 @@ describe('AuthService', () => {
             id: 't1',
             slug: 'test',
             createdAt: new Date(),
+        });
+        // The company NAME lives in tenant_configs, not on the tenant row. A
+        // tenant without this row resolves to its slug, so an invite screen
+        // would greet the recipient with `test` instead of the company they
+        // were invited to — which is what this fixture is here to catch.
+        await testDb.insert(tenantConfigs).values({
+            tenantId: 't1',
+            companyName: 'Test Tenant',
+            updatedAt: new Date(),
         });
         
         authService = new AuthService({} as any, mockKV as any);

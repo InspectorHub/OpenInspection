@@ -66,10 +66,17 @@ beforeEach(async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (mockDrizzle as any).mockReturnValue(db);
 
-    for (const [id, name] of [[ACME, 'Acme Inspections'], [BOLT, 'Bolt Home Services']]) {
+    // `name` used to ride on the tenant row. It no longer exists there, and the
+    // `as never` cast below meant nothing complained when the column went — the
+    // insert simply dropped it and every company came back named after its id.
+    // The name lives in tenant_configs now, so seed it where it lives.
+    for (const [id, companyName] of [[ACME, 'Acme Inspections'], [BOLT, 'Bolt Home Services']]) {
         await db.insert(schema.tenants).values({
-            id, name, slug: id, status: 'active',
+            id, slug: id, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        } as never);
+        await db.insert(schema.tenantConfigs).values({
+            tenantId: id, companyName, updatedAt: new Date(),
         } as never);
     }
     await db.insert(schema.users).values({

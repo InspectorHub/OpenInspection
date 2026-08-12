@@ -47,6 +47,14 @@ async function seed() {
         { id: TENANT_A, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now },
         { id: TENANT_B, slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now },
     ]);
+    // The company NAME lives here. Deliberately unlike the slugs ('A' vs 'a'),
+    // so the cross-tenant assertion below cannot pass on a fallback: an inbox
+    // that spans companies has to resolve the name, and a slug that merely
+    // looks like one would hide the difference.
+    await db.insert(schema.tenantConfigs).values([
+        { tenantId: TENANT_A, companyName: 'A', updatedAt: now },
+        { tenantId: TENANT_B, companyName: 'B', updatedAt: now },
+    ]);
     await db.insert(schema.users).values([
         { id: STAFF_USER, tenantId: TENANT_A, email: 'staff@a.com', name: 'Staff', passwordHash: 'x', role: 'owner', createdAt: now },
         { id: AGENT_USER, tenantId: null, email: 'agent@x.com', name: 'Agent', passwordHash: 'x', role: 'agent', createdAt: now },
