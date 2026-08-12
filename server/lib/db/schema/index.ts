@@ -54,11 +54,6 @@ export type { SigningKey, NewSigningKey, EsignAuditLog, NewEsignAuditLog } from 
 export { qboConnections, qboEntityMap, qboSyncErrors } from './qbo';
 export { calendarBlocks, calendarConnections, calendarConnectionReadCalendars, calendarExternalLinks } from './calendar';
 export { tenantCustomHolidays } from './holidays';
-// Apprentice review-queue subsystem removed 2026-06-13. The physical
-// `apprentice_reviews` table is orphaned (D1 cannot drop tables) but all
-// schema + code is gone (apprentices became plain inspectors).
-// Guest invite subsystem removed 2026-06-13. The physical `guest_invites`
-// table is orphaned (D1 cannot drop tables) but all schema + code is gone.
 // Design System 0520 subsystem D — UnitTree hierarchy
 export { inspectionUnits } from './units';
 // Design System 0520 subsystem D — ReportVersions (snapshot-on-publish)
