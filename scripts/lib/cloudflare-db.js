@@ -28,9 +28,24 @@ export function seedDatabase({ initialCompany, initialSubdomain, initialEmail, i
     const userId = crypto.randomUUID();
     const now = Math.floor(Date.now() / 1000);
 
+    // Three things this statement got wrong, all of them silent until first run:
+    //
+    //   `subdomain` has not been a column on `tenants` for some time — this
+    //   insert could never have succeeded against the current schema, so the
+    //   very first thing a self-hoster ran was already failing here.
+    //
+    //   `name` is gone too; the company name lives in `tenant_configs`, which
+    //   is why a second statement now writes it there.
+    //
+    //   `admin` is not one of the four roles (owner / manager / inspector /
+    //   agent). `requireRole('owner', …)` never matches it and capabilities are
+    //   looked up by role, so the account this script created for the person
+    //   installing the product could do nothing at all.
+    const company = initialCompany.replace(/'/g, "''");
     const sql = [
-        `INSERT INTO tenants (id, name, subdomain, tier, status, max_users, created_at) VALUES ('${tenantId}', '${initialCompany.replace(/'/g, "''")}', '${effectiveSubdomain}', 'free', 'active', 5, ${now});`,
-        `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at) VALUES ('${userId}', '${tenantId}', '${initialEmail.replace(/'/g, "''")}', '${initialPassHash}', 'admin', ${now});`
+        `INSERT INTO tenants (id, slug, tier, status, max_users, deployment_mode, created_at) VALUES ('${tenantId}', '${effectiveSubdomain}', 'free', 'active', 5, 'shared', ${now});`,
+        `INSERT INTO tenant_configs (tenant_id, company_name, updated_at) VALUES ('${tenantId}', '${company}', ${now});`,
+        `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at) VALUES ('${userId}', '${tenantId}', '${initialEmail.replace(/'/g, "''")}', '${initialPassHash}', 'owner', ${now});`
     ].join(' ');
 
     const targetDb = isLocal ? 'DB' : DB_NAME;

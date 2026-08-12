@@ -377,9 +377,14 @@ async function buildSql() {
      * The fixed tenant row may already exist (e.g. a dev /setup created it),
      * so UPSERT rather than delete+insert. Slug is UNIQUE; the old tenant
      * (which held this slug) is dropped above first, freeing it. */
-    push(`INSERT INTO tenants (id, name, slug, tier, status, max_users, deployment_mode, created_at)
-        VALUES (${strLit(TENANT_ID)}, ${strLit(TENANT_NAME)}, ${strLit(TENANT_SLUG)}, 'free', 'active', 5, 'shared', ${nowSec})
-        ON CONFLICT(id) DO UPDATE SET name = excluded.name, slug = excluded.slug, status = 'active';`);
+    push(`INSERT INTO tenants (id, slug, tier, status, max_users, deployment_mode, created_at)
+        VALUES (${strLit(TENANT_ID)}, ${strLit(TENANT_SLUG)}, 'free', 'active', 5, 'shared', ${nowSec})
+        ON CONFLICT(id) DO UPDATE SET slug = excluded.slug, status = 'active';`);
+    // TENANT_NAME goes to tenant_configs — the demo's whole point is a report
+    // with a real company name on the cover, and that name now has one home.
+    push(`INSERT INTO tenant_configs (tenant_id, company_name, updated_at)
+        VALUES (${strLit(TENANT_ID)}, ${strLit(TENANT_NAME)}, ${nowSec})
+        ON CONFLICT(tenant_id) DO UPDATE SET company_name = excluded.company_name;`);
 
     push(`INSERT INTO users (id, tenant_id, email, password_hash, name, license_number, role, created_at)
         VALUES (${strLit(USER_ID)}, ${strLit(TENANT_ID)}, ${strLit(LOGIN_EMAIL)}, ${strLit(pw)}, 'Alex Rivera', 'PCA-2024-0142', 'owner', ${nowSec});`);

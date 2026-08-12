@@ -373,10 +373,20 @@ export function seedFixtures(appDir: string): void {
     const nowMs = Date.now();
 
     // Two tenants — Tenant A is the default; Tenant B backs the branch-B fixture user below.
-    d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
-        VALUES ('${TENANT_A_ID}', 'Seed Tenant A', 'seed-a', 'active', 'shared', 'free', 5, '${now}')`, cwd);
-    d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
-        VALUES ('${TENANT_B_ID}', 'Seed Tenant B', 'seed-b', 'active', 'shared', 'free', 5, '${now}')`, cwd);
+    //
+    // No `name` column: the company name lives in `tenant_configs.company_name`.
+    // These are raw SQL strings, so the compiler could not tell anyone when the
+    // column went away — the seed simply failed at run time, which is why
+    // globalSetup treats a failed seed as fatal instead of a warning.
+    d1(`INSERT OR REPLACE INTO tenants (id, slug, status, deployment_mode, tier, max_users, created_at)
+        VALUES ('${TENANT_A_ID}', 'seed-a', 'active', 'shared', 'free', 5, '${now}')`, cwd);
+    d1(`INSERT OR REPLACE INTO tenants (id, slug, status, deployment_mode, tier, max_users, created_at)
+        VALUES ('${TENANT_B_ID}', 'seed-b', 'active', 'shared', 'free', 5, '${now}')`, cwd);
+    // Tenant A's config row is written further down (it also carries a feature
+    // flag); B and the at-cap tenant have no other reason for one, but without
+    // it they would display as their slug.
+    d1(`INSERT OR REPLACE INTO tenant_configs (tenant_id, company_name, updated_at)
+        VALUES ('${TENANT_B_ID}', 'Seed Tenant B', ${nowMs})`, cwd);
 
     // Tenant A users.
     //
@@ -411,9 +421,11 @@ export function seedFixtures(appDir: string): void {
                  'InterNACHI CPI', 'NACHI-24-0001', NULL, 0, 1, ${nowMs}, ${nowMs})`, cwd);
 
     // Seat-quota / at-cap admin for the over-quota E2E.
-    d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
-        VALUES ('00000000-0000-0000-0000-000000000cc1', 'Seed Full Tenant', 'seed-full',
+    d1(`INSERT OR REPLACE INTO tenants (id, slug, status, deployment_mode, tier, max_users, created_at)
+        VALUES ('00000000-0000-0000-0000-000000000cc1', 'seed-full',
                 'active', 'shared', 'free', 1, '${now}')`, cwd);
+    d1(`INSERT OR REPLACE INTO tenant_configs (tenant_id, company_name, updated_at)
+        VALUES ('00000000-0000-0000-0000-000000000cc1', 'Seed Full Tenant', ${nowMs})`, cwd);
     d1(`INSERT OR REPLACE INTO users (id, tenant_id, email, password_hash, name, role, created_at)
         VALUES ('55555555-5555-5555-5555-555555555cc1', '00000000-0000-0000-0000-000000000cc1',
                 '${ADMIN_FULL_EMAIL}', '${SEED_PASSWORD_HASH}', 'At-Cap Admin', 'owner', '${now}')`, cwd);
