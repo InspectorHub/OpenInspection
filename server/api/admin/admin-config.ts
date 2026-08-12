@@ -19,7 +19,6 @@ import {
 import { tenantConfigs } from '../../lib/db/schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { getDrizzle } from '../../lib/route-helpers';
-import { backfillAllTenants } from '../../services/message-template-backfill';
 
 
 // ─── Integration Config & Secrets ────────────────────────────────────────────
@@ -306,46 +305,6 @@ const togglePdfPipelineRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-/**
- * POST /api/admin/system/backfill-automation-templates
- *
- * One-shot, idempotent sweep: runs `backfillAutomationTemplates` for EVERY
- * tenant in this D1 database, not just the caller's. `backfillAutomationTemplates`
- * already runs lazily whenever a tenant opens the automations page, but a
- * tenant that has never touched the feature still holds its email/SMS copy
- * inline on the `automations` row. This endpoint finishes that migration for
- * the tenants the lazy path has not reached, ahead of those columns being
- * dropped. It is deliberately temporary — deleted together with the columns.
- *
- * OI core has no platform-wide "sysadmin" role (`server/lib/auth/roles.ts`
- * defines only the per-tenant owner/manager/inspector/agent tier); this is
- * gated the same as this file's other `/system/*` diagnostic route
- * (`GET /system/br-smoke`) rather than a role that does not exist here.
- */
-const BackfillAutomationTemplatesResponseSchema = z.object({
-    success: z.literal(true),
-    data: z.object({
-        tenants: z.number().describe('Number of tenants visited by the sweep.'),
-        created: z.number().describe('Total message_templates rows created across all tenants.'),
-    }),
-});
-const backfillAutomationTemplatesRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/system/backfill-automation-templates',
-    tags: ['admin'],
-    summary: 'One-shot cross-tenant sweep: finish migrating automation email/SMS copy into message_templates',
-    middleware: [requireRole('owner', 'manager')],
-    responses: {
-        200: {
-            content: { 'application/json': { schema: BackfillAutomationTemplatesResponseSchema } },
-            description: 'Sweep result — tenants visited and templates created.',
-        },
-    },
-    operationId: 'backfillAutomationTemplatesForAllTenants',
-    description: 'Runs the automations-to-message_templates backfill for every tenant, not just the caller\'s. Temporary — deleted once the drained automations columns are dropped.',
-}, { scopes: ['admin'], tier: 'extended' }));
-
-
 const adminConfigRoutes = createApiRouter()
     .openapi(getConfigRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -507,14 +466,6 @@ const adminConfigRoutes = createApiRouter()
             success: true as const,
             data: { tenantId, enabled },
         }, 200);
-    })
-    .openapi(backfillAutomationTemplatesRoute, async (c) => {
-        // Deliberately cross-tenant, unlike every other handler in this file:
-        // it sweeps `automations` rows for ALL tenants in this D1 database, not
-        // the caller's alone. See the route's doc comment above for why.
-        const result = await backfillAllTenants(c.env.DB);
-        logger.info('backfill-automation-templates sweep complete', result);
-        return c.json({ success: true as const, data: result }, 200);
     });
 
 export default adminConfigRoutes;

@@ -4,6 +4,9 @@ import { nanoid } from 'nanoid';
 import { automations, messageTemplates, tenants } from '../lib/db/schema';
 import { AUTOMATION_SEEDS } from '../data/automation-seeds';
 
+/** KV key latching {@link runAutomationTemplateBackfillOnce} — see its doc comment. */
+const BACKFILL_MARKER_KEY = 'migration:automation-templates-backfill:done';
+
 /** Collect {{var}} token names from one or more template strings. */
 function extractVars(...sources: (string | null | undefined)[]): string[] {
     const found = new Set<string>();
@@ -114,4 +117,42 @@ export async function backfillAllTenants(db: D1Database): Promise<{ tenants: num
         created += r.created;
     }
     return { tenants: rows.length, created };
+}
+
+/**
+ * One-shot migration aid, called from the scheduled (cron) handler
+ * (`server/scheduled.ts`) — NOT from an HTTP route. `backfillAllTenants` is
+ * deliberately cross-tenant (it writes rows for every tenant in this D1
+ * database), and cron is the only place that operation belongs: a per-tenant
+ * `owner`/`manager` role has no business triggering writes across every OTHER
+ * tenant, which is why the earlier version of this migration — a
+ * `POST /api/admin/system/backfill-automation-templates` route guarded by
+ * `requireRole('owner', 'manager')` — was wrong and was removed.
+ *
+ * Latched via a marker key in `TENANT_CACHE` so the sweep runs exactly ONCE
+ * across all cron ticks (every 5 minutes in production), not once per tick.
+ * The marker is written ONLY after `sweep` resolves — a thrown error leaves
+ * it unset so the next tick retries.
+ *
+ * Delete this function, its call site in `server/scheduled.ts`, and
+ * `backfillAllTenants` together once the migration is confirmed complete
+ * everywhere and the drained `automations` copy columns are dropped. It has
+ * no purpose after that point.
+ *
+ * @param sweep Injected for tests only; production always uses the default
+ *   (real) `backfillAllTenants`.
+ */
+export async function runAutomationTemplateBackfillOnce(
+    db: D1Database,
+    kv: KVNamespace | undefined,
+    sweep: (db: D1Database) => Promise<{ tenants: number; created: number }> = backfillAllTenants,
+): Promise<{ ran: boolean; result?: { tenants: number; created: number } }> {
+    // No KV binding → no way to latch the one-shot guarantee, so skip rather
+    // than risk running the cross-tenant sweep on every single tick.
+    if (!kv) return { ran: false };
+    if (await kv.get(BACKFILL_MARKER_KEY)) return { ran: false };
+
+    const result = await sweep(db);
+    await kv.put(BACKFILL_MARKER_KEY, new Date().toISOString());
+    return { ran: true, result };
 }
