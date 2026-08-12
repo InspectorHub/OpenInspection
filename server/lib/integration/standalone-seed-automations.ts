@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import { logger } from '../logger';
 import { extractVars } from '../../services/message-template-backfill';
+import { AUTOMATION_SEEDS } from '../../data/automation-seeds';
 import { SQL_UUID_V4 } from './standalone-uuid';
 
 // Default automation rules seeded for every new tenant. Without these, none of
@@ -10,14 +11,28 @@ import { SQL_UUID_V4 } from './standalone-uuid';
 // recipient discriminator (recipient_kind + recipient_role_profile_id), so
 // multi-recipient intents fan out into one row per recipient.
 //
+// ONE RULE LIST, NOT TWO. The rows come from `AUTOMATION_SEEDS`
+// (server/data/automation-seeds.ts) — the same list `AutomationCore.ensureSeeds`
+// inserts on the SaaS path, `backfillAutomationTemplates` recovers copy from,
+// and `automation-classes.ts` names its notification classes off. This file
+// used to keep its own parallel copy under a comment asking the reader to keep
+// the two "semantically in sync", and they had already drifted: six rules
+// carried a different name here than in the seed list, so a standalone tenant
+// got each of them seeded a SECOND time under the other name the first time
+// ensureSeeds ran (it dedupes on name+trigger). Two active rules on one
+// trigger means the client receives the mail twice. The copy is gone; what is
+// left below is only the raw-SQL WRITER, which is what this path actually
+// needs that ensureSeeds cannot give it.
+//
 // Idempotent: every INSERT below (both message_templates writes and the
 // automations write) carries its own `WHERE NOT EXISTS` guard against the
-// same (tenant_id, trigger, recipient_kind, name) lookup, evaluated by the
-// database at write time — so two concurrent callers can no longer both pass
-// a check and double-seed the same rule. The three statements for one row are
-// additionally run in a single db.batch() so a failure partway through (e.g.
-// the automations insert) cannot leave that row's templates committed with
-// nothing referencing them.
+// same (tenant_id, trigger, name) lookup, evaluated by the database at write
+// time — so two concurrent callers can no longer both pass a check and
+// double-seed the same rule. That triple is exactly the identity ensureSeeds
+// diffs on, so whichever path runs second recognises the other's rows. The
+// three statements for one row are additionally run in a single db.batch() so
+// a failure partway through (e.g. the automations insert) cannot leave that
+// row's templates committed with nothing referencing them.
 //
 // Implemented as a per-row JS loop because D1 caps compound SELECT terms
 // (~10) so a prior single-statement INSERT … SELECT … UNION ALL fan-out
@@ -27,47 +42,31 @@ import { SQL_UUID_V4 } from './standalone-uuid';
 // executes BEFORE seedStarterContent → seedRoleProfiles in the /setup flow
 // (server/api/auth.ts). The caller seeds role profiles first so the
 // recipientRoleKey → contact_role_profiles.id subquery has rows to find.
+
+/**
+ * The seed fields this writer reads. `AUTOMATION_SEEDS` is `as const` with a
+ * union of row shapes (only some entries carry `recipientRoleKey`, `smsBody`,
+ * `channels` or `defaultActive`), so it is widened once here rather than at
+ * every access.
+ */
+type SeedRow = {
+    name:             string;
+    trigger:          string;
+    recipientKind:    'role' | 'inspector' | 'all' | 'staff';
+    recipientRoleKey?: string | null;
+    delayMinutes:     number;
+    subjectTemplate:  string;
+    bodyTemplate:     string;
+    smsBody?:         string;
+    channels?:        readonly string[];
+    defaultActive?:   boolean;
+};
+
 export async function seedDefaultAutomations(db: D1Database, tenantId: string): Promise<void> {
-    // Tuple shape: [trigger, recipientRoleKey|null, name, subject, body, active, smsBody].
-    // recipientRoleKey null means recipient_kind='inspector' for that row (no seed here
-    // uses 'all'); a non-null key means recipient_kind='role' and the INSERT below
-    // resolves it to the tenant's contact_role_profiles.id via a correlated subquery.
-    // The active flag is 1 (enabled) for all lifecycle rules; only the Track J (#122)
-    // "Review request" row is 0 (seeded inactive — fail-closed until review_url set).
-    // smsBody (Track L) is the plain-text SMS template for the 3 client touchpoints
-    // (booking / reminder / report-ready); null elsewhere. channels stays email-only
-    // ('["email"]') for every seed — SMS is enabled per-rule by the inspector later.
-    // NOTE: keep these rows semantically in sync with AUTOMATION_SEEDS in
-    // server/data/automation-seeds.ts (the parallel seed path used by ensureSeeds).
-    const rows: Array<[string, string | null, string, string, string, number, string | null]> = [
-        ['report.published', 'client', 'Report Ready (Client)', 'Your inspection report is ready — {{property_address}}', '<p>Hi {{client_name}},</p><p>Your inspection report for <strong>{{property_address}}</strong> is ready to view.</p><p><a href="{{report_url}}">View Report</a></p><p>— {{company_name}}</p>', 1, '{{company_name}}: your inspection report for {{property_address}} is ready: {{report_url}} Reply STOP to opt out; questions? call {{company_phone}}'],
-        ['report.published', 'buyer_agent', "Report Ready (Buyer's Agent)", 'Your inspection report is ready — {{property_address}}', '<p>The inspection report for <strong>{{property_address}}</strong> is ready.</p><p><a href="{{report_url}}">View Report</a></p><p>— {{company_name}}</p>', 1, null],
-        ['report.published', 'listing_agent', 'Report Ready (Listing Agent)', 'Your inspection report is ready — {{property_address}}', '<p>The inspection report for <strong>{{property_address}}</strong> is ready.</p><p><a href="{{report_url}}">View Report</a></p><p>— {{company_name}}</p>', 0, null], // active=0: listing agent seeded inactive by default (Spec 2 §3.5)
-        ['report.amended', 'client', 'Report Updated (Client)', 'Your inspection report was updated — {{property_address}}', '<p>Hi {{client_name}},</p><p>Your inspection report for <strong>{{property_address}}</strong> has been updated.</p><p>{{summary}}</p><p><a href="{{report_url}}">View the updated report</a></p><p>— {{company_name}}</p>', 1, '{{company_name}}: your inspection report for {{property_address}} was updated: {{report_url}} Reply STOP to opt out; questions? call {{company_phone}}'],
-        ['report.amended', 'buyer_agent', "Report Updated (Buyer's Agent)", 'Inspection report updated — {{property_address}}', '<p>The inspection report for <strong>{{property_address}}</strong> has been updated.</p><p>{{summary}}</p><p><a href="{{report_url}}">View the updated report</a></p><p>— {{company_name}}</p>', 1, null],
-        ['inspection.confirmed', 'client', '24-Hour Reminder', 'Reminder: Inspection tomorrow — {{property_address}}', '<p>Hi {{client_name}},</p><p>Just a reminder that your inspection at <strong>{{property_address}}</strong> is scheduled for <strong>{{scheduled_date}}</strong>. Your inspector will arrive during the scheduled window.</p><p>— {{company_name}}</p>', 1, '{{company_name}}: reminder — your inspection at {{property_address}} is {{scheduled_date}}. Reply STOP to opt out; questions? call {{company_phone}}'],
-        ['inspection.cancelled', 'client', 'Cancellation Notice (Client)', 'Inspection cancelled — {{property_address}}', '<p>Hi {{client_name}},</p><p>Your inspection at <strong>{{property_address}}</strong> has been cancelled. Please contact us to reschedule.</p><p>— {{company_name}}</p>', 1, null],
-        ['inspection.cancelled', 'buyer_agent', "Cancellation Notice (Buyer's Agent)", 'Inspection cancelled — {{property_address}}', '<p>The inspection at <strong>{{property_address}}</strong> has been cancelled. The client may need to reschedule.</p><p>— {{company_name}}</p>', 1, null],
-        ['inspection.created', 'client', 'Booking Confirmation', 'Your inspection is scheduled — {{property_address}}', '<p>Hi {{client_name}},</p><p>Your inspection at <strong>{{property_address}}</strong> has been scheduled for <strong>{{scheduled_date}}</strong>.</p><p>Your inspector: {{inspector_name}}</p><p>— {{company_name}}</p>', 1, '{{company_name}}: your inspection at {{property_address}} is set for {{scheduled_date}}. Reply STOP to opt out; questions? call {{company_phone}}'],
-        ['inspection.created', 'client', 'Send Agreement to Client', 'Please sign your inspection agreement — {{property_address}}', '<p>Hi {{client_name}},</p><p>Please review and sign the inspection agreement for <strong>{{property_address}}</strong> scheduled for {{scheduled_date}}.</p><p><a href="{{agreement_sign_url}}">Review &amp; Sign Agreement</a></p><p>— {{company_name}}</p>', 1, null],
-        ['agreement.signed', 'client', 'Agreement Signed Confirmation', 'Confirmation: agreement signed — {{property_address}}', '<p>Hi {{client_name}},</p><p>Thank you for signing the inspection agreement for <strong>{{property_address}}</strong>. We will see you on {{scheduled_date}}.</p><p>— {{company_name}}</p>', 1, null],
-        ['invoice.created', 'client', 'Invoice / Payment Request', 'Invoice for your inspection — {{property_address}}', '<p>Hi {{client_name}},</p><p>An invoice has been created for your inspection at <strong>{{property_address}}</strong>.</p><p><a href="{{invoice_url}}">View &amp; Pay Invoice</a></p><p>— {{company_name}}</p>', 1, null],
-        ['payment.received', null, 'Payment Received (Inspector)', 'Payment received — {{property_address}}', '<p>Payment has been received for the inspection at <strong>{{property_address}}</strong> (client: {{client_name}}).</p><p>— {{company_name}}</p>', 1, null],
-        ['payment.received', 'client', 'Payment Received (Client Receipt)', 'Receipt: payment received — {{property_address}}', '<p>Hi {{client_name}},</p><p>Thank you — your payment for the inspection at <strong>{{property_address}}</strong> has been received.</p><p>— {{company_name}}</p>', 1, null],
-        // The lab result arriving. Names kept BYTE-IDENTICAL to the matching
-        // AUTOMATION_SEEDS rows: ensureSeeds dedupes on (name, trigger), and
-        // automation-classes.ts keys its notification class on the same pair —
-        // a standalone-only name would re-seed the rule twice and leave both
-        // copies unclassifiable.
-        ['event.results_received', 'client', 'Event Results Received', 'Your {{event_type_name}} results are in — {{property_address}}', '<p>Hi {{client_name}},</p><p>The results for your {{event_type_name}} at <strong>{{property_address}}</strong> have arrived and are now in your {{event_type_name}} report.</p><p><a href="{{report_url}}">View the report</a></p><p>— {{company_name}}</p>', 1, '{{company_name}}: your {{event_type_name}} results for {{property_address}} are in: {{report_url}} Reply STOP to opt out; questions? call {{company_phone}}'],
-        ['event.results_received', 'buyer_agent', "Event Results Received (Buyer's Agent)", '{{event_type_name}} results are in — {{property_address}}', '<p>Hello,</p><p>The results for the {{event_type_name}} at <strong>{{property_address}}</strong> have arrived and are now in the {{event_type_name}} report.</p><p><a href="{{report_url}}">View the report</a></p><p>— {{company_name}}</p>', 1, '{{company_name}}: the {{event_type_name}} results for {{property_address}} are in: {{report_url}} Reply STOP to opt out; questions? call {{company_phone}}'],
-        ['report.published', 'client', 'Post-inspection follow-up', 'Following up on your inspection — {{property_address}}', '<p>Hi {{client_name}},</p><p>We hope your inspection report for <strong>{{property_address}}</strong> was helpful. If anything raised a question, just reply — we are happy to help.</p><p>— {{company_name}}</p>', 1, null],
-        ['report.published', 'client', 'Review request', 'How did we do? — {{property_address}}', '<p>Hi {{client_name}},</p><p>Thanks for choosing us for your inspection at <strong>{{property_address}}</strong>. A short review helps other homebuyers find us:</p><p><a href="{{review_url}}">Leave a review</a></p><p>— {{company_name}}</p>', 0, null], // active=0: inactive until review_url configured
-    ];
     // The correlated subquery resolves a non-null recipientRoleKey to this
     // tenant's contact_role_profiles.id (mirrors the migration's data-copy
     // subquery pattern). A null bound param returns no rows (id stays NULL),
-    // matching recipient_kind='inspector'.
+    // which is what every non-`role` recipient kind wants.
     //
     // SP2 cutover — the rule no longer carries its own copy (the columns that
     // used to hold it are dropped from the automations table entirely).
@@ -82,8 +81,7 @@ export async function seedDefaultAutomations(db: D1Database, tenantId: string): 
     // writes.
     const notExistsExisting = `
         NOT EXISTS (
-            SELECT 1 FROM automations WHERE tenant_id = ? AND trigger = ?
-                AND recipient_kind = (CASE WHEN ? IS NULL THEN 'inspector' ELSE 'role' END) AND name = ?
+            SELECT 1 FROM automations WHERE tenant_id = ? AND trigger = ? AND name = ?
         )
     `;
     // message_templates timestamps are timestamp_ms (epoch milliseconds), same
@@ -102,38 +100,59 @@ export async function seedDefaultAutomations(db: D1Database, tenantId: string): 
     `;
     const insertAutomationStmt = `
         INSERT INTO automations (id, tenant_id, trigger, recipient_kind, recipient_role_profile_id, name, delay_minutes, email_template_id, is_active, channels, sms_template_id, is_default, created_at)
-        SELECT ${SQL_UUID_V4}, ?, ?, CASE WHEN ? IS NULL THEN 'inspector' ELSE 'role' END,
+        SELECT ${SQL_UUID_V4}, ?, ?, ?,
             (SELECT crp.id FROM contact_role_profiles crp WHERE crp.tenant_id = ? AND crp.key = ? AND crp.is_active = 1 LIMIT 1),
-            ?, 0, ?, ?, '["email"]', ?, 1, ${nowMsExpr}
+            ?, ?, ?, ?, ?, ?, 1, ${nowMsExpr}
         WHERE ${notExistsExisting}
     `;
-    for (const [trigger, recipientRoleKey, name, subject, body, active, smsBody] of rows) {
+    for (const raw of AUTOMATION_SEEDS) {
+        const seed = raw as unknown as SeedRow;
+        const { name, trigger, subjectTemplate, bodyTemplate } = seed;
         try {
-            const emailTemplateId = nanoid();
-            const statements = [
-                db.prepare(insertEmailTemplateStmt).bind(
-                    emailTemplateId, tenantId, `${name} — Email`, subject, body, JSON.stringify(extractVars(subject, body)),
-                    tenantId, trigger, recipientRoleKey, name,
-                ),
-            ];
+            // Channel gating is copied from `backfillAutomationTemplates`, which
+            // states the rule this file used to break: a template row for a
+            // channel the rule does not carry is a row in the operator's
+            // template library that nothing can ever send. Every seed is
+            // email-only or in-app-only today, so the sms branch is dormant —
+            // it stays because the gate, not the emptiness, is the invariant.
+            // (in_app wording is left to backfillAutomationTemplates, exactly as
+            // ensureSeeds leaves it.)
+            const channels = seed.channels ? [...seed.channels] : ['email'];
+            const roleKey = seed.recipientKind === 'role' ? (seed.recipientRoleKey ?? null) : null;
+            const statements = [];
+
+            let emailTemplateId: string | null = null;
+            if (channels.includes('email')) {
+                emailTemplateId = nanoid();
+                statements.push(
+                    db.prepare(insertEmailTemplateStmt).bind(
+                        emailTemplateId, tenantId, `${name} — Email`, subjectTemplate, bodyTemplate,
+                        JSON.stringify(extractVars(subjectTemplate, bodyTemplate)),
+                        tenantId, trigger, name,
+                    ),
+                );
+            }
 
             let smsTemplateId: string | null = null;
-            if (smsBody?.trim()) {
+            if (channels.includes('sms') && seed.smsBody?.trim()) {
                 smsTemplateId = nanoid();
                 statements.push(
                     db.prepare(insertSmsTemplateStmt).bind(
-                        smsTemplateId, tenantId, `${name} — SMS`, smsBody, JSON.stringify(extractVars(smsBody)),
-                        tenantId, trigger, recipientRoleKey, name,
+                        smsTemplateId, tenantId, `${name} — SMS`, seed.smsBody,
+                        JSON.stringify(extractVars(seed.smsBody)),
+                        tenantId, trigger, name,
                     ),
                 );
             }
 
             statements.push(
                 db.prepare(insertAutomationStmt).bind(
-                    tenantId, trigger, recipientRoleKey,
-                    tenantId, recipientRoleKey,
-                    name, emailTemplateId, active, smsTemplateId,
-                    tenantId, trigger, recipientRoleKey, name,
+                    tenantId, trigger, seed.recipientKind,
+                    tenantId, roleKey,
+                    name, seed.delayMinutes, emailTemplateId,
+                    seed.defaultActive === false ? 0 : 1,
+                    JSON.stringify(channels), smsTemplateId,
+                    tenantId, trigger, name,
                 ),
             );
 

@@ -40,6 +40,7 @@ const CLASS_BY_SEED: Record<string, string> = {
     // Client-facing, the recipient's call (§2.2 / §2.3).
     'inspection.confirmed::24-Hour Reminder':            'inspection-reminder',
     'inspection.cancelled::Cancellation Notice':         'inspection-cancelled',
+    "inspection.cancelled::Cancellation Notice (Buyer's Agent)": 'inspection-cancelled-buyers-agent',
     'report.amended::Report Updated':                    'report-amended',
     'report.published::Report Ready (Listing Agent)':    'report-ready-listing-agent',
     "inspection.created::Booking Confirmation (Buyer's Agent)": 'booking-confirmation-buyers-agent',
@@ -53,6 +54,11 @@ const CLASS_BY_SEED: Record<string, string> = {
 
     // Inspector work notifications (§2.5) — Operator's call, not the individual's.
     'payment.received::Payment Received':                                  'inspector-payment-received',
+
+    // The client's receipt for the same event. A separate class from the
+    // inspector's alert above because they go to different people and only one
+    // of them is a financial record the recipient keeps.
+    'payment.received::Payment Received (Client Receipt)':                 'payment-receipt',
     'agreement.signed::Notify inspector when client signs agreement':      'inspector-agreement-signed',
     'agreement.declined::Notify inspector when client declines agreement': 'inspector-agreement-declined',
     'agreement.viewed::Notify inspector when client views agreement':      'inspector-agreement-viewed',

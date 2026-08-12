@@ -18,6 +18,8 @@ import { and, eq } from 'drizzle-orm';
 import * as schema from '../../server/lib/db/schema';
 import { seedDefaultAutomations } from '../../server/lib/integration/standalone-seed-automations';
 import { seedRoleProfiles } from '../../server/services/seed/seed-role-profiles';
+import { AutomationService } from '../../server/services/automation.service';
+import { AUTOMATION_SEEDS } from '../../server/data/automation-seeds';
 import { applyMigrations as replayMigrations } from './migration-replay';
 
 const b = env as unknown as { DB: D1Database };
@@ -56,7 +58,17 @@ describe('seedDefaultAutomations — real D1 (I-2/I-3/I-4)', () => {
         const booking = rules.find(r => r.name === 'Booking Confirmation');
         expect(booking).toBeTruthy();
         expect(booking!.emailTemplateId).toBeTruthy();
-        expect(booking!.smsTemplateId).toBeTruthy(); // Booking Confirmation carries an smsBody
+        // NOT truthy — and this assertion used to say the opposite. The seeder
+        // created an SMS template for any seed carrying an `smsBody`, ignoring
+        // the rule's `channels`. No seed declares an sms channel (SMS is opted
+        // into per-rule by the inspector later), so every one of those was a row
+        // in the operator's template library that nothing could send — the exact
+        // outcome `message-template-backfill.ts` documents itself as avoiding
+        // for the email and in-app cases, and the behaviour
+        // `tests/unit/automations/automation-seeds-sms.spec.ts` already pinned
+        // on the other seed path. The template appears when the tenant enables
+        // the channel, via backfillAutomationTemplates.
+        expect(booking!.smsTemplateId).toBeNull();
         // I-3: createdAt must be a real, current millisecond epoch — the bug
         // this regresses stamped it in SECONDS, which drizzle (timestamp_ms)
         // reads back as 1970. A sane lower bound (the year 2020 in ms) is
@@ -113,5 +125,46 @@ describe('seedDefaultAutomations — real D1 (I-2/I-3/I-4)', () => {
         const rules = await db.select().from(schema.automations)
             .where(and(eq(schema.automations.tenantId, tenantId), eq(schema.automations.name, 'Booking Confirmation')));
         expect(rules).toHaveLength(1);
+    });
+
+    // The bug this closes, end to end. A standalone tenant runs BOTH seeders:
+    // /setup writes the rules, then the first automations API call (or any
+    // trigger) runs ensureSeeds. While this file kept its own copy of the rule
+    // list, six rules were spelled differently on each side, ensureSeeds
+    // dedupes on (name, trigger), and so it seeded all six AGAIN under the
+    // other name — two active `report.published`→client rules, two
+    // `report.amended`→client rules, and so on. Every client on that tenant got
+    // the mail twice, and (since this release) the duplicate minted its own
+    // message_templates row, so the operator saw it in their library too.
+    it('the /setup seeder then ensureSeeds leaves ONE rule per seed, not two', async () => {
+        const tenantId = crypto.randomUUID();
+        await seedTenant(tenantId);
+        const db = drizzle(b.DB);
+
+        const expected = AUTOMATION_SEEDS.map((s) => `${s.trigger}::${s.name}`).sort();
+        const seededKeys = async () =>
+            (await db.select().from(schema.automations).where(eq(schema.automations.tenantId, tenantId)))
+                .map((r) => `${r.trigger}::${r.name}`).sort();
+
+        await seedDefaultAutomations(b.DB, tenantId);
+        // Sorted-array equality, not a set: a duplicate row survives it. The
+        // count is part of the comparison, so "nothing was seeded" cannot read
+        // as agreement either.
+        expect(await seededKeys()).toEqual(expected);
+
+        await new AutomationService(b.DB).ensureSeeds(tenantId);
+        expect(await seededKeys()).toEqual(expected);
+
+        // And the same for the template library, which is where the duplication
+        // became visible to the operator: exactly one seeded email template per
+        // rule that has an email channel, none for any other channel.
+        const templates = await db.select().from(schema.messageTemplates)
+            .where(eq(schema.messageTemplates.tenantId, tenantId));
+        const emailNames = templates.filter((t) => t.channel === 'email').map((t) => t.name).sort();
+        const expectedEmailNames = AUTOMATION_SEEDS
+            .filter((s) => (('channels' in s ? (s.channels as readonly string[]) : ['email'])).includes('email'))
+            .map((s) => `${s.name} — Email`).sort();
+        expect(emailNames).toEqual(expectedEmailNames);
+        expect(templates.filter((t) => t.channel === 'sms')).toEqual([]);
     });
 });

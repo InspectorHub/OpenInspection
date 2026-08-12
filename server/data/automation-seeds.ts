@@ -67,6 +67,21 @@ export const AUTOMATION_SEEDS = [
         bodyTemplate:    '<p>Hi {{client_name}},</p><p>Your inspection at <strong>{{property_address}}</strong> has been cancelled. Please contact us to reschedule.</p><p>— {{company_name}}</p>',
         isDefault: true,
     },
+    // The referring agent is told the visit is off for the same reason they are
+    // told it was booked: they are coordinating a transaction around the date.
+    // Promoted from the standalone /setup seeder's private list, which shipped
+    // this rule to self-hosters while the SaaS path had no equivalent — the
+    // second half of the same defect as the six renamed duplicates.
+    {
+        name:            "Cancellation Notice (Buyer's Agent)",
+        trigger:         'inspection.cancelled' as const,
+        recipientKind:   'role' as const,
+        recipientRoleKey: 'buyer_agent' as const,
+        delayMinutes:    0,
+        subjectTemplate: 'Inspection cancelled — {{property_address}}',
+        bodyTemplate:    '<p>The inspection at <strong>{{property_address}}</strong> has been cancelled. The client may need to reschedule.</p><p>— {{company_name}}</p>',
+        isDefault: true,
+    },
     {
         name:            'Report Ready',
         trigger:         'report.published' as const,
@@ -141,6 +156,21 @@ export const AUTOMATION_SEEDS = [
         delayMinutes:    0,
         subjectTemplate: 'Payment received — {{property_address}}',
         bodyTemplate:    '<p>Payment has been received for the inspection at <strong>{{property_address}}</strong> (client: {{client_name}}).</p><p>— {{company_name}}</p>',
+        isDefault: true,
+    },
+    // The payer's own copy. The seed above tells the OFFICE money arrived; this
+    // tells the person who sent it, which is a record of a payment they made
+    // and the only one we ever produce. Promoted from the standalone /setup
+    // seeder's private list — same provenance as the buyer's-agent
+    // cancellation above.
+    {
+        name:            'Payment Received (Client Receipt)',
+        trigger:         'payment.received' as const,
+        recipientKind:   'role' as const,
+        recipientRoleKey: 'client' as const,
+        delayMinutes:    0,
+        subjectTemplate: 'Receipt: payment received — {{property_address}}',
+        bodyTemplate:    '<p>Hi {{client_name}},</p><p>Thank you — your payment for the inspection at <strong>{{property_address}}</strong> has been received.</p><p>— {{company_name}}</p>',
         isDefault: true,
     },
     {

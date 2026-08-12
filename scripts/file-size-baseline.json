@@ -58,6 +58,7 @@
   "server/services/template.service.ts": 432,
   "app/routes/public/portal-inspection.tsx": 430,
   "app/hooks/useStructureEdit.ts": 424,
+  "server/data/automation-seeds.ts": 423,
   "server/scheduled.ts": 417,
   "app/routes/calendar.tsx": 410,
   "server/services/agreement/signer-state.ts": 409,
