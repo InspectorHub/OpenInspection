@@ -77,6 +77,14 @@ const SCRIPT_GATES = [
     // An fs walk of ~680 client files with two regexes; comparable to the
     // tracking gate.
     { key: 'submitguard', label: 'Client submit-guard coverage', script: 'check-submit-guard.mjs', fix: 'npm run lint:submit-guard' },
+    // Pre-commit rather than CI, and for a reason the gates above do not share:
+    // a seeder that nothing runs automatically has NO other rung. `seed-pca-demo`
+    // and the CLI self-host setup script are both invoked by hand, months apart,
+    // so CI would never report them — they rot until a human hits the error. The
+    // one seeder CI does exercise, `tests/seed-fixtures.ts`, fails in e2e
+    // globalSetup: several minutes and one push after the mistake was typed.
+    // Reads 31 files with two regexes.
+    { key: 'seedsql', label: 'Seed SQL vs schema', script: 'check-seed-sql.mjs', fix: 'npm run lint:seed-sql' },
 ];
 
 const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup' };

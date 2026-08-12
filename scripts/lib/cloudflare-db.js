@@ -26,7 +26,11 @@ export function seedDatabase({ initialCompany, initialSubdomain, initialEmail, i
     const effectiveSubdomain = (initialSubdomain || initialCompany.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')).toLowerCase();
     const tenantId = SYSTEM_TENANT_ID;
     const userId = crypto.randomUUID();
-    const now = Math.floor(Date.now() / 1000);
+    // MILLISECONDS. `created_at` is a `timestamp_ms` column; SQLite accepts a
+    // seconds value without complaint and the row then reads as January 1970 —
+    // which is what the very first tenant of every self-hosted install has been
+    // dated. Caught by scripts/check-seed-sql.mjs, which exists because of it.
+    const now = Date.now();
 
     // Three things this statement got wrong, all of them silent until first run:
     //

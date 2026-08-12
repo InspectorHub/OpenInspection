@@ -1,0 +1,22 @@
+[
+    "scripts/seed-pca-demo.mjs:128 computes SECONDS (Date.now() / 1000) but this file writes tenants.created_at, which is timestamp_ms — the row will read as 1970",
+    "scripts/seed-pca-demo.mjs:389 writes users.license_number, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:395 writes tenant_configs.enable_customer_repair_export, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:395 writes tenant_configs.enable_repair_list, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:395 writes tenant_configs.reserve_schedule_enabled, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:395 writes tenant_configs.show_estimates, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:415 writes inspections.agreement_required, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:415 writes inspections.payment_required, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:494 writes report_signoff.dual_role, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:496 writes report_signoff.dual_role, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:534 writes document_review_items.na, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:534 writes document_review_items.received, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:534 writes document_review_items.requested, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:534 writes document_review_items.reviewed, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:540 writes inspections.agreement_required, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:540 writes inspections.payment_required, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:567 writes inspections.agreement_required, which does not exist in the schema",
+    "scripts/seed-pca-demo.mjs:567 writes inspections.payment_required, which does not exist in the schema",
+    "tests/unit/credentials/license-backfill.spec.ts:69 writes users.license_number, which does not exist in the schema",
+    "tests/workers/collab-multiclient.spec.ts:98 writes inspection_results.tenantId, which does not exist in the schema"
+]
