@@ -119,4 +119,35 @@ describe('pre-survey questionnaire (ASTM E2018 §8.5)', () => {
         // null rather than being backfilled with the receive time.
         expect(stored.sentAt).toBeNull();
     });
+
+    it('marking an EXISTING row sent stamps sent_at — the update path, not just insert', async () => {
+        // setPsqStatus('sent') upserts: a brand-new row records sentAt in the
+        // INSERT values, but the onConflictDoUpdate `set` used to omit sentAt
+        // entirely, so marking an already-existing row 'sent' silently left the
+        // timestamp untouched. A row whose first-ever write was NOT 'sent'
+        // (declined, here) starts with sent_at = null, which is what makes this
+        // discriminating — asserting on the insert path alone can't tell a
+        // fixed update from a no-op update, because sent_at was already a Date.
+        await svc.setPsqStatus('t1', PCA_INSPECTION_ID, 'declined');
+        const [beforeSend] = await testDb.select().from(schema.psqResponses).all();
+        expect(beforeSend.sentAt).toBeNull();
+
+        await svc.setPsqStatus('t1', PCA_INSPECTION_ID, 'sent');
+        const rows = await testDb.select().from(schema.psqResponses).all();
+        expect(rows).toHaveLength(1);
+        expect(rows[0]!.status).toBe('sent');
+        expect(rows[0]!.sentAt).toBeInstanceOf(Date);
+    });
+
+    it('declining after a send leaves sent_at as history, not wiped by the status change', async () => {
+        await svc.setPsqStatus('t1', PCA_INSPECTION_ID, 'sent');
+        const [sent] = await testDb.select().from(schema.psqResponses).all();
+        const sentAt = sent.sentAt;
+        expect(sentAt).toBeInstanceOf(Date);
+
+        await svc.setPsqStatus('t1', PCA_INSPECTION_ID, 'declined');
+        const [declined] = await testDb.select().from(schema.psqResponses).all();
+        expect(declined.status).toBe('declined');
+        expect(declined.sentAt?.getTime()).toBe(sentAt!.getTime());
+    });
 });

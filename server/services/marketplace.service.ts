@@ -180,7 +180,14 @@ export class MarketplaceService {
     firstId?: string,
   ): Promise<number> {
     const CHUNK = 25;
-    const nowSec = Math.floor(Date.now() / 1000);
+    // comments.created_at is timestamp_ms (Schema Rules) — epoch MILLISECONDS.
+    // An earlier version of this line bound a floored-to-whole-seconds value
+    // into this column; rows it wrote carry a seconds-magnitude number in a ms
+    // column (they read as ~1970). That value is exactly recoverable — it is
+    // 1000x too small — so a backfill for pre-existing rows is a mechanical
+    // follow-up, not data loss; it just isn't run here (see the report for why
+    // this pass is forward-only).
+    const nowMs = Date.now();
     let inserted = 0;
     for (let i = 0; i < entries.length; i += CHUNK) {
       const batch = entries.slice(i, i + CHUNK);
@@ -195,10 +202,18 @@ export class MarketplaceService {
           c.text,
           c.section ?? null,
           libraryId,             // S2-7 — provenance for replace mode
-          nowSec,
+          nowMs,
         );
       }
-      const stmt = `INSERT INTO comments (id, tenant_id, text, category, library_id, created_at) VALUES ${placeholders}`;
+      // `section` (not `category`) — `entries` never carries a category, only
+      // text + section (see parseLibraryComments below). Pre-existing imported
+      // rows have this backwards (section text landed in `category`, and
+      // `section` was never written); that is a separate, deliberately
+      // forward-only data-quality issue — see the release report — because
+      // `category` is a real, independently-read column elsewhere (repair-item
+      // comments' safety/maintenance/recommendation vocabulary,
+      // RecommendationService) and this fix does not touch it.
+      const stmt = `INSERT INTO comments (id, tenant_id, text, section, library_id, created_at) VALUES ${placeholders}`;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (this.rawDb as any).prepare(stmt).bind(...params).run();
       inserted += batch.length;

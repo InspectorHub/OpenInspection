@@ -129,6 +129,20 @@ describe('unified catalogue — one table, one import path', () => {
             .where(eq(schema.comments.libraryId, 'cmt-1')).all();
         expect(rows).toHaveLength(3);
 
+        // Section text lands in `section`, not `category` — the two are
+        // independently-read columns (admin comment CRUD, the inspection-edit
+        // picker's relevance scoring) and an import must not conflate them.
+        const roof = rows.find(r => r.text === 'Roof looks fine');
+        expect(roof!.section).toBe('roof');
+        expect(roof!.category).toBeNull();
+
+        // created_at is timestamp_ms: freshly inserted rows must read back near
+        // "now", not near the epoch (the historic seconds-into-ms bug).
+        for (const r of rows) {
+            const createdAt = r.createdAt instanceof Date ? r.createdAt.getTime() : (r.createdAt as unknown as number);
+            expect(Date.now() - createdAt).toBeLessThan(60_000);
+        }
+
         const [marker] = await testDb.select().from(tenantLibraryImports)
             .where(eq(tenantLibraryImports.libraryId, 'cmt-1')).all();
         expect(marker!.rowCount).toBe(3);

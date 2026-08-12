@@ -152,7 +152,10 @@ export class ComplianceService {
             .values({ id: crypto.randomUUID(), tenantId, inspectionId, responses: null, status, sentAt: status === 'sent' ? now : null, receivedAt: null, updatedAt: now })
             .onConflictDoUpdate({
                 target: [psqResponses.tenantId, psqResponses.inspectionId],
-                set: { status, updatedAt: now },
+                // `sentAt` must mirror the insert branch above, or marking an
+                // EXISTING row 'sent' silently drops the timestamp — only a
+                // brand-new row ever recorded it.
+                set: { status, sentAt: status === 'sent' ? now : undefined, updatedAt: now },
             });
     }
 }
