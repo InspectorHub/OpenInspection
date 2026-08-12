@@ -130,8 +130,13 @@ describe('check-migration-lag: reading the applied set', () => {
 });
 
 describe('check-migration-lag: the comparison', () => {
+    // Was `toBeGreaterThan(10)` against a 57-file chain. The 2026-08-12 squash
+    // collapsed that chain to a single `0000_baseline.sql`, so the bar drops to
+    // what the guard actually needs: at least one real file, so the fixtures
+    // below exercise `diffMigrations` against genuine repo content rather than
+    // an empty directory that would make every comparison pass vacuously.
     it('has real migrations to compare (guards the fixtures below)', () => {
-        expect(REAL_MIGRATIONS.length).toBeGreaterThan(10);
+        expect(REAL_MIGRATIONS.length).toBeGreaterThan(0);
     });
 
     // POSITIVE CONTROL for the whole diff.
@@ -140,11 +145,17 @@ describe('check-migration-lag: the comparison', () => {
         expect(d).toEqual({ missing: [], extra: [], acceptedExtra: [], staleAccepted: [] });
     });
 
-    it('names every migration the database has not applied (the 2026-08-09 shape)', () => {
-        const behind = REAL_MIGRATIONS.slice(0, -6);
-        const expected = REAL_MIGRATIONS.slice(-6);
-        const d = diffMigrations({ repoFiles: REAL_MIGRATIONS, applied: behind });
-        expect(d.missing).toEqual(expected);
+    // Was a `.slice(-6)` fixture reproducing the 2026-08-09 incident (a database
+    // missing four named features: `trade_slug`, `repair_action_tag`,
+    // `ai_content_reviews`, `inspector_narrative`). A one-file chain cannot
+    // reconstruct that shape — there is nothing left to slice six of — so this
+    // now exercises the same code at its most fundamental boundary instead of
+    // faking a multi-file lag: a database that has applied NOTHING is missing
+    // EVERYTHING. Still built from the real migrations/ directory, per the
+    // module's own rule against invented names.
+    it('names every migration the database has not applied', () => {
+        const d = diffMigrations({ repoFiles: REAL_MIGRATIONS, applied: [] });
+        expect(d.missing).toEqual(REAL_MIGRATIONS);
         expect(d.extra).toEqual([]);
     });
 
