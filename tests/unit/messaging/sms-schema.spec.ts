@@ -6,7 +6,6 @@ describe('Track L schema surface', () => {
         expect(schema.smsConsentLog).toBeDefined();
         expect(schema.smsDisclosureVersions).toBeDefined();
         expect(schema.automations.channels).toBeDefined();
-        expect(schema.automations.smsBody).toBeDefined();
         expect(schema.automationLogs.recipient).toBeDefined();
         expect(schema.automationLogs.channel).toBeDefined();
         expect(schema.tenantConfigs.smsMode).toBeDefined();

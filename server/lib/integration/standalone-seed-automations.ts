@@ -61,8 +61,8 @@ export async function seedDefaultAutomations(db: D1Database, tenantId: string): 
     // subquery pattern). A null bound param returns no rows (id stays NULL),
     // matching recipient_kind='inspector'.
     //
-    // SP2 cutover — the rule no longer carries its own copy (subject_template /
-    // body_template / sms_body are DEAD, see the automations schema comment).
+    // SP2 cutover — the rule no longer carries its own copy (the columns that
+    // used to hold it are dropped from the automations table entirely).
     // Instead this seeds a message_templates row per channel FIRST and the
     // automations INSERT below references it by id, mirroring ensureSeeds
     // (server/services/automation/core.ts). The existence check is done with a

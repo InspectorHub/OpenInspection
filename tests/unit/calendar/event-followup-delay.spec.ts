@@ -109,7 +109,7 @@ describe('EventService.followUpSendAt — per-event-type delay', () => {
         await testDb.insert(schema.automations).values({
             id: 'auto-followup-delay', tenantId: TENANT, name: 'Followup', trigger: 'event.completed',
             recipientKind: 'role', recipientRoleProfileId: `crp_${TENANT}_client`, delayMinutes: 0,
-            subjectTemplate: 'x', bodyTemplate: 'x', active: true, createdAt: new Date(),
+            active: true, createdAt: new Date(),
         });
         await setFollowUpHours(sewerEventTypeId, 0);
 

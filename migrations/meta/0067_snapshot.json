@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8d0521b5-0c45-4fc0-9d26-919d46d56697",
+  "id": "4c9a125f-7cc2-4a78-a7ba-68dcd4c54fa8",
   "prevId": "97728d25-ca74-43db-897e-1724a989b660",
   "tables": {
     "agreement_requests": {
@@ -935,20 +935,6 @@
           "autoincrement": false,
           "default": 0
         },
-        "subject_template": {
-          "name": "subject_template",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "body_template": {
-          "name": "body_template",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "email_template_id": {
           "name": "email_template_id",
           "type": "text",
@@ -970,13 +956,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'[\"email\"]'"
-        },
-        "sms_body": {
-          "name": "sms_body",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "sms_template_id": {
           "name": "sms_template_id",

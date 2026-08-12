@@ -69,11 +69,21 @@ async function seedSmsLog(over: { contactId?: string | null; smsBody?: string; r
     const ruleId = crypto.randomUUID();
     const smsBody = over.smsBody ?? 'Hi {{client_name}} — {{company_name}}';
     const recipientKind = over.recipientKind ?? 'role';
+    // The dead automations.sms_body column is gone — SP2's backfill fallback
+    // now only recovers copy from a matching AUTOMATION_SEEDS entry, and this
+    // rule's name ('R') matches no real seed. Create the sms template directly
+    // and reference it, the same way ensureSeeds does for a freshly-seeded rule.
+    const smsTemplateId = crypto.randomUUID();
+    await db.insert(schema.messageTemplates).values({
+        id: smsTemplateId, tenantId: TENANT, name: 'R — SMS', channel: 'sms',
+        subject: null, body: smsBody, variables: null, isSeeded: false,
+        createdAt: new Date(), updatedAt: new Date(),
+    } as never);
     await db.insert(schema.automations).values({
         id: ruleId, tenantId: TENANT, name: 'R', trigger: 'report.published',
         recipientKind, recipientRoleProfileId: recipientKind === 'role' ? roleProfileId('client') : null,
-        delayMinutes: 0, subjectTemplate: 'S', bodyTemplate: 'B', smsBody,
-        channels: '["sms"]', channel: 'sms', active: true, isDefault: false, createdAt: new Date(),
+        delayMinutes: 0, smsTemplateId,
+        channels: '["sms"]', active: true, isDefault: false, createdAt: new Date(),
     } as never);
     const logId = crypto.randomUUID();
     await db.insert(schema.automationLogs).values({
@@ -81,10 +91,6 @@ async function seedSmsLog(over: { contactId?: string | null; smsBody?: string; r
         recipient: '+15551234567', channel: 'sms', recipientRoleKey: 'client',
         sendAt: new Date(Date.now() - 1000), status: 'pending',
     } as never);
-    // SP2 — give the seeded sms rule a referenced template (body == embedded smsBody),
-    // so the decoupled SMS delivery renders byte-identical output.
-    const { backfillAutomationTemplates } = await import('../../../server/services/message-template-backfill');
-    await backfillAutomationTemplates({} as D1Database, TENANT);
     return { logId, inspId };
 }
 
@@ -458,15 +464,20 @@ describe('flush() — derived reminder due-time (Track L Step 3b)', () => {
             paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         } as never);
         const ruleId = crypto.randomUUID();
+        // 'Reminder' matches no real AUTOMATION_SEEDS entry, so backfillAutomationTemplates'
+        // seed-only fallback has nothing to recover — reference a template directly,
+        // the way ensureSeeds does for a freshly-seeded rule.
+        const emailTemplateId = crypto.randomUUID();
+        await db.insert(schema.messageTemplates).values({
+            id: emailTemplateId, tenantId: TENANT, name: 'Reminder — Email', channel: 'email',
+            subject: 'Reminder', body: 'See you tomorrow', variables: null, isSeeded: false,
+            createdAt: new Date(), updatedAt: new Date(),
+        } as never);
         await db.insert(schema.automations).values({
             id: ruleId, tenantId: TENANT, name: 'Reminder', trigger: 'inspection.reminder', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
-            delayMinutes: 1440, subjectTemplate: 'Reminder', bodyTemplate: 'See you tomorrow',
-            channels: '["email"]', channel: 'email', active: true, isDefault: false, createdAt: new Date(),
+            delayMinutes: 1440, emailTemplateId,
+            channels: '["email"]', active: true, isDefault: false, createdAt: new Date(),
         } as never);
-        // SP2 — give the seeded rule a referenced email template (content == the embedded
-        // subject/body), so the decoupled delivery renders byte-identical output.
-        const { backfillAutomationTemplates } = await import('../../../server/services/message-template-backfill');
-        await backfillAutomationTemplates({} as D1Database, TENANT);
 
         const logId = crypto.randomUUID();
         await db.insert(schema.automationLogs).values({

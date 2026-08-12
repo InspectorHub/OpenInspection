@@ -69,7 +69,7 @@ async function seedRule(opts: {
     await db.insert(schema.automations).values({
         id: ruleId, tenantId: TENANT, name: opts.name ?? 'Report Ready', trigger: 'report.published',
         recipientKind: opts.recipientKind, recipientRoleProfileId: opts.recipientRoleProfileId ?? null,
-        delayMinutes: 0, subjectTemplate: 'Subj', bodyTemplate: 'Body',
+        delayMinutes: 0,
         emailTemplateId: opts.emailTemplateId ?? null,
         channels: JSON.stringify(['email']), active: true, isDefault: false, createdAt: new Date(),
     } as never);

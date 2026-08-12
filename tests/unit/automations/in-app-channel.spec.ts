@@ -69,7 +69,7 @@ async function insertRule(id: string) {
     await db.insert(schema.automations).values({
         id, tenantId: T, name: 'In-app notice', trigger: 'report.published',
         recipientKind: 'all', recipientRoleProfileId: null, delayMinutes: 0,
-        subjectTemplate: '', bodyTemplate: '', channels: '["in_app"]',
+        channels: '["in_app"]',
         active: true, isDefault: false, createdAt: new Date(),
     } as never);
     return id;

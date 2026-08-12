@@ -64,7 +64,7 @@ async function seedInAppRule(opts: { templateId: string | null }) {
     await db.insert(schema.automations).values({
         id: 'auto-inapp', tenantId: T, name: 'Tell the office', trigger: 'report.published',
         recipientKind: 'staff', recipientRoleProfileId: null, delayMinutes: 0,
-        subjectTemplate: '', bodyTemplate: '', channels: '["in_app"]',
+        channels: '["in_app"]',
         inAppTemplateId: opts.templateId,
         active: true, isDefault: false, createdAt: new Date(),
     } as never);

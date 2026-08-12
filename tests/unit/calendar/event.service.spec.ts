@@ -129,7 +129,7 @@ describe('EventService', () => {
         it('createEvent queues a reminder log addressed to the primary client', async () => {
             await testDb.insert(schema.automations).values({
                 id: 'auto-reminder-1', tenantId: TENANT, name: 'Reminder', trigger: 'event.created',
-                recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0, subjectTemplate: 'x', bodyTemplate: 'x', active: true, createdAt: new Date(),
+                recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0, active: true, createdAt: new Date(),
             });
 
             await svc.createEvent(TENANT, INSP, {
@@ -146,7 +146,7 @@ describe('EventService', () => {
         it('updateEventStatus(completed) queues a followup log addressed to the primary client', async () => {
             await testDb.insert(schema.automations).values({
                 id: 'auto-followup-1', tenantId: TENANT, name: 'Followup', trigger: 'event.completed',
-                recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0, subjectTemplate: 'x', bodyTemplate: 'x', active: true, createdAt: new Date(),
+                recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0, active: true, createdAt: new Date(),
             });
 
             const event = await svc.createEvent(TENANT, INSP, {
@@ -165,7 +165,7 @@ describe('EventService', () => {
             await testDb.delete(schema.inspectionPeople).where(eq(schema.inspectionPeople.inspectionId, INSP));
             await testDb.insert(schema.automations).values({
                 id: 'auto-reminder-2', tenantId: TENANT, name: 'Reminder', trigger: 'event.created',
-                recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0, subjectTemplate: 'x', bodyTemplate: 'x', active: true, createdAt: new Date(),
+                recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0, active: true, createdAt: new Date(),
             });
 
             await svc.createEvent(TENANT, INSP, {

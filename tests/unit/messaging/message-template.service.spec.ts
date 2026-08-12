@@ -65,8 +65,6 @@ describe('MessageTemplateService', () => {
         await testDb.insert(schema.automations).values({
             id: 'auto-1', tenantId: T1, name: 'Rule', trigger: 'report.published', recipientKind: 'inspector', recipientRoleProfileId: null,
             delayMinutes: 0,
-            // subjectTemplate / bodyTemplate are NOT NULL DEAD columns — empty strings satisfy the constraint.
-            subjectTemplate: '', bodyTemplate: '',
             channels: '["email"]',
             active: true, isDefault: false,
             createdAt: new Date(),

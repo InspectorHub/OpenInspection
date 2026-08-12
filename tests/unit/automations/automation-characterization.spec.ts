@@ -79,18 +79,37 @@ async function seedRuleAndLog(opts: {
   recipientContactId?: string | null;
 }) {
   const ruleId = crypto.randomUUID();
+  const channel = opts.channel ?? 'email';
+  // 'R' matches no real AUTOMATION_SEEDS entry, so the dead automations.subject_
+  // template/body_template/sms_body columns (now dropped) can't be recovered by
+  // backfillAutomationTemplates' seed-only fallback — reference a template
+  // directly instead, the way ensureSeeds does for a freshly-seeded rule.
+  let emailTemplateId: string | null = null;
+  let smsTemplateId: string | null = null;
+  if (channel === 'email') {
+    emailTemplateId = crypto.randomUUID();
+    await db.insert(schema.messageTemplates).values({
+      id: emailTemplateId, tenantId: TENANT, name: 'R — Email', channel: 'email',
+      subject: opts.subject ?? 'Subj', body: opts.body ?? 'Body', variables: null, isSeeded: false,
+      createdAt: new Date(), updatedAt: new Date(),
+    } as never);
+  }
+  if (channel === 'sms' && opts.smsBody) {
+    smsTemplateId = crypto.randomUUID();
+    await db.insert(schema.messageTemplates).values({
+      id: smsTemplateId, tenantId: TENANT, name: 'R — SMS', channel: 'sms',
+      subject: null, body: opts.smsBody, variables: null, isSeeded: false,
+      createdAt: new Date(), updatedAt: new Date(),
+    } as never);
+  }
   await db.insert(schema.automations).values({
     id: ruleId, tenantId: TENANT, name: 'R', trigger: opts.trigger ?? 'report.published',
-    recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0, subjectTemplate: opts.subject ?? 'Subj',
-    bodyTemplate: opts.body ?? 'Body', smsBody: opts.smsBody ?? null,
-    channels: JSON.stringify([opts.channel ?? 'email']), channel: opts.channel ?? 'email',
+    recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0,
+    emailTemplateId, smsTemplateId,
+    channels: JSON.stringify([channel]),
     active: true, isDefault: false, createdAt: new Date(),
     conditions: opts.conditions ? JSON.stringify(opts.conditions) : null,
   } as never);
-  // SP2 — give the seeded rule a referenced email template (content == the embedded
-  // subject/body), so the decoupled delivery renders byte-identical output.
-  const { backfillAutomationTemplates } = await import('../../../server/services/message-template-backfill');
-  await backfillAutomationTemplates({} as D1Database, TENANT);
 
   const logId = crypto.randomUUID();
   await db.insert(schema.automationLogs).values({

@@ -55,15 +55,6 @@ export const automations = sqliteTable('automations', {
     recipientKind: text('recipient_kind', { enum: ['role', 'inspector', 'all', 'staff'] }).notNull(),
     recipientRoleProfileId: text('recipient_role_profile_id'),
     delayMinutes: integer('delay_minutes').notNull().default(0),
-    // -- DEAD (2026-06-26, SP2): embedded email subject/body retired. Automations
-    // now reference a message_templates row via email_template_id. Frozen: no
-    // reads/writes; D1 cannot drop an FK-referenced column. Do not reuse.
-    // Nullable as of the cutover that stopped writing this column on both the
-    // seed and create paths (previously NOT NULL, satisfied by an empty-string
-    // tombstone every writer had to remember to send).
-    subjectTemplate: text('subject_template'),
-    // -- DEAD (2026-06-26, SP2): see subject_template above.
-    bodyTemplate: text('body_template'),
     // SP2 — references a message_templates(channel='email') row for the email
     // channel. Null = no email template selected (channel disabled or unmigrated).
     emailTemplateId: text('email_template_id'),
@@ -73,10 +64,6 @@ export const automations = sqliteTable('automations', {
     // Track L (D2) — enabled delivery channels, JSON string[] e.g. '["email","sms"]'.
     // A firing emits one automation_logs row per channel. Default email-only.
     channels: text('channels').notNull().default('["email"]'),
-    // -- DEAD (2026-06-26, SP2): embedded plain-text SMS body retired. Automations
-    // now reference a message_templates(channel='sms') row via sms_template_id.
-    // Frozen: no reads/writes; do not reuse.
-    smsBody: text('sms_body'),
     // SP2 — references a message_templates(channel='sms') row for the SMS channel.
     // Null = no SMS template selected.
     smsTemplateId: text('sms_template_id'),

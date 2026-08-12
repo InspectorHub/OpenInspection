@@ -96,13 +96,13 @@ describe('EventService — event.results_received', () => {
                 id: 'auto-results-received', tenantId: TENANT, name: 'Results Received',
                 trigger: 'event.results_received', recipientKind: 'role',
                 recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0,
-                subjectTemplate: 'x', bodyTemplate: 'x', active: true, createdAt: new Date(),
+                active: true, createdAt: new Date(),
             },
             {
                 id: 'auto-followup', tenantId: TENANT, name: 'Followup',
                 trigger: 'event.completed', recipientKind: 'role',
                 recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0,
-                subjectTemplate: 'x', bodyTemplate: 'x', active: true, createdAt: new Date(),
+                active: true, createdAt: new Date(),
             },
         ]);
     });

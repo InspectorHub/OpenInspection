@@ -105,7 +105,7 @@ async function seedRule(opts: { inAppTemplateId: string | null }) {
     await db.insert(schema.automations).values({
         id: 'auto-locale', tenantId: T, name: 'Tell everyone', trigger: 'report.published',
         recipientKind: 'all', recipientRoleProfileId: null, delayMinutes: 0,
-        subjectTemplate: '', bodyTemplate: '', channels: '["email"]',
+        channels: '["email"]',
         inAppTemplateId: opts.inAppTemplateId,
         active: true, isDefault: false, createdAt: new Date(),
     } as never);

@@ -23,10 +23,16 @@ function parseChannels(raw: string | null): string[] {
 }
 
 /**
- * SP2 — one-time, idempotent backfill: migrate each automation's embedded
- * email subject/body and (when SMS-enabled) sms_body into seeded
- * message_templates and set email_template_id / sms_template_id. Re-running is a
- * no-op: an automation that already has a non-null ref id is skipped per channel.
+ * SP2 — one-time, idempotent backfill: give every default automation a
+ * referenced email/SMS template when it has none. The copy comes from the
+ * matching AUTOMATION_SEEDS entry (matched on name+trigger, the same key
+ * ensureSeeds uses) — `automations.subject_template` / `body_template` /
+ * `sms_body` used to hold this copy inline, but those columns are gone
+ * (dropped once every pre-existing tenant was drained), so a seed match is
+ * now the ONLY source. A custom (non-seed) rule that somehow reaches this
+ * function with no template id gets an empty one instead of nothing, same as
+ * before. Re-running is a no-op: an automation that already has a non-null
+ * ref id is skipped per channel.
  */
 export async function backfillAutomationTemplates(db: D1Database, tenantId: string): Promise<{ created: number }> {
     const d = drizzle(db);
@@ -39,6 +45,13 @@ export async function backfillAutomationTemplates(db: D1Database, tenantId: stri
 
         const channels = parseChannels(a.channels);
 
+        // Matched on (name, trigger), the same key ensureSeeds uses to decide a
+        // rule already exists. The only remaining source of embedded copy for
+        // any channel — see the function doc comment.
+        const seed = AUTOMATION_SEEDS.find(
+            (x) => x.name === a.name && x.trigger === a.trigger,
+        ) as { subjectTemplate?: string; bodyTemplate?: string; smsBody?: string; inAppTitle?: string; inAppBody?: string } | undefined;
+
         // Only give a rule an EMAIL template when it actually has an email
         // channel. B3's staff alerts are in-app only, and creating an email
         // template for them would put a row in the operator's template library
@@ -47,28 +60,15 @@ export async function backfillAutomationTemplates(db: D1Database, tenantId: stri
             const id = nanoid();
             await d.insert(messageTemplates).values({
                 id, tenantId, name: `${a.name} — Email`, channel: 'email',
-                subject: a.subjectTemplate ?? null, body: a.bodyTemplate ?? '',
-                variables: JSON.stringify(extractVars(a.subjectTemplate, a.bodyTemplate)),
+                subject: seed?.subjectTemplate ?? null, body: seed?.bodyTemplate ?? '',
+                variables: JSON.stringify(extractVars(seed?.subjectTemplate, seed?.bodyTemplate)),
                 isSeeded: true, createdAt: now, updatedAt: now,
             });
             patch.emailTemplateId = id;
             created++;
         }
 
-        // Matched on (name, trigger), the same key ensureSeeds uses to decide a
-        // rule already exists. Used below by both the SMS fallback and the
-        // in-app wording, neither of which is guaranteed to live on the row.
-        const seed = AUTOMATION_SEEDS.find(
-            (x) => x.name === a.name && x.trigger === a.trigger,
-        ) as { smsBody?: string; inAppTitle?: string; inAppBody?: string } | undefined;
-
-        // The SMS copy may live on the dead `automations.sms_body` column (rows
-        // seeded before ensureSeeds started inserting templates directly) or,
-        // for rows seeded after that cutover, only on the seed definition —
-        // ensureSeeds never writes the column for those, since a fresh seed's
-        // channels default to email-only and the SMS template (with its own
-        // copy) is created later, once the tenant turns the SMS channel on.
-        const smsText = a.smsBody ?? seed?.smsBody;
+        const smsText = seed?.smsBody;
         if (channels.includes('sms') && smsText?.trim() && !a.smsTemplateId) {
             const id = nanoid();
             await d.insert(messageTemplates).values({

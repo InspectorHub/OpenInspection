@@ -21,13 +21,15 @@ async function seedTenant(testDb: BetterSQLite3Database<typeof schema>, id: stri
     await testDb.insert(schema.tenants).values({ id, slug: id, createdAt: new Date() });
 }
 
+// name+trigger matches the real 'Report Ready' seed, so backfillAutomationTemplates'
+// seed-fallback (message-template-backfill.ts) has content to recover — the dead
+// automations.subject_template/body_template/sms_body columns are gone, and a
+// matching seed is now the ONLY source of copy for a rule with no template id.
 async function seedAuto(testDb: BetterSQLite3Database<typeof schema>, tenantId: string, id: string) {
     await testDb.insert(schema.automations).values({
         id, tenantId, name: 'Report Ready', trigger: 'report.published',
         recipientKind: 'inspector', recipientRoleProfileId: null, delayMinutes: 0,
-        subjectTemplate: 'Your report is ready — {{property_address}}',
-        bodyTemplate: '<p>Hi {{client_name}}</p>',
-        channels: '["email"]', smsBody: null,
+        channels: '["email"]',
         active: true, isDefault: true, createdAt: new Date(),
     });
 }
