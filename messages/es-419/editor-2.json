@@ -176,7 +176,7 @@
   "editor_publish_publishing": "Publicando…",
   "editor_publish_now": "Publicar ahora",
   "editor_publish_body": "Publicar finalizará esta inspección y pondrá el informe a disposición de los clientes.",
-  "editor_publish_cooling_notice": "Su empresa tiene menos de un día, así que el correo del informe al cliente esperará hasta {unlockAt} y luego se enviará solo; no hay que repetir nada. Publicar funciona con normalidad: el informe queda activo ahora y cualquiera con el enlace puede abrirlo. Conecte su propio proveedor de correo para enviarlo de inmediato.",
+  "editor_publish_cooling_notice": "Su empresa tiene menos de un día, así que el correo del informe al cliente esperará hasta {unlockAt} y luego se enviará solo; no hay que repetir nada. El informe queda activo ahora.",
   "editor_publish_warning": "Advertencia: solo se han calificado {rated} de {total} elementos ({pct}% completo).",
   "editor_publish_stat_items_rated": "Elementos calificados",
   "editor_publish_stat_completion": "Avance",

@@ -76,8 +76,16 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  </span>
  )}
  </p>
+ {/* No weight class here, and that is not an oversight: Banner hardcodes
+  `font-semibold` in its base, so a `font-medium` passed through
+  `className` loses the tie on stylesheet order and silently does
+  nothing — while `text-[12px]` on the same string DOES win, because
+  Tailwind v4 sorts arbitrary values after the named scale. One
+  override landing and the other not, from one attribute, is not
+  something a reader can see. The notice is kept SHORT instead, so
+  semibold does not out-shout the rating warning above it. */}
  {unlockAtMs !== null && (
- <Banner tone="info" className="mt-3 text-[12px] font-medium">
+ <Banner tone="info" className="mt-3 text-[12px]">
  {m.editor_publish_cooling_notice({
  unlockAt: formatShapedDateTime(unlockAtMs, timeZone, dtFormat),
  })}
