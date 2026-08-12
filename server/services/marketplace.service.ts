@@ -1,7 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, like, and, desc, sql } from 'drizzle-orm';
-import { hashCommentTexts, type PackEntry } from '../lib/library-edit-marker';
+import type { PackEntry } from '../lib/library-edit-marker';
 import { parseLibraryComments, countLibrarySchemaItems } from './marketplace/library-pack';
+import { insertLibraryComments } from './marketplace/library-insert';
 import {
     applyReplaceMode,
     previewLibraryReplace,
@@ -121,11 +122,15 @@ export class MarketplaceService {
 
     const importMap = new Map(imports.map(i => [i.libraryId, i.importedSemver]));
 
-    const rows = rawRows.map(l => ({
+    // `schema` is the pack ITSELF — counted here, then dropped. Spreading the
+    // whole row was free only while the starter pack was empty; filled in it is
+    // ~50KB per library at pageSize 1000. No client reads it; import and preview
+    // fetch by id.
+    const rows = rawRows.map(({ schema: packSchema, ...l }) => ({
       ...l,
       importedSemver: importMap.get(l.id) ?? null,
       hasUpdate: importMap.has(l.id) && importMap.get(l.id) !== l.semver,
-      itemCount: countLibrarySchemaItems(l.schema as unknown),
+      itemCount: countLibrarySchemaItems(packSchema as unknown),
     }));
 
     return { rows, total };
@@ -182,70 +187,6 @@ export class MarketplaceService {
     }
   }
 
-  /**
-   * Chunked bulk INSERT of canned-comment rows. Raw SQL with a placeholder
-   * list is one statement per chunk — dramatically faster than N individual
-   * inserts. D1 caps SQL statement size and bound-parameter count, so the chunk
-   * size is set against the per-row column count (see CHUNK below).
-   *
-   * @param firstId When supplied, the very first inserted row uses this id
-   *   instead of a fresh UUID (lets the caller return a stable local id).
-   * @returns The number of rows inserted.
-   */
-  private async insertLibraryComments(
-    libraryId: string,
-    entries: Array<{ text: string; section?: string }>,
-    firstId?: string,
-  ): Promise<number> {
-    // 20 x 7 = 140 placeholders, below the 150 this loop already shipped with
-    // before `import_hash` widened each row from six columns to seven.
-    const CHUNK = 20;
-    // The edit marker (#348). Every imported row records the hash of the text it
-    // arrived with, which is the only thing that later lets a re-import tell an
-    // untouched row from one the inspector rewrote. Computed here, at the single
-    // point rows enter the table from a pack, so no import path can forget it.
-    const importHashes = await hashCommentTexts(entries.map((e) => e.text));
-    // comments.created_at is timestamp_ms (Schema Rules) — epoch MILLISECONDS.
-    // An earlier version of this line bound a floored-to-whole-seconds value
-    // into this column; rows it wrote carry a seconds-magnitude number in a ms
-    // column (they read as ~1970). That value is exactly recoverable — it is
-    // 1000x too small — so a backfill for pre-existing rows is a mechanical
-    // follow-up, not data loss; it just isn't run here (see the report for why
-    // this pass is forward-only).
-    const nowMs = Date.now();
-    let inserted = 0;
-    for (let i = 0; i < entries.length; i += CHUNK) {
-      const batch = entries.slice(i, i + CHUNK);
-      const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ');
-      const params: (string | number | null)[] = [];
-      for (let j = 0; j < batch.length; j++) {
-        const c = batch[j];
-        const isFirst = i === 0 && j === 0;
-        params.push(
-          isFirst && firstId ? firstId : crypto.randomUUID(),
-          this.tenantId,
-          c.text,
-          c.section ?? null,
-          libraryId,             // S2-7 — provenance for replace mode
-          nowMs,
-          importHashes[i + j]!,  // #348 — the edit marker
-        );
-      }
-      // `section` (not `category`) — `entries` never carries a category, only
-      // text + section (see parseLibraryComments below). Pre-existing imported
-      // rows have this backwards (section text landed in `category`, and
-      // `section` was never written); that is a separate, deliberately
-      // forward-only data-quality issue — see the release report — because
-      // `category` is a real, independently-read column elsewhere (repair-item
-      // comments' safety/maintenance/recommendation vocabulary,
-      // RecommendationService) and this fix does not touch it.
-      const stmt = `INSERT INTO comments (id, tenant_id, text, section, library_id, created_at, import_hash) VALUES ${placeholders}`;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (this.rawDb as any).prepare(stmt).bind(...params).run();
-      inserted += batch.length;
-    }
-    return inserted;
-  }
 
   /**
    * The one import path, for every kind (#293).
@@ -316,7 +257,7 @@ export class MarketplaceService {
       });
     } else if (entry.kind === 'comments') {
       const entries = parseLibraryComments(entry.schema);
-      rowCount = await this.insertLibraryComments(catalogId, entries);
+      rowCount = await insertLibraryComments(this.rawDb, this.tenantId, catalogId, entries);
     } else {
       throw new Error(`Catalogue kind '${String(entry.kind)}' is not importable`);
     }
@@ -532,7 +473,7 @@ export class MarketplaceService {
 
     // Insert the new pack's entries (all fresh UUIDs, each stamped with the
     // import hash that makes the NEXT update able to ask this same question).
-    rowsAdded = await this.insertLibraryComments(libraryId, entries);
+    rowsAdded = await insertLibraryComments(this.rawDb, this.tenantId, libraryId, entries);
 
     // Update the marker. Replace mode resets rowCount to the new size; append
     // mode accumulates as before.

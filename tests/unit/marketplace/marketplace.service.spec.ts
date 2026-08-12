@@ -4,6 +4,8 @@ import { MarketplaceService } from '../../../server/services/marketplace.service
 import { createTestDb, setupSchema, toRawD1 } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { marketplaceLibraries, tenantLibraryImports } from '../../../server/lib/db/schema/marketplace';
+import { MARKETPLACE_LIBRARIES } from '../../../server/services/starter-content/fixtures/marketplace';
+import { CANNED_COMMENTS } from '../../../server/services/starter-content/fixtures/canned-comments';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -269,6 +271,56 @@ describe('MarketplaceService — import + update against the unified catalogue',
         const commentRows = await testDb.select().from(schema.comments)
             .where(eq(schema.comments.tenantId, TENANT)).all();
         expect(commentRows.length).toBe(3);
+    });
+
+    it('imports the SHIPPED Starter Comment Pack, and imports all of it', async () => {
+        // Driven by the real fixture rather than a hand-written pack, because a
+        // hand-written one is what hid this: the shipped pack put its rows under
+        // `entries`, a key `parseLibraryComments` does not read, and the array
+        // was empty besides. Every test passed. The catalogue offered a featured
+        // library that imported as zero rows, and no assertion in this file
+        // could see it, because none of them used the thing we ship.
+        const [pack] = MARKETPLACE_LIBRARIES;
+        const libraryId = crypto.randomUUID();
+        const now = new Date();
+        await testDb.insert(marketplaceLibraries).values({
+            id: libraryId, name: pack.name, kind: pack.kind, semver: pack.semver,
+            schema: JSON.stringify(pack.schema),
+            authorId: 'system', changelog: pack.changelog, downloadCount: 0,
+            featured: pack.featured, createdAt: now, updatedAt: now,
+            propertyType: null, jurisdiction: null, inspectionKind: null,
+        });
+
+        await svc.importCatalogEntry(libraryId);
+
+        const rows = await testDb.select().from(schema.comments)
+            .where(eq(schema.comments.tenantId, TENANT)).all();
+
+        // Both numbers, side by side. "more than zero" would have passed on a
+        // pack that lost 249 of its 250 rows in a chunking bug.
+        expect(rows.length).toBe(CANNED_COMMENTS.length);
+        expect(rows.length).toBeGreaterThan(0);
+
+        // The chunk loop binds one statement per CHUNK rows, and this pack
+        // crosses that boundary fourteen times — the case a 3-row pack cannot
+        // test. Compared as a multiset, not a set: the pack legitimately carries
+        // one sentence twice (a crawl-space mold finding filed under both
+        // Foundation and Mold), so deduplicating here would assert away a real
+        // row and hide exactly the off-by-one a chunk bug produces.
+        expect(rows.map(r => r.text).sort()).toEqual(
+            CANNED_COMMENTS.map(c => c.text).sort(),
+        );
+
+        // Section and severity both survive the trip. Severity is the half that
+        // was silently dropped: the same content seeded directly into a trial
+        // tenant carried it, and the marketplace copy did not.
+        expect(rows.every(r => r.section)).toBe(true);
+        expect(new Set(rows.map(r => r.severity))).toEqual(
+            new Set(CANNED_COMMENTS.map(c => c.severity)),
+        );
+
+        // Every row carries the edit marker, or "keep my edits" cannot protect it.
+        expect(rows.every(r => typeof r.importHash === 'string' && r.importHash.length === 64)).toBe(true);
     });
 
     it('imports a catalogue template with its sections intact', async () => {
