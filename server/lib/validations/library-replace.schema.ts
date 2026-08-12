@@ -13,15 +13,18 @@ export const LibraryReplaceParamsSchema = z.object({
 
 export const LibraryReplaceBodySchema = z.object({
     /**
-     * When true, the caller has acknowledged that user-modified rows from the
-     * prior import will be lost. Service refuses replace if this flag is false
-     * AND the prior import has any user-modified rows.
+     * The caller's acknowledgement that edits made to rows from the prior
+     * import will be lost. It is RECORDED, not enforced: replace mode deletes
+     * every row carrying this `library_id` whatever this flag says, and the
+     * value is written into the import-history metadata so the destructive
+     * update can be read back with the acknowledgement that accompanied it.
      *
-     * "User-modified" is detected via the comments `category` or `rating_bucket`
-     * field having been touched after the import (we do not track edits at
-     * row-level today; future Spec X to introduce a `last_edited_at` column).
-     * Until then, we conservatively flag any row whose text differs from the
-     * original library entry as user-modified.
+     * Nothing detects a user-modified row today, because nothing can — a
+     * comment carries no edit marker, so an edited import row is
+     * indistinguishable from a freshly imported one. Refusing replace on
+     * "has edits" needs a per-row edit timestamp first; until that exists,
+     * the honest contract is a recorded acknowledgement rather than a check
+     * that would silently pass on every row.
      */
     confirmLossOfEdits: z.boolean().default(false).describe('TODO describe confirmLossOfEdits field for the OpenInspection MCP integration'),
 }).optional();

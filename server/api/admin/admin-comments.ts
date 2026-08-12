@@ -32,11 +32,11 @@ import { getDrizzle } from '../../lib/route-helpers';
 // Module F (2026-07) — narrow Drizzle's generic `string | null` for
 // `severity` down to the Zod enum shape the OpenAPI response schema
 // declares. The DB column is just TEXT (column constraint isn't enforced
-// at the SQLite layer), so we cast at the response boundary. `ratingBucket`
-// is retired — `comments.rating_bucket` is FROZEN, no reads/writes; the
-// param type excludes it so no call site can accidentally reintroduce it.
+// at the SQLite layer), so we cast at the response boundary. `severity` is the
+// only severity a comment has: the older `ratingBucket` was retired and its
+// column has since been removed, so the row type below cannot carry it.
 type SeverityResp = 'good' | 'marginal' | 'significant' | 'minor' | null;
-function commentRowToResponse(r: Omit<typeof comments.$inferSelect, 'ratingBucket'>) {
+function commentRowToResponse(r: typeof comments.$inferSelect) {
     return {
         ...r,
         severity: (r.severity as SeverityResp) ?? null,

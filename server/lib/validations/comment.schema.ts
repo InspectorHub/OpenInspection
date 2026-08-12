@@ -8,9 +8,9 @@ import { z } from '@hono/zod-openapi';
 //
 // Module F (2026-07) — the single canonical severity vocabulary shared with
 // rating levels (`good | marginal | significant | minor`; see
-// app/lib/severity.ts / rating-system.schema.ts's SeverityEnum). Retires the
-// legacy `ratingBucket` (satisfactory | monitor | defect) write/read path —
-// `comments.rating_bucket` is FROZEN (schema/inspection/comments.ts).
+// app/lib/severity.ts / rating-system.schema.ts's SeverityEnum). Retired the
+// legacy `ratingBucket` (satisfactory | monitor | defect) write/read path; its
+// column is gone, so this enum is the only vocabulary a comment can carry.
 const SeverityFieldSchema = z.enum(['good', 'marginal', 'significant', 'minor']);
 
 export const CommentSchema = z.object({

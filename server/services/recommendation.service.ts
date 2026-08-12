@@ -14,7 +14,7 @@ import type { Severity } from '../lib/validations/rating-system.schema';
 // Field mapping recommendation ↔ comment:
 //   name                 → comments.text
 //   category             → comments.category
-//   severity             → comments.severity        (module F canonical vocabulary; rating_bucket is FROZEN)
+//   severity             → comments.severity        (module F canonical vocabulary; the older rating_bucket column is gone)
 //   defaultRepairSummary → comments.repairSummary
 //
 // A repair item carries SCOPE, not a price. The former defaultEstimateMin /

@@ -10,8 +10,8 @@ import { comments, tenants } from '../../../server/lib/db/schema';
  *
  * `severity` (Module F's single vocabulary shared with rating levels: 'good'
  * | 'marginal' | 'significant' | 'minor') is the live successor to the
- * retired `rating_bucket` column — see `comments.ratingBucket`'s `-- DEAD`
- * comment in server/lib/db/schema/inspection/comments.ts. This spec verifies
+ * retired `rating_bucket` column, whose removal left it the only severity a
+ * comment carries. This spec verifies
  * `severity` + `section` round-trip cleanly through Drizzle and that
  * filter-by-severity / filter-by-section / combined filters work the way the
  * /api/admin/comments route (server/api/admin/admin-comments.ts) expects.

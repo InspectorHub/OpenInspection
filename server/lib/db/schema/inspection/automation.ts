@@ -249,16 +249,6 @@ export const inspectionEvents = sqliteTable('inspection_events', {
     completedAt:       integer('completed_at', { mode: 'timestamp_ms' }),
     resultsReceivedAt: integer('results_received_at', { mode: 'timestamp_ms' }),
     cancelledAt:       integer('cancelled_at', { mode: 'timestamp_ms' }),
-    /**
-     * -- DEAD (2026-08-07, superseded by calendar_external_links)
-     * Held the Google event id for the tenant-wide push that pressed-the-button
-     * semantics made unsafe (no assignment boundary, no update, no delete). That
-     * push is retired; nothing reads or writes this column. It is NOT backfilled
-     * into calendar_external_links because it never recorded WHOSE calendar the
-     * event landed on, and that table's user_id is the fact it exists to hold.
-     * Frozen per the column-retirement rule — never reuse the name.
-     */
-    gcalEventId:       text('gcal_event_id'),
     createdAt:         integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_inspection_events_scheduled').on(t.tenantId, t.scheduledAt),

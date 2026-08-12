@@ -6,10 +6,6 @@ export const comments = sqliteTable('comments', {
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     text: text('text').notNull(),
     category: text('category'),
-    // -- DEAD (2026-07-04, Plan-4 module F): retired in favor of the single
-    // `severity` column below. No reads/writes. Column frozen (D1 can't drop
-    // FK-referenced columns) — never reuse the name.
-    ratingBucket: text('rating_bucket'),
     // Section label (Roof, Electrical, ...) — same shape as canned-comments.js
     // entries. Free-text so tenants can grow their own taxonomy.
     section: text('section'),
@@ -46,7 +42,6 @@ export const comments = sqliteTable('comments', {
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_comments_tenant').on(t.tenantId),
-    index('idx_comments_rating_bucket').on(t.tenantId, t.ratingBucket),
     index('idx_comments_library_id').on(t.libraryId),
 ]);
 

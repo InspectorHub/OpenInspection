@@ -477,6 +477,13 @@
       "when": 1786518633056,
       "tag": "0067_drop_automation_copy_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "6",
+      "when": 1786525305791,
+      "tag": "0068_drop_frozen_columns",
+      "breakpoints": true
     }
   ]
 }
