@@ -2,7 +2,8 @@
  * Resolve the immutable archive version for a report download. Published
  * reports serve the latest published report_versions snapshot (rendered once,
  * cached forever — the #120 archive). Drafts (and any pre-publish status) return
- * null → the download renders on-demand keyed by the live dataVersion instead.
+ * null → the download renders on-demand, keyed by a content hash of the current
+ * report data instead (see `report-pdf.service.ts`'s R2 key construction).
  */
 import { isReportPublished, type ReportStatus } from '../lib/status/report-status';
 

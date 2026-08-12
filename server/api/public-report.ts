@@ -425,7 +425,7 @@ const publicReportRoutes = createApiRouter()
 
         const db = getDrizzle(c);
         const insp = await db
-            .select({ status: inspections.status, reportStatus: inspections.reportStatus, dataVersion: inspections.dataVersion })
+            .select({ status: inspections.status, reportStatus: inspections.reportStatus })
             .from(inspections)
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
             .get();
