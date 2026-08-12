@@ -26,6 +26,10 @@ npm run db:check
 
 Migrations are applied with wrangler (`wrangler d1 migrations apply`), not `drizzle-kit migrate` — wrangler owns the `d1_migrations` bookkeeping table. `npm run db:generate` only emits the forward SQL.
 
+`db:check` compares two things that both live in the repo, so it can be green while a database runs a schema older than the code about to be deployed onto it. `npm run db:lag` closes that gap: it asks a database what it has applied and prints that count beside the repo's, and it runs inside `npm run deploy` before `wrangler deploy`. Both comparisons are by **filename** — neither can see a migration whose contents were rewritten in place.
+
+`scripts/migration-lag-baseline.json` is the one escape hatch for `db:lag`. When a baseline rebuild removes forward files, their names stay in `d1_migrations` forever (wrangler never deletes a row), and that file is where such names are declared per database so the gate subtracts them instead of failing. Every list in it is currently empty, deliberately: this deployment reconciled by rewriting the ledger, so no name needs forgiving. Declaring a name there silences the report without reconciling the schema — for an existing self-hosted database the fix is the reconcile in [`self-host/upgrade.md`](../self-host/upgrade.md).
+
 ## Key tables
 
 | Table | Purpose |

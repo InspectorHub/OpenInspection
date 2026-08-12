@@ -20,7 +20,7 @@ Running the engine on your own Cloudflare account.
 | Doc | Topic |
 |---|---|
 | [`self-host/deploy.md`](self-host/deploy.md) | First-time production deploy — one-click, CLI, and what gets provisioned |
-| [`self-host/upgrade.md`](self-host/upgrade.md) | Move an existing deployment to a newer release (forward-only) |
+| [`self-host/upgrade.md`](self-host/upgrade.md) | Move an existing deployment to a newer release (forward-only) — including the one-time reconcile a rebuilt baseline needs |
 | [`self-host/email-providers.md`](self-host/email-providers.md) | Transactional email adapters, platform-vs-own credentials (no SMTP) |
 | [`self-host/sms-compliance.md`](self-host/sms-compliance.md) | Privacy/Terms pages, carrier registration, TCPA/CTIA wording |
 | [`self-host/video-backend.md`](self-host/video-backend.md) | R2 (default, free) vs Cloudflare Stream |

@@ -360,9 +360,16 @@ function main() {
   }
   if (d.extra.length) {
     console.error(
-      '  The database is AHEAD of this checkout. Someone applied SQL out of band, or\n' +
-        '  this branch predates production. Reconcile before deploying — do NOT add these\n' +
-        '  to the baseline unless they are pre-rebuild names from a squashed chain.\n',
+      '  The database is AHEAD of this checkout. Three things cause that:\n' +
+        '    1. someone applied SQL out of band;\n' +
+        '    2. this branch predates production;\n' +
+        '    3. a release REBUILT the baseline — then these are the names of the forward\n' +
+        '       files it folded into 0000_baseline.sql, nothing was applied out of band,\n' +
+        '       and the database is right to still remember them.\n' +
+        '  For (3), follow "Upgrading across a rebuilt baseline" in\n' +
+        '  docs/self-host/upgrade.md: it brings the schema current and then rewrites the\n' +
+        '  ledger, which is what clears this message. Do NOT declare these names in the\n' +
+        '  baseline file instead — that silences the report while the schema stays behind.\n',
     );
   }
   process.exit(d.missing.length || d.extra.length || d.staleAccepted.length ? 1 : 0);
