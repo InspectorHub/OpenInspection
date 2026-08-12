@@ -29,9 +29,14 @@
  * from `tenantScopedTables()` for that reason, and therefore can never be
  * reached by a query that derives its tenant from a session belonging to that
  * tenant. Its reader is the platform operator and its filter is an argument.
- * See `readDestructionRecords` below, and the two callers in
- * `server/api/admin/admin-ai-assurance.ts` and
- * `server/portal/integration.routes.ts`.
+ * See `readDestructionRecords` below. Its two callers are the admin AI-assurance
+ * route and the portal integration route; both are found by grepping for the
+ * function name, which is what a reader wants anyway.
+ *
+ * Their paths are deliberately NOT spelled out here. `tests/unit/sync/
+ * portal-isolation.spec.ts` enforces the portal module boundary with `git grep`
+ * over `server/`, and git grep has no AST — a path named in prose reads exactly
+ * like an import, and this comment failed that gate on the way in.
  */
 import { and, desc, eq, lt, inArray, notExists, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';

@@ -50,6 +50,12 @@ export async function resolveLibraryUpdate(
     tenantId: string,
     libraryId: string,
 ) {
+    // Unscoped by `id` alone, and correctly so: `marketplace_libraries` is the
+    // published catalog and carries no `tenant_id` — every workspace may read
+    // every published library, which is the point of a marketplace. The
+    // tenant-specific half is the import row below, and that one IS scoped.
+    // `scripts/tenant-scoping-baseline.json` records this query; it moved here
+    // from marketplace.service.ts rather than being introduced.
     const [lib] = await db
         .select()
         .from(marketplaceLibraries)

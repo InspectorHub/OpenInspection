@@ -6,9 +6,10 @@
  * Rendered input/table/empty-state are Chrome-verified.
  *
  * We assert:
- *   - loader pulls retentionYears from GET /tenant-config (default 6) AND the
- *     erasure-log list from GET /compliance/erasure-log, via the BFF (no client
- *     fetch).
+ *   - loader pulls retentionYears from GET /tenant-config (default 6), the
+ *     erasure-log list from GET /compliance/erasure-log, and the AI assurance
+ *     page from GET /compliance/ai-assurance — all via the BFF (no client
+ *     fetch). All three must be stubbed below even where only one is asserted.
  *   - action intent=retention-save PATCHes tenant-config with the integer.
  *   - action rejects out-of-range retention years client-side (defense in depth)
  *     without calling the API.
@@ -19,6 +20,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const patchTenantConfig = vi.fn();
 const getTenantConfig = vi.fn();
 const getErasureLog = vi.fn();
+// The loader reads three endpoints, not two. Each is wrapped in `.catch(() =>
+// null)` so a failing one degrades to a default — but that catch only covers a
+// promise that EXISTS, and a missing branch of this mock throws while reading
+// `.$get` off undefined, synchronously, taking the whole loader with it. A stub
+// omitted here does not weaken one assertion; it fails every test in the file.
+const getAiAssurance = vi.fn();
 
 vi.mock('~/lib/session.server', () => ({
     requireToken: vi.fn(async () => 'tok-123'),
@@ -39,6 +46,9 @@ vi.mock('~/lib/api-client.server', () => ({
             compliance: {
                 'erasure-log': {
                     $get: getErasureLog,
+                },
+                'ai-assurance': {
+                    $get: getAiAssurance,
                 },
             },
         },
@@ -80,6 +90,9 @@ beforeEach(() => {
     patchTenantConfig.mockReset().mockResolvedValue(jsonRes({ success: true, data: { ok: true } }));
     getTenantConfig.mockReset().mockResolvedValue(
         jsonRes({ success: true, data: { agreementRetentionYears: 9 } }),
+    );
+    getAiAssurance.mockReset().mockResolvedValue(
+        jsonRes({ success: true, data: { calls: [], nextBefore: null } }),
     );
     getErasureLog.mockReset().mockResolvedValue(
         jsonRes({
