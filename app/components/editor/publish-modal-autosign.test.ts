@@ -8,6 +8,18 @@ import { PublishModal } from '~/components/editor/PublishModal';
  * and that the `autoSign` prop controls the checked state.
  */
 
+/**
+ * The component reads the session for the outbound cooling window, and
+ * `useRouteLoaderData` throws outside a data router — which `renderToStaticMarkup`
+ * is. Stubbed with NO window open, so nothing here depends on that copy; the
+ * notice itself is covered by publish-modal-cooling-notice.test.tsx.
+ */
+vi.mock('~/hooks/useSessionContext', () => ({
+  useSessionContext: () => ({ outboundCoolingWindow: null }),
+  useDisplayTimeZone: () => 'America/New_York',
+  useChromeDateTimeFormat: () => ({ locale: 'en-US', dateFormat: 'us', timeFormat: '12h' }),
+}));
+
 const baseProps = {
   open: true,
   progress: { rated: 5, total: 10, pct: 50 },
