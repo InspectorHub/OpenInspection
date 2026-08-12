@@ -1,1 +1,0 @@
-ALTER TABLE `agreement_signers` ADD `language_disclosure_version` integer;
