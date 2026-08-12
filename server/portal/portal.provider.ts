@@ -89,17 +89,26 @@ export class PortalProvider implements IntegrationProvider {
         // its own name. With the column gone the fallback is gone too, and the
         // rule is simply: settings owns the name once settings has one.
         //
-        // ⚠️ Consequence worth stating: a rename in portal no longer changes what
-        // core displays for a tenant whose company_name is already set — which,
-        // after the 0064 backfill, is every tenant. That was already true for 12
-        // of the 16 in production before this change; the backfill extends it to
-        // the other 4. If renames are meant to propagate, the fix is a command
-        // that says so explicitly, not a second column to fall back to.
+        // A rename does not travel this path at all — it has its own command
+        // (`cmd.tenant.rename` → applyTenantRename), which writes
+        // unconditionally precisely because THIS write is initialize-only. Right
+        // for a provisioning sync, silently wrong for a rename; hence two
+        // commands.
         //
-        // `name || slug` because the slug is the last resort a container name
-        // used to provide: a tenant provisioned without a name still needs
-        // something to render.
-        const initialName = name || slug;
+        // NO `|| slug` fallback, and the reason is that the slug fallback
+        // already exists — lazily, in `tenantDisplayName`
+        // (COALESCE(NULLIF(TRIM(company_name),''), slug)). Doing it EAGERLY here
+        // renders identically and costs something the lazy one does not: it
+        // fills the initialize-only slot. `name` is optional on
+        // `cmd.tenant.update`, which also carries status/tier/seat changes, so a
+        // nameless update is ordinary traffic — and one arriving before the
+        // named provisioning would write the slug, take the slot, and leave the
+        // real company name permanently unable to land.
+        //
+        // Every other reader of `company_name` already handles null (admin
+        // settings, branding and the booking agreement each carry their own
+        // `|| APP_NAME` / `?? null` default), so writing nothing costs nothing.
+        const initialName = name;
         if (initialName) {
             const finalTenantId = id || existingTenant?.id;
             if (finalTenantId) {

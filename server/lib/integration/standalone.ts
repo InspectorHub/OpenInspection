@@ -302,9 +302,9 @@ export class StandaloneProvider implements IntegrationProvider {
         }
 
         // Initialize companyName — initialize-only, so a name the tenant chose
-        // in settings wins. Now the ONLY place a name lands; `|| slug` keeps
-        // the last resort the container name used to provide.
-        const initialName = name || slug;
+        // in settings wins. No `|| slug`: it renders the same (tenantDisplayName
+        // already COALESCEs) but fills the slot, so a later name never lands.
+        const initialName = name;
         if (initialName) {
             const cfg = await db.select().from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
             if (!cfg) {
