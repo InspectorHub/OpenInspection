@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
-import { automations, messageTemplates } from '../lib/db/schema';
+import { automations, messageTemplates, tenants } from '../lib/db/schema';
 import { AUTOMATION_SEEDS } from '../data/automation-seeds';
 
 /** Collect {{var}} token names from one or more template strings. */
@@ -92,4 +92,26 @@ export async function backfillAutomationTemplates(db: D1Database, tenantId: stri
         }
     }
     return { created };
+}
+
+/**
+ * Every tenant, once. `backfillAutomationTemplates` is idempotent and lazy —
+ * it runs when a tenant opens automations — so tenants that have not touched
+ * the feature still hold their copy on the automations row. This is the sweep
+ * that finishes the job before those columns are dropped, and it is deleted
+ * together with them.
+ *
+ * Deliberately cross-tenant: it iterates every row in `tenants` with no
+ * `tenantId` filter, unlike every other query in this file. That is the
+ * point — it exists to reach tenants the lazy per-tenant path has not.
+ */
+export async function backfillAllTenants(db: D1Database): Promise<{ tenants: number; created: number }> {
+    const d = drizzle(db);
+    const rows = await d.select({ id: tenants.id }).from(tenants);
+    let created = 0;
+    for (const t of rows) {
+        const r = await backfillAutomationTemplates(db, t.id);
+        created += r.created;
+    }
+    return { tenants: rows.length, created };
 }
