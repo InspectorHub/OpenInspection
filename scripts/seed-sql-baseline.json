@@ -1,5 +1,4 @@
 [
     "server/services/marketplace.service.ts:183 computes SECONDS (Date.now() / 1000) but this file writes comments.created_at, which is timestamp_ms — the row will read as 1970",
-    "tests/unit/credentials/license-backfill.spec.ts:69 writes users.license_number, which does not exist in the schema",
     "tests/workers/collab-multiclient.spec.ts:98 writes inspection_results.tenantId, which does not exist in the schema"
 ]

@@ -5,7 +5,7 @@
  * / indexes / FKs — semantic, not DDL text). Regenerates a baseline from the
  * schema into drizzle-tmp/ and diffs its PRAGMA introspection against
  * migrations/. KNOWN_ACCEPTED (below) is the audited allowlist for divergences
- * that cannot be reconciled on D1 — empty after the 2026-06-21 baseline rebuild.
+ * that cannot be reconciled on D1 — empty after the 2026-08-12 baseline rebuild.
  *
  *   node scripts/verify-migration-equivalence.mjs
  */
@@ -32,7 +32,7 @@ const root = process.cwd();
 // with no migration). Adding to this list is a deliberate, reviewed decision.
 const KNOWN_ACCEPTED = {
   // Tables present in migrations but removed from schema. Kept EMPTY: the
-  // pre-launch baseline rebuild (2026-06-21) regenerated migrations/ from the
+  // baseline rebuild (2026-08-12) regenerated migrations/ from the
   // schema, so no orphan tables remain. Re-add only with a cited, D1-unfixable
   // reason — this list is the audited escape hatch, never a dumping ground.
   lostTables: new Set([]),

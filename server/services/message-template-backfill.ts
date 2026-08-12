@@ -1,11 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
-import { automations, messageTemplates, tenants } from '../lib/db/schema';
+import { automations, messageTemplates } from '../lib/db/schema';
 import { AUTOMATION_SEEDS } from '../data/automation-seeds';
-
-/** KV key latching {@link runAutomationTemplateBackfillOnce} — see its doc comment. */
-const BACKFILL_MARKER_KEY = 'migration:automation-templates-backfill:done';
 
 /** Collect {{var}} token names from one or more template strings. */
 export function extractVars(...sources: (string | null | undefined)[]): string[] {
@@ -23,16 +20,20 @@ function parseChannels(raw: string | null): string[] {
 }
 
 /**
- * SP2 — one-time, idempotent backfill: give every default automation a
- * referenced email/SMS template when it has none. The copy comes from the
- * matching AUTOMATION_SEEDS entry (matched on name+trigger, the same key
- * ensureSeeds uses) — `automations.subject_template` / `body_template` /
- * `sms_body` used to hold this copy inline, but those columns are gone
- * (dropped once every pre-existing tenant was drained), so a seed match is
- * now the ONLY source. A custom (non-seed) rule that somehow reaches this
- * function with no template id gets an empty one instead of nothing, same as
- * before. Re-running is a no-op: an automation that already has a non-null
- * ref id is skipped per channel.
+ * Standing repair path, not a one-time migration aid: `AutomationCore.ensureSeeds`
+ * (`server/services/automation/core.ts`) calls this unconditionally at the end
+ * of every run, for every tenant, so any automation rule missing a referenced
+ * template — freshly seeded, hand-edited, or otherwise incomplete — is topped
+ * up on the next call. The copy comes from the matching AUTOMATION_SEEDS entry
+ * (matched on name+trigger, the same key ensureSeeds uses); `automations`
+ * carries no inline copy of its own (the `subject_template` / `body_template` /
+ * `sms_body` columns that used to hold it are dropped), so a seed match is the
+ * ONLY source. This function is also the only writer of `inAppTemplateId`
+ * anywhere in the codebase — see `server/services/automation/notice-wording.ts`
+ * for the sole reader. A custom (non-seed) rule that reaches this function
+ * with no template id simply gets no template — there is no seed copy left to
+ * fall back to. Re-running is a no-op: an automation that already has a
+ * non-null ref id is skipped per channel.
  */
 export async function backfillAutomationTemplates(db: D1Database, tenantId: string): Promise<{ created: number }> {
     const d = drizzle(db);
@@ -104,64 +105,4 @@ export async function backfillAutomationTemplates(db: D1Database, tenantId: stri
         }
     }
     return { created };
-}
-
-/**
- * Every tenant, once. `backfillAutomationTemplates` is idempotent and lazy —
- * it runs when a tenant opens automations — so tenants that have not touched
- * the feature still hold their copy on the automations row. This is the sweep
- * that finishes the job before those columns are dropped, and it is deleted
- * together with them.
- *
- * Deliberately cross-tenant: it iterates every row in `tenants` with no
- * `tenantId` filter, unlike every other query in this file. That is the
- * point — it exists to reach tenants the lazy per-tenant path has not.
- */
-export async function backfillAllTenants(db: D1Database): Promise<{ tenants: number; created: number }> {
-    const d = drizzle(db);
-    const rows = await d.select({ id: tenants.id }).from(tenants);
-    let created = 0;
-    for (const t of rows) {
-        const r = await backfillAutomationTemplates(db, t.id);
-        created += r.created;
-    }
-    return { tenants: rows.length, created };
-}
-
-/**
- * One-shot migration aid, called from the scheduled (cron) handler
- * (`server/scheduled.ts`) — NOT from an HTTP route. `backfillAllTenants` is
- * deliberately cross-tenant (it writes rows for every tenant in this D1
- * database), and cron is the only place that operation belongs: a per-tenant
- * `owner`/`manager` role has no business triggering writes across every OTHER
- * tenant, which is why the earlier version of this migration — a
- * `POST /api/admin/system/backfill-automation-templates` route guarded by
- * `requireRole('owner', 'manager')` — was wrong and was removed.
- *
- * Latched via a marker key in `TENANT_CACHE` so the sweep runs exactly ONCE
- * across all cron ticks (every 5 minutes in production), not once per tick.
- * The marker is written ONLY after `sweep` resolves — a thrown error leaves
- * it unset so the next tick retries.
- *
- * Delete this function, its call site in `server/scheduled.ts`, and
- * `backfillAllTenants` together once the migration is confirmed complete
- * everywhere and the drained `automations` copy columns are dropped. It has
- * no purpose after that point.
- *
- * @param sweep Injected for tests only; production always uses the default
- *   (real) `backfillAllTenants`.
- */
-export async function runAutomationTemplateBackfillOnce(
-    db: D1Database,
-    kv: KVNamespace | undefined,
-    sweep: (db: D1Database) => Promise<{ tenants: number; created: number }> = backfillAllTenants,
-): Promise<{ ran: boolean; result?: { tenants: number; created: number } }> {
-    // No KV binding → no way to latch the one-shot guarantee, so skip rather
-    // than risk running the cross-tenant sweep on every single tick.
-    if (!kv) return { ran: false };
-    if (await kv.get(BACKFILL_MARKER_KEY)) return { ran: false };
-
-    const result = await sweep(db);
-    await kv.put(BACKFILL_MARKER_KEY, new Date().toISOString());
-    return { ran: true, result };
 }

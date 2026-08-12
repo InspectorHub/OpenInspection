@@ -20,7 +20,6 @@ import { PortalAccessService } from './services/portal-access.service';
 import { ReportPdfService } from './services/report-pdf.service';
 import { InspectionService } from './services/inspection.service';
 import type { ReportDeliveryDeps } from './services/automation/report-email';
-import { runAutomationTemplateBackfillOnce } from './services/message-template-backfill';
 
 export interface ScheduledEnv {
     DB: D1Database;
@@ -394,23 +393,5 @@ export async function scheduled(
                 logger.error('[usage] R2 measurement failed', {}, err instanceof Error ? err : undefined);
             }
         }
-    }
-
-    // 8. One-shot migration aid: finish migrating each tenant's automation
-    //    email/SMS copy into message_templates for tenants the lazy
-    //    per-tenant backfill (server/services/message-template-backfill.ts,
-    //    runs when a tenant opens the automations page) hasn't reached yet.
-    //    Deliberately cross-tenant — that's why it runs here, latched to run
-    //    exactly once via a TENANT_CACHE marker, rather than behind a
-    //    per-tenant owner/manager role on an HTTP route. DELETE this block
-    //    (and runAutomationTemplateBackfillOnce) once the automations copy
-    //    columns are dropped — it has no purpose after that.
-    try {
-        const outcome = await runAutomationTemplateBackfillOnce(env.DB, env.TENANT_CACHE);
-        if (outcome.ran) {
-            logger.info('[cron] automation-template backfill sweep complete', outcome.result);
-        }
-    } catch (e) {
-        logger.error('[cron] automation-template backfill sweep failed', {}, e instanceof Error ? e : undefined);
     }
 }

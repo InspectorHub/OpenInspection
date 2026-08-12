@@ -5,7 +5,7 @@ Cloudflare D1 (SQLite). Migrations are **drizzle-kit schema-first**: the Drizzle
 ## Source of truth
 
 - **Drizzle schema**: `server/lib/db/schema/` — TypeScript table definitions (the source of truth)
-- **Baseline migration**: `migrations/0000_baseline.sql` — the full baseline schema (50+ tables, plus indexes)
+- **Baseline migration**: `migrations/0000_baseline.sql` — the full baseline schema (95 tables, plus indexes)
 - **Schema re-export**: `server/lib/db/schema/index.ts`
 
 ## Running migrations
