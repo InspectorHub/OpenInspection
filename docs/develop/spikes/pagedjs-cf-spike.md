@@ -27,6 +27,16 @@ On a deployed environment with a real `BROWSER` binding: vendor Paged.js (`paged
 
 ## Client layer implemented (gated) — remaining CF verification
 
+> **Superseded, 2026-07 (#240).** The gated client layer described below was
+> built, then removed once `toc-pdflib-spike.md` (in this same directory)
+> found a way to get real TOC page numbers without ever touching Paged.js or
+> a CF Browser Rendering verification pass. The `pagedjs` devDependency, the
+> vendored polyfill, and the readiness-signal plumbing are gone from the tree;
+> `server/lib/toc-pages.ts` implements the approach that shipped instead. This
+> section is kept as a historical record — the FALLBACK reasoning above (why
+> the CF integration was never verified) is still the reason the shipped
+> approach avoids CF Browser Rendering-side pagination entirely.
+
 The **client layer** of the follow-up above is now implemented and proven in a
 real browser, but kept **strictly opt-in** so production PDFs are untouched. The
 CF integration (the actual deferred risk) is still unverified.

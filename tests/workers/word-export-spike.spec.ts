@@ -2,9 +2,8 @@
 // Throwaway-turned-regression-guard: proves `docx` (dolanmiu) actually runs
 // under real workerd (not just Node) and that Packer.toBuffer() output
 // round-trips byte-for-byte through the PHOTOS R2 binding. This is the
-// gating unknown for Phase W — see docs/superpowers/plans/
-// 2026-06-26-commercial-pca-phase-w-plan.md Task 1 and
-// scripts/spike/word-export-spike.md for the recorded decision.
+// gating unknown for Phase W (Task 1) — see
+// docs/develop/spikes/word-export-spike.md for the recorded decision.
 import { describe, it, expect } from 'vitest';
 import { Document, Packer, Paragraph, HeadingLevel, TableOfContents } from 'docx';
 import { env } from 'cloudflare:test';

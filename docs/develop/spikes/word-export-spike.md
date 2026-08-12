@@ -1,6 +1,8 @@
 # Commercial PCA Phase W — Task 1 spike decision (`docx`-on-Workers GO/FALLBACK gate)
 
-Plan: `docs/superpowers/plans/2026-06-26-commercial-pca-phase-w-plan.md`, Task 1.
+Plan: `2026-06-26-commercial-pca-phase-w-plan.md`, Task 1 (lived in the
+superproject's `docs/superpowers/plans/`, one level up from this submodule —
+not a resolvable link from here).
 Issue: `#186`.
 Date: 2026-07-12.
 `docx` version installed: `9.7.1`.
@@ -71,8 +73,9 @@ Headroom at baseline: `3072 − 2658 = 414 KiB` (13.5%).
 
 **Measured impact of actually including `docx` in the module graph:**
 Rather than estimate from the raw npm package size, forced a real measurement:
-temporarily added a throwaway file (`server/lib/_spike-docx-import.ts`,
-never committed) importing the classes Task 2+ will actually use
+temporarily added a throwaway file (`server/lib/_spike-docx-import.ts` —
+never committed, not present in the tree) importing the classes Task 2+ will
+actually use
 (`Document, Packer, Paragraph, HeadingLevel, TableOfContents, Table, TableRow,
 TableCell, ImageRun`) and a one-line import of it from `server/index.ts`, ran
 `npm run check:bundle`, then reverted both files before committing anything
@@ -83,8 +86,10 @@ worker upload: 17977 KiB raw / 2775 KiB gzip (90.3% of the 3 MiB Workers Free li
 ```
 
 - **Delta from `docx`: +117 KiB gzip** (2775 − 2658), well below a naive
-  estimate from the raw dist file (`node_modules/docx/dist/index.mjs` alone
-  gzips to ~214.5 KiB / 219,605 bytes standalone — wrangler's esbuild pass
+  estimate from the raw dist file (the installed dependency's
+  `node_modules/docx/dist/index.mjs` — not tracked in this repo, present only
+  after `npm install` — alone gzips to ~214.5 KiB / 219,605 bytes standalone
+  — wrangler's esbuild pass
   tree-shook/minified/deduped the actually-referenced surface down to
   ~117 KiB in the context of the full worker bundle).
 - **Remaining headroom after adding `docx`: `3072 − 2775 = 297 KiB` (9.7% of
@@ -94,12 +99,13 @@ worker upload: 17977 KiB raw / 2775 KiB gzip (90.3% of the 3 MiB Workers Free li
   production builder code (plus any further growth elsewhere in the worker)
   has materially less than 297 KiB of margin left before the gate goes red.
   Flagging for Task 2+ implementers and for the broader bundle-diet backlog
-  (`docs/superpowers/plans/2026-07-06-oi-knip-verified-cleanup-backlog.md` /
-  the pre-push WARNING).
-- `docx`'s own dependencies (`jszip`, `nanoid`, `xml`, `xml-js`, `hash.js`)
-  are pre-bundled into `docx`'s own `dist/index.mjs` (a single-file rollup) —
-  no additional transitive packages were pulled into the worker's module
-  graph beyond what that one import already carries.
+  (`2026-07-06-oi-knip-verified-cleanup-backlog.md`, another superproject
+  plan outside this submodule / the pre-push WARNING).
+- `docx`'s own dependencies (`jszip`, `nanoid`, `xml`, `xml-js`, `hash.js` —
+  npm package names, each its own `node_modules/<name>/` entry, not tracked
+  in this repo) are pre-bundled into `docx`'s own `dist/index.mjs` (a
+  single-file rollup) — no additional transitive packages were pulled into
+  the worker's module graph beyond what that one import already carries.
 
 ## Manual three-reader verification (Step 3 of the plan)
 
@@ -120,7 +126,9 @@ before Phase W is considered production-ready.
 - `package.json` / `package-lock.json` — `docx@9.7.1` added to `dependencies` (kept, GO).
 - `tests/workers/word-export-spike.spec.ts` — kept as a permanent regression guard
   (real-workerd proof that `docx` + R2 keep working as the dependency updates).
-- `scripts/spike/word-export-spike.md` — this file.
+- `docs/develop/spikes/word-export-spike.md` — this file (moved from
+  `scripts/spike/` — see `docs/README.md` for why spike write-ups live under
+  `docs/develop/spikes/` rather than beside the scripts that produced them).
 - No production code was added. `server/index.ts` and all other application
   files are unchanged from before this spike (the Gate B throwaway import was
   reverted).

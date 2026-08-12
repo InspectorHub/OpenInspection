@@ -56,9 +56,11 @@ function* walk(dir) {
 }
 
 const violations = [];
+let filesScanned = 0;
 
 for (const scanDir of SCAN_DIRS) {
   for (const file of walk(join(ROOT, scanDir))) {
+    filesScanned++;
     const rel = relative(ROOT, file);
     const lines = readFileSync(file, "utf8").split("\n");
     lines.forEach((line, i) => {
@@ -77,6 +79,16 @@ for (const scanDir of SCAN_DIRS) {
   }
 }
 
+// A gate that scanned nothing would pass forever. It has no business being green
+// when it cannot see the thing it claims to check.
+if (filesScanned === 0) {
+  console.error(
+    `Migration-reference hygiene: scanned 0 files across ${SCAN_DIRS.join(", ")} — ` +
+      "the scan dirs are wrong or the walk is broken. Refusing to report OK.",
+  );
+  process.exit(1);
+}
+
 if (violations.length > 0) {
   console.error("Migration-reference hygiene check FAILED.\n");
   console.error(
@@ -93,4 +105,4 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
-console.log("Migration-reference hygiene: OK");
+console.log(`Migration-reference hygiene: OK — ${filesScanned} file(s) scanned across ${SCAN_DIRS.join(", ")}`);

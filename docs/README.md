@@ -49,6 +49,7 @@ Running the engine on your own Cloudflare account.
 | [`develop/conventions/route-metadata.md`](develop/conventions/route-metadata.md) | Metadata every `createRoute()` must declare, and the gate that enforces it |
 | [`develop/conventions/i18n-glossary.md`](develop/conventions/i18n-glossary.md) | One es-419 equivalent per term, enforced by `lint:i18n-glossary` |
 | [`develop/conventions/mcp-oauth-notes.md`](develop/conventions/mcp-oauth-notes.md) | MCP + OAuth server internals and pinned package symbols |
+| [`develop/spikes/`](develop/spikes/) | GO/FALLBACK decision records for questions answered by throwaway code — the code is gone, the write-up is the deliverable |
 
 Also read [`CONTRIBUTING.md`](../CONTRIBUTING.md) (code conventions, PR process,
 versioning policy) and [`CLAUDE.md`](../CLAUDE.md) (the enforced house rules —
@@ -104,6 +105,14 @@ Two of the pages here are checked by gates rather than by eyes:
 
 Everything else is ordinary prose — but prefer stating the invariant over
 recounting the history, same as in code comments.
+
+**No number prefixes on filenames** (`01_setup.md`, `02_deploy.md`, …), in this
+directory or its subdirectories. A number prefix encodes reading order into
+the filename itself, so inserting a doc in the middle means renaming every
+file after it — and every link, cross-reference, and bookmark to those files
+breaks at the same time. The table above already carries reading order *and*
+the reason for it, which a bare number never does. Name files after what they
+cover.
 
 ---
 

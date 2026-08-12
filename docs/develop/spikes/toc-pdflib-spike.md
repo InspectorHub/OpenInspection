@@ -8,7 +8,8 @@ annotations with a destination that pdf-lib can resolve to the target **page
 number**? (The two-pass TOC-page-number plan depends on this.)
 
 ## Method
-`scripts/spike/toc-pdflib-spike.mjs` (throwaway) renders a fixture that mirrors
+`scripts/spike/toc-pdflib-spike.mjs` (throwaway — never committed, no longer in
+the tree) renders a fixture that mirrors
 `app/components/portal/sections/report/ReportToc.tsx` — a TOC of `<a href="#id">`
 entries plus the reserved empty `.toc-pageref` slot, then tall `<h2 id>` sections
 that each land on a later page — using **Playwright's bundled Chromium**
