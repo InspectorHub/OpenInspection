@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest';
 
 interface FilterCtx {
-    sort:         'relevance' | 'recent' | 'created' | 'frequent' | 'alpha';
-    filterMode:   'auto' | 'all';
-    itemLabel?:   string;
-    section?:     string;
-    ratingBucket?: 'satisfactory' | 'monitor' | 'defect';
+    sort:       'relevance' | 'recent' | 'created' | 'frequent' | 'alpha';
+    filterMode: 'auto' | 'all';
+    itemLabel?: string;
+    section?:   string;
+    severity?:  'good' | 'marginal' | 'significant' | 'minor';
 }
 
 interface Decision {
     matchItemLabel:   boolean;
     matchSection:     boolean;
-    matchRating:      boolean;
+    matchSeverity:    boolean;
     orderBy:          string;
 }
 
@@ -20,9 +20,9 @@ export function decideQuery(ctx: FilterCtx): Decision {
     return {
         matchItemLabel: auto && !!ctx.itemLabel,
         matchSection:   auto && !!ctx.section,
-        matchRating:    auto && !!ctx.ratingBucket,
+        matchSeverity:  auto && !!ctx.severity,
         orderBy: ({
-            relevance: 'rating_bucket, created_at DESC',
+            relevance: 'severity, created_at DESC',
             recent:    'last_used_at DESC NULLS LAST',
             created:   'created_at DESC',
             frequent:  'use_count DESC, last_used_at DESC',
@@ -33,24 +33,24 @@ export function decideQuery(ctx: FilterCtx): Decision {
 
 describe('decideQuery', () => {
     it('filterMode=all ignores context filters', () => {
-        const d = decideQuery({ sort: 'recent', filterMode: 'all', itemLabel: 'Roof Covering', section: 'Roof', ratingBucket: 'defect' });
+        const d = decideQuery({ sort: 'recent', filterMode: 'all', itemLabel: 'Roof Covering', section: 'Roof', severity: 'significant' });
         expect(d.matchItemLabel).toBe(false);
         expect(d.matchSection).toBe(false);
-        expect(d.matchRating).toBe(false);
+        expect(d.matchSeverity).toBe(false);
     });
 
     it('filterMode=auto applies all present context filters', () => {
-        const d = decideQuery({ sort: 'recent', filterMode: 'auto', itemLabel: 'Roof Covering', section: 'Roof', ratingBucket: 'defect' });
+        const d = decideQuery({ sort: 'recent', filterMode: 'auto', itemLabel: 'Roof Covering', section: 'Roof', severity: 'significant' });
         expect(d.matchItemLabel).toBe(true);
         expect(d.matchSection).toBe(true);
-        expect(d.matchRating).toBe(true);
+        expect(d.matchSeverity).toBe(true);
     });
 
     it('filterMode=auto skips filters whose context value is missing', () => {
         const d = decideQuery({ sort: 'recent', filterMode: 'auto', itemLabel: 'Roof Covering' });
         expect(d.matchItemLabel).toBe(true);
         expect(d.matchSection).toBe(false);
-        expect(d.matchRating).toBe(false);
+        expect(d.matchSeverity).toBe(false);
     });
 
     it('each sort option maps to a distinct ORDER BY', () => {
