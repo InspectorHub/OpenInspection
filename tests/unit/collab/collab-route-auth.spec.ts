@@ -62,11 +62,15 @@ interface BuildAppOptions {
     tenantId?: string | null;
     userId?:   string | null;
     userRole?: string;
-    /** What getInspection returns (or throws). */
+    /**
+     * What getInspection returns (or throws). Only `inspectorId` — the roster
+     * (who may edit) is a separate `getInspectionRoster` mock below;
+     * `leadInspectorId` / `helperInspectorIds` are request-payload field names
+     * only (`schedule.schema.ts`, `wizard.schema.ts`), never columns on the row
+     * the route reads.
+     */
     inspectionOverride?: {
         inspectorId?: string | null;
-        leadInspectorId?: string | null;
-        helperInspectorIds?: string;
         tenantId?: string;
     } | 'not_found';
     doNamespace?: ReturnType<typeof makeMockDoNamespace>;
@@ -81,8 +85,6 @@ function buildApp(opts: BuildAppOptions = {}) {
         userRole      = 'inspector',
         inspectionOverride = {
             inspectorId: 'u1',
-            leadInspectorId: 'u1',
-            helperInspectorIds: '[]',
             tenantId: 't1',
         },
         doNamespace,
@@ -91,18 +93,15 @@ function buildApp(opts: BuildAppOptions = {}) {
 
     const mockDo = doNamespace ?? makeMockDoNamespace();
 
-    // Default the roster from the legacy lead/helper override so each existing
-    // case keeps asserting the same thing it always did.
-    const legacyHelpers: string[] = (() => {
-        if (inspectionOverride === 'not_found') return [];
-        try { return JSON.parse(inspectionOverride.helperInspectorIds ?? '[]') as string[]; }
-        catch { return []; }
-    })();
+    // Default the roster to a solo inspector (lead = inspectorId, no helpers)
+    // so each existing case keeps asserting the same thing it always did.
+    // Cases that need a helper on the roster pass their own `roster` option
+    // (see (c2)) rather than smuggling it through the inspection row.
     const effectiveRoster = roster ?? {
         lead: inspectionOverride === 'not_found'
             ? null
-            : (inspectionOverride.leadInspectorId ?? inspectionOverride.inspectorId ?? null),
-        helpers: legacyHelpers,
+            : (inspectionOverride.inspectorId ?? null),
+        helpers: [] as string[],
     };
     resolvePrimaryReportId.mockReset();
     resolvePrimaryReportId.mockResolvedValue('rpt-insp1');
@@ -114,11 +113,9 @@ function buildApp(opts: BuildAppOptions = {}) {
         inspectionOverride === 'not_found'
             ? undefined
             : {
-                id:                 'insp1',
-                tenantId:           inspectionOverride.tenantId ?? 't1',
-                inspectorId:        inspectionOverride.inspectorId ?? 'u1',
-                leadInspectorId:    inspectionOverride.leadInspectorId ?? 'u1',
-                helperInspectorIds: inspectionOverride.helperInspectorIds ?? '[]',
+                id:          'insp1',
+                tenantId:    inspectionOverride.tenantId ?? 't1',
+                inspectorId: inspectionOverride.inspectorId ?? 'u1',
             };
 
     const getInspection = vi.fn().mockImplementation(
@@ -183,10 +180,8 @@ describe('collab WS route — auth gate', () => {
             tenantId: 't2',
             userId:   'u-other',
             inspectionOverride: {
-                inspectorId:        'u1',
-                leadInspectorId:    'u1',
-                helperInspectorIds: '[]',
-                tenantId:           't1', // row belongs to t1
+                inspectorId: 'u1',
+                tenantId:    't1', // row belongs to t1
             },
         });
         const res = await app.request(
@@ -202,10 +197,8 @@ describe('collab WS route — auth gate', () => {
             tenantId: 't1',
             userId:   'u-stranger',  // not inspectorId / lead / helper
             inspectionOverride: {
-                inspectorId:        'u1',
-                leadInspectorId:    'u1',
-                helperInspectorIds: '[]',
-                tenantId:           't1',
+                inspectorId: 'u1',
+                tenantId:    't1',
             },
         });
         const res = await app.request(
@@ -236,10 +229,8 @@ describe('collab WS route — auth gate', () => {
             userRole:  'inspector',
             doNamespace: mockDo,
             inspectionOverride: {
-                inspectorId:        'u1',
-                leadInspectorId:    'u1',
-                helperInspectorIds: '[]',
-                tenantId:           't1',
+                inspectorId: 'u1',
+                tenantId:    't1',
             },
         });
         await app.request(
@@ -261,11 +252,10 @@ describe('collab WS route — auth gate', () => {
             userId:    'u-helper',
             doNamespace: mockDo,
             inspectionOverride: {
-                inspectorId:        'u1',
-                leadInspectorId:    'u1',
-                helperInspectorIds: '["u-helper"]',
-                tenantId:           't1',
+                inspectorId: 'u1',
+                tenantId:    't1',
             },
+            roster: { lead: 'u1', helpers: ['u-helper'] },
         });
         await app.request(
             '/api/inspections/insp1/collab/ws',
@@ -284,10 +274,8 @@ describe('collab WS route — auth gate', () => {
             userRole:  'admin',
             doNamespace: mockDo,
             inspectionOverride: {
-                inspectorId:        'u1',
-                leadInspectorId:    'u1',
-                helperInspectorIds: '[]',
-                tenantId:           't1',
+                inspectorId: 'u1',
+                tenantId:    't1',
             },
         });
         const res = await app.request(
@@ -307,10 +295,8 @@ describe('collab WS route — auth gate', () => {
             userRole:  'manager',
             doNamespace: mockDo,
             inspectionOverride: {
-                inspectorId:        'u1',
-                leadInspectorId:    'u1',
-                helperInspectorIds: '[]',
-                tenantId:           't1',
+                inspectorId: 'u1',
+                tenantId:    't1',
             },
         });
         const res = await app.request(
@@ -327,10 +313,8 @@ describe('collab WS route — auth gate', () => {
             userId:    'u-stranger',
             userRole:  'inspector',
             inspectionOverride: {
-                inspectorId:        'u1',
-                leadInspectorId:    'u1',
-                helperInspectorIds: '[]',
-                tenantId:           't1',
+                inspectorId: 'u1',
+                tenantId:    't1',
             },
         });
         const res = await app.request(
@@ -347,10 +331,8 @@ describe('collab WS route — auth gate', () => {
             userId:    'u-stranger',
             userRole:  '',
             inspectionOverride: {
-                inspectorId:        'u1',
-                leadInspectorId:    'u1',
-                helperInspectorIds: '[]',
-                tenantId:           't1',
+                inspectorId: 'u1',
+                tenantId:    't1',
             },
         });
         const res = await app.request(
@@ -384,8 +366,6 @@ describe('collab WS route — auth gate', () => {
                             id: 'insp1',
                             tenantId: 't1',
                             inspectorId: 'u1',
-                            leadInspectorId: 'u1',
-                            helperInspectorIds: '[]',
                         },
                         template: null,
                     }),

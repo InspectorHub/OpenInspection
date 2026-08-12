@@ -181,7 +181,12 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
         expect(rows).toHaveLength(2);
     });
 
-    it('replace mode without confirmLossOfEdits flag is allowed when no user-modified rows exist', async () => {
+    // confirmLossOfEdits is recorded into import-history metadata but nothing
+    // branches on it — replace mode's delete is unconditional either way (see
+    // LibraryReplaceBodySchema's comment). This pins that the call succeeds
+    // with the flag omitted/false; it is not evidence of a guard that doesn't
+    // exist.
+    it('replace mode succeeds without the confirmLossOfEdits flag', async () => {
         const libraryId = await seedLibrary({ semver: '2.0.0', entries: [{ text: 'X' }] });
         await testDb.insert(tenantLibraryImports).values({
             id:             crypto.randomUUID(),
