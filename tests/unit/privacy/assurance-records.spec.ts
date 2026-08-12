@@ -17,6 +17,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
+import { asAnyDb } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import {
@@ -76,7 +77,7 @@ describe('readAiAssurance', () => {
         await seedCall('call-new', TENANT, 2_000);
         await seedReview('rev-1', TENANT, 'call-new', 2_500);
 
-        const page = await readAiAssurance(db, { tenantId: TENANT });
+        const page = await readAiAssurance(asAnyDb(db), { tenantId: TENANT });
 
         expect(page.calls.map(c => c.id)).toEqual(['call-new', 'call-old']);
         expect(page.calls[0].reviews).toHaveLength(1);
@@ -93,7 +94,7 @@ describe('readAiAssurance', () => {
     it('returns an unreviewed call with an empty review list rather than omitting it', async () => {
         await seedCall('call-unreviewed', TENANT, 1_000);
 
-        const page = await readAiAssurance(db, { tenantId: TENANT });
+        const page = await readAiAssurance(asAnyDb(db), { tenantId: TENANT });
 
         expect(page.calls).toHaveLength(1);
         expect(page.calls[0].reviews).toEqual([]);
@@ -103,7 +104,7 @@ describe('readAiAssurance', () => {
         await seedCall('call-mine',    TENANT, 1_000);
         await seedCall('call-theirs',  OTHER,  2_000);
 
-        const page = await readAiAssurance(db, { tenantId: TENANT });
+        const page = await readAiAssurance(asAnyDb(db), { tenantId: TENANT });
 
         expect(page.calls.map(c => c.id)).toEqual(['call-mine']);
     });
@@ -114,7 +115,7 @@ describe('readAiAssurance', () => {
         await seedCall('call-mine', TENANT, 1_000);
         await seedReview('rev-foreign', OTHER, 'call-mine', 1_500);
 
-        const page = await readAiAssurance(db, { tenantId: TENANT });
+        const page = await readAiAssurance(asAnyDb(db), { tenantId: TENANT });
 
         expect(page.calls[0].reviews).toEqual([]);
     });
@@ -124,7 +125,7 @@ describe('readAiAssurance', () => {
         await seedReview('rev-ok',      TENANT, 'call-mine',    1_500);
         await seedReview('rev-dangling', TENANT, 'call-missing', 1_600);
 
-        const page = await readAiAssurance(db, { tenantId: TENANT });
+        const page = await readAiAssurance(asAnyDb(db), { tenantId: TENANT });
 
         expect(page.unresolvedReviewCount).toBe(1);
         expect(page.calls[0].reviews.map(r => r.id)).toEqual(['rev-ok']);
@@ -135,11 +136,11 @@ describe('readAiAssurance', () => {
         await seedCall('c2', TENANT, 2_000);
         await seedCall('c3', TENANT, 3_000);
 
-        const first = await readAiAssurance(db, { tenantId: TENANT, limit: 2 });
+        const first = await readAiAssurance(asAnyDb(db), { tenantId: TENANT, limit: 2 });
         expect(first.calls.map(c => c.id)).toEqual(['c3', 'c2']);
         expect(first.nextBefore).toBe(2_000);
 
-        const second = await readAiAssurance(db, { tenantId: TENANT, limit: 2, before: first.nextBefore! });
+        const second = await readAiAssurance(asAnyDb(db), { tenantId: TENANT, limit: 2, before: first.nextBefore! });
         expect(second.calls.map(c => c.id)).toEqual(['c1']);
         expect(second.nextBefore).toBeNull();
     });
@@ -147,7 +148,7 @@ describe('readAiAssurance', () => {
     it('clamps a caller-supplied limit to the page ceiling', async () => {
         await seedCall('c1', TENANT, 1_000);
 
-        const page = await readAiAssurance(db, { tenantId: TENANT, limit: ASSURANCE_MAX_PAGE + 5_000 });
+        const page = await readAiAssurance(asAnyDb(db), { tenantId: TENANT, limit: ASSURANCE_MAX_PAGE + 5_000 });
 
         // The clamp is not observable through row count with one row seeded, so
         // assert the cursor contract instead: a page shorter than the (clamped)
@@ -160,7 +161,7 @@ describe('readAiAssurance', () => {
         await seedCall('call-mine', TENANT, 1_000);
         await seedReview('rev-1', TENANT, 'call-mine', 1_500, 'deleted-user-id');
 
-        const page = await readAiAssurance(db, { tenantId: TENANT });
+        const page = await readAiAssurance(asAnyDb(db), { tenantId: TENANT });
 
         expect(page.calls[0].reviews[0].reviewerName).toBeNull();
         expect(page.calls[0].reviews[0].reviewedBy).toBe('deleted-user-id');
@@ -180,7 +181,7 @@ describe('readDestructionRecords', () => {
         // The whole point: no `tenants` row is seeded for this id.
         await seedDestruction('d1', 'ghost-tenant', 5_000, 'ghost');
 
-        const page = await readDestructionRecords(db, { tenantId: 'ghost-tenant' });
+        const page = await readDestructionRecords(asAnyDb(db), { tenantId: 'ghost-tenant' });
 
         expect(page.records).toHaveLength(1);
         expect(page.records[0]).toMatchObject({
@@ -198,7 +199,7 @@ describe('readDestructionRecords', () => {
         await seedDestruction('d1', 'ghost-a', 1_000);
         await seedDestruction('d2', 'ghost-b', 2_000);
 
-        const page = await readDestructionRecords(db);
+        const page = await readDestructionRecords(asAnyDb(db));
 
         expect(page.records.map(r => r.id)).toEqual(['d2', 'd1']);
     });
@@ -207,7 +208,7 @@ describe('readDestructionRecords', () => {
         await seedDestruction('d1', 'ghost-a', 1_000);
         await seedDestruction('d2', 'ghost-b', 2_000);
 
-        const page = await readDestructionRecords(db, { tenantId: 'ghost-a' });
+        const page = await readDestructionRecords(asAnyDb(db), { tenantId: 'ghost-a' });
 
         expect(page.records.map(r => r.id)).toEqual(['d1']);
     });
@@ -216,18 +217,18 @@ describe('readDestructionRecords', () => {
         await seedDestruction('d1', 'ghost-a', 1_000);
         await seedDestruction('d2', 'ghost-b', 2_000);
 
-        const first = await readDestructionRecords(db, { limit: 1 });
+        const first = await readDestructionRecords(asAnyDb(db), { limit: 1 });
         expect(first.records.map(r => r.id)).toEqual(['d2']);
         expect(first.nextBefore).toBe(2_000);
 
-        const second = await readDestructionRecords(db, { limit: 1, before: first.nextBefore! });
+        const second = await readDestructionRecords(asAnyDb(db), { limit: 1, before: first.nextBefore! });
         expect(second.records.map(r => r.id)).toEqual(['d1']);
     });
 
     it('tolerates a null slug', async () => {
         await seedDestruction('d1', 'ghost-a', 1_000, null);
 
-        const page = await readDestructionRecords(db);
+        const page = await readDestructionRecords(asAnyDb(db));
 
         expect(page.records[0].tenantSlug).toBeNull();
     });
