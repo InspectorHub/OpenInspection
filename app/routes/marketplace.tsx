@@ -126,7 +126,13 @@ export default function MarketplacePage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {templates.map((raw) => {
-              const t = raw as unknown as { id: string; name?: string; title?: string; description?: string; category?: string; author?: string };
+              const t = raw as unknown as { id: string; name?: string; title?: string; description?: string; category?: string; author?: string; kind?: string; hasUpdate?: boolean; importedSemver?: string | null };
+              // #348 — an imported comment pack with a newer release does not
+              // get an Install button, because installing is not what is on
+              // offer: the review page shows what an update would overwrite
+              // first. Templates keep their old path — updating one mints a
+              // second local copy and destroys nothing.
+              const reviewUpdate = t.kind === "comments" && t.hasUpdate === true;
               return (
               <Card key={t.id} className="p-4">
                 <p className="text-[13px] font-semibold text-ih-fg-1">{t.name || t.title}</p>
@@ -142,14 +148,24 @@ export default function MarketplacePage() {
                       <span className="text-[11px] text-ih-fg-3">{t.author}</span>
                     )}
                   </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => handleInstall(t.id)}
-                    disabled={installFetcher.state !== "idle"}
-                  >
-                    {installingId === t.id ? m.marketplace_installing() : m.marketplace_install()}
-                  </Button>
+                  {reviewUpdate ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => navigate(`/library/marketplace/${t.id}/update`)}
+                    >
+                      {m.marketplace_review_update()}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleInstall(t.id)}
+                      disabled={installFetcher.state !== "idle"}
+                    >
+                      {installingId === t.id ? m.marketplace_installing() : m.marketplace_install()}
+                    </Button>
+                  )}
                 </div>
               </Card>
               );

@@ -1,0 +1,27 @@
+-- The edit marker on `comments`, so a marketplace re-import can tell a row the
+-- tenant rewrote from one that arrived as-is and was never touched.
+--
+-- Both columns are appended to the end of the table and are nullable, so this
+-- is two native ADD COLUMNs and no table rebuild. Hand-written rather than
+-- generated, because a generated rebuild needs foreign keys disabled outside a
+-- transaction, which D1 cannot do, and `comments` is referenced by
+-- `comment_usage`. The rebuild-signature check in the schema rules must print
+-- nothing against this file -- note that it greps for four literal strings, so
+-- this comment does not spell any of them out (a migration whose own prose
+-- fails its own check teaches the next author to ignore the check).
+--
+-- `edited_at` is epoch milliseconds (timestamp_ms, per the schema rules) and is
+-- display only: it is what lets the UI say "edited 12 March".
+--
+-- `import_hash` is what the re-import decision actually rests on. It holds a
+-- hash of the text the row carried the moment it arrived from a pack, so
+-- "edited" means "differs from what we imported" rather than "was written to
+-- since" -- which makes a row that was edited and then changed back correctly
+-- not a conflict, and lets a row the publisher did not touch in v2 stay out of
+-- the way. NULL for tenant-authored comments (no import to differ from) and for
+-- rows imported before this migration (nothing was recorded, so nothing is
+-- claimed: they are treated as unedited).
+--
+-- See #348.
+ALTER TABLE `comments` ADD `edited_at` integer;--> statement-breakpoint
+ALTER TABLE `comments` ADD `import_hash` text;

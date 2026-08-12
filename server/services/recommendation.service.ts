@@ -101,7 +101,10 @@ export class RecommendationService {
         const db = this.getDrizzle();
         const existing = await this.getById(id, tenantId);
         if (!existing) throw Errors.NotFound('Recommendation not found');
-        const updates: Partial<CommentRow> = {};
+        // #348 — display marker ("edited 12 March"); see comments.edited_at. The
+        // repair-items surface writes the same physical row as the canned-comment
+        // library, so it stamps the same marker.
+        const updates: Partial<CommentRow> = { editedAt: new Date() };
         if (patch.category !== undefined)             updates.category = patch.category ?? null;
         if (patch.name !== undefined)                 updates.text = patch.name;
         if (patch.severity !== undefined)             updates.severity = patch.severity;

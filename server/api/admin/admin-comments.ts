@@ -37,10 +37,16 @@ import { getDrizzle } from '../../lib/route-helpers';
 // column has since been removed, so the row type below cannot carry it.
 type SeverityResp = 'good' | 'marginal' | 'significant' | 'minor' | null;
 function commentRowToResponse(r: typeof comments.$inferSelect) {
+    // #348 — `importHash` is an internal edit marker, not API surface: it exists
+    // so a marketplace re-import can tell a rewritten row from an untouched one,
+    // and a client has no use for it. `editedAt` is the half a client DOES want.
+    const { importHash, ...rest } = r;
+    void importHash; // read so the strip is deliberate rather than an unused binding
     return {
-        ...r,
+        ...rest,
         severity: (r.severity as SeverityResp) ?? null,
         createdAt: safeISODate(r.createdAt),
+        editedAt: r.editedAt ? safeISODate(r.editedAt) : null,
     };
 }
 
@@ -212,6 +218,8 @@ const adminCommentsRoutes = createApiRouter()
             repairSummary:               comments.repairSummary,
             recommendedContractorTypeId: comments.recommendedContractorTypeId,
             createdAt:      comments.createdAt,
+            editedAt:       comments.editedAt,
+            importHash:     comments.importHash,
             useCount:       commentUsage.useCount,
             lastUsedAt:     commentUsage.lastUsedAt,
         })
@@ -270,6 +278,10 @@ const adminCommentsRoutes = createApiRouter()
             repairSummary: repairSummary ?? null,
             recommendedContractorTypeId: recommendedContractorTypeId ?? null,
             createdAt: new Date(),
+            // #348 — a tenant-authored comment has no import to differ from, and
+            // has not been edited since being written.
+            editedAt: null as Date | null,
+            importHash: null as string | null,
         };
         await db.insert(comments).values(row);
         auditFromContext(c, 'comment.created', 'comment', {
@@ -305,6 +317,11 @@ const adminCommentsRoutes = createApiRouter()
             category: category ?? null,
             severity: severity ?? null,
             section: section ?? null,
+            // #348 — display marker ("edited 12 March"). Whether a marketplace
+            // re-import may overwrite this row is decided by comparing its text
+            // against comments.import_hash, not by this field, so a write path
+            // that forgets to set it cannot cause an edit to be silently lost.
+            editedAt: new Date(),
         };
         if (repairSummary !== undefined) patch.repairSummary = repairSummary ?? null;
         if (recommendedContractorTypeId !== undefined) patch.recommendedContractorTypeId = recommendedContractorTypeId ?? null;

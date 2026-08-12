@@ -5,13 +5,8 @@ import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
 import { Errors, AppError } from '../lib/errors';
 import { auditFromContext } from '../lib/audit';
-import {
-    LibraryReplaceParamsSchema,
-    LibraryReplaceBodySchema,
-} from '../lib/validations/library-replace.schema';
-import {
-    ImportHistoryQuerySchema,
-} from '../lib/validations/import-history.schema';
+import { LibraryReplaceParamsSchema, LibraryReplaceBodySchema, LibraryReplacePreviewSchema } from '../lib/validations/library-replace.schema';
+import { ImportHistoryQuerySchema } from '../lib/validations/import-history.schema';
 import { MarketplaceBrowseQuerySchema } from '../lib/validations/marketplace-browse.schema';
 import {
     paginationQuerySchema,
@@ -264,14 +259,39 @@ const marketplaceRoutes = createApiRouter()
         throw err;
     }
 })
-// Sprint 2 S2-7 — Library "replace" mode update. Deletes prior-import rows
-// before inserting the new pack. Owner/admin only; user must acknowledge the
-// edit-loss when prior rows have been modified.
+// #348 — what a replace would cost, before anything is deleted. Read by the
+// import-conflict page so the choice is offered against the sentences at stake
+// rather than against a count. Inspectors can read it (their rewrites are the
+// thing at stake) even though only owner/manager can act on it.
+    .openapi(createRoute(withMcpMetadata({
+    method: 'get', path: '/libraries/{libraryId}/imports/replace/preview',
+    tags: ["marketplace"],
+    summary: 'Preview which imported comments a replace would overwrite',
+    description: "Lists the comments this tenant rewrote since importing the library, each beside the publisher's version in the pending release, so a destructive replace can be decided against the actual text rather than a count.",
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: { params: LibraryReplaceParamsSchema },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.boolean(), data: LibraryReplacePreviewSchema }) } },
+            description: 'Conflict preview',
+        },
+        400: { description: 'No update available, library not imported, or not a comment library' },
+        404: { description: 'Library not found' },
+    },
+    operationId: "getMarketplaceLibraryReplacePreview",
+}, { scopes: ['read'], tier: 'extended' })), async (c) => {
+    const { libraryId } = c.req.valid('param');
+    const data = await c.var.services.marketplace.previewLibraryReplace(libraryId);
+    return c.json({ success: true, data }, 200);
+})
+// Sprint 2 S2-7 — Library "replace" mode update. Swaps prior-import rows for
+// the new pack. Owner/admin only. #348 — rows the tenant rewrote survive unless
+// confirmLossOfEdits says otherwise; the flag is enforced, not just recorded.
     .openapi(createRoute(withMcpMetadata({
     method: 'post', path: '/libraries/{libraryId}/imports/replace',
     tags: ["marketplace"],
-    summary: 'Replace tenant library import (deletes prior rows + inserts new pack)',
-    description: "Auto-generated placeholder for replaceMarketplace (POST /libraries/{libraryId}/imports/replace, marketplace domain). TODO: replace with a real description sourced from the handler.",
+    summary: 'Replace tenant library import (swaps prior rows for the new pack)',
+    description: "Replaces the rows a previous import of this library created with the current release's. Comments the tenant rewrote since importing are kept unless confirmLossOfEdits is true; tenant-authored comments are never touched.",
     // Same reason as /libraries/{id}/update above: 'replace' mode deletes and
     // re-inserts `comments` rows only, and the kind guard rejects everything
     // else before that. No template is minted, so no template capability.
@@ -292,13 +312,14 @@ const marketplaceRoutes = createApiRouter()
             content: { 'application/json': { schema: z.object({
                 success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
                 data: z.object({
-                    rowsAdded:   z.number().int().describe('TODO describe rowsAdded field for the OpenInspection MCP integration'),
-                    rowsDeleted: z.number().int().describe('TODO describe rowsDeleted field for the OpenInspection MCP integration'),
-                    fromSemver:  z.string().describe('TODO describe fromSemver field for the OpenInspection MCP integration'),
-                    toSemver:    z.string().describe('TODO describe toSemver field for the OpenInspection MCP integration'),
-                    libraryName: z.string().describe('TODO describe libraryName field for the OpenInspection MCP integration'),
-                    mode:        z.literal('replace').describe('TODO describe mode field for the OpenInspection MCP integration'),
-                }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                    rowsAdded:     z.number().int().describe('Rows the new pack inserted'),
+                    rowsDeleted:   z.number().int().describe('Prior-import rows removed'),
+                    rowsPreserved: z.number().int().describe('Rows the tenant had rewritten and that were kept'),
+                    fromSemver:    z.string().describe('Version imported before this call'),
+                    toSemver:      z.string().describe('Version now imported'),
+                    libraryName:   z.string().describe('Display name of the library'),
+                    mode:          z.literal('replace').describe('Always "replace" on this route'),
+                }).describe('Outcome of the replace'),
             }) } },
             description: 'Replaced',
         },
@@ -322,11 +343,12 @@ const marketplaceRoutes = createApiRouter()
         auditFromContext(c, 'library.marketplace.updated', 'library', {
             entityId: libraryId,
             metadata: {
-                mode:        'replace',
-                fromSemver:  result.fromSemver,
-                toSemver:    result.toSemver,
-                rowsAdded:   result.rowsAdded,
-                rowsDeleted: result.rowsDeleted,
+                mode:          'replace',
+                fromSemver:    result.fromSemver,
+                toSemver:      result.toSemver,
+                rowsAdded:     result.rowsAdded,
+                rowsDeleted:   result.rowsDeleted,
+                rowsPreserved: result.rowsPreserved,
             },
         });
 

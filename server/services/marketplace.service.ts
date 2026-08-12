@@ -1,12 +1,20 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, like, and, desc, sql } from 'drizzle-orm';
+import { hashCommentTexts, type PackEntry } from '../lib/library-edit-marker';
+import { parseLibraryComments, countLibrarySchemaItems } from './marketplace/library-pack';
+import {
+    applyReplaceMode,
+    previewLibraryReplace,
+    resolveLibraryUpdate,
+    type LibraryReplacePreview,
+} from './marketplace/library-replace';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import {
     marketplaceLibraries,
     tenantLibraryImports,
     tenantMarketplaceImportHistory,
 } from '../lib/db/schema/marketplace';
-import { templates, comments } from '../lib/db/schema';
+import { templates } from '../lib/db/schema'; // `comments` is reached by raw SQL below, and by ./marketplace/library-replace.ts
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { TemplateService } from './template.service';
@@ -20,7 +28,13 @@ type LibraryUpdateMode = 'append' | 'replace';
 
 export interface UpdateLibraryImportOptions {
     mode?: LibraryUpdateMode;
-    /** Acknowledged by caller that user-modified rows will be lost. */
+    /**
+     * The destructive choice, and it is now enforced rather than merely recorded
+     * (#348). Replace mode defaults to KEEPING rows the tenant rewrote; passing
+     * true is the caller stating, deliberately, that those rewrites should be
+     * deleted along with everything else. Nothing else in this codebase should
+     * default it to true.
+     */
     confirmLossOfEdits?: boolean;
     /** User id for the history row (S2-8). Defaults to 'system'. */
     userId?: string;
@@ -29,11 +43,15 @@ export interface UpdateLibraryImportOptions {
 export interface UpdateLibraryImportResult {
     rowsAdded: number;
     rowsDeleted: number;
+    /** Rows the tenant had rewritten and that this update did not delete. */
+    rowsPreserved: number;
     fromSemver: string;
     toSemver: string;
     libraryName: string;
     mode: LibraryUpdateMode;
 }
+
+export type { LibraryReplacePreview };
 
 export class MarketplaceService {
   private db: ReturnType<typeof drizzle>;
@@ -167,8 +185,8 @@ export class MarketplaceService {
   /**
    * Chunked bulk INSERT of canned-comment rows. Raw SQL with a placeholder
    * list is one statement per chunk — dramatically faster than N individual
-   * inserts. D1 caps SQL statement size and bound-parameter count, so chunk to
-   * 25 rows (25 × 6 = 150 placeholders, well under D1 limits).
+   * inserts. D1 caps SQL statement size and bound-parameter count, so the chunk
+   * size is set against the per-row column count (see CHUNK below).
    *
    * @param firstId When supplied, the very first inserted row uses this id
    *   instead of a fresh UUID (lets the caller return a stable local id).
@@ -179,7 +197,14 @@ export class MarketplaceService {
     entries: Array<{ text: string; section?: string }>,
     firstId?: string,
   ): Promise<number> {
-    const CHUNK = 25;
+    // 20 x 7 = 140 placeholders, below the 150 this loop already shipped with
+    // before `import_hash` widened each row from six columns to seven.
+    const CHUNK = 20;
+    // The edit marker (#348). Every imported row records the hash of the text it
+    // arrived with, which is the only thing that later lets a re-import tell an
+    // untouched row from one the inspector rewrote. Computed here, at the single
+    // point rows enter the table from a pack, so no import path can forget it.
+    const importHashes = await hashCommentTexts(entries.map((e) => e.text));
     // comments.created_at is timestamp_ms (Schema Rules) — epoch MILLISECONDS.
     // An earlier version of this line bound a floored-to-whole-seconds value
     // into this column; rows it wrote carry a seconds-magnitude number in a ms
@@ -191,7 +216,7 @@ export class MarketplaceService {
     let inserted = 0;
     for (let i = 0; i < entries.length; i += CHUNK) {
       const batch = entries.slice(i, i + CHUNK);
-      const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
+      const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ');
       const params: (string | number | null)[] = [];
       for (let j = 0; j < batch.length; j++) {
         const c = batch[j];
@@ -203,6 +228,7 @@ export class MarketplaceService {
           c.section ?? null,
           libraryId,             // S2-7 — provenance for replace mode
           nowMs,
+          importHashes[i + j]!,  // #348 — the edit marker
         );
       }
       // `section` (not `category`) — `entries` never carries a category, only
@@ -213,7 +239,7 @@ export class MarketplaceService {
       // `category` is a real, independently-read column elsewhere (repair-item
       // comments' safety/maintenance/recommendation vocabulary,
       // RecommendationService) and this fix does not touch it.
-      const stmt = `INSERT INTO comments (id, tenant_id, text, section, library_id, created_at) VALUES ${placeholders}`;
+      const stmt = `INSERT INTO comments (id, tenant_id, text, section, library_id, created_at, import_hash) VALUES ${placeholders}`;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (this.rawDb as any).prepare(stmt).bind(...params).run();
       inserted += batch.length;
@@ -452,6 +478,11 @@ export class MarketplaceService {
     return rows;
   }
 
+  /** What a replace would cost, computed before anything is deleted (#348). */
+  previewLibraryReplace(libraryId: string): Promise<LibraryReplacePreview> {
+    return previewLibraryReplace(this.db, this.tenantId, libraryId);
+  }
+
   /**
    * Sprint 2 S2-7 — Library update with explicit Append vs Replace mode.
    *
@@ -472,29 +503,7 @@ export class MarketplaceService {
     const mode: LibraryUpdateMode = options.mode ?? 'append';
     const userId = options.userId ?? 'system';
 
-    const [lib] = await this.db
-      .select()
-      .from(marketplaceLibraries)
-      .where(eq(marketplaceLibraries.id, libraryId))
-      .limit(1);
-    if (!lib) throw Errors.NotFound('Marketplace library not found');
-
-    const [existing] = await this.db
-      .select()
-      .from(tenantLibraryImports)
-      .where(and(
-        eq(tenantLibraryImports.tenantId, this.tenantId),
-        eq(tenantLibraryImports.libraryId, libraryId),
-      ))
-      .limit(1);
-
-    if (!existing) {
-      throw Errors.BadRequest('Library has not been imported yet — use Import instead of Update');
-    }
-
-    if (existing.importedSemver === lib.semver) {
-      throw Errors.BadRequest('No update available — already on the latest version');
-    }
+    const { lib, existing } = await resolveLibraryUpdate(this.db, this.tenantId, libraryId);
 
     if (lib.kind !== 'comments') {
       throw new Error(`Library kind '${lib.kind}' not yet supported for update`);
@@ -504,29 +513,32 @@ export class MarketplaceService {
     const now = new Date();
     let rowsAdded = 0;
     let rowsDeleted = 0;
+    let rowsPreserved = 0;
 
-    // S2-7 — Replace mode: clear prior-import rows for this tenant first.
+    let entries: PackEntry[] = parseLibraryComments(lib.schema);
+
+    // S2-7 — Replace mode clears the prior import's rows before inserting the
+    // new pack. #348 — but not the ones the inspector rewrote, unless the caller
+    // has explicitly accepted losing them.
     if (mode === 'replace') {
-      const deleted = await this.db.delete(comments)
-        .where(and(
-          eq(comments.tenantId, this.tenantId),
-          eq(comments.libraryId, libraryId),
-        ))
-        .run();
-      // Drizzle returns a meta object on D1; better-sqlite3 returns
-      // { changes: number }. We tolerate both via duck-typing.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const changes = (deleted as any)?.meta?.changes ?? (deleted as any)?.changes ?? 0;
-      rowsDeleted = typeof changes === 'number' ? changes : 0;
+      const outcome = await applyReplaceMode(
+        this.db, this.tenantId, libraryId, entries,
+        options.confirmLossOfEdits !== true,
+      );
+      rowsDeleted   = outcome.rowsDeleted;
+      rowsPreserved = outcome.rowsPreserved;
+      entries       = outcome.entries;
     }
 
-    // Parse the new pack's entries and insert them (all fresh UUIDs).
-    const entries = parseLibraryComments(lib.schema);
+    // Insert the new pack's entries (all fresh UUIDs, each stamped with the
+    // import hash that makes the NEXT update able to ask this same question).
     rowsAdded = await this.insertLibraryComments(libraryId, entries);
 
     // Update the marker. Replace mode resets rowCount to the new size; append
     // mode accumulates as before.
-    const newRowCount = mode === 'replace' ? rowsAdded : (existing.rowCount + rowsAdded);
+    const newRowCount = mode === 'replace'
+      ? rowsAdded + rowsPreserved
+      : (existing.rowCount + rowsAdded);
     await this.db
       .update(tenantLibraryImports)
       .set({
@@ -554,6 +566,7 @@ export class MarketplaceService {
         kind:        lib.kind,
         rowsAdded,
         rowsDeleted,
+        rowsPreserved,
         confirmLossOfEdits: !!options.confirmLossOfEdits,
       },
       userId,
@@ -562,45 +575,11 @@ export class MarketplaceService {
     return {
       rowsAdded,
       rowsDeleted,
+      rowsPreserved,
       fromSemver,
       toSemver:    lib.semver,
       libraryName: lib.name,
       mode,
     };
   }
-}
-
-/**
- * Extract the comment entries from a library schema. The schema may arrive as a
- * parsed object (Drizzle json mode) or a raw string (some D1 driver / json
- * encoding paths); both are handled. Returns [] for anything malformed.
- */
-function parseLibraryComments(
-  schema: unknown,
-): Array<{ text: string; section?: string; rating?: string }> {
-  let parsed: { comments?: Array<{ text: string; section?: string; rating?: string }> } = {};
-  if (typeof schema === 'string') {
-    try { parsed = JSON.parse(schema); } catch { parsed = {}; }
-  } else if (schema && typeof schema === 'object') {
-    parsed = schema as typeof parsed;
-  }
-  return Array.isArray(parsed.comments) ? parsed.comments : [];
-}
-
-/**
- * Count the importable items a catalogue entry advertises. Tolerates the same
- * two encodings `parseLibraryComments` does — a parsed object (Drizzle json
- * mode) or a raw string — because both read the SAME column and a reader that
- * silently returns 0 for one of them is how an entry renders "0 items" while
- * holding content.
- */
-function countLibrarySchemaItems(schema: unknown): number {
-  let parsed: unknown = schema;
-  if (typeof parsed === 'string') {
-    try { parsed = JSON.parse(parsed); } catch { return 0; }
-  }
-  if (!parsed || typeof parsed !== 'object') return 0;
-  const s = parsed as Record<string, unknown>;
-  if (Array.isArray(s.comments)) return s.comments.length;
-  return 0;
 }
