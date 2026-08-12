@@ -11,12 +11,17 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const T = 'tenant-1';
 
-// The dead automations.subject_template/body_template/sms_body columns are
-// gone, so backfillAutomationTemplates now recovers copy ONLY from the
+// The automations.subject_template/body_template/sms_body columns are gone,
+// so backfillAutomationTemplates now recovers copy ONLY from the
 // AUTOMATION_SEEDS entry matching (name, trigger) — there is nothing left on
-// the row itself to override. Picking the real 'Report Ready' seed here (name
-// AND trigger both match) means the email/sms assertions below check against
-// that seed's actual text, not a custom fixture string.
+// the row itself to override. The default fixture below (name 'Report Ready',
+// trigger 'report.published') matches a real seed on both, so the first two
+// tests' email/sms assertions check against that seed's actual text, not a
+// custom fixture string. The third test ('email-only automation') overrides
+// only `name` to 'Payment Received' and keeps the hardcoded
+// trigger: 'report.published' default, which matches no AUTOMATION_SEEDS
+// entry (the real 'Payment Received' seeds fire on 'payment.received') — so
+// that case exercises the no-match, blank-template fallback instead.
 async function seedAuto(testDb: BetterSQLite3Database<typeof schema>, over: Partial<typeof schema.automations.$inferInsert> = {}) {
     await testDb.insert(schema.automations).values({
         id: over.id ?? 'a1', tenantId: T, name: over.name ?? 'Report Ready',

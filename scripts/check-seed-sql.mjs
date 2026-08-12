@@ -46,7 +46,7 @@ import { join, relative } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..');
 const SCHEMA_DIR = join(ROOT, 'server/lib/db/schema');
-const SCAN_DIRS = ['tests', 'scripts'];
+const SCAN_DIRS = ['tests', 'scripts', 'server'];
 
 /* ── Schema: physical table -> Set(physical columns), plus the ms-mode ones ── */
 

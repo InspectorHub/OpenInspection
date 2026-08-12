@@ -6,13 +6,21 @@ import { SQL_UUID_V4 } from './standalone-uuid';
 // Default automation rules seeded for every new tenant. Without these, none of
 // the lifecycle emails (booking confirm, report ready, agreement nag, invoice,
 // payment receipt) actually fire. Schema constrains `trigger` to a fixed enum
-// (see the `automationRules` table in schema) and each row targets a single
+// (see the `automations` table in schema) and each row targets a single
 // recipient discriminator (recipient_kind + recipient_role_profile_id), so
 // multi-recipient intents fan out into one row per recipient.
 //
-// Idempotent: NOT EXISTS guard on (tenant_id, trigger, recipient_kind, name).
+// Idempotent: every INSERT below (both message_templates writes and the
+// automations write) carries its own `WHERE NOT EXISTS` guard against the
+// same (tenant_id, trigger, recipient_kind, name) lookup, evaluated by the
+// database at write time — so two concurrent callers can no longer both pass
+// a check and double-seed the same rule. The three statements for one row are
+// additionally run in a single db.batch() so a failure partway through (e.g.
+// the automations insert) cannot leave that row's templates committed with
+// nothing referencing them.
+//
 // Implemented as a per-row JS loop because D1 caps compound SELECT terms
-// (~10) so the prior single-statement INSERT … SELECT … UNION ALL fan-out
+// (~10) so a prior single-statement INSERT … SELECT … UNION ALL fan-out
 // raised SQLITE_ERROR "too many terms in compound SELECT" at run time.
 //
 // PREREQUISITE: this runs from handleTenantUpdate (StandaloneProvider), which
@@ -65,57 +73,75 @@ export async function seedDefaultAutomations(db: D1Database, tenantId: string): 
     // used to hold it are dropped from the automations table entirely).
     // Instead this seeds a message_templates row per channel FIRST and the
     // automations INSERT below references it by id, mirroring ensureSeeds
-    // (server/services/automation/core.ts). The existence check is done with a
-    // plain SELECT (rather than folding it into the INSERT's own WHERE NOT
-    // EXISTS, as before) because the decision of whether to create a template
-    // has to happen before the automations row does — creating one for a rule
-    // that turns out to already exist would leave it permanently orphaned
-    // (nothing would ever reference or clean it up).
-    const existsStmt = `
-        SELECT 1 FROM automations WHERE tenant_id = ? AND trigger = ?
-            AND recipient_kind = (CASE WHEN ? IS NULL THEN 'inspector' ELSE 'role' END) AND name = ?
-        LIMIT 1
+    // (server/services/automation/core.ts).
+    //
+    // Every statement repeats the same NOT EXISTS lookup rather than sharing
+    // one up-front SELECT, because the up-front-SELECT shape is exactly what
+    // let two concurrent callers both observe "not seeded yet" and both write
+    // — each statement here decides for itself, atomically, at the instant it
+    // writes.
+    const notExistsExisting = `
+        NOT EXISTS (
+            SELECT 1 FROM automations WHERE tenant_id = ? AND trigger = ?
+                AND recipient_kind = (CASE WHEN ? IS NULL THEN 'inspector' ELSE 'role' END) AND name = ?
+        )
     `;
-    const insertStmt = `
+    // message_templates timestamps are timestamp_ms (epoch milliseconds), same
+    // as automations.created_at below — both computed the same way so neither
+    // drifts from the other.
+    const nowMsExpr = "CAST(unixepoch('now') * 1000 AS INTEGER)";
+    const insertEmailTemplateStmt = `
+        INSERT INTO message_templates (id, tenant_id, name, channel, subject, body, variables, is_seeded, created_at, updated_at)
+        SELECT ?, ?, ?, 'email', ?, ?, ?, 1, ${nowMsExpr}, ${nowMsExpr}
+        WHERE ${notExistsExisting}
+    `;
+    const insertSmsTemplateStmt = `
+        INSERT INTO message_templates (id, tenant_id, name, channel, subject, body, variables, is_seeded, created_at, updated_at)
+        SELECT ?, ?, ?, 'sms', NULL, ?, ?, 1, ${nowMsExpr}, ${nowMsExpr}
+        WHERE ${notExistsExisting}
+    `;
+    const insertAutomationStmt = `
         INSERT INTO automations (id, tenant_id, trigger, recipient_kind, recipient_role_profile_id, name, delay_minutes, email_template_id, is_active, channels, sms_template_id, is_default, created_at)
         SELECT ${SQL_UUID_V4}, ?, ?, CASE WHEN ? IS NULL THEN 'inspector' ELSE 'role' END,
             (SELECT crp.id FROM contact_role_profiles crp WHERE crp.tenant_id = ? AND crp.key = ? AND crp.is_active = 1 LIMIT 1),
-            ?, 0, ?, ?, '["email"]', ?, 1, unixepoch('now')
+            ?, 0, ?, ?, '["email"]', ?, 1, ${nowMsExpr}
+        WHERE ${notExistsExisting}
     `;
     for (const [trigger, recipientRoleKey, name, subject, body, active, smsBody] of rows) {
         try {
-            const already = await db.prepare(existsStmt)
-                .bind(tenantId, trigger, recipientRoleKey, name)
-                .first();
-            if (already) continue;
-
-            // message_templates timestamps are timestamp_ms (epoch milliseconds) —
-            // unlike automations.created_at just below (unixepoch('now'), seconds,
-            // a pre-existing quirk of this file left untouched here), so this uses
-            // an explicit *1000 rather than copying that pattern.
-            const nowMsExpr = "CAST(unixepoch('now') * 1000 AS INTEGER)";
             const emailTemplateId = nanoid();
-            await db.prepare(`
-                INSERT INTO message_templates (id, tenant_id, name, channel, subject, body, variables, is_seeded, created_at, updated_at)
-                VALUES (?, ?, ?, 'email', ?, ?, ?, 1, ${nowMsExpr}, ${nowMsExpr})
-            `).bind(emailTemplateId, tenantId, `${name} — Email`, subject, body, JSON.stringify(extractVars(subject, body))).run();
+            const statements = [
+                db.prepare(insertEmailTemplateStmt).bind(
+                    emailTemplateId, tenantId, `${name} — Email`, subject, body, JSON.stringify(extractVars(subject, body)),
+                    tenantId, trigger, recipientRoleKey, name,
+                ),
+            ];
 
             let smsTemplateId: string | null = null;
             if (smsBody?.trim()) {
                 smsTemplateId = nanoid();
-                await db.prepare(`
-                    INSERT INTO message_templates (id, tenant_id, name, channel, subject, body, variables, is_seeded, created_at, updated_at)
-                    VALUES (?, ?, ?, 'sms', NULL, ?, ?, 1, ${nowMsExpr}, ${nowMsExpr})
-                `).bind(smsTemplateId, tenantId, `${name} — SMS`, smsBody, JSON.stringify(extractVars(smsBody))).run();
+                statements.push(
+                    db.prepare(insertSmsTemplateStmt).bind(
+                        smsTemplateId, tenantId, `${name} — SMS`, smsBody, JSON.stringify(extractVars(smsBody)),
+                        tenantId, trigger, recipientRoleKey, name,
+                    ),
+                );
             }
 
-            await db.prepare(insertStmt)
-                .bind(
+            statements.push(
+                db.prepare(insertAutomationStmt).bind(
                     tenantId, trigger, recipientRoleKey,
                     tenantId, recipientRoleKey,
                     name, emailTemplateId, active, smsTemplateId,
-                )
-                .run();
+                    tenantId, trigger, recipientRoleKey, name,
+                ),
+            );
+
+            // One transaction per row: either every statement writes (the rule
+            // did not exist yet) or every guard evaluates false and none does
+            // (it did) — never a partial commit that leaves a template with
+            // nothing referencing it.
+            await db.batch(statements);
         } catch (err) {
             logger.warn('seedDefaultAutomations.row.failed', {
                 tenantId, trigger, name,

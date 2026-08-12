@@ -40,7 +40,7 @@ beforeEach(async () => {
     svc = new AutomationService({} as D1Database);
 });
 
-describe('AutomationService — channels + sms_body (Track L)', () => {
+describe('AutomationService — channels + smsTemplateId (Track L)', () => {
     it('create persists channels and smsTemplateId (SP2: embedded body fields replaced by template ids)', async () => {
         const row = await svc.create(TENANT, {
             name: 'Multi', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
@@ -49,7 +49,7 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
         });
         // Track L (Part A) — create/update parse channels on output (array, not JSON string).
         expect(row.channels).toEqual(['email', 'sms']);
-        // SP2: smsBody is a dead column (null); template id round-trips instead.
+        // SP2: the embedded smsBody column is gone; template id round-trips instead.
         expect(row.smsTemplateId).toBe('tpl-sms-1');
     });
 
@@ -59,7 +59,7 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
             delayMinutes: 0,
         });
         expect(row.channels).toEqual(['email']);
-        // SP2: smsBody column is written null by create(); smsTemplateId is also null by default.
+        // SP2: create() no longer writes an smsBody at all; smsTemplateId is null by default.
         expect(row.smsTemplateId).toBeNull();
     });
 

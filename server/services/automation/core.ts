@@ -124,6 +124,17 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
                             createdAt:       now,
                         });
                     }
+                    // KNOWN GAP (tracked, not closed here): every row's message_templates
+                    // insert above already committed by the time this loop starts, so a
+                    // chunk insert that throws partway through leaves the templates for
+                    // every not-yet-inserted row (this chunk's remainder, plus every later
+                    // chunk) orphaned — the same failure shape the write-time guard closes
+                    // in the standalone /setup seeder (standalone-seed-automations.ts). Not
+                    // restructured here: this path runs through drizzle's query builder
+                    // rather than raw D1, chunking exists only for D1's 100-bind-parameter
+                    // cap (not concurrency), and a mid-batch D1 insert failure is rare
+                    // enough here that widening this change's blast radius to fix it
+                    // wasn't judged worth it in this pass.
                     for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
                         await db.insert(automations).values(rows.slice(i, i + CHUNK_SIZE));
                     }

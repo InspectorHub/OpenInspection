@@ -54,7 +54,7 @@ export async function deliverTemplatedEmail(
     const { log, automation, inspection, tenant } = ctx;
     const { appName, appHost, appBaseUrl, emailSvc } = deps;
     // SP2 — resolve the referenced email template (replaces the
-    // embedded subject_template / body_template, now frozen DEAD).
+    // embedded subject_template / body_template, since dropped from the table).
     // Skip fail-closed when the rule has no resolvable email template.
     const store = createOiTemplateStore(deps.rawDb);
     // The RECIPIENT's language, resolved from the log's own recipient rather
