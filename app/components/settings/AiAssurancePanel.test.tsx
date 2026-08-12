@@ -21,10 +21,27 @@ import {
     AiAssurancePanel,
     type AiAssuranceInitial,
     type AiAssuranceRow,
+    type AiReviewRow,
 } from "~/components/settings/AiAssurancePanel";
 
 const CALL_AT = Date.UTC(2026, 7, 12, 9, 30);
 const REVIEW_AT = Date.UTC(2026, 7, 12, 9, 45);
+
+/**
+ * Typed against the panel's own row contract rather than inlined, so a field
+ * added to `AiReviewRow` fails here instead of rendering as a blank cell.
+ */
+function review(overrides: Partial<AiReviewRow> = {}): AiReviewRow {
+    return {
+        id: "r1",
+        artifactType: "inspection_result",
+        artifactId: "a1",
+        reviewedBy: "u1",
+        reviewerName: "Dana Reviewer",
+        reviewedAt: REVIEW_AT,
+        ...overrides,
+    };
+}
 
 function base(overrides: Partial<AiAssuranceInitial> = {}): AiAssuranceInitial {
     return {
@@ -45,14 +62,7 @@ function reviewedCall(): AiAssuranceRow {
         model: "gemini-2.5-flash",
         promptVersion: "professional-comment.v1",
         calledAt: CALL_AT,
-        reviews: [{
-            id: "r1",
-            artifactType: "inspection_result",
-            artifactId: "a1",
-            reviewedBy: "u1",
-            reviewerName: "Dana Reviewer",
-            reviewedAt: REVIEW_AT,
-        }],
+        reviews: [review()],
     };
 }
 

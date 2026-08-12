@@ -81,8 +81,12 @@ export async function resolveLibraryUpdate(
     return { lib, existing };
 }
 
-/** The prior import's rows for this tenant, in the shape the planner needs. */
-export function priorImportRows(
+/**
+ * The prior import's rows for this tenant, in the shape the planner needs.
+ * Module-private: `buildLibraryReplacePreview` below is the entry point, and
+ * this is the query it runs first.
+ */
+function priorImportRows(
     db: LibraryDb,
     tenantId: string,
     libraryId: string,

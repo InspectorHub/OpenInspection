@@ -24,6 +24,9 @@ import {
     readAiAssurance,
     readDestructionRecords,
     ASSURANCE_MAX_PAGE,
+    type AiAssuranceCall,
+    type AiReviewEntry,
+    type DestructionRecord,
 } from '../../../server/lib/compliance/assurance-records';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
@@ -166,6 +169,23 @@ describe('readAiAssurance', () => {
         expect(page.calls[0].reviews[0].reviewerName).toBeNull();
         expect(page.calls[0].reviews[0].reviewedBy).toBe('deleted-user-id');
     });
+
+    it('returns rows shaped as the published types, with timestamps already numbers', async () => {
+        // The reader's whole job on this axis is to hand a compliance caller
+        // something it can render without knowing which driver produced it — D1
+        // returns a timestamp as Date, number or string depending on the path.
+        // Naming the types here means a change to either one is caught by tsc at
+        // this line rather than by a route discovering it at runtime.
+        await seedCall('call-1', TENANT, 1_000);
+        await seedReview('rev-1', TENANT, 'call-1', 1_500);
+
+        const page = await readAiAssurance(asAnyDb(db), { tenantId: TENANT });
+        const call: AiAssuranceCall = page.calls[0];
+        const review: AiReviewEntry = call.reviews[0];
+
+        expect(typeof call.calledAt).toBe('number');
+        expect(typeof review.reviewedAt).toBe('number');
+    });
 });
 
 describe('readDestructionRecords', () => {
@@ -229,7 +249,12 @@ describe('readDestructionRecords', () => {
         await seedDestruction('d1', 'ghost-a', 1_000, null);
 
         const page = await readDestructionRecords(asAnyDb(db));
+        // Named for the same reason as the AI shape above: a destruction record
+        // is read by an operator long after the tenant is gone, so its shape has
+        // no live caller to keep it honest.
+        const record: DestructionRecord = page.records[0];
 
-        expect(page.records[0].tenantSlug).toBeNull();
+        expect(record.tenantSlug).toBeNull();
+        expect(typeof record.destroyedAt).toBe('number');
     });
 });

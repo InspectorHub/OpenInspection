@@ -35,8 +35,13 @@ export const LibraryReplaceBodySchema = z.object({
     confirmLossOfEdits: z.boolean().default(false).describe('Delete rows the tenant rewrote too. Default false keeps them.'),
 }).optional();
 
-/** One conflicted comment: the inspector's words beside the publisher's. */
-export const LibraryReplacePairSchema = z.object({
+/**
+ * One conflicted comment: the inspector's words beside the publisher's.
+ * Module-private: it exists to be composed into the preview schema below, and
+ * nothing outside this file names it. Exporting it made the dead-code gate
+ * report an unused public symbol, which is exactly what it was.
+ */
+const LibraryReplacePairSchema = z.object({
     commentId: z.string().describe('Id of the tenant comment row that was rewritten'),
     section:   z.string().nullable().describe('Section label the comment sits under, when it has one'),
     yours:     z.string().describe("The inspector's current text — what a replace would delete"),
