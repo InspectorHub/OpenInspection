@@ -58,9 +58,12 @@ export const automations = sqliteTable('automations', {
     // -- DEAD (2026-06-26, SP2): embedded email subject/body retired. Automations
     // now reference a message_templates row via email_template_id. Frozen: no
     // reads/writes; D1 cannot drop an FK-referenced column. Do not reuse.
-    subjectTemplate: text('subject_template').notNull(),
+    // Nullable as of the cutover that stopped writing this column on both the
+    // seed and create paths (previously NOT NULL, satisfied by an empty-string
+    // tombstone every writer had to remember to send).
+    subjectTemplate: text('subject_template'),
     // -- DEAD (2026-06-26, SP2): see subject_template above.
-    bodyTemplate: text('body_template').notNull(),
+    bodyTemplate: text('body_template'),
     // SP2 — references a message_templates(channel='email') row for the email
     // channel. Null = no email template selected (channel disabled or unmigrated).
     emailTemplateId: text('email_template_id'),

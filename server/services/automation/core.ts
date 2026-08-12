@@ -1,9 +1,10 @@
 import { eq, and, inArray, max } from 'drizzle-orm';
-import { automations, contactRoleProfiles, smsDisclosureVersions } from '../../lib/db/schema';
+import { automations, contactRoleProfiles, smsDisclosureVersions, messageTemplates } from '../../lib/db/schema';
 import { AUTOMATION_SEEDS } from '../../data/automation-seeds';
 import { nanoid } from 'nanoid';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
+import { extractVars } from '../message-template-backfill';
 import { SMS_DISCLOSURE_V1, AUTOMATION_CHANNELS, type AutomationChannel, type RecipientKind, type Constructor } from './shared';
 import type { AutomationBase } from './shared';
 
@@ -56,8 +57,12 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
                     const profileIdByKey = new Map(profileRows.map(r => [r.key, r.id]));
 
                     // D1 caps prepared-statement bind parameters at 100. Each row now binds
-                    // 13 columns (Track L added channels + sms_body), so chunk to 7 rows /
-                    // 91 binds per insert (under the 100 cap).
+                    // 13 columns — id, tenantId, name, trigger, recipientKind,
+                    // recipientRoleProfileId, delayMinutes, channels, emailTemplateId,
+                    // smsTemplateId, active, isDefault, createdAt (the seed now inserts its
+                    // own message_templates row(s) up front and carries only their ids;
+                    // subjectTemplate/bodyTemplate/smsBody are no longer written here) — so
+                    // chunk to 7 rows / 91 binds per insert (under the 100 cap).
                     const CHUNK_SIZE = 7;
                     const rows: (typeof automations.$inferInsert)[] = [];
                     for (const seed of toInsert) {
@@ -71,6 +76,38 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
                                 continue;
                             }
                         }
+
+                        // Seed the message_templates row(s) BEFORE the automation row, since
+                        // the row now carries their ids rather than the copy itself. Naming
+                        // (`${seed.name} — Email`/`— SMS`), the `isSeeded: true` flag, and the
+                        // extractVars call are copied deliberately from
+                        // backfillAutomationTemplates so a tenant seeded via this path is
+                        // indistinguishable from one built by the old copy-then-backfill path.
+                        const chans: string[] = (seed as { channels?: string[] }).channels ?? ['email'];
+                        const now = new Date();
+                        let emailTemplateId: string | null = null;
+                        let smsTemplateId: string | null = null;
+
+                        if (chans.includes('email')) {
+                            emailTemplateId = nanoid();
+                            await db.insert(messageTemplates).values({
+                                id: emailTemplateId, tenantId, name: `${seed.name} — Email`, channel: 'email',
+                                subject: seed.subjectTemplate, body: seed.bodyTemplate,
+                                variables: JSON.stringify(extractVars(seed.subjectTemplate, seed.bodyTemplate)),
+                                isSeeded: true, createdAt: now, updatedAt: now,
+                            });
+                        }
+                        const seedSms = (seed as { smsBody?: string }).smsBody;
+                        if (chans.includes('sms') && seedSms?.trim()) {
+                            smsTemplateId = nanoid();
+                            await db.insert(messageTemplates).values({
+                                id: smsTemplateId, tenantId, name: `${seed.name} — SMS`, channel: 'sms',
+                                subject: null, body: seedSms,
+                                variables: JSON.stringify(extractVars(seedSms)),
+                                isSeeded: true, createdAt: now, updatedAt: now,
+                            });
+                        }
+
                         rows.push({
                             id:              nanoid(),
                             tenantId,
@@ -79,13 +116,12 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
                             recipientKind:   seed.recipientKind,
                             recipientRoleProfileId,
                             delayMinutes:    seed.delayMinutes,
-                            subjectTemplate: seed.subjectTemplate,
-                            bodyTemplate:    seed.bodyTemplate,
-                            channels:        JSON.stringify((seed as { channels?: string[] }).channels ?? ['email']),
-                            smsBody:         (seed as { smsBody?: string }).smsBody ?? null,
+                            channels:        JSON.stringify(chans),
+                            emailTemplateId,
+                            smsTemplateId,
                             active:          (seed as { defaultActive?: boolean }).defaultActive ?? true,
                             isDefault:       true,
-                            createdAt:       new Date(),
+                            createdAt:       now,
                         });
                     }
                     for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
@@ -171,10 +207,10 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
                 // Track L — channels is the live field; the dead `channel` column is left
                 // to its DB default ('email') so its NOT NULL constraint stays satisfied.
                 channels: JSON.stringify(channels?.length ? channels : ['email']),
-                // SP2 — template ids; dead NOT NULL body columns get empty-string tombstones.
+                // SP2 — template ids; the rule references a message_templates row per
+                // channel rather than carrying the copy itself.
                 emailTemplateId: emailTemplateId ?? null,
                 smsTemplateId:   smsTemplateId ?? null,
-                subjectTemplate: '', bodyTemplate: '', smsBody: null,
                 active: true, isDefault: false, createdAt: new Date(),
             });
             // Track L (A) — parse channels on output to match the typed API shape.

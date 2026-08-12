@@ -41,7 +41,15 @@ describe('Track J seeds (#122)', () => {
         expect(followup?.delayMinutes).toBe(1440);
         expect(review?.active).toBe(false);                 // fail-closed until review_url set
         expect(review?.delayMinutes).toBe(4320);            // 3 days
-        expect(review?.bodyTemplate).toContain('{{review_url}}');
+        // automations.body_template is a DEAD column (see automation.schema.ts
+        // comment) — ensureSeeds now inserts the message_templates row directly
+        // and never writes it. Assert against that referenced template's body
+        // instead (mirrors automation-seeds-sms.spec.ts's equivalent rewrite for
+        // the SMS column).
+        expect(review?.emailTemplateId).toBeTruthy();
+        const tpl = await db.select().from(schema.messageTemplates)
+            .where(eq(schema.messageTemplates.id, review!.emailTemplateId!)).get();
+        expect(tpl?.body).toContain('{{review_url}}');
     });
 
     it('is idempotent — running twice does not duplicate', async () => {

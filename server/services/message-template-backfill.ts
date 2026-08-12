@@ -8,7 +8,7 @@ import { AUTOMATION_SEEDS } from '../data/automation-seeds';
 const BACKFILL_MARKER_KEY = 'migration:automation-templates-backfill:done';
 
 /** Collect {{var}} token names from one or more template strings. */
-function extractVars(...sources: (string | null | undefined)[]): string[] {
+export function extractVars(...sources: (string | null | undefined)[]): string[] {
     const found = new Set<string>();
     for (const s of sources) {
         if (!s) continue;
@@ -55,12 +55,26 @@ export async function backfillAutomationTemplates(db: D1Database, tenantId: stri
             created++;
         }
 
-        if (channels.includes('sms') && a.smsBody?.trim() && !a.smsTemplateId) {
+        // Matched on (name, trigger), the same key ensureSeeds uses to decide a
+        // rule already exists. Used below by both the SMS fallback and the
+        // in-app wording, neither of which is guaranteed to live on the row.
+        const seed = AUTOMATION_SEEDS.find(
+            (x) => x.name === a.name && x.trigger === a.trigger,
+        ) as { smsBody?: string; inAppTitle?: string; inAppBody?: string } | undefined;
+
+        // The SMS copy may live on the dead `automations.sms_body` column (rows
+        // seeded before ensureSeeds started inserting templates directly) or,
+        // for rows seeded after that cutover, only on the seed definition —
+        // ensureSeeds never writes the column for those, since a fresh seed's
+        // channels default to email-only and the SMS template (with its own
+        // copy) is created later, once the tenant turns the SMS channel on.
+        const smsText = a.smsBody ?? seed?.smsBody;
+        if (channels.includes('sms') && smsText?.trim() && !a.smsTemplateId) {
             const id = nanoid();
             await d.insert(messageTemplates).values({
                 id, tenantId, name: `${a.name} — SMS`, channel: 'sms',
-                subject: null, body: a.smsBody,
-                variables: JSON.stringify(extractVars(a.smsBody)),
+                subject: null, body: smsText,
+                variables: JSON.stringify(extractVars(smsText)),
                 isSeeded: true, createdAt: now, updatedAt: now,
             });
             patch.smsTemplateId = id;
@@ -70,14 +84,9 @@ export async function backfillAutomationTemplates(db: D1Database, tenantId: stri
         // B3 (IA-115) — the in-app wording. `subject` is the notice TITLE and
         // `body` its body (see the message_templates schema comment), so the
         // literal that used to live in `titleFor` becomes a row the operator
-        // can rewrite.
-        // The wording lives in the SEED, not on the row: `automations` has no
-        // title column and adding one would duplicate what the template is
-        // for. Matched on (name, trigger), the same key ensureSeeds uses to
-        // decide a rule already exists.
-        const seed = AUTOMATION_SEEDS.find(
-            (x) => x.name === a.name && x.trigger === a.trigger,
-        ) as { inAppTitle?: string; inAppBody?: string } | undefined;
+        // can rewrite. The wording lives in the SEED, not on the row:
+        // `automations` has no title column and adding one would duplicate
+        // what the template is for.
         if (channels.includes('in_app') && seed?.inAppTitle?.trim() && !a.inAppTemplateId) {
             const id = nanoid();
             await d.insert(messageTemplates).values({
