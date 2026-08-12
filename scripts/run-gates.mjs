@@ -78,11 +78,15 @@ const SCRIPT_GATES = [
     // tracking gate.
     { key: 'submitguard', label: 'Client submit-guard coverage', script: 'check-submit-guard.mjs', fix: 'npm run lint:submit-guard' },
     // Pre-commit rather than CI, and for a reason the gates above do not share:
-    // a seeder that nothing runs automatically has NO other rung. `seed-pca-demo`
-    // and the CLI self-host setup script are both invoked by hand, months apart,
-    // so CI would never report them — they rot until a human hits the error. The
-    // one seeder CI does exercise, `tests/seed-fixtures.ts`, fails in e2e
-    // globalSetup: several minutes and one push after the mistake was typed.
+    // a seeder that nothing runs automatically has NO other rung. The CLI
+    // self-host setup script is invoked by hand, months apart, so CI would never
+    // report it — it rots until a human hits the error. The demo PCA seeder was
+    // the same story and ended worse: twelve of its column names had drifted
+    // away from the schema, its first INSERT could not run, and nobody found out
+    // for months. It has since been retired into `tests/seed-fixtures.ts`, which
+    // e2e globalSetup does run. That one still fails a rung LATE — several
+    // minutes and one push after the mistake was typed — which is why this gate
+    // reads it here instead.
     // Reads 31 files with two regexes.
     { key: 'seedsql', label: 'Seed SQL vs schema', script: 'check-seed-sql.mjs', fix: 'npm run lint:seed-sql' },
 ];

@@ -13,7 +13,9 @@
  *
  *   tests/seed-fixtures.ts          three inserts — found by CI, after a push
  *   scripts/seed-test-user.mjs      would fail on next use
- *   scripts/seed-pca-demo.mjs       would fail on next use
+ *   scripts/seed-pca-demo.mjs       would fail on next use — it has since been
+ *                                   retired, its data shape moved into
+ *                                   tests/seed-fixtures.ts behind SEED_PCA=1
  *   scripts/lib/cloudflare-db.js    the CLI self-host setup path — and it was
  *                                   ALSO still writing `subdomain`, a column
  *                                   that had been gone far longer, so the first
@@ -190,12 +192,22 @@ for (const dir of SCAN_DIRS) {
 /* ── Baseline ──
  *
  * Turning this gate on found 20 violations that predate it, almost all of them
- * in `scripts/seed-pca-demo.mjs`, which writes a dozen columns that do not
- * exist — the demo seeder has been broken for a while and nothing said so.
- * They are frozen here rather than fixed in the same change that introduces the
- * gate, so that a NEW one fails immediately instead of waiting behind a
- * cleanup. The count is printed on every run, including green ones: a frozen
- * violation that stops being visible is just a violation.
+ * in `scripts/seed-pca-demo.mjs`, which wrote a dozen columns that did not
+ * exist — the demo seeder had been broken for a while and nothing said so.
+ * They were frozen here rather than fixed in the same change that introduced
+ * the gate, so that a NEW one fails immediately instead of waiting behind a
+ * cleanup.
+ *
+ * Eighteen of them then went away at once, because that seeder was DELETED
+ * rather than repaired: nothing invoked it, so no rung could ever report it
+ * again, and renaming its columns would have left it uninvoked and free to rot
+ * a second time. Its data shape now lives in `tests/seed-fixtures.ts` behind
+ * `SEED_PCA=1`, which e2e globalSetup runs and this gate reads. That is the
+ * shape of every fix here worth having: move the SQL somewhere watched, do not
+ * annotate it where it is not.
+ *
+ * The count is printed on every run, including green ones: a frozen violation
+ * that stops being visible is just a violation.
  */
 const BASELINE_PATH = join(ROOT, 'scripts/seed-sql-baseline.json');
 const updating = process.argv.includes('--update');

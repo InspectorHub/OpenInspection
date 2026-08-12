@@ -10,6 +10,15 @@
  *
  * Uses the same PBKDF2-SHA256 (100k iters, 16-byte salt, `pbkdf2:salt:hash`)
  * format as server/lib/password.ts, and the standalone SINGLE_TENANT_ID.
+ *
+ * NOT a wrapper around tests/seed-fixtures.ts, though the four statements below
+ * look like a subset of what that file writes. They are a different account in a
+ * different tenant: this script honours TEST_EMAIL / TEST_PASSWORD /
+ * SINGLE_TENANT_ID from the environment and hashes the password at run time, so
+ * a developer can seed a login of their own choosing. `seedFixtures` hard-codes
+ * its tenant id, its addresses and a pre-computed hash, on purpose — its rows
+ * are addressed BY id from the e2e specs. Folding one into the other would
+ * silently change which tenant a `npm run dev` login lands in.
  */
 import { execFileSync } from "node:child_process";
 import { writeFileSync, rmSync } from "node:fs";
