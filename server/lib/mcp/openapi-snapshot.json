@@ -7782,6 +7782,34 @@
     "description": "Public, no-login resolution of a team-invite token into the invited email + workspace name for the /join accept page. Returns 404 for unknown/expired/used invites so the page renders its recovery state."
   },
   {
+    "operationId": "getMarketplaceLibraryReplacePreview",
+    "method": "GET",
+    "pathTemplate": "/api/templates/marketplace/libraries/{libraryId}/imports/replace/preview",
+    "scopes": [
+      "read"
+    ],
+    "tag": "marketplace",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "libraryId",
+          "in": "path",
+          "required": true,
+          "description": "Catalogue id of the imported library to replace",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Catalogue id of the imported library to replace"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Preview which imported comments a replace would overwrite",
+    "description": "Lists the comments this tenant rewrote since importing the library, each beside the publisher's version in the pending release, so a destructive replace can be decided against the actual text rather than a count."
+  },
+  {
     "operationId": "getMessageInspection",
     "method": "GET",
     "pathTemplate": "/api/inspections/{inspectionId}/messages",
@@ -9948,6 +9976,48 @@
     },
     "summary": "List unified calendar items",
     "description": "Combines inspections, inspection events, calendar blocks, and external busy time for a civil-date or instant range. Owners and managers may select multiple users; inspectors are restricted to themselves."
+  },
+  {
+    "operationId": "listComplianceAiAssurance",
+    "method": "GET",
+    "pathTemplate": "/api/admin/compliance/ai-assurance",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "description": "Maximum number of ledger rows to return, newest first.",
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50,
+            "description": "Maximum number of ledger rows to return, newest first."
+          }
+        },
+        {
+          "name": "before",
+          "in": "query",
+          "required": false,
+          "description": "Epoch-ms exclusive upper bound; pass the previous page nextBefore to page back.",
+          "schema": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Epoch-ms exclusive upper bound; pass the previous page nextBefore to page back."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "AI assurance ledger for this workspace",
+    "description": "Returns the tenant-scoped AI accountability record: one row per model call with the prompt version, model and credential source recorded at call time, joined to every human review citing it. Read-only, newest first, paged backwards with the returned nextBefore cursor."
   },
   {
     "operationId": "listComplianceErasureLog",
@@ -16358,11 +16428,11 @@
           "name": "libraryId",
           "in": "path",
           "required": true,
-          "description": "TODO describe libraryId field for the OpenInspection MCP integration",
+          "description": "Catalogue id of the imported library to replace",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe libraryId field for the OpenInspection MCP integration"
+            "description": "Catalogue id of the imported library to replace"
           }
         }
       ],
@@ -16372,14 +16442,14 @@
           "confirmLossOfEdits": {
             "type": "boolean",
             "default": false,
-            "description": "TODO describe confirmLossOfEdits field for the OpenInspection MCP integration"
+            "description": "Delete rows the tenant rewrote too. Default false keeps them."
           }
         },
         "description": "TODO describe schema field for the OpenInspection MCP integration"
       }
     },
-    "summary": "Replace tenant library import (deletes prior rows + inserts new pack)",
-    "description": "Auto-generated placeholder for replaceMarketplace (POST /libraries/{libraryId}/imports/replace, marketplace domain). TODO: replace with a real description sourced from the handler."
+    "summary": "Replace tenant library import (swaps prior rows for the new pack)",
+    "description": "Replaces the rows a previous import of this library created with the current release's. Comments the tenant rewrote since importing are kept unless confirmLossOfEdits is true; tenant-authored comments are never touched."
   },
   {
     "operationId": "replaceRatingSystem",

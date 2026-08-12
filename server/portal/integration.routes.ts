@@ -18,6 +18,7 @@ import { requireServiceBinding } from './service-binding-guard';
 import { aiProvisioningHandler } from './ai-provisioning';
 import { findGlobalAgentByEmail } from '../services/agent/account';
 import { usageReportHandler } from './usage-report';
+import { destructionRecordsHandler } from './destruction-records';
 import { getSeatUsage } from '../features/seat-quota/usage';
 
 const api = new Hono<HonoConfig>();
@@ -121,6 +122,12 @@ api.post('/tenants/:slug/purge', requireServiceBinding, async (c) => {
         return c.json({ success: false, error: { message: 'Purge failed' } }, 500);
     }
 });
+
+/**
+ * GET /api/integration/destruction-records — the read side of the purge above.
+ * Handler + why it is deliberately NOT tenant-scoped: ./destruction-records.ts.
+ */
+api.get('/destruction-records', requireServiceBinding, destructionRecordsHandler);
 
 /**
  * POST /api/integration/sso-handoff

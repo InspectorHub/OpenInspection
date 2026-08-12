@@ -9,6 +9,7 @@ import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Table, Pill, type PillTone } from "@core/shared-ui";
 import { LegalDocsPanel } from "~/components/settings/LegalDocsPanel";
+import { AiAssurancePanel, type AiAssuranceRow } from "~/components/settings/AiAssurancePanel";
 import { getBaseUrlFromRequest, rebaseHostedLegalUrl } from "~/lib/legal-base-url";
 import { m } from "~/paraglide/messages";
 
@@ -43,9 +44,20 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
 
-  const [configRes, logRes] = await Promise.all([
+  // The AI ledger is read backwards from the newest end, so the page cursor
+  // lives in the URL: a compliance response can then cite the exact page it was
+  // produced from. A malformed value falls back to the newest page rather than
+  // erroring — this is a read-only accountability view, not a form.
+  const rawBefore = new URL(request.url).searchParams.get("aiBefore");
+  const parsedBefore = rawBefore === null ? NaN : Number(rawBefore);
+  const aiBefore = Number.isSafeInteger(parsedBefore) && parsedBefore > 0 ? parsedBefore : null;
+
+  const [configRes, logRes, aiRes] = await Promise.all([
     api.admin["tenant-config"].$get().catch(() => null),
     api.admin.compliance["erasure-log"].$get().catch(() => null),
+    api.admin.compliance["ai-assurance"]
+      .$get({ query: aiBefore === null ? {} : { before: String(aiBefore) } })
+      .catch(() => null),
   ]);
 
   let retentionYears = DEFAULT_RETENTION_YEARS;
@@ -103,7 +115,24 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     erasureLog = ((body.data ?? []) as ErasureLogRow[]);
   }
 
-  return { retentionYears, erasureLog, legal };
+  let aiAssurance = {
+    calls: [] as AiAssuranceRow[],
+    unresolvedReviewCount: 0,
+    nextBefore: null as number | null,
+    activeBefore: aiBefore,
+  };
+  if (aiRes?.ok) {
+    const body = (await aiRes.json()) as Record<string, unknown>;
+    const d = (body.data ?? {}) as Record<string, unknown>;
+    aiAssurance = {
+      calls: Array.isArray(d.calls) ? (d.calls as AiAssuranceRow[]) : [],
+      unresolvedReviewCount: Number(d.unresolvedReviewCount ?? 0),
+      nextBefore: typeof d.nextBefore === "number" ? d.nextBefore : null,
+      activeBefore: aiBefore,
+    };
+  }
+
+  return { retentionYears, erasureLog, legal, aiAssurance };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -191,6 +220,7 @@ export default function SettingsCompliancePage() {
       <RetentionWindow initialYears={data.retentionYears} />
       <LegalDocsPanel initial={data.legal} />
       <ErasureLogView rows={data.erasureLog} />
+      <AiAssurancePanel initial={data.aiAssurance} />
     </div>
   );
 }
