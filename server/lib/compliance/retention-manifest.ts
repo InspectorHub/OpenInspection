@@ -112,6 +112,23 @@ export const SYNC_OUTBOX_RETENTION_DAYS = 60;
 export const IDEMPOTENCY_REPLAY_RETENTION_DAYS = 7;
 
 /**
+ * Deletion window for `tenant_destruction_records` — the proof that a
+ * workspace's data was destroyed.
+ *
+ * Three years, and the driver is how long someone can still ASK rather than how
+ * long the data is sensitive. The row is non-personal (a tenant id snapshot, a
+ * slug, counts), so storage limitation is not pressing on it; what sets the
+ * number is the window in which a former customer or their counsel can request
+ * the deletion certification an SCC Clause 8.5 obligation promises them. Three
+ * years covers the ordinary contractual limitation period and spans at least
+ * two annual SOC 2 audit periods, so a purge sampled by an auditor is still
+ * evidenced by the report that covers it and by the one after.
+ *
+ * Reasoning and the instruments behind it: `docs/compliance/destruction-evidence.md`.
+ */
+export const DESTRUCTION_RECORD_RETENTION_MONTHS = 36;
+
+/**
  * A retention period, carrying its unit.
  *
  * Months are not days. A 24-month window expressed as 730 days drifts against
@@ -190,6 +207,13 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'days', value: IDEMPOTENCY_REPLAY_RETENTION_DAYS },
         action: 'delete',
         purpose: 'response_body is the verbatim success payload of a mutating API call, so it holds whatever PII that endpoint returned. Measured from created_at, NOT expires_at: that column decides whether a later caller may steal a dead claim and is never read once the row is done, so a completed row outlives it indefinitely. Seven days is seven times the store own declared 24h TTL — margin for a client re-driving a queued intent after a weekend, well inside the horizon past which the store itself says a retry is a different problem.',
+    },
+    {
+        table: 'tenant_destruction_records',
+        timestampColumn: 'destroyed_at',
+        window: { unit: 'months', value: DESTRUCTION_RECORD_RETENTION_MONTHS },
+        action: 'delete',
+        purpose: 'The certification that a workspace was destroyed. Non-personal (tenant id snapshot, slug, counts), so the period is set by how long someone can still ask for it rather than by storage limitation: three years covers the ordinary contractual limitation window for an SCC Clause 8.5 request and spans two annual SOC 2 audit periods. Only COMPLETED records expire — a row still reading started is an unfinished destruction, and deleting one closes an open anomaly instead of retiring a settled record. Measured from destroyed_at, the initiation time, which is the only timestamp an unfinished row has.',
     },
 ];
 

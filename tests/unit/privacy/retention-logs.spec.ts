@@ -15,6 +15,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
 import { asAnyDb } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
+import { subtractMonthsMs } from '../../../server/lib/compliance/db-row-utils';
 import {
     auditLogs,
     esignAuditLogs,
@@ -33,6 +34,7 @@ import {
     DEDUP_LOG_RETENTION_DAYS,
     IDEMPOTENCY_REPLAY_RETENTION_DAYS,
     SYNC_OUTBOX_RETENTION_DAYS,
+    DESTRUCTION_RECORD_RETENTION_MONTHS,
     RETENTION_MANIFEST,
 } from '../../../server/lib/compliance/retention-manifest';
 
@@ -223,6 +225,53 @@ describe('runLogRetentionSweep', () => {
         const rows = await db.select().from(syncOutbox).all();
         expect(rows.map((r) => r.id)).toEqual(['o-pending-ancient']);
         expect(rows[0]!.payload).toContain('staff@example.com');
+    });
+
+    async function seedDestruction(id: string, status: 'started' | 'completed', destroyedAt: Date) {
+        await db.insert(schema.tenantDestructionRecords).values({
+            id, tenantId: `t-${id}`, tenantSlug: id,
+            rowsDeleted: status === 'completed' ? 10 : 0,
+            destroyedAt, status,
+            ...(status === 'completed' ? { completedAt: destroyedAt } : {}),
+        });
+    }
+
+    const monthsAgo = (n: number) => new Date(subtractMonthsMs(NOW, n));
+
+    it('expires a completed destruction record at three years and keeps the one inside the window', async () => {
+        await seedDestruction('d-old', 'completed', monthsAgo(DESTRUCTION_RECORD_RETENTION_MONTHS + 1));
+        await seedDestruction('d-new', 'completed', monthsAgo(DESTRUCTION_RECORD_RETENTION_MONTHS - 1));
+
+        const summary = await runLogRetentionSweep(asAnyDb(db), NOW);
+        expect(summary.perTable.tenant_destruction_records).toBe(1);
+
+        const rows = await db.select().from(schema.tenantDestructionRecords).all();
+        expect(rows.map((r) => r.id)).toEqual(['d-new']);
+    });
+
+    it('never deletes an UNFINISHED destruction record, however old', async () => {
+        // The counterpart to the pending-outbox rule above, and the same kind of
+        // mistake if it were missing. A record still reading `started` is a
+        // workspace that was destroyed and never certified — an open anomaly,
+        // and the only artifact that says so. Expiring it on age would close the
+        // question by deleting the evidence of it, which is precisely what
+        // opening the record before the destruction was meant to prevent.
+        await seedDestruction('d-abandoned', 'started', monthsAgo(DESTRUCTION_RECORD_RETENTION_MONTHS * 5));
+
+        const summary = await runLogRetentionSweep(asAnyDb(db), NOW);
+        expect(summary.perTable.tenant_destruction_records ?? 0).toBe(0);
+
+        const rows = await db.select().from(schema.tenantDestructionRecords).all();
+        expect(rows.map((r) => r.id)).toEqual(['d-abandoned']);
+    });
+
+    it('the destruction fixture pair really straddles the window', () => {
+        // Positive control on the fixtures themselves: if both dates landed on
+        // the same side, the two cases above would agree with each other and
+        // prove nothing.
+        const cutoff = subtractMonthsMs(NOW, DESTRUCTION_RECORD_RETENTION_MONTHS);
+        expect(monthsAgo(DESTRUCTION_RECORD_RETENTION_MONTHS + 1).getTime()).toBeLessThan(cutoff);
+        expect(monthsAgo(DESTRUCTION_RECORD_RETENTION_MONTHS - 1).getTime()).toBeGreaterThan(cutoff);
     });
 
     it('the outbox window is its own number, not a neighbour reused', async () => {

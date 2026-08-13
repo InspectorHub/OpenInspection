@@ -35,7 +35,7 @@
  * will eventually chart it. Summaries carry counts and table names only — never
  * a row, never a value.
  */
-import { and, isNotNull, lt, ne, or } from 'drizzle-orm';
+import { and, eq, isNotNull, lt, ne, or } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { SQL } from 'drizzle-orm';
 import {
@@ -45,8 +45,10 @@ import {
     processedCmdEvents,
     processedWebhookEvents,
     syncOutbox,
+    tenantDestructionRecords,
 } from '../db/schema';
 import { SYNC_OUTBOX_STATUS } from '../status/sync-outbox-status';
+import { DESTRUCTION_STATUS } from '../status/destruction-status';
 import { ANONYMIZE_AUDIT_PII } from './anonymize-pii';
 import { changeCount, subtractMonthsMs } from './db-row-utils';
 import { RETENTION_MANIFEST, type RetentionWindow } from './retention-manifest';
@@ -178,6 +180,29 @@ const EXECUTORS: Record<string, Executor> = {
         const db = rawDb as any;
         const res = await db.delete(idempotencyKeys)
             .where(lt(idempotencyKeys.createdAt, cutoff))
+            .run();
+        return changeCount(res);
+    },
+
+    // Only COMPLETED records expire, and that is the rule rather than an
+    // optimization — the same shape as excluding `pending` from `sync_outbox`
+    // above. A row still reading `started` is a purge that destroyed a workspace
+    // and never said it finished. It is an open anomaly, and the only artifact
+    // that says so; sweeping it on age would close the question by destroying
+    // the evidence of it, which is the exact failure the two-phase write exists
+    // to prevent. Such a row ages out of nothing and waits for a human.
+    //
+    // `destroyed_at` is the initiation timestamp, not `completed_at`: it is the
+    // only one every row has, and a completed record's two timestamps are
+    // seconds apart, so the choice moves nothing for the rows that DO expire.
+    tenant_destruction_records: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const res = await db.delete(tenantDestructionRecords)
+            .where(and(
+                lt(tenantDestructionRecords.destroyedAt, cutoff),
+                eq(tenantDestructionRecords.status, DESTRUCTION_STATUS.COMPLETED),
+            ))
             .run();
         return changeCount(res);
     },

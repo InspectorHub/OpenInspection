@@ -76,10 +76,22 @@ The records are non-personal, so retaining them is not itself a processing risk
 — which is why the number is set by when the evidence stops being *useful*
 rather than by minimisation.
 
-⚠️ **No sweep enforces this yet.** Nothing deletes destruction records at three
-years; the number above is the stated policy and the specification for the sweep
-that will implement it. Recorded here rather than left implicit, because a
-retention period that exists only in someone's head is not a retention period.
+Enforced by the log-retention sweep on the shared cron tick. The period lives as
+`DESTRUCTION_RECORD_RETENTION_MONTHS` in `retention-manifest.ts` — where every
+window and the reason for it lives — and the executor that applies it is in
+`retention-logs.ts`. A spec asserts the two sets match in both directions, so a
+period with no executor and an executor with no period both fail.
+
+**Only `completed` records expire.** A row still reading `started` is an
+unfinished destruction and the only artifact that says so; expiring it on age
+would close an open question by deleting the evidence of it — the exact failure
+the two-phase write exists to prevent. Such a row ages out of nothing and waits
+for a person. This mirrors the sweep's rule for a `pending` outbox row, and it
+is a rule rather than an optimisation.
+
+The window is measured from `destroyed_at` (initiation), which is the only
+timestamp an unfinished row has. For rows that do expire the two timestamps are
+seconds apart, so the choice moves nothing for them.
 
 ## Who can read it
 
