@@ -77,9 +77,17 @@ The records are non-personal, so retaining them is not itself a processing risk
 rather than by minimisation.
 
 Enforced by the log-retention sweep on the shared cron tick. The period lives as
-`DESTRUCTION_RECORD_RETENTION_MONTHS` in `retention-manifest.ts` — where every
+`DESTRUCTION_RECORD_RETENTION_MONTHS` in `retention-windows.ts` — where every
 window and the reason for it lives — and the executor that applies it is in
-`retention-logs.ts`. A spec asserts the two sets match in both directions, so a
+`retention-logs.ts`.
+
+It was the first of eight ledgers to get a window in the same pass. The other
+seven — the two AI assurance tables, report versions, SMS disclosure versions,
+tenant legal versions, marketplace import history and slug history — are all on
+the same three-year clock, and the gate that demands a decision was widened
+afterwards so the next `_records` or `_versions` table cannot arrive without
+one. Five of them carry a predicate as well as a window, because deleting a row
+purely on age would have broken something that outlives it. A spec asserts the two sets match in both directions, so a
 period with no executor and an executor with no period both fail.
 
 **Only `completed` records expire.** A row still reading `started` is an

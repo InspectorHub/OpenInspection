@@ -35,7 +35,8 @@
  * will eventually chart it. Summaries carry counts and table names only — never
  * a row, never a value.
  */
-import { and, eq, isNotNull, lt, ne, or } from 'drizzle-orm';
+import { and, eq, exists, isNotNull, lt, ne, notExists, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { SQL } from 'drizzle-orm';
 import {
@@ -46,6 +47,14 @@ import {
     processedWebhookEvents,
     syncOutbox,
     tenantDestructionRecords,
+    aiCallProvenance,
+    aiContentReviews,
+    reportVersions,
+    smsConsentLog,
+    smsDisclosureVersions,
+    tenantLegalVersions,
+    tenantMarketplaceImportHistory,
+    tenantSlugHistory,
 } from '../db/schema';
 import { SYNC_OUTBOX_STATUS } from '../status/sync-outbox-status';
 import { DESTRUCTION_STATUS } from '../status/destruction-status';
@@ -202,6 +211,124 @@ const EXECUTORS: Record<string, Executor> = {
             .where(and(
                 lt(tenantDestructionRecords.destroyedAt, cutoff),
                 eq(tenantDestructionRecords.status, DESTRUCTION_STATUS.COMPLETED),
+            ))
+            .run();
+        return changeCount(res);
+    },
+
+    // A call a surviving review still cites does NOT expire, and equal windows
+    // are why the predicate is needed rather than why it is not: a review is
+    // written after the call it cites, so measured from each row's own
+    // timestamp the call goes first and leaves the review pointing at nothing.
+    // `readAiAssurance` counts exactly that shape as `unresolvedReviewCount` —
+    // a health signal for rows written before the ownership check existed. A
+    // sweep that manufactured them would turn the alarm into noise.
+    ai_call_provenance: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const res = await db.delete(aiCallProvenance)
+            .where(and(
+                lt(aiCallProvenance.createdAt, cutoff),
+                notExists(
+                    db.select({ one: sql`1` }).from(aiContentReviews)
+                        .where(eq(aiContentReviews.aiCallId, aiCallProvenance.id)),
+                ),
+            ))
+            .run();
+        return changeCount(res);
+    },
+
+    ai_content_reviews: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const res = await db.delete(aiContentReviews)
+            .where(lt(aiContentReviews.reviewedAt, cutoff))
+            .run();
+        return changeCount(res);
+    },
+
+    // SUPERSEDED versions only. The highest `version_number` for a report is
+    // what the report currently IS — it carries the signature and content hash
+    // the verifier reads — so expiring it would not retire history, it would
+    // delete the deliverable.
+    report_versions: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const newer = db.select({ one: sql`1` }).from(alias(reportVersions, 'rv_newer'))
+            .where(and(
+                eq(sql`rv_newer.report_id`, reportVersions.reportId),
+                sql`rv_newer.version_number > ${reportVersions.versionNumber}`,
+            ));
+        const res = await db.delete(reportVersions)
+            .where(and(lt(reportVersions.createdAt, cutoff), exists(newer)))
+            .run();
+        return changeCount(res);
+    },
+
+    // Two guards, and both are load-bearing. `sms_consent_log` is kept
+    // INDEFINITELY by an explicit exemption — the record is the tenant's
+    // defence against a consent challenge — and every consent row stamps the
+    // disclosure version it was shown. Deleting a cited version would leave
+    // permanent evidence pointing at text that no longer exists, which guts the
+    // exemption from the other side. The current (highest) version is also kept:
+    // it is what the next opt-in will show.
+    sms_disclosure_versions: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const res = await db.delete(smsDisclosureVersions)
+            .where(and(
+                lt(smsDisclosureVersions.publishedAt, cutoff),
+                notExists(
+                    db.select({ one: sql`1` }).from(smsConsentLog)
+                        .where(eq(smsConsentLog.disclosureVersion, smsDisclosureVersions.version)),
+                ),
+                exists(
+                    db.select({ one: sql`1` }).from(alias(smsDisclosureVersions, 'sdv_newer'))
+                        .where(sql`sdv_newer.version > ${smsDisclosureVersions.version}`),
+                ),
+            ))
+            .run();
+        return changeCount(res);
+    },
+
+    // SUPERSEDED versions only, per (tenant, doc). The newest is the live policy
+    // the hosted legal pages render; expiring it would blank them.
+    tenant_legal_versions: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const newer = db.select({ one: sql`1` }).from(alias(tenantLegalVersions, 'tlv_newer'))
+            .where(and(
+                eq(sql`tlv_newer.tenant_id`, tenantLegalVersions.tenantId),
+                eq(sql`tlv_newer.doc`, tenantLegalVersions.doc),
+                sql`tlv_newer.version > ${tenantLegalVersions.version}`,
+            ));
+        const res = await db.delete(tenantLegalVersions)
+            .where(and(lt(tenantLegalVersions.publishedAt, cutoff), exists(newer)))
+            .run();
+        return changeCount(res);
+    },
+
+    tenant_marketplace_import_history: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const res = await db.delete(tenantMarketplaceImportHistory)
+            .where(lt(tenantMarketplaceImportHistory.createdAt, cutoff))
+            .run();
+        return changeCount(res);
+    },
+
+    // A row whose `retired_until` has not passed is still holding a slug OUT OF
+    // CIRCULATION. Deleting one releases the slug early — a different tenant
+    // could claim it and inherit every stale link pointing at the old owner.
+    // Three years is well past the one-year block, so this predicate should
+    // never bind; it is here because "should never" is not "cannot".
+    tenant_slug_history: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const res = await db.delete(tenantSlugHistory)
+            .where(and(
+                lt(tenantSlugHistory.changedAt, cutoff),
+                lt(tenantSlugHistory.retiredUntil, cutoff),
             ))
             .run();
         return changeCount(res);
