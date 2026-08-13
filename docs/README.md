@@ -83,6 +83,7 @@ Written for auditors and counsel, not for engineers.
 | Doc | Topic |
 |---|---|
 | [`compliance/ai-data-flow.md`](compliance/ai-data-flow.md) | Field by field, what leaves the process when an AI feature runs |
+| [`compliance/destruction-evidence.md`](compliance/destruction-evidence.md) | What proves a workspace was destroyed, how it is written, and the 3-year retention |
 | [`compliance/erasure-heuristic-limits.md`](compliance/erasure-heuristic-limits.md) | What the erasure PII gate can and cannot see |
 | [`compliance/report-view-lia.md`](compliance/report-view-lia.md) | Legitimate Interests Assessment for report delivery confirmation |
 

@@ -41,6 +41,7 @@
 import { and, desc, eq, lt, inArray, notExists, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { aiCallProvenance, aiContentReviews, tenantDestructionRecords, users } from '../db/schema';
+import { DESTRUCTION_STATUS, isDestructionStatus, type DestructionStatus } from '../status/destruction-status';
 
 // Accept either the D1 drizzle type (prod) or the better-sqlite3 test db, the
 // same widening `erasure-orchestrator.ts` uses for the same reason: both expose
@@ -102,13 +103,16 @@ export interface AiAssurancePage {
      * Reviews for this workspace whose `ai_call_id` matches no provenance row
      * belonging to it — a citation that resolves to nothing.
      *
-     * Reported rather than silently dropped. `POST /api/ai/reviews` takes
-     * `aiCallId` from the request body and does not verify that the call is the
-     * workspace's own, so a review CAN name a row this workspace has no
-     * provenance for. Both halves of the join below are tenant-filtered, so such
-     * a row can never surface another workspace's call — it just vanishes from
-     * the page, and a compliance view that quietly loses evidence rows is the
-     * failure this whole change exists to fix. The count is over the whole
+     * Reported rather than silently dropped. The write path no longer allows a
+     * new one: `recordContentReview` refuses a review whose `aiCallId` is not
+     * this workspace's own. Rows written BEFORE that check are still out there,
+     * and the count is how they are found — so this stays, and a non-zero value
+     * now means "historical", not "ongoing".
+     *
+     * Both halves of the join below are tenant-filtered, so such a row can never
+     * surface another workspace's call. Without this count it would simply
+     * vanish from the page, and a compliance view that quietly loses evidence
+     * rows is the failure this module exists to fix. Counted over the whole
      * ledger, not the current page: it is a health signal, not a page item.
      */
     unresolvedReviewCount: number;
@@ -243,7 +247,20 @@ export interface DestructionRecord {
     r2Objects: number;
     r2Bytes: number;
     kvKeys: number;
+    /** When destruction was INITIATED — the row is opened before the cascade. */
     destroyedAt: number;
+    /**
+     * 'started' means the purge did not reach its own closing write. The counts
+     * beside it are therefore zeros, not measurements.
+     *
+     * This is the field a reader has to look at first, and the reason the record
+     * is opened before the destruction rather than written after it: without a
+     * status, an abandoned purge and a completed one are the same row, and the
+     * abandoned one is the case worth finding.
+     */
+    status: DestructionStatus;
+    /** Null while 'started'. What a deletion certification is read off. */
+    completedAt: number | null;
 }
 
 export interface DestructionRecordPage {
@@ -297,6 +314,8 @@ export async function readDestructionRecords(
         r2Bytes:     tenantDestructionRecords.r2Bytes,
         kvKeys:      tenantDestructionRecords.kvKeys,
         destroyedAt: tenantDestructionRecords.destroyedAt,
+        status:      tenantDestructionRecords.status,
+        completedAt: tenantDestructionRecords.completedAt,
     })
         .from(tenantDestructionRecords)
         .where(filters.length ? and(...filters) : undefined)
@@ -312,6 +331,14 @@ export async function readDestructionRecords(
         r2Bytes:     Number(r.r2Bytes ?? 0),
         kvKeys:      Number(r.kvKeys ?? 0),
         destroyedAt: toMs(r.destroyedAt),
+        // A value the axis does not recognise reads as UNFINISHED, not as
+        // finished. Rows predating the column carry the 'completed' default and
+        // pass through as themselves; anything else is a row this reader cannot
+        // vouch for, and the whole design here is that we do not certify what we
+        // cannot verify. Erring the other way would silently convert a
+        // corrupted or future value into a certificate.
+        status:      isDestructionStatus(r.status) ? r.status : DESTRUCTION_STATUS.STARTED,
+        completedAt: r.completedAt === null || r.completedAt === undefined ? null : toMs(r.completedAt),
     }));
 
     const last = records[records.length - 1];

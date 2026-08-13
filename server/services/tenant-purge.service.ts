@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, getTableColumns, getTableName } from 'drizzle-orm';
 import { logger } from '../lib/logger';
 import { tenants, tenantDestructionRecords, users } from '../lib/db/schema';
+import { DESTRUCTION_STATUS } from '../lib/status/destruction-status';
 // The tenant-scoped table set is DERIVED from the schema (every table with a
 // `tenant_id` column, minus the destruction-record ledger) so the purge can
 // never silently drift as tables are added. The former hand-maintained list
@@ -36,7 +37,42 @@ export class TenantPurgeService {
         }
         userIds.forEach(uid => kvKeys.push(`pwchanged:${uid}`));
 
-        // 2. Delete tenant rows in dependency-safe order. Every table is scoped by
+        // 2. Open the destruction record BEFORE anything is destroyed.
+        //
+        //    This row is the proof the deletion happened, and evidence written
+        //    after the fact is lost by precisely the failures worth recording.
+        //    Written last — as it was — a crash between the cascade and the
+        //    insert left a tenant permanently destroyed with nothing on file
+        //    saying so, and the only trace was a `logger.error` on a platform
+        //    whose logs are kept for days against an audit window kept for
+        //    years.
+        //
+        //    Nor could that be fixed by letting the write throw: by the time it
+        //    runs the data is already gone, so failing there does not undo
+        //    anything. It returns an error to a caller who may then RETRY, and
+        //    the retry deletes nothing and files a record reading `rowsDeleted:
+        //    0` — a false certificate, which is worse than a missing one.
+        //
+        //    Opened first, the failure mode inverts: a purge that dies partway
+        //    leaves a row that says 'started' and never completed. That is an
+        //    alert, an accurate one, and it names the tenant to go verify by
+        //    hand. `completed_at` is what an SCC Clause 8.5 certification is
+        //    actually read off.
+        //
+        //    The insert is deliberately NOT in a try/catch. Here, unlike at the
+        //    end, throwing is correct and costs nothing: nothing has been
+        //    destroyed yet, so refusing to start a destruction we cannot
+        //    evidence leaves the tenant exactly as it was.
+        const recordId = crypto.randomUUID();
+        await d.insert(tenantDestructionRecords).values({
+            id:          recordId,
+            tenantId,
+            tenantSlug,
+            destroyedAt: new Date(),
+            status:      DESTRUCTION_STATUS.STARTED,
+        });
+
+        // 3. Delete tenant rows in dependency-safe order. Every table is scoped by
         //    its `tenantId` column EXCEPT `tenants` itself, whose primary key is
         //    `id` — match on the correct column so the tenant row is actually
         //    destroyed (matching on a non-existent `tenants.tenantId` produces
@@ -63,7 +99,7 @@ export class TenantPurgeService {
             logger.error('Tenant row delete failed', { tenantId }, err instanceof Error ? err : undefined);
         }
 
-        // 3. R2 list + batch delete (accumulate object count + byte totals for the
+        // 4. R2 list + batch delete (accumulate object count + byte totals for the
         //    destruction record). The unified R2 key convention roots EVERY new asset
         //    under the bare `{tenantId}/` prefix (inspections/, branding/, messages/,
         //    inspector-photos/, etc.). Three legacy prefixes are also swept to cover
@@ -95,28 +131,35 @@ export class TenantPurgeService {
             } while (cursor);
         }
 
-        // 4. KV delete (best-effort)
+        // 5. KV delete (best-effort)
         let kvCount = 0;
         for (const k of kvKeys) {
             try { await this.kv.delete(k); kvCount++; } catch { /* ignore */ }
         }
 
-        // 5. Durable destruction record (Privacy P3 §3.2). Written AFTER the cascade
-        //    delete into a platform-level table (no tenant FK, not in TENANT_TABLES)
-        //    so it survives as non-personal proof that the tenant was destroyed.
+        // 6. Close the destruction record: the counts, and the fact that every
+        //    step ran. A row left at 'started' is a purge that did not finish,
+        //    and finding those is the point of writing the row up front.
+        //
+        //    This one IS best-effort, and for the opposite reason to the insert:
+        //    everything is already destroyed, so throwing here would report
+        //    failure for work that succeeded and invite a retry that files a
+        //    zero-count record. A row stuck at 'started' after a successful
+        //    purge understates what happened, which is the safe direction — it
+        //    asks a human to look, rather than certifying something false.
         try {
-            await d.insert(tenantDestructionRecords).values({
-                id:          crypto.randomUUID(),
-                tenantId,
-                tenantSlug,
-                rowsDeleted: rows,
-                r2Objects:   r2Count,
-                r2Bytes,
-                kvKeys:      kvCount,
-                destroyedAt: new Date(),
-            });
+            await d.update(tenantDestructionRecords)
+                .set({
+                    rowsDeleted: rows,
+                    r2Objects:   r2Count,
+                    r2Bytes,
+                    kvKeys:      kvCount,
+                    status:      DESTRUCTION_STATUS.COMPLETED,
+                    completedAt: new Date(),
+                })
+                .where(eq(tenantDestructionRecords.id, recordId));
         } catch (err) {
-            logger.error('Destruction record write failed', { tenantId }, err instanceof Error ? err : undefined);
+            logger.error('Destruction record close failed', { tenantId, recordId }, err instanceof Error ? err : undefined);
         }
 
         logger.info('Tenant purged', { tenantId, rows, r2: r2Count, r2Bytes, kv: kvCount });

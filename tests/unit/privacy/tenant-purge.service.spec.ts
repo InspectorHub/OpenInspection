@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TenantPurgeService, tenantScopedTables } from '../../../server/services/tenant-purge.service';
-import { getTableName } from 'drizzle-orm';
+import { getTableName, eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -106,6 +106,73 @@ describe('TenantPurgeService.purge', () => {
         expect(rec.r2Bytes).toBe(350);
         expect(rec.rowsDeleted).toBeGreaterThan(0);
         expect(rec.destroyedAt).toBeInstanceOf(Date);
+        expect(rec.status).toBe('completed');
+        expect(rec.completedAt).toBeInstanceOf(Date);
+    });
+
+    it('opens the record BEFORE destroying anything, and the cascade cannot delete it', async () => {
+        // The row carries a `tenant_id`, which is exactly what the cascade
+        // matches on — it survives only because `tenantScopedTables()` excludes
+        // this one table by name. Written after the cascade that exclusion was
+        // untested by construction; written before, it is load-bearing, so this
+        // asserts the surviving row is the SAME row that was opened.
+        const { drizzle } = await import('drizzle-orm/d1');
+        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+
+        const seen: string[] = [];
+        const r2 = makeR2([]);
+        // The first R2 list happens after the D1 cascade and before the record
+        // is closed — the one moment where "already opened, not yet completed"
+        // is observable from inside the purge.
+        const bucket = {
+            ...r2.bucket,
+            list: async (...args: unknown[]) => {
+                const mid = await testDb.select().from(schema.tenantDestructionRecords).all();
+                seen.push(...mid.map(r => `${r.id}:${r.status}`));
+                return (r2.bucket.list as (...a: unknown[]) => Promise<unknown>)(...args);
+            },
+        } as unknown as R2Bucket;
+
+        await new TenantPurgeService({} as D1Database, bucket, makeKv().ns).purge(TENANT);
+
+        // Exactly one row existed mid-purge, it was 'started', and it is the row
+        // that ends up 'completed' — not a second row written at the end.
+        expect(seen.length).toBeGreaterThan(0);
+        const openedId = seen[0]!.split(':')[0];
+        expect(seen[0]).toBe(`${openedId}:started`);
+
+        const after = await testDb.select().from(schema.tenantDestructionRecords).all();
+        expect(after).toHaveLength(1);
+        expect(after[0]!.id).toBe(openedId);
+        expect(after[0]!.status).toBe('completed');
+    });
+
+    it('a purge that dies mid-cascade leaves evidence, not silence', async () => {
+        // The failure the two-phase write exists for. R2 throwing aborts the
+        // purge after the D1 rows are already gone — the exact window in which
+        // the old write-it-last code destroyed a tenant and recorded nothing.
+        const { drizzle } = await import('drizzle-orm/d1');
+        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        const bucket = { list: async () => { throw new Error('R2 unavailable'); } } as unknown as R2Bucket;
+
+        await expect(
+            new TenantPurgeService({} as D1Database, bucket, makeKv().ns).purge(TENANT),
+        ).rejects.toThrow(/R2 unavailable/);
+
+        const records = await testDb.select().from(schema.tenantDestructionRecords).all();
+        expect(records).toHaveLength(1);
+        expect(records[0]!.tenantId).toBe(TENANT);
+        // 'started' with zero counts is the honest reading: destruction began,
+        // and nothing here may be certified as having finished.
+        expect(records[0]!.status).toBe('started');
+        expect(records[0]!.completedAt).toBeNull();
+        expect(records[0]!.rowsDeleted).toBe(0);
+
+        // And the tenant really is gone — this is evidence of a REAL partial
+        // destruction, not a record of an operation that never started.
+        const tenantRow = await testDb.select().from(schema.tenants)
+            .where(eq(schema.tenants.id, TENANT)).all();
+        expect(tenantRow).toHaveLength(0);
     });
 
     it('cascades agreement_signers (PII) so no orphaned signer rows survive', async () => {

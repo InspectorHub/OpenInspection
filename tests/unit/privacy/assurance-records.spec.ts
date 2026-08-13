@@ -257,4 +257,40 @@ describe('readDestructionRecords', () => {
         expect(record.tenantSlug).toBeNull();
         expect(typeof record.destroyedAt).toBe('number');
     });
+
+    it('surfaces an unfinished purge as unfinished', async () => {
+        // The reason the record is opened before the destruction rather than
+        // written after it. A row left at 'started' is a workspace that was
+        // destroyed and never certified, and the operator asking for proof is
+        // the only person who can find it — so the reader has to say so rather
+        // than handing back a row whose zero counts look like a small tenant.
+        await db.insert(schema.tenantDestructionRecords).values({
+            id: 'd-abandoned', tenantId: 'ghost-x', tenantSlug: 'ghost',
+            destroyedAt: new Date(9_000), status: 'started',
+        });
+
+        const page = await readDestructionRecords(asAnyDb(db), { tenantId: 'ghost-x' });
+        const record: DestructionRecord = page.records[0];
+
+        expect(record.status).toBe('started');
+        expect(record.completedAt).toBeNull();
+        expect(record.rowsDeleted).toBe(0);
+    });
+
+    it('reads a row written before the status column existed as completed', async () => {
+        // Rows that predate the two-phase write were only ever inserted AFTER
+        // the cascade, so the column default is the truth about them. Getting
+        // this backwards would retroactively mark every historical purge as
+        // unfinished and send someone hunting for destructions that did happen.
+        await db.insert(schema.tenantDestructionRecords).values({
+            id: 'd-legacy', tenantId: 'ghost-y', tenantSlug: 'old',
+            rowsDeleted: 12, r2Objects: 3, r2Bytes: 900, kvKeys: 1,
+            destroyedAt: new Date(8_000),
+        });
+
+        const page = await readDestructionRecords(asAnyDb(db), { tenantId: 'ghost-y' });
+
+        expect(page.records[0].status).toBe('completed');
+        expect(page.records[0].rowsDeleted).toBe(12);
+    });
 });

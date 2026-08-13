@@ -2,6 +2,7 @@ import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 import { tenants } from './core';
 import { users } from './user';
 import { SYNC_OUTBOX_STATUS, SYNC_OUTBOX_STATUSES } from '../../../status/sync-outbox-status';
+import { DESTRUCTION_STATUS, DESTRUCTION_STATUSES } from '../../../status/destruction-status';
 
 /**
  * Outbox for core → portal sync events. Append happens
@@ -57,7 +58,25 @@ export const tenantDestructionRecords = sqliteTable('tenant_destruction_records'
     r2Objects:   integer('r2_objects').notNull().default(0),
     r2Bytes:     integer('r2_bytes').notNull().default(0),
     kvKeys:      integer('kv_keys').notNull().default(0),
+    // When destruction was INITIATED. The row is written before the cascade, not
+    // after — see `status`.
     destroyedAt: integer('destroyed_at', { mode: 'timestamp_ms' }).notNull(),
+    // Written BEFORE the D1/R2/KV cascade as 'started', updated to 'completed'
+    // with the real counts once every step has run.
+    //
+    // The evidence has to be able to survive the thing it is evidence of. Written
+    // last, it was lost by exactly the failures worth recording: a row could be
+    // destroyed with no proof it ever happened, and the only trace was a
+    // `logger.error` on a platform whose logs are measured in days against an
+    // audit window measured in years. Written first, a crash mid-purge leaves
+    // 'started' — which is the auditable fact, and an alert rather than silence.
+    //
+    // Defaults to 'completed' so rows written before this column existed keep
+    // meaning what they meant: they were only ever inserted after the cascade.
+    status: text('status', { enum: DESTRUCTION_STATUSES }).notNull().default(DESTRUCTION_STATUS.COMPLETED),
+    // Null while 'started'. The gap between this and `destroyed_at` is how long
+    // the purge took; its absence is how you find one that never finished.
+    completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
 }, (t) => [
     index('idx_destruction_tenant').on(t.tenantId),
     index('idx_destruction_destroyed_at').on(t.destroyedAt),
