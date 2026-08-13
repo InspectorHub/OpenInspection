@@ -28,8 +28,8 @@ const CONTACT_T2 = '00000000-0000-0000-0000-000000000020';
 
 async function seedFixtures(db: BetterSQLite3Database<typeof schema>) {
     await db.insert(schema.tenants).values([
-        { id: T1, name: 'Tenant One', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-        { id: T2, name: 'Tenant Two', slug: 't2', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: T1, slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: T2, slug: 't2', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
     await db.insert(schema.contacts).values([
         { id: CONTACT_T1, tenantId: T1, type: 'agent', name: 'Agent One', email: 'agent1@t1.com', createdAt: new Date() },

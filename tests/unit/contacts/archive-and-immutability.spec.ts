@@ -17,7 +17,7 @@ const CLIENT = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbf1';
 
 async function seed(db: BetterSQLite3Database<typeof schema>) {
   await db.insert(schema.tenants).values(
-    { id: T, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
+    { id: T, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
   await db.insert(schema.contacts).values([
     { id: AGENT,      tenantId: T, type: 'agent',  name: 'Agent A',  email: 'a@x.test', createdAt: new Date() },
     { id: AGENT_ZERO, tenantId: T, type: 'agent',  name: 'Agent Z',  email: 'z@x.test', createdAt: new Date() },

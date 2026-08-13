@@ -24,7 +24,7 @@ const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
 // row alongside the (now-unread) legacy columns.
 async function seedFor(testDb: BetterSQLite3Database<typeof schema>, agreementRequired: boolean) {
     await testDb.insert(schema.tenants).values([
-        { id: TENANT, name: 'T', slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: TENANT, slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
     await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
     await testDb.insert(schema.contacts).values([
@@ -72,7 +72,7 @@ describe('AutomationService.trigger — agreement filter', () => {
         await testDb.insert(schema.automations).values({
             id: 'rule-1', tenantId: TENANT, name: 'Send agreement', trigger: 'inspection.created',
             recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0,
-            subjectTemplate: '', bodyTemplate: '', channels: '["email"]', emailTemplateId: 'tpl-agr-1',
+            channels: '["email"]', emailTemplateId: 'tpl-agr-1',
             active: true, isDefault: false, createdAt: new Date(),
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: INSP, triggerEvent: 'inspection.created', companyName: 'T', reportBaseUrl: 'http://localhost' });
@@ -86,7 +86,7 @@ describe('AutomationService.trigger — agreement filter', () => {
         await testDb.insert(schema.automations).values({
             id: 'rule-2', tenantId: TENANT, name: 'Send agreement', trigger: 'inspection.created',
             recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0,
-            subjectTemplate: '', bodyTemplate: '', channels: '["email"]', emailTemplateId: 'tpl-agr-2',
+            channels: '["email"]', emailTemplateId: 'tpl-agr-2',
             active: true, isDefault: false, createdAt: new Date(),
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: INSP, triggerEvent: 'inspection.created', companyName: 'T', reportBaseUrl: 'http://localhost' });
@@ -100,7 +100,7 @@ describe('AutomationService.trigger — agreement filter', () => {
         await testDb.insert(schema.automations).values({
             id: 'rule-3', tenantId: TENANT, name: 'Booking confirmation', trigger: 'inspection.created',
             recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0,
-            subjectTemplate: '', bodyTemplate: '', channels: '["email"]', emailTemplateId: 'tpl-ord-3',
+            channels: '["email"]', emailTemplateId: 'tpl-ord-3',
             active: true, isDefault: false, createdAt: new Date(),
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: INSP, triggerEvent: 'inspection.created', companyName: 'T', reportBaseUrl: 'http://localhost' });

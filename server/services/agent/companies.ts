@@ -1,6 +1,7 @@
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { contacts } from '../../lib/db/schema/contact';
-import { tenants } from '../../lib/db/schema/tenant';
+import { tenants, tenantConfigs } from '../../lib/db/schema/tenant';
+import { tenantDisplayName } from '../../lib/tenant-display-name';
 
 /** One company a partner agent currently works with, and their identity there. */
 export interface AgentCompany {
@@ -29,14 +30,15 @@ export async function listAgentCompanies(
     const rows = await db.select({
         tenantId: contacts.tenantId,
         contactId: contacts.id,
-        name: tenants.name,
+        name: tenantDisplayName,
     }).from(contacts)
         .innerJoin(tenants, eq(tenants.id, contacts.tenantId))
+        .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, tenants.id))
         .where(and(
             eq(contacts.agentUserId, agentUserId),
             isNull(contacts.agentRevokedAt),
         ))
-        .orderBy(asc(tenants.name))
+        .orderBy(asc(tenantDisplayName))
         .all();
 
     return rows.map((r: { tenantId: string; contactId: string; name: string | null }) => ({

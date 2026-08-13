@@ -19,19 +19,20 @@
 
 ## What it is
 
-OpenInspection is [open source home inspection software](https://inspectorhub.io/open-source) — a complete inspection stack: inspector dashboard, public booking widget, mobile field form, professional HTML reports with e-signatures, AI assistance, and PWA offline support, all running on Cloudflare's edge and self-hosted on a single Worker.
+OpenInspection is [open source home inspection software](https://inspectorhub.io/open-source) — a complete inspection stack: inspector dashboard, public booking widget, a field-ready inspection editor, professional HTML reports with e-signatures, AI assistance, and PWA offline support, all running on Cloudflare's edge and self-hosted on a single Worker.
 
 ### Architecture
 
-- **Single Cloudflare Worker** (`workers/app.ts`) — a Hono entry that mounts the full API in-process and delegates page routes to React Router v7 SSR (the cloudflare/react-router-hono-fullstack-template shape)
+- **Single Cloudflare Worker** (`workers/app.ts`) — a Hono entry that mounts the full API in-process and delegates page routes to React Router v8 SSR (the cloudflare/react-router-hono-fullstack-template shape)
 - **API** (`server/`) — Hono + Drizzle + D1, handles all business logic
-- **Web** (`app/`) — React Router v7 + React 18 + Tailwind v4, SSR on CF Workers
+- **Web** (`app/`) — React Router v8 + React 19 + Tailwind v4, SSR on CF Workers
 - **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based components
 - One deployable; React Router loaders/actions call the API directly through an in-process `API_WORKER` self-binding (no network hop, no second worker)
 
 ### Inspector workflow
-- 3-pane editor with 248 canned comments, slash-trigger snippet picker, AI rewrite
-- Keyboard-driven: 1-5 ratings, ⌘K palette, `/` snippet picker, `?` HUD
+- 3-pane editor; a new workspace starts with 250+ canned comments, 80 repair items, 4 rating systems and 17 templates
+- Keyboard-driven: `1`-`5` ratings, `/` canned-comment library, `;` snippets, `?` cheatsheet, `⌘K` palette in the workspace
+- Simultaneous editing — inspection results are a Yjs CRDT in a Durable Object
 - Offline-capable PWA with photo upload queue
 - Migrate from Spectora in under 5 minutes via paste-JSON import
 
@@ -56,7 +57,7 @@ OpenInspection is [open source home inspection software](https://inspectorhub.io
 - **Yours**: fork it, change templates, add integrations. No vendor lock-in.
 - **Fast**: edge-deployed, < 100 ms response times globally
 - **Compliant**: PBKDF2-SHA256 password hashing, hash-chained Ed25519 audit log on e-signatures (ESIGN Act + UETA), server-rendered PDF + Certificate of Completion via Browser Run, offline-verifiable evidence pack, tenant-scoped data isolation
-- **Modern**: React Router v7 + React 18 + Hono API + Drizzle + Tailwind v4 — small surface, easy to read
+- **Modern**: React Router v8 + React 19 + Hono API + Drizzle + Tailwind v4 — small surface, easy to read
 
 ## Quick start
 
@@ -72,7 +73,7 @@ Want to evaluate the product without running any infrastructure? Register at [**
 2. Cloudflare reads the committed `wrangler.jsonc` (which carries **placeholder IDs only**) and **auto-provisions and binds** the required resources — D1 (`DB`), KV (`TENANT_CACHE`), R2 (`PHOTOS`), the `BROWSER` binding, the Durable Objects and the Workflow — injecting the real resource IDs for you. There is no manual ID editing.
 3. After the deploy finishes, visit `/setup` on your new Worker URL and enter your **`SETUP_CODE`** to create the first admin account. For the one-click path, the wizard reads [`.dev.vars.example`](.dev.vars.example) and surfaces `SETUP_CODE` as a secret field you fill in **during** the deploy — that is the value you type at `/setup`. It must be any value of at least 6 characters. `/setup` is gated solely on this secret: if `SETUP_CODE` is unset the endpoint refuses to proceed, so an unprovisioned Worker can't be claimed. You can change it later in the dashboard under **Settings → Variables and Secrets**.
 
-Deep dive: [`docs/developers/02_deploy.md`](docs/developers/02_deploy.md).
+Deep dive: [`docs/self-host/deploy.md`](docs/self-host/deploy.md).
 
 ### 3. Deploy with the CLI
 
@@ -88,21 +89,24 @@ npm run deploy              # full react-router build, then wrangler deploy
 - Use `npm run deploy`, **not** raw `wrangler deploy` — the npm script runs the full `react-router build` (bundling `server/` API + `app/` SSR into one worker) before deploying. Its tail then runs idempotent ensure-steps that provision the JWT keypair and **print the `SETUP_CODE` in the deploy output** if one is not already set (it never overwrites an existing value). Visit `/setup` with that code for your first login.
 - For local development, use `npm run dev:hmr` (Vite dev server with hot module replacement, port 5173) for the fast iteration loop, or `npm run dev` (build-based — `react-router build` then `wrangler dev` on port 8788) to run the real bundled worker.
 
-Deep dive: [`docs/developers/02_deploy.md`](docs/developers/02_deploy.md). Architecture overview: [`docs/developers/01_architecture.md`](docs/developers/01_architecture.md).
+Deep dive: [`docs/self-host/deploy.md`](docs/self-host/deploy.md). Architecture overview: [`docs/develop/architecture.md`](docs/develop/architecture.md).
 
 ## Documentation
 
-- [Deploy](docs/developers/02_deploy.md) — first-time setup on Cloudflare
-- [Upgrading](docs/developers/12_upgrade.md) — upgrade an existing deployment to a newer release
-- [Architecture](docs/developers/01_architecture.md) — module map, request flow, cost model
-- [Design System](docs/developers/11_design_system.md) — tokens, shared-ui components, dark mode, `lint:ds`
+**[`docs/README.md`](docs/README.md) is the map.** The most-used entries:
+
+- [Deploy](docs/self-host/deploy.md) — first-time setup on Cloudflare
+- [Upgrading](docs/self-host/upgrade.md) — upgrade an existing deployment to a newer release
+- [User guide](docs/user-guide/README.md) — the inspection workflow end to end
+- [Architecture](docs/develop/architecture.md) — module map, request flow, cost model
+- [Design System](docs/develop/design-system.md) — tokens, shared-ui components, dark mode, `lint:ds`
 - [Contributing](CONTRIBUTING.md) — code conventions and PR process, including the [Versioning & Deprecation Policy](CONTRIBUTING.md#versioning--deprecation-policy)
 - [Community](docs/community.md) — Discussions categories and where to talk
 
 ## Tech stack
 
 - **Cloudflare Workers**: edge runtime (single Worker — Hono entry mounts the API in-process + delegates page routes to React Router SSR)
-- **React Router v7** + React 18: frontend SSR on Workers
+- **React Router v8** + React 19: frontend SSR on Workers
 - **Hono** + Zod OpenAPI: typed API layer
 - **Drizzle ORM** + Cloudflare D1: SQLite at the edge
 - **Cloudflare R2 / KV**: object storage and config cache

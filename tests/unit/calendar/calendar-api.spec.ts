@@ -78,7 +78,6 @@ describe('calendar API — calendar_connections', () => {
 
         await testDb.insert(schema.tenants).values({
             id: TENANT,
-            name: 'Acme',
             slug: 'acme',
             status: 'active',
             deploymentMode: 'shared',

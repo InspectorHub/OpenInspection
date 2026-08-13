@@ -22,7 +22,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import { drizzle as drizzleFor } from 'drizzle-orm/better-sqlite3';
-import { aiContentReviews } from '../../../server/lib/db/schema';
+import { aiContentReviews, aiCallProvenance } from '../../../server/lib/db/schema';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
@@ -93,6 +93,18 @@ beforeEach(async () => {
     const fixture = createTestDb();
     await setupSchema(fixture.sqlite);
     db = drizzleFor(fixture.sqlite);
+    // The route refuses a review citing a call this workspace does not own, so
+    // both call ids these cases use have to exist under this tenant. Retry
+    // safety is the subject here; ownership is asserted in
+    // tests/unit/ai/content-review-ownership.spec.ts.
+    for (const id of [CALL, 'call-2']) {
+        await db.insert(aiCallProvenance).values({
+            id, tenantId: T,
+            capability: 'assist', provider: 'gemini', mode: 'byo',
+            model: 'gemini-test', promptVersion: 'test.v1',
+            createdAt: new Date(1_700_000_000_000),
+        });
+    }
 });
 
 

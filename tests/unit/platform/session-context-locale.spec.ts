@@ -33,7 +33,6 @@ beforeEach(async () => {
 async function seedTenant() {
     await testDb.insert(schema.tenants).values({
         id: TENANT_ID,
-        name: 'Locale Test Co',
         slug: 'locale-test-co',
         tier: 'free',
         status: 'active',

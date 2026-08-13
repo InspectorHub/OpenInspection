@@ -26,7 +26,7 @@ describe('share token lifecycle (IA-37)', () => {
         await setupSchema(f.sqlite);
         (mockDrizzle as any).mockReturnValue(db);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
         } as any);
         clock = T0;

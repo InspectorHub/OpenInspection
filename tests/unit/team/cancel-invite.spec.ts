@@ -16,8 +16,8 @@ const OTHER_T  = 'cccccccc-cccc-cccc-cccc-ccccccccccc1';
 
 async function seed(db: BetterSQLite3Database<typeof schema>) {
   await db.insert(schema.tenants).values([
-    { id: TENANT_A, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-    { id: TENANT_B, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+    { id: TENANT_A, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+    { id: TENANT_B, slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
   ]);
   await db.insert(schema.tenantInvites).values([
     { id: PENDING,  tenantId: TENANT_A, email: 'p@a.test', role: 'inspector', status: 'pending',  expiresAt: new Date(Date.now() + 1e9) },

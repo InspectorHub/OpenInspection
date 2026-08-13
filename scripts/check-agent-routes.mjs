@@ -27,14 +27,16 @@ const ROUTES = join(ROOT, "app", "routes.ts");
 const LAYOUT = "routes/agent-layout.tsx";
 const PREFIX = "agent-";
 
-/** @returns {string[]} human-readable violation messages */
-export function findAgentRouteViolations(source) {
-  const out = [];
+/**
+ * Locate the agent-layout children array and pull out its route() paths.
+ * Shared by findAgentRouteViolations and the CLI's route-count denominator so
+ * the two never disagree about what "checked" means.
+ * @returns {{ routes: string[], error?: string }}
+ */
+function locateAgentLayoutRoutes(source) {
   const start = source.indexOf(`layout("${LAYOUT}"`);
   if (start === -1) {
-    // Fail loudly rather than passing vacuously. A gate that silently finds
-    // nothing to check is the failure mode this repository has been bitten by.
-    return [`agent-layout block not found in app/routes.ts (looked for layout("${LAYOUT}")`];
+    return { routes: [], error: `agent-layout block not found in app/routes.ts (looked for layout("${LAYOUT}")` };
   }
 
   // Walk from the opening bracket of the children array to its match, so a
@@ -49,13 +51,25 @@ export function findAgentRouteViolations(source) {
       if (depth === 0) { end = i; break; }
     }
   }
-  if (end === -1) return ["could not find the end of the agent-layout children array"];
+  if (end === -1) return { routes: [], error: "could not find the end of the agent-layout children array" };
 
   const block = source.slice(open, end);
   const routes = [...block.matchAll(/\broute\(\s*"([^"]+)"/g)].map((m) => m[1]);
   if (routes.length === 0) {
-    return ["agent-layout has no route() children — the gate is matching nothing"];
+    return { routes, error: "agent-layout has no route() children — the gate is matching nothing" };
   }
+  return { routes };
+}
+
+/** @returns {string[]} human-readable violation messages */
+export function findAgentRouteViolations(source) {
+  const { routes, error } = locateAgentLayoutRoutes(source);
+  if (error) {
+    // Fail loudly rather than passing vacuously. A gate that silently finds
+    // nothing to check is the failure mode this repository has been bitten by.
+    return [error];
+  }
+  const out = [];
   for (const path of routes) {
     if (!path.startsWith(PREFIX)) {
       out.push(
@@ -67,11 +81,13 @@ export function findAgentRouteViolations(source) {
   return out;
 }
 
-const violations = findAgentRouteViolations(readFileSync(ROUTES, "utf8"));
+const source = readFileSync(ROUTES, "utf8");
+const violations = findAgentRouteViolations(source);
 if (violations.length > 0) {
   console.error("\nAgent-route prefix gate FAILED:\n");
   for (const v of violations) console.error(`  ${v}`);
   console.error("");
   process.exit(1);
 }
-console.log(`agent-route gate OK`);
+const { routes } = locateAgentLayoutRoutes(source);
+console.log(`agent-route gate OK (${routes.length} route(s) checked under ${LAYOUT})`);

@@ -167,7 +167,7 @@ function isTokenExpired(token: string, nowMs: number): boolean {
  *
  * There are two front doors and they are not interchangeable. `/login` is for
  * STAFF: an agent has no account there, and under `APP_MODE=saas`
- * `routes/login.tsx` 302s again to `${PORTAL_API_URL}/login` — out of this
+ * `routes/login.tsx` 302s again to the portal's own login — out of this
  * product entirely, onto a portal sign-in an agent cannot use. So an agent sent
  * to `/login` on logout or on expiry does not land on a login page; they land
  * on a dead end. Agents sign in at `/agent-login`.

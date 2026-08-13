@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, sql, isNull } from 'drizzle-orm';
-import { users, tenantInvites, tenants } from '../lib/db/schema';
+import { users, tenantInvites, tenants, tenantConfigs } from '../lib/db/schema';
+import { tenantDisplayName } from '../lib/tenant-display-name';
 import { Errors } from '../lib/errors';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { logger } from '../lib/logger';
@@ -253,7 +254,9 @@ export class AuthService {
         if (!invite) return null;
         if (invite.status !== 'pending') return null;
         if (invite.expiresAt < new Date()) return null;
-        const tenant = await db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, invite.tenantId)).get();
+        const tenant = await db.select({ name: tenantDisplayName }).from(tenants)
+            .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, tenants.id))
+            .where(eq(tenants.id, invite.tenantId)).get();
         return { email: invite.email, workspaceName: tenant?.name ?? '' };
     }
 

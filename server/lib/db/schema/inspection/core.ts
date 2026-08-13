@@ -118,32 +118,10 @@ export const inspections = sqliteTable('inspections', {
     //   'awaiting_inspector' = agent submitted; inspector must approve (Spectora reviewer mode)
     //   'awaiting_client'    = magic-link sent to client; waiting on confirmation (HomeGauge auto mode or post-inspector-approve)
     conciergeStatus:     text('concierge_status'),
-    // Design System 0520 M3 — TeamMode + multi-inspector (subsystem B, phase 1).
-    //   teamMode             = boolean flag enabling team UI (TeamBanner / RosterPopover).
-    //   leadInspectorId      = -- DEAD (2026-08-03): replaced by inspection_inspectors.
-    //   helperInspectorIds   = -- DEAD (2026-08-03): replaced by inspection_inspectors.
-    //   dataVersion          = monotonic counter; bumped on every successful field write
-    //                          (see InspectionService.patchItem) for offline-queue staleness checks.
-    //                          Superseded by the Yjs state vector under collab editing (#181);
-    //                          column frozen — stop writes once the DO is the authority.
+    // Design System 0520 M3 — TeamMode flag enabling the team UI (TeamBanner /
+    // RosterPopover). WHO is on the team lives in `inspection_inspectors`, one
+    // row per person with their role — the only place any reader may learn it.
     teamMode:            integer('is_team_mode', { mode: 'boolean' }).notNull().default(false),
-    // -- DEAD (2026-08-03): replaced by inspection_inspectors.
-    //
-    // Zero production rows ever carried either: lead_inspector_id was NULL on all
-    // 19 inspections and helper_inspector_ids was '[]' on all of them. They were
-    // still READ — metrics attributed work via coalesce(lead_inspector_id,
-    // inspector_id) and collab access granted editing to the lead and the helpers
-    // JSON — so the two agreed with the rest of the app only by being empty. The
-    // first write of either would have made "who worked this" and, worse, "who may
-    // EDIT this" answer differently from everywhere else.
-    //
-    // A JSON array of ids cannot be indexed, joined, or carry a role beyond its
-    // position, which is what the link table exists to fix. No reads, no writes.
-    // Columns frozen — D1 cannot rebuild an FK-referenced table — and neither name
-    // is ever reused. Same treatment as `comments.rating_bucket`.
-    leadInspectorId:     text('lead_inspector_id'),
-    helperInspectorIds:  text('helper_inspector_ids').notNull().default('[]'),
-    dataVersion:         integer('data_version').notNull().default(0),
     // #119 — re-inspection linkage (app-layer refs, no DB FK per Schema Rules).
     // source = the baseline this re-inspection carried from (original OR a prior
     // re-inspection). root = the original at the chain root (grouping). round =

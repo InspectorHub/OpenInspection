@@ -34,7 +34,7 @@ beforeEach(async () => {
     db = fx.db;
     await setupSchema(fx.sqlite);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Delete Co', slug: 'delete-co', status: 'active',
+        id: TENANT, slug: 'delete-co', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
     await db.insert(schema.inspections).values({

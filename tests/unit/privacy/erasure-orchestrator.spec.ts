@@ -23,8 +23,8 @@ const OTHER_EMAIL = 'keep-me@test.com';
 
 async function seedTenants(db: BetterSQLite3Database<typeof schema>) {
     await db.insert(schema.tenants).values([
-        { id: TENANT_A, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-        { id: TENANT_B, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: TENANT_A, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: TENANT_B, slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
     await db.insert(schema.agreements).values([
         { id: 'agr-1', tenantId: TENANT_A, name: 'Standard', content: 'Agreement text', version: 1, createdAt: new Date() },

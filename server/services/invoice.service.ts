@@ -5,6 +5,7 @@ import { tenantConfigs } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { AutomationService } from './automation.service';
+import { resolveAutomationCompanyName } from './automation/company-name';
 import { logger } from '../lib/logger';
 import type { PaymentMethod } from '../lib/payment-method';
 import type { AppendedPayment } from './payment-ledger.service';
@@ -149,7 +150,8 @@ export class InvoiceService {
                 partialPaidAt = fresh?.partialPaidAt ?? null;
             }
             new AutomationService(this.db)
-                .trigger({ tenantId, inspectionId: data.inspectionId, triggerEvent: 'invoice.created', companyName: '', reportBaseUrl: '' })
+                .trigger({ tenantId, inspectionId: data.inspectionId, triggerEvent: 'invoice.created',
+                    companyName: await resolveAutomationCompanyName(drizzle(this.db), tenantId), reportBaseUrl: '' })
                 .catch(err => logger.error('automation trigger failed', { event: 'invoice.created' }, err instanceof Error ? err : undefined));
         }
         // `status` stays 'draft': a deposit does not send an invoice. The two

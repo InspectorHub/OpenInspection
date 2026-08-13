@@ -9,6 +9,7 @@ import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
 import { SsoHandoffSchema } from '../lib/validations/sso-handoff.schema';
 import { logger } from '../lib/logger';
 import { tenantConfigs, inspectionAccessTokens, tenants, contactRoleProfiles } from '../lib/db/schema';
+import { tenantDisplayName } from '../lib/tenant-display-name';
 import { capabilitiesForProfile, type RoleKind } from '../lib/people/capabilities';
 import { reencryptAllTenantSecrets } from '../lib/secrets-reencrypt';
 import { secretsCacheKey } from '../lib/secrets-cache';
@@ -17,6 +18,7 @@ import { requireServiceBinding } from './service-binding-guard';
 import { aiProvisioningHandler } from './ai-provisioning';
 import { findGlobalAgentByEmail } from '../services/agent/account';
 import { usageReportHandler } from './usage-report';
+import { destructionRecordsHandler } from './destruction-records';
 import { getSeatUsage } from '../features/seat-quota/usage';
 
 const api = new Hono<HonoConfig>();
@@ -120,6 +122,12 @@ api.post('/tenants/:slug/purge', requireServiceBinding, async (c) => {
         return c.json({ success: false, error: { message: 'Purge failed' } }, 500);
     }
 });
+
+/**
+ * GET /api/integration/destruction-records — the read side of the purge above.
+ * Handler + why it is deliberately NOT tenant-scoped: ./destruction-records.ts.
+ */
+api.get('/destruction-records', requireServiceBinding, destructionRecordsHandler);
 
 /**
  * POST /api/integration/sso-handoff
@@ -267,8 +275,15 @@ api.post('/backfill-default-templates', requireServiceBinding, async (c) => {
     const { drizzle } = await import('drizzle-orm/d1');
     const { tenants } = await import('../lib/db/schema');
     const { TemplateSeedService } = await import('../services/template-seed.service');
+    // DELIBERATELY carries no `templateCreate` capability (#307). This is
+    // provisioning, not a staff action: the route is authenticated by the
+    // portal M2M HMAC and runs with NO acting user, so there is no capability
+    // set to consult. Bolting one on would make tenant seeding depend on a
+    // permission nobody holds yet.
     const db = drizzle(c.env.DB);
-    const allTenants = await db.select({ id: tenants.id, name: tenants.name }).from(tenants).all();
+    // Operational output for a seeding caller, not a display surface.
+    const allTenants = await db.select({ id: tenants.id, name: tenantDisplayName })
+        .from(tenants).leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, tenants.id)).all();
     const svc = new TemplateSeedService(c.env.DB);
 
     const results: { tenantId: string; name: string; seeded: number; skipped: number }[] = [];

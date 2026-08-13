@@ -45,7 +45,7 @@ describe('saveAnnotation', () => {
     svc = new InspectionService({} as D1Database, r2.bucket, sdb);
 
     await testDb.insert(schema.tenants).values({
-      id: TENANT, name: 'Acme', slug: 'acme-ann', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+      id: TENANT, slug: 'acme-ann', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await testDb.insert(schema.inspections).values({
       id: INSPECTION_ID, tenantId: TENANT, templateId: null,

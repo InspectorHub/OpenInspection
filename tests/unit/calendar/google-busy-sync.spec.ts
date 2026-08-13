@@ -1,14 +1,14 @@
 /**
  * A-polish 10.3 — Google busy sync writes timed availability_overrides.
  *
- * The extracted syncGoogleBusyOverrides helper: converts provider busy blocks to
+ * The extracted syncProviderBusyOverrides helper: converts provider busy blocks to
  * tenant-tz civil date + wall-clock start/end, deletes stale google rows in the
  * synced range first, then upserts keyed on (inspector, source, external_id).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import { tenants, users, availabilityOverrides } from '../../../server/lib/db/schema';
-import { syncGoogleBusyOverrides } from '../../../server/lib/calendar/sync-busy';
+import { syncProviderBusyOverrides } from '../../../server/lib/calendar/sync-busy';
 import { and, eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
@@ -23,7 +23,7 @@ const TO = Date.UTC(2026, 6, 27, 0, 0, 0);
 const OPAQUE = { start: '2026-07-20T09:00:00Z', end: '2026-07-20T10:30:00Z', externalId: 'evt-opaque', transparency: 'opaque' as const };
 const TRANSPARENT = { start: '2026-07-21T14:00:00Z', end: '2026-07-21T15:00:00Z', externalId: 'evt-free', transparency: 'transparent' as const };
 
-describe('syncGoogleBusyOverrides', () => {
+describe('syncProviderBusyOverrides', () => {
     let db: BetterSQLite3Database<typeof schema>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let sqlite: any;
@@ -34,7 +34,7 @@ describe('syncGoogleBusyOverrides', () => {
         sqlite = fix.sqlite;
         await setupSchema(sqlite);
         await db.insert(tenants).values({
-            id: T, name: 'Co', slug: 'co', tier: 'free', status: 'active',
+            id: T, slug: 'co', tier: 'free', status: 'active',
             maxUsers: 5, deploymentMode: 'shared', createdAt: new Date(),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
@@ -46,13 +46,14 @@ describe('syncGoogleBusyOverrides', () => {
     });
     afterEach(() => sqlite.close());
 
-    const params = { tenantId: T, inspectorId: INSP, tenantTz: TZ, rangeFromMs: FROM, rangeToMs: TO };
+    // The source is now a parameter rather than a literal inside the helper.
+    const params = { tenantId: T, inspectorId: INSP, tenantTz: TZ, rangeFromMs: FROM, rangeToMs: TO, source: 'google' as const };
     const googleRows = () => db.select().from(availabilityOverrides)
         .where(and(eq(availabilityOverrides.tenantId, T), eq(availabilityOverrides.source, 'google')))
         .orderBy(availabilityOverrides.date).all();
 
     it('stores each block as a timed google override with its transparency', async () => {
-        const res = await syncGoogleBusyOverrides(db as never, params, [OPAQUE, TRANSPARENT]);
+        const res = await syncProviderBusyOverrides(db as never, params, [OPAQUE, TRANSPARENT]);
         expect(res.upserted).toBe(2);
         const rows = await googleRows();
         expect(rows).toHaveLength(2);
@@ -68,9 +69,9 @@ describe('syncGoogleBusyOverrides', () => {
     });
 
     it('re-syncing the same events updates in place (no duplicates)', async () => {
-        await syncGoogleBusyOverrides(db as never, params, [OPAQUE, TRANSPARENT]);
+        await syncProviderBusyOverrides(db as never, params, [OPAQUE, TRANSPARENT]);
         // Same external ids, opaque moved to a new time.
-        await syncGoogleBusyOverrides(db as never, params, [
+        await syncProviderBusyOverrides(db as never, params, [
             { ...OPAQUE, start: '2026-07-20T11:00:00Z', end: '2026-07-20T12:00:00Z' },
             TRANSPARENT,
         ]);
@@ -88,7 +89,7 @@ describe('syncGoogleBusyOverrides', () => {
             createdAt: new Date(),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
-        await syncGoogleBusyOverrides(db as never, params, [OPAQUE]);
+        await syncProviderBusyOverrides(db as never, params, [OPAQUE]);
         const rows = await googleRows();
         expect(rows.map(r => r.externalId)).toEqual(['evt-opaque']);
     });
@@ -101,7 +102,7 @@ describe('syncGoogleBusyOverrides', () => {
             createdAt: new Date(),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
-        await syncGoogleBusyOverrides(db as never, params, [OPAQUE]);
+        await syncProviderBusyOverrides(db as never, params, [OPAQUE]);
         const manual = await db.select().from(availabilityOverrides)
             .where(and(eq(availabilityOverrides.tenantId, T), eq(availabilityOverrides.id, 'manual-1'))).get();
         expect(manual).toBeTruthy();

@@ -11,14 +11,22 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const T = 'tenant-1';
 
+// The automations.subject_template/body_template/sms_body columns are gone,
+// so backfillAutomationTemplates now recovers copy ONLY from the
+// AUTOMATION_SEEDS entry matching (name, trigger) — there is nothing left on
+// the row itself to override. The default fixture below (name 'Report Ready',
+// trigger 'report.published') matches a real seed on both, so the first two
+// tests' email/sms assertions check against that seed's actual text, not a
+// custom fixture string. The third test ('email-only automation') overrides
+// only `name` to 'Payment Received' and keeps the hardcoded
+// trigger: 'report.published' default, which matches no AUTOMATION_SEEDS
+// entry (the real 'Payment Received' seeds fire on 'payment.received') — so
+// that case exercises the no-match, blank-template fallback instead.
 async function seedAuto(testDb: BetterSQLite3Database<typeof schema>, over: Partial<typeof schema.automations.$inferInsert> = {}) {
     await testDb.insert(schema.automations).values({
         id: over.id ?? 'a1', tenantId: T, name: over.name ?? 'Report Ready',
         trigger: 'report.published', recipientKind: 'inspector', recipientRoleProfileId: null, delayMinutes: 0,
-        subjectTemplate: over.subjectTemplate ?? 'Your report is ready — {{property_address}}',
-        bodyTemplate: over.bodyTemplate ?? '<p>Hi {{client_name}}</p><p><a href="{{report_url}}">View</a></p>',
         channels: over.channels ?? '["email","sms"]',
-        smsBody: over.smsBody !== undefined ? over.smsBody : '{{company_name}}: report ready {{report_url}}',
         active: true, isDefault: true, createdAt: new Date(), ...over,
     });
 }
@@ -44,7 +52,7 @@ describe('backfillAutomationTemplates', () => {
         const email = tpls.find((t) => t.channel === 'email')!;
         expect(email.isSeeded).toBe(true);
         expect(email.name).toBe('Report Ready — Email');
-        expect(email.subject).toBe('Your report is ready — {{property_address}}');
+        expect(email.subject).toBe('Your inspection report is ready — {{property_address}}');
         expect(JSON.parse(email.variables!)).toEqual(expect.arrayContaining(['property_address', 'client_name', 'report_url']));
         const sms = tpls.find((t) => t.channel === 'sms')!;
         expect(sms.name).toBe('Report Ready — SMS');
@@ -64,7 +72,7 @@ describe('backfillAutomationTemplates', () => {
     });
 
     it('email-only automation gets only an email template', async () => {
-        await seedAuto(testDb, { id: 'a2', name: 'Payment Received', channels: '["email"]', smsBody: null });
+        await seedAuto(testDb, { id: 'a2', name: 'Payment Received', channels: '["email"]' });
         const { created } = await backfillAutomationTemplates({} as D1Database, T);
         expect(created).toBe(1);
         const a = await testDb.select().from(schema.automations).where(eq(schema.automations.id, 'a2')).get();

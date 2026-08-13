@@ -68,7 +68,6 @@ describe('importContacts', () => {
         await setupSchema(fix.sqlite);
         await testDb.insert(schema.tenants).values({
             id: TENANT_ID,
-            name: 'Test Tenant',
             slug: 'test',
             status: 'active',
             deploymentMode: 'shared',
@@ -150,7 +149,7 @@ describe('importContacts', () => {
 
     it('does not dedupe against another tenant\'s contacts', async () => {
         await testDb.insert(schema.tenants).values({
-            id: 'other-tenant', name: 'Other', slug: 'other', status: 'active',
+            id: 'other-tenant', slug: 'other', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.contacts).values({

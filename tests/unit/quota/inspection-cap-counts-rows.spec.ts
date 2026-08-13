@@ -34,8 +34,8 @@ describe('D1/SQLite: conditional upsert with a correlated subquery', () => {
     /** `inspections.tenant_id` carries a legacy FK, and better-sqlite3 enforces
      *  foreign keys by default — so the parent row has to exist first. */
     const seedTenant = (tenantId: string) => sqlite.prepare(
-        `INSERT INTO tenants (id, name, slug, created_at) VALUES (?, ?, ?, ?)`,
-    ).run(tenantId, `Tenant ${tenantId}`, tenantId, Date.now());
+        `INSERT INTO tenants (id, slug, created_at) VALUES (?, ?, ?)`,
+    ).run(tenantId, tenantId, Date.now());
 
     /** Minimal inspection rows — only the NOT NULL columns are supplied. */
     const seedInspections = (tenantId: string, n: number) => {
@@ -181,8 +181,8 @@ describe('PlanQuotaGuard.consumeInspection counts rows, not creates', () => {
         (mockDrizzle as any).mockReturnValue(fixture.db);
         testD1 = toRawD1(sqlite);
         sqlite.prepare(
-            `INSERT INTO tenants (id, name, slug, tier, created_at) VALUES (?, ?, ?, 'free', ?)`,
-        ).run('t1', 'Acme', 'acme', Date.now());
+            `INSERT INTO tenants (id, slug, tier, created_at) VALUES (?, ?, 'free', ?)`,
+        ).run('t1', 'acme', Date.now());
         guard = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
     });
 

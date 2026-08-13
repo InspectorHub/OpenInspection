@@ -31,8 +31,8 @@ describe('exportAccount', () => {
         testDb = fix.db;
         await setupSchema(fix.sqlite);
         await testDb.insert(schema.tenants).values([
-            { id: TENANT,   name: 'T1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: TENANT_B, name: 'T2', slug: 't2', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_B, slug: 't2', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await testDb.insert(schema.users).values({
             id: USER_ID, tenantId: TENANT, email: 'a@x.com', passwordHash: 'x', role: 'owner', createdAt: new Date(),
@@ -89,7 +89,7 @@ describe('softDeleteAccount', () => {
         testDb = fix.db;
         await setupSchema(fix.sqlite);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'T1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            id: TENANT, slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.users).values({
             id: USER_ID, tenantId: TENANT, email: 'a@x.com', passwordHash: 'x', role: 'owner', createdAt: new Date(),

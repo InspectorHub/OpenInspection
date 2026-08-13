@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/templates";
-import { useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { useDisplayTimeZone, useCapability } from "~/hooks/useSessionContext";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { Pagination, PageHeader, Icon } from "@core/shared-ui";
@@ -160,6 +160,17 @@ export default function TemplatesPage() {
   const [searchParams] = useSearchParams();
   const { setPage, setPageSize } = usePagination();
 
+  // Capabilities are decided where they are ENFORCED (the four gates on
+  // server/api/inspections/templates.ts) and only READ here, so this page can
+  // never offer an action the API refuses (CLAUDE.md, Cross-Portal Reuse).
+  // `useCapability` is fail-closed when there is no session context.
+  //
+  // HIDDEN, not disabled-with-a-tooltip: a disabled control invites "why?" and
+  // the honest answer is a permission the viewer cannot change themselves.
+  const canCreate = useCapability("templateCreate");
+  const canImport = useCapability("templateImport");
+  const canDelete = useCapability("templateDelete");
+
   const [view, setView] = useState<"list" | "card">("list");
   const [searchQuery, setSearchQuery] = useState(loaderQ);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -292,13 +303,17 @@ export default function TemplatesPage() {
         meta={metaParts.join(" · ")}
         actions={
           <>
-            <button onClick={() => setImportOpen(true)} className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2">
-              <Icon name="download" size={16} strokeWidth={1.75} />
-              {m.templates_action_import_spectora()}
-            </button>
-            <button onClick={() => setCreateOpen(true)} className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2">
-              {m.templates_action_new_template()}
-            </button>
+            {canImport && (
+              <button onClick={() => setImportOpen(true)} className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2">
+                <Icon name="download" size={16} strokeWidth={1.75} />
+                {m.templates_action_import_spectora()}
+              </button>
+            )}
+            {canCreate && (
+              <button onClick={() => setCreateOpen(true)} className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2">
+                {m.templates_action_new_template()}
+              </button>
+            )}
           </>
         }
       />
@@ -354,6 +369,9 @@ export default function TemplatesPage() {
           handleDuplicate={handleDuplicate}
           setDeleteConfirm={setDeleteConfirm}
           timeZone={displayTz}
+          canCreate={canCreate}
+          canImport={canImport}
+          canDelete={canDelete}
         />
       )}
 
@@ -366,6 +384,9 @@ export default function TemplatesPage() {
           setCreateOpen={setCreateOpen}
           handleDuplicate={handleDuplicate}
           setDeleteConfirm={setDeleteConfirm}
+          canCreate={canCreate}
+          canImport={canImport}
+          canDelete={canDelete}
         />
       )}
 

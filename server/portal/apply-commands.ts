@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { tenants } from '../lib/db/schema';
+import { tenants, tenantConfigs } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import { PortalProvider } from './portal.provider';
 import { narrowAiTierCaps, writeTenantAiCaps } from '../features/plan-quota/ai-caps';
@@ -53,6 +53,51 @@ export async function applyAiCaps(
     // so they are safe to log and worth logging: an unexplained block is the
     // failure mode this whole path exists to make explicable.
     logger.info('ai-caps applied', { tenantId: p.tenantId, tier: p.tier, caps: caps?.[p.tier] ?? null });
+    return 'applied';
+}
+
+/**
+ * A company admin renamed their own company — write the DISPLAY name, always.
+ *
+ * The unconditional write is the whole point, and it is why this is not a field
+ * on `cmd.tenant.update`. That command's name write is initialize-only, which is
+ * right for a provisioning sync and wrong for a rename; while `tenants.name`
+ * existed the rename landed there instead and the difference stayed hidden.
+ *
+ * Upsert, because a tenant with no config row must still end up named rather
+ * than silently skipped — the row is created by both providers at provisioning,
+ * so this branch is belt-and-braces, and the failure it prevents is quiet.
+ *
+ * `legal_name` is untouched. It is a separate column for agreements, signature
+ * certificates, the invoice "from" party and the TCPA disclosure; renaming the
+ * brand must not rewrite the entity that signed something.
+ *
+ * The KV drop matches sync-quota's: the tenant cache carries the display name,
+ * and a rename nobody can see until the entry expires is the same silence this
+ * command exists to end.
+ */
+export async function applyTenantRename(
+    dbBinding: D1Database,
+    kv: KVNamespace | undefined,
+    p: { tenantId: string; companyName: string },
+): Promise<'applied' | 'tenant-not-found'> {
+    const db = drizzle(dbBinding);
+    const tenant = await db.select({ id: tenants.id })
+        .from(tenants).where(eq(tenants.id, p.tenantId)).get();
+    if (!tenant) return 'tenant-not-found';
+
+    const now = new Date();
+    await db.insert(tenantConfigs)
+        .values({ tenantId: p.tenantId, companyName: p.companyName, updatedAt: now })
+        .onConflictDoUpdate({
+            target: tenantConfigs.tenantId,
+            set: { companyName: p.companyName, updatedAt: now },
+        });
+
+    try {
+        await kv?.delete(`tenant:${p.tenantId}`);
+    } catch { /* cache miss is fine — read-through repopulates */ }
+    logger.info('tenant rename applied', { tenantId: p.tenantId });
     return 'applied';
 }
 

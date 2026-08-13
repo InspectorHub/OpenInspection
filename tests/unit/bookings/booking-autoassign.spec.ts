@@ -118,7 +118,7 @@ function buildApp(
 
 async function seedBaseTenant(db: BetterSQLite3Database<typeof schema>) {
     await db.insert(tenants).values({
-        id: T1, name: 'Acme', slug: 'acme', tier: 'free', status: 'active',
+        id: T1, slug: 'acme', tier: 'free', status: 'active',
         maxUsers: 5, deploymentMode: 'shared', createdAt: new Date(),
     } as any);
     await db.insert(users).values([
@@ -227,7 +227,7 @@ describe('POST /book — IA-26 auto-assign + fail-closed', () => {
     it('returns 409 company-level not-open when no availability rows exist at all', async () => {
         // Seed a fresh tenant with no availability rows.
         await db.insert(tenants).values({
-            id: 'tt2', name: 'Empty Co', slug: 'emptyco', tier: 'free', status: 'active',
+            id: 'tt2', slug: 'emptyco', tier: 'free', status: 'active',
             maxUsers: 5, deploymentMode: 'shared', createdAt: new Date(),
         } as any);
         await db.insert(users).values([
@@ -262,7 +262,7 @@ describe('POST /book — IA-26 auto-assign + fail-closed', () => {
     it('returns 404 when supplied inspectorId belongs to another tenant', async () => {
         // Seed tenant t2 and user U9.
         await db.insert(tenants).values({
-            id: T2, name: 'Other Co', slug: 'other', tier: 'free', status: 'active',
+            id: T2, slug: 'other', tier: 'free', status: 'active',
             maxUsers: 5, deploymentMode: 'shared', createdAt: new Date(),
         } as any);
         await db.insert(users).values([

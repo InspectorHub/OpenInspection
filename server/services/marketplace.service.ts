@@ -1,14 +1,21 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, like, and, desc, sql } from 'drizzle-orm';
+import type { PackEntry } from '../lib/library-edit-marker';
+import { parseLibraryComments, countLibrarySchemaItems } from './marketplace/library-pack';
+import { insertLibraryComments } from './marketplace/library-insert';
+import {
+    applyReplaceMode,
+    previewLibraryReplace,
+    resolveLibraryUpdate,
+    type LibraryReplacePreview,
+} from './marketplace/library-replace';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import {
-    marketplaceTemplates,
-    tenantMarketplaceImports,
     marketplaceLibraries,
     tenantLibraryImports,
     tenantMarketplaceImportHistory,
 } from '../lib/db/schema/marketplace';
-import { templates, comments } from '../lib/db/schema';
+import { templates } from '../lib/db/schema'; // `comments` is reached by raw SQL below, and by ./marketplace/library-replace.ts
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { TemplateService } from './template.service';
@@ -22,7 +29,13 @@ type LibraryUpdateMode = 'append' | 'replace';
 
 export interface UpdateLibraryImportOptions {
     mode?: LibraryUpdateMode;
-    /** Acknowledged by caller that user-modified rows will be lost. */
+    /**
+     * The destructive choice, and it is now enforced rather than merely recorded
+     * (#348). Replace mode defaults to KEEPING rows the tenant rewrote; passing
+     * true is the caller stating, deliberately, that those rewrites should be
+     * deleted along with everything else. Nothing else in this codebase should
+     * default it to true.
+     */
     confirmLossOfEdits?: boolean;
     /** User id for the history row (S2-8). Defaults to 'system'. */
     userId?: string;
@@ -31,11 +44,15 @@ export interface UpdateLibraryImportOptions {
 export interface UpdateLibraryImportResult {
     rowsAdded: number;
     rowsDeleted: number;
+    /** Rows the tenant had rewritten and that this update did not delete. */
+    rowsPreserved: number;
     fromSemver: string;
     toSemver: string;
     libraryName: string;
     mode: LibraryUpdateMode;
 }
+
+export type { LibraryReplacePreview };
 
 export class MarketplaceService {
   private db: ReturnType<typeof drizzle>;
@@ -48,42 +65,72 @@ export class MarketplaceService {
     this.tenantId = tenantId;
   }
 
-  async list(opts: { search?: string; category?: string; page?: number; pageSize?: number }) {
-    const { search = '', category = '', page = 1, pageSize = 50 } = opts;
+  /**
+   * Browse the one catalogue. Every importable kind is in `marketplace_libraries`
+   * and is reached through this method — there is no second query path, which is
+   * the point: the two mechanisms that used to sit behind one page returned
+   * different shapes from different tables and only one of them was ever wired
+   * to a UI.
+   *
+   * The three axes filter independently, because a jurisdiction's form standard
+   * and an inspection kind are not property types and the legacy single
+   * `category` column could only describe one of the three at a time.
+   */
+  async list(opts: {
+    search?: string;
+    kind?: 'comments' | 'templates';
+    propertyType?: string;
+    jurisdiction?: string;
+    inspectionKind?: string;
+    page?: number;
+    pageSize?: number;
+  } = {}) {
+    const { search = '', page = 1, pageSize = 50 } = opts;
     const offset = (page - 1) * pageSize;
 
     const conditions = [];
-    if (category) conditions.push(eq(marketplaceTemplates.category, category));
-    if (search)   conditions.push(like(marketplaceTemplates.name, `%${escapeLikePattern(search)}%`));
+    if (opts.kind)           conditions.push(eq(marketplaceLibraries.kind, opts.kind));
+    if (opts.propertyType)   conditions.push(eq(marketplaceLibraries.propertyType, opts.propertyType));
+    if (opts.jurisdiction)   conditions.push(eq(marketplaceLibraries.jurisdiction, opts.jurisdiction));
+    if (opts.inspectionKind) conditions.push(eq(marketplaceLibraries.inspectionKind, opts.inspectionKind));
+    if (search)              conditions.push(like(marketplaceLibraries.name, `%${escapeLikePattern(search)}%`));
     const where = conditions.length ? and(...conditions) : undefined;
 
     const totalRow = await this.db
       .select({ c: sql<number>`count(*)` })
-      .from(marketplaceTemplates)
+      .from(marketplaceLibraries)
       .where(where)
       .get();
     const total = totalRow?.c ?? 0;
 
-    // Spec 4F — featured templates always sort first; within tier, sort by download count.
+    // Featured entries always sort first; within tier, sort by download count.
     const rawRows = await this.db
       .select()
-      .from(marketplaceTemplates)
+      .from(marketplaceLibraries)
       .where(where)
-      .orderBy(desc(marketplaceTemplates.featured), desc(marketplaceTemplates.downloadCount))
+      .orderBy(desc(marketplaceLibraries.featured), desc(marketplaceLibraries.downloadCount))
       .limit(pageSize)
       .offset(offset);
 
     const imports = await this.db
-      .select()
-      .from(tenantMarketplaceImports)
-      .where(eq(tenantMarketplaceImports.tenantId, this.tenantId));
+      .select({
+        libraryId:      tenantLibraryImports.libraryId,
+        importedSemver: tenantLibraryImports.importedSemver,
+      })
+      .from(tenantLibraryImports)
+      .where(eq(tenantLibraryImports.tenantId, this.tenantId));
 
-    const importMap = new Map(imports.map(i => [i.marketplaceTemplateId, i.importedSemver]));
+    const importMap = new Map(imports.map(i => [i.libraryId, i.importedSemver]));
 
-    const rows = rawRows.map(t => ({
-      ...t,
-      importedSemver: importMap.get(t.id) ?? null,
-      hasUpdate: importMap.has(t.id) && importMap.get(t.id) !== t.semver,
+    // `schema` is the pack ITSELF — counted here, then dropped. Spreading the
+    // whole row was free only while the starter pack was empty; filled in it is
+    // ~50KB per library at pageSize 1000. No client reads it; import and preview
+    // fetch by id.
+    const rows = rawRows.map(({ schema: packSchema, ...l }) => ({
+      ...l,
+      importedSemver: importMap.get(l.id) ?? null,
+      hasUpdate: importMap.has(l.id) && importMap.get(l.id) !== l.semver,
+      itemCount: countLibrarySchemaItems(packSchema as unknown),
     }));
 
     return { rows, total };
@@ -140,116 +187,108 @@ export class MarketplaceService {
     }
   }
 
-  /**
-   * Chunked bulk INSERT of canned-comment rows. Raw SQL with a placeholder
-   * list is one statement per chunk — dramatically faster than N individual
-   * inserts. D1 caps SQL statement size and bound-parameter count, so chunk to
-   * 25 rows (25 × 6 = 150 placeholders, well under D1 limits).
-   *
-   * @param firstId When supplied, the very first inserted row uses this id
-   *   instead of a fresh UUID (lets the caller return a stable local id).
-   * @returns The number of rows inserted.
-   */
-  private async insertLibraryComments(
-    libraryId: string,
-    entries: Array<{ text: string; section?: string }>,
-    firstId?: string,
-  ): Promise<number> {
-    const CHUNK = 25;
-    const nowSec = Math.floor(Date.now() / 1000);
-    let inserted = 0;
-    for (let i = 0; i < entries.length; i += CHUNK) {
-      const batch = entries.slice(i, i + CHUNK);
-      const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
-      const params: (string | number | null)[] = [];
-      for (let j = 0; j < batch.length; j++) {
-        const c = batch[j];
-        const isFirst = i === 0 && j === 0;
-        params.push(
-          isFirst && firstId ? firstId : crypto.randomUUID(),
-          this.tenantId,
-          c.text,
-          c.section ?? null,
-          libraryId,             // S2-7 — provenance for replace mode
-          nowSec,
-        );
-      }
-      const stmt = `INSERT INTO comments (id, tenant_id, text, category, library_id, created_at) VALUES ${placeholders}`;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (this.rawDb as any).prepare(stmt).bind(...params).run();
-      inserted += batch.length;
-    }
-    return inserted;
-  }
 
-  async importTemplate(marketplaceId: string, userId: string = 'system'): Promise<string> {
-    const [mkt] = await this.db
+  /**
+   * The one import path, for every kind (#293).
+   *
+   * Branches on `kind` because the two shapes are genuinely different
+   * operations, not two flavours of one:
+   *
+   *   'templates' (1:1) — one catalogue row becomes ONE local `templates` row,
+   *                       tracked by that row's id in `local_entity_id`.
+   *   'comments'  (1:N) — one pack becomes N `comments` rows tagged with the
+   *                       catalogue id, tracked by `row_count`.
+   *
+   * There is no third kind and no generic fallthrough: writing the comments
+   * table because a kind was unrecognised is precisely the failure the branch
+   * exists to prevent.
+   */
+  async importCatalogEntry(catalogId: string, userId: string = 'system'): Promise<{
+    kind: 'comments' | 'templates';
+    localEntityId: string | null;
+    rowCount: number;
+  }> {
+    const [entry] = await this.db
       .select()
-      .from(marketplaceTemplates)
-      .where(eq(marketplaceTemplates.id, marketplaceId))
+      .from(marketplaceLibraries)
+      .where(eq(marketplaceLibraries.id, catalogId))
       .limit(1);
 
-    if (!mkt) throw new Error('Marketplace template not found');
+    if (!entry) throw new Error('Marketplace entry not found');
 
-    // Check if already imported by this tenant — make endpoint idempotent
+    // Idempotent: a second import returns what the first one produced. It
+    // returns the LOCAL content id, never the marker row's own id — the marker
+    // id is not a handle on anything a caller can use.
     const [existing] = await this.db
       .select()
-      .from(tenantMarketplaceImports)
+      .from(tenantLibraryImports)
       .where(and(
-        eq(tenantMarketplaceImports.tenantId, this.tenantId),
-        eq(tenantMarketplaceImports.marketplaceTemplateId, marketplaceId),
+        eq(tenantLibraryImports.tenantId, this.tenantId),
+        eq(tenantLibraryImports.libraryId, catalogId),
       ))
       .limit(1);
 
     if (existing) {
-      // Already imported — return existing local id (template or first comment)
-      return existing.localTemplateId;
+      return {
+        kind:          entry.kind,
+        localEntityId: existing.localEntityId,
+        rowCount:      existing.rowCount,
+      };
     }
 
-    // Spec 5B P3 — gate marketplace imports on v2 schema validation. The
-    // marketplace can technically host any JSON; without this check, a v1
-    // (legacy `type: 'rating'`) template would leak into a tenant and break
-    // the editor.
-    this.assertV2Schema(mkt.schema);
-
-    const newTemplateId = crypto.randomUUID();
     const now = new Date();
+    let rowCount = 0;
+    let localEntityId: string | null = null;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await this.db.insert(templates as any).values({
-      id:        newTemplateId,
-      tenantId:  this.tenantId,
-      name:      mkt.name,
-      schema:    mkt.schema,
-      createdAt: now,
-    });
+    if (entry.kind === 'templates') {
+      // Spec 5B P3 — gate imports on v2 schema validation. The catalogue can
+      // technically host any JSON; without this check a v1 (legacy
+      // `type: 'rating'`) template would leak into a tenant and break the editor.
+      this.assertV2Schema(entry.schema);
 
-    await this.db.insert(tenantMarketplaceImports).values({
-      id:                    crypto.randomUUID(),
-      tenantId:              this.tenantId,
-      marketplaceTemplateId: marketplaceId,
-      importedSemver:        mkt.semver,
-      localTemplateId:       newTemplateId,
-      importedAt:            now,
+      localEntityId = crypto.randomUUID();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await this.db.insert(templates as any).values({
+        id:        localEntityId,
+        tenantId:  this.tenantId,
+        name:      entry.name,
+        schema:    entry.schema,
+        createdAt: now,
+      });
+    } else if (entry.kind === 'comments') {
+      const entries = parseLibraryComments(entry.schema);
+      rowCount = await insertLibraryComments(this.rawDb, this.tenantId, catalogId, entries);
+    } else {
+      throw new Error(`Catalogue kind '${String(entry.kind)}' is not importable`);
+    }
+
+    await this.db.insert(tenantLibraryImports).values({
+      id:             crypto.randomUUID(),
+      tenantId:       this.tenantId,
+      libraryId:      catalogId,
+      importedSemver: entry.semver,
+      importedAt:     now,
+      rowCount,
+      localEntityId,
     });
 
     await this.db
-      .update(marketplaceTemplates)
-      .set({ downloadCount: sql`${marketplaceTemplates.downloadCount} + 1`, updatedAt: now })
-      .where(eq(marketplaceTemplates.id, marketplaceId));
+      .update(marketplaceLibraries)
+      .set({ downloadCount: sql`${marketplaceLibraries.downloadCount} + 1`, updatedAt: now })
+      .where(eq(marketplaceLibraries.id, catalogId));
 
-    // Sprint 2 S2-8 — record the install in import history.
     await this.writeHistory({
-      templateId:    newTemplateId,
+      templateId:    entry.kind === 'templates' ? localEntityId : null,
+      libraryId:     catalogId,
       action:        'install',
       sourceVersion: null,
-      targetVersion: mkt.semver,
-      rowsAffected:  1,
-      metadata:      { marketplaceTemplateId: marketplaceId, name: mkt.name },
+      targetVersion: entry.semver,
+      rowsAffected:  entry.kind === 'templates' ? 1 : rowCount,
+      metadata:      { name: entry.name, kind: entry.kind },
       userId,
     });
 
-    return newTemplateId;
+    return { kind: entry.kind, localEntityId, rowCount };
   }
 
   /**
@@ -268,22 +307,28 @@ export class MarketplaceService {
     newName: string;
     fromSemver: string;
     toSemver: string;
-    oldLocalId: string;
+    oldLocalId: string | null;
   }> {
     const [mkt] = await this.db
       .select()
-      .from(marketplaceTemplates)
-      .where(eq(marketplaceTemplates.id, marketplaceId))
+      .from(marketplaceLibraries)
+      .where(eq(marketplaceLibraries.id, marketplaceId))
       .limit(1);
 
     if (!mkt) throw Errors.NotFound('Marketplace template not found');
 
+    // A 1:N kind has no single local row to re-point, so this path would
+    // silently create a template out of a comment pack's schema.
+    if (mkt.kind !== 'templates') {
+      throw Errors.BadRequest(`Catalogue entry '${mkt.name}' is not a template — use the library update path`);
+    }
+
     const [existing] = await this.db
       .select()
-      .from(tenantMarketplaceImports)
+      .from(tenantLibraryImports)
       .where(and(
-        eq(tenantMarketplaceImports.tenantId, this.tenantId),
-        eq(tenantMarketplaceImports.marketplaceTemplateId, marketplaceId),
+        eq(tenantLibraryImports.tenantId, this.tenantId),
+        eq(tenantLibraryImports.libraryId, marketplaceId),
       ))
       .limit(1);
 
@@ -313,22 +358,22 @@ export class MarketplaceService {
       createdAt: now,
     });
 
-    const oldLocalId = existing.localTemplateId;
+    const oldLocalId = existing.localEntityId;
     const fromSemver = existing.importedSemver;
 
     await this.db
-      .update(tenantMarketplaceImports)
+      .update(tenantLibraryImports)
       .set({
-        localTemplateId: newTemplateId,
-        importedSemver:  mkt.semver,
-        importedAt:      now,
+        localEntityId:  newTemplateId,
+        importedSemver: mkt.semver,
+        importedAt:     now,
       })
-      .where(eq(tenantMarketplaceImports.id, existing.id));
+      .where(eq(tenantLibraryImports.id, existing.id));
 
     await this.db
-      .update(marketplaceTemplates)
-      .set({ downloadCount: sql`${marketplaceTemplates.downloadCount} + 1`, updatedAt: now })
-      .where(eq(marketplaceTemplates.id, marketplaceId));
+      .update(marketplaceLibraries)
+      .set({ downloadCount: sql`${marketplaceLibraries.downloadCount} + 1`, updatedAt: now })
+      .where(eq(marketplaceLibraries.id, marketplaceId));
 
     // Sprint 2 S2-8 — record the template update event.
     await this.writeHistory({
@@ -337,8 +382,9 @@ export class MarketplaceService {
       sourceVersion: fromSemver,
       targetVersion: mkt.semver,
       rowsAffected:  1,
+      libraryId:     marketplaceId,
       metadata: {
-        marketplaceTemplateId: marketplaceId,
+        catalogEntryId: marketplaceId,
         oldLocalId,
         newLocalId: newTemplateId,
         newName,
@@ -355,91 +401,27 @@ export class MarketplaceService {
     };
   }
 
-  // ─── Spec 5G M2 — Library marketplace (comments, snippets, etc) ───
+  // ─── The unified catalogue (marketplace_libraries) ───
 
+  /**
+   * Thin alias over `list()` for the kind-filtered `/libraries` route. It is an
+   * alias rather than a second query so there is exactly one place that knows
+   * how to read the catalogue — maintaining two was the defect this work
+   * removes. The route's contract is an unpaginated array, so it asks for a
+   * page large enough to be one.
+   */
   async listLibraries(opts: { kind?: string } = {}) {
-    const conditions: ReturnType<typeof eq>[] = [];
-    if (opts.kind) conditions.push(eq(marketplaceLibraries.kind, opts.kind as 'comments' | 'snippets'));
-    const list = await this.db
-      .select()
-      .from(marketplaceLibraries)
-      .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(desc(marketplaceLibraries.featured), desc(marketplaceLibraries.downloadCount));
-
-    const imports = await this.db
-      .select({ libraryId: tenantLibraryImports.libraryId, importedSemver: tenantLibraryImports.importedSemver })
-      .from(tenantLibraryImports)
-      .where(eq(tenantLibraryImports.tenantId, this.tenantId));
-    const importMap = new Map(imports.map((i) => [i.libraryId, i.importedSemver]));
-
-    return list.map((l) => ({
-      ...l,
-      importedSemver: importMap.get(l.id) ?? null,
-      hasUpdate: importMap.has(l.id) && importMap.get(l.id) !== l.semver,
-      itemCount: countLibrarySchemaItems(l.schema as unknown),
-    }));
+    const { rows } = await this.list({
+      ...(opts.kind ? { kind: opts.kind as 'comments' | 'templates' } : {}),
+      page:     1,
+      pageSize: 1000,
+    });
+    return rows;
   }
 
-  async importLibrary(libraryId: string, userId: string = 'system'): Promise<{ rowCount: number; localFirstId: string }> {
-    const [lib] = await this.db
-      .select()
-      .from(marketplaceLibraries)
-      .where(eq(marketplaceLibraries.id, libraryId))
-      .limit(1);
-    if (!lib) throw new Error('Marketplace library not found');
-
-    // Idempotent: if already imported, return the previous import meta
-    const [existing] = await this.db
-      .select()
-      .from(tenantLibraryImports)
-      .where(and(
-        eq(tenantLibraryImports.tenantId, this.tenantId),
-        eq(tenantLibraryImports.libraryId, libraryId),
-      ))
-      .limit(1);
-    if (existing) {
-      return { rowCount: existing.rowCount, localFirstId: existing.id };
-    }
-
-    const now = new Date();
-    let rowCount = 0;
-    const firstId = crypto.randomUUID();
-
-    if (lib.kind === 'comments') {
-      const entries = parseLibraryComments(lib.schema);
-      // The very first inserted row reuses firstId so the caller can return a
-      // stable local id; every other row gets a fresh UUID.
-      rowCount = await this.insertLibraryComments(libraryId, entries, firstId);
-    } else {
-      // 'snippets' or future kinds — extend with their target tables here
-      throw new Error(`Library kind '${lib.kind}' not yet supported for import`);
-    }
-
-    await this.db.insert(tenantLibraryImports).values({
-      id:             crypto.randomUUID(),
-      tenantId:       this.tenantId,
-      libraryId,
-      importedSemver: lib.semver,
-      importedAt:     now,
-      rowCount,
-    });
-    await this.db
-      .update(marketplaceLibraries)
-      .set({ downloadCount: sql`${marketplaceLibraries.downloadCount} + 1`, updatedAt: now })
-      .where(eq(marketplaceLibraries.id, libraryId));
-
-    // Sprint 2 S2-8 — record the library install.
-    await this.writeHistory({
-      libraryId,
-      action:        'install',
-      sourceVersion: null,
-      targetVersion: lib.semver,
-      rowsAffected:  rowCount,
-      metadata:      { libraryName: lib.name, kind: lib.kind },
-      userId,
-    });
-
-    return { rowCount, localFirstId: firstId };
+  /** What a replace would cost, computed before anything is deleted (#348). */
+  previewLibraryReplace(libraryId: string): Promise<LibraryReplacePreview> {
+    return previewLibraryReplace(this.db, this.tenantId, libraryId);
   }
 
   /**
@@ -462,29 +444,7 @@ export class MarketplaceService {
     const mode: LibraryUpdateMode = options.mode ?? 'append';
     const userId = options.userId ?? 'system';
 
-    const [lib] = await this.db
-      .select()
-      .from(marketplaceLibraries)
-      .where(eq(marketplaceLibraries.id, libraryId))
-      .limit(1);
-    if (!lib) throw Errors.NotFound('Marketplace library not found');
-
-    const [existing] = await this.db
-      .select()
-      .from(tenantLibraryImports)
-      .where(and(
-        eq(tenantLibraryImports.tenantId, this.tenantId),
-        eq(tenantLibraryImports.libraryId, libraryId),
-      ))
-      .limit(1);
-
-    if (!existing) {
-      throw Errors.BadRequest('Library has not been imported yet — use Import instead of Update');
-    }
-
-    if (existing.importedSemver === lib.semver) {
-      throw Errors.BadRequest('No update available — already on the latest version');
-    }
+    const { lib, existing } = await resolveLibraryUpdate(this.db, this.tenantId, libraryId);
 
     if (lib.kind !== 'comments') {
       throw new Error(`Library kind '${lib.kind}' not yet supported for update`);
@@ -494,29 +454,32 @@ export class MarketplaceService {
     const now = new Date();
     let rowsAdded = 0;
     let rowsDeleted = 0;
+    let rowsPreserved = 0;
 
-    // S2-7 — Replace mode: clear prior-import rows for this tenant first.
+    let entries: PackEntry[] = parseLibraryComments(lib.schema);
+
+    // S2-7 — Replace mode clears the prior import's rows before inserting the
+    // new pack. #348 — but not the ones the inspector rewrote, unless the caller
+    // has explicitly accepted losing them.
     if (mode === 'replace') {
-      const deleted = await this.db.delete(comments)
-        .where(and(
-          eq(comments.tenantId, this.tenantId),
-          eq(comments.libraryId, libraryId),
-        ))
-        .run();
-      // Drizzle returns a meta object on D1; better-sqlite3 returns
-      // { changes: number }. We tolerate both via duck-typing.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const changes = (deleted as any)?.meta?.changes ?? (deleted as any)?.changes ?? 0;
-      rowsDeleted = typeof changes === 'number' ? changes : 0;
+      const outcome = await applyReplaceMode(
+        this.db, this.tenantId, libraryId, entries,
+        options.confirmLossOfEdits !== true,
+      );
+      rowsDeleted   = outcome.rowsDeleted;
+      rowsPreserved = outcome.rowsPreserved;
+      entries       = outcome.entries;
     }
 
-    // Parse the new pack's entries and insert them (all fresh UUIDs).
-    const entries = parseLibraryComments(lib.schema);
-    rowsAdded = await this.insertLibraryComments(libraryId, entries);
+    // Insert the new pack's entries (all fresh UUIDs, each stamped with the
+    // import hash that makes the NEXT update able to ask this same question).
+    rowsAdded = await insertLibraryComments(this.rawDb, this.tenantId, libraryId, entries);
 
     // Update the marker. Replace mode resets rowCount to the new size; append
     // mode accumulates as before.
-    const newRowCount = mode === 'replace' ? rowsAdded : (existing.rowCount + rowsAdded);
+    const newRowCount = mode === 'replace'
+      ? rowsAdded + rowsPreserved
+      : (existing.rowCount + rowsAdded);
     await this.db
       .update(tenantLibraryImports)
       .set({
@@ -544,6 +507,7 @@ export class MarketplaceService {
         kind:        lib.kind,
         rowsAdded,
         rowsDeleted,
+        rowsPreserved,
         confirmLossOfEdits: !!options.confirmLossOfEdits,
       },
       userId,
@@ -552,35 +516,11 @@ export class MarketplaceService {
     return {
       rowsAdded,
       rowsDeleted,
+      rowsPreserved,
       fromSemver,
       toSemver:    lib.semver,
       libraryName: lib.name,
       mode,
     };
   }
-}
-
-/**
- * Extract the comment entries from a library schema. The schema may arrive as a
- * parsed object (Drizzle json mode) or a raw string (some D1 driver / json
- * encoding paths); both are handled. Returns [] for anything malformed.
- */
-function parseLibraryComments(
-  schema: unknown,
-): Array<{ text: string; section?: string; rating?: string }> {
-  let parsed: { comments?: Array<{ text: string; section?: string; rating?: string }> } = {};
-  if (typeof schema === 'string') {
-    try { parsed = JSON.parse(schema); } catch { parsed = {}; }
-  } else if (schema && typeof schema === 'object') {
-    parsed = schema as typeof parsed;
-  }
-  return Array.isArray(parsed.comments) ? parsed.comments : [];
-}
-
-function countLibrarySchemaItems(schema: unknown): number {
-  if (!schema || typeof schema !== 'object') return 0;
-  const s = schema as Record<string, unknown>;
-  if (Array.isArray(s.comments)) return s.comments.length;
-  if (Array.isArray(s.snippets)) return s.snippets.length;
-  return 0;
 }

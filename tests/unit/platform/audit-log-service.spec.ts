@@ -30,7 +30,7 @@ describe('AuditLogService.append — partial dedup index', () => {
     db = fixture.db;
     await setupSchema(fixture.sqlite);
     await db.insert(schema.tenants).values({
-      id: TENANT_A, name: 'A', slug: 'acme', status: 'active',
+      id: TENANT_A, slug: 'acme', status: 'active',
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);

@@ -112,6 +112,22 @@ const LEAD_INSPECTOR_ID = '22222222-2222-2222-2222-222222222aa1';
 const HALF_INSPECTOR_ID = '44444444-4444-4444-4444-444444444aa1';
 
 /**
+ * The commercial PCA inspection every `SEED_PCA=1` row hangs off — see
+ * `seedPcaFixtures`. Exported so a spec names the same inspection the seed
+ * wrote instead of restating the literal.
+ */
+export const PCA_INSPECTION_ID = '99999999-9999-4999-8999-999999999999';
+
+/** Pre-Survey Questionnaire answers for that inspection (ASTM §8.5 exhibit). */
+const PCA_PSQ_RESPONSES = {
+    ownerOccupied: false,
+    yearsOwned: 8,
+    knownDeficiencies: 'Roof membrane nearing the end of its service life.',
+    preventiveMaintenanceLevel: 'Moderate - quarterly HVAC service, annual roof inspection',
+    occupancyRate: '92%',
+};
+
+/**
  * Address the DB the way global-setup does: by BINDING (`DB`) against the same
  * wrangler config the worker was built from.
  *
@@ -373,10 +389,20 @@ export function seedFixtures(appDir: string): void {
     const nowMs = Date.now();
 
     // Two tenants — Tenant A is the default; Tenant B backs the branch-B fixture user below.
-    d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
-        VALUES ('${TENANT_A_ID}', 'Seed Tenant A', 'seed-a', 'active', 'shared', 'free', 5, '${now}')`, cwd);
-    d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
-        VALUES ('${TENANT_B_ID}', 'Seed Tenant B', 'seed-b', 'active', 'shared', 'free', 5, '${now}')`, cwd);
+    //
+    // No `name` column: the company name lives in `tenant_configs.company_name`.
+    // These are raw SQL strings, so the compiler could not tell anyone when the
+    // column went away — the seed simply failed at run time, which is why
+    // globalSetup treats a failed seed as fatal instead of a warning.
+    d1(`INSERT OR REPLACE INTO tenants (id, slug, status, deployment_mode, tier, max_users, created_at)
+        VALUES ('${TENANT_A_ID}', 'seed-a', 'active', 'shared', 'free', 5, '${now}')`, cwd);
+    d1(`INSERT OR REPLACE INTO tenants (id, slug, status, deployment_mode, tier, max_users, created_at)
+        VALUES ('${TENANT_B_ID}', 'seed-b', 'active', 'shared', 'free', 5, '${now}')`, cwd);
+    // Tenant A's config row is written further down (it also carries a feature
+    // flag); B and the at-cap tenant have no other reason for one, but without
+    // it they would display as their slug.
+    d1(`INSERT OR REPLACE INTO tenant_configs (tenant_id, company_name, updated_at)
+        VALUES ('${TENANT_B_ID}', 'Seed Tenant B', ${nowMs})`, cwd);
 
     // Tenant A users.
     //
@@ -411,9 +437,11 @@ export function seedFixtures(appDir: string): void {
                  'InterNACHI CPI', 'NACHI-24-0001', NULL, 0, 1, ${nowMs}, ${nowMs})`, cwd);
 
     // Seat-quota / at-cap admin for the over-quota E2E.
-    d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
-        VALUES ('00000000-0000-0000-0000-000000000cc1', 'Seed Full Tenant', 'seed-full',
+    d1(`INSERT OR REPLACE INTO tenants (id, slug, status, deployment_mode, tier, max_users, created_at)
+        VALUES ('00000000-0000-0000-0000-000000000cc1', 'seed-full',
                 'active', 'shared', 'free', 1, '${now}')`, cwd);
+    d1(`INSERT OR REPLACE INTO tenant_configs (tenant_id, company_name, updated_at)
+        VALUES ('00000000-0000-0000-0000-000000000cc1', 'Seed Full Tenant', ${nowMs})`, cwd);
     d1(`INSERT OR REPLACE INTO users (id, tenant_id, email, password_hash, name, role, created_at)
         VALUES ('55555555-5555-5555-5555-555555555cc1', '00000000-0000-0000-0000-000000000cc1',
                 '${ADMIN_FULL_EMAIL}', '${SEED_PASSWORD_HASH}', 'At-Cap Admin', 'owner', '${now}')`, cwd);
@@ -532,6 +560,134 @@ export function seedFixtures(appDir: string): void {
         `[seed-fixtures] Seeded tenants + 8 users + ${Object.keys(SEED_INSPECTIONS).length} inspections` +
         ` + the delivered client link (${SEED_REPAIR_DEFECTS.length} defects in` +
         ` ${new Set(SEED_REPAIR_DEFECTS.map((d) => d.sectionTitle)).size} sections).`,
+    );
+
+    // Opt-in, mirroring global-setup's own SEED_E2E gate rather than inventing a
+    // second convention. Off by default because the standard e2e run exercises
+    // residential reports only, and this is four more tables to write on every
+    // start.
+    if (process.env.SEED_PCA === '1') seedPcaFixtures(appDir);
+}
+
+/**
+ * Commercial PCA rows: cost items, document review, PSQ, dual sign-off.
+ *
+ * These four tables had exactly one generator, `scripts/seed-pca-demo.mjs`, and
+ * nothing invoked it — not package.json, not CI, not a hook. It had drifted
+ * twelve column names away from the schema (eight of them the same mistake:
+ * snake_casing the drizzle property and losing the `is_` prefix that boolean
+ * columns carry, so `is_requested` was written as `requested`), which meant its
+ * first INSERT failed. A script no rung watches is a script that rots. This one
+ * runs under globalSetup, whose failure is fatal when the seed was asked for,
+ * and every column name below is checked against the schema by
+ * `npm run lint:seed-sql` before it can be committed.
+ */
+export function seedPcaFixtures(appDir: string): void {
+    const cwd = appDir;
+    const now = new Date().toISOString();
+    // Epoch MILLISECONDS. Every timestamp column touched here is `timestamp_ms`;
+    // the retired script divided by a thousand for some of them, which SQLite
+    // accepts silently and every reader renders as 1970. (Spelling that division
+    // out in prose is itself a gate failure — check-seed-sql.mjs greps for the
+    // expression and has no AST to tell a comment from code.)
+    const nowMs = Date.now();
+    const daysAgoMs = (n: number) => nowMs - n * 86_400_000;
+
+    // A valid-format UUID, and stable. The inspection GET/results/units
+    // endpoints validate `:id` with `z.string().uuid()` and 400 on anything
+    // else, which makes the editor loader fall back to a "Loading…" stub — so a
+    // `seed-…`-style id would seed rows no editor can open.
+    d1(`INSERT OR REPLACE INTO inspections
+         (id, tenant_id, inspector_id, property_address, property_type, commercial_subtype,
+          report_tier, date, status, report_status, payment_status,
+          price_cents, is_payment_required, is_agreement_required, year_built, sqft, created_at)
+         VALUES ('${PCA_INSPECTION_ID}', '${TENANT_A_ID}', '${LEAD_INSPECTOR_ID}',
+                 '500 Commerce Way, Springfield IL', 'commercial', 'office',
+                 'full_pca', '2026-06-01', 'completed', 'published', 'paid',
+                 250000, 0, 0, 1998, 42000, '${now}')`, cwd);
+
+    // Document review (ASTM §8.6). Four rows, one per disclosure state the
+    // checklist exists to keep apart — a document that was never requested, one
+    // received but not yet reviewed, one fully reviewed, and one ruled N/A with
+    // its reason. A checklist that only carried the finished rows would be a
+    // to-do list; the point of this table is that the gaps are stated too.
+    const docRow = (
+        key: string, label: string, requested: number, received: number,
+        reviewed: number, na: number, notes: string | null, sort: number,
+    ) =>
+        `INSERT OR REPLACE INTO document_review_items
+         (id, tenant_id, inspection_id, document_key, label,
+          is_requested, is_received, is_reviewed, is_na, notes, sort_order)
+         VALUES ('seed-pca-doc-${key}', '${TENANT_A_ID}', '${PCA_INSPECTION_ID}',
+                 '${key}', '${label}', ${requested}, ${received}, ${reviewed}, ${na},
+                 ${notes === null ? 'NULL' : `'${notes}'`}, ${sort})`;
+    d1(docRow('certificate_of_occupancy', 'Certificate of Occupancy', 1, 1, 1, 0, null, 10), cwd);
+    d1(docRow('prior_pcrs', 'Prior Property Condition Reports', 1, 0, 0, 0,
+        'Owner unable to locate; none provided.', 30), cwd);
+    d1(docRow('service_contracts', 'Service / maintenance contracts', 1, 1, 0, 0,
+        'Received; pending detailed review.', 120), cwd);
+    d1(docRow('environmental_reports', 'Environmental reports (Phase I/II ESA)', 0, 0, 0, 1,
+        'Phase I ESA not commissioned for this engagement.', 130), cwd);
+
+    // PSQ (ASTM §8.5), received. `responses` is JSON, so it goes through the
+    // temp-file path rather than `--command` — see d1Script's comment on why the
+    // double quotes in a JSON payload cannot survive two shells.
+    // `share_token` is left NULL deliberately: no code path in the repo issues
+    // or resolves one today, so a fixture value would invent a contract.
+    d1Script(
+        `INSERT OR REPLACE INTO psq_responses\n` +
+        `  (id, tenant_id, inspection_id, responses, status, share_token, sent_at, received_at, updated_at)\n` +
+        `VALUES ('seed-pca-psq', '${TENANT_A_ID}', '${PCA_INSPECTION_ID}',\n` +
+        `        '${JSON.stringify(PCA_PSQ_RESPONSES)}', 'received', NULL,\n` +
+        `        ${daysAgoMs(5)}, ${daysAgoMs(3)}, ${daysAgoMs(3)});\n`,
+        cwd, 'pca-psq',
+    );
+
+    // Dual sign-off (§7.5): the field observer who walked the property and the
+    // PCR reviewer who exercises responsible control. `is_dual_role` is 0 here
+    // because these are two different people — the §7.6 one-person case sets it
+    // on BOTH rows. `signature_ref` is opaque base64url in production (an Ed25519
+    // signature over the attestation payload); the fixture cannot produce a real
+    // one without the tenant signing key, and no reader verifies it on load.
+    const signoffRow = (id: string, role: string, personId: string, name: string, license: string, atMs: number) =>
+        `INSERT OR REPLACE INTO report_signoff
+         (id, tenant_id, inspection_id, role, person_id, name, license,
+          qualifications_ref, signed_at, signature_ref, is_dual_role)
+         VALUES ('${id}', '${TENANT_A_ID}', '${PCA_INSPECTION_ID}', '${role}', '${personId}',
+                 '${name}', '${license}', NULL, ${atMs}, 'c2VlZC1zaWduYXR1cmU', 0)`;
+    d1(signoffRow('seed-pca-signoff-field', 'field_observer', LEAD_INSPECTOR_ID,
+        'Lead Inspector', 'PCA-2024-0142', daysAgoMs(2)), cwd);
+    d1(signoffRow('seed-pca-signoff-pcr', 'pcr_reviewer', '33333333-3333-3333-3333-333333333aa1',
+        'Seed Inspector B', 'PE-IL-0098234', daysAgoMs(1)), cwd);
+
+    // Cost items — one per bucket, because the buckets are what the two cost
+    // tables are built from: immediate + short_term feed the Opinion of Cost,
+    // long_term feeds the Reserve Schedule and is the only bucket that needs
+    // eul/eff_age/rul. A fixture with one bucket would leave the second table
+    // empty and the reserve maths unexercised.
+    const costRow = (
+        id: string, system: string, component: string, action: string, cents: number,
+        remedy: string, bucket: string, eul: string, effAge: string, rul: string, sort: number,
+    ) =>
+        `INSERT OR REPLACE INTO cost_items
+         (id, tenant_id, inspection_id, system, component, location, action, cost_method,
+          lump_sum_cents, eul, eff_age, rul, suggested_remedy, bucket, sort_order, created_at)
+         VALUES ('${id}', '${TENANT_A_ID}', '${PCA_INSPECTION_ID}', '${system}', '${component}',
+                 '', '${action}', 'lump_sum', ${cents}, ${eul}, ${effAge}, ${rul},
+                 '${remedy}', '${bucket}', ${sort}, ${nowMs})`;
+    d1(costRow('seed-pca-cost-immediate', 'Envelope', 'Brick veneer spalling repair', 'repair',
+        850_000, 'Remove and repoint spalled veneer; treat corroded ties at the NE corner.',
+        'immediate', 'NULL', 'NULL', 'NULL', 0), cwd);
+    d1(costRow('seed-pca-cost-short', 'Roofing', 'Membrane roof replacement (partial)', 'replace',
+        6_500_000, 'Replace the modified-bitumen membrane over the affected east-parapet area.',
+        'short_term', 'NULL', 'NULL', 'NULL', 1), cwd);
+    d1(costRow('seed-pca-cost-long', 'MEP', 'Rooftop package unit replacement (4 units)', 'replace',
+        18_000_000, 'Replace four rooftop package units at the end of their service life.',
+        'long_term', '20', '15', '5', 2), cwd);
+
+    console.info(
+        '[seed-fixtures] SEED_PCA=1 — seeded the full_pca inspection with 4 document-review rows,' +
+        ' 1 PSQ, 2 sign-offs and 3 cost items.',
     );
 }
 

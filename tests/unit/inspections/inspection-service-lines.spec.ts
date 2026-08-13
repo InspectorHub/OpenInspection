@@ -41,9 +41,9 @@ describe('ServiceService — service lines on an inspection (IA-87)', () => {
         await setupSchema(fixture.sqlite);
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
-        for (const [id, name, slug] of [[TENANT, 'Acme', 'acme'], [OTHER_TENANT, 'Other', 'other']] as const) {
+        for (const [id, slug] of [[TENANT, 'acme'], [OTHER_TENANT, 'other']] as const) {
             await db.insert(schema.tenants).values({
-                id, name, slug, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+                id, slug, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
             });
         }
         await db.insert(schema.inspections).values({

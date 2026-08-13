@@ -5,6 +5,7 @@ import { tenantMarketplaceImportHistory } from '../lib/db/schema/marketplace';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { MigrationStrategy } from '../lib/validations/template-migration.schema';
+import { findTemplateBlockingReference } from './template.service';
 
 export interface MigrationPreview {
     affected: number;
@@ -78,24 +79,32 @@ export class TemplateMigrationService {
     }
 
     /**
-     * Delete a template iff no inspection in this tenant still references it.
+     * Delete a template iff nothing in this tenant still references it.
      * Returns true when deleted, false when the gate refused.
+     *
+     * ⚠️ This was a SECOND delete path with its own, weaker gate: it checked
+     * `inspections` only, so a migration with `deleteOldTemplate: true` would
+     * orphan a report or break a marketplace re-import that
+     * `TemplateService.deleteTemplate` refuses outright. That is the
+     * money-redaction shape — one rule, two implementations, only one of them
+     * complete — so both callers now share `findTemplateBlockingReference`.
+     *
+     * The contract here stays `Promise<boolean>` rather than a throw: the
+     * migration itself SUCCEEDED, and tidying up the old row is the optional
+     * tail of it. The caller surfaces the outcome as `oldTemplateDeleted`.
      *
      * Exposed (rather than inlined) so callers and tests can drive the gate
      * deterministically when a concurrent insert needs to be simulated.
      */
     async tryDeleteOldTemplate(oldId: string): Promise<boolean> {
-        const stillRefs = await this.db.select({ id: inspections.id })
-            .from(inspections)
-            .where(and(
-                eq(inspections.templateId, oldId),
-                eq(inspections.tenantId, this.tenantId),
-            ))
-            .limit(1)
-            .get();
-        if (stillRefs) {
-            logger.info('[migrate] skipped delete — other inspections still reference old template', {
-                tenantId: this.tenantId, oldId,
+        const blocking = await findTemplateBlockingReference(this.db, oldId, this.tenantId);
+        if (blocking) {
+            // The `kind` and `label` are the point: an operator reading
+            // "skipped delete" with no subject cannot tell whether the template
+            // survived because of an inspection they can migrate or a service
+            // they can re-point.
+            logger.info('[migrate] skipped delete — old template is still referenced', {
+                tenantId: this.tenantId, oldId, kind: blocking.kind, label: blocking.label,
             });
             return false;
         }

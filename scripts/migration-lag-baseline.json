@@ -1,0 +1,44 @@
+{
+  "$comment": [
+    "Baseline for the migration-lag gate (scripts/check-migration-lag.mjs, `npm run db:lag`).",
+    "",
+    "The gate compares the migration filenames committed in this repo against the names a",
+    "database has recorded in its `d1_migrations` table. A name the database has applied that",
+    "this repo no longer contains normally means someone applied SQL out of band, and the gate",
+    "fails. There is exactly one legitimate reason for such a name: a squashed or rebuilt",
+    "migration chain leaves the pre-rebuild filenames in `d1_migrations` forever, because",
+    "wrangler never deletes a row from that table. This file is where those names are declared,",
+    "per database, so the gate can subtract them on a visible line instead of failing.",
+    "",
+    "SHAPE — one key per database, keyed by the gate's label:",
+    "  { \"<label>\": { \"acceptedExtra\": [\"<pre-rebuild-filename>.sql\", ...] } }",
+    "The label is `--label` when the npm script passes one (`saas`, `local-d1`), otherwise it is",
+    "derived: `<binding> (<wrangler config>, remote|local)` — e.g. `DB (wrangler.local.jsonc,",
+    "remote)` for a standalone self-host running `npm run db:lag`. Keys not listed here read as",
+    "an empty allowlist, which is the safe default: every unexpected name fails.",
+    "",
+    "WHY EVERY LIST BELOW IS EMPTY. This deployment reconciled the baseline rebuild by rewriting",
+    "the ledger rather than by allowlisting: the rows naming the superseded migrations were",
+    "deleted, leaving only `0000_baseline.sql`, which wrangler already considers applied. Nothing",
+    "is left for the gate to forgive. An empty list is a declaration, not an oversight — and a",
+    "declared name that the database no longer carries fails the gate as a stale allowlist, so",
+    "these lists must be emptied again whenever a ledger is rewritten.",
+    "",
+    "ADD A NAME HERE ONLY IF you deliberately chose to leave the pre-rebuild rows in place, and",
+    "only after confirming that the database's SCHEMA is current. This file silences a report; it",
+    "reconciles nothing. Self-hosters upgrading across the baseline rebuild should follow",
+    "docs/self-host/upgrade.md instead — the ledger rewrite it describes leaves this file empty."
+  ],
+  "saas": {
+    "acceptedExtra": []
+  },
+  "local-d1": {
+    "acceptedExtra": []
+  },
+  "DB (wrangler.local.jsonc, remote)": {
+    "acceptedExtra": []
+  },
+  "DB (wrangler.jsonc, remote)": {
+    "acceptedExtra": []
+  }
+}

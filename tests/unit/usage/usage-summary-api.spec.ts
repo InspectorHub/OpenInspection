@@ -67,7 +67,7 @@ describe('GET /api/usage/summary', () => {
 
     async function seedTenant(id: string, opts: { tier: 'free' | 'pro' | 'enterprise'; maxUsers?: number }) {
         await testDb.insert(tenants).values({
-            id, name: `Tenant ${id}`, slug: id, tier: opts.tier,
+            id, slug: id, tier: opts.tier,
             maxUsers: opts.maxUsers ?? 5, createdAt: new Date(),
         });
     }

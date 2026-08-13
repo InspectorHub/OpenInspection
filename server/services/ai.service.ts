@@ -11,6 +11,7 @@ import {
     type VersionedPrompt,
 } from '../lib/ai/prompts';
 import type { AiProvenanceSink } from '../lib/ai/provenance';
+import type { AiQuotaPreflight } from '../lib/ai/metering';
 import type { AiUsageKind } from '../lib/usage/period';
 
 /**
@@ -101,6 +102,12 @@ export class AIService {
          *  constructed without a sink must not inherit a silent bypass. The
          *  same fail-closed reading as the confirmation above. */
         private provenance?: AiProvenanceSink,
+        /** The read-only allowance check, paired with the meter above: CHECK
+         *  BEFORE, METER AFTER. Undefined wherever there is nothing to enforce
+         *  — a self-hosted deploy, a call on the tenant's own key, a tenant
+         *  with no delivered allowance — which is why enforcement is absent in
+         *  those cases rather than switched off by a flag here. */
+        private quota?: AiQuotaPreflight,
     ) {}
 
     private isDevMode(): boolean {
@@ -191,6 +198,14 @@ export class AIService {
         // message — the adapter still checks, for callers that reach it another
         // way — asked one step earlier so the ledger only holds real sends.
         this.assertModelConfigured();
+
+        // The allowance, BEFORE the send and before any row claims a call was
+        // made. Read-only: the counter moves at `meter.record` below, so a
+        // model failure never spends an allowance. Not swallowed, unlike the
+        // meter — a spent allowance is an answer to the inspector, and a
+        // caller that cannot tell "over your limit" from "nothing to say" is
+        // the failure this whole pairing exists to prevent.
+        if (this.quota) await this.quota.preflight(kind);
 
         // FAIL CLOSED on a missing sink. The alternative — record when a sink
         // happens to be present — is the failure this whole change is about: a
@@ -355,13 +370,17 @@ export class AIService {
             if (!match) return { suggestions: [], aiCallId: null };
             return { suggestions: JSON.parse(match[0]) as string[], aiCallId };
         } catch (err) {
-            // Same rule as `assertModelConfigured` above, applied to the one
-            // refusal that can only be raised from INSIDE this try: the
-            // capability gate in `callGemini`. A runtime model failure degrades
-            // to "no suggestions"; a capability the product does not offer must
-            // reach the inspector as a refusal, not as an empty popover that
-            // looks like the model had nothing to say.
-            if (err instanceof AppError && err.code === ErrorCode.AI_NOT_CONFIGURED) throw err;
+            // Same rule as `assertModelConfigured` above, applied to the two
+            // refusals that can only be raised from INSIDE this try: the
+            // capability gate and the allowance pre-flight in `callGemini`. A
+            // runtime model failure degrades to "no suggestions"; a capability
+            // the product does not offer, or an allowance already spent, must
+            // reach the inspector as a refusal — not as an empty popover that
+            // looks like the model had nothing to say. Matched on CODE, so a
+            // third refusal added at the chokepoint has to be listed here
+            // rather than silently inheriting the degrade.
+            if (err instanceof AppError
+                && (err.code === ErrorCode.AI_NOT_CONFIGURED || err.code === ErrorCode.QUOTA_EXHAUSTED)) throw err;
             return { suggestions: [], aiCallId: null };
         }
     }

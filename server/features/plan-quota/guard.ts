@@ -4,7 +4,7 @@ import { tenants } from '../../lib/db/schema';
 import { MeteringService } from '../../services/metering.service';
 import { STOCK_PERIOD } from '../../lib/usage/period';
 import { Errors } from '../../lib/errors';
-import { FREE_TIER_CAPS, type AiCappedMetric, type AiTierCaps } from './policy';
+import { FREE_TIER_CAPS, type AiCappedMetric, type AiTierCaps, type TenantPlan } from './policy';
 
 /**
  * Free-tier usage-quota guard. Two calling shapes:
@@ -36,9 +36,25 @@ import { FREE_TIER_CAPS, type AiCappedMetric, type AiTierCaps } from './policy';
  * do — and non-request contexts like Workflows/cron have no context at all).
  */
 export async function readTenantTier(db: D1Database, tenantId: string): Promise<string> {
-  const row = await drizzle(db).select({ tier: tenants.tier }).from(tenants)
+  return (await readTenantPlan(db, tenantId)).tier;
+}
+
+/**
+ * The tenant's tier AND status in one read.
+ *
+ * Both columns, because "is this tenant paying" needs both (`isPaidPlan`) and
+ * two callers reading two columns off the same row in two queries is how the
+ * two answers end up describing different moments. `readTenantTier` above is
+ * the narrow view for callers that only ever ask about a cap; it delegates here
+ * so there is still exactly one query shape.
+ *
+ * Defaults on a missing row are the least-privileged ones: the free tier, and a
+ * status that is not `active`. An absent tenant must not read as a paying one.
+ */
+export async function readTenantPlan(db: D1Database, tenantId: string): Promise<TenantPlan> {
+  const row = await drizzle(db).select({ tier: tenants.tier, status: tenants.status }).from(tenants)
     .where(eq(tenants.id, tenantId)).get();
-  return row?.tier ?? 'free';
+  return { tier: row?.tier ?? 'free', status: row?.status ?? 'pending' };
 }
 
 export class PlanQuotaGuard {

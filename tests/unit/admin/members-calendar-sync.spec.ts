@@ -47,8 +47,8 @@ describe('AdminService.getMembers — calendar sync metadata', () => {
         (mockDrizzle as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', slug: 'acme', createdAt: new Date() },
-            { id: OTHER_TENANT, name: 'Other', slug: 'other', createdAt: new Date() },
+            { id: TENANT, slug: 'acme', createdAt: new Date() },
+            { id: OTHER_TENANT, slug: 'other', createdAt: new Date() },
         ]);
         await testDb.insert(schema.users).values([
             { id: SYNCED, tenantId: TENANT, email: 'a@acme.com', passwordHash: 'h', role: 'inspector', createdAt: new Date() },

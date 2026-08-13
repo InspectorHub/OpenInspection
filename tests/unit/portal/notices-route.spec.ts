@@ -57,8 +57,8 @@ describe('client portal Notices routes', () => {
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
         const now = new Date();
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', slug: SLUG, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now },
-            { id: OTHER_TENANT, name: 'Other', slug: 'other-notices', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now },
+            { id: TENANT, slug: SLUG, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now },
+            { id: OTHER_TENANT, slug: 'other-notices', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now },
         ] as never);
         await testDb.insert(schema.contacts).values([
             { id: 'c-jane', tenantId: TENANT, type: 'client', name: 'Jane', email: 'jane@x.com', createdAt: now },

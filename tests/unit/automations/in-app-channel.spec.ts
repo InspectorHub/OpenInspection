@@ -55,7 +55,7 @@ beforeEach(async () => {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
     await db.insert(schema.tenants).values({
-        id: T, name: 'Acme', slug: 'acme-in-app', status: 'active',
+        id: T, slug: 'acme-in-app', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
     await db.insert(schema.inspections).values({
@@ -69,7 +69,7 @@ async function insertRule(id: string) {
     await db.insert(schema.automations).values({
         id, tenantId: T, name: 'In-app notice', trigger: 'report.published',
         recipientKind: 'all', recipientRoleProfileId: null, delayMinutes: 0,
-        subjectTemplate: '', bodyTemplate: '', channels: '["in_app"]',
+        channels: '["in_app"]',
         active: true, isDefault: false, createdAt: new Date(),
     } as never);
     return id;

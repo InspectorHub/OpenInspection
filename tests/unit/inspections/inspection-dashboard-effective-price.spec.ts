@@ -45,7 +45,7 @@ describe('dashboard rows — P-4 effective price (IA-131)', () => {
         svc = new InspectionAnalyticsService({} as D1Database, undefined, undefined, undefined, undefined, facadeStub);
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'PriceCo', slug: 'priceco',
+            id: TENANT, slug: 'priceco',
             status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.services).values({

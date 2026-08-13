@@ -7,14 +7,68 @@ import {
     type GoogleCalendarResponse,
     type GoogleEvent,
 } from '../google-calendar';
-import { capabilityToScopes, ExternalEventGoneError } from './provider';
+import { CalendarConnectError, ExternalEventGoneError } from './provider';
 import type {
+    CalendarAuth,
+    CalendarAuthInput,
+    CalendarCapability,
+    CalendarConnectResult,
     CalendarProvider,
-    OAuthExchangeResult,
     BusyBlock,
     CalendarListEntry,
     CalendarPushEventInput,
 } from './provider';
+import { loadGoogleOAuthMode, resolveGoogleOAuthCredentials } from './resolve-google-oauth';
+
+const GOOGLE_SCOPES: Record<CalendarCapability, string[]> = {
+    availability_read: [
+        'https://www.googleapis.com/auth/calendar.freebusy',
+        'https://www.googleapis.com/auth/calendar.readonly',
+    ],
+    events_read_write: [
+        'https://www.googleapis.com/auth/calendar.events',
+    ],
+};
+
+/**
+ * Google's capability↔scope mapping. It lives here rather than on the provider
+ * interface because a scope is an OAuth concept: CalDAV's app-specific password
+ * is all-or-nothing and the server reports no scopes at all.
+ */
+export function googleCapabilityScopes(capability: CalendarCapability): string[] {
+    return GOOGLE_SCOPES[capability];
+}
+
+/** Derive stored capability from OAuth scopes granted at callback. */
+export function capabilityFromScopes(scopes: string[]): CalendarCapability {
+    const normalized = scopes.map((s) => s.toLowerCase());
+    if (normalized.some((s) => s.includes('calendar.events'))) {
+        return 'events_read_write';
+    }
+    return 'availability_read';
+}
+
+/**
+ * What rides inside a Google `CalendarAuth`. Module-private on purpose: the
+ * whole point of the handle is that no caller can reach these three values.
+ */
+interface GoogleAuthMaterial {
+    clientId: string;
+    clientSecret: string;
+    refreshToken: string;
+}
+
+/**
+ * Unwrap a handle this provider minted. A handle stamped with someone else's
+ * provider id is a routing bug, and it must be loud rather than silently
+ * half-working against credentials that mean nothing here.
+ */
+function materialOf(auth: CalendarAuth): GoogleAuthMaterial {
+    if (auth.provider !== 'google') {
+        throw new Error(`Calendar auth handle for '${auth.provider}' handed to the google provider`);
+    }
+    return auth.material as GoogleAuthMaterial;
+}
 
 function toRfc3339(d: Date): string {
     return d.toISOString();
@@ -36,11 +90,8 @@ function googleEventBody(event: CalendarPushEventInput): Record<string, unknown>
     };
 }
 
-async function accessTokenFor(
-    clientId: string,
-    clientSecret: string,
-    refreshToken: string,
-): Promise<string> {
+async function accessTokenFor(auth: CalendarAuth): Promise<string> {
+    const { clientId, clientSecret, refreshToken } = materialOf(auth);
     return refreshAccessToken(clientId, clientSecret, refreshToken);
 }
 
@@ -48,12 +99,33 @@ export const googleCalendarProvider: CalendarProvider = {
     id: 'google',
     authType: 'oauth',
 
-    getAuthUrl({ clientId, redirectUri, state, pkce, capability }) {
+    async resolveAuth({ tenantId, credentials, env }: CalendarAuthInput): Promise<CalendarAuth | null> {
+        // A CalDAV payload on a Google connection is a stored shape this
+        // provider cannot act on. Null, not a throw: the caller reports
+        // "not connected" rather than a 500.
+        if ('appPassword' in credentials) return null;
+        if (!credentials.refreshToken) return null;
+        const mode = await loadGoogleOAuthMode(env.DB, tenantId);
+        const creds = await resolveGoogleOAuthCredentials(env, tenantId, mode);
+        if (!creds) return null;
+        return {
+            provider: 'google',
+            material: {
+                clientId: creds.clientId,
+                clientSecret: creds.clientSecret,
+                refreshToken: credentials.refreshToken,
+            } satisfies GoogleAuthMaterial,
+        };
+    },
+
+    connectFlow: { kind: 'redirect' },
+
+    startConnect({ clientId, redirectUri, state, pkce, capability }) {
         const params = new URLSearchParams({
-            client_id: clientId,
+            client_id: clientId ?? '',
             redirect_uri: redirectUri,
             response_type: 'code',
-            scope: capabilityToScopes('google', capability).join(' '),
+            scope: googleCapabilityScopes(capability).join(' '),
             access_type: 'offline',
             prompt: 'consent',
             state,
@@ -63,17 +135,25 @@ export const googleCalendarProvider: CalendarProvider = {
         return new URL(`${GOOGLE_AUTH_URL}?${params}`);
     },
 
-    async exchangeCode({ clientId, clientSecret, redirectUri, code, verifier }): Promise<OAuthExchangeResult> {
+    async completeConnect({ tenantId, env, submission, requestedCapability }): Promise<CalendarConnectResult> {
+        if (submission.kind !== 'oauth_code') {
+            throw new Error('Google connect requires an OAuth authorization code');
+        }
+        const mode = await loadGoogleOAuthMode(env.DB, tenantId);
+        const creds = await resolveGoogleOAuthCredentials(env, tenantId, mode);
+        if (!creds) {
+            throw new CalendarConnectError('Google Calendar integration is not configured');
+        }
         const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({
-                code,
-                client_id: clientId,
-                client_secret: clientSecret,
-                redirect_uri: redirectUri,
+                code: submission.code,
+                client_id: creds.clientId,
+                client_secret: creds.clientSecret,
+                redirect_uri: submission.redirectUri,
                 grant_type: 'authorization_code',
-                code_verifier: verifier,
+                code_verifier: submission.verifier,
             }),
         });
         const tokenData = await tokenRes.json() as GoogleTokenResponse & { scope?: string };
@@ -89,19 +169,28 @@ export const googleCalendarProvider: CalendarProvider = {
             ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
             : undefined;
         const scopes = (tokenData.scope ?? '').split(' ').filter(Boolean);
+        if (!tokenData.refresh_token) {
+            // Without one there is nothing to store: every later call refreshes.
+            throw new CalendarConnectError('Google did not return a refresh token');
+        }
         return {
             credentials: {
-                refreshToken: tokenData.refresh_token ?? '',
+                refreshToken: tokenData.refresh_token,
+                scopes,
                 ...(accessToken ? { accessToken } : {}),
                 ...(expiresAt ? { expiresAt } : {}),
             },
-            scopes,
             calendarId: calData.id ?? 'primary',
+            authType: 'oauth',
+            // DERIVED, not declared: what Google actually granted wins over what
+            // the user asked for. The fallback covers a token response that
+            // reports no scopes at all.
+            capability: scopes.length ? capabilityFromScopes(scopes) : requestedCapability,
         };
     },
 
-    async listBusy({ clientId, clientSecret, refreshToken, calendarId, range, capability }): Promise<BusyBlock[]> {
-        const accessToken = await accessTokenFor(clientId, clientSecret, refreshToken);
+    async listBusy({ auth, calendarId, range, capability }): Promise<BusyBlock[]> {
+        const accessToken = await accessTokenFor(auth);
         if (capability === 'availability_read') {
             const res = await fetch(`${GOOGLE_CALENDAR_API}/freeBusy`, {
                 method: 'POST',
@@ -154,8 +243,8 @@ export const googleCalendarProvider: CalendarProvider = {
         return blocks;
     },
 
-    async listCalendars({ clientId, clientSecret, refreshToken }): Promise<CalendarListEntry[]> {
-        const accessToken = await accessTokenFor(clientId, clientSecret, refreshToken);
+    async listCalendars({ auth }): Promise<CalendarListEntry[]> {
+        const accessToken = await accessTokenFor(auth);
         const res = await fetch(`${GOOGLE_CALENDAR_API}/users/me/calendarList`, {
             headers: { Authorization: `Bearer ${accessToken}` },
         });
@@ -173,8 +262,8 @@ export const googleCalendarProvider: CalendarProvider = {
             }));
     },
 
-    async pushEvent({ clientId, clientSecret, refreshToken, calendarId, event }): Promise<string> {
-        const accessToken = await accessTokenFor(clientId, clientSecret, refreshToken);
+    async pushEvent({ auth, calendarId, event }): Promise<string> {
+        const accessToken = await accessTokenFor(auth);
         const res = await fetch(
             `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`,
             {
@@ -195,8 +284,8 @@ export const googleCalendarProvider: CalendarProvider = {
         return created.id;
     },
 
-    async patchEvent({ clientId, clientSecret, refreshToken, calendarId, externalId, event }): Promise<void> {
-        const accessToken = await accessTokenFor(clientId, clientSecret, refreshToken);
+    async patchEvent({ auth, calendarId, externalId, event }): Promise<void> {
+        const accessToken = await accessTokenFor(auth);
         const res = await fetch(
             `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(externalId)}`,
             {
@@ -218,8 +307,8 @@ export const googleCalendarProvider: CalendarProvider = {
         }
     },
 
-    async deleteEvent({ clientId, clientSecret, refreshToken, calendarId, externalId }): Promise<void> {
-        const accessToken = await accessTokenFor(clientId, clientSecret, refreshToken);
+    async deleteEvent({ auth, calendarId, externalId }): Promise<void> {
+        const accessToken = await accessTokenFor(auth);
         const res = await fetch(
             `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(externalId)}`,
             {

@@ -70,7 +70,7 @@ describe('sendQuotaThresholdNotice', () => {
 
   async function seedOwner(tenantId: string, email: string) {
     await testDb.insert(schema.tenants).values({
-      id: tenantId, name: 'Acme', slug: tenantId, tier: 'free', createdAt: new Date(),
+      id: tenantId, slug: tenantId, tier: 'free', createdAt: new Date(),
     });
     await testDb.insert(schema.users).values({
       id: `${tenantId}-owner`, tenantId, email, passwordHash: 'x', role: 'owner', createdAt: new Date(),

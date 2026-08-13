@@ -182,6 +182,18 @@ describe('AI review evidence can name the narrative', () => {
     const reviews = () => db.select().from(schema.aiContentReviews)
         .where(eq(schema.aiContentReviews.tenantId, TENANT)).all();
 
+    // A review cites a call, and `recordContentReview` refuses to file one that
+    // cites a call this workspace does not own. These cases are about the
+    // artifact half, so the call has to actually exist for them to reach it.
+    beforeEach(async () => {
+        await db.insert(schema.aiCallProvenance).values({
+            id: AI_CALL, tenantId: TENANT,
+            capability: 'assist', provider: 'gemini', mode: 'byo',
+            model: 'gemini-2.5-flash', promptVersion: 'test.v1',
+            createdAt: new Date(1_700_000_000_000),
+        });
+    });
+
     /**
      * ⚠️ THE DECLARATION, CHECKED AT RUNTIME, AND THIS IS THE ASSERTION THAT
      * ACTUALLY BINDS.

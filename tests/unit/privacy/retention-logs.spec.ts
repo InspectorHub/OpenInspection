@@ -15,6 +15,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
 import { asAnyDb } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
+import { subtractMonthsMs } from '../../../server/lib/compliance/db-row-utils';
 import {
     auditLogs,
     esignAuditLogs,
@@ -33,6 +34,13 @@ import {
     DEDUP_LOG_RETENTION_DAYS,
     IDEMPOTENCY_REPLAY_RETENTION_DAYS,
     SYNC_OUTBOX_RETENTION_DAYS,
+    DESTRUCTION_RECORD_RETENTION_MONTHS,
+    AI_ASSURANCE_RETENTION_MONTHS,
+    REPORT_VERSION_RETENTION_MONTHS,
+    SMS_DISCLOSURE_RETENTION_MONTHS,
+    TENANT_LEGAL_VERSION_RETENTION_MONTHS,
+    MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS,
+    SLUG_HISTORY_RETENTION_MONTHS,
     RETENTION_MANIFEST,
 } from '../../../server/lib/compliance/retention-manifest';
 
@@ -77,7 +85,7 @@ describe('runLogRetentionSweep', () => {
         db = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        await db.insert(tenants).values({ id: 't1', name: 'T1', slug: 't1', createdAt: new Date(NOW) });
+        await db.insert(tenants).values({ id: 't1', slug: 't1', createdAt: new Date(NOW) });
     });
 
     afterEach(() => sqlite.close());
@@ -223,6 +231,196 @@ describe('runLogRetentionSweep', () => {
         const rows = await db.select().from(syncOutbox).all();
         expect(rows.map((r) => r.id)).toEqual(['o-pending-ancient']);
         expect(rows[0]!.payload).toContain('staff@example.com');
+    });
+
+    async function seedDestruction(id: string, status: 'started' | 'completed', destroyedAt: Date) {
+        await db.insert(schema.tenantDestructionRecords).values({
+            id, tenantId: `t-${id}`, tenantSlug: id,
+            rowsDeleted: status === 'completed' ? 10 : 0,
+            destroyedAt, status,
+            ...(status === 'completed' ? { completedAt: destroyedAt } : {}),
+        });
+    }
+
+    const monthsAgo = (n: number) => new Date(subtractMonthsMs(NOW, n));
+
+    it('expires a completed destruction record at three years and keeps the one inside the window', async () => {
+        await seedDestruction('d-old', 'completed', monthsAgo(DESTRUCTION_RECORD_RETENTION_MONTHS + 1));
+        await seedDestruction('d-new', 'completed', monthsAgo(DESTRUCTION_RECORD_RETENTION_MONTHS - 1));
+
+        const summary = await runLogRetentionSweep(asAnyDb(db), NOW);
+        expect(summary.perTable.tenant_destruction_records).toBe(1);
+
+        const rows = await db.select().from(schema.tenantDestructionRecords).all();
+        expect(rows.map((r) => r.id)).toEqual(['d-new']);
+    });
+
+    it('never deletes an UNFINISHED destruction record, however old', async () => {
+        // The counterpart to the pending-outbox rule above, and the same kind of
+        // mistake if it were missing. A record still reading `started` is a
+        // workspace that was destroyed and never certified — an open anomaly,
+        // and the only artifact that says so. Expiring it on age would close the
+        // question by deleting the evidence of it, which is precisely what
+        // opening the record before the destruction was meant to prevent.
+        await seedDestruction('d-abandoned', 'started', monthsAgo(DESTRUCTION_RECORD_RETENTION_MONTHS * 5));
+
+        const summary = await runLogRetentionSweep(asAnyDb(db), NOW);
+        expect(summary.perTable.tenant_destruction_records ?? 0).toBe(0);
+
+        const rows = await db.select().from(schema.tenantDestructionRecords).all();
+        expect(rows.map((r) => r.id)).toEqual(['d-abandoned']);
+    });
+
+    // ── The seven ledgers added with the destruction record ──────────────────
+    // Each pair is one row outside the window and one inside it, plus — where
+    // the executor carries a predicate — a row that is old enough and must
+    // survive anyway. That third case is the one worth having: every predicate
+    // here exists because deleting the row would break something that outlives
+    // it, and a spec with only the first two would pass on an executor that
+    // deletes everything old.
+
+    const seedCall = (id: string, at: Date) => db.insert(schema.aiCallProvenance).values({
+        id, tenantId: 't1', capability: 'assist', provider: 'gemini', mode: 'byo',
+        model: 'm', promptVersion: 'p.v1', createdAt: at,
+    });
+    const seedReview = (id: string, callId: string, at: Date) =>
+        db.insert(schema.aiContentReviews).values({
+            id, tenantId: 't1', artifactType: 'inspection_result', artifactId: 'a1',
+            reviewedBy: 'u1', reviewedAt: at, aiCallId: callId,
+        });
+
+    it('expires AI provenance and reviews on one shared clock', async () => {
+        await seedCall('c-old', monthsAgo(AI_ASSURANCE_RETENTION_MONTHS + 1));
+        await seedCall('c-new', monthsAgo(AI_ASSURANCE_RETENTION_MONTHS - 1));
+        await seedReview('r-old', 'c-new', monthsAgo(AI_ASSURANCE_RETENTION_MONTHS + 1));
+
+        await runLogRetentionSweep(asAnyDb(db), NOW);
+
+        expect((await db.select().from(schema.aiCallProvenance).all()).map(r => r.id)).toEqual(['c-new']);
+        expect(await db.select().from(schema.aiContentReviews).all()).toHaveLength(0);
+    });
+
+    it('never expires a call a surviving review still cites', async () => {
+        // The orphan the two rules would otherwise manufacture between them. A
+        // review is written AFTER its call, so on equal windows the call goes
+        // first — and `readAiAssurance` reports exactly that shape as
+        // `unresolvedReviewCount`, a signal for rows that predate the ownership
+        // check. A sweep that produced them would turn the alarm into noise.
+        await seedCall('c-cited', monthsAgo(AI_ASSURANCE_RETENTION_MONTHS + 2));
+        await seedReview('r-live', 'c-cited', monthsAgo(AI_ASSURANCE_RETENTION_MONTHS - 1));
+
+        await runLogRetentionSweep(asAnyDb(db), NOW);
+
+        expect((await db.select().from(schema.aiCallProvenance).all()).map(r => r.id)).toEqual(['c-cited']);
+    });
+
+    const seedReportVersion = (id: string, n: number, at: Date) =>
+        db.insert(schema.reportVersions).values({
+            id, tenantId: 't1', inspectionId: 'i1', reportId: 'rep-1', versionNumber: n,
+            snapshotJson: '{}', contentHash: `h${n}`, publishedBy: 'u1', publishedAt: at, createdAt: at,
+        });
+
+    it('expires superseded report versions and never the current one', async () => {
+        // v3 is what the report IS — it carries the signature and content hash a
+        // verifier reads. Expiring it would not retire history, it would delete
+        // the deliverable.
+        await seedReportVersion('rv1', 1, monthsAgo(REPORT_VERSION_RETENTION_MONTHS + 1));
+        await seedReportVersion('rv2', 2, monthsAgo(REPORT_VERSION_RETENTION_MONTHS + 1));
+        await seedReportVersion('rv3', 3, monthsAgo(REPORT_VERSION_RETENTION_MONTHS + 1));
+
+        await runLogRetentionSweep(asAnyDb(db), NOW);
+
+        expect((await db.select().from(schema.reportVersions).all()).map(r => r.id)).toEqual(['rv3']);
+    });
+
+    const seedDisclosure = (v: number, at: Date) =>
+        db.insert(schema.smsDisclosureVersions).values({ version: v, text: `d${v}`, publishedAt: at });
+
+    it('never expires an SMS disclosure a consent row still cites', async () => {
+        // `sms_consent_log` is RETENTION_OUT_OF_SCOPE — kept indefinitely,
+        // because the record is the tenant's defence against a consent
+        // challenge. Every consent row stamps the version it was shown, so
+        // expiring a cited version leaves permanent evidence pointing at text
+        // that no longer exists — gutting the exemption from the other side.
+        await seedDisclosure(1, monthsAgo(SMS_DISCLOSURE_RETENTION_MONTHS + 2));
+        await seedDisclosure(2, monthsAgo(SMS_DISCLOSURE_RETENTION_MONTHS + 2));
+        await seedDisclosure(3, monthsAgo(SMS_DISCLOSURE_RETENTION_MONTHS + 2));
+        await db.insert(schema.smsConsentLog).values({
+            id: 'cl-1', tenantId: 't1', contactId: 'ct1', phone: '+15550000000',
+            action: 'opt_in', source: 'web', disclosureVersion: 2, recipientType: 'client', capturedVia: 'booking_form',
+            occurredAt: new Date(NOW), createdAt: new Date(NOW),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+
+        await runLogRetentionSweep(asAnyDb(db), NOW);
+
+        // v1 unused and superseded → gone. v2 cited → kept. v3 current → kept.
+        expect((await db.select().from(schema.smsDisclosureVersions).all()).map(r => r.version).sort())
+            .toEqual([2, 3]);
+    });
+
+    const seedLegal = (id: string, doc: string, v: number, at: Date) =>
+        db.insert(schema.tenantLegalVersions).values({
+            id, tenantId: 't1', doc, version: v, bodySnapshot: 'x',
+            contentHash: `h${id}`, isMaterial: false, publishedAt: at,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+
+    it('expires superseded legal versions per doc, never the live one', async () => {
+        // Per (tenant, doc): the newest privacy version must not be expired by
+        // the existence of a newer TERMS version, which is what a naive
+        // "is there anything newer" predicate would do.
+        await seedLegal('p1', 'privacy', 1, monthsAgo(TENANT_LEGAL_VERSION_RETENTION_MONTHS + 1));
+        await seedLegal('p2', 'privacy', 2, monthsAgo(TENANT_LEGAL_VERSION_RETENTION_MONTHS + 1));
+        await seedLegal('t1', 'terms',   1, monthsAgo(TENANT_LEGAL_VERSION_RETENTION_MONTHS + 1));
+
+        await runLogRetentionSweep(asAnyDb(db), NOW);
+
+        expect((await db.select().from(schema.tenantLegalVersions).all()).map(r => r.id).sort())
+            .toEqual(['p2', 't1']);
+    });
+
+    it('expires marketplace import history on its own clock', async () => {
+        for (const [id, at] of [
+            ['ih-old', monthsAgo(MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS + 1)],
+            ['ih-new', monthsAgo(MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS - 1)],
+        ] as [string, Date][]) {
+            await db.insert(schema.tenantMarketplaceImportHistory).values({
+                id, tenantId: 't1', action: 'import', createdBy: 'u1', createdAt: at,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any);
+        }
+
+        await runLogRetentionSweep(asAnyDb(db), NOW);
+
+        expect((await db.select().from(schema.tenantMarketplaceImportHistory).all()).map(r => r.id))
+            .toEqual(['ih-new']);
+    });
+
+    it('never releases a slug still inside its retirement block', async () => {
+        // Deleting one releases the slug early: another tenant could claim it
+        // and inherit every stale link pointing at the old owner. Three years is
+        // well past the one-year block, so this should never bind — which is
+        // exactly why it is asserted rather than assumed.
+        await db.insert(schema.tenantSlugHistory).values([
+            { oldSlug: 'expired', tenantId: 't1', changedAt: monthsAgo(SLUG_HISTORY_RETENTION_MONTHS + 1), retiredUntil: monthsAgo(SLUG_HISTORY_RETENTION_MONTHS + 1) },
+            { oldSlug: 'blocked', tenantId: 't1', changedAt: monthsAgo(SLUG_HISTORY_RETENTION_MONTHS + 1), retiredUntil: new Date(NOW + 86_400_000) },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ] as any);
+
+        await runLogRetentionSweep(asAnyDb(db), NOW);
+
+        expect((await db.select().from(schema.tenantSlugHistory).all()).map(r => r.oldSlug))
+            .toEqual(['blocked']);
+    });
+
+    it('the destruction fixture pair really straddles the window', () => {
+        // Positive control on the fixtures themselves: if both dates landed on
+        // the same side, the two cases above would agree with each other and
+        // prove nothing.
+        const cutoff = subtractMonthsMs(NOW, DESTRUCTION_RECORD_RETENTION_MONTHS);
+        expect(monthsAgo(DESTRUCTION_RECORD_RETENTION_MONTHS + 1).getTime()).toBeLessThan(cutoff);
+        expect(monthsAgo(DESTRUCTION_RECORD_RETENTION_MONTHS - 1).getTime()).toBeGreaterThan(cutoff);
     });
 
     it('the outbox window is its own number, not a neighbour reused', async () => {

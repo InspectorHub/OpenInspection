@@ -123,6 +123,16 @@ export default function InvoicePage() {
             )}
           </div>
         )}
+        {/* Spec section 2 — the "from" party on an invoice is the registered
+            legal entity, not the trading brand above it. An ADDITION rather
+            than a swap: the bar above is brand chrome (logo OR name), and the
+            invoice previously named no issuing party at all. Rendered only when
+            it says something the brand bar does not. */}
+        {brand.legalName && brand.legalName !== brand.companyName && (
+          <p className="mb-4 text-[12px] text-ih-fg-3">
+            {m.invoice_from_party({ entity: brand.legalName })}
+          </p>
+        )}
         <PaymentSection
           invoice={invoice}
           brand={brand}

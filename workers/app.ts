@@ -32,7 +32,7 @@ type Ctx = Context<{ Bindings: WorkerEnv }>;
 // graph crashes that evaluation (the build + real-workerd path is unaffected).
 // Deferring the import keeps the entry's top-level graph tiny, so dev-mode
 // export-type detection succeeds; the first real request pays a one-time
-// (cached) import. See docs/developers for the dev-mode notes.
+// (cached) import. See docs/develop/architecture.md for the dev-mode notes.
 type ApiModule = typeof import("../server/index");
 let apiModule: Promise<ApiModule> | undefined;
 const getApi = () => (apiModule ??= import("../server/index"));

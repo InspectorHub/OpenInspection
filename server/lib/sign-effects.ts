@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { users, inspections, agreementRequests } from './db/schema';
 import { logger } from './logger';
+import { resolveAutomationCompanyName } from '../services/automation/company-name';
 import { getBookingHost } from './url';
 import { envelopeVerifyUrl } from './agreement-verify-url';
 import type { HonoConfig } from '../types/hono';
@@ -114,7 +115,7 @@ export async function runEnvelopeCompletionPipeline(
             tenantId,
             inspectionId,
             triggerEvent: 'agreement.signed',
-            companyName: c.env.APP_NAME || 'OpenInspection',
+            companyName: await resolveAutomationCompanyName(drizzle(c.env.DB), tenantId),
             reportBaseUrl: c.env.APP_BASE_URL || '',
         }).catch(() => {});
     }

@@ -54,7 +54,7 @@ beforeEach(async () => {
     (mockDrizzle as any).mockReturnValue(testDb);
     for (const id of [TENANT, OTHER_TENANT]) {
         await testDb.insert(schema.tenants).values({
-            id, name: 'Acme', slug: `acme-${id.slice(-2)}`, status: 'active',
+            id, slug: `acme-${id.slice(-2)}`, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(testDb), id);

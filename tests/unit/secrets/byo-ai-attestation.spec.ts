@@ -90,7 +90,7 @@ describe('BYO AI key attestation — POST/PUT /api/admin/secrets', () => {
         const { drizzle } = await import('drizzle-orm/d1');
         (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         // The route live-verifies a new Gemini key against Google before storing

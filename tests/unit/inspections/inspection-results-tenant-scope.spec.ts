@@ -13,7 +13,7 @@ describe('applyResultsBatch tenant scoping', () => {
   let db: BetterSQLite3Database<typeof schema>;
   beforeEach(async () => {
     const fix = createTestDb(); db = fix.db; await setupSchema(fix.sqlite);
-    for (const t of [T1, T2]) await db.insert(schema.tenants).values({ id: t, name: t, slug: t, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
+    for (const t of [T1, T2]) await db.insert(schema.tenants).values({ id: t, slug: t, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
     await db.insert(schema.inspections).values({ id: 'i-1', tenantId: T1, propertyAddress: 'x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date() });
   });
 

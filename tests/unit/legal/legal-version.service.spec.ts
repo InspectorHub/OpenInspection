@@ -24,7 +24,7 @@ describe('LegalVersionService', () => {
         db = fix.db;
         await setupSchema(fix.sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.tenantConfigs).values({
@@ -118,7 +118,7 @@ describe('LegalVersionService', () => {
 
     it('never lets one tenant read another tenant version', async () => {
         await db.insert(schema.tenants).values({
-            id: 'tenant-2', name: 'Other', slug: 'other', status: 'active',
+            id: 'tenant-2', slug: 'other', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await svc.recordPublish({ tenantId: TENANT, doc: 'privacy', body: 'Acme text.' });

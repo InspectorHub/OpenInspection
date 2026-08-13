@@ -34,7 +34,7 @@ async function makeDb(integrationConfig?: Record<string, unknown>) {
     vi.mocked(drizzle).mockReturnValue(fix.db as never);
     if (integrationConfig) {
         await fix.db.insert(tenants).values({
-            id: TENANT, name: 'Test', slug: 'test-tenant', createdAt: new Date(),
+            id: TENANT, slug: 'test-tenant', createdAt: new Date(),
         } as never);
         await fix.db.insert(tenantConfigs).values({
             tenantId: TENANT,

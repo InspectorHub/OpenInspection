@@ -35,6 +35,9 @@ import { m } from "~/paraglide/messages";
 
 interface Branding {
   companyName?: string | null;
+  /** Registered legal entity. NULL = "same as companyName" (the correct answer
+   *  for a sole proprietor); the fallback itself lives in BrandingService. */
+  legalName?: string | null;
   primaryColor?: string | null;
   defaultProfileId?: string | null;
   logoUrl?: string | null;
@@ -226,6 +229,20 @@ export default function SettingsWorkspacePage() {
               {fields.companyName.errors && (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.companyName.errors[0]}</p>
               )}
+            </div>
+            <div className="space-y-2">
+              {/* The placeholder showing the company name is the affordance that
+                  makes "leave blank" obvious. The hint stays because it explains
+                  WHERE the value comes from, which the label alone does not. */}
+              <label htmlFor={fields.legalName.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_legal_name_label()}</label>
+              <input type="text" id={fields.legalName.id} name={fields.legalName.name} defaultValue={branding.legalName ?? ""}
+                placeholder={branding.companyName ?? ""}
+                aria-invalid={fields.legalName.errors ? true : undefined}
+                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] text-ih-fg-1" />
+              {fields.legalName.errors && (
+                <p className="mt-1 text-xs text-ih-bad-fg">{fields.legalName.errors[0]}</p>
+              )}
+              <p className="mt-1 text-xs text-ih-fg-3">{m.settings_workspace_legal_name_hint()}</p>
             </div>
             <div className="space-y-2">
               <label htmlFor={fields.primaryColor.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_primary_color_label()}</label>

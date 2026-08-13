@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { Drawer } from "@core/shared-ui";
 import { getCapabilities, TOGGLEABLE, type Capability, type CapabilitySet, type PermissionOverrides } from "../../../server/lib/auth/capabilities";
+// TOGGLEABLE is still the source of truth for computeOverrideDiff below; the
+// RENDERING now walks CAP_GROUPS so the two drawers cannot group differently.
 import { SeatLimitPanel } from "./SeatLimitPanel";
 import { m } from "~/paraglide/messages";
 
@@ -31,7 +33,33 @@ export const CAP_LABELS: Record<Capability, string> = {
  get financial() { return m.label_cap_financial(); },
  get manageContacts() { return m.label_cap_manage_contacts(); },
  get viewCommunication() { return m.label_cap_view_communication(); },
+ get templateCreate() { return m.label_cap_template_create(); },
+ get templateEdit()   { return m.label_cap_template_edit(); },
+ get templateDelete() { return m.label_cap_template_delete(); },
+ get templateImport() { return m.label_cap_template_import(); },
 };
+
+/**
+ * Grouping is a presentation fact and lives with the labels, so the two
+ * drawers cannot group differently. EditMemberDrawer already imports
+ * CAP_LABELS and computeOverrideDiff from here for the same reason.
+ *
+ * `invite-overrides.test.ts` asserts this covers TOGGLEABLE exactly once: a
+ * tenth capability added to TOGGLEABLE and forgotten here would simply not
+ * render -- unsettable by anyone, in silence. That is #77 again, one layer up.
+ */
+export const CAP_GROUPS: ReadonlyArray<{ id: string; label: () => string; caps: readonly Capability[] }> = [
+ {
+  id: "general",
+  label: () => m.modal_invite_cap_group_general(),
+  caps: ["publish", "scheduleOthers", "financial", "manageContacts", "viewCommunication"],
+ },
+ {
+  id: "templates",
+  label: () => m.modal_invite_cap_group_templates(),
+  caps: ["templateCreate", "templateEdit", "templateDelete", "templateImport"],
+ },
+];
 
 /**
  * Reduce the edited capability set to only the toggles that differ from the
@@ -177,8 +205,11 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
  {m.modal_invite_advanced()}
  </button>
  {advancedOpen && (
- <div className="mt-3 space-y-2">
- {TOGGLEABLE.map((cap) => (
+ <div className="mt-3 space-y-3">
+ {CAP_GROUPS.map((group) => (
+ <div key={group.id} className="space-y-2">
+ <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">{group.label()}</span>
+ {group.caps.map((cap) => (
  <label key={cap} className="flex items-center gap-2 text-sm text-ih-fg-3">
  <input
  type="checkbox"
@@ -187,6 +218,8 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
  />
  {CAP_LABELS[cap]}
  </label>
+ ))}
+ </div>
  ))}
  </div>
  )}

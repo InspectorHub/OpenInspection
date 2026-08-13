@@ -2,7 +2,7 @@
 /**
  * i18n — glossary conformance gate (`lint:i18n-glossary`).
  *
- * `docs/developers/i18n-glossary.md` fixes one es-419 equivalent per product
+ * `docs/develop/conventions/i18n-glossary.md` fixes one es-419 equivalent per product
  * term. A glossary nobody checks is a suggestion, and 4,300 keys translated
  * against a suggestion produce four Spanish words for "Report". This gate reads
  * the glossary's own tables — the document is the source of truth, not a copy
@@ -61,7 +61,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const GLOSSARY = join(root, 'docs/developers/i18n-glossary.md');
+const GLOSSARY = join(root, 'docs/develop/conventions/i18n-glossary.md');
 const BASELINE = join(root, 'scripts/i18n-glossary-baseline.json');
 const SOURCE_LOCALE = 'en';
 const TARGET_LOCALE = 'es-419';
@@ -395,7 +395,7 @@ if (_scriptPath === _argv1 || _argv1.endsWith('/check-i18n-glossary.mjs')) {
     const fail = (msg) => { failed = true; console.error(`[i18n-glossary] ${msg}`); };
 
     if (!existsSync(GLOSSARY)) {
-        console.error('[i18n-glossary] docs/developers/i18n-glossary.md is missing — the gate has nothing to enforce.');
+        console.error('[i18n-glossary] docs/develop/conventions/i18n-glossary.md is missing — the gate has nothing to enforce.');
         console.error('[i18n-glossary] FAIL');
         process.exit(1);
     }
@@ -528,7 +528,7 @@ if (_scriptPath === _argv1 || _argv1.endsWith('/check-i18n-glossary.mjs')) {
     }
 
     if (failed) {
-        console.error('[i18n-glossary] FAIL — see docs/developers/i18n-glossary.md.');
+        console.error('[i18n-glossary] FAIL — see docs/develop/conventions/i18n-glossary.md.');
         process.exit(1);
     }
     const translated = sourceKeys.filter((k) => k in target && target[k].value.trim() !== '').length;

@@ -17,6 +17,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // Import resolver AFTER the mock is wired so it picks up the mock.
 import { resolveVideoBackend } from '../../../server/services/video/resolve';
+import { getDeploymentProfile } from '../../../server/lib/deployment-profile';
 import type { AppEnv } from '../../../server/types/hono';
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
@@ -55,8 +56,20 @@ function mockCtx(opts: {
         env.STREAM_CUSTOMER_SUBDOMAIN = opts.streamSubdomain;
     }
 
+    // The deployment profile is set by middleware in production, and the
+    // resolver reads it as `c.var.profile`. Deriving it here from the same
+    // `mode` this helper already takes keeps the mock matching production —
+    // the alternative is a context that satisfies the old `env.APP_MODE` read
+    // and nothing else, which is how this spec kept passing against a resolver
+    // it no longer resembled.
+    vars.profile = getDeploymentProfile(env);
+
     return {
         env,
+        // Hono exposes both accessors; the resolver uses `c.var`, other code
+        // uses `c.get`. A mock offering only one silently breaks whichever
+        // caller reaches for the other.
+        var: vars,
         get: (key: string) => vars[key],
         req: {
             url: 'https://test.example.com/api/test',
@@ -83,7 +96,6 @@ beforeEach(async () => {
 async function seedTenant(tier: string, status: string) {
     await testDb.insert(schema.tenants).values({
         id: TENANT_ID,
-        name: 'Test Co',
         slug: 'test-co',
         tier: tier as 'free' | 'pro' | 'enterprise',
         status: status as 'pending' | 'active' | 'suspended' | 'trial',
@@ -95,7 +107,6 @@ async function seedTenant(tier: string, status: string) {
 async function seedStandaloneTenant() {
     await testDb.insert(schema.tenants).values({
         id: TENANT_ID,
-        name: 'Self-Host Co',
         slug: 'self-host-co',
         tier: 'free',
         status: 'active',

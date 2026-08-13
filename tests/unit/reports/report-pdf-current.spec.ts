@@ -33,7 +33,7 @@ const HASH_V2    = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
 async function seedTenant(db: BetterSQLite3Database<typeof schema>) {
     await db.insert(schema.tenants).values({
-        id: TENANT_A, name: 'A', slug: 'a', status: 'active',
+        id: TENANT_A, slug: 'a', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
 }
@@ -186,7 +186,7 @@ describe('ReportPdfService.purgeTransientPdfs', () => {
 
         // Seed a tenant row for OTHER_TENANT to satisfy FK constraints.
         await testDb.insert(schema.tenants).values({
-            id: OTHER_TENANT, name: 'Other', slug: 'other', status: 'active',
+            id: OTHER_TENANT, slug: 'other', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
 

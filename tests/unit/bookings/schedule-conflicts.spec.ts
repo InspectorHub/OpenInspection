@@ -35,7 +35,7 @@ describe('findScheduleConflicts', () => {
 
         // Seed tenant
         await db.insert(tenants).values({
-            id: TENANT_ID, name: 'Test Co', slug: 'test-co',
+            id: TENANT_ID, slug: 'test-co',
             tier: 'free', status: 'active', maxUsers: 5,
             deploymentMode: 'shared', createdAt: new Date(),
         } as any);

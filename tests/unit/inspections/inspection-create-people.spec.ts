@@ -43,7 +43,7 @@ beforeEach(async () => {
 
     // Seed tenant
     await testDb.insert(schema.tenants).values({
-        id: TENANT, name: 'People Co', slug: 'people-co', status: 'active',
+        id: TENANT, slug: 'people-co', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
 

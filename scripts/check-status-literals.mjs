@@ -108,9 +108,12 @@ function findStatusLiterals(source, { statusKeys, members }) {
             }
 
             // Union-type guard: `status: 'a' | 'b'` is a type declaration, not a
-            // status write — skip when the literal is immediately followed by `|`.
+            // status write — skip when the literal is immediately followed by a
+            // SINGLE `|`. `[^|]` is what makes it single: a logical `||` is a
+            // real comparison, and treating it as a union hid every branch of an
+            // `||` chain except the last one.
             const after = source.slice(index + m[0].length);
-            if (/^\s*\|/.test(after)) continue;
+            if (/^\s*\|[^|]/.test(after)) continue;
 
             const lineEnd = source.indexOf('\n', index);
             const context = source.slice(lineStart, lineEnd === -1 ? source.length : lineEnd).trim();
@@ -133,12 +136,34 @@ function readMembers() {
         if (!m) return [];
         return [...m[1].matchAll(/['"]([a-z_]+)['"]/g)].map((x) => x[1]);
     };
-    return [
-        ...new Set([
-            ...grab('server/lib/status/inspection-status.ts', 'INSPECTION_STATUSES'),
-            ...grab('server/lib/status/report-status.ts', 'REPORT_STATUSES'),
-        ]),
+    // Every axis listed here is guarded; an axis NOT listed is invisible to this
+    // gate except where its vocabulary happens to collide with one that is.
+    // That is not a hypothetical: the destruction axis arrived with two literals
+    // in one change, and only `'completed'` was reported — because 'completed'
+    // is also an inspection status. `'started'` belongs to no listed axis and
+    // sailed through, in the same file, in the same commit. The gate fired for
+    // the right file for the wrong reason, and half-covered it.
+    //
+    // So: a new status axis means a new line here, not a baseline entry. The
+    // baseline is for a literal that is genuinely not a status write; it is not
+    // the place to put an axis nobody taught the gate about.
+    const AXES = [
+        ['server/lib/status/inspection-status.ts',   'INSPECTION_STATUSES'],
+        ['server/lib/status/report-status.ts',       'REPORT_STATUSES'],
+        ['server/lib/status/destruction-status.ts',  'DESTRUCTION_STATUSES'],
     ];
+    const members = AXES.flatMap(([path, name]) => {
+        const found = grab(path, name);
+        // An axis that parses to nothing silently shrinks the gate. A renamed
+        // constant or a moved file must fail here, not quietly stop guarding.
+        if (found.length === 0) {
+            console.error(`✘ Status-literal gate — parsed ZERO members from ${name} in ${path}.`);
+            console.error('  The gate would stop guarding that axis and still report green.');
+            process.exit(1);
+        }
+        return found;
+    });
+    return [...new Set(members)];
 }
 
 // ---------------------------------------------------------------------------

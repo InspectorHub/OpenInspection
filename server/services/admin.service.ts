@@ -71,10 +71,9 @@ export class AdminService {
                 lastSyncAt: calendarConnections.lastSyncAt,
             })
                 .from(calendarConnections)
-                .where(dbAnd(
-                    eq(calendarConnections.tenantId, tenantId),
-                    eq(calendarConnections.provider, 'google'),
-                )),
+                // Any provider. A member with an Apple connection is connected;
+                // filtering on 'google' showed them as never having connected.
+                .where(eq(calendarConnections.tenantId, tenantId)),
         ]);
 
         const syncByUser = new Map(connections.map((c) => [c.userId, c.lastSyncAt]));

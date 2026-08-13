@@ -10,6 +10,15 @@
  *
  * Uses the same PBKDF2-SHA256 (100k iters, 16-byte salt, `pbkdf2:salt:hash`)
  * format as server/lib/password.ts, and the standalone SINGLE_TENANT_ID.
+ *
+ * NOT a wrapper around tests/seed-fixtures.ts, though the four statements below
+ * look like a subset of what that file writes. They are a different account in a
+ * different tenant: this script honours TEST_EMAIL / TEST_PASSWORD /
+ * SINGLE_TENANT_ID from the environment and hashes the password at run time, so
+ * a developer can seed a login of their own choosing. `seedFixtures` hard-codes
+ * its tenant id, its addresses and a pre-computed hash, on purpose — its rows
+ * are addressed BY id from the e2e specs. Folding one into the other would
+ * silently change which tenant a `npm run dev` login lands in.
  */
 import { execFileSync } from "node:child_process";
 import { writeFileSync, rmSync } from "node:fs";
@@ -38,8 +47,9 @@ const userId = "test-admin-0000-0000-0000-000000000001";
 
 const sql = [
   // Tenant (standalone single tenant) — created once, ignored thereafter.
-  // (column renamed subdomain → slug in migration 0005)
-  `INSERT OR IGNORE INTO tenants (id, name, slug, created_at) VALUES ('${sq(TENANT_ID)}', 'Test Tenant', 'test', ${now});`,
+  // The company name is not on this row; it lives in `tenant_configs`.
+  `INSERT OR IGNORE INTO tenants (id, slug, created_at) VALUES ('${sq(TENANT_ID)}', 'test', ${now});`,
+  `INSERT OR IGNORE INTO tenant_configs (tenant_id, company_name, updated_at) VALUES ('${sq(TENANT_ID)}', 'Test Tenant', ${now});`,
   // Owner user — delete+insert so the password resets to a known value each run.
   `DELETE FROM users WHERE email = '${sq(EMAIL)}';`,
   `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at) VALUES ('${userId}', '${sq(TENANT_ID)}', '${sq(EMAIL)}', '${pw}', 'owner', ${now});`,

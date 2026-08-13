@@ -2,7 +2,7 @@
  * Collab edit permission, now decided from the ROSTER.
  *
  * It used to read `inspections.inspector_id`, `lead_inspector_id` and the
- * `helper_inspector_ids` JSON. The latter two are NULL and '[]' on every
+ * `helper_inspector_ids` JSON. The latter two were NULL and '[]' on every
  * production row, so the check was effectively "are you inspector_id" while
  * claiming to honour a lead and a helper list — and the first write of either
  * would have made who-may-EDIT disagree with every other answer to "who works

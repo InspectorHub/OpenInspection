@@ -26,7 +26,7 @@ describe('PeopleService.makePrimary', () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite);
         await seedRoleProfiles(db, 't1', new Date(1));
         await db.insert(schema.tenants).values([
-            { id: 't1', name: 'T1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(1) },
+            { id: 't1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(1) },
         ]);
         await db.insert(schema.contacts).values([
             { id: 'c1', tenantId: 't1', type: 'client', name: 'Buyer One', email: 'b1@x.com', createdAt: new Date(1) },
@@ -104,7 +104,7 @@ describe('addPerson with the primary role when one already exists', () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite);
         await seedRoleProfiles(db, 't1', new Date(1));
         await db.insert(schema.tenants).values([
-            { id: 't1', name: 'T1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(1) },
+            { id: 't1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(1) },
         ]);
         await db.insert(schema.contacts).values([
             { id: 'c1', tenantId: 't1', type: 'client', name: 'Buyer One', email: 'b1@x.com', createdAt: new Date(1) },

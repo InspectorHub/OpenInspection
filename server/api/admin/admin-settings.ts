@@ -301,6 +301,7 @@ const CommunicationResponseSchema = z.object({
     emailMode:               z.enum(['platform', 'own']).describe('platform = shared Resend; own = tenant Resend.'),
     senderDisplayName:       z.string().nullable().describe('From: display name (override; falls back to companyName).'),
     companyName:                z.string().nullable().describe('Canonical company name (from workspace branding).'),
+    legalName:                  z.string().describe('Registered legal entity, already resolved (falls back to companyName). Prefills the SMS compliance wizard.'),
     pointOfContact:          z.enum(['inspector', 'company']).describe('Who client-facing emails come from.'),
     resendConfigured:        z.boolean().describe('Whether a Resend API key is configured (env or tenant secret).'),
     templates:               z.array(z.object({
@@ -670,11 +671,14 @@ const adminSettingsRoutes = createApiRouter()
             } catch { /* no decryptable secrets — leave false */ }
         }
         const icsToken = cfg.icsToken as string | null | undefined;
+        // Any provider: these fields report whether THIS user has a calendar
+        // connected at all. `googleOAuthConfigured` below is the one that is
+        // genuinely Google-specific — it gates the Google button.
         const googleCalendarConnected = user?.sub
-            ? await userHasCalendarConnection(c.env.DB, tenantId, user.sub, 'google')
+            ? await userHasCalendarConnection(c.env.DB, tenantId, user.sub)
             : false;
         const calendarRow = user?.sub && googleCalendarConnected
-            ? await getCalendarConnection(c.env.DB, tenantId, user.sub, 'google')
+            ? await getCalendarConnection(c.env.DB, tenantId, user.sub)
             : null;
         const integrationCfg = await c.var.services.branding.getIntegrationConfig(tenantId);
         const googleOAuthMode: 'platform' | 'own' = integrationCfg.googleOAuthMode === 'own' ? 'own' : 'platform';
@@ -688,6 +692,7 @@ const adminSettingsRoutes = createApiRouter()
                 emailMode: (cfg.emailMode as 'platform' | 'own') ?? 'platform',
                 senderDisplayName: (cfg.senderDisplayName as string | null) ?? null,
                 companyName: (cfg.companyName as string | null) ?? null,
+                legalName: (await c.var.services.branding.getBrand(tenantId)).legalName,
                 pointOfContact: (cfg.pointOfContact as 'inspector' | 'company') ?? 'company',
                 resendConfigured,
                 templates: [],

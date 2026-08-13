@@ -106,7 +106,7 @@ beforeEach(async () => {
 
     for (const [id, slug] of [[TENANT, 'acme'], [OTHER_TENANT, 'globex']] as const) {
         await db.insert(schema.tenants).values({
-            id, name: slug, slug, status: 'active',
+            id, slug, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
     }

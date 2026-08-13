@@ -1,5 +1,7 @@
-import { Modal, Button } from "@core/shared-ui";
+import { Modal, Button, Banner } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { formatShapedDateTime } from "~/lib/format-date";
+import { useSessionContext, useChromeDateTimeFormat, useDisplayTimeZone } from "~/hooks/useSessionContext";
 
 export interface PublishModalProps {
  open: boolean;
@@ -21,6 +23,19 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  // independent). When the on-site work is not yet marked complete, offer an
  // advisory choice — do both, or just publish — but never block.
  const notCompleted = status !== "completed";
+ // Portal #98 — the outbound cooling window holds client email for a company's
+ // first 24 hours. Said HERE, on the button that sets the expectation, because
+ // the account-wide banner answers a different question: it says the window
+ // exists, not that THIS publish is about to land in it. Publishing itself is
+ // unaffected — the report goes live and the client's email is re-scheduled to
+ // the unlock instant, so the wording promises a delay, never a loss.
+ //
+ // Same `unlockAtMs` the banner reads, so the two cannot name different times;
+ // it is non-null only while the window is open, and the server decides that
+ // (see resolveCoolingWindowForSession) — no clock arithmetic here.
+ const unlockAtMs = useSessionContext()?.outboundCoolingWindow?.unlockAtMs ?? null;
+ const timeZone = useDisplayTimeZone();
+ const dtFormat = useChromeDateTimeFormat();
  return (
  <Modal
  open={open}
@@ -61,6 +76,21 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  </span>
  )}
  </p>
+ {/* No weight class here, and that is not an oversight: Banner hardcodes
+  `font-semibold` in its base, so a `font-medium` passed through
+  `className` loses the tie on stylesheet order and silently does
+  nothing — while `text-[12px]` on the same string DOES win, because
+  Tailwind v4 sorts arbitrary values after the named scale. One
+  override landing and the other not, from one attribute, is not
+  something a reader can see. The notice is kept SHORT instead, so
+  semibold does not out-shout the rating warning above it. */}
+ {unlockAtMs !== null && (
+ <Banner tone="info" className="mt-3 text-[12px]">
+ {m.editor_publish_cooling_notice({
+ unlockAt: formatShapedDateTime(unlockAtMs, timeZone, dtFormat),
+ })}
+ </Banner>
+ )}
  <div className="mt-4 p-3 rounded-lg bg-ih-bg-muted text-[12px] space-y-1">
  <div className="flex justify-between"><span className="text-ih-fg-3">{m.editor_publish_stat_items_rated()}</span><span className="font-bold">{progress.rated}/{progress.total}</span></div>
  <div className="flex justify-between"><span className="text-ih-fg-3">{m.editor_publish_stat_completion()}</span><span className="font-bold">{progress.pct}%</span></div>

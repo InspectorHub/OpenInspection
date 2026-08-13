@@ -11,6 +11,14 @@ vi.mock('../../../server/lib/calendar/registry', () => ({
 import { importBusyForConnection, SYNC_WINDOW_DAYS } from '../../../server/lib/calendar/sync-engine';
 import { upsertLink } from '../../../server/lib/calendar/external-links';
 import type { CalendarConnectionRow } from '../../../server/lib/calendar/connection';
+import type { CalendarAuth } from '../../../server/lib/calendar/provider';
+
+// One opaque provider-minted handle replaces the three OAuth values the engine
+// used to take by hand. The engine never looks inside it.
+const auth = {
+    provider: 'google',
+    material: { clientId: 'cid', clientSecret: 'sec', refreshToken: 'rt' },
+} as CalendarAuth;
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const USER = '00000000-0000-0000-0000-000000000010';
@@ -35,8 +43,6 @@ const connection = {
     lastSyncAt: null,
 } as unknown as CalendarConnectionRow;
 
-const deps = { clientId: 'cid', clientSecret: 'sec', refreshToken: 'rt' };
-
 function ev(over: Record<string, unknown> = {}) {
     return {
         start: '2026-06-10T14:00:00Z',
@@ -58,7 +64,7 @@ describe('importBusyForConnection', () => {
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'A', slug: 'a', status: 'active',
+            id: TENANT, slug: 'a', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.tenantConfigs).values({
@@ -85,7 +91,7 @@ describe('importBusyForConnection', () => {
      */
     it('persists the provider event id, not a synthesised range key', async () => {
         listBusy.mockResolvedValue([ev({ externalId: 'google-abc' })]);
-        const out = await importBusyForConnection(db as AnyDb, connection, deps, NOW);
+        const out = await importBusyForConnection(db as AnyDb, connection, auth, NOW);
 
         expect(out.upserted).toBe(1);
         const rows = await overrides();
@@ -98,7 +104,7 @@ describe('importBusyForConnection', () => {
             ev({ externalId: 'a', start: '2026-06-10T14:00:00Z', end: '2026-06-10T16:00:00Z' }),
             ev({ externalId: 'b', start: '2026-06-10T15:00:00Z', end: '2026-06-10T17:00:00Z' }),
         ]);
-        await importBusyForConnection(db as AnyDb, connection, deps, NOW);
+        await importBusyForConnection(db as AnyDb, connection, auth, NOW);
 
         const ids = (await overrides()).map((r) => r.externalId).sort();
         expect(ids).toEqual(['a', 'b']);
@@ -111,21 +117,21 @@ describe('importBusyForConnection', () => {
         });
         listBusy.mockResolvedValue([ev({ externalId: 'ours' }), ev({ externalId: 'theirs' })]);
 
-        const out = await importBusyForConnection(db as AnyDb, connection, deps, NOW);
+        const out = await importBusyForConnection(db as AnyDb, connection, auth, NOW);
         expect(out.skipped.oi_originated).toBe(1);
         expect((await overrides()).map((r) => r.externalId)).toEqual(['theirs']);
     });
 
     it('does not import recurring instances', async () => {
         listBusy.mockResolvedValue([ev({ externalId: 'r1', recurringEventId: 'series' })]);
-        const out = await importBusyForConnection(db as AnyDb, connection, deps, NOW);
+        const out = await importBusyForConnection(db as AnyDb, connection, auth, NOW);
         expect(out.skipped.recurring_instance).toBe(1);
         expect(await overrides()).toHaveLength(0);
     });
 
     it('does not backfill events that predate the connection', async () => {
         listBusy.mockResolvedValue([ev({ externalId: 'old', createdMs: Date.UTC(2026, 3, 1) })]);
-        const out = await importBusyForConnection(db as AnyDb, connection, deps, NOW);
+        const out = await importBusyForConnection(db as AnyDb, connection, auth, NOW);
         expect(out.skipped.before_connect).toBe(1);
         expect(await overrides()).toHaveLength(0);
     });
@@ -137,7 +143,7 @@ describe('importBusyForConnection', () => {
      */
     it('asks the provider for the shipped 30-day window', async () => {
         listBusy.mockResolvedValue([]);
-        await importBusyForConnection(db as AnyDb, connection, deps, NOW);
+        await importBusyForConnection(db as AnyDb, connection, auth, NOW);
 
         expect(SYNC_WINDOW_DAYS).toBe(30);
         const { range } = listBusy.mock.calls[0]![0] as { range: { from: Date; to: Date } };
@@ -148,7 +154,7 @@ describe('importBusyForConnection', () => {
     it('stores busy time as tenant-local wall clock, not UTC', async () => {
         // 14:00Z on 2026-06-10 is 10:00 in America/New_York (EDT).
         listBusy.mockResolvedValue([ev()]);
-        await importBusyForConnection(db as AnyDb, connection, deps, NOW);
+        await importBusyForConnection(db as AnyDb, connection, auth, NOW);
 
         const row = (await overrides())[0]!;
         expect(row.date).toBe('2026-06-10');
@@ -161,7 +167,7 @@ describe('importBusyForConnection', () => {
             ev({ externalId: 'keep' }),
             ev({ externalId: 'r', recurringEventId: 's' }),
         ]);
-        const out = await importBusyForConnection(db as AnyDb, connection, deps, NOW);
+        const out = await importBusyForConnection(db as AnyDb, connection, auth, NOW);
         expect(out).toMatchObject({ totalEvents: 2, upserted: 1 });
     });
 });

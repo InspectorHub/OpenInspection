@@ -42,7 +42,7 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
         people = new PeopleService({ DB: {} as D1Database });
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', slug: SLUG, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: SLUG, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
     });
@@ -70,6 +70,11 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
             // inspection_people (PeopleService.getPrimaryClient /
             // contactIdForRole). The row itself carries none of them.
             templateId: 'tpl-1',
+            // #307 — getInspectionHub awaits computePublishReadiness, which now
+            // requires the inspection's own frozen structure. A row naming a
+            // template it does not carry a snapshot for fails the WHOLE hub,
+            // not just the report page.
+            templateSnapshot: { sections: [] },
             coverPhotoId: 'cover-1', date: '2026-06-01', status: 'completed',
             paymentStatus: 'unpaid', price: 35000, paymentRequired: true, agreementRequired: true,
             createdAt: new Date(),
@@ -154,7 +159,7 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
     it('returns null for a cross-tenant id', async () => {
         const OTHER = '00000000-0000-0000-0000-0000000000ff';
         await testDb.insert(schema.tenants).values({
-            id: OTHER, name: 'Other', slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            id: OTHER, slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
             id: 'insp-other', tenantId: OTHER, propertyAddress: 'X',

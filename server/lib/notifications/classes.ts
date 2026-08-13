@@ -115,6 +115,10 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     { id: 'agreement-signed',     label: 'Your signed agreement',   category: 'transactional', required: true,  channels: ['email'], audience: ['client'] },
     { id: 'evidence-pack',        label: 'Signature certificate',   category: 'transactional', required: true,  channels: ['email'], audience: ['client'] },
     { id: 'payment-request',      label: 'Invoice',                 category: 'transactional', required: true,  channels: ['email'], audience: ['client'] },
+    // The receipt for a payment already made. Required for the same reason the
+    // invoice is: it is the only record we produce of money that changed hands,
+    // and muting it hides money the recipient has paid.
+    { id: 'payment-receipt',      label: 'Your payment receipt',    category: 'transactional', required: true,  channels: ['email'], audience: ['client'] },
     { id: 'report-ready',         label: 'Your report is ready',    category: 'transactional', required: true,  channels: ['email'], audience: ['client'] },
     { id: 'report-ready-pdf',     label: 'Your report (PDF)',       category: 'transactional', required: true,  channels: ['email'], audience: ['client'] },
     // A one-off share to a typed-in address — see the third `required: true`
@@ -182,6 +186,7 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     // has content for — and a switch for a message that can never be sent is a
     // control that lies.
     { id: 'inspection-cancelled',         label: 'Your inspection was cancelled',   category: 'transactional', required: false, channels: ['email'], audience: ['client'] },
+    { id: 'inspection-cancelled-buyers-agent', label: 'An inspection you referred was cancelled', category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
     { id: 'report-amended',               label: 'Your report was updated',         category: 'transactional', required: false, channels: ['email'], audience: ['client'] },
     { id: 'report-ready-listing-agent',   label: 'A report is ready (listing agent)', category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
     { id: 'booking-confirmation-buyers-agent', label: 'An inspection you referred is booked', category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },

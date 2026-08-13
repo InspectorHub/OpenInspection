@@ -35,8 +35,8 @@ describe('Track G schema', () => {
         // better-sqlite3 enables FK enforcement by default, so seed the parent
         // tenant and user rows that availability.tenant_id / inspector_id reference.
         sqlite.prepare(
-            `INSERT INTO tenants (id, name, slug, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?,?)`
-        ).run('t1', 'Test Co', 'test-co', 'free', 'active', 5, 'shared', Date.now());
+            `INSERT INTO tenants (id, slug, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?)`
+        ).run('t1', 'test-co', 'free', 'active', 5, 'shared', Date.now());
         sqlite.prepare(
             `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at) VALUES (?,?,?,?,?,?)`
         ).run('u1', 't1', 'insp@example.com', 'hash', 'inspector', Date.now());
@@ -51,8 +51,8 @@ describe('Track G schema', () => {
     it('partial unique index allows multiple is_available=1 rows but rejects duplicate is_available=0 rows (DB-9)', async () => {
         // Seed parent tenant and user rows (FK enforcement active in better-sqlite3).
         sqlite.prepare(
-            `INSERT INTO tenants (id, name, slug, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?,?)`
-        ).run('t2', 'Override Co', 'override-co', 'free', 'active', 5, 'shared', Date.now());
+            `INSERT INTO tenants (id, slug, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?)`
+        ).run('t2', 'override-co', 'free', 'active', 5, 'shared', Date.now());
         sqlite.prepare(
             `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at) VALUES (?,?,?,?,?,?)`
         ).run('u2', 't2', 'insp2@example.com', 'hash', 'inspector', Date.now());

@@ -47,7 +47,7 @@ beforeEach(async () => {
     await setupSchema(fixture.sqlite);
 
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({
@@ -253,7 +253,7 @@ describe('payment ledger — idempotency', () => {
 
     it('lets the same provider ref exist once per tenant', async () => {
         await db.insert(schema.tenants).values({
-            id: 'tenant-two', name: 'Beta', slug: 'beta', status: 'active',
+            id: 'tenant-two', slug: 'beta', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.invoices).values({

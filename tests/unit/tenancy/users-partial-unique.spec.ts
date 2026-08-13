@@ -47,7 +47,6 @@ beforeEach(async () => {
     // Seed the required tenant row
     await db.insert(schema.tenants).values({
         id: TENANT,
-        name: 'Test Tenant',
         slug: 'test-tenant',
         status: 'active',
         deploymentMode: 'shared',

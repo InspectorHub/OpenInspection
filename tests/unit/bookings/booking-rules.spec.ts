@@ -97,7 +97,7 @@ describe('getTenantSlots enforces the rules on the computed grid', () => {
         await setupSchema(sqlite);
         (mockDrizzle as any).mockReturnValue(db);
         svc = new BookingService({} as any);
-        await db.insert(tenants).values({ id: 't1', name: 'Acme', slug: 'acme', createdAt: new Date() });
+        await db.insert(tenants).values({ id: 't1', slug: 'acme', createdAt: new Date() });
         await db.insert(users).values({
             id: 'u1', tenantId: 't1', email: 'u1@x.com', passwordHash: 'h',
             role: 'inspector', name: 'Ann', createdAt: new Date(),

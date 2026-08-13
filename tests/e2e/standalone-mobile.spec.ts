@@ -134,13 +134,19 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
     // + active-tab styling). A server-side redirect is viewport-independent, so
     // there is nothing mobile-specific left to assert.
 
-    test('M-07: Marketplace renders without horizontal overflow on mobile', async ({ page }) => {
-        await gotoMobile(page, '/library/marketplace', adminToken);
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-        expect(overflow, 'no horizontal overflow').toBeLessThanOrEqual(1);
-        await expect(page.locator('h1:has-text("Marketplace")')).toBeVisible();
-        // (The former search-box assertion was removed in the 2026-07 de-stale:
-        // marketplace.tsx was redesigned to a PageHeader + TabStrip + card grid
-        // with no search input — server-side pagination via ?page/?pageSize.)
-    });
+    // M-07 deleted (2026-08-11): it asserted that /library/marketplace renders,
+    // which stopped being true for standalone in the same round this spec last
+    // ran green. The content marketplace is a hosted-only surface — the loader
+    // throws 404 when `hasContentMarketplace` is false — so there is no
+    // standalone page whose mobile layout could overflow.
+    //
+    // Deleted rather than rewritten for the reason M-06 was: a server-side gate
+    // is viewport-independent, so nothing about it belongs in a mobile spec. The
+    // assertion moved to standalone-api.spec.ts (API-25), where it is stronger —
+    // it sends a VALID admin token, so a 404 can only be the capability and not
+    // a permission.
+    //
+    // Worth noting how long this hid: the run that first exposed it had 151
+    // specs that never executed, because globalSetup swallowed a failed
+    // migration. This one was among them.
 });

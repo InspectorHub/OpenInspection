@@ -27,7 +27,7 @@ import { buildReportOutline } from '../../lib/report-outline';
 import { resolveProfile } from '../../lib/report-style/resolve';
 import type { Deviation } from '../../lib/pca-deviations';
 import type { DefectCommentState } from '../../types/inspection-item-state';
-import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS } from './shared';
+import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS, requireTemplateSnapshot } from './shared';
 import { InspectionSubService } from './base';
 import { DefectCategoryService } from './defect-category.service';
 import { buildCostTables } from '../../lib/pca-costs';
@@ -182,25 +182,20 @@ export class InspectionReportService extends InspectionSubService {
         // are imported from '../../lib/collab/results-doc.types' — single
         // source of truth for the inspection_results.data projection shape.
 
-        // Feature #20 — prefer the per-inspection templateSnapshot over the
-        // source template.schema. The snapshot is the authoritative shape
-        // for the inspection once it's been created: rating-system swaps,
-        // inline added/removed sections + items, and per-job tweaks all
-        // land there. Falling back to template.schema preserves behavior
-        // for legacy inspections that pre-date the snapshot column.
-        const inspectionSnapshotRaw = (inspection as unknown as { templateSnapshot?: unknown }).templateSnapshot;
-        const inspectionSnapshot = inspectionSnapshotRaw
-            ? (typeof inspectionSnapshotRaw === 'string' ? JSON.parse(inspectionSnapshotRaw as string) : inspectionSnapshotRaw)
-            : null;
-        const hasInspectionSnapshot = inspectionSnapshot
-            && typeof inspectionSnapshot === 'object'
-            && Array.isArray((inspectionSnapshot as { sections?: unknown }).sections)
-            && (inspectionSnapshot as { sections: unknown[] }).sections.length > 0;
-        const rawSchema = hasInspectionSnapshot
-            ? inspectionSnapshot
-            : template?.schema
-                ? (typeof template.schema === 'string' ? JSON.parse(template.schema) : template.schema)
-                : { sections: [] };
+        // Feature #20 — the per-inspection templateSnapshot IS the shape of
+        // this report: rating-system swaps, inline added/removed sections +
+        // items, and per-job tweaks all land there.
+        //
+        // #307 — it is now REQUIRED, not preferred. This used to fall back to
+        // the live `template.schema`, which answered "what does this report
+        // contain" with today's template rather than the one the inspector
+        // filled in, and did so silently. A missing snapshot is an invariant
+        // violation and fails loudly with the inspection id.
+        const inspectionSnapshot = requireTemplateSnapshot(
+            inspection as { id: string; templateId?: string | null; templateSnapshot?: unknown },
+            tenantId,
+        );
+        const rawSchema: unknown = inspectionSnapshot;
         // Support both formats: { sections: [...] } and flat array of items
         const schemaData: SchemaData = Array.isArray(rawSchema)
             ? { sections: [{ id: 'general', title: 'General', items: rawSchema }] }
@@ -221,8 +216,10 @@ export class InspectionReportService extends InspectionSubService {
                 levels = mapRatingSystemLevels((snap as { levels: Array<Record<string, unknown>> }).levels);
             }
         }
-        if (levels.length === 0 && hasInspectionSnapshot) {
-            const snapLevels = (inspectionSnapshot as { ratingSystem?: { levels?: unknown[] } }).ratingSystem?.levels;
+        if (levels.length === 0) {
+            // Precedence step 2. The snapshot is now guaranteed to exist, so
+            // the old `hasInspectionSnapshot` guard would always be true.
+            const snapLevels = (inspectionSnapshot as unknown as { ratingSystem?: { levels?: unknown[] } }).ratingSystem?.levels;
             if (Array.isArray(snapLevels)) {
                 levels = mapRatingSystemLevels(snapLevels as Array<Record<string, unknown>>);
             }

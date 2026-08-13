@@ -18,6 +18,12 @@ const ContractorTypeListResponseSchema = z.object({
     success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
     data: z.array(ContractorTypeSchema).describe('TODO describe data field for the OpenInspection MCP integration'),
 });
+const ContractorTypeDeletePreflightResponseSchema = z.object({
+    success: z.literal(true).describe('Always true; failures are returned as an error envelope.'),
+    data: z.object({
+        comments: z.number().int().nonnegative().describe('Canned comments in this tenant that recommend this contractor type and would be left pointing at nothing.'),
+    }).describe('Counts of the soft references a delete would orphan.'),
+});
 
 /* ── GET /api/contractor-types ────────────────────────────────────────────── */
 const listContractorTypesRoute = createRoute(withMcpMetadata({
@@ -78,6 +84,24 @@ const deleteContractorTypeRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteContractorType (DELETE /{id}, contractor-types domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'primary' }));
 
+/* ── GET /api/contractor-types/:id/preflight ──────────────────────────────── */
+// What a delete would orphan. Read-only and NON-blocking on purpose: the
+// schema calls `comments.recommended_contractor_type_id` a soft reference and
+// a stale one acceptable, so the delete stays permitted and this exists only
+// so the tenant is told the cost before confirming.
+const contractorTypeDeletePreflightRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/{id}/preflight',
+    tags: ["contractor-types"],
+    summary: 'Count what deleting a contractor type would orphan',
+    middleware: [requireRole('owner', 'manager')] as const,
+    request: { params: z.object({ id: z.string().min(1).describe('Contractor type id the delete would target.') }).describe('Path parameters for the contractor-type delete preflight.') },
+    responses: {
+        200: { content: { 'application/json': { schema: ContractorTypeDeletePreflightResponseSchema } }, description: 'Reference counts' },
+    },
+    operationId: "getContractorTypeDeletePreflight",
+    description: "Counts the tenant's canned comments that recommend this contractor type. Advisory only -- the delete is never blocked, because the reference is soft by design and published reports store the resolved label rather than the id."
+}, { scopes: ['read'], tier: 'extended' }));
+
 /* ── POST /api/contractor-types/reorder ───────────────────────────────────── */
 const reorderContractorTypesRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/reorder',
@@ -112,6 +136,12 @@ const contractorTypesRoutes = createApiRouter()
         const r = await c.var.services.contractorType.update(id, tenantId, patch);
         auditFromContext(c, 'contractor_type.updated', 'contractor_type', { entityId: r.id });
         return c.json({ success: true as const, data: r }, 200);
+    })
+    .openapi(contractorTypeDeletePreflightRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const tenantId = c.get('tenantId') as string;
+        const data = await c.var.services.contractorType.countReferences(id, tenantId);
+        return c.json({ success: true as const, data }, 200);
     })
     .openapi(deleteContractorTypeRoute, async (c) => {
         const { id } = c.req.valid('param');

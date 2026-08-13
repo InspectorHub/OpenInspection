@@ -36,7 +36,6 @@ describe('seedStarterContent', () => {
         // Seed a tenant row to satisfy FKs.
         await testDb.insert(schema.tenants).values({
             id:        tenantId,
-            name:      'Test Tenant',
             slug: 'test',
             createdAt: new Date(),
         });

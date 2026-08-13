@@ -1,0 +1,14 @@
+{
+  "specversion": "1.0",
+  "id": "cmd-subject-erase-fixture-1",
+  "type": "io.inspectorhub.cmd.subject.erase",
+  "source": "portal",
+  "time": "2026-08-10T01:00:01.000Z",
+  "dataschema": "cmd-subject-erase/v1",
+  "tenantseq": 2,
+  "replyto": "dsar:dsar-fixture-2",
+  "data": {
+    "tenantId": "fixture-tenant-4",
+    "subjectEmail": "subject@example.com"
+  }
+}

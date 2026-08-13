@@ -98,7 +98,7 @@ describe('listReportLinkStatus', () => {
         db = fix.db;
         await setupSchema(fix.sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(NOW),
         });
     });
@@ -157,7 +157,6 @@ describe('listReportLinkStatus', () => {
         await db.insert(schema.automations).values({
             id: 'auto-1', tenantId: TENANT, name: 'Payment reminder', trigger: 'invoice.created',
             recipientKind: 'role', active: true, createdAt: new Date(NOW - 5 * HOUR),
-            subjectTemplate: '', bodyTemplate: '',
         });
         await log('client@x.com', NOW - HOUR, 'sent', 'auto-1');
         // Nothing to report: an invoice email is not a report delivery, and a

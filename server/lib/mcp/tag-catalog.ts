@@ -4,7 +4,7 @@ import { roleAllowedScopeKinds } from "./scopes";
 
 /**
  * Human-facing module groups layered over the controlled-vocabulary route tags
- * (docs/developers/07_route_metadata.md). The OAuth consent grid (`/oauth/authorize`)
+ * (docs/develop/conventions/route-metadata.md). The OAuth consent grid (`/oauth/authorize`)
  * renders one row per visible group with Read / Write checkboxes; ticking a box
  * expands to the underlying `kind:tag` scope strings the MCP server enforces.
  *

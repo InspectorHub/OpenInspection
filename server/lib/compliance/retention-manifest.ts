@@ -9,14 +9,11 @@
  * two lists are separate and why a table has to appear in one of these three
  * arrays or the gate (`scripts/check-retention-manifest.mjs`) fails.
  *
- * ── One constant per number, and the name says what it moves ────────────────
- * An earlier draft had a single `OPERATIONAL_LOG_RETENTION_DAYS` covering every
- * table here. It was withdrawn: storage limitation asks for a period PER
- * PURPOSE, and a dedup ledger and a PII-bearing audit trail are not one
- * purpose. The shared constant was also the shape where editing one value
- * silently moved two unrelated clocks. These numbers are published in the
- * privacy policy, so each one is named after the thing it governs and moving it
- * shows up in the diff as the specific clock it is.
+ * ── The numbers live next door ──────────────────────────────────────────────
+ * `retention-windows.ts` holds every period and the reason for it, one constant
+ * per clock, and this file re-exports them so no import site cares which of the
+ * two it came from. That file is where you go to change HOW LONG; this one is
+ * WHICH TABLES and WHAT ACTION.
  *
  * ── Anonymize means the actor does not survive ──────────────────────────────
  * `anonymize` on this list is the same verb the erasure orchestrator uses, and
@@ -35,81 +32,22 @@
  * of it.
  */
 
-/**
- * `audit_logs` anonymization window.
- *
- * Two years covers a dispute cycle plus the annual audit that follows it. Past
- * that, the part of an audit row still worth keeping is the structured event —
- * who-did-what-to-which-entity minus the who.
- */
-export const AUDIT_LOG_ANONYMIZE_MONTHS = 24;
+export * from './retention-windows';
+import {
+    AUDIT_LOG_ANONYMIZE_MONTHS,
+    DEDUP_LOG_RETENTION_DAYS,
+    DEAD_LETTER_RETENTION_DAYS,
+    SYNC_OUTBOX_RETENTION_DAYS,
+    IDEMPOTENCY_REPLAY_RETENTION_DAYS,
+    DESTRUCTION_RECORD_RETENTION_MONTHS,
+    AI_ASSURANCE_RETENTION_MONTHS,
+    REPORT_VERSION_RETENTION_MONTHS,
+    SMS_DISCLOSURE_RETENTION_MONTHS,
+    TENANT_LEGAL_VERSION_RETENTION_MONTHS,
+    MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS,
+    SLUG_HISTORY_RETENTION_MONTHS,
+} from './retention-windows';
 
-/**
- * Deletion window for the replay-protection ledgers
- * (`processed_webhook_events`, `processed_cmd_events`).
- *
- * These only have to outlive a provider or queue retry window, which is
- * measured in hours. Ninety days is a wide margin over the longest documented
- * redelivery schedule, and nothing in the codebase reads a row older than that.
- */
-export const DEDUP_LOG_RETENTION_DAYS = 90;
-
-/**
- * Deletion window for the portal to core dead-letter queue
- * (`parked_cmd_events`).
- *
- * Shorter than the dedup ledgers on purpose: a parked row is a signal that two
- * deploys disagree about a command shape, and that is a days-to-weeks
- * diagnosis. A skew nobody noticed in thirty days will not be diagnosed from a
- * row a year later.
- */
-export const DEAD_LETTER_RETENTION_DAYS = 30;
-
-/**
- * Deletion window for TERMINAL rows of the core to portal user-sync outbox
- * (`sync_outbox`).
- *
- * Sixty days, and deliberately neither of its neighbours' numbers.
- *
- * SHORTER than the dedup ledgers' ninety. Those rows are an event id and a
- * timestamp; an outbox row carries a serialized user-sync CloudEvent — staff
- * email and name, and for `user.password_changed` the password HASH. A window
- * over identifier-bearing rows should not be copied from a window over rows
- * that hold none.
- *
- * LONGER than the dead-letter queue's thirty. A parked row can only be READ: it
- * is an unparseable command, and diagnosis is all it will ever support. A
- * terminal outbox row is still ACTIONABLE — `retryFailed()` republishes it, and
- * doing so repairs real divergence between portal and core. Deleting it removes
- * the fix, not just the evidence.
- *
- * Why sixty specifically: a portal/core user divergence is not noticed by a
- * monitor, it is noticed by a human reading a seat count or a stale member on a
- * monthly cycle. The row has to survive long enough that a divergence spotted
- * in one cycle can still be re-driven during the next — two cycles, so ~60 days.
- */
-export const SYNC_OUTBOX_RETENTION_DAYS = 60;
-
-/**
- * Deletion window for the idempotent-replay store (`idempotency_keys`).
- *
- * ── This is NOT `expires_at`, and the difference is the point ───────────────
- * `expires_at` answers a CONCURRENCY question: may a later caller steal a claim
- * whose holder died? `claimKey` consults it only on an `in_flight` row — the
- * `done` branch returns the stored response ABOVE that check — so a completed
- * row replays forever, years past its own `expires_at`, still holding
- * `response_body`. Two different questions, and only one of them was answered.
- *
- * ── Why seven days ──────────────────────────────────────────────────────────
- * Derived from the horizon the feature itself declares rather than picked. The
- * store's TTL is 24 hours and its schema says a retry older than that "is a
- * different problem". Deleting a `done` row means a later replay of the same
- * key RE-EXECUTES the mutation, so the window must clear any legitimate retry:
- * a week is seven full TTLs of margin, enough for a client re-driving a queued
- * intent after a weekend outage, and short enough that a verbatim API response
- * body — whatever PII that endpoint returned — is not kept for a quarter.
- */
-export const IDEMPOTENCY_REPLAY_RETENTION_DAYS = 7;
 
 /**
  * A retention period, carrying its unit.
@@ -190,6 +128,62 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'days', value: IDEMPOTENCY_REPLAY_RETENTION_DAYS },
         action: 'delete',
         purpose: 'response_body is the verbatim success payload of a mutating API call, so it holds whatever PII that endpoint returned. Measured from created_at, NOT expires_at: that column decides whether a later caller may steal a dead claim and is never read once the row is done, so a completed row outlives it indefinitely. Seven days is seven times the store own declared 24h TTL — margin for a client re-driving a queued intent after a weekend, well inside the horizon past which the store itself says a retry is a different problem.',
+    },
+    {
+        table: 'tenant_destruction_records',
+        timestampColumn: 'destroyed_at',
+        window: { unit: 'months', value: DESTRUCTION_RECORD_RETENTION_MONTHS },
+        action: 'delete',
+        purpose: 'The certification that a workspace was destroyed. Non-personal (tenant id snapshot, slug, counts), so the period is set by how long someone can still ask for it rather than by storage limitation: three years covers the ordinary contractual limitation window for an SCC Clause 8.5 request and spans two annual SOC 2 audit periods. Only COMPLETED records expire — a row still reading started is an unfinished destruction, and deleting one closes an open anomaly instead of retiring a settled record. Measured from destroyed_at, the initiation time, which is the only timestamp an unfinished row has.',
+    },
+    {
+        table: 'ai_call_provenance',
+        timestampColumn: 'created_at',
+        window: { unit: 'months', value: AI_ASSURANCE_RETENTION_MONTHS },
+        action: 'delete',
+        purpose: 'Which prompt version and model produced a piece of assisted text. Non-personal by construction — the schema forbids prompt text — and it grows per AI call, so it needs a window rather than an exemption. Three years is the same clock as the reviews that cite it, and it MUST stay the same clock: they are one governance record split across two tables. A row a surviving review still cites does not expire, because a review is written after its call and would otherwise outlive it and read as an orphan citation.',
+    },
+    {
+        table: 'ai_content_reviews',
+        timestampColumn: 'reviewed_at',
+        window: { unit: 'months', value: AI_ASSURANCE_RETENTION_MONTHS },
+        action: 'delete',
+        purpose: 'That a named person reviewed the output of one AI call before it was published. Shares its clock with ai_call_provenance for the reason stated there. Three years covers the window in which a disputing customer or an auditor can still ask whether anyone checked a piece of assisted text.',
+    },
+    {
+        table: 'report_versions',
+        timestampColumn: 'created_at',
+        window: { unit: 'months', value: REPORT_VERSION_RETENTION_MONTHS },
+        action: 'delete',
+        purpose: 'The amendment trail behind a published report. SUPERSEDED versions only: the highest version_number for a report is what the report currently IS, carries its signature and content hash, and never expires here. What ages out is the earlier drafts and amendments behind it, three years past the point anyone is likely to question a revision.',
+    },
+    {
+        table: 'sms_disclosure_versions',
+        timestampColumn: 'published_at',
+        window: { unit: 'months', value: SMS_DISCLOSURE_RETENTION_MONTHS },
+        action: 'delete',
+        purpose: 'The TCPA disclosure text shown at SMS opt-in. Expires only versions that NO surviving consent row cites, and never the current (highest) version. sms_consent_log is kept indefinitely by an explicit exemption because that record is the tenant defence against a consent challenge, and every consent row stamps the version it was shown — deleting a cited version would leave permanent evidence pointing at text that no longer exists. In practice this reaps only versions published and never used.',
+    },
+    {
+        table: 'tenant_legal_versions',
+        timestampColumn: 'published_at',
+        window: { unit: 'months', value: TENANT_LEGAL_VERSION_RETENTION_MONTHS },
+        action: 'delete',
+        purpose: 'Published snapshots of a tenant own Privacy and Terms text. SUPERSEDED versions only, per tenant and doc: the newest is the live policy the hosted legal pages render, and expiring it would blank them. The body is company-authored prose rather than personal data, so three years is set by how long a superseded policy is worth producing on request.',
+    },
+    {
+        table: 'tenant_marketplace_import_history',
+        timestampColumn: 'created_at',
+        window: { unit: 'months', value: MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS },
+        action: 'delete',
+        purpose: 'Display-only record of which catalogue version a workspace imported and when. The marker the update and replace paths actually read is tenant_library_imports, a different table, so expiring a history row shortens a list and cannot change what the next import does.',
+    },
+    {
+        table: 'tenant_slug_history',
+        timestampColumn: 'changed_at',
+        window: { unit: 'months', value: SLUG_HISTORY_RETENTION_MONTHS },
+        action: 'delete',
+        purpose: 'Who a released slug used to belong to, and a one-year block on reusing it. Three years is comfortably past that block (SLUG_RETIREMENT_MS), so the sweep can never release a slug early; what it retires is the lookup that answers a stale link long after anyone follows one. A row whose retired_until has not passed is kept regardless of age.',
     },
 ];
 

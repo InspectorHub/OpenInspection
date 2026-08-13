@@ -30,7 +30,7 @@ describe('results and versions move onto reports', () => {
         await setupSchema(sqlite);
 
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'T', slug: 't', createdAt: new Date(),
+            id: TENANT, slug: 't', createdAt: new Date(),
         });
     });
 

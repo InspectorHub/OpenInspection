@@ -19,7 +19,7 @@ describe('roleKeysWithCapability(selfRetrieveReport) — agent flip opens agent-
     const f = createTestDb(); db = f.db; await setupSchema(f.sqlite);
     await seedRoleProfiles(db, 't1', new Date(1));
     await db.insert(schema.tenants).values([
-      { id: 't1', name: 'T1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(1) },
+      { id: 't1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(1) },
     ]);
     (mockDrizzle as any).mockReturnValue(db);
     svc = new PeopleService({} as any);

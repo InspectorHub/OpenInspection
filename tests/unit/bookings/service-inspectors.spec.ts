@@ -86,8 +86,8 @@ describe('GET / PUT /:id/inspectors (Task 11, Track G)', () => {
 
         // Seed tenant T1 and tenant T2.
         await db.insert(tenants).values([
-            { id: T1, name: 'Acme', slug: 'acme', tier: 'free', status: 'active', maxUsers: 10, deploymentMode: 'shared', createdAt: new Date() },
-            { id: T2, name: 'Other Co', slug: 'other-co', tier: 'free', status: 'active', maxUsers: 10, deploymentMode: 'shared', createdAt: new Date() },
+            { id: T1, slug: 'acme', tier: 'free', status: 'active', maxUsers: 10, deploymentMode: 'shared', createdAt: new Date() },
+            { id: T2, slug: 'other-co', tier: 'free', status: 'active', maxUsers: 10, deploymentMode: 'shared', createdAt: new Date() },
         ] as any);
 
         // Seed users: U1 and U2 are inspectors in T1; U_AGENT is agent in T1.

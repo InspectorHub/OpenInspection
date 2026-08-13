@@ -35,7 +35,7 @@ beforeEach(async () => {
     await setupSchema(fx.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme-ide0', status: 'active', phone: '+15550001111',
+        id: TENANT, slug: 'acme-ide0', status: 'active', phone: '+15550001111',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
     await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));

@@ -47,7 +47,7 @@ describe('TemplateService mirror-column persistence', () => {
         testDb = setup.db;
         await setupSchema(setup.sqlite);
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'T', slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);

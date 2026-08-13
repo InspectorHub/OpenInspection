@@ -36,8 +36,8 @@ describe('agent schema', () => {
     });
 
     it('allows only one LIVE contact per tenant to hold a given agent account', () => {
-        sqlite.prepare(`INSERT INTO tenants (id, name, slug, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?,?)`).run(
-            't1', 'Acme', 'acme', 'free', 'active', 5, 'shared', Date.now(),
+        sqlite.prepare(`INSERT INTO tenants (id, slug, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?)`).run(
+            't1', 'acme', 'free', 'active', 5, 'shared', Date.now(),
         );
         const insert = sqlite.prepare(
             `INSERT INTO contacts (id, tenant_id, type, name, email, created_at, agent_user_id, agent_linked_at) VALUES (?,?,'agent',?,?,?,?,?)`,
@@ -54,8 +54,8 @@ describe('agent schema', () => {
         // that archived an agent contact and re-added the same person could
         // never bind the new row — the dead one still held the slot, and every
         // inspection on the live contact fell out of that agent's view.
-        sqlite.prepare(`INSERT INTO tenants (id, name, slug, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?,?)`).run(
-            't1', 'Acme', 'acme', 'free', 'active', 5, 'shared', Date.now(),
+        sqlite.prepare(`INSERT INTO tenants (id, slug, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?)`).run(
+            't1', 'acme', 'free', 'active', 5, 'shared', Date.now(),
         );
         sqlite.prepare(
             `INSERT INTO contacts (id, tenant_id, type, name, email, created_at, agent_user_id, agent_linked_at, archived_at) VALUES (?,?,'agent',?,?,?,?,?,?)`,

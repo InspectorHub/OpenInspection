@@ -30,7 +30,7 @@ const EMAIL = 'dana@realty.test';
 
 async function seed(db: BetterSQLite3Database<typeof schema>) {
   await db.insert(schema.tenants).values({
-    id: T, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+    id: T, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
   });
   await db.insert(schema.contacts).values({
     id: CONTACT, tenantId: T, type: 'client', name: 'Dana', email: EMAIL, createdAt: new Date(),

@@ -6,9 +6,15 @@
  * The buckets must come from the SAME `resolveAi` resolver the runtime uses
  * (via `resolveRuntimeAiSource`), not a re-derivation: if the console says
  * "byo", it must be because the resolver would run that tenant's call on its
- * own key. With managed entitlement still a literal `false`, the managed
- * bucket is 0 everywhere — asserted, because faking a nonzero count would be
- * the console lying about a path that cannot resolve yet.
+ * own key.
+ *
+ * ENTITLEMENT IS NOW REAL, AND THIS IS THE SURFACE IT REPAINTS. The managed
+ * bucket used to be 0 everywhere because entitlement was a hardcoded `false`.
+ * It is now derived from the tenant's plan (`isPaidPlan`), so a paying tenant
+ * with no key of their own lands in `managed` — on a deployment that has
+ * actually provisioned a platform key. This endpoint is portal-facing, so the
+ * numbers below move because of a one-line change in THIS repository, with no
+ * portal deploy. That is the point of asserting them here.
  *
  * Wire contract pinned by portal's `narrowAiProvisioning`
  * (apps/portal server/services/tier-quota.service.ts): `{ tiers: { <tier>:
@@ -62,12 +68,12 @@ describe('GET /api/integration/ai-provisioning', () => {
     expect(res.status).toBe(403);
   });
 
-  it('buckets tenants per tier by the runtime resolver; absent tier stays absent; managed is 0 while entitlement is off', async () => {
+  it('buckets tenants per tier by the runtime resolver; absent tier stays absent; a paying tenant with no key of their own is managed', async () => {
     await testDb.insert(schema.tenants).values([
-      { id: 't-free-nokey', name: 'F1', slug: 'f1', tier: 'free', createdAt: new Date() },
-      { id: 't-free-key', name: 'F2', slug: 'f2', tier: 'free', createdAt: new Date() },
-      { id: 't-pro-key', name: 'P1', slug: 'p1', tier: 'pro', createdAt: new Date() },
-      { id: 't-pro-nokey', name: 'P2', slug: 'p2', tier: 'pro', createdAt: new Date() },
+      { id: 't-free-nokey', slug: 'f1', tier: 'free', createdAt: new Date() },
+      { id: 't-free-key', slug: 'f2', tier: 'free', createdAt: new Date() },
+      { id: 't-pro-key', slug: 'p1', tier: 'pro', createdAt: new Date() },
+      { id: 't-pro-nokey', slug: 'p2', tier: 'pro', createdAt: new Date() },
     ] as never);
     vi.mocked(loadTenantSecrets).mockImplementation(async (_db, _kv, tenantId) =>
       tenantId === 't-free-key' || tenantId === 't-pro-key' ? { GEMINI_API_KEY: 'tenant-own-key' } : null);
@@ -76,20 +82,52 @@ describe('GET /api/integration/ai-provisioning', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { tiers: Record<string, TierCounts> } };
 
-    // AI_MANAGED_API_KEY is configured in ENV, yet managed stays 0: the
-    // entitlement is a literal `false` until granted as configuration. A
-    // nonzero managed count here would mean a SECOND resolution path invented
-    // an entitlement the runtime does not have.
+    // BOTH DIRECTIONS IN ONE ASSERTION. A free tenant with no key stays
+    // `unconfigured` even though AI_MANAGED_API_KEY is configured in ENV — the
+    // free tier is not entitled, which is the whole restriction. The paying
+    // tenant with no key is `managed`. A suite that only asserted the refusal
+    // would pass against an implementation that refuses everyone, which is
+    // exactly what the previous hardcoded `false` was.
     expect(body.data.tiers).toEqual({
       free: { managed: 0, byo: 1, unconfigured: 1 },
-      pro: { managed: 0, byo: 1, unconfigured: 1 },
+      pro: { managed: 1, byo: 1, unconfigured: 0 },
     });
     expect(body.data.tiers).not.toHaveProperty('enterprise');
   });
 
+  it('a tenant still on trial is NOT entitled, even on a paid tier', async () => {
+    // Trialling is not paying. The predicate is shared with the video backend
+    // (`isPaidPlan`), so this row and the Stream plan gate cannot drift into
+    // two different answers to "is this tenant on a paying plan".
+    await testDb.insert(schema.tenants).values([
+      { id: 't-pro-trial', slug: 't', tier: 'pro', status: 'trial', createdAt: new Date() },
+    ] as never);
+
+    const res = await app().request('/api/integration/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, ENV);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { tiers: Record<string, TierCounts> } };
+    expect(body.data.tiers).toEqual({ pro: { managed: 0, byo: 0, unconfigured: 1 } });
+  });
+
+  it('reports nothing managed when the deployment never provisioned a platform key', async () => {
+    // The state production is actually in today: entitlement resolves TRUE for
+    // this tenant and the answer is still `unconfigured`, because `resolveAi`
+    // fails closed on an absent platform key. This is why wiring entitlement
+    // changes no production number until the key lands.
+    await testDb.insert(schema.tenants).values([
+      { id: 't-pro-nokey2', slug: 'p', tier: 'pro', createdAt: new Date() },
+    ] as never);
+
+    const noKeyEnv = { ...ENV, AI_MANAGED_API_KEY: undefined };
+    const res = await app().request('/api/integration/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, noKeyEnv);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { tiers: Record<string, TierCounts> } };
+    expect(body.data.tiers).toEqual({ pro: { managed: 0, byo: 0, unconfigured: 1 } });
+  });
+
   it('a tenant whose secrets blob cannot be decrypted counts as unconfigured — the same shape the runtime resolves it to', async () => {
     await testDb.insert(schema.tenants).values([
-      { id: 't-broken', name: 'B', slug: 'b', tier: 'free', createdAt: new Date() },
+      { id: 't-broken', slug: 'b', tier: 'free', createdAt: new Date() },
     ] as never);
     vi.mocked(loadTenantSecrets).mockRejectedValue(new Error('undecryptable'));
 

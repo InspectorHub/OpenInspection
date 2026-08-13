@@ -84,7 +84,7 @@ describe('GET /api/portal/:tenant/exchange — agent tokens never mint a client 
         await setupSchema(sqlite);
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme-exchange-agent', status: 'active',
+            id: TENANT, slug: 'acme-exchange-agent', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as never);
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));

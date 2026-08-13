@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useLoaderData, useFetcher } from 'react-router';
+import { useLoaderData } from 'react-router';
 import { Icon, RadioGroup, Button, Modal, Banner } from "@core/shared-ui";
 import { SettingsCrumb } from '~/components/SettingsCrumb';
+import { useGuardedSubmit } from '~/hooks/useGuardedSubmit';
 import type { Route } from './+types/settings-inspection';
 import { requireToken } from '~/lib/session.server';
 import { createApi } from '~/lib/api-client.server';
@@ -102,11 +103,11 @@ export default function SettingsInspectionPage() {
     // IA-100 — optimistic so the checkbox does not appear to ignore a click
     // while the PUT is in flight; the loader revalidation is the source of
     // truth on the next render.
-    const archiveRevokesFetcher = useFetcher<{ ok?: boolean }>();
+    const { submit: submitArchiveRevokes, busy: savingArchiveRevokes } = useGuardedSubmit<{ ok?: boolean }>();
     const [archiveRevokes, setArchiveRevokes] = useState(initialArchiveRevokes);
     const saveArchiveRevokes = (next: boolean) => {
         setArchiveRevokes(next);
-        archiveRevokesFetcher.submit(
+        submitArchiveRevokes(
             { intent: "archive-revokes", value: next ? "1" : "0" },
             { method: "post" },
         );
@@ -226,7 +227,8 @@ export default function SettingsInspectionPage() {
                         className="mt-0.5"
                         checked={archiveRevokes}
                         onChange={(e) => saveArchiveRevokes(e.target.checked)}
-                        disabled={archiveRevokesFetcher.state !== "idle"}
+                        disabled={savingArchiveRevokes}
+                        aria-busy={savingArchiveRevokes || undefined}
                     />
                     <span>
                         <span className="block text-[13px] font-medium text-ih-fg-1">
@@ -285,7 +287,7 @@ export default function SettingsInspectionPage() {
  * what is about to happen.
  */
 export function BulkLinkExpiry({ ttl, liveLinks }: { ttl: ReportLinkTtl; liveLinks: number | null }) {
-    const fetcher = useFetcher<typeof action>();
+    const { fetcher, submit, busy } = useGuardedSubmit<typeof action>();
     const [confirming, setConfirming] = useState(false);
 
     // Unknown count (the lookup failed) → no control at all. A bulk destructive
@@ -296,7 +298,6 @@ export function BulkLinkExpiry({ ttl, liveLinks }: { ttl: ReportLinkTtl; liveLin
     const label = lifting
         ? liveLinks === 1 ? m.settings_inspection_report_link_bulk_lift_one() : m.settings_inspection_report_link_bulk_lift({ count: liveLinks })
         : liveLinks === 1 ? m.settings_inspection_report_link_bulk_expire_one() : m.settings_inspection_report_link_bulk_expire({ count: liveLinks });
-    const busy = fetcher.state !== 'idle';
     const done = fetcher.state === 'idle' && fetcher.data?.ok === true;
 
     return (
@@ -330,7 +331,7 @@ export function BulkLinkExpiry({ ttl, liveLinks }: { ttl: ReportLinkTtl; liveLin
                             variant="danger"
                             disabled={busy}
                             onClick={() => {
-                                fetcher.submit({ ttl: JSON.stringify(ttl) }, { method: 'post' });
+                                submit({ ttl: JSON.stringify(ttl) }, { method: 'post' });
                                 setConfirming(false);
                             }}
                         >

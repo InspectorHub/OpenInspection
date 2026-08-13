@@ -1,7 +1,7 @@
 /**
  * The multilingual demand signal is a NUMBER SOMEONE DECIDES ON, so the SQL
  * that produces it is treated as code: it lives in
- * `docs/developers/multilingual-demand-signal.md`, and this spec runs every
+ * `docs/concepts/multilingual-demand-signal.md`, and this spec runs every
  * query in that document against a database built from the real migrations.
  *
  * Two failures are worth catching mechanically, and neither one is visible to
@@ -32,7 +32,7 @@ import * as schema from '../../../server/lib/db/schema';
 
 const DOC = path.resolve(
     __dirname,
-    '../../../docs/developers/multilingual-demand-signal.md',
+    '../../../docs/concepts/multilingual-demand-signal.md',
 );
 
 /** Every fenced ```sql block in the doc, keyed by its `-- Query X` marker. */
@@ -79,8 +79,8 @@ beforeAll(async () => {
     const now = new Date('2026-08-01T12:00:00Z').getTime();
 
     await db.insert(schema.tenants).values([
-        { id: T1, name: 'Tenant One', slug: 't1', createdAt: new Date(now) },
-        { id: T2, name: 'Tenant Two', slug: 't2', createdAt: new Date(now) },
+        { id: T1, slug: 't1', createdAt: new Date(now) },
+        { id: T2, slug: 't2', createdAt: new Date(now) },
     ]);
 
     await db.insert(schema.contacts).values([

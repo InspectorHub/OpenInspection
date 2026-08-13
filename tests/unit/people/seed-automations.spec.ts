@@ -29,7 +29,7 @@ beforeEach(async () => {
     await setupSchema(fx.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme-a5a5', status: 'active',
+        id: TENANT, slug: 'acme-a5a5', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     // ensureSeeds resolves recipientRoleKey -> contact_role_profiles.id, so

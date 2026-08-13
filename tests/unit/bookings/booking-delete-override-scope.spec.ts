@@ -25,8 +25,8 @@ describe('AvailabilityService — deleteOverride cross-tenant isolation', () => 
 
         // Seed TENANT_A and TENANT_B
         await db.insert(tenants).values([
-            { id: TENANT_A, name: 'Tenant A', slug: 'tenant-a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: TENANT_B, name: 'Tenant B', slug: 'tenant-b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_A, slug: 'tenant-a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_B, slug: 'tenant-b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
 
         // Seed a user (inspector) under TENANT_A

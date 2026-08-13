@@ -14,8 +14,10 @@
  * publish day.
  *
  * A LIST FROM DAY ONE even though only the lead is populated. An inspection can
- * have more than one inspector (`leadInspectorId` + `helperInspectorIds`), and
- * the report shows a single name today. Which of them the cover should credit is
+ * have more than one inspector — the roster lives in `inspection_inspectors`;
+ * `leadInspectorId` and `helperInspectorIds` survive only as the request-payload
+ * field names that write into it (`schedule.schema.ts`, `wizard.schema.ts`) —
+ * and the report shows a single name today. Which of them the cover should credit is
  * a product question, not this change's; what this change fixes is that the
  * answer must not cost a migration of every stored snapshot to revisit. A scalar
  * that becomes a list AFTER snapshots exist is exactly that migration. Getting

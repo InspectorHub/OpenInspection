@@ -51,7 +51,7 @@ describe('InspectionAnalyticsService — voided invoice exclusion', () => {
         );
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'VoidAnalyticsCo', slug: 'voidanalyticsco',
+            id: TENANT, slug: 'voidanalyticsco',
             status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
 

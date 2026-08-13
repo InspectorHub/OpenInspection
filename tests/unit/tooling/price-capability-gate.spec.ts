@@ -32,7 +32,12 @@ function runGate(...args: string[]) {
     return { status: res.status, output: `${res.stdout ?? ''}${res.stderr ?? ''}` };
 }
 
-describe('price-capability gate', () => {
+// Explicit timeout: this gate scans the whole repo per invocation, and several
+// `it`s here spawn it as a child process. Isolated the file passes in ~1s, but
+// under concurrent vitest workers it loses the CPU and blew the 5000ms default
+// (11153ms observed in the full suite) — same reasoning as the timeout on
+// `tests/unit/agent/magic-login.spec.ts`'s allowlist describe.
+describe('price-capability gate', { timeout: 30_000 }, () => {
     it('passes on the real source tree', () => {
         const { status, output } = runGate();
         expect(output).toContain('price-capability: OK');

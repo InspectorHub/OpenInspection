@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { MarketplaceService } from '../../../server/services/marketplace.service';
-import { createTestDb, setupSchema } from '../db';
+import { createTestDb, setupSchema, toRawD1 } from '../db';
 import * as schema from '../../../server/lib/db/schema';
-import { marketplaceTemplates, tenantMarketplaceImports, marketplaceLibraries, tenantLibraryImports } from '../../../server/lib/db/schema/marketplace';
+import { marketplaceLibraries, tenantLibraryImports } from '../../../server/lib/db/schema/marketplace';
+import { MARKETPLACE_LIBRARIES } from '../../../server/services/starter-content/fixtures/marketplace';
+import { CANNED_COMMENTS } from '../../../server/services/starter-content/fixtures/canned-comments';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -11,54 +13,59 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
-describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
+describe('MarketplaceService — import + update against the unified catalogue', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
+    let sqlite: ReturnType<typeof createTestDb>['sqlite'];
     let svc: MarketplaceService;
 
     beforeEach(async () => {
         const setup = createTestDb();
         testDb = setup.db;
+        sqlite = setup.sqlite;
         await setupSchema(setup.sqlite);
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'T', slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        svc = new MarketplaceService({} as any, TENANT);
+        // The comment-pack path runs raw SQL through rawDb.prepare(...).bind(...).run(),
+        // so the raw D1 adapter is the constructor's first argument.
+        svc = new MarketplaceService(toRawD1(setup.sqlite), TENANT);
     });
 
-    it('Spec 5B P3 — rejects v1 marketplace templates with a clear error', async () => {
+    it('Spec 5B P3 — rejects v1 catalogue templates with a clear error', async () => {
         // v1 shape: no schemaVersion, items use type:"rating" — must fail validation.
         const v1Schema = JSON.stringify({
             sections: [{ id: 's', title: 'S', items: [{ id: 'i', label: 'I', type: 'rating' }] }],
         });
-        const marketplaceId = crypto.randomUUID();
+        const catalogId = crypto.randomUUID();
         const now = new Date();
-        await testDb.insert(marketplaceTemplates).values({
-            id:            marketplaceId,
+        await testDb.insert(marketplaceLibraries).values({
+            id:            catalogId,
             name:          'Legacy v1 Template',
-            category:      'residential',
+            kind:          'templates',
             semver:        '0.9.0',
             schema:        v1Schema,
             authorId:      'system',
             changelog:     'legacy',
             downloadCount: 0,
+            featured:      false,
             createdAt:     now,
             updatedAt:     now,
+            propertyType:  'single-family',
+            jurisdiction:  null,
+            inspectionKind: null,
         });
 
-        await expect(svc.importTemplate(marketplaceId)).rejects.toThrow(/v2/i);
+        await expect(svc.importCatalogEntry(catalogId)).rejects.toThrow(/v2/i);
 
         // Confirm no row leaked into the tenant's templates table.
         const rows = await testDb.select().from(schema.templates).all();
         expect(rows.length).toBe(0);
     });
 
-    // review — "Update available" flow (Scheme 2): keep the old local
-    // template, create a NEW local row at the new semver, re-point the
-    // import marker. The following three tests cover happy path + the
-    // two reject paths the brief calls out.
+    // "Update available" flow (Scheme 2): keep the old local template, create a
+    // NEW local row at the new semver, re-point the import marker.
 
     function v2Schema(label: string) {
         const richItem = (id: string, l: string) => ({
@@ -73,21 +80,25 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
     }
 
     async function seedImportedTemplate(opts: { mktSemver: string; importedSemver: string }) {
-        const marketplaceId = crypto.randomUUID();
+        const catalogId = crypto.randomUUID();
         const oldLocalId = crypto.randomUUID();
         const now = new Date();
 
-        await testDb.insert(marketplaceTemplates).values({
-            id:            marketplaceId,
+        await testDb.insert(marketplaceLibraries).values({
+            id:            catalogId,
             name:          'Standard Residential',
-            category:      'residential',
+            kind:          'templates',
             semver:        opts.mktSemver,
             schema:        v2Schema('Section A'),
             authorId:      'system',
             changelog:     'updated',
             downloadCount: 5,
+            featured:      false,
             createdAt:     now,
             updatedAt:     now,
+            propertyType:  'single-family',
+            jurisdiction:  null,
+            inspectionKind: null,
         });
         await testDb.insert(schema.templates).values({
             id:        oldLocalId,
@@ -96,24 +107,25 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
             schema:    v2Schema('Section A'),
             createdAt: new Date(),
         });
-        await testDb.insert(tenantMarketplaceImports).values({
-            id:                    crypto.randomUUID(),
-            tenantId:              TENANT,
-            marketplaceTemplateId: marketplaceId,
-            importedSemver:        opts.importedSemver,
-            localTemplateId:       oldLocalId,
-            importedAt:            now,
+        await testDb.insert(tenantLibraryImports).values({
+            id:             crypto.randomUUID(),
+            tenantId:       TENANT,
+            libraryId:      catalogId,
+            importedSemver: opts.importedSemver,
+            importedAt:     now,
+            rowCount:       0,
+            localEntityId:  oldLocalId,
         });
-        return { marketplaceId, oldLocalId };
+        return { catalogId, oldLocalId };
     }
 
-    it('review — updateTemplateImport: creates new local copy + repoints import + preserves old row', async () => {
-        const { marketplaceId, oldLocalId } = await seedImportedTemplate({
+    it('updateTemplateImport: creates new local copy + repoints import + preserves old row', async () => {
+        const { catalogId, oldLocalId } = await seedImportedTemplate({
             mktSemver: '1.1.0',
             importedSemver: '1.0.0',
         });
 
-        const result = await svc.updateTemplateImport(marketplaceId);
+        const result = await svc.updateTemplateImport(catalogId);
 
         expect(result.fromSemver).toBe('1.0.0');
         expect(result.toSemver).toBe('1.1.0');
@@ -132,83 +144,84 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
         expect(newRow!.name).toBe('Standard Residential (v1.1.0)');
 
         // Import marker repointed to the new local id + new semver
-        const imports = await testDb.select().from(tenantMarketplaceImports)
-            .where(eq(tenantMarketplaceImports.marketplaceTemplateId, marketplaceId)).all();
+        const imports = await testDb.select().from(tenantLibraryImports)
+            .where(eq(tenantLibraryImports.libraryId, catalogId)).all();
         expect(imports.length).toBe(1);
-        expect(imports[0].localTemplateId).toBe(result.newLocalId);
-        expect(imports[0].importedSemver).toBe('1.1.0');
+        expect(imports[0]!.localEntityId).toBe(result.newLocalId);
+        expect(imports[0]!.importedSemver).toBe('1.1.0');
     });
 
-    it('review — updateTemplateImport: rejects when no update is available (semvers match)', async () => {
-        const { marketplaceId } = await seedImportedTemplate({
+    it('updateTemplateImport: rejects when no update is available (semvers match)', async () => {
+        const { catalogId } = await seedImportedTemplate({
             mktSemver: '1.0.0',
             importedSemver: '1.0.0',
         });
-        await expect(svc.updateTemplateImport(marketplaceId)).rejects.toThrow(/No update available/i);
+        await expect(svc.updateTemplateImport(catalogId)).rejects.toThrow(/No update available/i);
     });
 
-    it('review — updateTemplateImport: rejects when no prior import exists', async () => {
-        const marketplaceId = crypto.randomUUID();
+    it('updateTemplateImport: rejects when no prior import exists', async () => {
+        const catalogId = crypto.randomUUID();
         const now = new Date();
-        await testDb.insert(marketplaceTemplates).values({
-            id:            marketplaceId,
+        await testDb.insert(marketplaceLibraries).values({
+            id:            catalogId,
             name:          'Brand New Template',
-            category:      'residential',
+            kind:          'templates',
             semver:        '1.0.0',
             schema:        v2Schema('S'),
             authorId:      'system',
             changelog:     null,
             downloadCount: 0,
+            featured:      false,
             createdAt:     now,
             updatedAt:     now,
+            propertyType:  null,
+            jurisdiction:  null,
+            inspectionKind: null,
         });
-        await expect(svc.updateTemplateImport(marketplaceId)).rejects.toThrow(/has not been imported/i);
+        await expect(svc.updateTemplateImport(catalogId)).rejects.toThrow(/has not been imported/i);
     });
 
-    it('review — updateTemplateImport: refuses to update to a v1 schema (R36 v2 gate)', async () => {
-        // Seed a tenant that is on a healthy v2 import, then mutate the
-        // marketplace row's schema to a legacy v1 shape and bump its semver.
-        // The update must refuse rather than leak v1 into the tenant.
-        const { marketplaceId } = await seedImportedTemplate({
+    it('updateTemplateImport: refuses to update to a v1 schema (v2 gate)', async () => {
+        // Seed a tenant that is on a healthy v2 import, then mutate the catalogue
+        // row's schema to a legacy v1 shape and bump its semver. The update must
+        // refuse rather than leak v1 into the tenant.
+        const { catalogId } = await seedImportedTemplate({
             mktSemver: '1.0.0',
             importedSemver: '1.0.0',
         });
         const v1Schema = JSON.stringify({
             sections: [{ id: 's', title: 'S', items: [{ id: 'i', label: 'I', type: 'rating' }] }],
         });
-        await testDb.update(marketplaceTemplates)
+        await testDb.update(marketplaceLibraries)
             .set({ semver: '1.1.0', schema: v1Schema })
-            .where(eq(marketplaceTemplates.id, marketplaceId));
+            .where(eq(marketplaceLibraries.id, catalogId));
 
-        await expect(svc.updateTemplateImport(marketplaceId)).rejects.toThrow(/v2/i);
+        await expect(svc.updateTemplateImport(catalogId)).rejects.toThrow(/v2/i);
     });
 
-    it('review — updateLibraryImport: appends new rows + repoints import marker', async () => {
-        // The library update path runs raw SQL via rawDb.prepare(...).bind(...).run()
-        // (chunked INSERT). Wire rawDb to better-sqlite3 with a thin shim so the
-        // D1-style fluent .bind().run() works under test.
-        const sqliteDb = (testDb as unknown as { $client?: { prepare: (sql: string) => { run: (...p: unknown[]) => unknown } } }).$client
-            ?? null;
-        // Fallback — fish out the raw better-sqlite3 instance via testDb internals
-        // exposed by drizzle's BetterSQLite3Database class.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const raw = sqliteDb ?? ((testDb as any).session?.client) ?? ((testDb as any)._.session?.client);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rawDb: any = {
-            prepare(sql: string) {
-                return {
-                    bind(...params: unknown[]) {
-                        return {
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            run: () => (raw as any).prepare(sql).run(...params),
-                        };
-                    },
-                };
-            },
-        };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const svcWithRaw = new MarketplaceService(rawDb, TENANT);
+    it('updateTemplateImport: refuses a comments entry rather than building a template from it', async () => {
+        const catalogId = crypto.randomUUID();
+        const now = new Date();
+        await testDb.insert(marketplaceLibraries).values({
+            id:            catalogId,
+            name:          'Starter Comments',
+            kind:          'comments',
+            semver:        '1.0.0',
+            schema:        JSON.stringify({ comments: [{ text: 'a' }] }),
+            authorId:      'system',
+            changelog:     null,
+            downloadCount: 0,
+            featured:      false,
+            createdAt:     now,
+            updatedAt:     now,
+            propertyType:  null,
+            jurisdiction:  null,
+            inspectionKind: null,
+        });
+        await expect(svc.updateTemplateImport(catalogId)).rejects.toThrow(/not a template/i);
+    });
 
+    it('updateLibraryImport: appends new rows + repoints import marker', async () => {
         const libraryId = crypto.randomUUID();
         const now = new Date();
         await testDb.insert(marketplaceLibraries).values({
@@ -227,6 +240,9 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
             featured:      false,
             createdAt:     now,
             updatedAt:     now,
+            propertyType:  null,
+            jurisdiction:  null,
+            inspectionKind: null,
         });
         await testDb.insert(tenantLibraryImports).values({
             id:             crypto.randomUUID(),
@@ -235,9 +251,10 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
             importedSemver: '1.0.0',
             importedAt:     now,
             rowCount:       10, // pretend the v1 import added 10 rows previously
+            localEntityId:  null,
         });
 
-        const result = await svcWithRaw.updateLibraryImport(libraryId);
+        const result = await svc.updateLibraryImport(libraryId);
 
         expect(result.fromSemver).toBe('1.0.0');
         expect(result.toSemver).toBe('1.1.0');
@@ -256,10 +273,57 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
         expect(commentRows.length).toBe(3);
     });
 
-    it('imports a marketplace template with its sections intact (post-Spec1 fix)', async () => {
-        // Seed marketplace_templates with the CORRECT shape the importer expects:
-        // {sections: [...]} at the top level (not nested under a second .schema key).
-        // Spec 5B — v2 schema shape: schemaVersion: 2 + rich items with tabs.
+    it('imports the SHIPPED Starter Comment Pack, and imports all of it', async () => {
+        // Driven by the real fixture rather than a hand-written pack, because a
+        // hand-written one is what hid this: the shipped pack put its rows under
+        // `entries`, a key `parseLibraryComments` does not read, and the array
+        // was empty besides. Every test passed. The catalogue offered a featured
+        // library that imported as zero rows, and no assertion in this file
+        // could see it, because none of them used the thing we ship.
+        const [pack] = MARKETPLACE_LIBRARIES;
+        const libraryId = crypto.randomUUID();
+        const now = new Date();
+        await testDb.insert(marketplaceLibraries).values({
+            id: libraryId, name: pack.name, kind: pack.kind, semver: pack.semver,
+            schema: JSON.stringify(pack.schema),
+            authorId: 'system', changelog: pack.changelog, downloadCount: 0,
+            featured: pack.featured, createdAt: now, updatedAt: now,
+            propertyType: null, jurisdiction: null, inspectionKind: null,
+        });
+
+        await svc.importCatalogEntry(libraryId);
+
+        const rows = await testDb.select().from(schema.comments)
+            .where(eq(schema.comments.tenantId, TENANT)).all();
+
+        // Both numbers, side by side. "more than zero" would have passed on a
+        // pack that lost 249 of its 250 rows in a chunking bug.
+        expect(rows.length).toBe(CANNED_COMMENTS.length);
+        expect(rows.length).toBeGreaterThan(0);
+
+        // The chunk loop binds one statement per CHUNK rows, and this pack
+        // crosses that boundary fourteen times — the case a 3-row pack cannot
+        // test. Compared as a multiset, not a set: the pack legitimately carries
+        // one sentence twice (a crawl-space mold finding filed under both
+        // Foundation and Mold), so deduplicating here would assert away a real
+        // row and hide exactly the off-by-one a chunk bug produces.
+        expect(rows.map(r => r.text).sort()).toEqual(
+            CANNED_COMMENTS.map(c => c.text).sort(),
+        );
+
+        // Section and severity both survive the trip. Severity is the half that
+        // was silently dropped: the same content seeded directly into a trial
+        // tenant carried it, and the marketplace copy did not.
+        expect(rows.every(r => r.section)).toBe(true);
+        expect(new Set(rows.map(r => r.severity))).toEqual(
+            new Set(CANNED_COMMENTS.map(c => c.severity)),
+        );
+
+        // Every row carries the edit marker, or "keep my edits" cannot protect it.
+        expect(rows.every(r => typeof r.importHash === 'string' && r.importHash.length === 64)).toBe(true);
+    });
+
+    it('imports a catalogue template with its sections intact', async () => {
         const richItem = (id: string, label: string) => ({
             id, label, type: 'rich' as const,
             ratingOptions: ['Inspected', 'Not Inspected', 'Not Present', 'Repair', 'Safety Hazard'],
@@ -272,27 +336,31 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
                 { id: 'sec2', title: 'Section 2', items: [richItem('i2', 'Item 2')] },
             ],
         });
-        const marketplaceId = crypto.randomUUID();
+        const catalogId = crypto.randomUUID();
         const now = new Date();
-        await testDb.insert(marketplaceTemplates).values({
-            id:            marketplaceId,
+        await testDb.insert(marketplaceLibraries).values({
+            id:            catalogId,
             name:          'Standard Residential Inspection',
-            category:      'residential',
+            kind:          'templates',
             semver:        '1.0.0',
             schema:        correctSchema,
             authorId:      'system',
             changelog:     'test',
             downloadCount: 0,
+            featured:      false,
             createdAt:     now,
             updatedAt:     now,
+            propertyType:  'single-family',
+            jurisdiction:  null,
+            inspectionKind: null,
         });
 
-        const localTemplateId = await svc.importTemplate(marketplaceId);
+        const { localEntityId } = await svc.importCatalogEntry(catalogId);
 
         const localRow = await testDb
             .select()
             .from(schema.templates)
-            .where(eq(schema.templates.id, localTemplateId))
+            .where(eq(schema.templates.id, localEntityId!))
             .get();
 
         expect(localRow).toBeTruthy();

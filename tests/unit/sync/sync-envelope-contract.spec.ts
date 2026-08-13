@@ -25,6 +25,16 @@ const CASES: { file: string; eventType: SyncEventType }[] = [
     // A-21 batch 3 — offboarding replies.
     { file: 'reply-tenant-export-completed.v1.json', eventType: 'reply.tenant.export_completed' },
     { file: 'reply-tenant-purged.v1.json', eventType: 'reply.tenant.purged' },
+    // Privacy P3 — DSAR replies, correlated by `data.replyto` = `dsar:<id>`.
+    //
+    // The COUNTS inside `reply-subject-erased`'s coverage block are illustrative
+    // and are deliberately not asserted against the live catalogue anywhere: the
+    // manifest gains rules most months, and a fixture pinned to today's totals
+    // would be a red build with no defect behind it. What the fixture pins is
+    // the SHAPE — which fields exist, and that `pendingRules.length` equals
+    // `pendingEnforcementCount`, the one invariant portal refuses a reply over.
+    { file: 'reply-subject-exported.v1.json', eventType: 'reply.subject.exported' },
+    { file: 'reply-subject-erased.v1.json', eventType: 'reply.subject.erased' },
 ];
 
 describe('sync envelope contract (golden fixtures)', () => {

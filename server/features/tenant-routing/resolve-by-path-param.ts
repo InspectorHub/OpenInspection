@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { tenants } from '../../lib/db/schema';
+import { tenants, tenantSlugHistory } from '../../lib/db/schema';
 import type { HonoConfig } from '../../types/hono';
 
 /**
@@ -55,6 +55,43 @@ export async function resolveByPathParam(c: Context<HonoConfig>, path: string): 
                 if (c.env.TENANT_CACHE && c.executionCtx) {
                     c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(tenantMatch), { expirationTtl: 3600 }));
                 }
+            }
+        } catch {
+            // DB unavailable in test contexts — fall through to "not resolved"
+        }
+    }
+
+    // A slug this tenant USED to have. Consulted ONLY here, after the live
+    // lookup missed, so a live tenant can never be shadowed by history — if
+    // somebody has since claimed this slug, the query above already resolved
+    // them and we never reach this line.
+    //
+    // Deliberately NOT bounded by `retired_until`: that window governs
+    // re-registration, not resolution. Past it, an unclaimed slug still reaching
+    // its original owner is strictly better than a 404, and a claimed one is
+    // handled by the live lookup above.
+    //
+    // Guarded on `fixedTenantId`: standalone never writes this table, and its
+    // fixed-tenant fallthrough already resolves any slug in the URL, so the read
+    // would be pure cost on the hottest unauthenticated path in the product.
+    //
+    // Not cached. The KV entry above is keyed on the REQUESTED slug, so warming
+    // it from a history hit would serve the previous owner to whoever later
+    // claims that slug — for a full TTL, invisibly. `portal.provider.ts` does
+    // drop `tenant:<slug>` on every sync, which covers the claim; leaving the
+    // history path uncached means there is nothing to get stale in between.
+    if (!cachedTenant && !c.var.profile?.fixedTenantId) {
+        try {
+            const db = drizzle(c.env.DB);
+            const prior = await db
+                .select({ tenantId: tenantSlugHistory.tenantId })
+                .from(tenantSlugHistory)
+                .where(eq(tenantSlugHistory.oldSlug, tenantSlug))
+                .get();
+            if (prior) {
+                const owner = await db.select().from(tenants)
+                    .where(eq(tenants.id, prior.tenantId)).get();
+                if (owner) cachedTenant = owner;
             }
         } catch {
             // DB unavailable in test contexts — fall through to "not resolved"

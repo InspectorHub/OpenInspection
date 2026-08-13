@@ -53,7 +53,7 @@ describe('GET /api/admin/comments?search= — SQL pushdown (Track H)', () => {
         db = fixture.db;
         await setupSchema(fixture.sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'T', slug: 't', createdAt: new Date(),
+            id: TENANT, slug: 't', createdAt: new Date(),
         });
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     });
@@ -98,7 +98,7 @@ describe('GET /api/admin/comments?search= — SQL pushdown (Track H)', () => {
     });
 
     it('search never leaks another tenant\'s rows', async () => {
-        await db.insert(schema.tenants).values({ id: 't2', name: 'O', slug: 'o', createdAt: new Date() });
+        await db.insert(schema.tenants).values({ id: 't2', slug: 'o', createdAt: new Date() });
         await db.insert(schema.comments).values({
             id: 'other', tenantId: 't2', text: 'Water staining elsewhere.',
             severity: null, section: null, category: null, createdAt: new Date(),

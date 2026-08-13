@@ -25,7 +25,7 @@ const HELPER = 'user-helper';
 
 async function seed(db: BetterSQLite3Database<typeof schema>) {
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({

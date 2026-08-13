@@ -53,7 +53,7 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
         (mockDrizzle as any).mockReturnValue(db);
 
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme-ics', status: 'active',
+            id: TENANT, slug: 'acme-ics', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.tenantConfigs).values({

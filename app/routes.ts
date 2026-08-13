@@ -209,6 +209,8 @@ export default [
       route("library/rating-systems", "routes/library/rating-systems.tsx"),
       route("library/defect-categories", "routes/library/defect-categories.tsx"),
       route("library/marketplace", "routes/marketplace.tsx"),
+      // #348 — reviewing what a library update would overwrite, before it does.
+      route("library/marketplace/:libraryId/update", "routes/library/marketplace-update.tsx"),
     ]),
   ]),
   layout("routes/agent-layout.tsx", [

@@ -338,6 +338,17 @@ export async function certRenderHandler(
 
   const html = HTML_HEAD +
     `<h1>Certificate of Completion</h1>` +
+    // The whole point of a certificate: the evidence pack must be able to
+    // attest WHICH ENTITY the client contracted with. NULL means the envelope
+    // predates identity capture, and says so — naming today's entity there
+    // would assert something untrue about what was signed. Deliberately NOT a
+    // Paraglide message: the certificate renders in English as the
+    // authoritative legal artefact.
+    `<p><strong>Contracting entity:</strong> ${
+      reqRow.signerLegalName
+        ? escapeHtml(reqRow.signerLegalName)
+        : '<em>not recorded — this envelope predates identity capture</em>'
+    }</p>` +
     `<p><strong>Document:</strong> Signed agreement for ${escapeHtml(clientLabel)}</p>` +
     `<p><strong>Envelope ID:</strong> <code>${escapeHtml(reqRow.id)}</code></p>` +
     `<p><strong>Signed by:</strong></p>` +

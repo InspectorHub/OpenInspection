@@ -7,6 +7,7 @@ import { createApi } from "~/lib/api-client.server";
 import { CommandPalette, CommandPaletteProvider } from "~/components/CommandPalette";
 import { Sidebar, MobileHeader } from "~/components/Sidebar";
 import { RouteSkeleton } from "~/components/RouteSkeleton";
+import { OutboundCoolingBanner } from "~/components/OutboundCoolingBanner";
 import type { SessionContext } from "~/hooks/useSessionContext";
 
 /**
@@ -139,6 +140,12 @@ export default function AuthLayout() {
           </p>
         </div>
       )}
+
+      {/* Portal #98 §3.4 — the outbound cooling window, shown while it is OPEN.
+          Mounted here, on the layout every authenticated page renders through,
+          because the point is that the reader meets it before they press Send.
+          `outboundCoolingWindow` is already null once the window closes. */}
+      <OutboundCoolingBanner unlockAtMs={context?.outboundCoolingWindow?.unlockAtMs ?? null} />
 
       <MobileHeader />
       <div className="flex min-h-screen">

@@ -42,7 +42,7 @@ describe('InspectionCoreService.getInspection / .listInspections — primary-cli
         (mockDrizzle as any).mockReturnValue(db);
 
         await db.insert(schema.tenants).values([
-            { id: T1, name: 'Tenant One', slug: T1, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: T1, slug: T1, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await seedRoleProfiles(asD1Db(db), T1, new Date(1));
         await db.insert(schema.contacts).values({

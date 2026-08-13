@@ -16,6 +16,10 @@ const listBusy = vi.fn();
 vi.mock('../../../server/lib/calendar/registry', () => ({
     getCalendarProvider: () => ({
         id: 'google',
+        resolveAuth: async () => ({
+            provider: 'google',
+            material: { clientId: 'cid', clientSecret: 'sec', refreshToken: 'rt' },
+        }),
         listBusy,
     }),
 }));
@@ -67,7 +71,7 @@ describe('calendar sync freshness', () => {
         listBusy.mockReset();
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.users).values({

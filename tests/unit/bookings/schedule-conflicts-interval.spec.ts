@@ -34,7 +34,7 @@ describe('findScheduleConflicts interval overlap', () => {
         sqlite = fix.sqlite;
         await setupSchema(sqlite);
         await db.insert(tenants).values({
-            id: T, name: 'Co', slug: 'co', tier: 'free', status: 'active',
+            id: T, slug: 'co', tier: 'free', status: 'active',
             maxUsers: 5, deploymentMode: 'shared', createdAt: new Date(),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);

@@ -40,7 +40,6 @@ describe('AuthService.findLoginUser — tenant-scoped, fail-closed row selection
 
         await testDb.insert(tenants).values({
             id: TENANT,
-            name: 'Test Tenant',
             slug: 'test',
             createdAt: new Date(),
         });

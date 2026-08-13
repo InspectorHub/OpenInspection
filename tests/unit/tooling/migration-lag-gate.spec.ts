@@ -3,17 +3,19 @@
  *
  * The gate answers ONE question `db:check` never asked: does the target D1
  * database's `d1_migrations` table contain every migration committed to this
- * repo? On 2026-08-09 the SaaS core database sat at `0050` while the repo was at
- * `0056`, and nothing in CI, pre-push, or the release skills could see it —
- * `db:check` compares the Drizzle schema against `migrations/`, and both of
- * those live in the repo.
+ * repo? On 2026-08-09 the SaaS core database was six migrations behind the
+ * repo's head, and nothing in CI, pre-push, or the release skills could see
+ * it — `db:check` compares the Drizzle schema against `migrations/`, and both
+ * of those live in the repo. The 2026-08-12 squash later collapsed that whole
+ * numbered chain into a single `0000_baseline.sql`, so the fixtures below are
+ * built from today's one-file shape rather than the numbered filenames the
+ * 2026-08-09 incident actually involved.
  *
  * Three properties are covered, because the first two mask each other:
  *
- *  1. **It reports lag, by filename.** A count alone would not have told anyone
- *     which four features (`trade_slug`, `repair_action_tag`,
- *     `ai_content_reviews`, `inspector_narrative`) were about to hit a database
- *     that had never heard of them.
+ *  1. **It reports lag, by name.** A count alone would not have told anyone
+ *     which features were about to hit a database that had never heard of
+ *     them.
  *  2. **It fails closed.** Every way of failing to READ the applied set — an
  *     API error payload, a truncated banner, a query that reported
  *     `success: false` — must throw, never return `[]`. An empty applied set and
@@ -64,11 +66,13 @@ beforeAll(async () => {
 
 // This file's SUBJECT is migration filenames: they are fixture data and captured
 // payloads, not prose citing a migration. They are interpolated rather than
-// inlined so the capture and its expectation cannot drift apart.
-// migrefs-allow: captured wrangler payload, not a citation.
+// inlined so the capture and its expectation cannot drift apart. The extra two
+// rows are synthetic (not real migration names, before or after the squash) —
+// `parseAppliedNames` only reads the `name` column of each row, so nothing
+// about the shape of that string is under test here.
 const CAPTURED_BASELINE = '0000_baseline.sql';
-const CAPTURED_SECOND = '0055_dazzling_namor.sql';
-const CAPTURED_THIRD = '0056_fluffy_fenris.sql';
+const CAPTURED_SECOND = 'add_widgets_table.sql';
+const CAPTURED_THIRD = 'add_gadgets_index.sql';
 
 /** A real `wrangler d1 execute --remote --json` capture, banner and all. */
 const REAL_WRANGLER_STDOUT = `▲ [WARNING] Processing wrangler.saas.jsonc configuration:
@@ -130,8 +134,13 @@ describe('check-migration-lag: reading the applied set', () => {
 });
 
 describe('check-migration-lag: the comparison', () => {
+    // Was `toBeGreaterThan(10)` against a 57-file chain. The 2026-08-12 squash
+    // collapsed that chain to a single `0000_baseline.sql`, so the bar drops to
+    // what the guard actually needs: at least one real file, so the fixtures
+    // below exercise `diffMigrations` against genuine repo content rather than
+    // an empty directory that would make every comparison pass vacuously.
     it('has real migrations to compare (guards the fixtures below)', () => {
-        expect(REAL_MIGRATIONS.length).toBeGreaterThan(10);
+        expect(REAL_MIGRATIONS.length).toBeGreaterThan(0);
     });
 
     // POSITIVE CONTROL for the whole diff.
@@ -140,11 +149,17 @@ describe('check-migration-lag: the comparison', () => {
         expect(d).toEqual({ missing: [], extra: [], acceptedExtra: [], staleAccepted: [] });
     });
 
-    it('names every migration the database has not applied (the 2026-08-09 shape)', () => {
-        const behind = REAL_MIGRATIONS.slice(0, -6);
-        const expected = REAL_MIGRATIONS.slice(-6);
-        const d = diffMigrations({ repoFiles: REAL_MIGRATIONS, applied: behind });
-        expect(d.missing).toEqual(expected);
+    // Was a `.slice(-6)` fixture reproducing the 2026-08-09 incident (a database
+    // missing four named features: `trade_slug`, `repair_action_tag`,
+    // `ai_content_reviews`, `inspector_narrative`). A one-file chain cannot
+    // reconstruct that shape — there is nothing left to slice six of — so this
+    // now exercises the same code at its most fundamental boundary instead of
+    // faking a multi-file lag: a database that has applied NOTHING is missing
+    // EVERYTHING. Still built from the real migrations/ directory, per the
+    // module's own rule against invented names.
+    it('names every migration the database has not applied', () => {
+        const d = diffMigrations({ repoFiles: REAL_MIGRATIONS, applied: [] });
+        expect(d.missing).toEqual(REAL_MIGRATIONS);
         expect(d.extra).toEqual([]);
     });
 
@@ -233,16 +248,14 @@ describe('check-migration-lag: the report prints BOTH numbers', () => {
             ...base,
             repoCount: 57,
             appliedCount: 51,
-    // migrefs-allow: fixture data for a gate whose subject IS migration filenames.
-            missing: ['0052_repair_action_tag.sql', '0056_fluffy_fenris.sql'],
+            missing: ['add_repair_action_tag.sql', 'add_inspector_narrative.sql'],
             extra: [],
         });
         expect(out).toMatch(/repo\s+migrations\/\*\.sql\s+57/);
         expect(out).toMatch(/database\s+d1_migrations rows\s+51/);
         expect(out).toMatch(/difference\s+6/);
-    // migrefs-allow: fixture data for a gate whose subject IS migration filenames.
-        expect(out).toContain('0052_repair_action_tag.sql');
-        expect(out).toContain('0056_fluffy_fenris.sql');
+        expect(out).toContain('add_repair_action_tag.sql');
+        expect(out).toContain('add_inspector_narrative.sql');
         expect(out).not.toContain('in sync');
     });
 
@@ -252,8 +265,7 @@ describe('check-migration-lag: the report prints BOTH numbers', () => {
             repoCount: 51,
             appliedCount: 57,
             missing: [],
-    // migrefs-allow: fixture data for a gate whose subject IS migration filenames.
-            extra: ['0056_fluffy_fenris.sql'],
+            extra: ['add_inspector_narrative.sql'],
         });
         expect(out).toMatch(/difference\s+-6/);
         expect(out).toContain('APPLIED OUT OF BAND');

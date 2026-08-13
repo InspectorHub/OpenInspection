@@ -21,8 +21,8 @@
 import { useState, useEffect } from "react";
 import { useFetcher } from "react-router";
 import { Drawer } from "@core/shared-ui";
-import { getCapabilities, TOGGLEABLE, type CapabilitySet } from "../../../server/lib/auth/capabilities";
-import { CAP_LABELS, computeOverrideDiff } from "./InviteSeatDrawer";
+import { getCapabilities, type CapabilitySet } from "../../../server/lib/auth/capabilities";
+import { CAP_LABELS, CAP_GROUPS, computeOverrideDiff } from "./InviteSeatDrawer";
 import { m } from "~/paraglide/messages";
 
 const FORM_ID = "edit-member-form";
@@ -139,17 +139,22 @@ export function EditMemberDrawer({ open, onClose, member }: EditMemberDrawerProp
             </select>
           </label>
 
-          <div className="border-t border-ih-border pt-3 space-y-2">
+          <div className="border-t border-ih-border pt-3 space-y-3">
             <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">{m.modal_invite_advanced()}</span>
-            {TOGGLEABLE.map((cap) => (
-              <label key={cap} className="flex items-center gap-2 text-sm text-ih-fg-3">
-                <input
-                  type="checkbox"
-                  checked={caps[cap]}
-                  onChange={(e) => setCaps((prev) => ({ ...prev, [cap]: e.target.checked }))}
-                />
-                {CAP_LABELS[cap]}
-              </label>
+            {CAP_GROUPS.map((group) => (
+              <div key={group.id} className="space-y-2">
+                <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">{group.label()}</span>
+                {group.caps.map((cap) => (
+                  <label key={cap} className="flex items-center gap-2 text-sm text-ih-fg-3">
+                    <input
+                      type="checkbox"
+                      checked={caps[cap]}
+                      onChange={(e) => setCaps((prev) => ({ ...prev, [cap]: e.target.checked }))}
+                    />
+                    {CAP_LABELS[cap]}
+                  </label>
+                ))}
+              </div>
             ))}
           </div>
 

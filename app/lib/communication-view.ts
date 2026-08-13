@@ -159,6 +159,12 @@ export function reasonText(reasonCode: string | null): string | null {
     case "no sms template":         return m.comm_reason_no_sms_template();
     case "no email template":       return m.comm_reason_no_email_template();
     case "managed_not_approved":    return m.comm_reason_managed_not_approved();
+    // The only reason here that is NOT a skip. The row is still pending and
+    // still owed, so the fallback's "Skipped — " prefix would be a plain
+    // untruth about a message that is going to arrive. The instant it arrives
+    // is the row's own `sendAt`, already on screen beside it.
+    case "waiting — new company, client email unlocks 24h after signup":
+      return m.comm_reason_cooling_window();
     default:                        return m.comm_reason_fallback({ raw: reasonCode });
   }
 }

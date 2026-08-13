@@ -20,6 +20,7 @@ import { parseTestResults } from "~/lib/connection-test";
 import { SaveVideoSchema } from "../../server/lib/validations/video.schema";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
+import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 
 export function meta() {
   return [{ title: m.settings_integrations_meta_title() }];
@@ -122,9 +123,11 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   if (intent === "save-video") {
-    // SaaS guard: video backend is plan-managed in hosted mode.
-    const bffEnv = getCloudflareEnv(context);
-    if (bffEnv?.APP_MODE === "saas") {
+    // Guard: the video backend is plan-managed where the platform owns it, so
+    // there is nothing for a tenant to save. Read the capability, not the mode
+    // (OI #308) — the API enforces this too; this short-circuits the POST.
+    const profile = getDeploymentProfile(getCloudflareEnv(context));
+    if (profile.videoBackendManaged) {
       return {
         intent,
         success: false,

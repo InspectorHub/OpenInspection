@@ -91,7 +91,7 @@ describe('POST /api/inspections/:id/agreement-requests (Task 7, #111)', () => {
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: SLUG, status: 'active',
+            id: TENANT, slug: SLUG, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.inspections).values({
@@ -204,7 +204,7 @@ describe('POST /api/inspections/:id/agreement-requests (Task 7, #111)', () => {
     it('422 when the provided agreementId belongs to another tenant', async () => {
         await seedAgreement();
         await db.insert(schema.tenants).values({
-            id: OTHER, name: 'Other', slug: 'other', status: 'active',
+            id: OTHER, slug: 'other', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.agreements).values({
@@ -218,7 +218,7 @@ describe('POST /api/inspections/:id/agreement-requests (Task 7, #111)', () => {
     it('404 for a cross-tenant inspection', async () => {
         await seedAgreement();
         await db.insert(schema.tenants).values({
-            id: OTHER, name: 'Other', slug: 'other', status: 'active',
+            id: OTHER, slug: 'other', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.inspections).values({

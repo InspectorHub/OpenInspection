@@ -61,7 +61,7 @@ describe('auth login i18n (Phase C pilot)', () => {
 
   it('resolves login UI + interpolation messages in es-419', () => {
     overwriteGetLocale(() => 'es-419');
-    // Formal `usted` register — see docs/developers/i18n-glossary.md.
+    // Formal `usted` register — see docs/develop/conventions/i18n-glossary.md.
     expect(m.auth_login_heading()).toBe('Inicie sesión en su espacio de trabajo');
     expect(m.auth_login_submit()).toBe('Iniciar sesión');
     // category 2 — server-side interpolation message

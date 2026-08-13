@@ -26,8 +26,8 @@ describe('GET /api/integration/tenants/by-email', () => {
     const s = createTestDb(); testDb = s.db; sqlite = s.sqlite; await setupSchema(sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
     await testDb.insert(schema.tenants).values([
-      { id: 't1', name: 'Acme', slug: 'acme', createdAt: new Date() },
-      { id: 't2', name: 'Beta', slug: 'beta', createdAt: new Date() },
+      { id: 't1', slug: 'acme', createdAt: new Date() },
+      { id: 't2', slug: 'beta', createdAt: new Date() },
     ] as never);
     // The discovery query now joins each grant's role key against its OWN
     // tenant's active role profiles and gates on the selfRetrieveReport

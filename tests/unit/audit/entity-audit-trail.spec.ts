@@ -53,8 +53,8 @@ describe('GET /api/audit/entity/:entityId (IA-64)', () => {
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
         await db.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: OTHER_TENANT, name: 'Rival', slug: 'rival', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: OTHER_TENANT, slug: 'rival', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await db.insert(schema.users).values({
             id: USER, tenantId: TENANT, email: 'ed@acme.test', passwordHash: 'x', name: 'Ed Editor', createdAt: new Date(),

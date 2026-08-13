@@ -8,32 +8,12 @@ import type { RenderResult } from '../../lib/email-templates/types';
 import { ResendProvider } from '../../lib/email/providers/resend';
 import type { EmailProvider } from '../../lib/email/provider';
 import type { EmailDedupePort } from '../../lib/email/dedupe';
+import type { OutboundCoolingPort } from '../../lib/email/outbound-cooling-window';
+import { escapeHtml, appendSignature, arrayBufferToBase64 } from './html-helpers';
 
-/**
- * Sprint B-4 — when callers pass `inspector` + `host`, every customer-facing
- * automation appends the inspector's business-card signature to its HTML body
- * so customers can rebook with that specific inspector by clicking the link.
- * Legacy callers that omit the args get the unmodified body (no signature).
- */
-export function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function appendSignature(html: string, inspector?: SignatureUser, host?: string): string {
-    if (!inspector || !host) return html;
-    const sig = inspectorSignature(inspector, host);
-    return html + sig.html;
-}
-
-function arrayBufferToBase64(buf: ArrayBuffer): string {
-    const bytes = new Uint8Array(buf);
-    let binary = '';
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-        binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-    }
-    return btoa(binary);
-}
+// Re-exported: these moved to ./html-helpers when this file crossed the
+// 400-line ceiling, and callers importing them from here still work.
+export { escapeHtml };
 
 /**
  * Base for the EmailService domain split. Holds the constructor (dependency
@@ -98,6 +78,14 @@ export class EmailBaseService {
          * `meter` is.
          */
         public dedupe?: EmailDedupePort,
+        /**
+         * Portal #98 §3.2 — the first-24-hours cooling window on platform-funded
+         * outbound. Injected ONLY when the deployment is SaaS and the send is
+         * funded by the platform (see `assembleTenantEmailService`); absent
+         * otherwise, so standalone and BYO are exempt by construction rather
+         * than by a branch in here.
+         */
+        public cooling?: OutboundCoolingPort,
     ) {
         this.provider = provider ?? new ResendProvider({ apiKey: this.apiKey });
     }
@@ -252,6 +240,12 @@ export class EmailBaseService {
             idempotencyKey?: string;
         },
     ): Promise<{ delivered: boolean }> {
+        // Cooling window BEFORE quota: a company inside the window is at zero
+        // usage, so the quota gate could never fire — but if the ordering ever
+        // changed, the reader would get "you are out of free emails", which is
+        // both false and un-actionable. The more specific refusal goes first.
+        await this.cooling?.check(opts?.classId);
+
         // Free-tier pre-flight quota gate — runs BEFORE any provider request is
         // built. A quota block throws here, so no provider HTTP call is made
         // and no meter record happens for a send that never went out.

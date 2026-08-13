@@ -21,7 +21,7 @@ beforeEach(async () => {
     await setupSchema(fx.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     // Spec 2 Task 0 — ensureSeeds now resolves each seed's recipientRoleKey to a
@@ -41,7 +41,15 @@ describe('Track J seeds (#122)', () => {
         expect(followup?.delayMinutes).toBe(1440);
         expect(review?.active).toBe(false);                 // fail-closed until review_url set
         expect(review?.delayMinutes).toBe(4320);            // 3 days
-        expect(review?.bodyTemplate).toContain('{{review_url}}');
+        // automations.body_template is dropped, not frozen — the column no
+        // longer exists in automation.schema.ts. ensureSeeds now inserts the
+        // message_templates row directly and never writes it. Assert against
+        // that referenced template's body instead (mirrors
+        // automation-seeds-sms.spec.ts's equivalent rewrite for the SMS column).
+        expect(review?.emailTemplateId).toBeTruthy();
+        const tpl = await db.select().from(schema.messageTemplates)
+            .where(eq(schema.messageTemplates.id, review!.emailTemplateId!)).get();
+        expect(tpl?.body).toContain('{{review_url}}');
     });
 
     it('is idempotent — running twice does not duplicate', async () => {

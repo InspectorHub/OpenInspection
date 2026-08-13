@@ -70,7 +70,7 @@ export class EmailTemplateRenderer {
       if (kind === 'auditMetadata') {
         parts.push(`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 16px;margin:8px 0;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#94a3b8;line-height:1.6;">Signed: ${esc(data.signedAtUtc)}<br>IP: ${esc(data.ipAddress) || 'recorded'}<br>Confirmation: ${esc(data.confirmationId)}</div>`);
       } else if (kind === 'attachmentManifest') {
-        parts.push(`<p style="margin:8px 0;font-size:13px;color:#64748b;">The full document is attached to this email.</p>`);
+        parts.push(ATTACHMENT_MANIFEST_HTML);
       } else if (kind === 'icsHint') {
         if (!data.icsAttached) continue;
         parts.push(`<p style="margin:8px 0;font-size:13px;color:#64748b;">A calendar invite (<strong>inspection.ics</strong>) is attached — open it to add this to your calendar.</p>`);
@@ -80,6 +80,29 @@ export class EmailTemplateRenderer {
     }
     return parts.join('\n');
   }
+}
+
+const ATTACHMENT_MANIFEST_HTML =
+  `<p style="margin:8px 0;font-size:13px;color:#64748b;">The full document is attached to this email.</p>`;
+
+/**
+ * The system blocks a report-DELIVERY email owes its recipient, for the one
+ * sender that cannot go through `render()`.
+ *
+ * An automation rule whose `email_template_id` supplies the copy
+ * (services/automation/report-email.ts) writes tenant-authored HTML, not
+ * descriptor blocks, so there is no descriptor to hang `systemBlocks` off.
+ * That path still hands over a report link, which is exactly what condition 4
+ * of the LIA binds — so it gets the same two blocks from the same painters
+ * rather than a second copy of the words. Adding a third caller of these
+ * blocks means adding it HERE, not re-deriving the notice at the call site.
+ */
+export function reportDeliverySystemBlocks(
+  args: { reportUrl: string; hasAttachment: boolean },
+): string {
+  const parts = [viewDisclosureHtml(args.reportUrl)];
+  if (args.hasAttachment) parts.unshift(ATTACHMENT_MANIFEST_HTML);
+  return parts.join('\n');
 }
 
 /**

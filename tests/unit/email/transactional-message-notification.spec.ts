@@ -56,7 +56,7 @@ describe('TransactionalEmailMixin.sendMessageNotification — client sourcing (T
         (mockDrizzle as any).mockReturnValue(testDb);
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));

@@ -43,7 +43,7 @@ describe('EventService.followUpSendAt — per-event-type delay', () => {
         (mockDrizzle as any).mockReturnValue(testDb);
         svc = new EventService({} as D1Database);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await svc.bulkSeed(TENANT);
@@ -80,7 +80,7 @@ describe('EventService.followUpSendAt — per-event-type delay', () => {
 
     it('never reads another tenant\'s setting', async () => {
         await testDb.insert(schema.tenants).values({
-            id: 'other', name: 'Other', slug: 'other', status: 'active',
+            id: 'other', slug: 'other', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await setFollowUpHours(sewerEventTypeId, 0);
@@ -109,7 +109,7 @@ describe('EventService.followUpSendAt — per-event-type delay', () => {
         await testDb.insert(schema.automations).values({
             id: 'auto-followup-delay', tenantId: TENANT, name: 'Followup', trigger: 'event.completed',
             recipientKind: 'role', recipientRoleProfileId: `crp_${TENANT}_client`, delayMinutes: 0,
-            subjectTemplate: 'x', bodyTemplate: 'x', active: true, createdAt: new Date(),
+            active: true, createdAt: new Date(),
         });
         await setFollowUpHours(sewerEventTypeId, 0);
 

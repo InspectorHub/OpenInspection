@@ -27,6 +27,7 @@ import { BrandingService } from './branding.service';
 import { buildReportDocx, type ReportDocxInput, type DocxAppendixPhoto, type DocxCostLine, type DocxReserveSchedule, type DocxSection, type DocxProfileRow } from '../lib/report-docx';
 import { parseWordExportJob } from '../lib/sync-events/word-export-job';
 import { sniffImageDimensions } from '../lib/media/image-dimensions';
+import { documentReviewNarrativeItems, type DocumentReviewRow } from '../lib/pca-document-review';
 import type { ImagesBinding } from '../lib/media/strip-exif';
 
 /** Minimal binding surface the consumer needs, decoupled from the full
@@ -272,24 +273,6 @@ function narrativeBodyForId(
     }
 }
 
-/** §4 Document Review & Interviews narrative items — checklist rows + PSQ status. */
-function documentReviewItems(
-    documentReview: Array<{ label: string; requested: boolean; received: boolean; reviewed: boolean; na: boolean; notes: string | null }>,
-    psq: { status: string } | null,
-): Array<{ label: string; narrative: string }> {
-    const items = documentReview.map((d) => {
-        const flags = [
-            d.na ? 'N/A' : null,
-            d.requested ? 'Requested' : null,
-            d.received ? 'Received' : null,
-            d.reviewed ? 'Reviewed' : null,
-        ].filter((s): s is string => s !== null).join(', ') || 'Not requested';
-        return { label: d.label, narrative: d.notes ? `${flags} — ${d.notes}` : flags };
-    });
-    if (psq) items.push({ label: 'Pre-Survey Questionnaire (PSQ)', narrative: `Status: ${psq.status}` });
-    return items;
-}
-
 /** One narrative-only DocxSection whose body/items resolve to nothing renders
  *  as no section at all (buildSections's empty-section guard) — so ids with
  *  no content here are safe to emit unconditionally. */
@@ -300,7 +283,7 @@ function buildNarrativeSections(
         deviations: Array<{ area: string; deviation: string; baselineRequirement: string; reason: string }>;
     },
     relianceText: { userReliance: string; pointInTime: string; siteSpecific: string },
-    documentReview: Array<{ label: string; requested: boolean; received: boolean; reviewed: boolean; na: boolean; notes: string | null }>,
+    documentReview: DocumentReviewRow[],
     psq: { status: string } | null,
 ): DocxSection[] {
     // Front-matter registry entries (level 0: transmittal-letter, systems-summary,
@@ -319,7 +302,7 @@ function buildNarrativeSections(
             };
         }
         if (entry.id === 'document-review') {
-            return { id: entry.id, level: entry.level, title: entry.title, items: documentReviewItems(documentReview, psq) };
+            return { id: entry.id, level: entry.level, title: entry.title, items: documentReviewNarrativeItems(documentReview, psq) };
         }
         const body = narrativeBodyForId(entry.id, pcaReport.narrative, relianceText);
         return { id: entry.id, level: entry.level, title: entry.title, ...(body ? { body } : {}) };
@@ -388,7 +371,7 @@ function adaptReportDocxInput(
         sections: Parameters<typeof buildFindingsSections>[0];
         costTables: Parameters<typeof adaptCostTables>[0];
         relianceText: { userReliance: string; pointInTime: string; siteSpecific: string };
-        documentReview: Parameters<typeof documentReviewItems>[0];
+        documentReview: DocumentReviewRow[];
         psq: { status: string } | null;
     },
     companyName: string | null,

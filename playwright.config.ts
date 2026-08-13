@@ -15,9 +15,12 @@ export default defineConfig({
     //      late setup 409s harmlessly instead of renaming the workspace.
     //   2. Four specs shelled out to `wrangler d1 execute --local` mid-test to
     //      re-hash an admin password that already had that exact value, and
-    //      those calls locked the SQLite file. They are deleted. The one
-    //      remaining CLI user is calendar-connect, which genuinely needs D1 and
-    //      cannot contend with itself.
+    //      those calls locked the SQLite file. They are deleted. No spec in
+    //      the default run shells out to the wrangler CLI any more —
+    //      calendar-connect was the last one and now writes through the worker
+    //      (calendar-connect.spec.ts), and the only remaining CLI user,
+    //      core.integration.spec.ts, is excluded by `testIgnore` below. So
+    //      nothing in a default run holds the SQLite lock.
     //   3. Ten projects were handed the SAME seeded inspection, which only ever
     //      worked because they ran one at a time. The first run at 3 workers
     //      duly failed: SpeedMode found nothing left to rate after a concurrent
@@ -206,9 +209,12 @@ export default defineConfig({
                 baseURL: process.env.CLOUD_BASE_URL || 'https://openinspection-api.important-new.workers.dev',
             },
         },
-        // Design System 0520 subsystem A E2E suites. Skipped automatically
-        // when TEST_INSPECTOR_EMAIL / _PASSWORD / TEST_INSPECTION_ID are not
-        // set, so local CI passes without seed data.
+        // Design System 0520 subsystem A E2E suites. These are driven by the
+        // `editor-seed` handoff below, NOT by TEST_INSPECTOR_EMAIL /
+        // TEST_INSPECTION_ID — those survive only in report-viewer.spec.ts.
+        // A spec here that needs the seed declares `dependencies:
+        // ['editor-seed']` and throws if the handoff is missing; it does not
+        // silently skip.
         // Seeds one editable inspection (with items) + writes the editor-seed
         // handoff the editor subsystem specs read. Depends on `api` so the
         // admin it logs in as already exists. Runs whenever any editor spec runs.
@@ -289,7 +295,15 @@ export default defineConfig({
         { name: 'people-role-profiles', testMatch: 'people-role-profiles.spec.ts', dependencies: ['editor-seed'] },
         // Workspace responsive smoke — the authenticated counterpart to
         // public-pages-responsive. Depends on editor-seed for a login.
-        { name: 'workspace-pages-responsive', testMatch: 'workspace-pages-responsive.spec.ts', dependencies: ['editor-seed'] },
+        // It also depends on `people-role-profiles`, which is NOT a data
+        // dependency — it is a scheduling one. This spec opens by POSTing 25
+        // long-string contacts in beforeAll, and it already allows itself 60s
+        // just for the worker to answer /status; people-role-profiles runs
+        // three UI logins against that same worker and was the project whose
+        // budget was thinnest. Both were released together by the shared
+        // `editor-seed` dependency, so the burst landed exactly on top of the
+        // logins. Ordering them costs one serial slot and removes the window.
+        { name: 'workspace-pages-responsive', testMatch: 'workspace-pages-responsive.spec.ts', dependencies: ['editor-seed', 'people-role-profiles'] },
         // Issue #250 — settings-communication sticky section-nav (scroll-spy).
         { name: 'settings-communication-nav', testMatch: 'settings-communication-nav.spec.ts', dependencies: ['editor-seed'] },
         // Spec 2 Task 8 — role-aware report sending (final task of the

@@ -31,6 +31,9 @@ const NEVER_OFF = [
     'password-reset', 'workspace-invitation', 'agent-invite', 'agent-login-link',
     'client-portal-login',
     'agreement-request', 'agreement-signed', 'evidence-pack', 'payment-request',
+    // The receipt is the same harm as the invoice, from the other side: it is
+    // the only record we produce of money the recipient has already paid.
+    'payment-receipt',
     'report-ready', 'report-ready-pdf',
     // Not §2.0/§2.1 but the same harm: muting it means the workspace hits the
     // free-tier wall with no warning.
@@ -62,7 +65,8 @@ const RECIPIENT_MAY_MUTE = [
     // §2.2 / §2.3 — seeded automation rules the recipient may switch off.
     // §5.3 settles the sharpest pair outright: report-ready is required,
     // post-inspection-followup and review-request are not.
-    'inspection-reminder', 'inspection-cancelled', 'report-amended',
+    'inspection-reminder', 'inspection-cancelled', 'inspection-cancelled-buyers-agent',
+    'report-amended',
     'report-ready-listing-agent', 'booking-confirmation-buyers-agent',
     'report-amended-buyers-agent', 'event-reminder', 'event-followup',
     'event-results-received', 'event-results-received-buyers-agent',

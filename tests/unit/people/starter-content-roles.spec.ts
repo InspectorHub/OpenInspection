@@ -26,7 +26,6 @@ describe('seedStarterContent seeds role profiles', () => {
     // Seed a default tenant to satisfy foreign keys
     await testDb.insert(schema.tenants).values({
       id: 't1',
-      name: 'Test Tenant',
       slug: 'test',
       createdAt: new Date(),
     });

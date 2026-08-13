@@ -3,12 +3,17 @@
  * Task 19a — two-pass real TOC page numbers).
  *
  * Chrome's `page.pdf()` encodes intra-doc `<a href="#id">` TOC links as PDF
- * NAMED destinations whose name === the linked element's `id` (verified by
- * `scripts/spike/toc-pdflib-spike.mjs` — see
- * `scripts/spike/toc-pdflib-spike.md` for the full write-up). This module
- * walks the PDF catalog's `/Names -> /Dests` name tree (plus the legacy
- * catalog `/Dests` dict) and resolves each named destination's target page
- * to a 1-based page number, keyed by the destination name (== anchor id).
+ * NAMED destinations whose name === the linked element's `id` (verified by a
+ * throwaway spike script, never committed — see
+ * `docs/develop/spikes/toc-pdflib-spike.md` for the full write-up). This
+ * module walks the PDF catalog's `/Names -> /Dests` name tree (plus the
+ * legacy catalog `/Dests` dict) and resolves each named destination's target
+ * page to a 1-based page number, keyed by the destination name (== anchor id).
+ *
+ * An earlier approach — rendering page numbers via Paged.js inside Cloudflare
+ * Browser Rendering — was investigated first and never verified against a
+ * real CF-produced PDF; see `docs/develop/spikes/pagedjs-cf-spike.md` for why
+ * that path was abandoned in favor of this one.
  *
  * Used by the two-pass renderer (`generatePdfWithTocPages` in
  * `server/lib/pdf.ts`): pass 1 renders the report once, this function reads

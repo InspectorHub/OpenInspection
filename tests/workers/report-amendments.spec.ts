@@ -82,7 +82,7 @@ async function verify(token: string) {
 async function seedInspection(tenantId: string, inspectionId: string): Promise<void> {
     const db = drizzle(b.DB);
     await db.insert(schema.tenants).values({
-        id: tenantId, name: 'Acme', slug: `acme-${tenantId.slice(-4)}`, status: 'active',
+        id: tenantId, slug: `acme-${tenantId.slice(-4)}`, status: 'active',
         deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({

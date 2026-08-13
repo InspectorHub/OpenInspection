@@ -27,7 +27,7 @@ async function seed(
     opts: { locationOptions?: string[]; mode?: 'tagged' | 'per_unit'; data?: Record<string, unknown> },
 ) {
     await testDb.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await testDb.insert(schema.inspections).values({

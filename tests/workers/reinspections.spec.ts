@@ -114,7 +114,7 @@ function templateSnapshot(itemIds: string[]) {
 async function seedTenant(tenantId: string, slug: string): Promise<void> {
     const db = drizzle(b.DB);
     await db.insert(schema.tenants).values({
-        id: tenantId, name: 'Acme', slug, status: 'active',
+        id: tenantId, slug, status: 'active',
         deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
     });
     // PortalAccessService.issueToken validates `role` against the tenant's

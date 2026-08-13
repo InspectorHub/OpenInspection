@@ -1,12 +1,15 @@
-import { sqliteTable, text, integer, real, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import type { ReportLinkTtl } from '../../../report-link-ttl';
 import type { CancellationPolicy } from '../../../billing/cancellation-policy';
 import type { DepositPolicy } from '../../../billing/deposit-policy';
 
+// `name` was here — the CONTAINER name, a second column for one fact that was
+// allowed to diverge from `tenant_configs.company_name` and did: of 16
+// production tenants, 11 matched, 1 had parted ways, 4 had no settings name at
+// all. One name now, and it is company_name.
 export const tenants = sqliteTable('tenants', {
     id: text('id').primaryKey(),
-    name: text('name').notNull(),
     slug: text('slug').unique().notNull(),
     tier: text('tier', { enum: ['free','pro','enterprise'] }).notNull().default('free'),
     stripeConnectAccountId: text('stripe_connect_account_id'),
@@ -375,23 +378,19 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // away the only off switch, and the defaults look intentional, so nobody
     // notices. Appended at END per the D1 add-column-at-end rule.
     repairQuickPhrases: text('repair_quick_phrases', { mode: 'json' }).$type<string[]>(),
+    /**
+     * The registered legal entity, as it appears on the licence — distinct
+     * from `companyName`, which is the trading brand / DBA.
+     *
+     * NULLABLE and meant to stay that way. A sole proprietor trading under
+     * their own registered name has ONE name and must not be made to type it
+     * twice; NULL means "same as companyName" and the fallback lives in
+     * BrandingService.getBrand so no call site carries it.
+     *
+     * Appears ONLY on agreements, signature certificates, the invoice "from"
+     * party, and the TCPA disclosure. It is NOT what `{{company_name}}`
+     * resolves to. Appended at END per the D1 add-column-at-end rule
+     * (tenant_configs is FK-referenced).
+     */
+    legalName: text('legal_name'),
 });
-
-/**
- * Email-template Phase 3 — sparse per-tenant overrides for transactional
- * email templates. One row per (tenant, trigger) the tenant has customized;
- * absence = pure registry default. `subject`/`blocks` null = use default for
- * that field; `blocks` is a partial { blockKey: value } map (only overridden
- * keys). `enabled=false` stops that email being sent (ignored for `required`
- * templates, which the API refuses to disable).
- */
-export const emailTemplates = sqliteTable('email_templates', {
-    tenantId:  text('tenant_id').notNull().references(() => tenants.id),
-    trigger:   text('trigger').notNull(),
-    subject:   text('subject'),
-    blocks:    text('blocks', { mode: 'json' }).$type<Record<string, string>>(),
-    enabled:   integer('is_enabled', { mode: 'boolean' }).notNull().default(true),
-    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-}, (t) => ({
-    pk: primaryKey({ columns: [t.tenantId, t.trigger] }),
-}));

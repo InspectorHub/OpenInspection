@@ -145,7 +145,7 @@ describe('POST /api/inspections/:id/submit — report review endpoints', () => {
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.users).values({
@@ -196,7 +196,7 @@ describe('POST /api/inspections/:id/return — publish-gated', () => {
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.users).values({
@@ -272,7 +272,7 @@ describe('POST /api/inspections/:id/unpublish — publish-gated', () => {
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.users).values({

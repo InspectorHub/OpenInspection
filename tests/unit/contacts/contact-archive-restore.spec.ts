@@ -40,7 +40,7 @@ describe('ContactService — archive / restore round trip', () => {
 
         for (const [id, slug] of [[TENANT, 'c1'], [OTHER_TENANT, 'c2']] as const) {
             await db.insert(schema.tenants).values({
-                id, name: slug, slug, status: 'active',
+                id, slug, status: 'active',
                 deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
             });
         }

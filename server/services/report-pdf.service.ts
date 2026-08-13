@@ -232,9 +232,9 @@ export class ReportPdfService {
      * On-demand content-hash cache-or-render.
      *
      * Cache decision is based on a SHA-256 hash of the render inputs
-     * (inspection data + RENDER_VERSION salt) rather than version/dataVersion,
-     * so a no-op edit that bumps dataVersion but leaves the visible report
-     * unchanged reuses the existing PDF without a Browser Rendering round-trip.
+     * (inspection data + RENDER_VERSION salt), not a version counter, so a
+     * no-op edit that leaves the visible report unchanged reuses the existing
+     * PDF without a Browser Rendering round-trip.
      *
      * Cache HIT  → return existing ready row immediately (no render).
      * Cache MISS → renderAndStore with content-addressed R2 key, store hash.

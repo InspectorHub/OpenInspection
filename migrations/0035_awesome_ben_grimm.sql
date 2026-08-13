@@ -1,1 +1,0 @@
-ALTER TABLE `event_types` ADD `follow_up_delay_hours` integer DEFAULT 72 NOT NULL;
