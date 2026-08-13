@@ -87,6 +87,30 @@ describe('findStatusLiterals', () => {
         expect(hits).toHaveLength(0);
     });
 
+    it('flags every branch of an `||` chain of comparisons', () => {
+        // The union-type guard exists to skip `status: 'a' | 'b'` declarations.
+        // A logical `||` is not a union: `status === 'completed' || …` is a real
+        // comparison, and skipping it made every branch but the last invisible.
+        // Both branches here are writes the gate must see.
+        const hits = findStatusLiterals(
+            "if (status === 'completed' || status === 'cancelled') {}",
+            OPTS,
+        );
+        expect(hits).toHaveLength(2);
+    });
+
+    it('flags an object property followed by an `||` default', () => {
+        const hits = findStatusLiterals("const s = { status: 'completed' || fallback };", OPTS);
+        expect(hits).toHaveLength(1);
+    });
+
+    it('still skips a union type whose `|` carries no space', () => {
+        // The `||` fix must not narrow the union guard: a single `|` still means
+        // a type declaration whether or not it is spaced.
+        const hits = findStatusLiterals("status:'completed'|'cancelled';", OPTS);
+        expect(hits).toHaveLength(0);
+    });
+
     it('does not flag a non-member value bound to a status key', () => {
         // 'delivered' is a ghost value (not in either axis) — it is not a member,
         // so this detector does not touch it; the type layer already rejects it.

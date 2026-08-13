@@ -46,7 +46,7 @@ describe('BrandingService — tenant-config write allowlist', () => {
             { put: r2Put } as unknown as R2Bucket,
         );
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
     });

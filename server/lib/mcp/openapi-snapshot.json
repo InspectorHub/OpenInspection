@@ -7220,6 +7220,34 @@
     "description": "Returns the contact record, its inspection history (newest first; clients match via clientContactId or legacy clientEmail, agents via referredByAgentId or sellingAgentId), and aggregate stats (inspection count + total paid-invoice revenue in cents)."
   },
   {
+    "operationId": "getContractorTypeDeletePreflight",
+    "method": "GET",
+    "pathTemplate": "/api/contractor-types/{id}/preflight",
+    "scopes": [
+      "read"
+    ],
+    "tag": "contractor-types",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Contractor type id the delete would target.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contractor type id the delete would target."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Count what deleting a contractor type would orphan",
+    "description": "Counts the tenant's canned comments that recommend this contractor type. Advisory only -- the delete is never blocked, because the reference is soft by design and published reports store the resolved label rather than the id."
+  },
+  {
     "operationId": "getDispatchBoard",
     "method": "GET",
     "pathTemplate": "/api/calendar/dispatch",
@@ -7752,6 +7780,34 @@
     },
     "summary": "Resolve a team-invite token for the accept page",
     "description": "Public, no-login resolution of a team-invite token into the invited email + workspace name for the /join accept page. Returns 404 for unknown/expired/used invites so the page renders its recovery state."
+  },
+  {
+    "operationId": "getMarketplaceLibraryReplacePreview",
+    "method": "GET",
+    "pathTemplate": "/api/templates/marketplace/libraries/{libraryId}/imports/replace/preview",
+    "scopes": [
+      "read"
+    ],
+    "tag": "marketplace",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "libraryId",
+          "in": "path",
+          "required": true,
+          "description": "Catalogue id of the imported library to replace",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Catalogue id of the imported library to replace"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Preview which imported comments a replace would overwrite",
+    "description": "Lists the comments this tenant rewrote since importing the library, each beside the publisher's version in the pending release, so a destructive replace can be decided against the actual text rather than a count."
   },
   {
     "operationId": "getMessageInspection",
@@ -9283,6 +9339,22 @@
     "description": "Spec 5H D1 — optional inspector pre-sign. Allowed only while envelope is pending."
   },
   {
+    "operationId": "installBundledContent",
+    "method": "POST",
+    "pathTemplate": "/api/admin/data/install-bundled-content",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Install the starter content this release ships that the workspace lacks",
+    "description": "Idempotently adds the bundled starter content (templates, agreements, canned comments, event types, tags, repair items, rating systems, contractor types, services) this workspace does not already have. Matching is by name, so existing rows are never updated and a renamed row is re-added under its original name."
+  },
+  {
     "operationId": "inviteTeam",
     "method": "POST",
     "pathTemplate": "/api/team/invite",
@@ -9904,6 +9976,48 @@
     },
     "summary": "List unified calendar items",
     "description": "Combines inspections, inspection events, calendar blocks, and external busy time for a civil-date or instant range. Owners and managers may select multiple users; inspectors are restricted to themselves."
+  },
+  {
+    "operationId": "listComplianceAiAssurance",
+    "method": "GET",
+    "pathTemplate": "/api/admin/compliance/ai-assurance",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "description": "Maximum number of ledger rows to return, newest first.",
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50,
+            "description": "Maximum number of ledger rows to return, newest first."
+          }
+        },
+        {
+          "name": "before",
+          "in": "query",
+          "required": false,
+          "description": "Epoch-ms exclusive upper bound; pass the previous page nextBefore to page back.",
+          "schema": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Epoch-ms exclusive upper bound; pass the previous page nextBefore to page back."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "AI assurance ledger for this workspace",
+    "description": "Returns the tenant-scoped AI accountability record: one row per model call with the prompt version, model and credential source recorded at call time, joined to every human review citing it. Read-only, newest first, paged backwards with the returned nextBefore cursor."
   },
   {
     "operationId": "listComplianceErasureLog",
@@ -11106,7 +11220,7 @@
             "type": "string",
             "enum": [
               "comments",
-              "snippets"
+              "templates"
             ],
             "description": "TODO describe kind field for the OpenInspection MCP integration"
           }
@@ -11114,7 +11228,7 @@
       ],
       "body": null
     },
-    "summary": "List marketplace libraries (comment packs, snippet packs)",
+    "summary": "List marketplace catalogue entries (comment packs, templates)",
     "description": "Auto-generated placeholder for listMarketplaceLibraries (GET /libraries, marketplace domain). TODO: replace with a real description sourced from the handler."
   },
   {
@@ -11155,35 +11269,70 @@
           "name": "search",
           "in": "query",
           "required": false,
-          "description": "Free-text search over marketplace template names",
+          "description": "Free-text search over catalogue entry names",
           "schema": {
             "type": "string",
-            "description": "Free-text search over marketplace template names"
+            "description": "Free-text search over catalogue entry names"
           }
         },
         {
-          "name": "category",
+          "name": "kind",
           "in": "query",
           "required": false,
-          "description": "Filter marketplace templates by inspection category",
+          "description": "Filter the catalogue to one kind of importable content",
           "schema": {
             "type": "string",
             "enum": [
-              "residential",
-              "commercial",
-              "trec",
-              "condo",
-              "new_construction",
-              "standards_aligned"
+              "comments",
+              "templates"
             ],
-            "description": "Filter marketplace templates by inspection category"
+            "description": "Filter the catalogue to one kind of importable content"
+          }
+        },
+        {
+          "name": "propertyType",
+          "in": "query",
+          "required": false,
+          "description": "Filter templates by the property type they are written for",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "single-family",
+              "multi-unit",
+              "commercial"
+            ],
+            "description": "Filter templates by the property type they are written for"
+          }
+        },
+        {
+          "name": "jurisdiction",
+          "in": "query",
+          "required": false,
+          "description": "Filter by a jurisdiction's form standard, e.g. trec",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Filter by a jurisdiction's form standard, e.g. trec"
+          }
+        },
+        {
+          "name": "inspectionKind",
+          "in": "query",
+          "required": false,
+          "description": "Filter by inspection kind, e.g. new_construction",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Filter by inspection kind, e.g. new_construction"
           }
         }
       ],
       "body": null
     },
     "summary": "List marketplaces for current tenant",
-    "description": "Paginated list of marketplace templates for the current tenant."
+    "description": "Paginated list of marketplace catalogue entries for the current tenant."
   },
   {
     "operationId": "listMessageTemplates",
@@ -16279,11 +16428,11 @@
           "name": "libraryId",
           "in": "path",
           "required": true,
-          "description": "TODO describe libraryId field for the OpenInspection MCP integration",
+          "description": "Catalogue id of the imported library to replace",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe libraryId field for the OpenInspection MCP integration"
+            "description": "Catalogue id of the imported library to replace"
           }
         }
       ],
@@ -16293,14 +16442,14 @@
           "confirmLossOfEdits": {
             "type": "boolean",
             "default": false,
-            "description": "TODO describe confirmLossOfEdits field for the OpenInspection MCP integration"
+            "description": "Delete rows the tenant rewrote too. Default false keeps them."
           }
         },
         "description": "TODO describe schema field for the OpenInspection MCP integration"
       }
     },
-    "summary": "Replace tenant library import (deletes prior rows + inserts new pack)",
-    "description": "Auto-generated placeholder for replaceMarketplace (POST /libraries/{libraryId}/imports/replace, marketplace domain). TODO: replace with a real description sourced from the handler."
+    "summary": "Replace tenant library import (swaps prior rows for the new pack)",
+    "description": "Replaces the rows a previous import of this library created with the current release's. Comments the tenant rewrote since importing are kept unless confirmLossOfEdits is true; tenant-authored comments are never touched."
   },
   {
     "operationId": "replaceRatingSystem",

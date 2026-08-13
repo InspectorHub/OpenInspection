@@ -45,7 +45,7 @@ describe('repair share round trip — trade (IA-57)', () => {
         const testDb = fixture.db;
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);

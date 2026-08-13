@@ -24,7 +24,7 @@ describe('BookingService tenant aggregation (IA-26)', () => {
         (mockDrizzle as any).mockReturnValue(db);
         svc = new BookingService({} as any);
 
-        await db.insert(tenants).values({ id: 't1', name: 'Acme', slug: 'acme', createdAt: new Date() });
+        await db.insert(tenants).values({ id: 't1', slug: 'acme', createdAt: new Date() });
         const u = (id: string, role: NonNullable<(typeof users.$inferInsert)['role']>) => ({
             id, tenantId: 't1', email: `${id}@x.com`, passwordHash: 'h', role, name: id, createdAt: new Date(),
         });

@@ -12,11 +12,13 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { eq, and } from 'drizzle-orm';
 import { auditFromContext } from '../../lib/audit';
 import { requireRole } from '../../lib/middleware/rbac';
+import { requireCapability } from '../../lib/middleware/require-capability';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { ImportResponseSchema } from '../../lib/validations/admin.schema';
 import { templates, agreements as agreementTable, inspections, inspectionResults, contactRoleProfiles } from '../../lib/db/schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
+import { templateSnapshotSectionsOrNone } from '../../services/inspection/shared';
 import { syncInspectionAssignmentsBatch } from '../../lib/db/assignment-links';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
@@ -45,7 +47,14 @@ const importDataRoute = createRoute(withMcpMetadata({
     path: '/import',
     tags: ["admin"],
     summary: "Import tenant for current tenant",
-    middleware: [requireRole('owner', 'manager')],
+    // The bulk import INSERTS TEMPLATES (see the `insert(templates)` below), so
+    // it creates templates in bulk and wears templateCreate like the single
+    // create route does (#307). It is a staff action with an acting user, which
+    // is what separates it from the two provisioning paths that mint templates
+    // with no user at all: `TemplateSeedService.bulkSeed` behind the portal M2M
+    // backfill route, and first-run setup in server/lib/integration/standalone.ts.
+    // Both carry a comment saying so at the insert.
+    middleware: [requireRole('owner', 'manager'), requireCapability('templateCreate')],
     request: {
         body: {
             content: {
@@ -69,10 +78,11 @@ const importDataRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
+        403: { description: "Missing the 'templateCreate' capability" },
     },
     operationId: "importTenant",
     description: "Auto-generated placeholder for importTenant (POST /import, admin domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['admin'], tier: 'extended' }));
+}, { scopes: ['admin'], tier: 'extended', capability: 'templateCreate' }));
 
 
 // --- Finding Key Migration (one-time data migration) ---
@@ -307,21 +317,15 @@ const adminDataImportRoutes = createApiRouter()
                 // live template schema
                 const itemToSection = new Map<string, string>();
 
+                // #307 — the item→section map comes from the inspection's own
+                // snapshot and from nothing else. It used to fall back to the
+                // live template, which would rewrite legacy finding keys
+                // against TODAY's section layout rather than the one the
+                // results were recorded under — a silent mis-filing, not a
+                // missing label. With no snapshot the map is empty, the keys
+                // below are left alone, and the miss is logged.
                 interface SchemaSectionLite { id: string; items?: Array<{ id: string }> }
-                let sections: SchemaSectionLite[] = [];
-
-                const snap = insp.templateSnapshot as { sections?: SchemaSectionLite[] } | null;
-                if (snap && Array.isArray(snap?.sections)) {
-                    sections = snap.sections;
-                } else if (insp.templateId) {
-                    const tpl = await db.select().from(templates)
-                        .where(and(eq(templates.id, insp.templateId), eq(templates.tenantId, tenantId)))
-                        .get();
-                    const live = tpl?.schema as { sections?: SchemaSectionLite[] } | null;
-                    if (live && Array.isArray(live?.sections)) {
-                        sections = live.sections;
-                    }
-                }
+                const sections = templateSnapshotSectionsOrNone<SchemaSectionLite>(insp, tenantId);
 
                 for (const sec of sections) {
                     for (const item of (sec.items ?? [])) {

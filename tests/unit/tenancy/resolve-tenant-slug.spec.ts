@@ -74,7 +74,6 @@ describe('resolveTenantSlug', () => {
         // Seed the tenants table with a minimal valid row.
         await testDb.insert(schema.tenants).values({
             id:             TENANT_ID,
-            name:           'Acme Inspections',
             slug:           TENANT_SLUG,
             status:         'active',
             deploymentMode: 'shared',

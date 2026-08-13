@@ -20,7 +20,7 @@
  *     connect — an old event moved into the window is a real change.
  *
  * Rules 4 and 5 (keyed upsert, delete-in-range) are not here: they already
- * shipped inside `syncGoogleBusyOverrides`.
+ * shipped inside `syncProviderBusyOverrides`.
  *
  * Blocks with no `externalId` come from the freeBusy endpoint, which reports
  * anonymous ranges. None of these rules can be evaluated against them, so they

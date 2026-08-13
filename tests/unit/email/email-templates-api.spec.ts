@@ -46,7 +46,6 @@ describe('GET /api/admin/email-templates', () => {
 
         await testDb.insert(schema.tenants).values({
             id: TENANT_ID,
-            name: 'Test Tenant',
             slug: 'test',
             status: 'active',
             deploymentMode: 'shared',
@@ -101,7 +100,6 @@ describe('GET /api/admin/email-templates/:trigger', () => {
 
         await testDb.insert(schema.tenants).values({
             id: TENANT_ID,
-            name: 'Test Tenant',
             slug: 'test',
             status: 'active',
             deploymentMode: 'shared',
@@ -165,7 +163,6 @@ describe('PUT /api/admin/email-templates/:trigger', () => {
 
         await testDb.insert(schema.tenants).values({
             id: TENANT_ID,
-            name: 'Test Tenant',
             slug: 'test',
             status: 'active',
             deploymentMode: 'shared',
@@ -257,7 +254,6 @@ describe('POST /api/admin/email-templates/:trigger/reset', () => {
 
         await testDb.insert(schema.tenants).values({
             id: TENANT_ID,
-            name: 'Test Tenant',
             slug: 'test',
             status: 'active',
             deploymentMode: 'shared',
@@ -315,7 +311,6 @@ describe('POST /api/admin/email-templates/:trigger/preview', () => {
 
         await testDb.insert(schema.tenants).values({
             id: TENANT_ID,
-            name: 'Test Tenant',
             slug: 'test',
             status: 'active',
             deploymentMode: 'shared',

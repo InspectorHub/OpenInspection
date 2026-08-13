@@ -293,20 +293,20 @@ describe('bannedMatcher — whole word, optional plural, accent-blind', () => {
 
 describe('the real glossary', () => {
     it('parses with zero complaints', () => {
-        const text = readFileSync(path.resolve(REPO, 'docs/developers/i18n-glossary.md'), 'utf8');
+        const text = readFileSync(path.resolve(REPO, 'docs/develop/conventions/i18n-glossary.md'), 'utf8');
         const { errors } = parse(text);
         expect(errors).toEqual([]);
     });
 
     it('matches its committed baseline exactly, so a drift shows up here too', () => {
-        const text = readFileSync(path.resolve(REPO, 'docs/developers/i18n-glossary.md'), 'utf8');
+        const text = readFileSync(path.resolve(REPO, 'docs/develop/conventions/i18n-glossary.md'), 'utf8');
         const { result } = parse(text);
         const committed = JSON.parse(readFileSync(path.resolve(REPO, 'scripts/i18n-glossary-baseline.json'), 'utf8'));
         expect(buildBaseline(result)).toEqual(committed);
     });
 
     it('still enforces the register section a global floor once let vanish', () => {
-        const text = readFileSync(path.resolve(REPO, 'docs/developers/i18n-glossary.md'), 'utf8');
+        const text = readFileSync(path.resolve(REPO, 'docs/develop/conventions/i18n-glossary.md'), 'utf8');
         const { result } = parse(text);
         const register = result.sections.get('Register enforcement');
         expect(register).toBeDefined();

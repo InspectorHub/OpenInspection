@@ -10,6 +10,10 @@ import { createOiTemplateStore } from './template-store';
 import { automationClassId } from '../../lib/notifications/automation-classes';
 import { oiClock, isStaffRecipient } from './shared';
 import { createRecipientLocaleResolver } from '../../lib/i18n/recipient-locale';
+import {
+    COOLING_WINDOW_SENTINEL, COOLING_WINDOW_DEFER_REASON, coolingWindowSentinelFor,
+    coolingWindowUnlockAtMs, deferUntilCoolingWindowOpens,
+} from './cooling-window';
 import type { FlushInspection } from './shared';
 import type { EmailService } from '../email.service';
 import type { automations, automationLogs as automationLogsTable, tenants } from '../../lib/db/schema';
@@ -50,7 +54,7 @@ export async function deliverTemplatedEmail(
     const { log, automation, inspection, tenant } = ctx;
     const { appName, appHost, appBaseUrl, emailSvc } = deps;
     // SP2 — resolve the referenced email template (replaces the
-    // embedded subject_template / body_template, now frozen DEAD).
+    // embedded subject_template / body_template, since dropped from the table).
     // Skip fail-closed when the rule has no resolvable email template.
     const store = createOiTemplateStore(deps.rawDb);
     // The RECIPIENT's language, resolved from the log's own recipient rather
@@ -176,6 +180,13 @@ export async function deliverTemplatedEmail(
             variables: tpl.variables,
         }),
     };
+    // The instant the cooling window opens, captured on the way past. The
+    // transport port speaks in `{ ok, error }` strings, so the refusal's own
+    // payload cannot cross that boundary — and the payload is the whole point
+    // here: it is what turns "declined" into "declined until 21:27 tomorrow",
+    // which is what the log row is re-scheduled to. Scoped to this one
+    // delivery, written on exactly one branch, read on exactly one.
+    let coolingUnlockAtMs: number | null = null;
     const transport = {
         sendEmail: async (a: { to: string; subject: string; html: string }) => {
             // The rules layer names what it is sending, like every other
@@ -186,9 +197,19 @@ export async function deliverTemplatedEmail(
             // exactOptionalPropertyTypes distinguishes "absent" from "present
             // and undefined", and absent is what an unclassified send means.
             const classId = automationClassId(automation);
-            const { delivered } = await emailSvc.sendEmail(
-                [a.to], a.subject, a.html, undefined, classId ? { classId } : {},
-            );
+            let delivered = false;
+            try {
+                ({ delivered } = await emailSvc.sendEmail(
+                    [a.to], a.subject, a.html, undefined, classId ? { classId } : {},
+                ));
+            } catch (err) {
+                // The cooling window DECLINED; it did not break. Anything else
+                // is a real fault and must keep propagating as one.
+                const sentinel = coolingWindowSentinelFor(err);
+                if (!sentinel) throw err;
+                coolingUnlockAtMs = coolingWindowUnlockAtMs(err);
+                return { ok: false as const, error: sentinel };
+            }
             // OI maps "not delivered" (e.g. email not configured) to a
             // SKIPPED log, not a failure. Encode that as a sentinel the
             // logger adapter below translates.
@@ -205,6 +226,25 @@ export async function deliverTemplatedEmail(
             if (row.status === 'failed' && row.error === '__email_not_configured__') {
                 await db.update(automationLogs).set({ status: 'skipped', error: 'email not configured' })
                     .where(eq(automationLogs.id, log.id));
+                return;
+            }
+            // Portal #98 — NOT a translation to another terminal status. A
+            // decline that undoes itself on a known clock is the one refusal
+            // the message survives: the row is re-scheduled to the unlock
+            // instant and stays pending. See ./cooling-window.
+            //
+            // Without a usable instant there is nothing to re-schedule TO, and
+            // a guessed one parks the row where nobody looks — so that case
+            // keeps the terminal skip, which loses one message rather than
+            // hiding it.
+            if (row.status === 'failed' && row.error === COOLING_WINDOW_SENTINEL) {
+                if (coolingUnlockAtMs !== null) {
+                    await deferUntilCoolingWindowOpens(db, log.id, coolingUnlockAtMs);
+                } else {
+                    await db.update(automationLogs)
+                        .set({ status: 'skipped', error: COOLING_WINDOW_DEFER_REASON })
+                        .where(eq(automationLogs.id, log.id));
+                }
                 return;
             }
             if (row.status === 'sent') {

@@ -208,7 +208,7 @@ describe('routeInspector against real rows', () => {
         (mockDrizzle as any).mockReturnValue(db);
         svc = new BookingService({} as any);
 
-        await db.insert(tenants).values({ id: 't1', name: 'Acme', slug: 'acme', createdAt: new Date() });
+        await db.insert(tenants).values({ id: 't1', slug: 'acme', createdAt: new Date() });
         await db.insert(users).values([
             { id: 'u1', tenantId: 't1', email: 'u1@x.com', passwordHash: 'h', role: 'inspector', name: 'Ann', createdAt: new Date() },
             { id: 'u2', tenantId: 't1', email: 'u2@x.com', passwordHash: 'h', role: 'inspector', name: 'Bea', createdAt: new Date() },

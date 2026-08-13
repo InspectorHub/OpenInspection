@@ -34,8 +34,8 @@ describe('GET /api/integration/usage', () => {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
     testD1 = toRawD1(sqlite);
     await testDb.insert(schema.tenants).values([
-      { id: 't-free', name: 'Free Co', slug: 'free-co', tier: 'free', createdAt: new Date() },
-      { id: 't-pro', name: 'Pro Co', slug: 'pro-co', tier: 'pro', createdAt: new Date() },
+      { id: 't-free', slug: 'free-co', tier: 'free', createdAt: new Date() },
+      { id: 't-pro', slug: 'pro-co', tier: 'pro', createdAt: new Date() },
     ] as never);
   });
   afterEach(() => { sqlite.close(); vi.clearAllMocks(); });

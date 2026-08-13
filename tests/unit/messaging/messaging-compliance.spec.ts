@@ -509,7 +509,7 @@ describe('compliance-status webhook → outbox emit (Task 11)', () => {
 
         // Seed the tenant used by webhook tests.
         await db.insert(schema.tenants).values({
-            id: TENANT_WH, name: 'Webhook Co', slug: 'webhookco', status: 'active',
+            id: TENANT_WH, slug: 'webhookco', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as never);
     });

@@ -13,6 +13,7 @@ import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { PublicAgreementBodySchema } from '../../lib/validations/agreement-public.schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
 import { getDrizzle } from '../../lib/route-helpers';
+import { resolveAutomationCompanyName } from '../../services/automation/company-name';
 import { AGREEMENT_LANGUAGE_DISCLOSURE } from '../../lib/legal/agreement-language-disclosure';
 
 // Local aliases for the literal unions the DB columns are narrowed to in the
@@ -431,8 +432,7 @@ const agreementRoutes = createApiRouter()
                 tenantId: result.tenantId,
                 inspectionId: result.inspectionId,
                 triggerEvent: 'agreement.signer_signed',
-                companyName: c.env.APP_NAME || 'OpenInspection',
-                reportBaseUrl: c.env.APP_BASE_URL || '',
+                companyName: await resolveAutomationCompanyName(getDrizzle(c), result.tenantId), reportBaseUrl: c.env.APP_BASE_URL || '',
             }).catch(() => {});
         }
 
@@ -507,7 +507,7 @@ const agreementRoutes = createApiRouter()
                 tenantId: r.tenantId,
                 inspectionId: r.inspectionId,
                 triggerEvent: 'agreement.declined',
-                companyName: c.env.APP_NAME || 'OpenInspection',
+                companyName: await resolveAutomationCompanyName(getDrizzle(c), r.tenantId),
                 reportBaseUrl: c.env.APP_BASE_URL || '',
             }).catch(() => {});
         }

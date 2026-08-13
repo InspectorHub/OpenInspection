@@ -37,6 +37,17 @@ function walkFiles(dir, out = []) {
 
 const OPEN = 'createRoute(withMcpMetadata(';
 const failures = [];
+const files = walkFiles(SCAN_DIR);
+
+// A gate that scanned nothing would pass forever. It has no business being
+// green when it cannot see the thing it claims to check.
+if (files.length === 0) {
+    console.error(
+        `Capability-declaration gate: scanned 0 files under ${relative(ROOT, SCAN_DIR).replace(/\\/g, '/')} — ` +
+        'the scan dir is wrong or the walk is broken. Refusing to report OK.',
+    );
+    process.exit(1);
+}
 
 /**
  * Blank out comment bodies, preserving length and newlines.
@@ -52,7 +63,7 @@ function blankComments(src) {
     return src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, ' '));
 }
 
-for (const file of walkFiles(SCAN_DIR)) {
+for (const file of files) {
     const rel = relative(ROOT, file).replace(/\\/g, '/');
     const source = blankComments(readFileSync(file, 'utf8'));
     const starts = [];
@@ -86,4 +97,4 @@ if (failures.length > 0) {
     );
     process.exit(1);
 }
-console.log('Capability-declaration gate: OK.');
+console.log(`Capability-declaration gate: OK — ${files.length} route file(s) scanned under ${relative(ROOT, SCAN_DIR).replace(/\\/g, '/')}.`);

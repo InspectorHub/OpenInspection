@@ -23,6 +23,7 @@ import { SectionNav } from "~/components/settings/SectionNav";
 import { parseTestResults } from "~/lib/connection-test";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
+import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 
 export function meta() {
   return [{ title: m.settings_comms_meta_title() }];
@@ -35,6 +36,8 @@ interface CommConfig {
   emailMode: "platform" | "own";
   senderDisplayName: string | null;
   companyName: string | null;
+  /** Registered legal entity, already resolved by getBrand — do NOT re-apply the fallback. */
+  legalName: string;
   pointOfContact: "inspector" | "company";
 }
 
@@ -122,6 +125,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       emailMode: (d?.emailMode as "platform" | "own") || "platform",
       senderDisplayName: (d?.senderDisplayName as string) || null,
       companyName: (d?.companyName as string) || null,
+      legalName: (d?.legalName as string) || "",
       pointOfContact: ((d?.pointOfContact as string) === "inspector" ? "inspector" : "company") as "inspector" | "company",
     } as CommConfig,
     emailTemplates,
@@ -377,13 +381,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent, ok: true, error: null, field: null, test: { sent: true } };
   }
 
-  // ─── Managed SMS compliance provisioning (SaaS-only, Task 9) ───────────────
+  // ─── Managed SMS compliance provisioning (platform-operated) ──────────────
   if (intent === "sms-compliance-provision" || intent === "sms-compliance-resubmit") {
-    // Gate: SaaS only. The API endpoint also enforces this (403 in standalone),
-    // but we short-circuit a direct POST here so standalone never reaches the API.
-    const isSaasAction =
-      getCloudflareEnv(context)?.APP_MODE === "saas";
-    if (!isSaasAction) {
+    // Gate: a platform must exist to file the 10DLC brand/campaign on the
+    // operator's behalf. The API endpoint also enforces this (403 otherwise),
+    // but we short-circuit a direct POST here. Capability, not mode (OI #308).
+    const profile = getDeploymentProfile(getCloudflareEnv(context));
+    if (!profile.hasManagedCompliance) {
       return { intent, ok: false as const, error: m.settings_comms_managed_saas_only(), field: null, test: null };
     }
 
@@ -465,6 +469,7 @@ export default function SettingsCommunication() {
   const EMPTY_CONFIG: CommConfig = {
     senderEmail: null, replyTo: null, resendConfigured: false, emailMode: "platform",
     senderDisplayName: null, companyName: null, pointOfContact: "company",
+    legalName: "",
   };
   const config = denied ? EMPTY_CONFIG : loaderResult.config;
   const emailTemplates = denied ? [] : loaderResult.emailTemplates;
@@ -709,6 +714,7 @@ export default function SettingsCommunication() {
               </p>
               <ManagedComplianceWizard
                 compliance={compliance}
+                legalName={config.legalName}
                 managedProvider={managedProvider}
                 savingManagedProvider={savingManagedProvider}
                 actionError={

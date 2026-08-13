@@ -1,5 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { aiContentReviews } from '../db/schema';
+import { and, eq } from 'drizzle-orm';
+import { aiContentReviews, aiCallProvenance } from '../db/schema';
+import { Errors } from '../errors';
 
 /**
  * WHICH table `artifactId` points into. Derived from the schema column rather
@@ -42,7 +44,34 @@ export async function recordContentReview(args: {
     reviewedBy: string;
     aiCallId: string;
 }): Promise<void> {
-    await drizzle(args.db)
+    const db = drizzle(args.db);
+
+    // The call being reviewed must belong to THIS workspace. `tenantId` is taken
+    // from the verified session, but `aiCallId` arrives in the request body, and
+    // without this a caller could file a review citing another tenant's call —
+    // writing a row that claims provenance it does not have, and putting one
+    // workspace's identifier into another's audit ledger.
+    //
+    // Not a 403, and the message does not distinguish "no such call" from "not
+    // yours": both answers would confirm the existence of an id the caller is
+    // not entitled to know about.
+    //
+    // This read does NOT reintroduce the race the note above warns against.
+    // That warning is about deciding whether a DUPLICATE review exists, which
+    // must stay atomic and still does — the insert below is unchanged. This
+    // check answers a different question, about a row the request cannot create
+    // and no concurrent retry can change.
+    const [call] = await db
+        .select({ id: aiCallProvenance.id })
+        .from(aiCallProvenance)
+        .where(and(
+            eq(aiCallProvenance.id, args.aiCallId),
+            eq(aiCallProvenance.tenantId, args.tenantId),
+        ))
+        .limit(1);
+    if (!call) throw Errors.NotFound('No AI call to review.');
+
+    await db
         .insert(aiContentReviews)
         .values({
             id: crypto.randomUUID(),

@@ -74,7 +74,7 @@ const resultsData = {
 
 async function seed() {
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'T', slug: 't', createdAt: new Date(),
+        id: TENANT, slug: 't', createdAt: new Date(),
     });
     await db.insert(schema.comments).values({
         id: COMMENT_ID, tenantId: TENANT, text: NARRATIVE,

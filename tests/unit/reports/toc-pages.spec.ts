@@ -6,10 +6,10 @@ import { extractAnchorPages } from '../../../server/lib/toc-pages';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Deterministic fixture produced by the validated spike
-// (scripts/spike/toc-pdflib-spike.mjs) — a TOC of 5 <a href="#id"> entries
-// followed by tall sections, rendered via Chromium's page.pdf(). Known-correct
-// pages per scripts/spike/toc-pdflib-spike.md.
+// Deterministic fixture produced by the validated spike (a throwaway script,
+// never committed) — a TOC of 5 <a href="#id"> entries followed by tall
+// sections, rendered via Chromium's page.pdf(). Known-correct pages per
+// docs/develop/spikes/toc-pdflib-spike.md.
 const FIXTURE_PATH = join(__dirname, '../../fixtures/toc-fixture.pdf');
 
 describe('extractAnchorPages', () => {

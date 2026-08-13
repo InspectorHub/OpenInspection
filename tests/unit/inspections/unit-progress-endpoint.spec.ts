@@ -33,7 +33,7 @@ const TEMPLATE = {
 
 async function seed(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await testDb.insert(schema.inspections).values({
@@ -100,7 +100,7 @@ describe('unit-progress summary (Phase U Batch C2a)', () => {
     it('is tenant-scoped: another tenant\'s units + results never enter this summary', async () => {
         const OTHER = '00000000-0000-0000-0000-0000000000ff';
         await testDb.insert(schema.tenants).values({
-            id: OTHER, name: 'Other', slug: 'other', status: 'active',
+            id: OTHER, slug: 'other', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         // Same inspection id space is unique per row, so give the other tenant its

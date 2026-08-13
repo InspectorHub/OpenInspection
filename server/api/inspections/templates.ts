@@ -4,6 +4,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
+import { requireCapability } from '../../lib/middleware/require-capability';
 import { auditFromContext } from '../../lib/audit';
 import { paginationQuerySchema, PaginatedMetaSchema, buildMeta } from '../../lib/validations/pagination.schema';
 import { CreateTemplateSchema, UpdateTemplateSchema } from '../../lib/validations/template.schema';
@@ -127,7 +128,7 @@ const createTemplateRoute = createRoute(withMcpMetadata({
             },
         },
     },
-    middleware: [requireRole('owner', 'manager', 'inspector')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('templateCreate')],
     responses: {
         201: {
             content: {
@@ -137,9 +138,10 @@ const createTemplateRoute = createRoute(withMcpMetadata({
             },
             description: 'Created',
         },
+        403: { description: "Missing the 'templateCreate' capability" },
     },
     operationId: "createInspectionTemplates"
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'templateCreate' }));
 
 
 /**
@@ -173,7 +175,7 @@ const importSpectoraRoute = createRoute(withMcpMetadata({
             },
         },
     },
-    middleware: [requireRole('owner', 'manager', 'inspector')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('templateImport')],
     responses: {
         201: {
             content: {
@@ -186,9 +188,10 @@ const importSpectoraRoute = createRoute(withMcpMetadata({
             },
             description: 'Imported',
         },
+        403: { description: "Missing the 'templateImport' capability" },
     },
     operationId: "createInspectionTemplatesImportSpectora"
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'templateImport' }));
 
 
 /**
@@ -209,7 +212,7 @@ const updateTemplateRoute = createRoute(withMcpMetadata({
             },
         },
     },
-    middleware: [requireRole('owner', 'manager', 'inspector')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('templateEdit')],
     responses: {
         200: {
             content: {
@@ -219,10 +222,11 @@ const updateTemplateRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
+        403: { description: "Missing the 'templateEdit' capability" },
     },
     operationId: "updateInspectionTemplate",
     description: "Auto-generated placeholder for updateInspectionTemplate (PUT /templates/{id}, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'templateEdit' }));
 
 
 /**
@@ -236,7 +240,7 @@ const deleteTemplateRoute = createRoute(withMcpMetadata({
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
-    middleware: [requireRole('owner', 'manager', 'inspector')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('templateDelete')],
     responses: {
         200: {
             content: {
@@ -246,10 +250,12 @@ const deleteTemplateRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
+        403: { description: "Missing the 'templateDelete' capability" },
+        409: { description: 'Another row still references this template' },
     },
     operationId: "deleteInspectionTemplate",
     description: "Auto-generated placeholder for deleteInspectionTemplate (DELETE /templates/{id}, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'templateDelete' }));
 
 
 const templatesRoutes = createApiRouter()

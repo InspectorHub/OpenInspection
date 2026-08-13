@@ -113,7 +113,14 @@ export function OutboxList({
             {open && (
               <ul className="pb-2.5 pl-2 pr-1.5 space-y-1.5">
                 {g.recipients.map((r) => {
-                  const reason = r.status === "skipped" || r.status === "failed" ? reasonText(r.reasonCode) : null;
+                  // `pending` joined the other two because a pending row can
+                  // now carry a reason: the outbound cooling window holds a
+                  // send and says when it lets go (Portal #98). Every other
+                  // pending row has a null `reasonCode` and is unaffected —
+                  // `reasonText` returns null for it, same as before.
+                  const reason = r.status === "skipped" || r.status === "failed" || r.status === "pending"
+                    ? reasonText(r.reasonCode)
+                    : null;
                   const consentRemedy = (r.reasonCode ?? "").trim().toLowerCase() === "no sms consent";
                   return (
                     <li key={r.id} className="flex items-start gap-2 text-[12px]">

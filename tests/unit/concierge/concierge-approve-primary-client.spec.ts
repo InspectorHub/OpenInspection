@@ -39,7 +39,7 @@ describe('ConciergeService.approveByInspector — primary-client resolution (Tas
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));

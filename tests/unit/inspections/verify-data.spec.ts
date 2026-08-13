@@ -37,7 +37,7 @@ describe('loadVerifyData — Track I-a snapshot + signers', () => {
     db = fixture.db;
     await setupSchema(fixture.sqlite);
     await db.insert(schema.tenants).values({
-      id: TENANT_A, name: 'A', slug: 'acme', status: 'active',
+      id: TENANT_A, slug: 'acme', status: 'active',
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({

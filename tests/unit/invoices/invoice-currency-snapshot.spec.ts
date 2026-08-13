@@ -25,7 +25,7 @@ describe('InvoiceService — currency snapshot on creation', () => {
         (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
         svc = new InvoiceService({} as D1Database);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'CurCo', slug: 'curco', status: 'active',
+            id: TENANT, slug: 'curco', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
     });

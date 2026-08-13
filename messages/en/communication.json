@@ -30,6 +30,7 @@
   "comm_reason_no_sms_template": "Skipped — the rule has no text template.",
   "comm_reason_no_email_template": "Skipped — the rule has no email template.",
   "comm_reason_managed_not_approved": "Skipped — the sending number is still awaiting carrier approval.",
+  "comm_reason_cooling_window": "Waiting — client email on our shared sender unlocks in your company's first 24 hours. This sends itself at the time shown; connect your own email provider to send now.",
   "comm_reason_fallback": "Skipped — {raw}",
   "comm_status_sent": "Delivered",
   "comm_status_failed": "Failed",

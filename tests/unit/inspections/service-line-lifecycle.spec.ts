@@ -40,7 +40,7 @@ describe('inspection service lines — scope changes at the door', () => {
         (mockDrizzle as any).mockReturnValue(db);
 
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'T', slug: 't', createdAt: new Date(),
+            id: TENANT, slug: 't', createdAt: new Date(),
         });
         await db.insert(schema.inspections).values({
             id: INSP, tenantId: TENANT, propertyAddress: '1 Main St', date: '2026-09-01',

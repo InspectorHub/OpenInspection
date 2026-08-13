@@ -251,5 +251,7 @@
   "invoices_payments_error_record": "Could not record that payment. Nothing was changed — try again.",
   "invoices_payments_error_correct": "Could not correct that payment. Nothing was changed — try again.",
   "load_failed_generic": "This could not be loaded, so it may be incomplete. Reload before treating it as empty.",
-  "load_failed_named": "{what} could not be loaded, so this may be incomplete. Reload before treating it as empty."
+  "load_failed_named": "{what} could not be loaded, so this may be incomplete. Reload before treating it as empty.",
+  "outbound_cooling_notice": "Your company is less than a day old, so client email on our shared sender — reports, agreements, invoices and automations — unlocks {unlockAt}. Everything else works now: inspections, reports, scheduling, sign-in email and team invitations.",
+  "outbound_cooling_notice_action": "Use your own email provider"
 }

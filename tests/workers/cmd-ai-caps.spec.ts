@@ -35,7 +35,7 @@ function envelope(
 
 async function seedSchema(): Promise<void> {
     await b.DB.exec(
-        "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, tier TEXT NOT NULL DEFAULT 'free', stripe_connect_account_id TEXT, status TEXT NOT NULL DEFAULT 'pending', max_users INTEGER NOT NULL DEFAULT 5, deployment_mode TEXT NOT NULL DEFAULT 'shared', applied_cmd_seq INTEGER NOT NULL DEFAULT 0, applied_cred_seq INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);",
+        "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, slug TEXT UNIQUE NOT NULL, tier TEXT NOT NULL DEFAULT 'free', stripe_connect_account_id TEXT, status TEXT NOT NULL DEFAULT 'pending', max_users INTEGER NOT NULL DEFAULT 5, deployment_mode TEXT NOT NULL DEFAULT 'shared', applied_cmd_seq INTEGER NOT NULL DEFAULT 0, applied_cred_seq INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);",
     );
     await b.DB.exec(
         'CREATE TABLE IF NOT EXISTS processed_cmd_events (event_id TEXT PRIMARY KEY, cmd_type TEXT NOT NULL, processed_at INTEGER NOT NULL);',
@@ -51,7 +51,7 @@ async function reset(): Promise<void> {
         await b.DB.exec(`DELETE FROM ${t};`);
     }
     await b.DB.prepare(
-        "INSERT INTO tenants (id, name, slug, tier, status, max_users, deployment_mode, applied_cmd_seq, applied_cred_seq, created_at) VALUES (?1, 'Caps Co', 'caps-co', 'pro', 'active', 5, 'shared', 0, 0, ?2)",
+        "INSERT INTO tenants (id, slug, tier, status, max_users, deployment_mode, applied_cmd_seq, applied_cred_seq, created_at) VALUES (?1, 'caps-co', 'pro', 'active', 5, 'shared', 0, 0, ?2)",
     ).bind(T, Date.now()).run();
 }
 

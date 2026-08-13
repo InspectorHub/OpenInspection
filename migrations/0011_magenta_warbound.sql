@@ -1,1 +1,0 @@
-ALTER TABLE `contact_role_profiles` ADD `capability_overrides` text;

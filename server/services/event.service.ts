@@ -4,6 +4,7 @@ import { eventTypes, inspectionEvents, automations, automationLogs } from '../li
 import { EVENT_TYPES } from './starter-content/fixtures/event-types';
 import { logger } from '../lib/logger';
 import { PeopleService } from './people.service';
+import { resolveAutomationCompanyName } from './automation/company-name';
 import { EVENT_STATUS, type EventStatus } from '../lib/status/event-status';
 
 const REMINDER_MIN_DELAY_MS = 5 * 60_000;
@@ -164,7 +165,7 @@ export class EventService {
             await new AutomationService(this.db).trigger({
                 tenantId, inspectionId,
                 triggerEvent: 'event.results_received',
-                companyName: '', reportBaseUrl: '',
+                companyName: await resolveAutomationCompanyName(drizzle(this.db), tenantId), reportBaseUrl: '',
                 // Carries the visit through to delivery: the copy names the
                 // event type from it, and a retry dedupes on it.
                 eventId,

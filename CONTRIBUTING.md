@@ -20,7 +20,7 @@ npm run setup:cloudflare    # provisions D1 / R2 / KV (or use --local)
 npm run dev                 # http://localhost:8788
 ```
 
-Detailed setup including Cloudflare bindings and environment variables: [`docs/deploy.md`](docs/deploy.md). Architecture overview: [`docs/architecture.md`](docs/architecture.md). Extension cookbook: [`docs/extending.md`](docs/extending.md).
+Detailed setup including Cloudflare bindings and environment variables: [`docs/self-host/deploy.md`](docs/self-host/deploy.md). Architecture overview: [`docs/develop/architecture.md`](docs/develop/architecture.md). Everything else: [`docs/README.md`](docs/README.md).
 
 ## Code conventions
 
@@ -31,7 +31,7 @@ These are summarized from `CLAUDE.md` — read that file for the canonical, exha
 - **Auth**: HS256 JWT in HttpOnly cookie, PBKDF2 password hashing. Never use a fallback secret. Read `CLAUDE.md` § JWT & Auth Security Rules.
 - **Multi-tenant**: Every D1 table includes `tenant_id`. Use `c.var.services.xxx` (DI proxy) — services auto-scope to the tenant.
 - **Logging**: Server-side code uses `import { logger } from '../lib/logger'`. Browser-side `console.*` is fine.
-- **CSS**: Tailwind v4 utilities + the Design System 0523 token layer defined in `app/styles/tailwind.css` (`bg-ih-*`, `text-ih-*`, `shadow-ih-*`). No raw palette classes (`bg-slate-200`, `shadow-lg`, ...) — enforced by `npm run lint:ds`. Full reference: [`docs/developers/11_design_system.md`](docs/developers/11_design_system.md).
+- **CSS**: Tailwind v4 utilities + the Design System 0523 token layer defined in `app/styles/tailwind.css` (`bg-ih-*`, `text-ih-*`, `shadow-ih-*`). No raw palette classes (`bg-slate-200`, `shadow-lg`, ...) — enforced by `npm run lint:ds`. Full reference: [`docs/develop/design-system.md`](docs/develop/design-system.md).
 
 ## Commit style
 
@@ -59,7 +59,7 @@ OpenInspection follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.
 
 - **Breaking changes** ship only in a **major** version bump. A `feat!:` / `fix!:` commit or a `BREAKING CHANGE:` footer drives the major increment; the change is described in the release's breaking-change section.
 - **Deprecations** are announced in the `CHANGELOG` and kept for **at least one minor version** before removal, giving self-hosters a window to migrate.
-- **Migrations are forward-only** — there is no down migration and no downgrade path (matching the schema-first Drizzle policy). Back up D1 before upgrading. See the [upgrade guide](docs/developers/12_upgrade.md).
+- **Migrations are forward-only** — there is no down migration and no downgrade path (matching the schema-first Drizzle policy). Back up D1 before upgrading. A major version may additionally **rebuild the baseline migration**, regenerating `0000_baseline.sql` and removing the forward files it now covers; because `wrangler` matches applied migrations by filename, an existing database needs a documented one-time reconcile in that case and the automated migrate step will not perform it. Such a release carries a `BREAKING CHANGE:` footer. See the [upgrade guide](docs/self-host/upgrade.md).
 - **Security fixes** are called out explicitly in the release notes so operators can prioritize the upgrade. Report vulnerabilities privately (see [Security disclosures](#security-disclosures)).
 
 ## Pull requests

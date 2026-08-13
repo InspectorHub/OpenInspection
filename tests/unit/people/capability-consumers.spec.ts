@@ -26,7 +26,7 @@ describe('capability consumers honour per-profile overrides', () => {
         await setupSchema(fixture.sqlite);
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
-        await db.insert(schema.tenants).values({ id: T, name: 'T', slug: 't-capcon', createdAt: new Date() });
+        await db.insert(schema.tenants).values({ id: T, slug: 't-capcon', createdAt: new Date() });
         await db.insert(schema.inspections).values({
             id: INSP, tenantId: T, propertyAddress: '1 Main', date: '2026-07-01', createdAt: new Date(), price: 0,
         });

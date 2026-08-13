@@ -33,7 +33,7 @@ describe('InvoiceService — report payment gate sync', () => {
         (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
         svc = new InvoiceService({} as D1Database);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
             id: INSP, tenantId: TENANT, propertyAddress: '1 St', date: '2026-06-01',

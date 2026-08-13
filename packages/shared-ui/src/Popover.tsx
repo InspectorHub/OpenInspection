@@ -24,7 +24,7 @@ const PANEL_GAP_PX = 8;
 
 /**
  * Anchored floating panel for lightweight in-context choices (column toggles,
- * dropdowns) — see docs/developers/11_design_system.md §4. NOT a Modal/Drawer:
+ * dropdowns) — see docs/develop/design-system.md §4. NOT a Modal/Drawer:
  * no full-screen scrim, no body scroll-lock, no hard Tab focus-trap. The rest of
  * the page must stay visible and interactive while a Popover is open.
  *

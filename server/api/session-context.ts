@@ -19,6 +19,31 @@ import { isRole } from '../lib/auth/roles';
 import { getDrizzle } from '../lib/route-helpers';
 import { getBaseUrl } from '../lib/url';
 import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
+import { resolveVideoProvider, videoStreamServiceable } from '../services/video/resolve';
+import { unlockAtMs } from '../lib/email/outbound-cooling-window';
+
+/**
+ * Portal #98 item 3 — is the outbound cooling window OPEN for this viewer, and
+ * when does it close?
+ *
+ * The server answers both, and ships only the instant. If the client also
+ * decided "open", the two could disagree across a clock skew and the banner
+ * would either linger after sends work or vanish while they still fail.
+ *
+ * `null` means "nothing to say", covering three different situations on
+ * purpose: self-hosted (no window exists), elapsed (no window remains), and
+ * unreadable anchor (we do not know, and guessing would put a banner in front
+ * of someone whose sends work fine).
+ */
+export function resolveCoolingWindowForSession(input: {
+    mode: string;
+    createdAt: Date | null | undefined;
+    nowMs: number;
+}): { unlockAtMs: number } | null {
+    if (input.mode !== 'saas' || !input.createdAt) return null;
+    const unlock = unlockAtMs(input.createdAt.getTime());
+    return input.nowMs < unlock ? { unlockAtMs: unlock } : null;
+}
 
 /**
  * Session context endpoint for the React Router v7 frontend layout.
@@ -150,48 +175,50 @@ const sessionContextRoutes = createApiRouter()
 
         // Resolve the video backend provider for this tenant. Used by the
         // inspection editor to render the correct VideoCapture/VideoPlayer branch.
+        //
+        // Calls the same resolver the media-studio API uses. This used to be a
+        // 40-line copy annotated "Mirror resolveVideoBackend" — which it did not:
+        // on a misconfigured stream tenant the copy reported 'r2' while the API
+        // threw 503, so the editor offered a capture path every upload refused.
         let videoProvider: 'r2' | 'stream' = 'r2';
         if (tenantId) {
             try {
-                const db = getDrizzle(c);
-                const isSaas = c.env.APP_MODE === 'saas';
-                if (isSaas) {
-                    const tenantRow = await db
-                        .select({ tier: tenants.tier, status: tenants.status })
-                        .from(tenants)
-                        .where(eq(tenants.id, tenantId))
-                        .get();
-                    const tier = tenantRow?.tier ?? 'free';
-                    const status = tenantRow?.status ?? 'pending';
-                    const paid = (tier === 'pro' || tier === 'enterprise') && status !== 'trial';
-                    videoProvider = paid ? 'stream' : 'r2';
-                } else {
-                    const cfgRow = await db
-                        .select({ videoMode: tenantConfigs.videoMode, integrationConfig: tenantConfigs.integrationConfig })
-                        .from(tenantConfigs)
-                        .where(eq(tenantConfigs.tenantId, tenantId))
-                        .get();
-                    const videoModeRaw = (cfgRow?.videoMode as 'r2' | 'stream' | null) ?? null;
-                    if (videoModeRaw === 'stream' && !!c.env.STREAM) {
-                        // Mirror resolveVideoBackend: also require a non-empty
-                        // streamCustomerSubdomain, otherwise create-upload throws 503.
-                        let streamSubdomain = '';
-                        const rawCfg = (cfgRow as unknown as { integrationConfig?: string | null } | null)?.integrationConfig ?? null;
-                        if (rawCfg) {
-                            try {
-                                const parsed = JSON.parse(rawCfg) as Record<string, unknown>;
-                                if (typeof parsed.streamCustomerSubdomain === 'string') {
-                                    streamSubdomain = parsed.streamCustomerSubdomain;
-                                }
-                            } catch { /* ignore parse error — treat as empty */ }
-                        }
-                        videoProvider = streamSubdomain ? 'stream' : 'r2';
-                    } else {
-                        videoProvider = 'r2';
-                    }
-                }
+                const resolved = await resolveVideoProvider(c, tenantId, getDrizzle(c));
+                videoProvider = videoStreamServiceable(resolved) ? 'stream' : 'r2';
             } catch (e) {
                 logger.warn('[session-context] videoProvider resolution failed', { error: (e as Error).message });
+            }
+        }
+
+        // Portal #98 item 3 — the open outbound cooling window, so the chrome can
+        // say so before anyone presses Send.
+        //
+        // This is its OWN read of `tenants`, and that is not an oversight. The
+        // plan for this feature assumed the block above still selected the tenant
+        // row here and that `createdAt` could ride along for free; it does not —
+        // that read now lives inside `resolveVideoProvider`, which fetches
+        // tier/status only on the managed branch and owns the video question, not
+        // this one. Widening a video resolver's return type to carry an email
+        // anchor would couple two unrelated concerns to save one primary-key
+        // lookup. So: one indexed read by primary key, and only where a window
+        // can exist at all — standalone pays nothing.
+        //
+        // Fail-open, matching the send gate: an unreadable anchor leaves this
+        // null, so a D1 blip never puts a banner in front of someone whose sends
+        // work fine.
+        let outboundCoolingWindow: { unlockAtMs: number } | null = null;
+        if (tenantId && profile.mode === 'saas') {
+            try {
+                const tenantRow = await getDrizzle(c)
+                    .select({ createdAt: tenants.createdAt })
+                    .from(tenants)
+                    .where(eq(tenants.id, tenantId))
+                    .get();
+                outboundCoolingWindow = resolveCoolingWindowForSession({
+                    mode: profile.mode, createdAt: tenantRow?.createdAt, nowMs: Date.now(),
+                });
+            } catch (e) {
+                logger.warn('[session-context] cooling-window anchor read failed', { error: (e as Error).message });
             }
         }
 
@@ -286,6 +313,7 @@ const sessionContextRoutes = createApiRouter()
                 },
                 seatUsage,
                 videoProvider,
+                outboundCoolingWindow,
                 collabEditing,
                 // Track D — the sidebar Messages badge. One indexed count
                 // (idx_msg_unread) per layout load; refreshes on navigation.

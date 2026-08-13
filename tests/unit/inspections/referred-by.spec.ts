@@ -56,8 +56,8 @@ describe('referred_by_contact_id', () => {
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
         await db.insert(schema.tenants).values([
-            { id: T, name: 'A', slug: 't-refby-a', createdAt: new Date() },
-            { id: OTHER, name: 'B', slug: 't-refby-b', createdAt: new Date() },
+            { id: T, slug: 't-refby-a', createdAt: new Date() },
+            { id: OTHER, slug: 't-refby-b', createdAt: new Date() },
         ]);
         await db.insert(schema.inspections).values({
             id: INSP, tenantId: T, propertyAddress: '1 Main', date: '2026-07-01', createdAt: new Date(), price: 0,

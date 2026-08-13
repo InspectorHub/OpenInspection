@@ -275,7 +275,14 @@ function walk(dir: string, out: string[] = []): string[] {
     return out;
 }
 
-describe('agreement language disclosure — containment', () => {
+// Explicit timeout: the containment tests below walk `server/` and `app/` and
+// read every .ts/.tsx file — ~2700 of them. Alone that costs ~5.1s, which is
+// already over the 5000ms default; under concurrent vitest workers it loses the
+// CPU and fails outright, while a solo re-run passes and reads as a flake. Same
+// reasoning as the timeout on the price-capability gate: a spec whose subject is
+// "the whole repository" is not a unit test's worth of work, and its budget has
+// to say so rather than depend on how loaded the machine is.
+describe('agreement language disclosure — containment', { timeout: 30_000 }, () => {
     // The detector is the whole test. A scan that cannot see the thing it looks
     // for passes vacuously forever, so prove it sees one before trusting a zero.
     it('the importer detector actually detects', () => {

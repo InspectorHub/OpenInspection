@@ -38,7 +38,7 @@ describe('template resolution by locale', () => {
 
     const setTenantLocale = async (tenantId: string, locale: string) => {
         await testDb.insert(tenants).values({
-            id: tenantId, name: tenantId, slug: tenantId, status: 'active',
+            id: tenantId, slug: tenantId, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(tenantConfigs)

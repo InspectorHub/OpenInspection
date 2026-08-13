@@ -6,7 +6,7 @@
  * is keyed on exactly that tuple, which is what makes a second push an UPDATE
  * of the same remote event rather than a second event on someone's calendar.
  */
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { calendarExternalLinks } from '../db/schema';
 import type { CalendarProviderId } from './provider';
@@ -73,6 +73,32 @@ export async function getLink(
             eq(calendarExternalLinks.entityType, key.entityType),
             eq(calendarExternalLinks.entityId, key.entityId),
         ))
+        .get();
+    return row ?? null;
+}
+
+/**
+ * The link for one entity WITHOUT knowing which provider wrote it.
+ *
+ * The delete path needs this: the provider that owns a remote event is a fact
+ * about the link row, not about whatever connection the user happens to hold
+ * now. Re-deriving it from the connection would aim the DELETE at the wrong
+ * calendar for anyone who reconnected under a different provider.
+ *
+ * One connection per user means at most one row here; the ordering only makes
+ * the read deterministic rather than a coin flip if that ever stops holding.
+ */
+export async function findEntityLink(
+    db: DrizzleD1Database,
+    key: { tenantId: string; entityType: CalendarLinkEntityType; entityId: string },
+): Promise<CalendarExternalLinkRow | null> {
+    const row = await db.select().from(calendarExternalLinks)
+        .where(and(
+            eq(calendarExternalLinks.tenantId, key.tenantId),
+            eq(calendarExternalLinks.entityType, key.entityType),
+            eq(calendarExternalLinks.entityId, key.entityId),
+        ))
+        .orderBy(asc(calendarExternalLinks.createdAt), asc(calendarExternalLinks.id))
         .get();
     return row ?? null;
 }

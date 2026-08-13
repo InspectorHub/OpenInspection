@@ -6,16 +6,20 @@ import * as schema from '../../../server/lib/db/schema';
 import { comments, tenants } from '../../../server/lib/db/schema';
 
 /**
- * Spec 2026-05-07 — Comments Library unification.
+ * Comments Library — severity + section filtering.
  *
- * Verifies that the `rating_bucket` + `section` columns round-trip cleanly
- * through Drizzle and that filter-by-bucket / filter-by-section / combined
- * filters work the way the /api/admin/comments route expects.
+ * `severity` (Module F's single vocabulary shared with rating levels: 'good'
+ * | 'marginal' | 'significant' | 'minor') is the live successor to the
+ * retired `rating_bucket` column, whose removal left it the only severity a
+ * comment carries. This spec verifies
+ * `severity` + `section` round-trip cleanly through Drizzle and that
+ * filter-by-severity / filter-by-section / combined filters work the way the
+ * /api/admin/comments route (server/api/admin/admin-comments.ts) expects.
  *
- * Smoke-tests migration backward compatibility too: rows inserted with the
- * pre-migration shape (no bucket / no section) MUST survive and stay queryable.
+ * Also smoke-tests that rows with no severity set (the pre-Module-F shape)
+ * stay queryable: `severity` defaults to null and must round-trip as such.
  */
-describe('comments table — rating bucket + section', () => {
+describe('comments table — severity + section', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
     let sqlite: any;
 
@@ -27,7 +31,6 @@ describe('comments table — rating bucket + section', () => {
 
         await testDb.insert(tenants).values({
             id: 't1',
-            name: 'Test Tenant',
             slug: 'test',
             createdAt: new Date(),
         });
@@ -37,26 +40,26 @@ describe('comments table — rating bucket + section', () => {
         sqlite.close();
     });
 
-    it('round-trips ratingBucket and section', async () => {
+    it('round-trips severity and section', async () => {
         await testDb.insert(comments).values({
             id: 'c1',
             tenantId: 't1',
             text: 'Active leak observed.',
             category: null,
-            ratingBucket: 'defect',
+            severity: 'significant',
             section: 'Plumbing',
             createdAt: new Date(),
         });
 
         const row = await testDb.select().from(comments).where(eq(comments.id, 'c1')).get();
         expect(row).toBeDefined();
-        expect(row!.ratingBucket).toBe('defect');
+        expect(row!.severity).toBe('significant');
         expect(row!.section).toBe('Plumbing');
     });
 
-    it('keeps pre-migration rows queryable with null bucket/section', async () => {
-        // Simulate a row created before the 0039 migration shipped: no
-        // bucket or section. Both should default to null and round-trip.
+    it('keeps rows with no severity set queryable with null severity/section', async () => {
+        // Simulate a row created before Module F's severity column shipped: no
+        // severity or section. Both should default to null and round-trip.
         await testDb.insert(comments).values({
             id: 'c-legacy',
             tenantId: 't1',
@@ -67,62 +70,61 @@ describe('comments table — rating bucket + section', () => {
 
         const row = await testDb.select().from(comments).where(eq(comments.id, 'c-legacy')).get();
         expect(row).toBeDefined();
-        expect(row!.ratingBucket).toBeNull();
+        expect(row!.severity).toBeNull();
         expect(row!.section).toBeNull();
         expect(row!.category).toBe('Roofing');
     });
 
-    it('filters by ratingBucket + tenantId', async () => {
+    it('filters by severity + tenantId', async () => {
         await testDb.insert(comments).values([
-            { id: 'a', tenantId: 't1', text: 'A', ratingBucket: 'satisfactory', section: null, category: null, createdAt: new Date() },
-            { id: 'b', tenantId: 't1', text: 'B', ratingBucket: 'monitor',      section: null, category: null, createdAt: new Date() },
-            { id: 'c', tenantId: 't1', text: 'C', ratingBucket: 'defect',       section: null, category: null, createdAt: new Date() },
-            { id: 'd', tenantId: 't1', text: 'D', ratingBucket: 'defect',       section: null, category: null, createdAt: new Date() },
+            { id: 'a', tenantId: 't1', text: 'A', severity: 'good',        section: null, category: null, createdAt: new Date() },
+            { id: 'b', tenantId: 't1', text: 'B', severity: 'marginal',    section: null, category: null, createdAt: new Date() },
+            { id: 'c', tenantId: 't1', text: 'C', severity: 'significant', section: null, category: null, createdAt: new Date() },
+            { id: 'd', tenantId: 't1', text: 'D', severity: 'significant', section: null, category: null, createdAt: new Date() },
         ]);
 
-        const defects = await testDb.select().from(comments)
-            .where(and(eq(comments.tenantId, 't1'), eq(comments.ratingBucket, 'defect')))
+        const significant = await testDb.select().from(comments)
+            .where(and(eq(comments.tenantId, 't1'), eq(comments.severity, 'significant')))
             .all();
-        expect(defects).toHaveLength(2);
-        expect(defects.map(r => r.id).sort()).toEqual(['c', 'd']);
+        expect(significant).toHaveLength(2);
+        expect(significant.map(r => r.id).sort()).toEqual(['c', 'd']);
     });
 
-    it('filters by section + ratingBucket combined', async () => {
+    it('filters by section + severity combined', async () => {
         await testDb.insert(comments).values([
-            { id: 'r-sat',  tenantId: 't1', text: 'roof sat',  ratingBucket: 'satisfactory', section: 'Roof',     category: null, createdAt: new Date() },
-            { id: 'r-def',  tenantId: 't1', text: 'roof def',  ratingBucket: 'defect',       section: 'Roof',     category: null, createdAt: new Date() },
-            { id: 'p-def',  tenantId: 't1', text: 'plmb def',  ratingBucket: 'defect',       section: 'Plumbing', category: null, createdAt: new Date() },
+            { id: 'r-good', tenantId: 't1', text: 'roof good', severity: 'good',        section: 'Roof',     category: null, createdAt: new Date() },
+            { id: 'r-sig',  tenantId: 't1', text: 'roof sig',  severity: 'significant', section: 'Roof',     category: null, createdAt: new Date() },
+            { id: 'p-sig',  tenantId: 't1', text: 'plmb sig',  severity: 'significant', section: 'Plumbing', category: null, createdAt: new Date() },
         ]);
 
-        const roofDefects = await testDb.select().from(comments)
+        const roofSignificant = await testDb.select().from(comments)
             .where(and(
                 eq(comments.tenantId, 't1'),
-                eq(comments.ratingBucket, 'defect'),
+                eq(comments.severity, 'significant'),
                 eq(comments.section, 'Roof'),
             ))
             .all();
-        expect(roofDefects).toHaveLength(1);
-        expect(roofDefects[0]!.id).toBe('r-def');
+        expect(roofSignificant).toHaveLength(1);
+        expect(roofSignificant[0]!.id).toBe('r-sig');
     });
 
-    it('does not leak across tenants when filtering by bucket', async () => {
-        // Tenant isolation rule (CLAUDE.md): bucket filter alone is not
+    it('does not leak across tenants when filtering by severity', async () => {
+        // Tenant isolation rule (CLAUDE.md): severity filter alone is not
         // enough — must always combine with tenantId.
         await testDb.insert(tenants).values({
             id: 't2',
-            name: 'Other Tenant',
             slug: 'other',
             createdAt: new Date(),
         });
         await testDb.insert(comments).values([
-            { id: 't1-def', tenantId: 't1', text: 'mine',  ratingBucket: 'defect', section: null, category: null, createdAt: new Date() },
-            { id: 't2-def', tenantId: 't2', text: 'theirs', ratingBucket: 'defect', section: null, category: null, createdAt: new Date() },
+            { id: 't1-sig', tenantId: 't1', text: 'mine',   severity: 'significant', section: null, category: null, createdAt: new Date() },
+            { id: 't2-sig', tenantId: 't2', text: 'theirs', severity: 'significant', section: null, category: null, createdAt: new Date() },
         ]);
 
         const mine = await testDb.select().from(comments)
-            .where(and(eq(comments.tenantId, 't1'), eq(comments.ratingBucket, 'defect')))
+            .where(and(eq(comments.tenantId, 't1'), eq(comments.severity, 'significant')))
             .all();
         expect(mine).toHaveLength(1);
-        expect(mine[0]!.id).toBe('t1-def');
+        expect(mine[0]!.id).toBe('t1-sig');
     });
 });

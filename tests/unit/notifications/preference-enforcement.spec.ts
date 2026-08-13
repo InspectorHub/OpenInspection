@@ -39,7 +39,7 @@ beforeEach(async () => {
     (mockDrizzle as any).mockReturnValue(db);
     rawDb = toRawD1(fx.sqlite);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: TENANT, status: 'active',
+        id: TENANT, slug: TENANT, status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
 });
@@ -123,7 +123,7 @@ describe('preference port', () => {
         // `users.tenant_id` carries a legacy FK, so the other tenant has to
         // exist before a user can live in it.
         await db.insert(schema.tenants).values({
-            id: 't-other', name: 'Other', slug: 't-other', status: 'active',
+            id: 't-other', slug: 't-other', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as never);
         await db.insert(schema.users).values({

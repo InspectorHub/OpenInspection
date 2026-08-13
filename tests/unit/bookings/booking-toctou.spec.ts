@@ -81,7 +81,7 @@ describe('B-28 booking TOCTOU', () => {
         svc = new BookingService({} as any);
 
         await db.insert(tenants).values({
-            id: TENANT_ID, name: 'TOCTOU Inspections', slug: TENANT_SLUG,
+            id: TENANT_ID, slug: TENANT_SLUG,
             tier: 'free', status: 'active', maxUsers: 5,
             deploymentMode: 'shared', createdAt: new Date(),
         } as any);

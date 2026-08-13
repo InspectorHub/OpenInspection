@@ -5,9 +5,7 @@ import { AdminService } from '../../services/admin.service';
 import { UnitService } from '../../services/unit.service';
 import { UnitSwitchService } from '../../services/unit-switch.service';
 import { ReportVersionService } from '../../services/report-version.service';
-import { AIService } from '../../services/ai.service';
-import { buildAiMeter, resolveRuntimeAiSource } from '../ai/metering';
-import { buildAiProvenanceSink } from '../ai/provenance';
+import { buildTenantAiService } from '../ai/build-ai-service';
 import { AuthService } from '../../services/auth.service';
 import { OutboxService } from '../../portal/outbox.service';
 import { publishRow } from '../../portal/outbox.service';
@@ -63,7 +61,8 @@ import { ClientDocumentService } from '../../services/client-document.service';
 import { ComplianceService } from '../../services/compliance/pca-compliance.service';
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../../portal/portal.provider';
-import { PlanQuotaGuard, readTenantTier } from '../../features/plan-quota/guard';
+import { PlanQuotaGuard, readTenantPlan } from '../../features/plan-quota/guard';
+import type { TenantPlan } from '../../features/plan-quota/policy';
 import { tenantAiCapsLoader } from '../../features/plan-quota/ai-caps';
 
 /**
@@ -94,10 +93,15 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
     // in server/index.ts), so resolve it here once per request, under the same
     // /api/ gate as emailCfg, whenever the usage-quota guard is active.
     let tenantTierForQuota: string | undefined = c.get('tenantTier');
+    // The same row also answers the AI entitlement (`isPaidPlan` needs the
+    // status, not just the tier). Null wherever it was not read — a session
+    // tier carries no status, and null is deliberately NOT an entitlement.
+    let tenantPlan: TenantPlan | null = null;
     if (tenantId && c.req.path.startsWith('/api/')) {
         emailCfg = await loadTenantEmailConfig(c.env, tenantId);
         if (!tenantTierForQuota && c.var.profile.hasUsageQuota) {
-            tenantTierForQuota = await readTenantTier(c.env.DB, tenantId).catch(() => undefined);
+            tenantPlan = await readTenantPlan(c.env.DB, tenantId).catch(() => null);
+            tenantTierForQuota = tenantPlan?.tier;
         }
     }
 
@@ -160,28 +164,24 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         target.admin = new AdminService(c.env.DB, provider);
                     }
                     break;
-                case 'ai': {
-                    // ONE credential picture: meter tag, gate source, key confirmation and
-                    // provenance mode all read from it, resolved ONCE — a second resolve is
-                    // a second answer to whose key funded the call. No sink ⇒ the chokepoint
-                    // refuses rather than producing output nothing recorded.
-                    const aiCreds = { profile: c.var.profile, tenantKey: emailCfg.dbSecrets.geminiApiKey || null, managedKey: c.env.AI_MANAGED_API_KEY ?? null, model: c.env.AI_MODEL ?? '' };
-                    const aiSource = resolveRuntimeAiSource(aiCreds) ?? 'byo'; // null (off) → 'byo'
-                    target.ai = new AIService(
-                        c.env.DB,
-                        // The tenant's own bound key — always wins, and still the ONLY
-                        // credential reaching the service until managed access is granted.
-                        aiCreds.tenantKey ?? '',
-                        // A-4: standalone with no key returns dev-mock, not a 503.
-                        c.var.profile.aiDevMockFallback ? 'standalone' : 'saas',
+                case 'ai':
+                    // ONE credential resolution, made in build-ai-service.ts: the meter
+                    // tag, the gate source, the provenance mode and the allowance cap all
+                    // read from it. A second resolve is a second answer to whose key
+                    // funded the call.
+                    target.ai = buildTenantAiService({
+                        db: c.env.DB,
+                        profile: c.var.profile,
+                        tenantId,
+                        tenantKey: emailCfg.dbSecrets.geminiApiKey || null,
+                        managedKey: c.env.AI_MANAGED_API_KEY ?? null,
                         // No default: an unset AI_MODEL fails closed at the service.
-                        aiCreds.model,
-                        buildAiMeter({ db: c.env.DB, tenantId, ...aiCreds }),
-                        { source: aiSource, tenantKeyAttested: emailCfg.aiKeyAttested === true }, // unloaded config → NOT confirmed
-                        buildAiProvenanceSink({ db: c.env.DB, tenantId, source: aiSource, model: aiCreds.model }),
-                    );
+                        model: c.env.AI_MODEL ?? '',
+                        plan: tenantPlan,
+                        tenantKeyAttested: emailCfg.aiKeyAttested === true, // unloaded config → NOT confirmed
+                        quotaGuard: buildPlanQuota(),
+                    });
                     break;
-                }
                 case 'auth':
                     // Outbox forwarding to portal is SaaS-only: buildOutbox
                     // returns undefined when SYNC_QUEUE is absent (standalone)

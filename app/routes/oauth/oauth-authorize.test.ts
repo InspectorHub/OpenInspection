@@ -11,7 +11,7 @@ import {
 import { ConsentForm, isRegisteredRedirectUri } from "~/routes/oauth/authorize";
 
 // The tags MODULE_GROUPS is allowed to use: the controlled vocabulary from
-// docs/developers/07_route_metadata.md plus the two real route tags that
+// docs/develop/conventions/route-metadata.md plus the two real route tags that
 // predate that prose list (verified present in server/api/** metadata).
 const KNOWN_TAGS = new Set<string>([
   // primary vocabulary (07_route_metadata.md)

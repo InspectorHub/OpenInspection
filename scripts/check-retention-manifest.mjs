@@ -80,7 +80,22 @@ const MANIFEST = manifestArg === -1
  * reason, so the one table the issue got wrong is the one table the gate keeps
  * saying out loud.
  */
-const LEDGER_NAME = /_log(s)?$|^processed_|^parked_|_events$/;
+// Widened 2026-08-13, after every table the widening newly demands was already
+// registered — so it costs nothing today and starts earning on the next one.
+//
+// The four original patterns covered nine tables. Sixteen of ninety-five had a
+// decision, which means the other seven that DID were volunteered by whoever
+// wrote them; the gate was not what got them there. `tenant_destruction_records`
+// is the proof: a compliance ledger that grows per purge, named `_records`,
+// invisible to this line, and it went a year with no retention decision while
+// this gate reported green. `ai_call_provenance` and `ai_content_reviews` were
+// in the same position.
+//
+// `_versions?$` is the one to be careful with — it also catches reference
+// tables whose rows are CITED by longer-lived evidence. Those still need a
+// decision; the decision is usually a window plus a "not still cited" predicate
+// rather than an exemption, and having the gate ask is the point.
+const LEDGER_NAME = /_log(s)?$|^processed_|^parked_|_events$|_records?$|_history$|_versions?$|_provenance$|_reviews?$/;
 
 /**
  * Ledgers whose names do not say so. Each line is a claim that this table

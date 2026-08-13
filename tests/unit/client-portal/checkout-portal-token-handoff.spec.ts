@@ -52,7 +52,7 @@ describe('IA-44 — checkout mints the signer a portal token', () => {
 
     async function seed() {
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(db), TENANT);

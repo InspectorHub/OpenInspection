@@ -37,7 +37,7 @@ beforeEach(async () => {
     await setupSchema(fx.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme-a11a', status: 'active', phone: '+15550009999',
+        id: TENANT, slug: 'acme-a11a', status: 'active', phone: '+15550009999',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
     await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
@@ -174,16 +174,36 @@ describe('AutomationService.flush — SMS consent + client_name resolve via insp
         await new SmsConsentService({} as D1Database).publishDisclosure('disclosure');
     });
 
+    // 'R' matches no real AUTOMATION_SEEDS entry, so the dead automations.subject_
+    // template/body_template/sms_body columns (now dropped) can't be recovered by
+    // backfillAutomationTemplates' seed-only fallback — reference a template
+    // directly instead, the way ensureSeeds does for a freshly-seeded rule.
     async function seedRule(opts: { recipientRoleKey: string; channel: 'email' | 'sms'; body: string; smsBody?: string }) {
         const ruleId = crypto.randomUUID();
+        let emailTemplateId: string | null = null;
+        let smsTemplateId: string | null = null;
+        if (opts.channel === 'email') {
+            emailTemplateId = crypto.randomUUID();
+            await db.insert(schema.messageTemplates).values({
+                id: emailTemplateId, tenantId: TENANT, name: 'R — Email', channel: 'email',
+                subject: 'Subj', body: opts.body, variables: null, isSeeded: false,
+                createdAt: new Date(), updatedAt: new Date(),
+            } as never);
+        }
+        if (opts.channel === 'sms' && opts.smsBody) {
+            smsTemplateId = crypto.randomUUID();
+            await db.insert(schema.messageTemplates).values({
+                id: smsTemplateId, tenantId: TENANT, name: 'R — SMS', channel: 'sms',
+                subject: null, body: opts.smsBody, variables: null, isSeeded: false,
+                createdAt: new Date(), updatedAt: new Date(),
+            } as never);
+        }
         await db.insert(schema.automations).values({
             id: ruleId, tenantId: TENANT, name: 'R', trigger: 'report.published',
             recipientKind: 'role', recipientRoleProfileId: roleProfileId(opts.recipientRoleKey), delayMinutes: 0,
-            subjectTemplate: 'Subj', bodyTemplate: opts.body, smsBody: opts.smsBody ?? null,
+            emailTemplateId, smsTemplateId,
             channels: JSON.stringify([opts.channel]), active: true, isDefault: false, createdAt: new Date(),
         } as never);
-        const { backfillAutomationTemplates } = await import('../../../server/services/message-template-backfill');
-        await backfillAutomationTemplates({} as D1Database, TENANT);
         return ruleId;
     }
 

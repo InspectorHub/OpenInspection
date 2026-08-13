@@ -28,7 +28,7 @@ const guard = () => new PlanQuotaGuard(b.DB, { enforced: true, billingPortalUrl:
 
 async function seedSchema(): Promise<void> {
     await b.DB.exec(
-        "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL, tier TEXT NOT NULL DEFAULT 'free', created_at INTEGER NOT NULL);",
+        "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, slug TEXT NOT NULL, tier TEXT NOT NULL DEFAULT 'free', created_at INTEGER NOT NULL);",
     );
     await b.DB.exec(
         'CREATE TABLE IF NOT EXISTS inspections (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_address TEXT, date TEXT, created_at INTEGER NOT NULL);',
@@ -42,10 +42,10 @@ async function reset(): Promise<void> {
     await b.DB.exec('DELETE FROM usage_counters;');
     await b.DB.exec('DELETE FROM inspections;');
     await b.DB.exec('DELETE FROM tenants;');
-    await b.DB.prepare('INSERT INTO tenants (id, name, slug, tier, created_at) VALUES (?, ?, ?, ?, ?)')
-        .bind(TENANT, 'Acme', 'acme', 'free', Date.now()).run();
-    await b.DB.prepare('INSERT INTO tenants (id, name, slug, tier, created_at) VALUES (?, ?, ?, ?, ?)')
-        .bind(OTHER, 'Other', 'other', 'free', Date.now()).run();
+    await b.DB.prepare('INSERT INTO tenants (id, slug, tier, created_at) VALUES (?, ?, ?, ?)')
+        .bind(TENANT, 'acme', 'free', Date.now()).run();
+    await b.DB.prepare('INSERT INTO tenants (id, slug, tier, created_at) VALUES (?, ?, ?, ?)')
+        .bind(OTHER, 'other', 'free', Date.now()).run();
 }
 
 /** The row a caller inserts right after a successful consume. */

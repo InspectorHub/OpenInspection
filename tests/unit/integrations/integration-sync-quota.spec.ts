@@ -58,7 +58,6 @@ describe('POST /api/integration/sync-quota', () => {
 
         await testDb.insert(schema.tenants).values({
             id:        tenantId,
-            name:      'Test Tenant',
             slug:      'test',
             maxUsers:  5,
             createdAt: new Date(),

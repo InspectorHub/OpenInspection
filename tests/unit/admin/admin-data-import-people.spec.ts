@@ -73,7 +73,7 @@ describe('POST /import — writes inspection_people for imported clients (Task 7
         people = new PeopleService({ DB: {} as D1Database });
 
         await db.insert(tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as never);
         await seedRoleProfiles(db as never, TENANT, new Date(1));

@@ -52,7 +52,7 @@ describe('ServiceService.proposeEventsForService', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(db);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'T', slug: 't', createdAt: new Date(),
+            id: TENANT, slug: 't', createdAt: new Date(),
         });
         await addEventType('radon_dropoff', 'Radon Drop-off');
         await addEventType('radon_pickup', 'Radon Pickup');
@@ -84,7 +84,7 @@ describe('ServiceService.proposeEventsForService', () => {
 
     it('never proposes another tenant\'s event type of the same slug', async () => {
         await db.insert(schema.tenants).values({
-            id: 'other', name: 'O', slug: 'o', createdAt: new Date(),
+            id: 'other', slug: 'o', createdAt: new Date(),
         });
         await db.insert(schema.eventTypes).values({
             id: 'et-other', tenantId: 'other', name: 'Radon Pickup', slug: 'radon_pickup',

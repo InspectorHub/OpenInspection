@@ -107,7 +107,7 @@ beforeEach(async () => {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.users).values({
@@ -220,7 +220,7 @@ describe('POST /api/invoices/{id}/payments — recording', () => {
 
     it('404s for an invoice in another tenant', async () => {
         await db.insert(schema.tenants).values({
-            id: 'tenant-two', name: 'Beta', slug: 'beta', status: 'active',
+            id: 'tenant-two', slug: 'beta', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.update(schema.invoices).set({ tenantId: 'tenant-two' }).where(eq(schema.invoices.id, INV_ID));

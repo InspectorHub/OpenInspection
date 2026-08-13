@@ -30,7 +30,7 @@ describe('GET /api/integration/tenants/:slug/seat-usage', () => {
     const s = createTestDb(); testDb = s.db; sqlite = s.sqlite; await setupSchema(sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
     await testDb.insert(schema.tenants).values([
-      { id: 't-a', name: 'Tenant A', slug: 'tenant-a', tier: 'free', maxUsers: 5, createdAt: new Date() },
+      { id: 't-a', slug: 'tenant-a', tier: 'free', maxUsers: 5, createdAt: new Date() },
     ] as never);
   });
   afterEach(() => { sqlite.close(); vi.clearAllMocks(); });
@@ -72,7 +72,7 @@ describe('GET /api/integration/tenants/:slug/seat-usage', () => {
 
   it('max is null when maxUsers is the unlimited sentinel (0)', async () => {
     await testDb.insert(schema.tenants).values([
-      { id: 't-b', name: 'Tenant B', slug: 'tenant-b', tier: 'pro', maxUsers: 0, createdAt: new Date() },
+      { id: 't-b', slug: 'tenant-b', tier: 'pro', maxUsers: 0, createdAt: new Date() },
     ] as never);
 
     const res = await app().request(

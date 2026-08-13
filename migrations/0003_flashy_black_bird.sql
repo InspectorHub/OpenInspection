@@ -1,1 +1,0 @@
-ALTER TABLE `repair_request_items` ADD `trade_snapshot` text;

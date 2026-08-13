@@ -37,13 +37,16 @@ describe('getReportData photo precedence (annotatedKey || croppedKey || key)', (
         svc = new InspectionService({} as D1Database);
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme-prec', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            id: TENANT, slug: 'acme-prec', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.templates).values({
             id: TEMPLATE_ID, tenantId: TENANT, name: 'Standard', schema: TEMPLATE_SCHEMA, version: 1, createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
             id: INSPECTION_ID, tenantId: TENANT, templateId: TEMPLATE_ID,
+            // #307 — the report reads the inspection's own frozen structure;
+            // there is no live-template fallback to lean on any more.
+            templateSnapshot: TEMPLATE_SCHEMA,
             propertyAddress: '1 Main St',
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
             paymentRequired: false, agreementRequired: false, createdAt: new Date(),

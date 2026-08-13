@@ -82,7 +82,7 @@ async function callLog(opts: {
     await setupSchema(fixture.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
-    await db.insert(schema.tenants).values({ id: TENANT, name: 'T', slug: 't-repairlog', createdAt: new Date() });
+    await db.insert(schema.tenants).values({ id: TENANT, slug: 't-repairlog', createdAt: new Date() });
     if (inspectionExists) {
         await db.insert(schema.inspections).values({
             id: INSP, tenantId: TENANT, propertyAddress: '1 Main St',

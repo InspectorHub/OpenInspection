@@ -61,7 +61,7 @@ describe('find-my-report discovery — capability-driven role filter', () => {
     beforeEach(async () => {
         const s = createTestDb(); testDb = s.db; sqlite = s.sqlite; await setupSchema(sqlite);
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        await testDb.insert(schema.tenants).values({ id: TENANT, name: 'Acme', slug: 'acme-cap', createdAt: new Date() } as never);
+        await testDb.insert(schema.tenants).values({ id: TENANT, slug: 'acme-cap', createdAt: new Date() } as never);
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
         await seedCustomRoles(testDb, TENANT);
         await testDb.insert(schema.inspectionAccessTokens).values([
@@ -124,7 +124,7 @@ describe('PortalService.listRecipientInspections — capability-driven role filt
         await setupSchema(fix.sqlite);
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme-cap2', status: 'active',
+            id: TENANT, slug: 'acme-cap2', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as never);
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
@@ -220,7 +220,7 @@ describe('GET /api/portal/:tenant/exchange — capability-driven role gate', () 
         await setupSchema(fix.sqlite);
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme-cap3', status: 'active',
+            id: TENANT, slug: 'acme-cap3', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as never);
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));

@@ -68,6 +68,6 @@ export class MeteringService {
  *  tenantId = SINGLE_TENANT_ID (whole-instance usage). Kept as a factory (rather
  *  than `new MeteringService` at call sites) so request + scheduled contexts share
  *  one construction point. */
-export function maybeMetering(env: { APP_MODE?: string; DB: D1Database }): MeteringService {
+export function maybeMetering(env: { DB: D1Database }): MeteringService {
   return new MeteringService(env.DB);
 }

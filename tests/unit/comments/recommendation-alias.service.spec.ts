@@ -16,7 +16,7 @@ describe('RecommendationService (alias over comments)', () => {
 
   beforeEach(async () => {
     const f = createTestDb(); testDb = f.db; await setupSchema(f.sqlite);
-    await testDb.insert(schema.tenants).values({ id: T, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', maxUsers: 5, appliedCmdSeq: 0, appliedCredSeq: 0, createdAt: new Date() });
+    await testDb.insert(schema.tenants).values({ id: T, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', maxUsers: 5, appliedCmdSeq: 0, appliedCredSeq: 0, createdAt: new Date() });
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
     svc = new RecommendationService({} as D1Database);
   });

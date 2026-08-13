@@ -7,11 +7,14 @@ export async function getGoogleCalendarStatus(
     tenantId: string,
     userId: string,
 ) {
-    const connection = await getCalendarConnection(env.DB, tenantId, userId, 'google');
+    const connection = await getCalendarConnection(env.DB, tenantId, userId);
     return {
         connected: Boolean(connection),
         capability: connection?.capabilities ?? null,
-        provider: 'google' as const,
+        provider: connection?.provider ?? null,
+        // Reads generic, means one specific thing: whether GOOGLE OAuth is
+        // configured on this deployment. It gates the Google button and only
+        // the Google button — CalDAV needs no OAuth client at all.
         oauthConfigured: await isGoogleOAuthConfigured(env, tenantId),
         lastSyncAt: connection?.lastSyncAt instanceof Date ? connection.lastSyncAt.getTime() : null,
         // NULL once a sync succeeds. Surfaced because a stale freshness badge

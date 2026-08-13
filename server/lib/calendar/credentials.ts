@@ -1,15 +1,22 @@
 import { sealSecrets, openSecrets } from '../config-crypto';
 
 /** OAuth refresh/access tokens + granted scopes (Google / Microsoft). */
-export interface CalendarOAuthCredentials {
+interface CalendarOAuthCredentials {
     refreshToken: string;
     accessToken?: string;
     expiresAt?: string;
     scopes: string[];
 }
 
-/** CalDAV app-password shape (Apple / iCloud — future). */
+/**
+ * CalDAV app-password shape (Apple / iCloud).
+ *
+ * `username` is the Apple ID the app-specific password belongs to: iCloud
+ * authenticates on it, and it is not derivable from `url`, which names the
+ * discovered calendar home and already has one meaning.
+ */
 interface CalendarCalDavCredentials {
+    username: string;
     appPassword: string;
     url: string;
 }
@@ -20,7 +27,7 @@ const SCOPES_KEY = 'scopes';
 
 function toSealRecord(payload: CalendarCredentialPayload): Record<string, string> {
     if ('appPassword' in payload) {
-        return { appPassword: payload.appPassword, url: payload.url };
+        return { username: payload.username ?? '', appPassword: payload.appPassword, url: payload.url };
     }
     const record: Record<string, string> = { refreshToken: payload.refreshToken };
     if (payload.accessToken) record.accessToken = payload.accessToken;
@@ -30,8 +37,11 @@ function toSealRecord(payload: CalendarCredentialPayload): Record<string, string
 }
 
 function fromSealRecord(record: Record<string, string>): CalendarCredentialPayload {
+    // The discriminator stays `appPassword && url` on purpose. Keying it on
+    // `username` would make a row sealed before that field existed decode as an
+    // OAuth payload with an empty refresh token — unusable, and silent.
     if (record.appPassword && record.url) {
-        return { appPassword: record.appPassword, url: record.url };
+        return { username: record.username ?? '', appPassword: record.appPassword, url: record.url };
     }
     const scopesRaw = record[SCOPES_KEY];
     const scopes: string[] = scopesRaw ? JSON.parse(scopesRaw) as string[] : [];

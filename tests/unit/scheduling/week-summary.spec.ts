@@ -64,7 +64,7 @@ describe('schedule week-summary', () => {
 
         const now = new Date();
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: now,
         });
         await testDb.insert(schema.users).values([

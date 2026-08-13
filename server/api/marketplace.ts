@@ -2,15 +2,12 @@ import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
+import { requireCapability } from '../lib/middleware/require-capability';
 import { Errors, AppError } from '../lib/errors';
 import { auditFromContext } from '../lib/audit';
-import {
-    LibraryReplaceParamsSchema,
-    LibraryReplaceBodySchema,
-} from '../lib/validations/library-replace.schema';
-import {
-    ImportHistoryQuerySchema,
-} from '../lib/validations/import-history.schema';
+import { LibraryReplaceParamsSchema, LibraryReplaceBodySchema, LibraryReplacePreviewSchema } from '../lib/validations/library-replace.schema';
+import { ImportHistoryQuerySchema } from '../lib/validations/import-history.schema';
+import { MarketplaceBrowseQuerySchema } from '../lib/validations/marketplace-browse.schema';
 import {
     paginationQuerySchema,
     PaginatedMetaSchema,
@@ -26,10 +23,7 @@ const marketplaceRoutes = createApiRouter()
     summary: "List marketplaces for current tenant",
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        query: paginationQuerySchema.extend({
-            search:   z.string().optional().describe('Free-text search over marketplace template names'),
-            category: z.enum(['residential', 'commercial', 'trec', 'condo', 'new_construction', 'standards_aligned']).optional().describe('Filter marketplace templates by inspection category'),
-        }),
+        query: paginationQuerySchema.merge(MarketplaceBrowseQuerySchema),
     },
     responses: {
         200: {
@@ -38,16 +32,19 @@ const marketplaceRoutes = createApiRouter()
                 data:    z.array(z.any()),
                 meta:    PaginatedMetaSchema,
             }) } },
-            description: 'Paginated list of marketplace templates for the current tenant.',
+            description: 'Paginated list of marketplace catalogue entries for the current tenant.',
         },
     },
     operationId: "listMarketplaces",
-    description: "Paginated list of marketplace templates for the current tenant.",
+    description: "Paginated list of marketplace catalogue entries for the current tenant.",
 }, { scopes: ['read'], tier: 'primary' })), async (c) => {
     const q = c.req.valid('query');
     const { rows, total } = await c.var.services.marketplace.list({
-        ...(q.search   !== undefined ? { search:   q.search }   : {}),
-        ...(q.category !== undefined ? { category: q.category } : {}),
+        ...(q.search         !== undefined ? { search:         q.search }         : {}),
+        ...(q.kind           !== undefined ? { kind:           q.kind }           : {}),
+        ...(q.propertyType   !== undefined ? { propertyType:   q.propertyType }   : {}),
+        ...(q.jurisdiction   !== undefined ? { jurisdiction:   q.jurisdiction }   : {}),
+        ...(q.inspectionKind !== undefined ? { inspectionKind: q.inspectionKind } : {}),
         page:     q.page,
         pageSize: q.pageSize,
     });
@@ -62,37 +59,47 @@ const marketplaceRoutes = createApiRouter()
     method: 'post', path: '/{id}/import',
     tags: ["marketplace"],
     summary: 'Import marketplace template as tenant copy',
-    middleware: [requireRole('owner', 'manager')] as const,
+    // `importCatalogEntry` MINTS A LOCAL TEMPLATE for a kind='templates' entry,
+    // so this is a template-import path and wears templateImport (#307).
+    //
+    // The gate is an over-approximation for the OTHER kind this same handler
+    // serves: a comments pack import is not a template import, but a route gate
+    // takes exactly one capability and the handler does not know the kind until
+    // it has read the row. Erring toward the template verb is the conservative
+    // half -- owner/manager hold templateImport by default, so the practical
+    // effect is confined to a workspace that has deliberately revoked it.
+    middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
     request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ localTemplateId: z.string().describe('TODO describe localTemplateId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ localTemplateId: z.string().nullable().describe('Local template id for a 1:1 kind; null for a 1:N kind, which produces row_count rows rather than one') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Imported',
         },
+        403: { description: "Missing the 'templateImport' capability" },
         404: { description: 'Not found' },
     },
     operationId: "importMarketplace",
     description: "Auto-generated placeholder for importMarketplace (POST /{id}/import, marketplace domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' })), async (c) => {
+}, { scopes: ['write'], tier: 'extended', capability: 'templateImport' })), async (c) => {
     const { id } = c.req.valid('param');
     try {
-        const localTemplateId = await c.var.services.marketplace.importTemplate(id);
-        return c.json({ success: true, data: { localTemplateId } }, 201);
+        const result = await c.var.services.marketplace.importCatalogEntry(id);
+        return c.json({ success: true, data: { localTemplateId: result.localEntityId } }, 201);
     } catch (err) {
-        if (err instanceof Error && err.message === 'Marketplace template not found') {
+        if (err instanceof Error && err.message === 'Marketplace entry not found') {
             throw Errors.NotFound('Marketplace template not found');
         }
         throw err;
     }
 })
-// Spec 5G M2 — Library marketplace (comments, snippets)
+// The unified catalogue, filtered by kind.
     .openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/libraries',
     tags: ["marketplace"],
-    summary: 'List marketplace libraries (comment packs, snippet packs)',
+    summary: 'List marketplace catalogue entries (comment packs, templates)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        query: z.object({ kind: z.enum(['comments', 'snippets']).optional().describe('TODO describe kind field for the OpenInspection MCP integration') }).describe('TODO describe query field for the OpenInspection MCP integration'),
+        query: z.object({ kind: z.enum(['comments', 'templates']).optional().describe('TODO describe kind field for the OpenInspection MCP integration') }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.any()).describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
@@ -112,7 +119,9 @@ const marketplaceRoutes = createApiRouter()
     method: 'post', path: '/{id}/update',
     tags: ["marketplace"],
     summary: 'Update tenant copy to latest marketplace version (creates new local copy)',
-    middleware: [requireRole('owner', 'manager')] as const,
+    // Scheme 2 mints a SECOND local template row, so "update to latest" is a
+    // template import by any measure that matters here (#307).
+    middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
     request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
@@ -128,11 +137,12 @@ const marketplaceRoutes = createApiRouter()
             description: 'Updated',
         },
         400: { description: 'No update available' },
+        403: { description: "Missing the 'templateImport' capability" },
         404: { description: 'Not found' },
     },
     operationId: "createMarketplaceUpdate",
     description: "Auto-generated placeholder for createMarketplaceUpdate (POST /{id}/update, marketplace domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' })), async (c) => {
+}, { scopes: ['write'], tier: 'extended', capability: 'templateImport' })), async (c) => {
     const { id } = c.req.valid('param');
     try {
         const result = await c.var.services.marketplace.updateTemplateImport(id);
@@ -164,21 +174,27 @@ const marketplaceRoutes = createApiRouter()
     method: 'post', path: '/libraries/{id}/import',
     tags: ["marketplace"],
     summary: 'Import marketplace library into tenant',
-    middleware: [requireRole('owner', 'manager')] as const,
+    // The SAME handler as POST /{id}/import above -- one `importCatalogEntry`
+    // call, so this route mints a local template for a kind='templates' entry
+    // exactly as that one does. It is not in the #307 plan's table; the plan's
+    // enumerating grep was `insert(templates)` and this path writes
+    // `insert(templates as any)`, which that pattern does not match.
+    middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
     request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        201: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ rowCount: z.number().describe('TODO describe rowCount field for the OpenInspection MCP integration'), localFirstId: z.string().describe('TODO describe localFirstId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Imported' },
+        201: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ kind: z.enum(['comments', 'templates']).describe('Which shape the import produced'), rowCount: z.number().describe('Rows created for a 1:N kind; 0 for a 1:1 kind'), localEntityId: z.string().nullable().describe('Local row id for a 1:1 kind; null for a 1:N kind') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Imported' },
+        403: { description: "Missing the 'templateImport' capability" },
         404: { description: 'Not found' },
     },
     operationId: "importMarketplace",
     description: "Auto-generated placeholder for importMarketplace (POST /libraries/{id}/import, marketplace domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' })), async (c) => {
+}, { scopes: ['write'], tier: 'extended', capability: 'templateImport' })), async (c) => {
     const { id } = c.req.valid('param');
     try {
-        const result = await c.var.services.marketplace.importLibrary(id);
+        const result = await c.var.services.marketplace.importCatalogEntry(id);
         return c.json({ success: true, data: result }, 201);
     } catch (err) {
-        if (err instanceof Error && err.message === 'Marketplace library not found') {
+        if (err instanceof Error && err.message === 'Marketplace entry not found') {
             throw Errors.NotFound('Marketplace library not found');
         }
         // Diagnostic: surface real error to caller for debugging
@@ -194,6 +210,9 @@ const marketplaceRoutes = createApiRouter()
     method: 'post', path: '/libraries/{id}/update',
     tags: ["marketplace"],
     summary: 'Update tenant library import to latest marketplace version (adds new rows)',
+    // Deliberately NO template capability: `updateLibraryImport` refuses any
+    // kind other than 'comments' outright, so this path cannot reach the
+    // `templates` table. Said here so the next auditor does not re-derive it.
     middleware: [requireRole('owner', 'manager')] as const,
     request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
@@ -240,14 +259,42 @@ const marketplaceRoutes = createApiRouter()
         throw err;
     }
 })
-// Sprint 2 S2-7 — Library "replace" mode update. Deletes prior-import rows
-// before inserting the new pack. Owner/admin only; user must acknowledge the
-// edit-loss when prior rows have been modified.
+// #348 — what a replace would cost, before anything is deleted. Read by the
+// import-conflict page so the choice is offered against the sentences at stake
+// rather than against a count. Inspectors can read it (their rewrites are the
+// thing at stake) even though only owner/manager can act on it.
+    .openapi(createRoute(withMcpMetadata({
+    method: 'get', path: '/libraries/{libraryId}/imports/replace/preview',
+    tags: ["marketplace"],
+    summary: 'Preview which imported comments a replace would overwrite',
+    description: "Lists the comments this tenant rewrote since importing the library, each beside the publisher's version in the pending release, so a destructive replace can be decided against the actual text rather than a count.",
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: { params: LibraryReplaceParamsSchema },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.boolean(), data: LibraryReplacePreviewSchema }) } },
+            description: 'Conflict preview',
+        },
+        400: { description: 'No update available, library not imported, or not a comment library' },
+        404: { description: 'Library not found' },
+    },
+    operationId: "getMarketplaceLibraryReplacePreview",
+}, { scopes: ['read'], tier: 'extended' })), async (c) => {
+    const { libraryId } = c.req.valid('param');
+    const data = await c.var.services.marketplace.previewLibraryReplace(libraryId);
+    return c.json({ success: true, data }, 200);
+})
+// Sprint 2 S2-7 — Library "replace" mode update. Swaps prior-import rows for
+// the new pack. Owner/admin only. #348 — rows the tenant rewrote survive unless
+// confirmLossOfEdits says otherwise; the flag is enforced, not just recorded.
     .openapi(createRoute(withMcpMetadata({
     method: 'post', path: '/libraries/{libraryId}/imports/replace',
     tags: ["marketplace"],
-    summary: 'Replace tenant library import (deletes prior rows + inserts new pack)',
-    description: "Auto-generated placeholder for replaceMarketplace (POST /libraries/{libraryId}/imports/replace, marketplace domain). TODO: replace with a real description sourced from the handler.",
+    summary: 'Replace tenant library import (swaps prior rows for the new pack)',
+    description: "Replaces the rows a previous import of this library created with the current release's. Comments the tenant rewrote since importing are kept unless confirmLossOfEdits is true; tenant-authored comments are never touched.",
+    // Same reason as /libraries/{id}/update above: 'replace' mode deletes and
+    // re-inserts `comments` rows only, and the kind guard rejects everything
+    // else before that. No template is minted, so no template capability.
     middleware: [requireRole('owner', 'manager')] as const,
     request: {
         params: LibraryReplaceParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
@@ -265,13 +312,14 @@ const marketplaceRoutes = createApiRouter()
             content: { 'application/json': { schema: z.object({
                 success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
                 data: z.object({
-                    rowsAdded:   z.number().int().describe('TODO describe rowsAdded field for the OpenInspection MCP integration'),
-                    rowsDeleted: z.number().int().describe('TODO describe rowsDeleted field for the OpenInspection MCP integration'),
-                    fromSemver:  z.string().describe('TODO describe fromSemver field for the OpenInspection MCP integration'),
-                    toSemver:    z.string().describe('TODO describe toSemver field for the OpenInspection MCP integration'),
-                    libraryName: z.string().describe('TODO describe libraryName field for the OpenInspection MCP integration'),
-                    mode:        z.literal('replace').describe('TODO describe mode field for the OpenInspection MCP integration'),
-                }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                    rowsAdded:     z.number().int().describe('Rows the new pack inserted'),
+                    rowsDeleted:   z.number().int().describe('Prior-import rows removed'),
+                    rowsPreserved: z.number().int().describe('Rows the tenant had rewritten and that were kept'),
+                    fromSemver:    z.string().describe('Version imported before this call'),
+                    toSemver:      z.string().describe('Version now imported'),
+                    libraryName:   z.string().describe('Display name of the library'),
+                    mode:          z.literal('replace').describe('Always "replace" on this route'),
+                }).describe('Outcome of the replace'),
             }) } },
             description: 'Replaced',
         },
@@ -295,11 +343,12 @@ const marketplaceRoutes = createApiRouter()
         auditFromContext(c, 'library.marketplace.updated', 'library', {
             entityId: libraryId,
             metadata: {
-                mode:        'replace',
-                fromSemver:  result.fromSemver,
-                toSemver:    result.toSemver,
-                rowsAdded:   result.rowsAdded,
-                rowsDeleted: result.rowsDeleted,
+                mode:          'replace',
+                fromSemver:    result.fromSemver,
+                toSemver:      result.toSemver,
+                rowsAdded:     result.rowsAdded,
+                rowsDeleted:   result.rowsDeleted,
+                rowsPreserved: result.rowsPreserved,
             },
         });
 

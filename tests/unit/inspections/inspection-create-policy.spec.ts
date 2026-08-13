@@ -35,7 +35,6 @@ describe('InspectionService.createInspection — Round-2 #10 policy inheritance'
 
         await testDb.insert(schema.tenants).values({
             id: TENANT,
-            name: 'Acme',
             slug: 'acme',
             status: 'active',
             deploymentMode: 'shared',

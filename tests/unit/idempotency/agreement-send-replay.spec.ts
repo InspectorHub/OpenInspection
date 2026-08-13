@@ -100,7 +100,7 @@ beforeEach(async () => {
     auditAppend = vi.fn(async () => {});
 
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'A', slug: 'a', status: 'active',
+        id: TENANT, slug: 'a', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({

@@ -55,12 +55,6 @@ export const automations = sqliteTable('automations', {
     recipientKind: text('recipient_kind', { enum: ['role', 'inspector', 'all', 'staff'] }).notNull(),
     recipientRoleProfileId: text('recipient_role_profile_id'),
     delayMinutes: integer('delay_minutes').notNull().default(0),
-    // -- DEAD (2026-06-26, SP2): embedded email subject/body retired. Automations
-    // now reference a message_templates row via email_template_id. Frozen: no
-    // reads/writes; D1 cannot drop an FK-referenced column. Do not reuse.
-    subjectTemplate: text('subject_template').notNull(),
-    // -- DEAD (2026-06-26, SP2): see subject_template above.
-    bodyTemplate: text('body_template').notNull(),
     // SP2 — references a message_templates(channel='email') row for the email
     // channel. Null = no email template selected (channel disabled or unmigrated).
     emailTemplateId: text('email_template_id'),
@@ -70,10 +64,6 @@ export const automations = sqliteTable('automations', {
     // Track L (D2) — enabled delivery channels, JSON string[] e.g. '["email","sms"]'.
     // A firing emits one automation_logs row per channel. Default email-only.
     channels: text('channels').notNull().default('["email"]'),
-    // -- DEAD (2026-06-26, SP2): embedded plain-text SMS body retired. Automations
-    // now reference a message_templates(channel='sms') row via sms_template_id.
-    // Frozen: no reads/writes; do not reuse.
-    smsBody: text('sms_body'),
     // SP2 — references a message_templates(channel='sms') row for the SMS channel.
     // Null = no SMS template selected.
     smsTemplateId: text('sms_template_id'),
@@ -148,6 +138,28 @@ export const automationLogs = sqliteTable('automation_logs', {
     // derived for them and no backfill could ever have helped.
     // Appended at table end for D1 rebuild safety.
     noticeId: text('notice_id'),
+    /**
+     * How many times flush() has PICKED THIS ROW UP.
+     *
+     * Stamped when the batch is claimed — before anything is dispatched — and
+     * that ordering is the entire point. Every exit in the delivery paths
+     * writes a terminal status, so "pending, `error` null, long past due" can
+     * only mean flush never finished with it. Two very different things produce
+     * that state and they used to be indistinguishable: the cron did not run at
+     * all, or it ran and the isolate died mid-batch (CPU/wall limit) before the
+     * outcome write. A counter incremented at claim time separates them —
+     * `attempts = 0` is the first, anything else is the second.
+     *
+     * Not a retry BUDGET. Nothing reads it to decide whether to try again, and
+     * it should stay that way until there is a policy worth encoding; it exists
+     * so the question "was this ever picked up" has an answer at all.
+     * Appended at table end for D1 rebuild safety.
+     */
+    attempts: integer('attempts').notNull().default(0),
+    /** When the last claim happened — `attempts` says how many, this says how
+     *  stale. A row stuck at attempts=6 tells you nothing without it.
+     *  Appended at table end for D1 rebuild safety. */
+    lastAttemptAt: integer('last_attempt_at', { mode: 'timestamp_ms' }),
 }, (t) => [
     index('idx_automation_logs_pending').on(t.tenantId, t.status, t.sendAt),
     index('idx_automation_logs_insp').on(t.inspectionId),
@@ -237,16 +249,6 @@ export const inspectionEvents = sqliteTable('inspection_events', {
     completedAt:       integer('completed_at', { mode: 'timestamp_ms' }),
     resultsReceivedAt: integer('results_received_at', { mode: 'timestamp_ms' }),
     cancelledAt:       integer('cancelled_at', { mode: 'timestamp_ms' }),
-    /**
-     * -- DEAD (2026-08-07, superseded by calendar_external_links)
-     * Held the Google event id for the tenant-wide push that pressed-the-button
-     * semantics made unsafe (no assignment boundary, no update, no delete). That
-     * push is retired; nothing reads or writes this column. It is NOT backfilled
-     * into calendar_external_links because it never recorded WHOSE calendar the
-     * event landed on, and that table's user_id is the fact it exists to hold.
-     * Frozen per the column-retirement rule — never reuse the name.
-     */
-    gcalEventId:       text('gcal_event_id'),
     createdAt:         integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_inspection_events_scheduled').on(t.tenantId, t.scheduledAt),

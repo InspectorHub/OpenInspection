@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useLoaderData, useActionData, useNavigation, useFetcher, Form } from "react-router";
+import { useLoaderData, useActionData, useNavigation, Form } from "react-router";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-integrations-qbo";
 import { requireToken } from "~/lib/session.server";
@@ -146,11 +147,12 @@ export default function SettingsIntegrationsQbo() {
       return () => clearTimeout(t);
     }
   }, [actionData]);
-  const qboFetcher = useFetcher<{ success: boolean; intent?: string | null; error: string | null; syncEnabled?: boolean }>();
+  const { fetcher: qboFetcher, submit: submitQbo, busy: qboBusy } =
+    useGuardedSubmit<{ success: boolean; intent?: string | null; error: string | null; syncEnabled?: boolean }>();
 
   const connected = status?.connected;
   const discrepancies = status?.paymentDiscrepancies ?? [];
-  const syncing = qboFetcher.state !== "idle" && qboFetcher.formData?.get("intent") === "qbo-sync";
+  const syncing = qboBusy && qboFetcher.formData?.get("intent") === "qbo-sync";
   const expiryWarning =
     status?.refreshTokenExpiresAt &&
     status.refreshTokenExpiresAt <
@@ -167,15 +169,15 @@ export default function SettingsIntegrationsQbo() {
   }, [qboFetcher.data]);
 
   function triggerSync() {
-    qboFetcher.submit({ intent: "qbo-sync" }, { method: "POST" });
+    submitQbo({ intent: "qbo-sync" }, { method: "POST" });
   }
 
   function togglePause() {
-    qboFetcher.submit({ intent: "qbo-pause" }, { method: "POST" });
+    submitQbo({ intent: "qbo-pause" }, { method: "POST" });
   }
 
   function disconnect() {
-    qboFetcher.submit({ intent: "qbo-disconnect" }, { method: "POST" });
+    submitQbo({ intent: "qbo-disconnect" }, { method: "POST" });
   }
 
   return (
@@ -333,20 +335,25 @@ export default function SettingsIntegrationsQbo() {
             <div className="flex gap-2 flex-wrap">
               <button
                 onClick={triggerSync}
-                disabled={syncing}
+                disabled={qboBusy}
+                aria-busy={syncing || undefined}
                 className="px-4 py-2 text-[12px] font-bold bg-ih-primary-tint text-ih-primary-text rounded-md hover:bg-ih-primary-tint transition-colors disabled:opacity-50"
               >
                 {syncing ? m.settings_qbo_syncing() : m.settings_qbo_sync_now()}
               </button>
               <button
                 onClick={togglePause}
-                className="px-4 py-2 text-[12px] font-bold bg-ih-bg-muted text-ih-fg-2 rounded-md hover:bg-ih-bg-muted transition-colors"
+                disabled={qboBusy}
+                aria-busy={qboBusy || undefined}
+                className="px-4 py-2 text-[12px] font-bold bg-ih-bg-muted text-ih-fg-2 rounded-md hover:bg-ih-bg-muted transition-colors disabled:opacity-50"
               >
                 {status.syncEnabled ? m.settings_qbo_pause_sync() : m.settings_qbo_resume_sync()}
               </button>
               <button
                 onClick={disconnect}
-                className="px-4 py-2 text-[12px] font-bold text-ih-bad-fg hover:bg-ih-bad-bg rounded-md transition-colors"
+                disabled={qboBusy}
+                aria-busy={qboBusy || undefined}
+                className="px-4 py-2 text-[12px] font-bold text-ih-bad-fg hover:bg-ih-bad-bg rounded-md transition-colors disabled:opacity-50"
               >
                 {m.settings_qbo_disconnect()}
               </button>

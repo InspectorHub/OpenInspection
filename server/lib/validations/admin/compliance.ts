@@ -27,6 +27,50 @@ function capabilityToggleMap() {
 }
 
 /**
+ * One sentence per capability, published in the OpenAPI document.
+ *
+ * `Record<Capability, string>`, so adding a member to `TOGGLEABLE` does not
+ * compile until its sentence exists — the same forcing function `CAP_LABELS`
+ * applies on the UI side. The five original sentences are moved here VERBATIM
+ * from the inline `z.object` in `server/api/auth/profile.ts`: they are the
+ * published contract, so a paraphrase would be a silent contract change.
+ */
+export const CAPABILITY_DESCRIPTIONS: Record<Capability, string> = {
+    publish:           'May publish and unpublish reports.',
+    scheduleOthers:    'May schedule inspections for other inspectors.',
+    financial:         'May see money on inspections, services and invoices.',
+    manageContacts:    'May create, edit and archive contacts and role profiles.',
+    viewCommunication: 'May read the per-inspection Outbox, including recipient addresses.',
+    templateCreate:    'May create new inspection templates.',
+    templateEdit:      'May change an existing inspection template, including through a template migration.',
+    templateDelete:    'May delete an inspection template, directly or as part of a migration.',
+    templateImport:    'May bring a template in from a Spectora export or the content marketplace.',
+};
+
+/**
+ * The RESOLVED capability set, as `GET /api/auth/me` returns it: every key
+ * present, every key required.
+ *
+ * ⚠️ Deliberately NOT the same shape as `capabilityToggleMap()` above. That one
+ * is the SPARSE override map (all keys optional — only what differs from the
+ * role template travels); this one is the complete answer. Collapsing them
+ * would make the request schema accept a partial set where the response
+ * promises a full one, and would let a capability go missing from /me as
+ * merely "absent" rather than "false".
+ *
+ * Derived from `TOGGLEABLE` because `/me` used to hand-list five keys inline —
+ * the exact shape of #77, one layer over. Parity is asserted by
+ * `tests/unit/platform/capability-schema-parity.spec.ts`.
+ */
+export function resolvedCapabilitySchema() {
+    return z.object(
+        Object.fromEntries(
+            TOGGLEABLE.map((cap) => [cap, z.boolean().describe(CAPABILITY_DESCRIPTIONS[cap])]),
+        ) as { [K in Capability]: z.ZodBoolean },
+    );
+}
+
+/**
  * Validation schema for inviting a new team member.
  */
 export const InviteMemberSchema = z.object({

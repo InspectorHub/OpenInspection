@@ -2,7 +2,8 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { inspections, templates, agreements } from '../lib/db/schema';
 import { logger } from '../lib/logger';
-import { zipSync, Zip, ZipPassThrough, ZipDeflate } from 'fflate';
+import { zipSync } from 'fflate';
+import { streamZipToR2 } from '../lib/zip-to-r2';
 
 export interface ExportManifest {
     rows:    number;
@@ -129,51 +130,11 @@ export class DataExportService {
             cursor = list.truncated ? list.cursor : undefined;
         } while (cursor);
 
-        // R2 contract: every part except the LAST must be the same size, and
-        // non-last parts must be ≥5 MiB — the floor clamp keeps callers honest.
-        const PART_SIZE = Math.max(opts.partSizeBytes ?? 8 * 1024 * 1024, 5 * 1024 * 1024);
-        const upload = await exportsBucket.createMultipartUpload(r2Key);
-        const parts: R2UploadedPart[] = [];
-        let partNumber = 1;
-        const pending: Uint8Array[] = [];
-        let pendingBytes = 0;
-        let zipErr: Error | null = null;
-
-        // fflate's Zip delivers output chunks synchronously during push()/end().
-        const zip = new Zip((err, chunk) => {
-            if (err) { zipErr = err instanceof Error ? err : new Error(String(err)); return; }
-            if (chunk && chunk.length > 0) { pending.push(chunk); pendingBytes += chunk.length; }
-        });
-
-        /** Concatenate exactly `n` bytes off the pending list (remainder kept). */
-        const takeExact = (n: number): Uint8Array => {
-            const out = new Uint8Array(n);
-            let filled = 0;
-            while (filled < n) {
-                const head = pending[0]!;
-                const need = n - filled;
-                if (head.length <= need) {
-                    out.set(head, filled);
-                    filled += head.length;
-                    pending.shift();
-                } else {
-                    out.set(head.subarray(0, need), filled);
-                    pending[0] = head.subarray(need);
-                    filled = n;
-                }
-            }
-            pendingBytes -= n;
-            return out;
-        };
-
-        const flushFullParts = async (): Promise<void> => {
-            if (zipErr) throw zipErr;
-            while (pendingBytes >= PART_SIZE) {
-                parts.push(await upload.uploadPart(partNumber++, takeExact(PART_SIZE)));
-            }
-        };
-
-        try {
+        // The multipart part-sizing / abort machinery lives in `lib/zip-to-r2.ts`
+        // — shared with the Privacy P3 subject SAR export, which archives a
+        // different row set through the identical transport.
+        let photosEmbedded = 0;
+        const { parts } = await streamZipToR2(exportsBucket, r2Key, async (w) => {
             // 1. Photos — stream each R2 object through a pass-through entry.
             for (const p of photos) {
                 let obj: R2ObjectBody | null = null;
@@ -183,54 +144,26 @@ export class DataExportService {
                     logger.error('Photo fetch failed during export', { tenantId, key: p.key }, err instanceof Error ? err : undefined);
                 }
                 if (!obj) continue;
-                const entry = new ZipPassThrough(`photos/${p.key}`);
-                zip.add(entry);
-                const reader = obj.body.getReader();
-                for (;;) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    entry.push(value);
-                    await flushFullParts();
-                }
-                entry.push(new Uint8Array(0), true);
+                await w.addStream(`photos/${p.key}`, obj.body);
                 p.included = true;
-                await flushFullParts();
             }
-            const photosEmbedded = photos.filter(p => p.included).length;
+            photosEmbedded = photos.filter(p => p.included).length;
 
             // 2. Text entries (deflated).
-            const enc = new TextEncoder();
-            const addText = (name: string, content: string): void => {
-                const entry = new ZipDeflate(name);
-                zip.add(entry);
-                entry.push(enc.encode(content), true);
-            };
-            addText('inspections.csv', this.rowsToCsv(insps as never));
-            addText('templates.json', JSON.stringify(tpls, null, 2));
-            addText('agreements.json', JSON.stringify(agrs, null, 2));
-            addText('photos-manifest.json', JSON.stringify(photos, null, 2));
-            addText('README.txt',
+            await w.addText('inspections.csv', this.rowsToCsv(insps as never));
+            await w.addText('templates.json', JSON.stringify(tpls, null, 2));
+            await w.addText('agreements.json', JSON.stringify(agrs, null, 2));
+            await w.addText('photos-manifest.json', JSON.stringify(photos, null, 2));
+            await w.addText('README.txt',
                 `Tenant ${tenantId} data export. Generated ${new Date().toISOString()}.\n` +
                 `${insps.length} inspections, ${tpls.length} templates, ${photos.length} photos ` +
                 `(${photosEmbedded} with embedded bytes under photos/; any photo missing from ` +
                 `photos/ failed to read and is listed in photos-manifest.json with included=false).\n`);
-            zip.end();
-            await flushFullParts();
+        }, opts);
 
-            // 3. Final (possibly short) part + complete.
-            if (pendingBytes > 0) {
-                parts.push(await upload.uploadPart(partNumber++, takeExact(pendingBytes)));
-            }
-            if (zipErr) throw zipErr;
-            await upload.complete(parts);
-
-            const manifest: ExportManifest = { rows: insps.length, photos: photos.length, photosEmbedded };
-            logger.info('Data export streamed to R2', { tenantId, r2Key, parts: parts.length, ...manifest });
-            return manifest;
-        } catch (err) {
-            await upload.abort().catch(() => { /* already gone */ });
-            throw err;
-        }
+        const manifest: ExportManifest = { rows: insps.length, photos: photos.length, photosEmbedded };
+        logger.info('Data export streamed to R2', { tenantId, r2Key, parts, ...manifest });
+        return manifest;
     }
 
     private rowsToCsv(rows: Record<string, unknown>[]): string {

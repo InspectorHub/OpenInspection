@@ -1,1 +1,0 @@
-ALTER TABLE `automations` ADD `in_app_template_id` text;

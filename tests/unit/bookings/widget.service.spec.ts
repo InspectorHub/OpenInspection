@@ -25,7 +25,7 @@ describe('WidgetService.isOriginAllowed', () => {
         svc = new WidgetService({} as any);
 
         await testDb.insert(tenants).values({
-            id: TENANT_ID, name: 'T', slug: 't', status: 'active',
+            id: TENANT_ID, slug: 't', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(tenantConfigs).values({
@@ -57,7 +57,7 @@ describe('WidgetService.isOriginAllowed', () => {
         const svc2 = new WidgetService({} as any);
         const otherTenant = '00000000-0000-0000-0000-000000000002';
         await setup2.db.insert(tenants).values({
-            id: otherTenant, name: 'T2', slug: 't2', status: 'active',
+            id: otherTenant, slug: 't2', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await setup2.db.insert(tenantConfigs).values({ tenantId: otherTenant, updatedAt: new Date() });
@@ -87,7 +87,7 @@ describe('WidgetService.recordEvent', () => {
         const svc = new WidgetService({} as any);
 
         await setup.db.insert(tenants).values({
-            id: TENANT_ID, name: 'T', slug: 't', status: 'active',
+            id: TENANT_ID, slug: 't', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
 

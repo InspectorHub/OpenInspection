@@ -41,7 +41,7 @@ describe('seedStarterContent — service catalogue', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(db);
         await db.insert(schema.tenants).values({
-            id: tenantId, name: 'T', slug: 't', createdAt: new Date(),
+            id: tenantId, slug: 't', createdAt: new Date(),
         });
     });
 

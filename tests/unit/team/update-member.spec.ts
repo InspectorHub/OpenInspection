@@ -34,7 +34,7 @@ function userRow(id: string, role: Role, email: string) {
 
 async function seed(db: BetterSQLite3Database<typeof schema>, extraOwner = false) {
   await db.insert(schema.tenants).values([
-    { id: TENANT, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+    { id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
   ]);
   const rows = [
     userRow(OWNER, 'owner', 'owner@a.test'),

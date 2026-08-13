@@ -19,7 +19,7 @@ beforeEach(async () => {
     db = fx.db; await setupSchema(fx.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     // Spec 2 Task 0 — ensureSeeds now resolves each seed's recipientRoleKey to a
@@ -39,12 +39,13 @@ describe('Track L seeds', () => {
         expect(disc?.version).toBe(1);
     });
 
-    // automations.sms_body is a DEAD column (see automation.schema.ts comment) —
-    // never read at send time. The delivered TCPA disclosure text lives in the
-    // referenced message_templates row (sms_template_id), which is only backfilled
-    // once the automation's channels actually include 'sms'. Assert against that
-    // interpolated body, not the dead column (mirrors automation-flush-sms.spec.ts's
-    // "resolves the referenced sms template body" pattern).
+    // automations.sms_body is dropped, not frozen — the column no longer
+    // exists in automation.schema.ts. The delivered TCPA disclosure text lives
+    // in the referenced message_templates row (sms_template_id), which is only
+    // backfilled once the automation's channels actually include 'sms'.
+    // Assert against that interpolated body, not the removed column (mirrors
+    // automation-flush-sms.spec.ts's "resolves the referenced sms template
+    // body" pattern).
     it('once SMS channel is enabled, the backfilled message_templates body carries the TCPA "Reply STOP" disclosure', async () => {
         const svc = new AutomationService({} as D1Database);
         await svc.ensureSeeds(TENANT);

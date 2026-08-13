@@ -118,7 +118,7 @@ function buildApp(
 
 async function seedBaseTenant(db: BetterSQLite3Database<typeof schema>) {
     await db.insert(tenants).values({
-        id: T1, name: 'Acme', slug: 'acme', tier: 'free', status: 'active',
+        id: T1, slug: 'acme', tier: 'free', status: 'active',
         maxUsers: 5, deploymentMode: 'shared', createdAt: new Date(),
     } as any);
     await db.insert(users).values([

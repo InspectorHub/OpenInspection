@@ -98,6 +98,9 @@ export class BrandingService {
         opts?: { slug?: string | null; baseUrl?: string | null },
     ): Promise<{
         companyName: string | null;
+        /** The registered legal entity, ALREADY RESOLVED — never null. See the
+         *  fallback at the bottom of this method; consumers must not re-apply it. */
+        legalName: string;
         logoUrl: string | null;
         primaryColor: string | null;
         defaultTimezone: string;
@@ -113,6 +116,7 @@ export class BrandingService {
         const row = await db
             .select({
                 companyName: tenantConfigs.companyName,
+                legalName: tenantConfigs.legalName,
                 logoUrl: tenantConfigs.logoUrl,
                 primaryColor: tenantConfigs.primaryColor,
                 defaultTimezone: tenantConfigs.defaultTimezone,
@@ -145,6 +149,13 @@ export class BrandingService {
 
         return {
             companyName: row?.companyName ?? null,
+            // Resolved here and ONLY here. `legalName` is nullable in the
+            // schema because a sole proprietor has one name; every consumer
+            // gets a resolved string so none of them re-implements this and
+            // none of them can forget it. Whitespace counts as unset -- a
+            // cleared settings field submits '   ', and that must not reach
+            // an agreement.
+            legalName: row?.legalName?.trim() || row?.companyName?.trim() || '',
             logoUrl: row?.logoUrl ?? null,
             primaryColor: row?.primaryColor ?? null,
             // Public surfaces (portal/report) anchor displayed dates to the tenant

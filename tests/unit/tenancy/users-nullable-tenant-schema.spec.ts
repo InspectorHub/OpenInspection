@@ -22,11 +22,11 @@ describe('users schema — A1', () => {
         // core's shared D1, matching the per-identity / per-membership model on
         // the portal side.
         const row1 = sqlite.prepare(
-            `INSERT INTO tenants (id, name, slug, tier, status, max_users, deployment_mode, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO tenants (id, slug, tier, status, max_users, deployment_mode, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
         );
-        row1.run('t-a', 'A', 'aco', 'free', 'active', 5, 'shared', Date.now());
-        row1.run('t-b', 'B', 'bco', 'free', 'active', 5, 'shared', Date.now());
+        row1.run('t-a', 'aco', 'free', 'active', 5, 'shared', Date.now());
+        row1.run('t-b', 'bco', 'free', 'active', 5, 'shared', Date.now());
 
         const insertUser = sqlite.prepare(
             `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at)

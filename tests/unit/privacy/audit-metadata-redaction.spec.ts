@@ -48,7 +48,7 @@ describe('audit metadata never becomes a PII store', () => {
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'A', slug: 'a', status: 'active',
+            id: TENANT, slug: 'a', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -45,7 +45,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
         testDb = setup.db;
         await setupSchema(setup.sqlite);
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'T', slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
@@ -181,7 +181,12 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
         expect(rows).toHaveLength(2);
     });
 
-    it('replace mode without confirmLossOfEdits flag is allowed when no user-modified rows exist', async () => {
+    // confirmLossOfEdits is recorded into import-history metadata but nothing
+    // branches on it — replace mode's delete is unconditional either way (see
+    // LibraryReplaceBodySchema's comment). This pins that the call succeeds
+    // with the flag omitted/false; it is not evidence of a guard that doesn't
+    // exist.
+    it('replace mode succeeds without the confirmLossOfEdits flag', async () => {
         const libraryId = await seedLibrary({ semver: '2.0.0', entries: [{ text: 'X' }] });
         await testDb.insert(tenantLibraryImports).values({
             id:             crypto.randomUUID(),
@@ -247,7 +252,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
     it('does not delete other tenants comments under replace', async () => {
         const otherTenant = '00000000-0000-0000-0000-000000000002';
         await testDb.insert(schema.tenants).values({
-            id: otherTenant, name: 'O', slug: 'o',
+            id: otherTenant, slug: 'o',
             status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         const libraryId = await seedLibrary({ semver: '2.0.0', entries: [{ text: 'X' }] });

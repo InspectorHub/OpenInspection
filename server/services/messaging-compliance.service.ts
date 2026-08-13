@@ -8,6 +8,7 @@ import type { UserSyncOutbox } from '../lib/integration/user-sync';
 import { D1ComplianceStateStore } from '../lib/messaging/compliance-state-store';
 import type { ComplianceProvider, ComplianceProviderId } from '../lib/messaging/compliance-provider';
 import { resolveComplianceProvider, type ComplianceResolverEnv } from '../lib/sms/resolve-compliance-provider';
+import { persistWizardLegalName } from '../lib/sms/persist-legal-name';
 
 type ReadClient = Pick<TwilioClient, 'tollfree' | 'brands'>;
 
@@ -130,6 +131,7 @@ export class MessagingComplianceService {
         provider: ComplianceProvider,
         statusCallbackUrl?: string,
     ): Promise<{ complianceStatus: string }> {
+        await persistWizardLegalName(this.db, tenantId, businessInfo.legalName); // wizard → Settings
         const store = new D1ComplianceStateStore(this.db);
         const snapshot = await provider.provision(
             { tenantId, channel, businessInfo, statusCallbackUrl },

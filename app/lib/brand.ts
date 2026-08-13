@@ -8,6 +8,8 @@ import type { DateFormat, TimeFormat } from "../../server/lib/session/display-pr
  */
 export interface TenantBrand {
   companyName: string | null;
+  /** Registered legal entity, ALREADY RESOLVED — never re-apply the fallback. */
+  legalName: string;
   primaryColor: string | null;
   logoUrl: string | null;
   /** Tenant display timezone (IANA; 'UTC' when unset). Public/report surfaces
@@ -31,6 +33,7 @@ export interface TenantBrand {
 
 export const EMPTY_BRAND: TenantBrand = {
   companyName: null,
+  legalName: "",
   primaryColor: null,
   logoUrl: null,
   defaultTimezone: "UTC",

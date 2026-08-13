@@ -30,7 +30,9 @@ export type SyncEventType =
     | 'user.deleted'
     | 'reply.tenant.updated'
     | 'reply.tenant.export_completed'
-    | 'reply.tenant.purged';
+    | 'reply.tenant.purged'
+    | 'reply.subject.exported'
+    | 'reply.subject.erased';
 
 /** CloudEvents 1.0 envelope (subset profile used by this seam). */
 export interface SyncEnvelope {
@@ -109,6 +111,77 @@ const replyTenantPurgedDataSchema = z.object({
     kv: z.number(),
 });
 
+/**
+ * Privacy P3 — the COVERAGE DISCLOSURE that rides `reply.subject.erased`.
+ *
+ * Portal cannot compute this. The erasure catalogue lives in this repo and is
+ * not importable across the submodule boundary, so the disclosure exists only if
+ * it arrives on the wire — and portal refuses to mark a DSAR `completed` without
+ * it, because writing "completed" with nothing behind it is an affirmative claim
+ * that everything belonging to the subject was erased.
+ *
+ * Every field is REQUIRED for the same reason: an optional field is one a future
+ * refactor drops without anything going red, and the record silently reverts to
+ * a bare "completed".
+ *
+ * The two halves describe DIFFERENT things and must never be conflated:
+ *   - `executedTables` is what THIS RUN actually touched, derived from the run's
+ *     own decisions — not from the catalogue, and not from what it could have
+ *     reached had there been rows.
+ *   - `manifestRuleCount` / `outOfScopeCount` describe the CATALOGUE, a parallel
+ *     document rather than the code path that ran. Hence the literal
+ *     `catalogueIsAdvisory` flag: a UI cannot present one as the other.
+ *   - `pendingRules` are catalogued-but-not-yet-enforced. A flat covered-count
+ *     would report them as covered, which is the same false record in a new
+ *     place, so the identifiers travel alongside their count.
+ *
+ * No count is validated against a literal here or on the portal side. Those
+ * numbers move whenever the catalogue does; a baked-in expectation would be
+ * stale within the month and is precisely the trap this disclosure closes. The
+ * one thing asserted is INTERNAL CONSISTENCY — a disclosure whose `pendingRules`
+ * and `pendingEnforcementCount` disagree is not a disclosure, so portal refuses
+ * it and the reply parks for a human. Builder: `erasure-coverage.ts`.
+ */
+const coverageDisclosureSchema = z.object({
+    manifestRuleCount: z.number(),
+    outOfScopeCount: z.number(),
+    pendingEnforcementCount: z.number(),
+    pendingRules: z.array(z.string()),
+    executedTables: z.array(z.string()),
+    catalogueIsAdvisory: z.literal(true),
+    subjectAxis: z.string(),
+}).refine(
+    (c) => c.pendingRules.length === c.pendingEnforcementCount,
+    { message: 'coverage disclosure is internally inconsistent: pendingRules.length !== pendingEnforcementCount' },
+);
+
+/** P3 — the subject SAR ZIP landed at `r2Key` in the shared EXPORTS_BUCKET.
+ *  `r2Key` is what core WROTE, not an echo of what it was asked to write. */
+const replySubjectExportedDataSchema = z.object({
+    tenantId: z.string(),
+    correlationId: z.string(),
+    replyto: z.string(),
+    r2Key: z.string(),
+    manifest: z.object({
+        rows: z.number(),
+        photos: z.number(),
+        photosEmbedded: z.union([z.number(), z.boolean()]),
+    }),
+});
+
+/** P3 — subject erasure finished. `coverage` is REQUIRED (see above); `decisions`
+ *  is the orchestrator's per-step record, stored verbatim by portal. */
+const replySubjectErasedDataSchema = z.object({
+    tenantId: z.string(),
+    correlationId: z.string(),
+    replyto: z.string(),
+    anonymizedCount: z.number(),
+    deletedCount: z.number(),
+    retainedCount: z.number(),
+    decisions: z.array(z.unknown()),
+    coverage: coverageDisclosureSchema,
+});
+
 /** Registry mapping each event type to its supported dataschema versions.
  *  Portal's `isKnown(type, dataschema)` consults the equivalent registry; a
  *  version absent here parks rather than 400s on the consumer side. */
@@ -119,6 +192,8 @@ export const SCHEMAS: Record<SyncEventType, readonly string[]> = {
     'reply.tenant.updated': ['v1'],
     'reply.tenant.export_completed': ['v1'],
     'reply.tenant.purged': ['v1'],
+    'reply.subject.exported': ['v1'],
+    'reply.subject.erased': ['v1'],
 };
 
 /** Zod validator per event type, for tests and producer-side assertions. */
@@ -129,6 +204,8 @@ export const DATA_SCHEMAS: Record<SyncEventType, z.ZodTypeAny> = {
     'reply.tenant.updated': replyTenantUpdatedDataSchema,
     'reply.tenant.export_completed': replyTenantExportCompletedDataSchema,
     'reply.tenant.purged': replyTenantPurgedDataSchema,
+    'reply.subject.exported': replySubjectExportedDataSchema,
+    'reply.subject.erased': replySubjectErasedDataSchema,
 };
 
 /** `user.invited` -> `user-invited`, `user.password_changed` ->

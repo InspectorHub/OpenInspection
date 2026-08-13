@@ -73,7 +73,7 @@ beforeEach(async () => {
     svc = new BookingService({} as D1Database);
 
     await db.insert(tenants).values({
-        id: TENANT_ID, name: 'Deposit Co', slug: TENANT_SLUG,
+        id: TENANT_ID, slug: TENANT_SLUG,
         tier: 'pro', status: 'active', maxUsers: 5,
         deploymentMode: 'shared', createdAt: new Date(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

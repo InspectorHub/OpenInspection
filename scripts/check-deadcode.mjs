@@ -13,10 +13,16 @@
  * green while catching every NEW piece of dead code — the same baseline-ratchet
  * used by `check-tenant-scoping` and `check-file-size`.
  *
- * The ratchet has since reached zero: `scripts/knip-baseline.json` is `[]` and
- * MUST stay that way. An empty baseline means every knip finding is a failure,
- * which is the whole point — a baseline that only ever grows has stopped being
+ * The ratchet reached zero once and has NOT stayed there: the baseline now
+ * holds two `files:` entries (the non-translatable legal manifests, which knip
+ * cannot see are loaded by the i18n gate). Two is the number to argue down, not
+ * a licence to add a third — a baseline that only ever grows has stopped being
  * a ratchet.
+ *
+ * This paragraph used to claim the file was `[]` and must stay `[]`, and it kept
+ * saying so for two PRs after the entries went in. A gate's own description is
+ * read as its rules; when it drifts it does not merely go out of date, it
+ * misstates what is allowed. Whoever changes that file changes this line.
  *
  *   node scripts/check-deadcode.mjs            # gate (CI + `npm run lint`)
  *   node scripts/check-deadcode.mjs --update   # regenerate the baseline snapshot

@@ -22,7 +22,7 @@ const INSPECTION = 'cc000000-0000-0000-0000-000000000003';
 
 async function seedBase(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await testDb.insert(schema.users).values({

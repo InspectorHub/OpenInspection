@@ -29,7 +29,7 @@ describe('PortalAccessService — token role references a role-profile key', () 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme-role-key', status: 'active',
+            id: TENANT, slug: 'acme-role-key', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));

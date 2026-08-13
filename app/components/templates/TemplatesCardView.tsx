@@ -11,6 +11,11 @@ interface TemplatesCardViewProps {
   setCreateOpen: (open: boolean) => void;
   handleDuplicate: (t: Template) => void;
   setDeleteConfirm: (id: string | null) => void;
+  /** Same three the list view takes, from the same source (#307). The two views
+   *  are the pair this repo keeps half-fixing, so they change together. */
+  canCreate: boolean;
+  canImport: boolean;
+  canDelete: boolean;
 }
 
 export function TemplatesCardView({
@@ -20,6 +25,9 @@ export function TemplatesCardView({
   setCreateOpen,
   handleDuplicate,
   setDeleteConfirm,
+  canCreate,
+  canImport,
+  canDelete,
 }: TemplatesCardViewProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -42,19 +50,23 @@ export function TemplatesCardView({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setImportOpen(true)}
-                  className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
-                >
-                  <Icon name="download" size={16} strokeWidth={1.75} />
-                  {m.templates_import_title()}
-                </button>
-                <button
-                  onClick={() => setCreateOpen(true)}
-                  className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2"
-                >
-                  {m.templates_empty_new()}
-                </button>
+                {canImport && (
+                  <button
+                    onClick={() => setImportOpen(true)}
+                    className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
+                  >
+                    <Icon name="download" size={16} strokeWidth={1.75} />
+                    {m.templates_import_title()}
+                  </button>
+                )}
+                {canCreate && (
+                  <button
+                    onClick={() => setCreateOpen(true)}
+                    className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2"
+                  >
+                    {m.templates_empty_new()}
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -89,12 +101,16 @@ export function TemplatesCardView({
                 <Link to={`/templates/${t.id}/edit`} className="text-[11px] font-bold text-ih-primary-text hover:text-ih-primary-text transition-colors">
                   {m.common_edit()}
                 </Link>
-                <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary-text transition-colors">
-                  {m.templates_action_duplicate()}
-                </button>
-                <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-bad-fg transition-colors ml-auto">
-                  {m.common_delete()}
-                </button>
+                {canCreate && (
+                  <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary-text transition-colors">
+                    {m.templates_action_duplicate()}
+                  </button>
+                )}
+                {canDelete && (
+                  <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-bad-fg transition-colors ml-auto">
+                    {m.common_delete()}
+                  </button>
+                )}
               </div>
             </div>
           );

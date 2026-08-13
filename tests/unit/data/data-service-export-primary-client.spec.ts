@@ -42,7 +42,7 @@ describe('DataService.exportInspectionsCSV — primary-client sourcing (Task 9c)
         svc = new DataService({} as D1Database);
 
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme-export', status: 'active',
+            id: TENANT, slug: 'acme-export', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));

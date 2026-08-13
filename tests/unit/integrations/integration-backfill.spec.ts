@@ -49,7 +49,6 @@ describe('POST /api/integration/backfill-default-templates', () => {
 
         await testDb.insert(schema.tenants).values({
             id:        '00000000-0000-0000-0000-000000000001',
-            name:      'Test Tenant',
             slug:      'test',
             createdAt: new Date(),
         });

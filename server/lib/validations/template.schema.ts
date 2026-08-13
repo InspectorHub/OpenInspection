@@ -18,7 +18,12 @@ import { z } from '@hono/zod-openapi';
 // than a hard-coded 3-value enum — see server/types/template-schema.ts.
 const DefectCategorySchema = z.string().min(1);
 
-const PropertyTypeEnum = z.enum(['single-family', 'multi-unit', 'commercial']);
+/** The canonical property-type vocabulary. Exported because the marketplace
+ *  catalogue's browse axis reuses it verbatim: a catalogue template exists to
+ *  become a local `templates` row, so a second vocabulary there could not
+ *  survive the import (see marketplace-browse.schema.ts). Distinct from the
+ *  wizard's five-value underscore enum, which is NOT interchangeable. */
+export const PropertyTypeEnum = z.enum(['single-family', 'multi-unit', 'commercial']);
 
 /** Section applicability — gates a section by property type and (for commercial)
  *  by subtype. Empty/absent arrays mean "applies to all" (see sectionApplies). */

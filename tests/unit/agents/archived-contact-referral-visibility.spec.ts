@@ -17,7 +17,7 @@ const AGENT_USER = 'dddddddd-dddd-dddd-dddd-ddddddddddc1'; // global agent accou
 
 async function seed(db: BetterSQLite3Database<typeof schema>) {
   await db.insert(schema.tenants).values(
-    { id: T, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
+    { id: T, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
   await db.insert(schema.users).values(
     { id: AGENT_USER, tenantId: null, email: 'a@x.test', passwordHash: 'x', role: 'agent', createdAt: new Date() });
   await db.insert(schema.contacts).values(

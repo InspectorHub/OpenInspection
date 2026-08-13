@@ -77,7 +77,7 @@ beforeEach(async () => {
     markPartial = vi.fn((id: string, cents: number, tid: string) => invoiceSvc.markPartial(id, tid, 'qbo', cents));
 
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: T1,
     });
     await db.insert(schema.inspections).values({

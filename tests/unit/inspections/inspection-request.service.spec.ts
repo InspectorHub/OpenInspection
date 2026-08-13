@@ -37,8 +37,8 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
 
         // Seed tenants + templates so create() can validate ownership.
         await testDb.insert(schema.tenants).values([
-            { id: TENANT,  name: 'Acme', slug: 'acme',  status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: TENANT2, name: 'Beta', slug: 'beta',  status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 'acme',  status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT2, slug: 'beta',  status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await testDb.insert(schema.templates).values([
             // eslint-disable-next-line @typescript-eslint/no-explicit-any

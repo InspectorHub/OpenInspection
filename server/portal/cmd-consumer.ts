@@ -5,11 +5,11 @@ import { logger } from '../lib/logger';
 import {
     parseCmdEnvelope, isKnownCmd, cmdTenantUpdateDataSchema, cmdSyncQuotaDataSchema,
     cmdSeedStarterContentDataSchema, cmdDataExportDataSchema, cmdPurgeDataSchema,
-    cmdTenantAiCapsDataSchema,
+    cmdTenantAiCapsDataSchema, cmdTenantRenameDataSchema, cmdSubjectExportDataSchema, cmdSubjectEraseDataSchema,
     type CmdEnvelope,
 } from '../lib/sync-events/cmd-envelope';
 import type { SyncEnvelope } from '../lib/sync-events/envelope';
-import { applySyncQuota, applyTenantUpdate, applySeedStarterContent, applyAiCaps } from './apply-commands';
+import { applySyncQuota, applyTenantUpdate, applySeedStarterContent, applyAiCaps, applyTenantRename } from './apply-commands';
 import { applyCredentialIfFresh } from './admin-credential';
 import { parkedFingerprint } from './parked-fingerprint';
 import { OutboxService, type OutboxRow } from './outbox.service';
@@ -89,12 +89,30 @@ export async function applyCmdEnvelope(
     // Per-tenant stale guard. Tenant row absent → first contact (tenant.update
     // upserts it) → guard passes vacuously.
     //
+    // ⚠️ EXEMPT: the Privacy P3 subject commands. The guard answers "has this
+    // TENANT-FIELD STATE been superseded?" — last-writer-wins over slug/status/
+    // tier/quota, where dropping an older write is exactly right. A DSAR is not
+    // state; it is an OPERATION on behalf of a natural person, carrying a
+    // statutory deadline, and it shares `tenants.cmd_seq` with every unrelated
+    // tenant command only because portal has one sequence per tenant. Left
+    // guarded, a quota sync that merely OVERTOOK the erasure in the queue would
+    // drop it — silently, with no reply, leaving portal's request at
+    // `fulfilling` until the Art. 12(3) month ran out. Nothing about the erasure
+    // is superseded by a seat-count change.
+    //
+    // Safe to exempt because both subject commands are idempotent and
+    // order-independent: the export overwrites its own r2Key, and a re-run
+    // erasure finds its predicates already cleared and matches zero rows. They
+    // also never advance the high-water mark (the advance below is `lt`-guarded,
+    // so a lower seq is a no-op) — an exempted command cannot make a genuinely
+    // stale tenant update look fresh.
+    //
     // Correctness of read-guard-then-apply relies on the consumer running with
     // max_concurrency: 1 (wrangler consumer config) — the lt-guarded seq advance
     // protects the counter, but concurrent applies could still interleave row
     // writes. Do not raise concurrency without revisiting this.
     const tenantId = env.data['tenantId'] as string | undefined;
-    if (tenantId) {
+    if (tenantId && !isSubjectCmd(env.type)) {
         const row = await db.select({ applied: tenants.appliedCmdSeq })
             .from(tenants).where(eq(tenants.id, tenantId)).get();
         if (row && env.tenantseq <= row.applied) {
@@ -155,12 +173,27 @@ export async function applyCmdEnvelope(
 
 /** Map a command type to its reply event type (null = command never replies —
  *  quota/seed carry no replyto today and would just be ignored). */
-type CmdReplyType = 'reply.tenant.updated' | 'reply.tenant.export_completed' | 'reply.tenant.purged';
+type CmdReplyType = 'reply.tenant.updated' | 'reply.tenant.export_completed' | 'reply.tenant.purged'
+    | 'reply.subject.exported' | 'reply.subject.erased';
+/** The DSAR pair — operations on behalf of a person, not tenant state. Used by
+ *  the stale-guard exemption above; see the reasoning there. */
+function isSubjectCmd(cmdType: string): boolean {
+    return cmdType === 'io.inspectorhub.cmd.subject.export'
+        || cmdType === 'io.inspectorhub.cmd.subject.erase';
+}
+
 function replyTypeFor(cmdType: string): CmdReplyType | null {
     switch (cmdType) {
         case 'io.inspectorhub.cmd.tenant.update': return 'reply.tenant.updated';
         case 'io.inspectorhub.cmd.tenant.data_export': return 'reply.tenant.export_completed';
         case 'io.inspectorhub.cmd.tenant.purge': return 'reply.tenant.purged';
+        // Privacy P3 — the DSAR replies. Unlike the tenant replies these wake
+        // NOTHING: a DSAR is a durable portal row, not a parked Workflow, so
+        // there is no waitForEvent timeout behind them and no RPC fallback. The
+        // durability that stands in for it is the sync outbox (append first,
+        // publish inline, cron sweeper republishes stragglers).
+        case 'io.inspectorhub.cmd.subject.export': return 'reply.subject.exported';
+        case 'io.inspectorhub.cmd.subject.erase': return 'reply.subject.erased';
         default: return null;
     }
 }
@@ -247,6 +280,32 @@ async function applyKnownCmd(
                 throw new Error(`ai_caps: tenant not found ${data.tenantId}`);
             }
             return;
+        }
+        case 'io.inspectorhub.cmd.tenant.rename': {
+            // Strict parse; not-found throws for sync_quota's reason.
+            const data = cmdTenantRenameDataSchema.parse(env.data);
+            if (await applyTenantRename(dbBinding, kv, data) === 'tenant-not-found') {
+                throw new Error(`tenant.rename: tenant not found ${data.tenantId}`);
+            }
+            return;
+        }
+        case 'io.inspectorhub.cmd.subject.export': {
+            // Privacy P3 — Art. 15 access request for a NON-account data
+            // subject. Strict parse: these are the only commands whose payload
+            // names a natural person, so an unexpected field means the sender
+            // believes core does something it does not (see cmd-envelope.ts).
+            const data = cmdSubjectExportDataSchema.parse(env.data);
+            const { applySubjectExport } = await import('./apply-subject-commands');
+            return applySubjectExport(drizzle(dbBinding), buckets ?? {}, data);
+        }
+        case 'io.inspectorhub.cmd.subject.erase': {
+            // Privacy P3 — Art. 17 erasure. The reply MUST carry the coverage
+            // disclosure; the applier refuses to produce one for a partial run
+            // rather than let portal record an unbacked "completed".
+            const data = cmdSubjectEraseDataSchema.parse(env.data);
+            const { applySubjectErase } = await import('./apply-subject-commands');
+            return applySubjectErase(drizzle(dbBinding), data,
+                env.replyto !== undefined ? { requestedBy: env.replyto } : {});
         }
         case 'io.inspectorhub.cmd.tenant.sync_quota': {
             const data = cmdSyncQuotaDataSchema.parse(env.data);

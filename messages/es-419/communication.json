@@ -30,6 +30,7 @@
   "comm_reason_no_sms_template": "Omitido: la regla no tiene una plantilla de texto.",
   "comm_reason_no_email_template": "Omitido: la regla no tiene una plantilla de correo electrónico.",
   "comm_reason_managed_not_approved": "Omitido: el número remitente todavía está en espera de la aprobación del operador.",
+  "comm_reason_cooling_window": "En espera: el correo a clientes desde nuestro remitente compartido se habilita durante las primeras 24 horas de su empresa. Se enviará solo a la hora indicada; conecte su propio proveedor de correo para enviarlo ahora.",
   "comm_reason_fallback": "Omitido: {raw}",
   "comm_status_sent": "Entregado",
   "comm_status_failed": "Fallido",

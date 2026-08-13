@@ -69,8 +69,8 @@ describe('/api/inspections/:id/people', () => {
         await setupSchema(sqlite);
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT_ID, name: 'Test Tenant', slug: 'test', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: OTHER_TENANT_ID, name: 'Other Tenant', slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_ID, slug: 'test', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: OTHER_TENANT_ID, slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ] as never);
         await seedRoleProfiles(asD1Db(testDb), TENANT_ID, new Date(1));
         await seedRoleProfiles(asD1Db(testDb), OTHER_TENANT_ID, new Date(1));

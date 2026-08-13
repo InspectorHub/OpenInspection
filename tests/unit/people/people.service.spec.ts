@@ -14,7 +14,7 @@ describe('PeopleService', () => {
     const f = createTestDb(); db = f.db; await setupSchema(f.sqlite);
     await seedRoleProfiles(db, 't1', new Date(1));
     await db.insert(schema.tenants).values([
-      { id: 't1', name: 'T1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(1) },
+      { id: 't1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(1) },
     ]);
     await db.insert(schema.contacts).values([
       { id: 'c1', tenantId: 't1', type: 'client', name: 'Buyer One', email: 'b1@x.com', phone: '111', createdAt: new Date(1) },
@@ -58,7 +58,7 @@ describe('PeopleService', () => {
 
   it('contactIdForRole is tenant-scoped — a same-inspectionId row in another tenant does not leak', async () => {
     await seedRoleProfiles(db, 't2', new Date(1));
-    await db.insert(schema.tenants).values({ id: 't2', name: 'T2', slug: 't2', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(1) });
+    await db.insert(schema.tenants).values({ id: 't2', slug: 't2', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(1) });
     await db.insert(schema.contacts).values({ id: 'c3', tenantId: 't2', type: 'agent', name: 'Other Agent', email: 'o@x.com', createdAt: new Date(1) });
     await svc.addPerson('t2', 'i1', 'c3', `crp_t2_buyer_agent`);
     const id = await svc.contactIdForRole('t1', 'i1', 'buyer_agent');

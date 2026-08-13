@@ -49,7 +49,7 @@ describe('InspectionRequestService.create — writes inspection_people (Task 7b/
         people = new PeopleService({ DB: {} as D1Database });
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await testDb.insert(schema.templates).values([
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -156,7 +156,7 @@ describe('InspectionRequestService.addSubInspection — writes inspection_people
         people = new PeopleService({ DB: {} as D1Database });
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await testDb.insert(schema.templates).values([
             // eslint-disable-next-line @typescript-eslint/no-explicit-any

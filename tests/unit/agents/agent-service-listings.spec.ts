@@ -31,14 +31,17 @@ describe('AgentService.listReferrals — A2', () => {
         await setupSchema(fixture.sqlite);
 
         await testDb.insert(schema.tenants).values([
-            { id: T1, name: 'Acme Inspections', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: T2, name: 'BobsInsp', slug: 'bobs', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: T1, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: T2, slug: 'bobs', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         // Tenant display tz lives on tenant_configs (branding.default_timezone).
         // T1 configures NY; T2 has NO config row -> listReferrals falls back to
         // 'UTC' (the leftJoin yields null there).
+        // The company name lives here now — `tenants.name` is gone, so a tenant
+        // with no config row displays its slug instead.
         await testDb.insert(schema.tenantConfigs).values([
-            { tenantId: T1, defaultTimezone: 'America/New_York', updatedAt: new Date() },
+            { tenantId: T1, companyName: 'Acme Inspections', defaultTimezone: 'America/New_York', updatedAt: new Date() },
+            { tenantId: T2, companyName: 'BobsInsp', updatedAt: new Date() },
         ]);
         await seedRoleProfiles(asD1Db(testDb), T1, new Date(1));
         await seedRoleProfiles(asD1Db(testDb), T2, new Date(1));
@@ -192,8 +195,13 @@ describe('AgentService.listInspectors — A2', () => {
         await setupSchema(fixture.sqlite);
 
         await testDb.insert(schema.tenants).values([
-            { id: T1, name: 'Acme Inspections', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: T2, name: 'BobsInsp', slug: 'bobs', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: T1, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: T2, slug: 'bobs', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        ]);
+        // The company name lives in tenant_configs now.
+        await testDb.insert(schema.tenantConfigs).values([
+            { tenantId: T1, companyName: 'Acme Inspections', updatedAt: new Date() },
+            { tenantId: T2, companyName: 'BobsInsp', updatedAt: new Date() },
         ]);
 
         await testDb.insert(schema.users).values([
@@ -247,7 +255,7 @@ describe('AgentService.listInspectors — A2', () => {
     it('falls back to null inspector fields when invitedByUserId missing', async () => {
         // Add a link with no invitedByUserId (auto-link path).
         await testDb.insert(schema.tenants).values({
-            id: 'T3', name: 'NoInspector', slug: 'no', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            id: 'T3', slug: 'no', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         // IA-104 — a contact with NO createdByUserId is the auto-link shape
         // this case is about: bound to the account, but with no inspector
@@ -274,7 +282,7 @@ describe('AgentService.revokeLink — A2', () => {
         await setupSchema(fixture.sqlite);
 
         await testDb.insert(schema.tenants).values({
-            id: T1, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            id: T1, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.users).values({
             id: AGENT_USER, tenantId: null, email: 'jane@realty.com', role: 'agent', name: 'Jane', createdAt: new Date(), passwordHash: 'h',

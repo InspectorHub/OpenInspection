@@ -6,6 +6,7 @@ import { mintToken, hashToken } from '../../lib/token-hash';
 import { SIGNER_TOKEN_TTL_MS } from '../../lib/token-ttl';
 import { sealToken } from '../../lib/config-crypto';
 import { PeopleService } from '../people.service';
+import { BrandingService } from '../branding.service';
 import { sha256Hex, type Constructor, type SignerInput } from './base';
 import type { AgreementServiceBase } from './base';
 
@@ -170,6 +171,11 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
             const requestId = crypto.randomUUID();
             const contentSnapshot = agreement.content;
             const contentHash = await sha256Hex(contentSnapshot);
+            // Spec 2026-08-04 section 3 — freeze the contracting identity onto
+            // the envelope. Renaming the company must not retroactively rewrite
+            // which entity a past agreement was signed with. `legalName` arrives
+            // ALREADY resolved from getBrand; no fallback is re-applied here.
+            const brand = await new BrandingService(this.db).getBrand(tenantId);
 
             const newRow = {
                 id: requestId,
@@ -190,6 +196,8 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                 contentHash,
                 completionPolicy,
                 createdAt: now,
+                signerLegalName:   brand.legalName || null,
+                signerCompanyName: brand.companyName || null,
             };
             await db.insert(agreementRequests).values(newRow);
 

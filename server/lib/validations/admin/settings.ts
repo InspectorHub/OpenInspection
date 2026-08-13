@@ -42,6 +42,9 @@ const CancellationPolicySchema = z.object({
  */
 export const UpdateBrandingSchema = z.object({
     companyName: z.string().min(1, 'Company name is required').max(50).optional().openapi({ example: 'My Inspection Pro' }).describe('TODO describe companyName field for the OpenInspection MCP integration'),
+    // `max(120)` rather than companyName's `max(50)`: registered entity names
+    // are longer than brands ("Acme Home Inspections of Greater Cincinnati, LLC").
+    legalName: z.string().max(120).nullable().optional().openapi({ example: 'Acme Holdings LLC' }).describe('Registered legal entity name, as it appears on the licence. Distinct from companyName (the trading brand). Blank means "same as the company name" and is the correct answer for a sole proprietor. Appears on agreements, signature certificates, invoices and the TCPA disclosure.'),
     primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color').optional().openapi({ example: '#4f46e5' }).describe('TODO describe primaryColor field for the OpenInspection MCP integration'),
     supportEmail: z.string().email('Invalid email address').optional().openapi({ example: 'support@example.com' }).describe('TODO describe supportEmail field for the OpenInspection MCP integration'),
     billingUrl: z.string().url('Invalid URL').or(z.literal('')).optional().openapi({ example: 'https://example.com/billing' }).describe('TODO describe billingUrl field for the OpenInspection MCP integration'),

@@ -93,7 +93,7 @@ beforeEach(async () => {
     sendAgreementRequest = vi.fn().mockResolvedValue(undefined);
 
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: SLUG, status: 'active',
+        id: TENANT, slug: SLUG, status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({

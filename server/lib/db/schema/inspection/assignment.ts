@@ -65,7 +65,10 @@ export const availabilityOverrides = sqliteTable('availability_overrides', {
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     // A-polish 10 — origin of this override. NULL = manual (inspector-entered).
     // 'google' = pulled from a Google calendar sync (upserted/deleted by external_id).
-    source: text('source', { enum: ['google'] }),
+    // Which calendar provider synced this row, or NULL for a manual override.
+    // The slot map keys TIMED-vs-whole-day blocking on synced-versus-manual —
+    // i.e. on this column being non-NULL — not on any particular provider.
+    source: text('source', { enum: ['google', 'apple'] }),
     // Provider event id for google-sourced rows; unique per (inspector, source).
     externalId: text('external_id'),
     // Google event transparency: 'opaque' (busy) or 'transparent' (free).

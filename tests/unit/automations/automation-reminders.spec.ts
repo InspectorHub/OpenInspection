@@ -28,7 +28,7 @@ beforeEach(async () => {
     await setupSchema(fx.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+        id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
@@ -39,7 +39,7 @@ async function reminderRule(delayMinutes = 1440) {
     const id = crypto.randomUUID();
     await db.insert(schema.automations).values({
         id, tenantId: TENANT, name: 'Appt reminder', trigger: 'inspection.reminder',
-        recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes, subjectTemplate: 'Reminder', bodyTemplate: 'See you {{scheduled_date}}',
+        recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes,
         active: true, isDefault: false, createdAt: new Date(),
     } as never);
     return id;

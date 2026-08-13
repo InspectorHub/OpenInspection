@@ -4,7 +4,7 @@ The open-source inspection engine. A single Cloudflare Worker (the
 cloudflare/react-router-hono-fullstack-template shape): a Hono entry that mounts the full
 API in-process and delegates page routes to React Router v8 SSR.
 
-**Docs**: `docs/developers/` (architecture, deploy, testing, API ref) · `docs/getting-started.md` (user guide)
+**Docs**: `docs/README.md` is the map — `docs/self-host/` (deploy, upgrade, configure) · `docs/develop/` (architecture, testing, design system) · `docs/reference/` (API, database, roles, deployment modes) · `docs/concepts/` (how the engine works) · `docs/user-guide/` (using the product)
 
 ## Commands
 
@@ -86,6 +86,7 @@ Directory = suite; a spec's location alone decides which config runs it
 | `tests/unit/<domain>/` | `test:unit` (CI) | `vitest.api.config.ts` |
 | `tests/workers/` | `test:workers` (CI) | `vitest.workers.config.ts` |
 | `tests/e2e/` | `test:e2e` (+ integration/remote modes) | `playwright.config.ts` (local, seeds D1) / `.integration` / `.remote` |
+| `tests/docs-shots/**/*.shots.ts` | `docs:shots` (NOT a test suite) | `playwright.docs-shots.config.ts` |
 
 Choosing a home for a new spec:
 1. Frontend component/unit test? → **co-locate** beside the component as
@@ -100,6 +101,15 @@ Choosing a home for a new spec:
    (self-resetting, serial) and remote/staging runs are just other configs
    over the same dir — not separate directories.
 
+`tests/docs-shots/` is the odd one out and deliberately so: those files are a
+**documentation build step**, not tests. They walk the real product and
+photograph it, so every screenshot in `docs/user-guide/` was produced by
+software that actually clicked the button — a UI change that breaks a documented
+step breaks the docs build instead of leaving a lie on the website. They are
+`*.shots.ts` so no other config can collect them, they carry **no copy** (every
+word lives in the markdown, joined by `<!-- shot: id | alt -->` markers), and
+`npm run lint:docs-markers` / `npm run docs:check` enforce that the two agree.
+
 Rules: `tests/unit/<domain>/` dirs are named after the `server/api/` module (or
 service family) the specs exercise — never flat specs at the root. Frontend
 tests co-locate under `app/` (do not recreate `tests/web/unit/`). E2E is the
@@ -113,7 +123,7 @@ example). `tests/e2e/` stays flat: one spec file = one playwright project. Every
 spec must be collected by exactly one config (playwright projects must resolve).
 Fully-skipped specs need a `TODO(...)` naming their blocker. Name new specs after
 behavior, not sprints. Full rules for classification, writing, and run
-initialization: `docs/developers/05_testing.md`.
+initialization: `docs/develop/testing.md`.
 
 ## Core Architecture
 
@@ -154,7 +164,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`app/styles/tailwind.css`). Tailwind is v4-only (via `@tailwindcss/vite`); no separate server-side CSS build.
 - **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. RR v8 loader/action functions call the in-process API through the injected `API_WORKER` binding (`createApi(context)` in `app/lib/api-client.server.ts`) — no network hop.
 - **State management**: React hooks — `useInspection` (~900 LOC), `useFindings`, `useKeyboard`, `useCannedComments`, `useOfflineQueue`, `usePresence`, `useTheme`, `useUnsavedChanges`.
-- **Component library**: `packages/shared-ui/` provides 25 design-system components consumed by the frontend — Button, Pill, StatCard, Icon, Eyebrow, PageHeader, TabStrip, Input, Select, Textarea, Checkbox, Radio, RadioGroup, EmptyState, Skeleton, Card, Banner, Modal, Drawer, Popover, Pagination, FileDropzone, Table, SegmentedControl, Avatar. See `docs/developers/11_design_system.md`.
+- **Component library**: `packages/shared-ui/` provides 25 design-system components consumed by the frontend — Button, Pill, StatCard, Icon, Eyebrow, PageHeader, TabStrip, Input, Select, Textarea, Checkbox, Radio, RadioGroup, EmptyState, Skeleton, Card, Banner, Modal, Drawer, Popover, Pagination, FileDropzone, Table, SegmentedControl, Avatar. See `docs/develop/design-system.md`.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
 - **Offline**: Service Worker + `useOfflineQueue` hook for photo upload queue and field sync.
 
@@ -169,14 +179,14 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 | `DB` | Yes | Cloudflare D1 Database binding |
 | `PHOTOS` | Yes | Cloudflare R2 Bucket for image storage |
 | `TENANT_CACHE`| Yes | Cloudflare KV for configuration caching |
-| `INSPECTION_DOC` | No | Durable Object binding (`class_name: InspectionDocDO`) for collaborative inspection editing (#181 — Yjs CRDT host; one DO per inspection, tenant-scoped `idFromName`). Declared in `wrangler.jsonc` (committed) and must be added to `wrangler.saas.jsonc` (gitignored) with the matching `v2` SQLite-class migration. When absent the collab routes return `501` and fail closed — editing falls back to a single-client Y.Doc with no realtime sync. See `docs/developers/collab-editing.md`. |
+| `INSPECTION_DOC` | No | Durable Object binding (`class_name: InspectionDocDO`) for collaborative inspection editing (#181 — Yjs CRDT host; one DO per inspection, tenant-scoped `idFromName`). Declared in `wrangler.jsonc` (committed) and must be added to `wrangler.saas.jsonc` (gitignored) with the matching `v2` SQLite-class migration. When absent the collab routes return `501` and fail closed — editing falls back to a single-client Y.Doc with no realtime sync. See `docs/concepts/collab-editing.md`. |
 | `TURNSTILE_SECRET_KEY` | No | Server-side Turnstile verification — `POST /api/book` enforces this when set. Use test secret `1x0000000000000000000000000000000AA` for local dev. |
 | `APP_BASE_URL` | No | Public URL for OAuth and link generation |
 | `APP_BASE_URL` | No | Public origin used when building absolute links (reports, hosted `/legal/:tenant/…` Privacy & Terms). |
 | `RESEND_API_KEY`| No | Platform-default email delivery (Resend). Tenants may switch to their OWN Resend key + verified sender via Settings → Communication (per-tenant override; the email pipeline resolves own-vs-platform explicitly). |
 | `GEMINI_API_KEY`| No | Not the credential AI features run on. `AIService` resolves credentials per call (`server/lib/ai/resolve-provider.ts`): a tenant's own stored key (Settings → Advanced → AI) always wins, and in `saas` mode a deployment-provided key may be used instead for tenants the deployment grants managed access to. In `standalone` there is no managed path at all — the tenant's key or nothing. This env is still read by the Advanced-settings "Test connection" diagnostic. |
 | `AI_MODEL` | No | Model id every AI call uses (e.g. a Gemini model name). **No default is compiled in**: when unset, AI features fail closed with a 503 rather than silently pinning whichever model was current when the code was written. Required for any AI feature to work, in every mode. |
-| `AI_MANAGED_API_KEY` | No | Deployment-provided AI key. Used only where `profile.hasManagedAi` is true (`saas`), and only for tenants the deployment grants managed access to; an entitled tenant on a deployment that never provisioned this key gets the feature OFF, not a runtime credential error. Absent in `standalone` by construction rather than disabled by a flag. Usage on this key meters under `ai_translate`/`ai_assist`; usage on a tenant's own key meters under `ai_translate_byo`/`ai_assist_byo` and never counts against a deployment allowance. |
+| `AI_MANAGED_API_KEY` | No | Deployment-provided AI key. Used only where `profile.hasManagedAi` is true (`saas`), and only for tenants the deployment grants managed access to — that grant is `isPaidPlan` (`server/features/plan-quota/policy.ts`), the one predicate every platform-funded capability reads, answered once in `resolveRuntimeAiSource`. An entitled tenant on a deployment that never provisioned this key gets the feature OFF, not a runtime credential error. Absent in `standalone` by construction rather than disabled by a flag. Usage on this key meters under `ai_translate`/`ai_assist` and is checked against any delivered per-tier allowance before the call (`PlanQuotaGuard.checkAiQuota`); usage on a tenant's own key meters under `ai_translate_byo`/`ai_assist_byo` and never counts against a deployment allowance. What actually leaves the process on either key is enumerated field-by-field in `docs/compliance/ai-data-flow.md`. |
 | `APP_MODE` | No | `standalone` (default) or `saas` — controls tenant resolution |
 | `APP_NAME` | No | Custom branding name |
 | `PRIMARY_COLOR` | No | Custom branding color |
@@ -260,7 +270,7 @@ DB design policies (2026-06-04 DBA review). These apply to ALL new tables/column
 - **Naming**: money columns end in `_cents` (integer cents, never floats); encrypted-at-rest columns end in `_enc`; booleans always use `integer(..., { mode: 'boolean' })` (never raw 0/1); index names are prefixed `idx_`.
 - **Money authority chain**: when an invoice exists it is authoritative; otherwise the sum of `inspection_services` price snapshots; `inspections.price` is a denormalized cache only — never reconcile the other way.
 - **Status fields**: any column that models a state machine MUST declare a drizzle `{ enum: [...] }` (type-layer only, no DDL cost).
-- **Column retirement**: D1 cannot drop columns on FK-referenced tables. Retired columns are FROZEN: stop all reads/writes, add a `-- DEAD (date, reason)` schema comment, never reuse the name.
+- **Column retirement**: native `ALTER TABLE … DROP COLUMN` is the expected way to retire a column, and it works even on FK-referenced tables. What is forbidden is letting drizzle generate the drop — `db:generate` emits a twelve-step rebuild (copy the table under a new name, retire the original, rename the copy into place) that needs `PRAGMA foreign_keys=OFF` outside a transaction, which D1 cannot do, so rows other tables reference are lost. Drop migrations are hand-written instead, and verified before they are applied: `grep -nE "PRAGMA|__new_|DROP TABLE|RENAME TO" <file>` must return nothing — those four strings are the rebuild's signature. Freezing (stop all reads/writes, add a `-- DEAD (date, reason)` schema comment, never reuse the name) is the exception, reserved for the cases SQLite's native `DROP COLUMN` genuinely refuses: a PRIMARY KEY column, a UNIQUE- or CHECK-constrained column, one named in a foreign key, a generated-column expression or a partial-index predicate, or one referenced by a view. An **indexed** column can still be dropped, but its index must be dropped first, in the same migration. A column still being read needs draining first, whatever the reason it can't simply go.
 
 ## Quality gates
 

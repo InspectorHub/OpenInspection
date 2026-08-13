@@ -1,0 +1,16 @@
+{
+  "specversion": "1.0",
+  "id": "cmd-subject-export-fixture-1",
+  "type": "io.inspectorhub.cmd.subject.export",
+  "source": "portal",
+  "time": "2026-08-10T01:00:00.000Z",
+  "dataschema": "cmd-subject-export/v1",
+  "tenantseq": 1,
+  "replyto": "dsar:dsar-fixture-1",
+  "data": {
+    "tenantId": "fixture-tenant-4",
+    "subjectEmail": "subject@example.com",
+    "subjectPhone": "+15555550123",
+    "r2Key": "dsar/fixture-tenant-4/dsar-fixture-1.zip"
+  }
+}

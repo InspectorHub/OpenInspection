@@ -1,5 +1,7 @@
 import { eq, and, desc, inArray } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, tenantConfigs, tenants, inspectionServices, agreements, agreementRequests, agreementSigners, invoices, contacts } from '../../lib/db/schema';
+// `templates` is deliberately absent: #307 removed the live-template fallback,
+// so nothing in this file reads the templates row any more.
+import { inspections, inspectionResults, users, tenantConfigs, tenants, inspectionServices, agreements, agreementRequests, agreementSigners, invoices, contacts } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { applyAutoSignatureOnPublish } from '../../lib/inspection/auto-sign';
@@ -22,6 +24,7 @@ import {
     resolvePublishTrigger,
     resolveRequireDefectFields,
     computePublishReadinessFromState,
+    requireTemplateSnapshot,
     type RequireDefectFields,
     type PublishReadiness,
 } from './shared';
@@ -615,8 +618,9 @@ export class InspectionPublishService extends InspectionSubService {
      * PublishReadiness payload so the pre-publish gate can surface blocking
      * defects to the inspector.
      *
-     * Schema resolution mirrors getReportData: inspection templateSnapshot
-     * takes precedence over the live template.schema.
+     * Schema resolution mirrors getReportData: the inspection's own
+     * templateSnapshot, and nothing else (#307). The live `templates` row is
+     * deliberately not read here any more — see requireTemplateSnapshot.
      */
     async computePublishReadiness(inspectionId: string, tenantId: string): Promise<PublishReadiness> {
         const db = this.getDrizzle();
@@ -626,42 +630,18 @@ export class InspectionPublishService extends InspectionSubService {
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
 
-        const template = inspection.templateId
-            ? await db.select().from(templates)
-                .where(and(eq(templates.id, inspection.templateId as string), eq(templates.tenantId, tenantId)))
-                .get()
-            : null;
-
         const resultsRow = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
             .get();
 
-        // Prefer per-inspection snapshot over live template schema (mirrors getReportData).
-        const inspectionSnapshotRaw = (inspection as unknown as { templateSnapshot?: unknown }).templateSnapshot;
-        const inspectionSnapshot = parseMaybeJson(inspectionSnapshotRaw);
-        const hasInspectionSnapshot = inspectionSnapshot
-            && typeof inspectionSnapshot === 'object'
-            && Array.isArray((inspectionSnapshot as { sections?: unknown }).sections)
-            && (inspectionSnapshot as { sections: unknown[] }).sections.length > 0;
-
-        let rawSchema: unknown;
-        if (hasInspectionSnapshot) {
-            rawSchema = inspectionSnapshot;
-        } else if (template?.schema) {
-            rawSchema = parseMaybeJson(template.schema);
-        } else {
-            rawSchema = { sections: [] };
-        }
-
-        interface RawSchemaData { sections?: unknown[] }
-        let schemaData: TemplateSchemaV2;
-        if (Array.isArray(rawSchema)) {
-            schemaData = { schemaVersion: 2, sections: [{ id: 'general', title: 'General', items: rawSchema }] } as unknown as TemplateSchemaV2;
-        } else if ((rawSchema as RawSchemaData).sections) {
-            schemaData = rawSchema as TemplateSchemaV2;
-        } else {
-            schemaData = { schemaVersion: 2, sections: [] } as unknown as TemplateSchemaV2;
-        }
+        // #307 — the per-inspection snapshot is REQUIRED, not preferred. This
+        // used to fall back to the live template schema, so "may this report be
+        // published" could be answered against a structure the inspector never
+        // saw. A missing snapshot fails loudly with the inspection id instead.
+        const schemaData: TemplateSchemaV2 = requireTemplateSnapshot(
+            inspection as { id: string; templateId?: string | null; templateSnapshot?: unknown },
+            tenantId,
+        );
 
         const resultData: Record<string, unknown> = (parseMaybeJson(resultsRow?.data) as Record<string, unknown> | null) ?? {};
 

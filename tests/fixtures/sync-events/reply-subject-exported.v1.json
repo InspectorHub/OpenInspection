@@ -1,0 +1,15 @@
+{
+  "specversion": "1.0",
+  "id": "00000000-0000-4000-8000-0000000rep01",
+  "type": "io.inspectorhub.reply.subject.exported",
+  "source": "core",
+  "time": "2026-08-10T01:00:05.000Z",
+  "dataschema": "reply-subject-exported/v1",
+  "data": {
+    "tenantId": "fixture-tenant-4",
+    "correlationId": "cmd-subject-export-fixture-1",
+    "replyto": "dsar:dsar-fixture-1",
+    "r2Key": "dsar/fixture-tenant-4/dsar-fixture-1.zip",
+    "manifest": { "rows": 7, "photos": 2, "photosEmbedded": 2 }
+  }
+}

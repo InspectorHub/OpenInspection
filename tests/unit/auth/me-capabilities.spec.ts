@@ -40,7 +40,7 @@ async function callMe({ role, overrides }: { role: Role; overrides: PermissionOv
     await setupSchema(fixture.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
-    await db.insert(schema.tenants).values({ id: TENANT, name: 'T', slug: 't-me', createdAt: new Date() });
+    await db.insert(schema.tenants).values({ id: TENANT, slug: 't-me', createdAt: new Date() });
     await db.insert(schema.users).values({
         id: USER, tenantId: TENANT, email: 'me@example.com', passwordHash: 'x',
         name: 'Me', role, createdAt: new Date(),

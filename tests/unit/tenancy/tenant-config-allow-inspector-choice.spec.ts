@@ -25,7 +25,6 @@ describe('tenant-config allowInspectorChoice — IA-26', () => {
         const TENANT = '00000000-0000-0000-0000-000000000a26';
         await fixture.db.insert(schema.tenants).values({
             id: TENANT,
-            name: 'IA-26 Test Co',
             slug: 'ia26test',
             status: 'active',
             deploymentMode: 'shared',

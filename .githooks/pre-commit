@@ -58,7 +58,11 @@ printf '%b\n' "${BOLD}── OpenInspection (Pre-commit Checks) ─────�
 #        which builds the api project first). NOT `type-check:api`: its include
 #        is `server/**` and holds no test file, so that spelling made this tier
 #        a no-op for tests-only commits.
-#      - anything touching app/ workers/ packages/ or ts-config files → full (type-check)
+#      - anything touching app/ workers/ packages/ or ts-config files → app,
+#        plus api unless the change cannot reach it, plus the tests program
+#        whenever a spec is among the staged files. That last clause is not
+#        decoration: without it this tier — the one for the BROADEST commits —
+#        checked less of the test program than the narrow tier above.
 STAGED=$(git diff --cached --name-only --diff-filter=ACMRD)
 STAGED_TREE=$(git diff --cached --name-only --diff-filter=ADR)
 TS_STAGED=$(echo "$STAGED" | grep -E '\.(ts|tsx)$' || true)
@@ -146,15 +150,32 @@ else
         APP_ONLY=1
     fi
 
+    # The two programs this tier compiles are `tsconfig.json` (app) and
+    # `tsconfig.api.json` (server). NEITHER includes `tsconfig.tests.json`, so a
+    # spec staged ALONGSIDE app/ or server/ code was type-checked by nothing
+    # here — this tier, the one that runs when a commit is broadest, covered
+    # LESS of the test program than the narrow server/tests tier above it. The
+    # bug that surfaced it passed a better-sqlite3 handle to a parameter typed
+    # `DrizzleD1Database | { [k: string]: unknown }`, which a class can never
+    # satisfy; the spec shipped green because its commit also touched app/.
+    # `npm run type-check` — what CI runs, and what the failure hints here name —
+    # has always ended with this pass. This tier reimplemented that script inline
+    # and dropped the last step. Only charged when a spec is actually staged.
+    TESTS_STAGED=$(echo "$TS_STAGED" | grep -E '^tests/' || true)
+    staged_tests_ok() {
+        [ -z "$TESTS_STAGED" ] && return 0
+        npm run type-check:tests > /dev/null 2>&1
+    }
+
     if [ "$GEN_OK" -eq 0 ]; then
         fail "Type generation failed  →  npm run type-check"
     elif [ "$APP_ONLY" -eq 1 ]; then
-        if npm run type-check:app > /dev/null 2>&1; then
+        if npm run type-check:app > /dev/null 2>&1 && staged_tests_ok; then
             pass "Type check passed (tsc, app pass only — no staged server/ changes${GEN_NOTE})"
         else
-            fail "Type check failed  →  npm run type-check:app"
+            fail "Type check failed  →  npm run type-check"
         fi
-    elif npm run type-check:app > /dev/null 2>&1 && npm run type-check:api > /dev/null 2>&1; then
+    elif npm run type-check:app > /dev/null 2>&1 && npm run type-check:api > /dev/null 2>&1 && staged_tests_ok; then
         pass "Type check passed (tsc${GEN_NOTE})"
     else
         fail "Type check failed  →  npm run type-check"

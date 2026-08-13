@@ -51,7 +51,7 @@ describe('InvoiceService.countInvoices', () => {
         (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
         svc = new InvoiceService({} as D1Database);
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Co', slug: 'co', status: 'active',
+            id: TENANT, slug: 'co', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         } as any);
     });

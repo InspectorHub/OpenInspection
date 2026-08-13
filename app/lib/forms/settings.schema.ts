@@ -119,6 +119,10 @@ export function makeWorkspaceSchema() {
     companyName: requiredText(m.validation_workspace_name_required())
       .min(1, m.validation_workspace_name_required())
       .max(50, m.validation_workspace_name_too_long()),
+    // The registered legal entity. Optional and nullable BOTH: absent means the
+    // form never carried it, and null is the tenant clearing it back to "same as
+    // the company name" -- which must persist as NULL, not "".
+    legalName: z.string().max(120).optional(),
     primaryColor: z
       .string()
       .regex(/^#[0-9A-Fa-f]{6}$/, m.validation_workspace_color_invalid())

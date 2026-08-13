@@ -170,7 +170,7 @@ describe('#81 — leaving `cancelled` goes through POST /api/inspections/:id/unc
         db = fixture.db;
         await setupSchema(fixture.sqlite);
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'A', slug: 's', status: 'active',
+            id: TENANT, slug: 's', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.inspections).values({

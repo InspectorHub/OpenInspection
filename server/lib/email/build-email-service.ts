@@ -11,6 +11,8 @@ import { resolveEmailProvider, coerceEmailByoProvider, type EmailByoProvider } f
 import { buildEmailSuppression } from './suppression';
 import { buildEmailDedupe } from './dedupe';
 import { buildNotificationPreferences } from '../notifications/preference-port';
+import { buildOutboundCoolingWindow, coolingWindowApplies } from './outbound-cooling-window';
+import { getDeploymentProfile } from '../deployment-profile';
 import { logger } from '../logger';
 import { ResendProvider } from './providers/resend';
 import { RecordingEmailProvider } from './providers/recording';
@@ -214,6 +216,27 @@ export function assembleTenantEmailService(
         ? buildEmailDedupe(drizzle(env.DB), meterTenantId)
         : undefined;
 
+    // Portal #98 §3.2 — the 24-hour outbound cooling window, under the SAME
+    // guard as `meter` (it needs a tenant to anchor the clock to) plus the two
+    // conditions that decide whether the window applies at all.
+    //
+    // Note what is NOT a condition here: "this send path belongs to OI". Every
+    // gated surface — report delivery, agreement send, invoice send, automations
+    // — IS an OI path, so that test would gate a self-hosted operator's own
+    // outbound, which is not ours to gate. The conditions are the DEPLOYMENT
+    // and WHOSE CREDENTIALS pay for the send (`isByo`, already resolved above
+    // for the meter tag and the quota gate — one answer, read three times).
+    //
+    // The deployment condition is read through the capability seam, never off
+    // the raw mode binding (OI #308 §6.1). `getDeploymentProfile` takes a
+    // `ProfileEnv` of exactly the three fields it reads, which `EmailServiceEnv`
+    // satisfies structurally — so a Cloudflare Workflow env reaches the seam
+    // here with no cast, which is the whole point of that narrowing.
+    const profile = getDeploymentProfile(env);
+    const cooling = meterTenantId && coolingWindowApplies({ profile, platformFunded: !isByo })
+        ? buildOutboundCoolingWindow(env.DB, meterTenantId)
+        : undefined;
+
     // TEST-ONLY email sink (E2E). Capture every message to KV instead of
     // sending, so E2E can read back links it cannot see from the browser (the
     // password-reset token). Sentinel apiKey + a non-empty From make `sendEmail`
@@ -231,7 +254,7 @@ export function assembleTenantEmailService(
         );
     }
 
-    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider, suppression, quota, preferences, dedupe);
+    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider, suppression, quota, preferences, dedupe, cooling);
 }
 
 /**

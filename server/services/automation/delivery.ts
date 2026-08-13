@@ -1,4 +1,4 @@
-import { eq, and, lte, ne, or, isNull, desc } from 'drizzle-orm';
+import { eq, and, lte, ne, or, isNull, desc, sql, inArray, asc } from 'drizzle-orm';
 import { automations, automationLogs, inspections, tenants, tenantConfigs, contacts, contactRoleProfiles, inspectionPeople, reportVersions } from '../../lib/db/schema';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../../lib/tz';
@@ -26,6 +26,26 @@ import { deliverTemplatedEmail } from './deliver-email';
  * 2 fields under these names) — only the source table moves — so this keeps the
  * `flush-column-budget` spec's total the same.
  */
+/**
+ * How late a claim has to be before it is worth saying so out loud.
+ *
+ * Three ticks of the recommended five-minute cron. One missed tick is a deploy
+ * or a slow batch and says nothing; three is a pattern. Measured from `send_at`,
+ * which for a delayed rule is the moment the operator asked for, not the
+ * moment the rule fired.
+ */
+const OVERDUE_AFTER_MS = 15 * 60 * 1000;
+
+/** Ids per claim-stamp statement. D1 binds 100 parameters; the `set` clause
+ *  spends one on the timestamp, so 80 leaves room without needing to be exact. */
+const ATTEMPT_STAMP_CHUNK = 80;
+
+/** `send_at` reads back as a Date on drizzle-d1 and as a number on the
+ *  better-sqlite3 test driver; the lag arithmetic must not care which. */
+function toMs(v: Date | number): number {
+    return v instanceof Date ? v.getTime() : Number(v);
+}
+
 export const FLUSH_SELECTION = {
     log: automationLogs,
     automation: automations,
@@ -126,6 +146,14 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                         ne(automations.trigger, 'inspection.reminder' as any),
                     ),
                 ))
+                // OLDEST DUE FIRST. `limit` without an order asks the query
+                // planner to decide who waits, and it has no opinion about
+                // fairness — so a backlog past `batchSize` drained in whatever
+                // order the scan produced, and which messages were held back
+                // was not a fact anyone could state. `id` breaks the tie so a
+                // batch is reproducible when a rule fans out to many recipients
+                // on one `send_at`.
+                .orderBy(asc(automationLogs.sendAt), asc(automationLogs.id))
                 .limit(batchSize);
 
             // Reminder logs: fetch ALL pending (bounded — enqueueReminders only creates
@@ -164,6 +192,50 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             const pending = [...normal, ...dueReminders];
 
             if (pending.length === 0) return;
+
+            // Stamp the CLAIM before anything is dispatched.
+            //
+            // Every exit below writes a terminal status, so a row found later
+            // still `pending` with a null `error` and a long-past `send_at` can
+            // only mean this function never finished with it — and the two ways
+            // that happens want opposite responses: the cron did not run (look
+            // at the schedule / the deploy) or it ran and the isolate was killed
+            // mid-batch (look at what the batch was doing). Without a mark laid
+            // down at claim time those two are the same row, which is how a
+            // fourteen-hour delivery gap can look exactly like a quiet one.
+            //
+            // One statement per CHUNK, not one per row: this is bookkeeping,
+            // and bookkeeping that costs a write per delivery is bookkeeping
+            // someone eventually removes.
+            //
+            // Chunked because the batch is not `batchSize` — the reminder half
+            // is deliberately unbounded (enqueueReminders only creates rows
+            // inside the lead window, so it is small by construction, not by
+            // limit). D1 binds 100 parameters per statement; blowing that would
+            // throw here, ABOVE the per-row try/catch, and take the whole tick
+            // down — turning a bookkeeping line into the outage it was added to
+            // make visible.
+            const claimIds = pending.map(({ log }) => log.id);
+            for (let i = 0; i < claimIds.length; i += ATTEMPT_STAMP_CHUNK) {
+                await db.update(automationLogs)
+                    .set({ attempts: sql`${automationLogs.attempts} + 1`, lastAttemptAt: now })
+                    .where(inArray(automationLogs.id, claimIds.slice(i, i + ATTEMPT_STAMP_CHUNK)));
+            }
+
+            // Overdue is measured against the claim, not against delivery: a row
+            // that waited three ticks to be picked up has already lost the time,
+            // whatever happens to it next. Logged as a WARN with the worst lag
+            // named, because the failure this exists to surface is silent by
+            // construction — nobody reports mail that never arrived, and the
+            // rows themselves say `pending`, which reads as "in progress".
+            const overdue = pending.filter(({ log }) => nowMs - toMs(log.sendAt) > OVERDUE_AFTER_MS);
+            if (overdue.length > 0) {
+                logger.warn('AutomationService.flush: overdue rows claimed', {
+                    count: overdue.length,
+                    worstLagMs: Math.max(...overdue.map(({ log }) => nowMs - toMs(log.sendAt))),
+                    maxAttempts: Math.max(...overdue.map(({ log }) => log.attempts ?? 0)),
+                });
+            }
             logger.info('AutomationService.flush: processing', { count: pending.length });
 
             const appHost = (() => {
@@ -269,9 +341,14 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // existing test, or a deploy missing JWT_SECRET) falls through
                     // unchanged to the generic template path below. SMS report links
                     // stay generic — out of scope (deliverSms above is untouched).
+                    //
+                    // `automation` rides along because the WORDS are the rule's, not
+                    // this branch's — see deliverReportEmail's "whose words go out".
                     if (log.channel === 'email' && automation?.trigger === 'report.published' && reportDelivery) {
                         const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
-                        await deliverReportEmail(db, { log, inspection, tenant }, emailSvc, appBaseUrl, reportDelivery, pdfMemo);
+                        await deliverReportEmail(db, { log, automation, inspection, tenant },
+                            emailSvc, appBaseUrl, reportDelivery, pdfMemo,
+                            { rawDb: this.db, appName, appHost });
                         continue;
                     }
 

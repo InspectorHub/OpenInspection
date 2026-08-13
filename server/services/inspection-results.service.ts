@@ -1,4 +1,4 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspections, inspectionResults } from '../lib/db/schema';
 import { findingKey, DEFAULT_UNIT } from '../lib/finding-key';
@@ -102,17 +102,6 @@ export async function applyResultsBatch(
             data:         data as unknown as object,
             lastSyncedAt: new Date(),
         });
-    }
-
-    // Bump inspections.dataVersion to mirror the single-field path so offline
-    // queues notice that the world moved. Always scoped to the verified tenant.
-    try {
-        await db.update(inspections)
-            .set({ dataVersion: sql`${inspections.dataVersion} + 1` })
-            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
-    } catch {
-        // dataVersion may be absent on minimal test schemas — silently ignore;
-        // batch callers don't depend on the bump.
     }
 
     return { applied: patches.length };

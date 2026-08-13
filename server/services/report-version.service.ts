@@ -167,9 +167,11 @@ export class ReportVersionService {
      * here regardless, because deciding otherwise later must not mean migrating
      * every snapshot that already exists.
      *
-     * `inspection_inspectors` is the query face over `leadInspectorId` +
-     * `helperInspectorIds`; when it holds nothing (older inspections that never
-     * synced) the inspection's own `inspectorId` is the lead.
+     * `inspection_inspectors` is where the roster lives; `leadInspectorId` and
+     * `helperInspectorIds` survive only as request-payload field names
+     * (`schedule.schema.ts`, `wizard.schema.ts`) that get synced into this
+     * table on write. When the table holds nothing (older inspections that
+     * never synced) the inspection's own `inspectorId` is the lead.
      */
     private async resolveInspectors(
         tenantId: string,

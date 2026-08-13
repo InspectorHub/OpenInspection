@@ -6,10 +6,6 @@ export const comments = sqliteTable('comments', {
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     text: text('text').notNull(),
     category: text('category'),
-    // -- DEAD (2026-07-04, Plan-4 module F): retired in favor of the single
-    // `severity` column below. No reads/writes. Column frozen (D1 can't drop
-    // FK-referenced columns) — never reuse the name.
-    ratingBucket: text('rating_bucket'),
     // Section label (Roof, Electrical, ...) — same shape as canned-comments.js
     // entries. Free-text so tenants can grow their own taxonomy.
     section: text('section'),
@@ -44,9 +40,28 @@ export const comments = sqliteTable('comments', {
     // Soft ref → contractor_types.id (no DB FK per schema rules). Stale ref acceptable.
     recommendedContractorTypeId: text('recommended_contractor_type_id'),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // When this row was last written by the tenant. Display only: it is what
+    // lets the UI say "edited 12 March". It is NOT what decides whether a
+    // marketplace re-import may overwrite the row — see `importHash`.
+    editedAt: integer('edited_at', { mode: 'timestamp_ms' }),
+    // Hash of the text this row carried the moment it arrived from a
+    // marketplace pack; NULL for tenant-authored comments, which have no
+    // import to differ from.
+    //
+    // This is the marker that makes "edited" answerable at all. A timestamp
+    // alone answers "was this row written to", which is a different and worse
+    // question: a row the tenant edited and then changed back is not a
+    // conflict, and a write path that forgets to stamp a timestamp silently
+    // reports "never edited". Comparing the current text against what was
+    // imported answers "does this differ from what we gave them", which is the
+    // question a destructive re-import actually needs answered, and it answers
+    // it for every write path including ones that predate the marker.
+    //
+    // Rows imported before this column existed carry NULL and are treated as
+    // unedited: nothing was recorded, so nothing can be claimed. See #348.
+    importHash: text('import_hash'),
 }, (t) => [
     index('idx_comments_tenant').on(t.tenantId),
-    index('idx_comments_rating_bucket').on(t.tenantId, t.ratingBucket),
     index('idx_comments_library_id').on(t.libraryId),
 ]);
 

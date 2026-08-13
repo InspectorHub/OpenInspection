@@ -37,7 +37,7 @@ async function seedBase() {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
     await db.insert(schema.tenants).values({
-        id: T, name: 'Acme', slug: 'acme-vis', status: 'active',
+        id: T, slug: 'acme-vis', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await seedRoleProfiles(asD1Db(db), T, new Date(1));

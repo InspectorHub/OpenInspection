@@ -54,4 +54,15 @@ describe('check-naming gate', () => {
         const src = `legacyFlag: integer('active', { mode: 'boolean' }), // naming-lint-ok: frozen legacy column`;
         expect(findNamingViolations(src, 'x.ts')).toEqual([]);
     });
+    it('flags an is_/has_ predicate stored as text instead of a real boolean', () => {
+        const src = [
+            `flag1: text('is_archived'),`,
+            `flag2: text('has_signature'),`,
+        ].join('\n');
+        expect(findNamingViolations(src, 'x.ts')).toHaveLength(2);
+    });
+    it('does NOT flag a text column with a non-predicate name (the undetectable half)', () => {
+        const src = `status: text('status'),`;
+        expect(findNamingViolations(src, 'x.ts')).toEqual([]);
+    });
 });

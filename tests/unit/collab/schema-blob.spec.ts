@@ -26,7 +26,6 @@ describe('inspection_results.ydoc_state blob round-trip', () => {
         // legacy frozen set; better-sqlite3 honours PRAGMA foreign_keys).
         await db.insert(tenants).values({
             id: 't-collab',
-            name: 'Collab Test Tenant',
             slug: 'collab-test',
             createdAt: new Date(),
         } as any);

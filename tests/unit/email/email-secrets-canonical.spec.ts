@@ -37,7 +37,6 @@ describe('loadTenantEmailConfig — canonical secrets store', () => {
         const db = vi.mocked(drizzle)({} as never);
         await db.insert(tenants).values({
             id: TENANT_ID,
-            name: 'Test Tenant',
             slug: 't-1',
             createdAt: new Date(),
         } as never);

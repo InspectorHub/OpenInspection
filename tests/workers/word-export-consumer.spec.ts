@@ -80,18 +80,19 @@ const applyMigrations = () => replayMigrations(b.DB, migrationSql);
 async function seedCommercialInspection(): Promise<void> {
     const db = drizzle(b.DB);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme PCA', slug: `acme-pca-${TENANT.slice(-4)}`, status: 'active',
+        id: TENANT, slug: `acme-pca-${TENANT.slice(-4)}`, status: 'active',
         deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
     });
+    const templateSchema = {
+        sections: [{
+            id: 'roofing', title: 'Roofing',
+            items: [{ id: 'roof-covering', label: 'Roof Covering', type: 'rich' }],
+        }],
+    };
     await db.insert(schema.templates).values({
         id: TEMPLATE, tenantId: TENANT, name: 'Commercial PCA', version: 1,
         propertyType: 'commercial',
-        schema: JSON.stringify({
-            sections: [{
-                id: 'roofing', title: 'Roofing',
-                items: [{ id: 'roof-covering', label: 'Roof Covering', type: 'rich' }],
-            }],
-        }),
+        schema: JSON.stringify(templateSchema),
         createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({
@@ -100,6 +101,12 @@ async function seedCommercialInspection(): Promise<void> {
         status: 'requested', reportStatus: 'in_progress', paymentStatus: 'unpaid', price: 0,
         paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         propertyType: 'commercial', reportTier: 'full_pca', sqft: 10000,
+        // REQUIRED since #307 retired the live-`templates` fallback: the report
+        // path resolves structure from the per-inspection snapshot only, so a
+        // fixture naming a template without one throws. Same object as the
+        // template above — a snapshot that differs would test a drift no
+        // production inspection has.
+        templateSnapshot: templateSchema,
     });
     await db.insert(schema.inspectionResults).values({
         id: crypto.randomUUID(), tenantId: TENANT, inspectionId: INSPECTION,
@@ -133,18 +140,19 @@ async function seedLargeCommercialInspection(
 ): Promise<void> {
     const db = drizzle(b.DB);
     await db.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme PCA', slug: `acme-pca-${TENANT.slice(-4)}`, status: 'active',
+        id: TENANT, slug: `acme-pca-${TENANT.slice(-4)}`, status: 'active',
         deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
     });
     const items = Array.from({ length: photoCount }, (_, i) => ({
         id: `finding-${i + 1}`, label: `Finding ${i + 1}`, type: 'rich',
     }));
+    const templateSchema = {
+        sections: [{ id: 'observations', title: 'Field Observations', items }],
+    };
     await db.insert(schema.templates).values({
         id: TEMPLATE, tenantId: TENANT, name: 'Commercial PCA', version: 1,
         propertyType: 'commercial',
-        schema: JSON.stringify({
-            sections: [{ id: 'observations', title: 'Field Observations', items }],
-        }),
+        schema: JSON.stringify(templateSchema),
         createdAt: new Date(),
     });
     await db.insert(schema.inspections).values({
@@ -153,6 +161,8 @@ async function seedLargeCommercialInspection(
         status: 'requested', reportStatus: 'in_progress', paymentStatus: 'unpaid', price: 0,
         paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         propertyType: 'commercial', reportTier: 'full_pca', sqft: 10000,
+        // See the note on the other fixture: the snapshot is REQUIRED (#307).
+        templateSnapshot: templateSchema,
     });
     const data: Record<string, unknown> = {};
     for (let i = 0; i < photoCount; i++) {

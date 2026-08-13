@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { tenants, tenantConfigs, users } from '../../lib/db/schema/tenant';
+import { tenantDisplayName } from '../../lib/tenant-display-name';
 import { contacts } from '../../lib/db/schema/contact';
 import { inspections, inspectionResults } from '../../lib/db/schema/inspection';
 import { inspectionPeople, contactRoleProfiles } from '../../lib/db/schema';
@@ -98,7 +99,7 @@ export async function listReferrals(
         .select({
             id:              inspections.id,
             tenantId:        inspections.tenantId,
-            tenantName:      tenants.name,
+            tenantName:      tenantDisplayName,
             tenantSlug: tenants.slug,
             tenantTimezone:  tenantConfigs.defaultTimezone,
             // Whether this company lets agents open / build its repair list;
@@ -322,7 +323,7 @@ export async function listRecommendationsForAgent(
         .select({
             id:                inspections.id,
             tenantId:          inspections.tenantId,
-            tenantName:        tenants.name,
+            tenantName:        tenantDisplayName,
             tenantSlug:        tenants.slug,
             inspectionPrefs:   tenantConfigs.inspectionPrefs,
             propertyAddress:   inspections.propertyAddress,
@@ -411,7 +412,7 @@ export async function listInspectors(
     const rows = await db
         .select({
             tenantId:          contacts.tenantId,
-            tenantName:        tenants.name,
+            tenantName:        tenantDisplayName,
             tenantSlug:   tenants.slug,
             contactId:         contacts.id,
             inspectorUserId:   users.id,
@@ -430,6 +431,7 @@ export async function listInspectors(
         // archived-contact-referral-visibility.spec.
         .from(contacts)
         .innerJoin(tenants, eq(tenants.id, contacts.tenantId))
+        .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, contacts.tenantId))
         // The inspector who brought this agent into the workspace. Was
         // agent_tenant_links.invited_by_user_id, which duplicated this exact
         // fact; the owner-fallback it needed is gone with the link table.

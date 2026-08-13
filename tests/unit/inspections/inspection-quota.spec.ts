@@ -61,7 +61,7 @@ describe('Inspection creation consumes the free-tier quota (Task 3)', () => {
         sdb = new ScopedDB(testDb as any, TENANT);
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
     });

@@ -224,7 +224,7 @@ describe('the chokepoint hands the provenance row id to its caller', () => {
      *  to exist too — the migrations enable foreign_keys. */
     async function seedInspection() {
         await db.insert(schema.tenants).values({
-            id: TENANT, name: 'Provenance Co', slug: 'provenance-co', createdAt: new Date(),
+            id: TENANT, slug: 'provenance-co', createdAt: new Date(),
         });
         await db.insert(schema.inspections).values({
             id: INSPECTION, tenantId: TENANT, propertyAddress: '1 Test St',

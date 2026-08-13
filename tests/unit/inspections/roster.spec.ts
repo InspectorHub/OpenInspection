@@ -35,7 +35,7 @@ describe('getInspectionRoster', () => {
 
         for (const id of [TENANT, OTHER]) {
             await db.insert(schema.tenants).values({
-                id, name: id, slug: id, createdAt: new Date(),
+                id, slug: id, createdAt: new Date(),
             });
         }
         for (const [id, name] of [[LEAD, 'Dana Okoye'], [HELPER, 'Sam Reyes']] as const) {

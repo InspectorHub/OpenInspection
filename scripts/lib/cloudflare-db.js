@@ -26,11 +26,30 @@ export function seedDatabase({ initialCompany, initialSubdomain, initialEmail, i
     const effectiveSubdomain = (initialSubdomain || initialCompany.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')).toLowerCase();
     const tenantId = SYSTEM_TENANT_ID;
     const userId = crypto.randomUUID();
-    const now = Math.floor(Date.now() / 1000);
+    // MILLISECONDS. `created_at` is a `timestamp_ms` column; SQLite accepts a
+    // seconds value without complaint and the row then reads as January 1970 —
+    // which is what the very first tenant of every self-hosted install has been
+    // dated. Caught by scripts/check-seed-sql.mjs, which exists because of it.
+    const now = Date.now();
 
+    // Three things this statement got wrong, all of them silent until first run:
+    //
+    //   `subdomain` has not been a column on `tenants` for some time — this
+    //   insert could never have succeeded against the current schema, so the
+    //   very first thing a self-hoster ran was already failing here.
+    //
+    //   `name` is gone too; the company name lives in `tenant_configs`, which
+    //   is why a second statement now writes it there.
+    //
+    //   `admin` is not one of the four roles (owner / manager / inspector /
+    //   agent). `requireRole('owner', …)` never matches it and capabilities are
+    //   looked up by role, so the account this script created for the person
+    //   installing the product could do nothing at all.
+    const company = initialCompany.replace(/'/g, "''");
     const sql = [
-        `INSERT INTO tenants (id, name, subdomain, tier, status, max_users, created_at) VALUES ('${tenantId}', '${initialCompany.replace(/'/g, "''")}', '${effectiveSubdomain}', 'free', 'active', 5, ${now});`,
-        `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at) VALUES ('${userId}', '${tenantId}', '${initialEmail.replace(/'/g, "''")}', '${initialPassHash}', 'admin', ${now});`
+        `INSERT INTO tenants (id, slug, tier, status, max_users, deployment_mode, created_at) VALUES ('${tenantId}', '${effectiveSubdomain}', 'free', 'active', 5, 'shared', ${now});`,
+        `INSERT INTO tenant_configs (tenant_id, company_name, updated_at) VALUES ('${tenantId}', '${company}', ${now});`,
+        `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at) VALUES ('${userId}', '${tenantId}', '${initialEmail.replace(/'/g, "''")}', '${initialPassHash}', 'owner', ${now});`
     ].join(' ');
 
     const targetDb = isLocal ? 'DB' : DB_NAME;

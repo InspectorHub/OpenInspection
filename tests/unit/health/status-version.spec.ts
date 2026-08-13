@@ -5,7 +5,7 @@ import type { HonoConfig } from '../../../server/types/hono';
 /**
  * Self-hoster release contract (#124) — GET /status surfaces the running package
  * semver so an operator can confirm which tagged release is deployed after an
- * upgrade (docs/developers/12_upgrade.md). The value flows package.json ->
+ * upgrade (docs/self-host/upgrade.md). The value flows package.json ->
  * scripts/gen-version.js -> server/generated/version.ts (BUILD.version).
  *
  * /status is a public health route registered before the auth/tenant/di

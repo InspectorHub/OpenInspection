@@ -9,7 +9,7 @@ export const CLIENT_CONTACT_ID = '00000000-0000-0000-0000-0000000000c1';
 
 export async function seedBase(testDb: TestDb) {
     await testDb.insert(schema.tenants).values([
-        { id: TENANT_A, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: TENANT_A, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
     // NB: no clientName/clientEmail here — those columns were DROPPED from
     // `inspections` (see schema/inspection/core.ts); WHO is the

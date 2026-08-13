@@ -4,6 +4,8 @@ import {
     InviteMemberSchema,
     UpdateMemberSchema,
     TeamMembersResponseSchema,
+    resolvedCapabilitySchema,
+    CAPABILITY_DESCRIPTIONS,
 } from '../../../server/lib/validations/admin/compliance';
 
 /**
@@ -64,5 +66,38 @@ describe('team request schemas accept exactly the TOGGLEABLE capability set', ()
             permissionOverrides: { ...everyCapability, deleteTenant: true },
         });
         expect(Object.keys(parsed.permissionOverrides ?? {})).not.toContain('deleteTenant');
+    });
+});
+
+/**
+ * `GET /api/auth/me` HAND-LISTED five capabilities in an inline z.object
+ * (profile.ts). It is the same shape as #77 -- a set declared in one place and
+ * re-typed in another -- and the only reason it was harmless is that
+ * zod-openapi does not strip response bodies, so the extra keys travelled while
+ * the published contract under-described them. The inspector portal reads this
+ * contract, so an under-described capability is a capability no client can be
+ * written against.
+ */
+describe('the /me capability contract describes the whole set', () => {
+    it('describes exactly TOGGLEABLE', () => {
+        expect(Object.keys(resolvedCapabilitySchema().shape).sort()).toEqual(sorted);
+    });
+
+    it('gives every capability a non-empty description', () => {
+        for (const cap of TOGGLEABLE) {
+            expect(CAPABILITY_DESCRIPTIONS[cap]?.length ?? 0).toBeGreaterThan(0);
+        }
+    });
+
+    it('requires every key, unlike the sparse override map', () => {
+        // capabilityToggleMap() (all optional) and resolvedCapabilitySchema()
+        // (all required) are different shapes on purpose: the request accepts a
+        // partial set, the response promises a complete one. Collapsing them
+        // would let /me under-report a capability as simply absent.
+        //
+        // safeParse, not `expect(...).toThrow()`: a missing export throws too,
+        // so a toThrow() here passes before the schema exists at all.
+        const result = resolvedCapabilitySchema().safeParse({ publish: true });
+        expect(result.success).toBe(false);
     });
 });

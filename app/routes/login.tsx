@@ -10,7 +10,7 @@ import { Input, Button } from "@core/shared-ui";
 import { safeReturnTo } from "../../server/lib/mcp/safe-return-to";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
-import type { WorkerEnv } from "../../workers/env";
+import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 
 export function meta() {
   return [{ title: m.auth_login_meta_title() }];
@@ -20,13 +20,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // B-26 — SaaS deploys have no local login: identities live on the portal
   // (POST /api/auth/login already answers 410 LOGIN_MOVED_TO_PORTAL there).
   // Bounce the PAGE too, so app.<domain>/login never renders a dead form.
-  // Mirrors getDeploymentProfile(): saas mode + PORTAL_API_URL as the base.
-  // PORTAL_API_URL stays a local declaration rather than moving onto
-  // WorkerEnv: the SaaS-portal isolation gate confines that name to
-  // integration-boundary files, so it must not sit on the shared env.
-  const env = getCloudflareEnv(context) as WorkerEnv & { PORTAL_API_URL?: string };
-  if (env?.APP_MODE === "saas" && env.PORTAL_API_URL) {
-    return redirect(`${env.PORTAL_API_URL.replace(/\/$/, "")}/login`);
+  //
+  // The portal base is read through the capability seam (OI #308): this route
+  // never names the portal base-URL var, so workers/env.ts can keep declining
+  // to put it on the shared env AND the isolation gate can scan `app` — which
+  // it now does. (The var is spelled out nowhere here for the same reason
+  // workers/env.ts:53-62 gives: the gate matches the literal, comments too.)
+  const profile = getDeploymentProfile(getCloudflareEnv(context));
+  if (profile.loginRedirectBase) {
+    return redirect(`${profile.loginRedirectBase}/login`);
   }
 
   // Preserve a post-login destination (e.g. the OAuth consent loader bounces

@@ -81,12 +81,8 @@ function makeCtx(recipientKind: 'role' | 'inspector' | 'all' = 'role', recipient
             trigger: 'report.published',
             recipientKind, recipientRoleProfileId,
             delayMinutes: 0,
-            subjectTemplate: 'S',
-            bodyTemplate: 'B',
-            smsBody: 'Hi {{client_name}}',  // no {{review_url}} so no fail-closed gate
             smsTemplateId: 'tpl-sms-1',     // SP2 — deliverSms resolves this via the (mocked) TemplateStore
             channels: '["sms"]',
-            channel: 'sms',
             active: true,
             isDefault: false,
             createdAt: new Date(),

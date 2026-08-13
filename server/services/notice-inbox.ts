@@ -24,7 +24,8 @@
  * (`tests/unit/notifications/notice-inbox.spec.ts`).
  */
 import { and, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
-import { notifications, automationLogs, contacts, tenants } from '../lib/db/schema';
+import { notifications, automationLogs, contacts, tenants, tenantConfigs } from '../lib/db/schema';
+import { tenantDisplayName } from '../lib/tenant-display-name';
 
 /** Accepts the D1 drizzle instance or the better-sqlite3 test db. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,8 +178,9 @@ export async function listNoticesForContacts(
         .where(inArray(automationLogs.noticeId, ids));
 
     const tenantIds = [...new Set(headers.map((h: { tenantId: string }) => h.tenantId))] as string[];
-    const companyRows = await db.select({ id: tenants.id, name: tenants.name })
+    const companyRows = await db.select({ id: tenants.id, name: tenantDisplayName })
         .from(tenants)
+        .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, tenants.id))
         .where(inArray(tenants.id, tenantIds));
     const companyById = new Map<string, string>(
         companyRows.map((t: { id: string; name: string }) => [t.id, t.name]),

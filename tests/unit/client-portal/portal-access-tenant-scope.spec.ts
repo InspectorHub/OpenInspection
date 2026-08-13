@@ -28,7 +28,7 @@ describe('PortalAccessService tenant scoping', () => {
         (mockDrizzle as any).mockReturnValue(db);
         for (const t of [T1, T2]) {
             await db.insert(schema.tenants).values({
-                id: t, name: t, slug: t, status: 'active',
+                id: t, slug: t, status: 'active',
                 deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
             });
             // issueToken validates `role` against the tenant's active role

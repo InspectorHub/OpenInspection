@@ -84,7 +84,7 @@ describe('getTenantSlots applies the ZIP filter before the slot union', () => {
         (mockDrizzle as any).mockReturnValue(db);
         svc = new BookingService({} as any);
 
-        await db.insert(tenants).values({ id: 't1', name: 'Acme', slug: 'acme', createdAt: new Date() });
+        await db.insert(tenants).values({ id: 't1', slug: 'acme', createdAt: new Date() });
         await db.insert(users).values([
             { id: 'u1', tenantId: 't1', email: 'u1@x.com', passwordHash: 'h', role: 'inspector', name: 'Ann', createdAt: new Date() },
             { id: 'u2', tenantId: 't1', email: 'u2@x.com', passwordHash: 'h', role: 'inspector', name: 'Bea', createdAt: new Date() },
@@ -125,7 +125,7 @@ describe('getTenantSlots applies the ZIP filter before the slot union', () => {
     });
 
     it('another tenant`s territory rows never narrow this tenant', async () => {
-        await db.insert(tenants).values({ id: 't2', name: 'Other', slug: 'other', createdAt: new Date() });
+        await db.insert(tenants).values({ id: 't2', slug: 'other', createdAt: new Date() });
         await db.insert(inspectorServiceAreas).values({
             id: 'sa9', tenantId: 't2', userId: 'u1', zipPrefix: '00000', createdAt: new Date(),
         });

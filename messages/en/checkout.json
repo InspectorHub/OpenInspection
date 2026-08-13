@@ -44,6 +44,7 @@
   "invoice_error_service_unavailable": "Service unavailable",
   "invoice_not_available": "This invoice is not available.",
   "invoice_brand_logo_alt": "Logo",
+  "invoice_from_party": "Issued by {entity}",
   "agreement_printable_meta_title": "Signed Agreement - OpenInspection",
   "agreement_printable_not_found": "Agreement not found.",
   "agreement_printable_envelope_id": "Envelope ID: {envelopeId}",

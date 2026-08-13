@@ -1,5 +1,7 @@
 import { eq, and, sql } from 'drizzle-orm';
-import { inspections, inspectionResults, inspectionMediaPool, templates } from '../../lib/db/schema';
+// `templates` is deliberately absent: #307 removed the live-template fallback
+// from the photo-drawer label map, so this file never reads the templates row.
+import { inspections, inspectionResults, inspectionMediaPool } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../../lib/finding-key';
@@ -9,6 +11,7 @@ import { applyReorder, applyDetach, applyRevert, moveEntry } from '../../lib/med
 import type { PhotoEntry } from '../../lib/media/collect-attached';
 import type { ScopedDB } from '../../lib/db/scoped';
 import { InspectionSubService } from './base';
+import { templateSnapshotSectionsOrNone } from './shared';
 import type { InspectionService } from '../inspection.service';
 import { r2Keys } from '../../lib/r2-keys';
 
@@ -151,23 +154,16 @@ export class InspectionPhotoService extends InspectionSubService {
             .get();
         if (!insp) throw Errors.NotFound('Inspection not found');
 
-        // Resolve section/item label map from the snapshot (preferred) or
-        // the live template row. Falls back to using the item id as label
-        // when neither resolves — the drawer is still usable, just less
-        // descriptive.
+        // Resolve the section/item label map from the inspection's own
+        // snapshot, and from nothing else (#307). This used to fall back to the
+        // live template row; that made the snapshot optional in practice, and a
+        // label map built from today's template can name an item this
+        // inspection never had. Without a snapshot the map is empty and each
+        // item is its own label, exactly as this code already degraded — but
+        // the miss is now LOGGED with the inspection id rather than silent.
         interface SchemaItemLite { id: string; label?: string; title?: string }
         interface SchemaSectionLite { id: string; title?: string; name?: string; items?: SchemaItemLite[] }
-        let sections: SchemaSectionLite[] = [];
-        const snap = insp.templateSnapshot as { sections?: SchemaSectionLite[] } | null;
-        if (snap && Array.isArray(snap.sections)) {
-            sections = snap.sections;
-        } else if (insp.templateId) {
-            const tpl = await db.select().from(templates)
-                .where(and(eq(templates.id, insp.templateId), eq(templates.tenantId, tenantId)))
-                .get();
-            const live = tpl?.schema as { sections?: SchemaSectionLite[] } | null;
-            if (live && Array.isArray(live.sections)) sections = live.sections;
-        }
+        const sections = templateSnapshotSectionsOrNone<SchemaSectionLite>(insp, tenantId);
 
         const itemMeta = new Map<string, { itemLabel: string; sectionId: string; sectionTitle: string }>();
         for (const sec of sections) {

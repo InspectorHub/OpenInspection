@@ -43,12 +43,14 @@ const RECENTS_CAP = 8;
 
 // Built as thunks (not module-level consts) so the Paraglide `m.*()` labels
 // resolve inside the per-request locale scope instead of freezing at import.
-function getPages(): PaletteItem[] {
+function getPages(isSaas: boolean): PaletteItem[] {
   return [
     { id: "p-inspections", label: m.command_palette_page_inspections(), group: m.command_palette_group_pages(), icon: "page", to: "/inspections", hint: m.command_palette_hint_g_then_i() },
     { id: "p-reports", label: m.command_palette_page_reports(), group: m.command_palette_group_pages(), icon: "page", to: "/inspections?workflow=published", hint: m.command_palette_hint_g_then_r() },
     { id: "p-templates", label: m.command_palette_page_templates(), group: m.command_palette_group_pages(), icon: "page", to: "/library/templates", hint: m.command_palette_hint_g_then_t() },
-    { id: "p-marketplace", label: m.command_palette_page_marketplace(), group: m.command_palette_group_pages(), icon: "page", to: "/library/marketplace" },
+    // SaaS-only: `/library/marketplace` 404s in standalone, and the palette is
+    // the second door to it besides the Library hub tile.
+    ...(isSaas ? [{ id: "p-marketplace", label: m.command_palette_page_marketplace(), group: m.command_palette_group_pages(), icon: "page", to: "/library/marketplace" }] : []),
     { id: "p-agreements", label: m.command_palette_page_agreements(), group: m.command_palette_group_pages(), icon: "page", to: "/library/agreements" },
     { id: "p-comments", label: m.command_palette_page_comments(), group: m.command_palette_group_pages(), icon: "page", to: "/library/comments" },
     { id: "p-repair", label: m.command_palette_page_repair(), group: m.command_palette_group_pages(), icon: "page", to: "/library/repair-items" },
@@ -177,6 +179,8 @@ export function CommandPalette({
   const navigate = useNavigate();
   const recentsFetcher = useFetcher<{ inspections: Array<Record<string, unknown>> }>();
   const sessionCtx = useSessionContext();
+  /** Fail closed: no session context hides the SaaS-only destinations. */
+  const isSaas = sessionCtx?.branding.isSaas === true;
 
   // F6 — Build booking link action dynamically from session context
   const bookingActions = useMemo(() => {
@@ -253,7 +257,7 @@ export function CommandPalette({
           to: `/inspections/${insp.id}`,
         };
       });
-      sources = [...getPages(), ...recents, ...getSettings(), ...dynamicQuickActions];
+      sources = [...getPages(isSaas), ...recents, ...getSettings(), ...dynamicQuickActions];
     }
 
     if (!q) return sources;
@@ -262,7 +266,7 @@ export function CommandPalette({
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((x) => x.item);
-  }, [query, recentsFetcher.data]);
+  }, [query, recentsFetcher.data, isSaas]);
 
   // Group the filtered results. No per-group truncation: every source group is
   // already bounded (Pages/Settings are fixed lists; Recents is sliced to

@@ -19,6 +19,7 @@ import { eq, and, asc } from 'drizzle-orm';
 import { resolveSignatureInspector } from '../../lib/signature-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
+import { resolveAutomationCompanyName } from '../../services/automation/company-name';
 
 /**
  * POST /api/inspections/:id/agreement-requests
@@ -361,8 +362,7 @@ const agreementsRoutes = createApiRouter()
                 tenantId: result.tenantId,
                 inspectionId: result.inspectionId,
                 triggerEvent: 'agreement.signer_signed',
-                companyName: c.env.APP_NAME || 'OpenInspection',
-                reportBaseUrl: c.env.APP_BASE_URL || '',
+                companyName: await resolveAutomationCompanyName(getDrizzle(c), result.tenantId), reportBaseUrl: c.env.APP_BASE_URL || '',
             }).catch(() => {});
         }
 
