@@ -69,7 +69,18 @@ beforeEach(async () => {
 });
 
 describe('⑤ reportLinkTtl stamps expires_at when a link is minted', () => {
-    it('no policy configured → open-ended link (expires_at stays NULL)', async () => {
+    // Until 2026-08-14 an unset policy meant NULL — an open-ended link. The
+    // default is now two years, so NULL is reachable only by choosing `never`.
+    it('no policy configured → the two-year default is stamped', async () => {
+        const before = Date.now();
+        await svc.issueToken({ tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: RECIPIENT });
+        const at = (await row())?.expiresAt?.getTime() ?? 0;
+        expect(at).toBeGreaterThanOrEqual(before + 729 * 86_400_000);
+        expect(at).toBeLessThan(before + 732 * 86_400_000);
+    });
+
+    it('an explicit never → open-ended link (expires_at NULL)', async () => {
+        await setPolicy(TENANT, 'never');
         await svc.issueToken({ tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: RECIPIENT });
         expect((await row())?.expiresAt).toBeNull();
     });
@@ -87,12 +98,17 @@ describe('⑤ reportLinkTtl stamps expires_at when a link is minted', () => {
 describe('⑥ the policy applies to FUTURE links only', () => {
     it('re-issuing an existing live link neither rotates it nor re-dates it', async () => {
         const first = await svc.issueToken({ tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: RECIPIENT });
+        const stampedFirst = (await row())?.expiresAt?.getTime();
         await setPolicy(TENANT, { count: 90, unit: 'days' });
         const again = await svc.issueToken({ tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: RECIPIENT });
         // The stable-link contract other code depends on (copy-pay-link,
         // automation emails): the same plaintext comes back.
         expect(again).toBe(first);
-        expect((await row())?.expiresAt).toBeNull();
+        // Stronger than the old `toBeNull()`: the date must be the one stamped
+        // at FIRST issue, not merely absent. NULL used to double as the
+        // sentinel for "no policy ran"; with a real default it cannot, and
+        // asserting the value is unchanged is what ⑥ actually claims.
+        expect((await row())?.expiresAt?.getTime()).toBe(stampedFirst);
     });
 });
 
@@ -139,10 +155,17 @@ describe('② rotateForRecipient — in-place rotation', () => {
 
     it('re-dates the rotated link from the CURRENT policy', async () => {
         await svc.issueToken({ tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: RECIPIENT });
-        expect((await row())?.expiresAt).toBeNull();
+        const atIssue = (await row())?.expiresAt?.getTime() ?? 0;
         await setPolicy(TENANT, { count: 90, unit: 'days' });
+        const before = Date.now();
         await svc.rotateForRecipient(TENANT, INSPECTION, RECIPIENT);
-        expect((await row())?.expiresAt).not.toBeNull();
+        const atRotate = (await row())?.expiresAt?.getTime() ?? 0;
+        // Both dates are now non-null, so "not null" no longer distinguishes
+        // anything — the claim is that the rotation MOVED the date onto the
+        // current policy, which needs the value, not its presence.
+        expect(atRotate).not.toBe(atIssue);
+        expect(atRotate).toBeGreaterThanOrEqual(before + 89 * 86_400_000);
+        expect(atRotate).toBeLessThan(before + 91 * 86_400_000);
     });
 
     it('null when the recipient has no link at all (nothing to reset)', async () => {

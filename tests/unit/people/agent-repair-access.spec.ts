@@ -11,10 +11,22 @@ import {
  * API refuses.
  */
 describe('agent repair-list access policy', () => {
-    it('defaults to readwrite when the company never touched the setting', () => {
-        expect(resolveAgentRepairAccess(undefined)).toBe('readwrite');
-        expect(resolveAgentRepairAccess(null)).toBe('readwrite');
-        expect(resolveAgentRepairAccess({})).toBe('readwrite');
+    // Was `readwrite` until 2026-08-14. The old default let an external agent
+    // WRITE a homebuyer's defect list at a company that had never been asked,
+    // justified by continuity for companies predating the setting — an argument
+    // that says nothing about a company created afterwards. Narrowed for every
+    // company rather than split by signup date, so the answer to "what can an
+    // agent do here" does not depend on when the company joined.
+    it('defaults to read — an untouched setting does not grant write', () => {
+        expect(resolveAgentRepairAccess(undefined)).toBe('read');
+        expect(resolveAgentRepairAccess(null)).toBe('read');
+        expect(resolveAgentRepairAccess({})).toBe('read');
+    });
+
+    it('still grants write only where the company chose it explicitly', () => {
+        expect(resolveAgentRepairAccess({ agentRepairAccess: 'readwrite' })).toBe('readwrite');
+        expect(agentMayWriteRepairList(resolveAgentRepairAccess({}))).toBe(false);
+        expect(agentMayReadRepairList(resolveAgentRepairAccess({}))).toBe(true);
     });
 
     it('returns exactly what the company configured', () => {
