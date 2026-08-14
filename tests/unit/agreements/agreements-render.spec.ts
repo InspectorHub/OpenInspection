@@ -47,7 +47,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane',
-      token: TOKEN_A, status: 'sent', signatureBase64: null,
+      status: 'sent', signatureBase64: null,
       createdAt: new Date(),
     });
     const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
@@ -58,7 +58,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,iVBORw0KGgo=',
       signedAt: new Date(),
       createdAt: new Date(),
@@ -83,7 +83,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane',
-      token: TOKEN_A, status: 'signed', signatureBase64: 'data:image/png;base64,xyz',
+      status: 'signed', signatureBase64: 'data:image/png;base64,xyz',
       signedAt: new Date(), createdAt: new Date(),
     });
     const res = await agreementRenderHandler({} as D1Database, 'wrongslug', REQ_ID);
@@ -94,7 +94,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane',
-      token: TOKEN_A, status: 'signed', signatureBase64: 'data:image/png;base64,xyz',
+      status: 'signed', signatureBase64: 'data:image/png;base64,xyz',
       signedAt: new Date(), createdAt: new Date(),
     });
     const res = await agreementRenderHandler({} as D1Database, '', REQ_ID);
@@ -105,7 +105,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,clientsig',
       signedAt: new Date(),
       inspectorSignatureBase64: 'data:image/png;base64,inspectorsig',
@@ -124,7 +124,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,clientsig',
       signedAt: new Date(),
       createdAt: new Date(),
@@ -142,7 +142,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,clientsig',
       signedAt: new Date(),
       contentSnapshot: '<p>Snapshot at sign time</p>',
@@ -165,7 +165,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,envelopesig',
       signedAt: new Date(),
       contentSnapshot: '<p>Body</p>', contentHash: 'h',
@@ -202,7 +202,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,envelopesig',
       signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
       createdAt: new Date(),
@@ -223,7 +223,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,envelopesig',
       signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
       createdAt: new Date(),
@@ -246,7 +246,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,envelopesig',
       signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
       createdAt: new Date(),
@@ -272,7 +272,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,legacysig',
       signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
       createdAt: new Date(),
@@ -319,7 +319,7 @@ describe('cert-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane',
-      token: TOKEN_A, status: 'sent', signatureBase64: null,
+      status: 'sent', signatureBase64: null,
       createdAt: new Date(),
     });
     const res = await certRenderHandler({} as D1Database, REQ_ID);
@@ -330,7 +330,7 @@ describe('cert-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,abc',
       signedAt: new Date(),
       createdAt: new Date(),
@@ -434,7 +434,7 @@ describe('agreement-render handler — language disclosure', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,clientsig',
       signedAt: new Date(),
       contentSnapshot: '<p>Snapshot at sign time</p>',
@@ -563,7 +563,7 @@ describe('cert-render handler — language disclosure version', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,clientsig',
       signedAt: new Date(), createdAt: new Date(),
     });

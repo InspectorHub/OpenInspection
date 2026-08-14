@@ -64,9 +64,8 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
         expect(result).toBeNull();
     });
 
-    it('returns the token for a pending request', async () => {
+    it('finds a pending request by inspection id', async () => {
         const reqId = '00000000-0000-0000-0000-000000000100';
-        const token = 'pending-token-1';
         await testDb.insert(schema.agreementRequests).values({
             id: reqId,
             tenantId: TENANT_A,
@@ -74,18 +73,16 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
             agreementId: AGR_ID,
             clientEmail: 'jane@test.com',
             clientName: 'Jane',
-            token,
             status: 'pending',
             createdAt: new Date(),
         });
         const result = await svc.findPendingByInspectionId(TENANT_A, INSP_ID);
-        // `token` is no longer returned — the redirect must not offer a link the
-// hash-only lookup cannot resolve. What the caller needs is the row.
+        // No token comes back: the redirect must not offer a link the hash-only
+        // lookup cannot resolve. What the caller needs is the row.
         expect(result?.requestId).toBeTruthy();
     });
 
-    it('returns the token for a sent request', async () => {
-        const token = 'sent-token-1';
+    it('finds a sent request by inspection id', async () => {
         await testDb.insert(schema.agreementRequests).values({
             id: '00000000-0000-0000-0000-000000000101',
             tenantId: TENANT_A,
@@ -93,19 +90,17 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
             agreementId: AGR_ID,
             clientEmail: 'jane@test.com',
             clientName: 'Jane',
-            token,
             status: 'sent',
             sentAt: new Date(),
             createdAt: new Date(),
         });
         const result = await svc.findPendingByInspectionId(TENANT_A, INSP_ID);
-        // `token` is no longer returned — the redirect must not offer a link the
-// hash-only lookup cannot resolve. What the caller needs is the row.
+        // No token comes back: the redirect must not offer a link the hash-only
+        // lookup cannot resolve. What the caller needs is the row.
         expect(result?.requestId).toBeTruthy();
     });
 
-    it('returns the token for a viewed request', async () => {
-        const token = 'viewed-token-1';
+    it('finds a viewed request by inspection id', async () => {
         await testDb.insert(schema.agreementRequests).values({
             id: '00000000-0000-0000-0000-000000000102',
             tenantId: TENANT_A,
@@ -113,14 +108,13 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
             agreementId: AGR_ID,
             clientEmail: 'jane@test.com',
             clientName: 'Jane',
-            token,
             status: 'viewed',
             viewedAt: new Date(),
             createdAt: new Date(),
         });
         const result = await svc.findPendingByInspectionId(TENANT_A, INSP_ID);
-        // `token` is no longer returned — the redirect must not offer a link the
-// hash-only lookup cannot resolve. What the caller needs is the row.
+        // No token comes back: the redirect must not offer a link the hash-only
+        // lookup cannot resolve. What the caller needs is the row.
         expect(result?.requestId).toBeTruthy();
     });
 
@@ -131,7 +125,6 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
             inspectionId: INSP_ID,
             agreementId: AGR_ID,
             clientEmail: 'jane@test.com',
-            token: 'signed-token',
             status: 'signed',
             signedAt: new Date(),
             signatureBase64: 'data:image/png;base64,XX',
@@ -149,7 +142,6 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
                 inspectionId: INSP_ID,
                 agreementId: AGR_ID,
                 clientEmail: 'jane@test.com',
-                token: 'declined-token',
                 status: 'declined',
                 createdAt: new Date(),
             },
@@ -159,7 +151,6 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
                 inspectionId: INSP_ID,
                 agreementId: AGR_ID,
                 clientEmail: 'jane@test.com',
-                token: 'expired-token',
                 status: 'expired',
                 createdAt: new Date(),
             },
@@ -176,7 +167,6 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
             inspectionId: INSP_B,
             agreementId: AGR_ID, // agreement template doesn't have FK enforcement on tenant
             clientEmail: 'bob@test.com',
-            token: 'tenant-b-token',
             status: 'pending',
             createdAt: new Date(),
         });
@@ -195,7 +185,6 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
                 inspectionId: INSP_ID,
                 agreementId: AGR_ID,
                 clientEmail: 'jane@test.com',
-                token: 'older-token',
                 status: 'pending',
                 createdAt: olderTime,
             },
@@ -205,7 +194,6 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
                 inspectionId: INSP_ID,
                 agreementId: AGR_ID,
                 clientEmail: 'jane@test.com',
-                token: 'newer-token',
                 status: 'pending',
                 createdAt: newerTime,
             },

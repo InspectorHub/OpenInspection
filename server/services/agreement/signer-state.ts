@@ -43,8 +43,8 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
          * existed. Production held three such rows and every one of them was
          * `expired` — an expired envelope is not signable, so the branch could
          * only ever resolve something the caller must refuse anyway.
-         * `agreement_requests.token` itself stays: `findOrCreate` still writes a
-         * throwaway UUID into it to satisfy NOT NULL + UNIQUE.
+         * The column itself is gone now: nothing could present a value that
+         * resolved, because `findOrCreate` never wrote the matching `token_hash`.
          */
         async getSignerByPresentedToken(presented: string): Promise<ResolvedSigner | null> {
             const db = this.getDrizzle();

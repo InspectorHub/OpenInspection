@@ -49,8 +49,7 @@ async function seedSignedEnvelope(db: BetterSQLite3Database<typeof schema>, sign
     });
     await db.insert(schema.agreementRequests).values({
         id: reqId, tenantId: TENANT_A, inspectionId: inspId, agreementId: 'agr-1',
-        clientEmail: SUBJECT_EMAIL, clientName: 'Jane Subject', token: 'tok-signed',
-        status: 'signed', signatureBase64: 'env-sig-keep', signedAt: new Date(signedAtMs),
+        clientEmail: SUBJECT_EMAIL, clientName: 'Jane Subject', status: 'signed', signatureBase64: 'env-sig-keep', signedAt: new Date(signedAtMs),
         completionPolicy: 'all', contentSnapshot: 'Agreement text', contentHash: 'hash-keep',
         createdAt: new Date(),
     });
@@ -188,8 +187,7 @@ describe('runErasure', () => {
         });
         await db.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: inspId, agreementId: 'agr-1',
-            clientEmail: SUBJECT_EMAIL, clientName: 'Drafty', token: 'tok-draft',
-            status: 'viewed', completionPolicy: 'all', createdAt: new Date(),
+            clientEmail: SUBJECT_EMAIL, clientName: 'Drafty', status: 'viewed', completionPolicy: 'all', createdAt: new Date(),
         });
         await db.insert(schema.agreementSigners).values({
             id: 'signer-draft', tenantId: TENANT_A, requestId: reqId,
@@ -226,8 +224,7 @@ describe('runErasure', () => {
         });
         await db.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: inspId, agreementId: 'agr-1',
-            clientEmail: SUBJECT_EMAIL, clientName: 'Jane Subject', token: 'tok-partial',
-            status: 'viewed', signedAt: null, completionPolicy: 'all',
+            clientEmail: SUBJECT_EMAIL, clientName: 'Jane Subject', status: 'viewed', signedAt: null, completionPolicy: 'all',
             contentSnapshot: 'Agreement text', contentHash: 'hash-partial', createdAt: new Date(),
         });
         await db.insert(schema.agreementSigners).values([

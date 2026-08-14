@@ -27,7 +27,7 @@ import { setupWizardRoutes } from './features/setup-wizard';
 
 import { jwtAuthMiddleware } from './lib/middleware/jwt-auth';
 import { idempotencyMiddleware } from './lib/middleware/idempotency';
-import { agreementSignPath } from './lib/public-urls';
+import { agreementSignPath, agreementRenderPath } from './lib/public-urls';
 import { loadVerifyData } from './lib/verify-data';
 
 
@@ -592,14 +592,19 @@ app.get('/api/public/verify/:envelopeId/public-key', async (c) => {
     return c.body(data.pubKey.pem);
 });
 
-// Spec 5H D-patch — view the signed document. Looks up the envelope's
-// public token and redirects to /agreements/sign/{token} which renders
-// the same printable agreement (now with Download PDF button on signed status).
+// Spec 5H D-patch — view the signed document.
+//
+// Redirects to the renderer, which is keyed by the envelope's requestId. It
+// used to redirect to /agreements/sign/{token} built from the envelope-level
+// `token` column, and that stopped working when envelope lookup went hash-only:
+// nothing resolves that value any more, so the reader followed a verification
+// link and landed on a 404. The rest of the codebase had already moved to the
+// requestId-keyed renderer; this route was the one that had not.
 app.get('/api/public/verify/:envelopeId/document', async (c) => {
     const envelopeId = c.req.param('envelopeId') as string;
     const data = await loadVerifyData(c, envelopeId);
     if (!data) return c.text('Not found', 404);
-    return c.redirect(agreementSignPath(data.tenantSlug, data.reqRow.token), 302);
+    return c.redirect(agreementRenderPath(data.tenantSlug, data.reqRow.id), 302);
 });
 
 app.get('/api/public/verify-by-token/:token', async (c) => {

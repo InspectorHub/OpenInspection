@@ -39,7 +39,7 @@ describe('applyInspectorPreSign', () => {
     });
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT, inspectionId: INSP_ID, agreementId: AGR_ID,
-      clientEmail: 'c@x', token: 'tk', status: 'pending', createdAt: new Date(),
+      clientEmail: 'c@x', status: 'pending', createdAt: new Date(),
     });
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
   });

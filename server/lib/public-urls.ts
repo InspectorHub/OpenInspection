@@ -89,9 +89,16 @@ export function checkoutUrl(host: string, tenantSlug: string, token: string): st
 }
 
 /**
- * Track I-a — keyed by the stable envelope requestId (the legacy plaintext
- * `token` column is no longer distributed; signer tokens live per-signer).
+ * Track I-a — keyed by the stable envelope requestId. Signer tokens live
+ * per-signer; the envelope never had a distributable one of its own.
+ *
+ * Path form, for anything a browser follows. Absolute URLs are for mail.
  */
+export function agreementRenderPath(tenantSlug: string, requestId: string): string {
+    return `/m2m/agreement-render/${tenantSlug}/${requestId}`;
+}
+
+/** Absolute form of {@link agreementRenderPath}, for Browser Rendering and mail. */
 export function m2mAgreementRenderUrl(host: string, tenantSlug: string, requestId: string): string {
-    return joinUrl(host, `/m2m/agreement-render/${tenantSlug}/${requestId}`);
+    return joinUrl(host, agreementRenderPath(tenantSlug, requestId));
 }

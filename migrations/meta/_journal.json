@@ -57,6 +57,13 @@
       "when": 1786716202923,
       "tag": "0007_drop_commercial_subtypes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1786717210513,
+      "tag": "0008_drop_agreement_request_plaintext_token",
+      "breakpoints": true
     }
   ]
 }

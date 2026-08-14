@@ -26,11 +26,6 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     agreementId: text('agreement_id').notNull().references(() => agreements.id),
     clientEmail: text('client_email').notNull(),
     clientName: text('client_name'),
-    // Internal envelope handle: a throwaway, NEVER-distributed UUID written by
-    // findOrCreate to satisfy NOT NULL + UNIQUE. Public links use per-signer
-    // tokenHash; the /sign/:id redirect resolves an envelope via this through
-    // getSignerByPresentedToken's synthesize fallback. Not a distributed secret.
-    token: text('token').notNull().unique(),
     status: text('status', { enum: ['pending', 'sent', 'viewed', 'signed', 'declined', 'expired'] }).notNull().default('pending'),
     // LEGACY envelope-level client signature — superseded for NEW writes by
     // agreement_signers.signatureBase64 / .signedAt (findOrCreate no longer

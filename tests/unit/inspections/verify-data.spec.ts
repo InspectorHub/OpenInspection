@@ -61,7 +61,7 @@ describe('loadVerifyData — Track I-a snapshot + signers', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: 'tok-verify-1', status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,sig',
       signedAt: new Date(),
       contentSnapshot: '<p>Pinned snapshot</p>', contentHash: 'abc123',
@@ -101,7 +101,7 @@ describe('loadVerifyData — Track I-a snapshot + signers', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: 'tok-verify-2', status: 'signed',
+      status: 'signed',
       signatureBase64: 'data:image/png;base64,sig',
       signedAt: new Date(),
       contentSnapshot: null, contentHash: null,

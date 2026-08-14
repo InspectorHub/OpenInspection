@@ -34,7 +34,7 @@ describe('downloadAgreementPdf', () => {
     });
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-      clientEmail: 'jane@x', token: 'tk', status: 'signed',
+      clientEmail: 'jane@x', status: 'signed',
       signatureBase64: 'data:image/png;base64,abc',
       signedAt: new Date(), createdAt: new Date(),
     });
@@ -100,7 +100,7 @@ describe('downloadCertPdf', () => {
     });
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-      clientEmail: 'jane@x', token: 'tk', status: 'signed',
+      clientEmail: 'jane@x', status: 'signed',
       signatureBase64: 'data:image/png;base64,abc',
       signedAt: new Date(), createdAt: new Date(),
     });
@@ -151,7 +151,7 @@ describe('downloadEvidenceZip', () => {
     });
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-      clientEmail: 'jane@x', token: 'tk', status: 'signed',
+      clientEmail: 'jane@x', status: 'signed',
       signatureBase64: 'data:image/png;base64,abc',
       signedAt: new Date(), createdAt: new Date(),
     });

@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 94 |
-| Columns | 1105 |
+| Columns | 1104 |
 | Indexes (excluding primary keys) | 159 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 509 (46%) |
+| Columns carrying a source comment | 508 (46%) |
 
 **Reading the tables.** SQLite has four storage types; the semantic type is a
 Drizzle layer on top — `integer{mode:timestamp_ms}` is epoch milliseconds,
@@ -31,7 +31,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `agreement_requests`
 
-<sub>server/lib/db/schema/inspection/agreements.ts · 25 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/inspection/agreements.ts · 24 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -40,8 +40,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `inspection_id` | text | NN IX FK→`inspections.id` |  |  | Every agreement envelope is bound to an inspection (the send UI + every service path require it). |
 | `agreement_id` | text | NN FK→`agreements.id` |  |  | *App-layer reference to another row — no database foreign key.* |
 | `client_email` | text | NN |  |  | *An email address.* |
-| `client_name` | text |  |  |  | *A name.* |
-| `token` | text | NN UQ |  | `pending, sent, viewed, signed, declined, expired` | Internal envelope handle: a throwaway, NEVER-distributed UUID written by findOrCreate to satisfy NOT NULL + UNIQUE. |
+| `client_name` | text |  |  | `pending, sent, viewed, signed, declined, expired` | *A name.* |
 | `status` | text | NN | `'pending'` | `pending, sent, viewed, signed, declined, expired` | *State-machine column — see the Values column for the vocabulary.* |
 | `signature_base64` | text |  |  |  | LEGACY envelope-level client signature — superseded for NEW writes by agreement_signers.signatureBase64 / .signedAt (findOrCreate no longer writes these). **[more]** |
 | `signed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |

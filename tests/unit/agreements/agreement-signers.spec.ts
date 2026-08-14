@@ -113,7 +113,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const reqId = crypto.randomUUID();
         await testDb.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-            clientEmail: 'jane@test.com', clientName: 'Jane', token: legacyToken,
+            clientEmail: 'jane@test.com', clientName: 'Jane', 
             tokenHash: await hashToken(legacyToken),
             status: 'sent', completionPolicy: 'all', createdAt: new Date(),
         });
@@ -134,8 +134,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const orphanId = crypto.randomUUID();
         await testDb.insert(schema.agreementRequests).values({
             id: orphanId, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-            clientEmail: 'no@test.com', clientName: 'No', token: 'plaintext-only-token-456',
-            status: 'sent', completionPolicy: 'all', createdAt: new Date(),
+            clientEmail: 'no@test.com', clientName: 'No', status: 'sent', completionPolicy: 'all', createdAt: new Date(),
         });
         expect(await svc.getSignerByPresentedToken('plaintext-only-token-456')).toBeNull();
     });
@@ -242,7 +241,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const reqId = crypto.randomUUID();
         await testDb.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-            clientEmail: 'b@test.com', clientName: 'B', token: crypto.randomUUID(),
+            clientEmail: 'b@test.com', clientName: 'B', 
             status: 'sent', completionPolicy: 'all', createdAt: new Date(),
         });
         const backfillId = crypto.randomUUID();
@@ -303,7 +302,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const reqId = crypto.randomUUID();
         await testDb.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-            clientEmail: 'c@test.com', token: crypto.randomUUID(),
+            clientEmail: 'c@test.com', 
             status: 'viewed', completionPolicy: 'all', contentSnapshot: null, contentHash: null, createdAt: new Date(),
         });
         const nullEnv = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, reqId)).get();
@@ -464,6 +463,29 @@ describe('AgreementService — signer-level envelope state machine', () => {
 
         // getSignerLink cannot reconstruct the link without a sealing key.
         await expect(noSecretSvc.getSignerLink(TENANT_A, r.requestId, signers[0].id))
+            .rejects.toThrow(/Token sealing key unavailable/);
+    });
+
+    it('no-secrets REUSE path: findOrCreate surfaces the failure instead of handing back a dead link', async () => {
+        // The create path can return the plaintext it just minted. The REUSE
+        // path has nothing minted to hand back, so it has to reconstruct via
+        // getSignerLink — and when that cannot work, there is no link.
+        //
+        // It used to swallow the error and return `agreement_requests.token`
+        // instead. That column was never resolvable through the hash-only
+        // lookup, so the caller built a sign URL that could only 404. A caller
+        // that is told "no link" routes the customer somewhere real; a caller
+        // handed a dead link cannot tell the difference until the customer does.
+        const withSecrets = new AgreementService({} as D1Database, { jwtSecret: 'test-secret' });
+        const first = await withSecrets.findOrCreate(TENANT_A, INSP_ID, {
+            signers: [{ name: 'Jane', email: 'jane@test.com' }],
+        });
+        expect(first.alreadyExists).toBe(false);
+
+        // Same inspection, non-terminal envelope -> the reuse branch. Without a
+        // sealing key the sealed token cannot be opened.
+        const noSecretSvc = new AgreementService({} as D1Database);
+        await expect(noSecretSvc.findOrCreate(TENANT_A, INSP_ID))
             .rejects.toThrow(/Token sealing key unavailable/);
     });
 
