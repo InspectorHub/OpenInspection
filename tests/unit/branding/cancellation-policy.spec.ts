@@ -209,27 +209,9 @@ describe('BrandingService — cancellation policy attestation gate', () => {
         await expect(branding.attestCancellationClause(TENANT, foreign.id)).rejects.toThrow(/not found/i);
     });
 
-    // ─── Embedded repair estimates ───────────────────────────────────────────
-    // The other refusal in the same writer. `showEstimates` stays open in the
-    // Zod schema (it is a real column with a real off-switch), so the service
-    // is the only place that can be asymmetric about which value it accepts.
-
-    async function storedShowEstimates(): Promise<boolean | null> {
-        const row = await testDb.select({ v: schema.tenantConfigs.showEstimates })
-            .from(schema.tenantConfigs).where(eq(schema.tenantConfigs.tenantId, TENANT)).get();
-        return row?.v ?? null;
-    }
-
-    it('refuses to turn embedded report estimates on', async () => {
-        await expect(branding.updateBranding(TENANT, { showEstimates: true }))
-            .rejects.toThrow(/estimates cannot be shown inside the inspection report/i);
-        expect(await storedShowEstimates()).toBeNull();
-    });
-
-    it('still lets a tenant turn embedded report estimates off', async () => {
-        // Asymmetric on purpose: a blanket refusal would strand any tenant the
-        // column is already true for, with no supported way back to false.
-        await branding.updateBranding(TENANT, { showEstimates: false });
-        expect(await storedShowEstimates()).toBe(false);
-    });
+    // The writer used to carry a second refusal, on `is_estimates_shown`, which
+    // it accepted `false` for and rejected `true` for. That column was dropped
+    // once it was established that nothing read it — the report payload pins
+    // `showEstimates` to false regardless — so the refusal and its tests went
+    // with it. The cancellation-policy gate above is now the only one here.
 });

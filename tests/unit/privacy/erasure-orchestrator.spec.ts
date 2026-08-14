@@ -458,20 +458,20 @@ describe('runErasure — the residences the original manifest missed (#88)', () 
 
     it('concierge_confirm_tokens: the subject rows are deleted, other recipients kept', async () => {
         await db.insert(schema.conciergeConfirmTokens).values([
-            { token: 'cct-subject', inspectionId: INSP, tenantId: TENANT_A, clientEmail: SUBJECT_EMAIL, expiresAt: new Date(Date.now() + 86400_000), createdAt: new Date() },
-            { token: 'cct-other', inspectionId: INSP, tenantId: TENANT_A, clientEmail: OTHER_EMAIL, expiresAt: new Date(Date.now() + 86400_000), createdAt: new Date() },
+            { id: 'cct-subject', tokenHash: 's'.repeat(64), inspectionId: INSP, tenantId: TENANT_A, clientEmail: SUBJECT_EMAIL, expiresAt: new Date(Date.now() + 86400_000), createdAt: new Date() },
+            { id: 'cct-other', tokenHash: 'o'.repeat(64), inspectionId: INSP, tenantId: TENANT_A, clientEmail: OTHER_EMAIL, expiresAt: new Date(Date.now() + 86400_000), createdAt: new Date() },
         ]);
 
         await run();
 
         const rows = await db.select().from(schema.conciergeConfirmTokens).all();
-        expect(rows.map((r) => r.token)).toEqual(['cct-other']);
+        expect(rows.map((r) => r.id)).toEqual(['cct-other']);
     });
 
     it('inspection_access_tokens: the subject rows are deleted — portal access is revoked', async () => {
         await db.insert(schema.inspectionAccessTokens).values([
-            { id: 'iat-subject', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: SUBJECT_EMAIL, token: 'tok-s', createdAt: new Date() },
-            { id: 'iat-other', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: OTHER_EMAIL, token: 'tok-o', createdAt: new Date() },
+            { id: 'iat-subject', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: SUBJECT_EMAIL, createdAt: new Date() },
+            { id: 'iat-other', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: OTHER_EMAIL, createdAt: new Date() },
         ]);
 
         await run();
@@ -494,8 +494,8 @@ describe('runErasure — the residences the original manifest missed (#88)', () 
         // permanently unreachable — no later DSAR, and no repair pass, can ever
         // find them again.
         await db.insert(schema.inspectionAccessTokens).values([
-            { id: 'iat-subject', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: SUBJECT_EMAIL, token: 'tok-s', createdAt: new Date() },
-            { id: 'iat-other', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: OTHER_EMAIL, token: 'tok-o', createdAt: new Date() },
+            { id: 'iat-subject', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: SUBJECT_EMAIL, createdAt: new Date() },
+            { id: 'iat-other', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: OTHER_EMAIL, createdAt: new Date() },
         ]);
         await db.insert(schema.reportViews).values([
             { id: 'rv-subject', tenantId: TENANT_A, inspectionId: INSP, accessTokenId: 'iat-subject', firstViewedAt: new Date(), lastViewedAt: new Date(), viewCount: 4 },

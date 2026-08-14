@@ -56,21 +56,10 @@ export const users = sqliteTable('users', {
     // per worker isolate). Powers TeamStrip "last active Nm ago" pill and the
     // soft-presence fallback when WebSocket cannot connect.
     lastActiveAt:     integer('last_active_at', { mode: 'timestamp_ms' }),
-    // Design System 0520 subsystem C phase 1 — role-extension columns.
-    //   mentorId            = DEAD (2026-06-13, apprentice subsystem removed).
-    //                          Formerly the apprentice's mentor FK → users.id —
-    //                          no reads/writes.
-    //   assignedSectionIds  = DEAD (2026-06-13). Formerly: JSON array of
-    //                          section ids restricting a specialist's edit
-    //                          scope. Specialist scoping deferred — no reads/writes.
-    //   expiresAt           = DEAD (2026-06-13, guest removal). Formerly the
-    //                          guest-invite expiry epoch — no reads/writes.
-    // DEAD (2026-06-13, apprentice subsystem removed) — no reads/writes
-    mentorId:             text('mentor_id'),
-    // DEAD (2026-06-13, guest removal / specialist deferred) — no reads/writes
-    assignedSectionIds:   text('assigned_section_ids').notNull().default('[]'),
-    // DEAD (2026-06-13, guest removal / specialist deferred) — no reads/writes
-    expiresAt:            integer('expires_at'), // ts-lint-ok: DEAD frozen column (guest removal), no reads/writes
+    // `mentor_id`, `assigned_section_ids` and `expires_at` were here — the
+    // role-extension columns of the apprentice / specialist / guest subsystems,
+    // all three removed 2026-06-13. They were marked DEAD and kept, and stayed
+    // dead: a grep of every production path found no reader and no writer.
     // Account soft-delete marker — set by POST /api/account/delete after
     // the user retypes their email to confirm. NULL = active. Kept rather
     // than hard-deleted so audit-linked rows remain referentially intact.
@@ -134,12 +123,10 @@ export const tenantInvites = sqliteTable('tenant_invites', {
     // Schema Rules: state-machine column declares its enum (type-layer only).
     status: text('status', { enum: ['pending', 'accepted'] }).notNull().default('pending'),
     expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
-    // Design System 0520 subsystem C P5 — carry role-extension fields from the
-    // InviteSeatDrawer into the eventual users row at accept time.
-    // DEAD (2026-06-13, apprentice subsystem removed) — written on invite but
-    // never replayed onto the users row; no behavior depends on it.
-    mentorId:           text('mentor_id'),
-    assignedSectionIds: text('assigned_section_ids').notNull().default('[]'),
+    // `mentor_id` and `assigned_section_ids` were here, mirroring the columns of
+    // the same name on `users` so an invite could carry them through accept.
+    // They were dropped with those columns: nothing wrote them and accept never
+    // replayed them.
     // Role permission-template overrides (2026-06-13). Mirrors
     // users.permission_overrides — carries the inviter's chosen toggle diffs
     // through accept onto the new users row. Null = pure role template.

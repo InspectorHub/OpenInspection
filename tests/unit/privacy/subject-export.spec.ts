@@ -97,7 +97,11 @@ describe('SubjectExportService', () => {
         ]);
         await db.insert(schema.inspectionAccessTokens).values({
             id: 'tok-1', tenantId: TENANT_A, inspectionId: 'insp-subject', recipientEmail: SUBJECT,
-            role: 'client', token: 'live-bearer-token-do-not-ship', createdAt: new Date(),
+            role: 'client', createdAt: new Date(),
+            // The plaintext column is gone; what a row can still leak is the
+            // lookup hash and the sealed token, and both are credentials.
+            tokenHash: 'live-bearer-hash-do-not-ship',
+            tokenEnc: 't1:live-bearer-enc-do-not-ship',
         });
         // Booking request reachable ONLY by phone — the email on it is different.
         await db.insert(schema.inspectionRequests).values({
@@ -159,12 +163,15 @@ describe('SubjectExportService', () => {
 
     it('redacts live bearer tokens — a SAR is not a credential handout', async () => {
         const { files } = await run();
-        const tokens = JSON.parse(files['data/inspection_access_tokens.json']!) as { token: string; recipientEmail: string }[];
+        const tokens = JSON.parse(files['data/inspection_access_tokens.json']!) as
+            { tokenHash: string; tokenEnc: string; recipientEmail: string }[];
         expect(tokens).toHaveLength(1);
         expect(tokens[0]!.recipientEmail).toBe(SUBJECT);
-        expect(tokens[0]!.token).toBe('[redacted]');
-        // The whole archive, not just that one field.
-        expect(JSON.stringify(files)).not.toContain('live-bearer-token-do-not-ship');
+        expect(tokens[0]!.tokenHash).toBe('[redacted]');
+        expect(tokens[0]!.tokenEnc).toBe('[redacted]');
+        // The whole archive, not just those two fields.
+        expect(JSON.stringify(files)).not.toContain('live-bearer-hash-do-not-ship');
+        expect(JSON.stringify(files)).not.toContain('live-bearer-enc-do-not-ship');
     });
 
     it('the phone axis widens the match set — a booking reachable only by phone', async () => {

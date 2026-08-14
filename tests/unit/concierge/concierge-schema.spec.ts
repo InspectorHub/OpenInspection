@@ -22,10 +22,15 @@ describe('concierge schema — A3', () => {
         expect(t.conciergeReviewRequired?.name).toBe('is_concierge_review_required');
     });
 
-    it('concierge_confirm_tokens table is exported with token primary key', () => {
+    it('concierge_confirm_tokens table is exported with an id primary key and no plaintext column', () => {
         expect(conciergeConfirmTokens).toBeDefined();
         const t = conciergeConfirmTokens as unknown as Record<string, { name: string }>;
-        expect(t.token?.name).toBe('token');
+        expect(t.id?.name).toBe('id');
+        expect(t.tokenHash?.name).toBe('token_hash');
+        // The plaintext column the PK used to be. Asserted ABSENT rather than
+        // simply not asserted: its whole history is that it looked like it held
+        // the secret and never did, so a reintroduction should fail here.
+        expect(t.token).toBeUndefined();
         expect(t.inspectionId?.name).toBe('inspection_id');
         expect(t.tenantId?.name).toBe('tenant_id');
         expect(t.clientEmail?.name).toBe('client_email');
@@ -72,7 +77,8 @@ describe('concierge schema — A3', () => {
             createdAt: new Date(),
         });
         await fixture.db.insert(schema.conciergeConfirmTokens).values({
-            token: 'tok-a3-1',
+            id: 'cct-a3-1',
+            tokenHash: 'a'.repeat(64),
             inspectionId: 'insp-a3',
             tenantId: TENANT,
             clientEmail: 'sarah@example.com',
@@ -81,7 +87,8 @@ describe('concierge schema — A3', () => {
         });
         const tokens = await fixture.db.select().from(schema.conciergeConfirmTokens).all();
         expect(tokens.length).toBe(1);
-        expect(tokens[0].token).toBe('tok-a3-1');
+        expect(tokens[0].id).toBe('cct-a3-1');
+        expect(tokens[0].tokenHash).toBe('a'.repeat(64));
         expect(tokens[0].confirmedAt).toBeNull();
     });
 });

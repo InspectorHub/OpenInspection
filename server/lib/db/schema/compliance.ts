@@ -118,7 +118,9 @@ export const messagingCompliance = sqliteTable('messaging_compliance', {
     tenantId: text('tenant_id').notNull().primaryKey(),
     mode: text('mode', { enum: ['own', 'managed_shared', 'managed_dedicated'] }).notNull().default('own'),
     provider: text('provider', { enum: ['twilio', 'telnyx'] }), // which provider holds this tenant's entities
-    subaccountSid: text('subaccount_sid'),
+    // `subaccount_sid` was here. Unlike its neighbours it was never written by
+    // any provisioning step and never read by any resolver — the one column of
+    // this table with no code on either side of it.
     customerProfileSid: text('customer_profile_sid'),
     customerProfileStatus: text('customer_profile_status'),
     brandSid: text('brand_sid'),

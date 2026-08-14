@@ -2,16 +2,21 @@
  * Sprint 2 S2-4 — Repair estimate range e2e suite.
  *
  * Drives the JSON API directly (no browser) against the local dev worker
- * (http://127.0.0.1:8789) to confirm:
+ * (http://127.0.0.1:8789).
  *
- *   - POST /api/admin/branding refuses to turn `showEstimates` on and still
- *     accepts turning it off.
- *   - The recommendation enum is exposed (sanity check shared with S2-3).
+ * This suite used to open on three legs about `showEstimates` — refuse `true`,
+ * accept `false`, round-trip the stored value. All three are gone with the
+ * `is_estimates_shown` column: there is no setting to refuse or accept any
+ * more, and a POST naming it is now simply an unknown key that Zod strips.
+ *
+ * What remains is the part that never depended on that column: the Report
+ * Features settings surface renders (E-04), and the results write path folds a
+ * defect-estimate patch by DROPPING the price keys rather than rejecting them
+ * (E-05) — the rule that outlived the flag, enforced by lib/repair-price-keys.ts.
  *
  * The inspection-results JSON sanitizer (sanitizeDefectStates) is covered
- * by the unit suite at tests/unit/estimate-range.spec.ts; the e2e suite
- * focuses on the surfaces that depend on a live worker (KV + D1 +
- * BrandingService caching).
+ * by the unit suite; the e2e suite focuses on the surfaces that depend on a
+ * live worker (KV + D1 + BrandingService caching).
  */
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
@@ -50,49 +55,11 @@ test.describe.serial('Sprint 2 S2-4 — Repair estimate range', () => {
         adminToken = await loginApi(request, ADMIN_EMAIL, ADMIN_PASSWORD);
     });
 
-    test('E-01: POST /api/admin/branding REFUSES showEstimates=true', async ({ request }) => {
-        // Inverted deliberately. This test used to assert 200 and persistence,
-        // from when the field was writable. Estimates are being redesigned as a
-        // separate deliverable rather than a section of the signed report, so
-        // the service now refuses to turn the in-report form on. Turning it off
-        // stays permitted — see E-03, which is the control that keeps this
-        // assertion honest: without it, a route that rejected EVERY branding
-        // write would satisfy E-01 just as well.
-        const res = await request.post(`${BASE_URL}/api/admin/branding`, {
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
-            data: { showEstimates: true },
-        });
-        expect(res.status(), await res.text()).toBe(422);
-    });
-
-    test('E-02: subsequent GET /api/admin/branding round-trips showEstimates', async ({ request }) => {
-        const res = await request.get(`${BASE_URL}/api/admin/branding`, {
-            headers: { Authorization: `Bearer ${adminToken}` },
-        });
-        expect(res.status()).toBe(200);
-        const body = await res.json();
-        // The typed branding response omits showEstimates; the raw column does
-        // travel in the payload, and that is deliberate — the setting must stay
-        // readable so it can be audited and turned off. What must not happen is
-        // a successful write of `true`, which E-01 covers.
-        expect(body.success).toBe(true);
-    });
-
-    test('E-03: POST showEstimates=false toggles back without errors', async ({ request }) => {
-        const res = await request.post(`${BASE_URL}/api/admin/branding`, {
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
-            data: { showEstimates: false },
-        });
-        expect(res.status()).toBe(200);
-        const body = await res.json();
-        expect(body.success).toBe(true);
-    });
-
     test('E-04: the Report Features settings surface renders for an admin', async ({ request }) => {
-        // showEstimates is a branding flag round-tripped by the API (E-01..E-03);
-        // there is no standalone "estimate" checkbox in the UI. The report-feature
-        // toggles live in the Report Features section of /settings/workspace (the
-        // old /settings/workspace/reports sub-route never existed — it 404s).
+        // There is no standalone "estimate" checkbox in the UI, and now no flag
+        // behind one either. The report-feature toggles live in the Report
+        // Features section of /settings/workspace (the old
+        // /settings/workspace/reports sub-route never existed — it 404s).
         // Assert that surface renders for an admin.
         const res = await request.get(`${BASE_URL}/settings/workspace`, {
             headers: { Cookie: `__Host-inspector_token=${adminToken}` },

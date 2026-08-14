@@ -26,24 +26,24 @@ const baseInspection = {
 
 describe('canEdit (subsystem C P4)', () => {
     it('owner / manager can edit anything', () => {
-        expect(canEdit({ id: 'u', role: 'owner', assignedSectionIds: '[]' }, baseInspection)).toBe(true);
-        expect(canEdit({ id: 'u', role: 'manager', assignedSectionIds: '[]' }, baseInspection)).toBe(true);
+        expect(canEdit({ id: 'u', role: 'owner' }, baseInspection)).toBe(true);
+        expect(canEdit({ id: 'u', role: 'manager' }, baseInspection)).toBe(true);
     });
 
     it('inspector can edit own inspections', () => {
-        expect(canEdit({ id: 'u-lead', role: 'inspector', assignedSectionIds: '[]' }, baseInspection)).toBe(true);
+        expect(canEdit({ id: 'u-lead', role: 'inspector' }, baseInspection)).toBe(true);
     });
 
     it('inspector cannot edit foreign inspection', () => {
-        expect(canEdit({ id: 'u-other', role: 'inspector', assignedSectionIds: '[]' }, baseInspection)).toBe(false);
+        expect(canEdit({ id: 'u-other', role: 'inspector' }, baseInspection)).toBe(false);
     });
 
     it('a helper on the roster can edit', () => {
-        expect(canEdit({ id: 'u-helper-1', role: 'inspector', assignedSectionIds: '[]' }, baseInspection)).toBe(true);
+        expect(canEdit({ id: 'u-helper-1', role: 'inspector' }, baseInspection)).toBe(true);
     });
 
     it('on-inspection inspector has full access regardless of sectionId (specialist scoping removed)', () => {
-        const u = { id: 'u-helper-1', role: 'inspector', assignedSectionIds: '["s-roof"]' };
+        const u = { id: 'u-helper-1', role: 'inspector' };
         expect(canEdit(u, baseInspection, 's-roof')).toBe(true);
         expect(canEdit(u, baseInspection, 's-elec')).toBe(true);
         expect(canEdit(u, baseInspection)).toBe(true);
@@ -54,11 +54,11 @@ describe('canEdit (subsystem C P4)', () => {
         // JSON to malform any more, but the outcome that mattered — an empty
         // membership list must deny rather than fail open — still does.
         const unassigned = { ...baseInspection, assignedUserIds: [] };
-        expect(canEdit({ id: 'u-lead', role: 'inspector', assignedSectionIds: '[]' }, unassigned)).toBe(false);
-        expect(canEdit({ id: 'u-lead', role: 'owner', assignedSectionIds: '[]' }, unassigned)).toBe(true);
+        expect(canEdit({ id: 'u-lead', role: 'inspector' }, unassigned)).toBe(false);
+        expect(canEdit({ id: 'u-lead', role: 'owner' }, unassigned)).toBe(true);
     });
 
     it('agent role denied (subsystem A buyer-agent surface, read-only)', () => {
-        expect(canEdit({ id: 'u-lead', role: 'agent', assignedSectionIds: '[]' }, baseInspection)).toBe(false);
+        expect(canEdit({ id: 'u-lead', role: 'agent' }, baseInspection)).toBe(false);
     });
 });

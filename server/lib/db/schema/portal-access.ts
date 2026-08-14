@@ -34,7 +34,12 @@ export const inspectionAccessTokens = sqliteTable('inspection_access_tokens', {
     // drizzle enum. SQLite stores plain TEXT; this is a type-layer widening
     // only, no DDL/migration cost. See spec 2026-07-16-oi-people-role-profiles.
     role:           text('role').notNull().default('client'),
-    token:          text('token').notNull(),
+    // The plaintext `token` column was here. It was NOT NULL + UNIQUE, so every
+    // insert had to put something in it, and what it put was a per-row sentinel —
+    // the real token has only ever lived in the link, in `token_hash` for lookup
+    // and in `token_enc` for reconstruction. It survived as a lazy-upgrade path
+    // for rows predating the hash; when the last of those was gone the branch
+    // could only ever miss, so both went.
     createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     expiresAt:      integer('expires_at', { mode: 'timestamp_ms' }),   // null = open (order active)
     revokedAt:      integer('revoked_at', { mode: 'timestamp_ms' }),   // null = live
@@ -67,7 +72,6 @@ export const inspectionAccessTokens = sqliteTable('inspection_access_tokens', {
     // recreate that fails (or drops the table) on remote D1.
     viewTrackingObjectedAt: integer('view_tracking_objected_at', { mode: 'timestamp_ms' }),
 }, (t) => [
-    uniqueIndex('idx_iat_token').on(t.token),
     index('idx_iat_inspection').on(t.tenantId, t.inspectionId),
     uniqueIndex('idx_iat_recipient').on(t.inspectionId, t.recipientEmail),
     uniqueIndex('idx_iat_token_hash').on(t.tokenHash),

@@ -35,8 +35,8 @@ describe('GET /api/integration/tenants/by-email', () => {
     await seedRoleProfiles(asD1Db(testDb), 't1', new Date(1));
     await seedRoleProfiles(asD1Db(testDb), 't2', new Date(1));
     await testDb.insert(schema.inspectionAccessTokens).values([
-      { id: 'g1', tenantId: 't1', inspectionId: 'i1', recipientEmail: 'jane@x.com', role: 'client', token: 'tok1', createdAt: new Date() },
-      { id: 'g2', tenantId: 't2', inspectionId: 'i2', recipientEmail: 'jane@x.com', role: 'co_client', token: 'tok2', createdAt: new Date(), revokedAt: new Date() }, // revoked → excluded
+      { id: 'g1', tenantId: 't1', inspectionId: 'i1', recipientEmail: 'jane@x.com', role: 'client', createdAt: new Date() },
+      { id: 'g2', tenantId: 't2', inspectionId: 'i2', recipientEmail: 'jane@x.com', role: 'co_client', createdAt: new Date(), revokedAt: new Date() }, // revoked → excluded
     ] as never);
   });
   afterEach(() => { sqlite.close(); vi.clearAllMocks(); });

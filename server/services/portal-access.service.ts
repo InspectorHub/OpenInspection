@@ -11,10 +11,9 @@ import { portalLinkState, type PortalLinkState } from '../lib/portal-link-state'
 
 /** A row EXISTS here, so 'unknown' (nothing to speak for) cannot occur. */
 type IssuedLinkState = Exclude<PortalLinkState, 'unknown'>;
-import { mintToken, hashToken, deadTokenSentinel, resolveTokenRow } from '../lib/token-hash';
+import { mintToken, hashToken } from '../lib/token-hash';
 import { sealToken, openToken } from '../lib/config-crypto';
 import { Errors } from '../lib/errors';
-import { logger } from '../lib/logger';
 
 /**
  * Issues + resolves the PERSISTENT per-(recipient, order) portal tokens.
@@ -47,13 +46,10 @@ export class PortalAccessService {
     }
 
     /**
-     * Reconstruct the plaintext link for a row. Prefers a non-sentinel legacy
-     * plaintext column (row not yet upgraded); otherwise opens the sealed
-     * token_enc (current → previous secret). Mirrors AgreementService.getSignerLink.
+     * Reconstruct the plaintext link for a row by opening the sealed `token_enc`
+     * (current → previous secret). Mirrors AgreementService.getSignerLink.
      */
     private async reconstruct(row: typeof inspectionAccessTokens.$inferSelect): Promise<string> {
-        const sentinel = deadTokenSentinel(row.id);
-        if (row.token && row.token !== sentinel) return row.token; // legacy not-yet-upgraded
         if (!row.tokenEnc) throw Errors.Internal('Portal token cannot be reconstructed (no token_enc)');
         const s = this.requireSecrets();
         return openToken(row.tokenEnc, row.tenantId, s.jwtSecret, s.jwtSecretPrevious);
@@ -140,7 +136,6 @@ export class PortalAccessService {
             await this.validateRole(input.tenantId, effectiveRole);
             await db.update(inspectionAccessTokens)
                 .set({
-                    token: deadTokenSentinel(existing.id),
                     tokenHash,
                     tokenEnc,
                     revokedAt: null,
@@ -161,8 +156,6 @@ export class PortalAccessService {
             inspectionId: input.inspectionId,
             recipientEmail: input.recipientEmail,
             role: effectiveRole,
-            // Never distributed — satisfies NOT NULL + UNIQUE on the legacy column.
-            token: deadTokenSentinel(id),
             tokenHash,
             tokenEnc,
             createdAt: new Date(),
@@ -175,28 +168,12 @@ export class PortalAccessService {
     /** Single-row lookup for the public-access guard. */
     async resolveToken(token: string): Promise<PortalAccessRow | null> {
         const db = this.getDrizzle();
-        const row = await resolveTokenRow<typeof inspectionAccessTokens.$inferSelect>({
-            presented: token,
-            byHash: async (hash) =>
-                (await db.select().from(inspectionAccessTokens).where(eq(inspectionAccessTokens.tokenHash, hash)).get()) ?? null,
-            byPlaintext: async (t) =>
-                (await db.select().from(inspectionAccessTokens).where(eq(inspectionAccessTokens.token, t)).get()) ?? null,
-            upgrade: async (legacy, hash) => {
-                const setValues: Partial<typeof inspectionAccessTokens.$inferInsert> = {
-                    tokenHash: hash,
-                    token: deadTokenSentinel(legacy.id),
-                };
-                // Best-effort seal so re-issue can reconstruct after upgrade.
-                if (this.secrets) {
-                    try {
-                        setValues.tokenEnc = await sealToken(token, legacy.tenantId, this.secrets.jwtSecret);
-                    } catch (e) {
-                        logger.warn('portal-access.upgrade.seal.failed', { error: e instanceof Error ? e.message : String(e) });
-                    }
-                }
-                await db.update(inspectionAccessTokens).set(setValues).where(eq(inspectionAccessTokens.id, legacy.id)).run();
-            },
-        });
+        // Hash-only. The plaintext column this used to fall back to is gone, and
+        // with it the lazy upgrade that rewrote a matched legacy row: production
+        // held no un-hashed rows left for either to reach.
+        const hash = await hashToken(token);
+        const row = (await db.select().from(inspectionAccessTokens)
+            .where(eq(inspectionAccessTokens.tokenHash, hash)).get()) ?? null;
         if (!row) return null;
         return {
             id: row.id, inspectionId: row.inspectionId,
@@ -392,7 +369,6 @@ export class PortalAccessService {
         const tokenEnc = await sealToken(token, tenantId, s.jwtSecret);
         await db.update(inspectionAccessTokens)
             .set({
-                token: deadTokenSentinel(existing.id),
                 tokenHash,
                 tokenEnc,
                 // A reset RESTORES access for a recipient who is still on the

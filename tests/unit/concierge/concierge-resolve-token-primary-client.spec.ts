@@ -23,6 +23,7 @@ import type { EmailService } from '../../../server/services/email.service';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { asD1Db } from '../helpers/test-db';
+import { hashToken } from '../../../server/lib/token-hash';
 
 const T1 = '00000000-0000-0000-0000-0000000000c1';
 const CLIENT = 'contact-client-concierge-resolve';
@@ -62,7 +63,10 @@ describe('ConciergeService.resolveToken — primary-client sourcing (Task 9c)', 
         await people.addPerson(T1, INSP, CLIENT, roleProfileId('client'));
 
         await db.insert(schema.conciergeConfirmTokens).values({
-            token: 'plain-token-for-resolve-test-1234567890',
+            id: crypto.randomUUID(),
+            // The row stores only the hash; the plaintext lives in the link the
+            // test presents below, the same way the emailed one does.
+            tokenHash: await hashToken('plain-token-for-resolve-test-1234567890'),
             inspectionId: INSP,
             tenantId: T1,
             clientEmail: 'jane@example.com',

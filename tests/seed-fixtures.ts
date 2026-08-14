@@ -535,10 +535,10 @@ export function seedFixtures(appDir: string): void {
     // revoked_at NULL = live. Both are read numerically by the guard, and NULL is
     // the only value that means "not set" — a 0 would read as 1970 and revoke it.
     d1(`INSERT OR REPLACE INTO inspection_access_tokens
-         (id, tenant_id, inspection_id, recipient_email, role, token, created_at,
+         (id, tenant_id, inspection_id, recipient_email, role, created_at,
           expires_at, revoked_at, token_hash, token_enc, view_tracking_objected_at)
          VALUES ('${CLIENT_ACCESS_TOKEN_ID}', '${TENANT_A_ID}', '${SEED_INSPECTIONS.delivered}',
-                 '${CLIENT_RECIPIENT_EMAIL}', 'client', '${CLIENT_PORTAL_TOKEN}', ${nowMs},
+                 '${CLIENT_RECIPIENT_EMAIL}', 'client', ${nowMs},
                  NULL, NULL, '${CLIENT_PORTAL_TOKEN_HASH}', NULL, NULL)`, cwd);
 
     // Report content. Both payloads are JSON, so they go through d1Script (see

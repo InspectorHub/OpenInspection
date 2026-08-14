@@ -99,7 +99,7 @@ describe('PeopleService.addPerson — reports whether a seat was created', () =>
         await testDb.insert(schema.inspectionAccessTokens).values({
             id: 'tok-1', tenantId: TENANT, inspectionId: INSPECTION,
             recipientEmail: 'rosa@example.com', role: 'buyer_agent',
-            token: 'plain-1', createdAt: new Date(), revokedAt,
+            createdAt: new Date(), revokedAt,
         } as never);
 
         await svc.addPerson(TENANT, INSPECTION, CONTACT, AGENT_ROLE);

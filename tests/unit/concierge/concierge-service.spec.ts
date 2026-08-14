@@ -394,15 +394,17 @@ describe('ConciergeService — A3', () => {
 
     // ─── Track I-a — confirm-token hash-at-rest (tier-1) ──────────────────────
     describe('token hash-at-rest', () => {
-        it('(a) createBooking stores hash, NOT plaintext (PK is a sentinel)', async () => {
+        it('(a) createBooking stores the hash and nothing else — the row holds no plaintext at all', async () => {
             await seedFixture(testDb, { reviewRequired: false });
             await svc.createBooking(baseParams());
             const tok = emailedToken();
             const rows = await testDb.select().from(schema.conciergeConfirmTokens).all();
             expect(rows).toHaveLength(1);
-            expect(rows[0].token).toMatch(/^x:/);          // sentinel
-            expect(rows[0].token).not.toBe(tok);
             expect(rows[0].tokenHash).toBe(await hashToken(tok));
+            // There used to be a sentinel to assert here, because the plaintext
+            // column was the PK and had to hold SOMETHING. Now the assertion is
+            // the stronger one: the emailed token appears nowhere in the row.
+            expect(JSON.stringify(rows[0])).not.toContain(tok);
         });
 
         it('(b) presenting the emailed plaintext resolves via the hash path', async () => {
@@ -412,50 +414,24 @@ describe('ConciergeService — A3', () => {
             expect(view).not.toBeNull();
         });
 
-        it('(c) legacy plaintext row resolves AND is upgraded in place', async () => {
-            await seedFixture(testDb, { reviewRequired: false });
-            const created = await svc.createBooking(baseParams());
-            // Simulate a pre-hash legacy row: plaintext PK, no hash.
-            const legacyToken = 'legacy-concierge-confirm-token-1234567890';
-            await testDb.insert(schema.conciergeConfirmTokens).values({
-                token: legacyToken,
-                inspectionId: created.inspectionId,
-                tenantId: T1,
-                clientEmail: 'legacy@x.com',
-                expiresAt: new Date(Date.now() + 86_400_000),
-                confirmedAt: null,
-                createdAt: new Date(),
-            });
-            const view = await svc.resolveToken(legacyToken);
-            expect(view).not.toBeNull();
-            const upgraded = await testDb.select().from(schema.conciergeConfirmTokens)
-                .where(eq(schema.conciergeConfirmTokens.tokenHash, await hashToken(legacyToken))).get();
-            expect(upgraded).toBeTruthy();
-            expect(upgraded?.token).toMatch(/^x:/);     // PK rewritten to sentinel
-            expect(upgraded?.clientEmail).toBe('legacy@x.com');
-        });
+        // (c) and (c2) used to cover the legacy plaintext row: resolve it, upgrade
+        // it in place, and prove the confirm still landed despite the PK being
+        // rewritten mid-flight. Both the plaintext column and the upgrade are
+        // gone — the table was empty when they went, so there is no such row to
+        // resolve and nothing to upgrade. What (c2) was really protecting is
+        // single-use, which is not about legacy rows at all, so it stays:
 
-        it('(c2) legacy plaintext confirm is single-use (mark-used survives the lazy upgrade)', async () => {
+        it('(c) a confirm is single-use', async () => {
             await seedFixture(testDb, { reviewRequired: false });
-            const created = await svc.createBooking(baseParams());
-            const legacyToken = 'legacy-concierge-confirm-token-replay-99';
-            await testDb.insert(schema.conciergeConfirmTokens).values({
-                token: legacyToken,
-                inspectionId: created.inspectionId,
-                tenantId: T1,
-                clientEmail: 'legacy@x.com',
-                expiresAt: new Date(Date.now() + 86_400_000),
-                confirmedAt: null,
-                createdAt: new Date(),
-            });
-            // First confirm succeeds; the lazy upgrade rewrites the PK to a
-            // sentinel mid-flight — confirmedAt must land on the row anyway.
-            await svc.confirmByClient(legacyToken);
-            const upgraded = await testDb.select().from(schema.conciergeConfirmTokens)
-                .where(eq(schema.conciergeConfirmTokens.tokenHash, await hashToken(legacyToken))).get();
-            expect(upgraded?.confirmedAt).toBeTruthy();
-            // Replay must be rejected.
-            await expect(svc.confirmByClient(legacyToken)).rejects.toThrow(/already/i);
+            await svc.createBooking(baseParams());
+            const tok = emailedToken();
+
+            await svc.confirmByClient(tok);
+            const row = await testDb.select().from(schema.conciergeConfirmTokens)
+                .where(eq(schema.conciergeConfirmTokens.tokenHash, await hashToken(tok))).get();
+            expect(row?.confirmedAt).toBeTruthy();
+
+            await expect(svc.confirmByClient(tok)).rejects.toThrow(/already/i);
         });
     });
 });

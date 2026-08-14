@@ -3,10 +3,10 @@
  *
  * `POST /api/admin/branding` spreads its whole validated body into
  * `BrandingService.updateBranding`, which spread it on into `writeConfig`, which
- * wrote whatever key it was handed. `showEstimates` got a refusal of its own
- * when someone noticed it could be flipped in one owner/manager call; the
- * TRANSITIVITY was never fixed, so the next sensitive column would inherit the
- * same reachability for free.
+ * wrote whatever key it was handed. One column (`is_estimates_shown`, since
+ * dropped) got a refusal of its own when someone noticed it could be flipped in
+ * one owner/manager call; the TRANSITIVITY was never fixed, so the next
+ * sensitive column would inherit the same reachability for free.
  *
  * The discriminating spec here is "refuses a column no request schema declares".
  * A spec that only asserts the legitimate fields still save passes just as

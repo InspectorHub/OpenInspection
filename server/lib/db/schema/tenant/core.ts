@@ -103,13 +103,15 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Nullable; server applies hard-coded defaults when NULL.
     inspectionPrefs: text('inspection_prefs', { mode: 'json' })
         .$type<{ cloneDefault: 'rating' | 'rating_notes' | 'all'; autoAdvanceDelayMs: number; pinnedTagIds: string[]; agentRepairAccess?: 'off' | 'read' | 'readwrite'; reportLinkTtl?: ReportLinkTtl }>(),
-    // Sprint 2 S2-4 — when true, published reports render the per-defect
-    // "Estimated cost: $X – $Y" badge.
-    // ⚠️ This column cannot currently be set to true: `BrandingService.updateBranding`
-    // refuses an enable (422) and accepts only a disable. Estimates are being reshaped
-    // into a deliverable of their own instead of a section of the signed report, so any
-    // new writer of this column must carry the same refusal or it is bypassed silently.
-    showEstimates: integer('is_estimates_shown', { mode: 'boolean' }).notNull().default(false),
+    // `is_estimates_shown` was here. It gated a per-defect "Estimated cost"
+    // badge on the published report, and by the time it was dropped it gated
+    // nothing: `inspection-report.service.ts` pins the report payload's
+    // `showEstimates` to `false` unconditionally, so no tenant's setting ever
+    // reached a renderer. The writer additionally refused every enable. A flag
+    // that cannot be turned on and is not read when it is on is not a setting.
+    // Repair estimates remain the buyer's to state, not the platform's — see
+    // `scripts/check-price-capability.mjs`, which still fails if a price-shaped
+    // column reappears on a finding.
     // Track E1 (ITB §11, UC-ITB-07) — when true, the published report sub-nav
     // exposes a "Repair List" tab. Default OFF — opt-in for realtors who want
     // a separate punch-list view rather than the full narrative report.
@@ -153,10 +155,6 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     enablePdfPipeline: integer('is_pdf_pipeline_enabled', { mode: 'boolean' }).notNull().default(false),
     // Design System 0520 subsystem C P10 — /team Defaults section toggles.
     teamModeDefault:          integer('is_team_mode_default',          { mode: 'boolean' }).notNull().default(false),
-    // DEAD (2026-06-13, apprentice subsystem removed) — no reads/writes
-    apprenticeReviewRequired: integer('is_apprentice_review_required', { mode: 'boolean' }).notNull().default(false),
-    // DEAD (2026-06-13, guest removal) — no reads/writes
-    guestInvitesEnabled:      integer('is_guest_invites_enabled',      { mode: 'boolean' }).notNull().default(true),
     // Track H (IA-7 / P-6②) — which defect fields the publish gate REQUIRES.
     // Tenant default; per-inspection override on inspections.require_defect_
     // fields_override (the blockUnpaid → paymentRequired inheritance pattern).

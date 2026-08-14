@@ -515,9 +515,9 @@ export class InspectionReportService extends InspectionSubService {
         }
 
         // OFF for every tenant, unconditionally: costs are being rebuilt as a
-        // standalone deliverable rather than a section of the signed report, so
-        // NOTHING assigns this from tenantConfigs.showEstimates — that column
-        // survives for audit and for turning off, never for rendering.
+        // standalone deliverable rather than a section of the signed report.
+        // No tenant setting sits behind this — the column that looked like one
+        // was dropped once it was established that nothing ever read it.
         const showEstimates = false;
         // Report Style Presets — tenant's default appearance profile id (resolved below).
         let tenantDefaultProfileId: string | null = null;

@@ -21,6 +21,7 @@ import { signM2mHeader, M2M_HEADER } from '../../../server/lib/m2m-auth';
 import { PortalService } from '../../../server/services/portal.service';
 import { PeopleService } from '../../../server/services/people.service';
 import portalRoutes from '../../../server/api/portal';
+import { hashToken } from '../../../server/lib/token-hash';
 
 const TENANT = '00000000-0000-0000-0000-0000000000d1';
 // Custom, non-literal role key whose kind is 'client' — proves the filter is
@@ -65,10 +66,10 @@ describe('find-my-report discovery — capability-driven role filter', () => {
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
         await seedCustomRoles(testDb, TENANT);
         await testDb.insert(schema.inspectionAccessTokens).values([
-            { id: 'g-client', tenantId: TENANT, inspectionId: 'i1', recipientEmail: 'jane@x.com', role: 'client', token: 'tok1', createdAt: new Date() },
-            { id: 'g-agent', tenantId: TENANT, inspectionId: 'i2', recipientEmail: 'agent@x.com', role: 'buyer_agent', token: 'tok2', createdAt: new Date() },
-            { id: 'g-other', tenantId: TENANT, inspectionId: 'i3', recipientEmail: 'vendor@x.com', role: CUSTOM_OTHER_KEY, token: 'tok3', createdAt: new Date() },
-            { id: 'g-custom-client', tenantId: TENANT, inspectionId: 'i4', recipientEmail: 'buyer@x.com', role: CUSTOM_CLIENT_KEY, token: 'tok4', createdAt: new Date() },
+            { id: 'g-client', tenantId: TENANT, inspectionId: 'i1', recipientEmail: 'jane@x.com', role: 'client', createdAt: new Date() },
+            { id: 'g-agent', tenantId: TENANT, inspectionId: 'i2', recipientEmail: 'agent@x.com', role: 'buyer_agent', createdAt: new Date() },
+            { id: 'g-other', tenantId: TENANT, inspectionId: 'i3', recipientEmail: 'vendor@x.com', role: CUSTOM_OTHER_KEY, createdAt: new Date() },
+            { id: 'g-custom-client', tenantId: TENANT, inspectionId: 'i4', recipientEmail: 'buyer@x.com', role: CUSTOM_CLIENT_KEY, createdAt: new Date() },
         ] as never);
     });
     afterEach(() => { sqlite.close(); vi.clearAllMocks(); });
@@ -114,7 +115,7 @@ describe('PortalService.listRecipientInspections — capability-driven role filt
     async function seedTok(inspectionId: string, email: string, role: string) {
         await testDb.insert(schema.inspectionAccessTokens).values({
             id: crypto.randomUUID(), tenantId: TENANT, inspectionId, recipientEmail: email, role,
-            token: crypto.randomUUID(), createdAt: new Date(), expiresAt: null, revokedAt: null,
+            createdAt: new Date(), expiresAt: null, revokedAt: null,
         } as never);
     }
 
@@ -167,7 +168,8 @@ describe('GET /api/portal/:tenant/exchange — capability-driven role gate', () 
         return {
             resolveToken: async (token: string) => {
                 const rows = await testDb.select().from(schema.inspectionAccessTokens);
-                const row = rows.find((r) => r.token === token);
+                const presented = await hashToken(token);
+                const row = rows.find((r) => r.tokenHash === presented);
                 if (!row) return null;
                 return {
                     inspectionId: row.inspectionId,
@@ -209,7 +211,7 @@ describe('GET /api/portal/:tenant/exchange — capability-driven role gate', () 
         const token = crypto.randomUUID();
         await testDb.insert(schema.inspectionAccessTokens).values({
             id: crypto.randomUUID(), tenantId: TENANT, inspectionId, recipientEmail: email, role,
-            token, createdAt: new Date(), expiresAt: null, revokedAt: null,
+            tokenHash: await hashToken(token), createdAt: new Date(), expiresAt: null, revokedAt: null,
         } as never);
         return token;
     }

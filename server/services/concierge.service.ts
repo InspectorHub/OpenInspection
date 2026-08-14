@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, or, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import {
     inspections,
     tenantConfigs,
@@ -13,7 +13,7 @@ import { resolveHoldInspector, resolveInvitingUser, attachHoldServices } from '.
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
-import { hashToken, deadTokenSentinel, resolveTokenRow } from '../lib/token-hash';
+import { hashToken } from '../lib/token-hash';
 import { PeopleService } from './people.service';
 import { ContactService } from './contact.service';
 import type { EmailService } from './email.service';
@@ -381,21 +381,12 @@ export class ConciergeService {
                     eq(inspections.tenantId, row.tenantId),
                 ),
             );
-        // Mark token used. resolveConfirmToken returns the PRE-upgrade snapshot,
-        // so row.token may be the original plaintext while the DB column was just
-        // rewritten to a sentinel by the lazy upgrade. Key on the hash (set by
-        // both hash-native creation and the upgrade) OR the snapshot token
-        // (covers a legacy row whose upgrade write failed) — exactly one row
-        // can match either.
+        // Mark token used. Keyed on the row id: `resolveConfirmToken` just
+        // returned this row by hash, so the id is exact and needs no re-derivation.
         await db
             .update(conciergeConfirmTokens)
             .set({ confirmedAt: new Date() })
-            .where(
-                or(
-                    eq(conciergeConfirmTokens.tokenHash, await hashToken(token)),
-                    eq(conciergeConfirmTokens.token, row.token),
-                ),
-            );
+            .where(eq(conciergeConfirmTokens.id, row.id));
 
         // Notify the originating agent. The buyer's-agent contact is resolved
         // via the inspection_people (buyer_agent) join (Task 9c-X2) — not the
@@ -455,18 +446,12 @@ export class ConciergeService {
      */
     private async resolveConfirmToken(token: string): Promise<typeof conciergeConfirmTokens.$inferSelect | null> {
         const db = this.getDrizzle();
-        return resolveTokenRow<typeof conciergeConfirmTokens.$inferSelect>({
-            presented: token,
-            byHash: async (hash) =>
-                (await db.select().from(conciergeConfirmTokens).where(eq(conciergeConfirmTokens.tokenHash, hash)).get()) ?? null,
-            byPlaintext: async (t) =>
-                (await db.select().from(conciergeConfirmTokens).where(eq(conciergeConfirmTokens.token, t)).get()) ?? null,
-            upgrade: async (legacy, hash) => {
-                await db.update(conciergeConfirmTokens)
-                    .set({ tokenHash: hash, token: deadTokenSentinel(crypto.randomUUID()) })
-                    .where(eq(conciergeConfirmTokens.token, legacy.token));
-            },
-        });
+        // Hash-only. There is no plaintext column to fall back to, and there is
+        // nothing to lazily upgrade: every row this table has ever held that was
+        // reachable by plaintext is gone (the table was empty when the column was).
+        const hash = await hashToken(token);
+        return (await db.select().from(conciergeConfirmTokens)
+            .where(eq(conciergeConfirmTokens.tokenHash, hash)).get()) ?? null;
     }
 
     /**
@@ -569,10 +554,9 @@ export class ConciergeService {
         const db = this.getDrizzle();
         const token = mintToken();
         await db.insert(conciergeConfirmTokens).values({
-            // `token` is the PK; the plaintext is never stored. A per-row random
-            // sentinel keeps the PK unique while the real token lives only in the
-            // email + token_hash. Tier-1: hash only (single-use magic link).
-            token: deadTokenSentinel(crypto.randomUUID()),
+            // Tier-1: hash only (single-use magic link). The plaintext lives in
+            // the email and nowhere else.
+            id: crypto.randomUUID(),
             tokenHash: await hashToken(token),
             inspectionId,
             tenantId,
