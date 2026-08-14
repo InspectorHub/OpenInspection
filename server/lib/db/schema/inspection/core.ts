@@ -278,41 +278,22 @@ export const inspectionRequests = sqliteTable('inspection_requests', {
         enum: ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'],
     }).notNull().default('pending'),
     notes:            text('notes'),
-    /**
-     * What the sub-services summed to WHEN THE REQUEST WAS CREATED. A snapshot,
-     * and outside the money-authority chain entirely.
-     *
-     * ⚠️ NOT a fourth tier of that chain, and must never be reconciled against
-     * it. The authority for what an order costs is
-     * `getEffectivePriceCents()` — invoice, then the sum of
-     * `inspection_services` snapshots, then the `inspections.price` cache. This
-     * column is a booking-time figure on the PARENT request and does not follow
-     * a reprice, an override or an invoice.
-     *
-     * It is also, today, read by nothing that decides anything: the only reader
-     * is the response projection in `inspection-request/request-read.ts`, no
-     * first-party client reads the field, and no billing path touches it. It is
-     * published in the OpenAPI/MCP contract, so it is not free to remove — but
-     * a reader arriving at it should know it is a record of what was quoted,
-     * not a number to charge from.
-     *
-     * Written consistently by both creation paths: the dashboard multi-service
-     * create sums the sub-service prices, and the public booking delegates to
-     * that same method whenever services were chosen. The literal `0` in
-     * `fulfill-booking.ts` is the branch where NONE were — a legacy booking
-     * carrying no service, where zero is the right answer rather than a gap.
-     */
-    totalAmount:      integer('total_amount_cents').notNull().default(0),
-    /**
-     * ⚠️ Written by both creation paths and read by NOTHING. A grep for
-     * `inspectionRequests.paymentStatus` returns no reader: payment state that
-     * anyone acts on lives on the ORDER (`inspections.payment_status`) and in
-     * the `order_payments` ledger. This one is a state machine with no
-     * consumer, kept because it is in the published response contract.
-     */
-    paymentStatus:    text('payment_status', {
-        enum: ['unpaid', 'partial', 'paid'],
-    }).notNull().default('unpaid'),
+    // `total_amount_cents` and `payment_status` were here, and money on a
+    // request row is a tempting thing to re-add, so: both were WRITE-ONLY.
+    //
+    // The total was a booking-time sum of the sub-service prices whose only
+    // reader was its own accumulator; no first-party client, no billing path
+    // and no test ever consulted it, and it did not follow a reprice, an
+    // override or an invoice, so it could not have been trusted if one had.
+    // What an order costs is `getEffectivePriceCents()` — invoice, then the sum
+    // of `inspection_services` snapshots, then the `inspections.price` cache.
+    //
+    // The payment status had no reader at all. Payment state anyone acts on
+    // lives on the ORDER (`inspections.payment_status`) and in `order_payments`.
+    //
+    // Both were published in the OpenAPI/MCP contract, which is the only reason
+    // they survived the first sweep; removing them is a contract change, taken
+    // deliberately rather than a column drop.
     createdAt:        integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt:        integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [

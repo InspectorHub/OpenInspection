@@ -58,7 +58,6 @@ export interface UpdateRequestInput {
     notes?:           string | null;
     status?:          'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
     paymentStatus?:   'unpaid' | 'partial' | 'paid';
-    totalAmount?:     number;
 }
 
 export class InspectionRequestService {
@@ -129,8 +128,6 @@ export class InspectionRequestService {
             if (!tplById.has(id)) throw Errors.BadRequest(`Template not found: ${id}`);
         }
 
-        const totalAmount = subs.reduce((sum, s) => sum + (s.price ?? 0), 0);
-
         // Quota is consumed for the whole batch at once, after every precondition
         // check above (bounds, template ownership) and BEFORE the parent
         // request row is inserted — a request row must never be orphaned
@@ -153,8 +150,6 @@ export class InspectionRequestService {
             scheduledAt:     new Date(input.scheduledAt),
             notes:           input.notes ?? null,
             status:          'pending',
-            totalAmount,
-            paymentStatus:   'unpaid',
             createdAt:       now,
             updatedAt:       now,
         });
@@ -270,9 +265,8 @@ export class InspectionRequestService {
             createdAt:                now,
         });
 
-        const newTotal = (req.totalAmount ?? 0) + (sub.price ?? 0);
         await db.update(inspectionRequests)
-            .set({ totalAmount: newTotal, updatedAt: now })
+            .set({ updatedAt: now })
             .where(and(eq(inspectionRequests.id, requestId), eq(inspectionRequests.tenantId, tenantId)));
 
         // Task 7c (people-role-profiles fix) — mirror the client (inherited
@@ -331,8 +325,6 @@ export class InspectionRequestService {
         if (patch.scheduledAt     !== undefined) update.scheduledAt     = new Date(patch.scheduledAt);
         if (patch.notes           !== undefined) update.notes           = patch.notes;
         if (patch.status          !== undefined) update.status          = patch.status;
-        if (patch.paymentStatus   !== undefined) update.paymentStatus   = patch.paymentStatus;
-        if (patch.totalAmount     !== undefined) update.totalAmount     = patch.totalAmount;
 
         await db.update(inspectionRequests)
             .set(update)

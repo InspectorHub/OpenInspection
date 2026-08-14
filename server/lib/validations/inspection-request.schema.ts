@@ -42,8 +42,6 @@ export const UpdateInspectionRequestSchema = z.object({
     scheduledAt:     z.string().min(1).optional().describe('TODO describe scheduledAt field for the OpenInspection MCP integration'),
     notes:           z.string().max(2000).optional().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
     status:          z.enum(['pending', 'confirmed', 'in_progress', 'completed', 'cancelled']).optional().describe('TODO describe status field for the OpenInspection MCP integration'),
-    paymentStatus:   z.enum(['unpaid', 'partial', 'paid']).optional().describe('TODO describe paymentStatus field for the OpenInspection MCP integration'),
-    totalAmount:     z.number().int().min(0).optional().describe('TODO describe totalAmount field for the OpenInspection MCP integration'),
 }).openapi('UpdateInspectionRequest');
 
 export const InspectionRequestListQuerySchema = z.object({
@@ -79,8 +77,6 @@ export const InspectionRequestResponseSchema = z.object({
     scheduledAt:      z.string().describe('TODO describe scheduledAt field for the OpenInspection MCP integration'),
     status:           z.enum(['pending', 'confirmed', 'in_progress', 'completed', 'cancelled']).describe('TODO describe status field for the OpenInspection MCP integration'),
     notes:            z.string().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
-    totalAmount:      z.number().describe('TODO describe totalAmount field for the OpenInspection MCP integration'),
-    paymentStatus:    z.enum(['unpaid', 'partial', 'paid']).describe('TODO describe paymentStatus field for the OpenInspection MCP integration'),
     createdAt:        z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
     updatedAt:        z.string().describe('TODO describe updatedAt field for the OpenInspection MCP integration'),
     inspections:      z.array(SubInspectionResponseSchema).describe('TODO describe inspections field for the OpenInspection MCP integration'),

@@ -43,6 +43,13 @@
       "when": 1786698675528,
       "tag": "0005_drop_prefix_redundant_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1786702451474,
+      "tag": "0006_drop_request_money_columns",
+      "breakpoints": true
     }
   ]
 }
