@@ -50,7 +50,16 @@ Migrations are applied with wrangler (`wrangler d1 migrations apply`), not `driz
 | `audit_logs` / `esign_audit_logs` | Immutable audit trail |
 | `tenant_destruction_records` | Durable, non-personal proof a tenant was purged during offboarding (no FK to `tenants` so it outlives the deletion) |
 
-For the complete schema (all tables with columns, indexes, and constraints), see `migrations/0000_baseline.sql` — or the Drizzle definitions in `server/lib/db/schema/`, which are the source of truth.
+For the complete schema — every table, every column, with types, nullability,
+defaults, enum vocabularies, keys and indexes — see
+[`database-schema.md`](database-schema.md). It is GENERATED from the migration
+chain and the Drizzle definitions by `npm run docs:schema`, and
+`npm run lint:schema-doc` (part of `npm run lint`) fails if the committed copy
+has fallen behind the schema. Regenerate it in the same commit as a schema
+change; do not edit it by hand.
+
+The sources it derives from remain the authority if the two ever disagree:
+`migrations/` for structure, `server/lib/db/schema/` for meaning.
 
 ## Drizzle ORM usage
 

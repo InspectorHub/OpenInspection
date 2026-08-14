@@ -61,6 +61,7 @@ auth, validation, logging, tenancy, schema).
 |---|---|
 | [`reference/api.md`](reference/api.md) | REST endpoints and auth patterns. Live OpenAPI at `/doc`, Swagger UI at `/ui` |
 | [`reference/database.md`](reference/database.md) | D1 schema, drizzle-kit schema-first migration flow |
+| [`reference/database-schema.md`](reference/database-schema.md) | Every table and column, generated from the schema (`npm run docs:schema`) |
 | [`reference/roles.md`](reference/roles.md) | The four roles, the nine capability toggles, mapping from Spectora / ISN |
 | [`reference/deployment-modes.md`](reference/deployment-modes.md) | What differs between `standalone` and `saas`, capability by capability (generated) |
 
