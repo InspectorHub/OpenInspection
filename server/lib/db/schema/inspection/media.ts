@@ -18,7 +18,6 @@ export const tags = sqliteTable('tags', {
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({
     tenantNameUnique: uniqueIndex('idx_tags_tenant_name').on(t.tenantId, t.name),
-    tenantIdx:        index('idx_tags_tenant').on(t.tenantId),
 }));
 
 export const inspectionItemTagLinks = sqliteTable('inspection_item_tag_links', {

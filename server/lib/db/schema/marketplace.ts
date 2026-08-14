@@ -65,7 +65,6 @@ export const tenantLibraryImports = sqliteTable('tenant_library_imports', {
   localEntityId: text('local_entity_id'),
 }, (t) => [
   uniqueIndex('uq_tenant_library_import').on(t.tenantId, t.libraryId),
-  index('idx_tenant_library_imports_tenant').on(t.tenantId),
 ]);
 
 // Sprint 2 Track 3 (S2-8) — per-import history. One row per

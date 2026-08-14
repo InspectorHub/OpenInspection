@@ -39,7 +39,6 @@ export const inspectionPeople = sqliteTable('inspection_people', {
     roleProfileId: text('role_profile_id').notNull(),    // → contact_role_profiles.id
     createdAt:     integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
-    index('idx_ip_inspection').on(t.inspectionId),
     index('idx_ip_tenant').on(t.tenantId),
     uniqueIndex('uq_ip_insp_contact_role').on(t.inspectionId, t.contactId, t.roleProfileId),
 ]);

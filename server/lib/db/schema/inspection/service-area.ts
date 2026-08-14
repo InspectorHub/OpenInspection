@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /**
  * Which ZIPs an inspector will travel to.
@@ -23,8 +23,6 @@ export const inspectorServiceAreas = sqliteTable('inspector_service_areas', {
     zipPrefix: text('zip_prefix').notNull(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
-    index('idx_inspector_service_areas_tenant').on(t.tenantId),
-    index('idx_inspector_service_areas_user').on(t.tenantId, t.userId),
     // One row per (tenant, inspector, prefix). Saving the same list twice must
     // not double it; the replace-list write deletes then inserts, and this
     // index is what makes a partially-applied replace impossible to paper over.

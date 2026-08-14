@@ -49,7 +49,6 @@ export const invoices = sqliteTable('invoices', {
     // invoice. Appended at table end. See #273.
     amountPaidCents: integer('amount_paid_cents'),
 }, (t) => [
-    index('idx_invoices_tenant').on(t.tenantId),
     index('idx_invoices_inspection').on(t.inspectionId),
     index('idx_invoices_contact').on(t.tenantId, t.contactId),
 ]);

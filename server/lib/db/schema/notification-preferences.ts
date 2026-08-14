@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /**
  * One recipient's answer to "send me this or don't", per notification class
@@ -49,7 +49,6 @@ export const notificationPreferences = sqliteTable('notification_preferences', {
     uniqueIndex('idx_notification_prefs_unique')
         .on(t.tenantId, t.subjectKind, t.subjectId, t.classId, t.channel),
     // The send-boundary read: "what has this subject muted?"
-    index('idx_notification_prefs_subject').on(t.tenantId, t.subjectKind, t.subjectId),
 ]);
 
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;

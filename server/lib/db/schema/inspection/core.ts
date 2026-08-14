@@ -244,9 +244,7 @@ export const inspections = sqliteTable('inspections', {
     // Appended at table end for D1 rebuild safety.
     depositOverridden:   integer('is_deposit_overridden', { mode: 'boolean' }).notNull().default(false),
 }, (t) => [
-    index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),
-    index('idx_inspections_inspector').on(t.inspectorId),
     index('idx_inspections_tenant_status').on(t.tenantId, t.status),
     index('idx_inspections_tenant_date').on(t.tenantId, t.date),
     index('idx_inspections_inspector_date').on(t.inspectorId, t.date),

@@ -17,7 +17,6 @@ export const ratingSystems = sqliteTable('rating_systems', {
     updatedAt:   integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({
     tenantSlugUnique: uniqueIndex('idx_rating_systems_tenant_slug').on(t.tenantId, t.slug),
-    tenantIdx:        index('idx_rating_systems_tenant').on(t.tenantId),
 }));
 
 export const templates = sqliteTable('templates', {

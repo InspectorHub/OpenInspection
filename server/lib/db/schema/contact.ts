@@ -51,7 +51,6 @@ export const contacts = sqliteTable('contacts', {
     locale: text('locale'),
 }, (t) => [
     index('idx_contacts_type').on(t.tenantId, t.type),
-    index('idx_contacts_tenant').on(t.tenantId),
     // DB-9: one ACTIVE contact per (tenant,email); NULL emails and archived rows don't collide.
     uniqueIndex('uq_contacts_tenant_email').on(t.tenantId, t.email).where(sql`email IS NOT NULL AND archived_at IS NULL`),
     // IA-104 — replaces agent_tenant_links' UNIQUE (agent_user_id, tenant_id).
