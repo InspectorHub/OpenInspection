@@ -20,6 +20,10 @@ export const reportSignoff = sqliteTable('report_signoff', {
     id:                text('id').primaryKey(),
     tenantId:          text('tenant_id').notNull(),
     inspectionId:      text('inspection_id').notNull(),
+    // Which ASTM seat signed — and the UPSERT KEY with inspection_id, so
+    // re-signing REPLACES the prior attestation rather than appending one.
+    // The presence of a 'pcr_reviewer' row is one of the three gates
+    // computeConformance requires before a report may claim conformance.
     role:              text('role', { enum: ['field_observer', 'pcr_reviewer'] }).notNull(),
     // The user/identity sub of the signer (accountability). Free text — no FK.
     personId:          text('person_id').notNull(),
@@ -50,6 +54,11 @@ export const psqResponses = sqliteTable('psq_responses', {
     id:           text('id').primaryKey(),
     tenantId:     text('tenant_id').notNull(),
     inspectionId: text('inspection_id').notNull(),
+    // A free-form question -> answer map, NOT a fixed catalogue: whatever keys
+    // the upsert sends are rendered verbatim as the Appendix E definition list,
+    // so the question wording lives in the data. NULL whenever only the status
+    // was set (sent / declined). It is `status`, never this, that the
+    // conformance gate and the Word export read.
     responses:    text('responses', { mode: 'json' }).$type<Record<string, unknown>>(),
     status:       text('status', { enum: ['sent', 'received', 'declined'] }).notNull().default('sent'),
     // Persistent per-inspection share token for the no-login PSQ form (mirrors

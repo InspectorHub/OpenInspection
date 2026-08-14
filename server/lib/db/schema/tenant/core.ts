@@ -11,6 +11,11 @@ import type { DepositPolicy } from '../../../billing/deposit-policy';
 export const tenants = sqliteTable('tenants', {
     id: text('id').primaryKey(),
     slug: text('slug').unique().notNull(),
+    // Commercial plan. Written ONLY by the portal command seam
+    // (`portal.provider` handleTenantUpdate) — core has no UI for it, so a
+    // standalone deploy stays 'free'. Never read alone: `isPaidPlan` pairs it
+    // with `status` (a paid tier still trialling has not paid) to decide the
+    // platform-funded capabilities — managed AI key, Stream video backend.
     tier: text('tier', { enum: ['free','pro','enterprise'] }).notNull().default('free'),
     stripeConnectAccountId: text('stripe_connect_account_id'),
     status: text('status', { enum: ['pending','active','suspended','trial'] }).notNull().default('pending'),
@@ -33,6 +38,11 @@ export const tenants = sqliteTable('tenants', {
 export const tenantConfigs = sqliteTable('tenant_configs', {
     tenantId: text('tenant_id').primaryKey().references(() => tenants.id),
     companyName: text('company_name'),
+    // Tenant brand hex, validated as `#rrggbb` by the settings form. Never used
+    // raw: `brandTokens()` derives the hover shades and a contrast-safe
+    // foreground from it, and NULL emits no tokens at all (platform defaults
+    // stand). Wraps every client-facing surface — report, invoice, checkout,
+    // /book, client portal.
     primaryColor: text('primary_color'),
     logoUrl: text('logo_url'),
     supportEmail: text('support_email'),
@@ -48,6 +58,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // is the From: address; `replyTo` is the Reply-To: header. Both null until
     // the workspace configures them in Settings → Communication.
     senderEmail: text('sender_email'),
+    // Beats the inspector's own address even when pointOfContact='inspector'
+    // (`resolveSenderIdentity`: configured replyTo ?? inspector email). Blank in
+    // 'company' mode means the mail carries NO Reply-To at all, which is why the
+    // communication PATCH refuses that combination outright.
     replyTo: text('reply_to'),
     // Phase 1 (B-4/A-7) — sender identity. `email_mode` switches between the
     // platform Resend account ('platform', default) and the tenant's own
@@ -88,7 +102,17 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // (`k1:iv:wrapped`, AES-GCM under the HKDF KEK from JWT_SECRET, AAD=tenantId).
     // NULL while the tenant still has a legacy un-prefixed blob (or no secrets).
     dekEnc: text('dek_enc'),
+    // The ONLY credential on the public company calendar feed `/api/ics/:token`
+    // (no auth, 90 days of inspections including addresses). Minted lazily as a
+    // dashless UUID the first time an admin opens the calendar-links panel and
+    // never rotated — rewriting it silently breaks every subscribed calendar.
+    // Deliberately absent from the branding write allowlist.
     icsToken: text('ics_token'),
+    // Cross-origin allowlist for the embeddable booking widget; an entry may
+    // carry ONE `*` in the host (`https://*.acme.com`), and protocol/port must
+    // match exactly. NULL or [] is FAIL-CLOSED — `isOriginAllowed` returns false
+    // on an empty list, so the widget embeds nowhere until an origin is saved.
+    // Written only by WidgetService, never through the branding allowlist.
     widgetAllowedOrigins: text('widget_allowed_origins', { mode: 'json' }).$type<string[]>(),
     // Report Style Presets — default appearance profile id (built-in: signature|meridian|terra).
     // Open-ended (Phase 2 adds tenant-authored profiles); resolveProfile falls back to 'signature'.
@@ -252,6 +276,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     customTermsUrl: text('custom_terms_url'),
     // Optional full-page body for hosted mode; null = built-in template.
     privacyBody: text('privacy_body'),
+    // Whitespace-only is stored as NULL. Every PATCH that mentions this column
+    // also records a legal-version publish row (content-hash de-duped, non-fatal
+    // if it fails), and THAT registry — not this row's updated_at — is the "Last
+    // updated" the public /legal/:tenant/terms page shows.
     termsBody: text('terms_body'),
     // #270 — display SHAPE, independent of language. A US user wanting a
     // 24-hour clock has no locale that expresses it: en-US implies 12h, en-GB
@@ -259,6 +287,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // here — the tenant default is the bottom of the resolution chain.
     // Appended at END of the table per the D1 add-column-at-end rule.
     dateFormat: text('date_format', { enum: ['us', 'iso', 'eu'] }).notNull().default('us'),
+    // Becomes `hourCycle` h23/h12 in the shared date formatter. `users.time_format`
+    // overrides it for workspace CHROME only; inspection, report and appointment
+    // times resolve from the tenant value alone, so an edit here changes the clock
+    // every party reads off the same document.
     timeFormat: text('time_format', { enum: ['12h', '24h'] }).notNull().default('12h'),
     // How internal scheduling treats a DOUBLE-BOOKING — the same inspector
     // already busy at the proposed instant. Sibling of `holidayInternalPolicy`,
@@ -341,6 +373,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // per-inspector setup at all. NULL = never geocoded (or the lookup failed);
     // `closest` treats that as "this workspace has no anchor", not as (0,0).
     companyLat: real('company_lat'),
+    // Both coordinates must be `typeof number` before `closest` anchors anything
+    // — a lone lat is no anchor — and 0 is a legitimate longitude, which is why
+    // the routing check is a typeof and never truthiness. Written only as a pair,
+    // by the company-geocode endpoint.
     companyLng: real('company_lng'),
     companyGeocodedAt: integer('company_geocoded_at', { mode: 'timestamp_ms' }),
     // What the workspace confirmed when it saved its OWN AI provider key.
@@ -364,10 +400,21 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Appended at END of the table per the D1 add-column-at-end rule
     // (tenant_configs is FK-referenced).
     aiKeyAttestationProvider: text('ai_key_attestation_provider', { enum: ['gemini'] }),
+    // The arrangement attested: the tenant's OWN key, not a managed one. All six
+    // are written in the same statement as `secrets_enc` by the secrets save, and
+    // every one must be non-null before a BYO AI call is allowed.
     aiKeyAttestationMode: text('ai_key_attestation_mode', { enum: ['tenant_key'] }),
+    // Whose provider account the key bills to — and therefore whose provider
+    // terms govern the content sent to it.
     aiKeyAttestationAccountOwner: text('ai_key_attestation_account_owner', { enum: ['tenant'] }),
+    // Stamped from AI_PROVIDER_TERMS_VERSION at write time. A later bump of that
+    // constant does NOT invalidate stored rows — the runtime check requires the
+    // column non-null and ignores its value — so re-confirmation stays a
+    // deliberate pass rather than an outage caused by a one-character edit.
     aiKeyAttestationTermsVersion: text('ai_key_attestation_terms_version'),
     aiKeyAttestationAttestedAt: integer('ai_key_attestation_attested_at', { mode: 'timestamp_ms' }),
+    // Stamped from AI_KEY_ATTESTATION_POLICY_VERSION — the revision of OUR
+    // statements, which moves independently of the provider terms above.
     aiKeyAttestationPolicyVersion: text('ai_key_attestation_policy_version'),
     // #275 — quick-insert phrases for repair-request notes, maintained by the
     // tenant. Same shape and storage idiom as `custom_referral_sources` above.

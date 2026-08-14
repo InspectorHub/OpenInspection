@@ -16,6 +16,11 @@ export const inspectionInspectors = sqliteTable('inspection_inspectors', {
     inspectionId: text('inspection_id').notNull(),
     userId:       text('user_id').notNull(),
     tenantId:     text('tenant_id').notNull(),
+    // 'lead' is the value everything keys on: the ICS feed takes the lead's row
+    // as the calendar owner, roster.ts hangs the rest off it, inspector metrics
+    // split led-vs-assisted from it, and version-diff calls the lead "the"
+    // inspector of a report version. syncInspectionAssignments writes at most one
+    // lead per inspection and dedupes helpers against them.
     role:         text('role', { enum: ['lead', 'helper'] }).notNull().default('lead'),
     createdAt:    integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [

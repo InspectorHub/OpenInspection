@@ -10,6 +10,11 @@ export const contactRoleProfiles = sqliteTable('contact_role_profiles', {
     tenantId:        text('tenant_id').notNull(),
     key:             text('key').notNull(),              // stable machine id, unique per tenant
     label:           text('label').notNull(),            // tenant-editable display name
+    // The capability baseline every tenant-named role resolves to: report
+    // delivery, self-retrieval, whether the person may hold an account, agent-
+    // portal visibility, repair-list access. Read by capabilitiesForKind, which
+    // FAILS CLOSED — a value outside the enum grants nothing rather than
+    // defaulting, because callers cast the DB string through `as RoleKind`.
     kind:            text('kind', { enum: ['client', 'agent', 'other'] }).notNull(),
     emailTemplateId: text('email_template_id'),          // → message_templates.id (optional)
     smsTemplateId:   text('sms_template_id'),

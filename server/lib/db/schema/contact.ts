@@ -5,10 +5,18 @@ import { tenants } from './tenant';
 export const contacts = sqliteTable('contacts', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
+    // Load-bearing, not descriptive. Agent signup will only bind an account to a
+    // contact already typed 'agent', and the booking path's auto-create only
+    // reuses an existing 'client' — so retyping a row changes what it can be
+    // matched to. (tenant, type) is indexed because that is the list query.
     type: text('type', { enum: ['agent', 'client', 'other'] }).notNull().default('client'),
     name: text('name').notNull(),
     email: text('email'),
     phone: text('phone'),
+    // The agent's brokerage or firm. Free text, and the one contact field that
+    // leaves the product: it is sent as QuickBooks CompanyName on customer
+    // sync, groups the agent-referral leaderboard, and is a mapped column in
+    // both CSV import and export.
     agency: text('agency'),
     notes: text('notes'),
     createdByUserId: text('created_by_user_id'),

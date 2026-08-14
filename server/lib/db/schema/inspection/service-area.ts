@@ -20,6 +20,10 @@ export const inspectorServiceAreas = sqliteTable('inspector_service_areas', {
     id:        text('id').primaryKey(),
     tenantId:  text('tenant_id').notNull(),
     userId:    text('user_id').notNull(),
+    // Uppercased and shape-checked at the API: 3-10 chars, `[A-Z0-9]+` rather
+    // than digits-only, so ZIP+4 and a Canadian FSA both fit. Rows are written
+    // as a whole-list REPLACEMENT (delete the inspector's rows, then chunked
+    // insert), never patched one prefix at a time.
     zipPrefix: text('zip_prefix').notNull(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [

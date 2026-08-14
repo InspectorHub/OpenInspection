@@ -50,6 +50,7 @@
   "app/components/portal/sections/RepairBuilderSection.tsx": 450,
   "app/components/editor/CostItemsPanel.tsx": 449,
   "server/api/inspections/results.ts": 445,
+  "server/lib/db/schema/tenant/core.ts": 442,
   "app/lib/collab/results-doc-connection.ts": 435,
   "app/routes/templates.tsx": 435,
   "server/api/inspections/media.ts": 435,
@@ -59,7 +60,8 @@
   "app/routes/public/portal-inspection.tsx": 430,
   "app/hooks/useStructureEdit.ts": 424,
   "server/data/automation-seeds.ts": 423,
+  "server/lib/db/schema/inspection/core.ts": 412,
   "app/routes/calendar.tsx": 410,
-  "server/services/agreement/signer-state.ts": 409,
-  "server/lib/compliance/erasure-manifest.ts": 406
+  "server/lib/compliance/erasure-manifest.ts": 406,
+  "server/services/agreement/signer-state.ts": 401
 }

@@ -10,18 +10,30 @@ export const inspections = sqliteTable('inspections', {
     id:                  text('id').primaryKey(),
     tenantId:            text('tenant_id').notNull().references(() => tenants.id),
     inspectorId:         text('inspector_id').references(() => users.id),
+    // The free-text address every surface actually shows: dashboard rows, the
+    // command palette's LIKE search, ICS/calendar summaries, agreement envelopes,
+    // notification templates, the report header. The address_* fields below only
+    // enrich it — nothing falls back to them — so it stays NOT NULL.
     propertyAddress:     text('property_address').notNull(),
     // Spec 5D — geocoded address fields populated by Google Places Details
     // when the inspector picks an autocomplete result. All nullable so legacy
     // inspections (free-text address only) load without backfill.
+    //
+    // Written at intake from the wizard's Places pick, and by the public
+    // booking's post-insert geocode stamp; copied verbatim onto a re-inspection.
+    // The erasure manifest RETAINS the whole family under Art. 17(3)(e), which
+    // is currently the only place that rules on them at all. The create path
+    // coerces with `||`, so a blank text component stores NULL, never ''.
     addressPlaceId:      text('address_place_id'),
-    addressStreet:       text('address_street'),
-    addressCity:         text('address_city'),
-    addressState:        text('address_state'),
-    addressZip:          text('address_zip'),
-    addressCounty:       text('address_county'),
+    addressStreet:       text('address_street'),   // street line only; the whole address stays in property_address
+    addressCity:         text('address_city'),    // Places locality component
+    addressState:        text('address_state'),   // Places admin-area-1 short form (e.g. TX)
+    addressZip:          text('address_zip'),      // not the coverage input: booking eligibility matches the zip the booker submitted
+    addressCounty:       text('address_county'),   // raw Places component; the strip-editable one is `county` below
+    // No reader found for either: the wizard's map draws from the live Places
+    // pick held in component state, not from the stored row.
     addressLat:          real('address_lat'),
-    addressLng:          real('address_lng'),
+    addressLng:          real('address_lng'),     // written with address_lat; likewise no reader
     addressGeocodedAt:   integer('address_geocoded_at', { mode: 'timestamp_ms' }),
     // IA-1 — WHO is captured via inspection_people (client/agent rows); see
     // schema/inspection/people.ts. The former denormalized clientContactId/
@@ -32,7 +44,15 @@ export const inspections = sqliteTable('inspections', {
     // TEXT per the Schema Rules calendar-field exception, not an epoch timestamp.
     date:                text('date').notNull(),
     status:              text('status', { enum: [...INSPECTION_STATUSES] }).notNull().default('requested'),
+    // The report's lifecycle, tracked apart from `status` (the appointment). Every
+    // anonymous surface — public report, share link, /verify, repair builder —
+    // gates on isReportPublished() of this value, and only InspectionStatusService
+    // moves it, each transition asserting the current value first.
     reportStatus:        text('report_status', { enum: [...REPORT_STATUSES] }).notNull().default('in_progress'),
+    // Order-level payment state. Every reader tests `=== 'paid'` (publish
+    // pre-flight, the report gate, automation conditions), so 'partial' behaves
+    // exactly as 'unpaid' here — the finer states live on `invoices`. Voiding a
+    // paid invoice resets it (invoice-payment-gate.ts).
     paymentStatus:       text('payment_status', { enum: ['unpaid','partial','paid'] }).notNull().default('unpaid'),
     // Buyer's Agent — see inspection_people (referredByAgentId column DROPPED, superseded).
     // P-4 authority chain: denormalized cache only — never reconcile back from invoice
@@ -59,13 +79,30 @@ export const inspections = sqliteTable('inspections', {
     // Calendar-semantic YYYY-MM-DD (real-estate closing date, no time) — intentionally
     // TEXT per the Schema Rules calendar-field exception, not an epoch timestamp.
     closingDate:         text('closing_date'),
+    // Free text, not an id: the Hub's Order-details dropdown offers the tenant's
+    // configured list but keeps an off-list value the operator typed. /api/metrics
+    // groups the trimmed non-empty values into the financial top-sources panel.
     referralSource:      text('referral_source'),
+    // The TENANT's own order number, for cross-referencing their other systems —
+    // we never generate it, parse it, or enforce uniqueness. Edited in Order
+    // details, frozen into the publish snapshot, off by default as a list column.
     referenceNumber:             text('reference_number'),
+    // Staff-private note. NOTHING WRITES IT: no request schema accepts it and no
+    // UI edits it. The readers are the tenant CSV export and the public-report
+    // projection, which deletes it (with `price`) before the payload reaches any
+    // link holder — keep that delete if a writer ever appears.
     internalNotes:       text('internal_notes'),
     yearBuilt:           integer('year_built'),
     sqft:                integer('sqft'),
+    // Plain text rather than an enum: getPropertyFacts coerces anything outside
+    // basement/slab/crawlspace/other to 'other' on read, so an Estated autofill
+    // value can land here without the write path having to reject it.
     foundationType:      text('foundation_type'),
     bedrooms:            integer('bedrooms'),
+    // `real` because half-baths are normal (2.5). One of the six Property Facts
+    // columns patched together by updatePropertyFacts; Estated autofill fills it
+    // from `structure.baths`. NULL = the inspector has not entered it, and the
+    // strip renders its "—" placeholder.
     bathrooms:           real('bathrooms'),
     // Round-2 backlog G1 (Spectora §E.2) — free-text lot size so inspectors
     // can enter "0.25 acres", "10,000 sqft", etc. without a parser.
@@ -78,8 +115,16 @@ export const inspections = sqliteTable('inspections', {
     // row used as the report cover image. NULL until the inspector picks
     // one; the Publish pre-flight surfaces this as a gate.
     coverPhotoId:        text('cover_photo_id'),
-    // Media Studio (cover crop) — re-editable crop transform applied to the
-    // SOURCE image (cover_photo_id), in source-pixel coords. NULL = uncropped.
+    // Media Studio (cover crop) — the crop transform applied to the SOURCE image
+    // (cover_photo_id), in source-pixel coords. NULL = uncropped.
+    //
+    // ⚠️ It says "re-editable" nowhere any more, because it is not. The value is
+    // written by the cover cropper and read back by NOTHING: it rides the single
+    // inspection GET to the browser, but `CoverCropper` takes no initial-crop
+    // prop and `PhotoCropper` beneath it accepts no initial region, so re-opening
+    // the cropper starts from the default 3:2 frame every time. The data to
+    // restore the previous crop is here and has always been here; the two props
+    // to carry it are what is missing.
     coverCrop:           text('cover_crop', { mode: 'json' }).$type<{
         aspect: '3:2' | '16:9' | '1.91:1' | '4:3';
         orientation: 'landscape' | 'portrait';
@@ -89,8 +134,19 @@ export const inspections = sqliteTable('inspections', {
     // (JPEG, 2048px long edge). Report/OG/PDF read THIS when set; falls back
     // to cover_photo_id (uncropped source) otherwise.
     coverImageKey:       text('cover_image_key'),
+    // Suite / unit designation of the ONE subject property ("Suite 200"). Not a
+    // link to `inspection_units` and nothing to do with per-unit mode. Written
+    // only by the Property Facts strip; read by the inspections CSV export and
+    // the inspection read schema — the report's facts banner does not carry it.
     unit:                text('unit'),
+    // Decides what the report becomes: resolveReportTier() reads it to tell
+    // commercial from residential, section applicability filters on it, and the
+    // editor's Property Info preset resolves only when it is 'commercial'.
     propertyType:        text('property_type'),
+    // Plain text because org-custom subtypes live alongside the platform ids.
+    // Meaningful only when property_type = 'commercial': it selects the editor's
+    // metadata preset (`commercial:<id>`) and gates template sections through
+    // applicableTo.commercialSubtypes (org ids match via their platform parent).
     commercialSubtype:   text('commercial_subtype'),
     // Commercial PCA Phase T — report tier. Meaningful only for commercial
     // inspections (NULL on residential/multi-unit). Drives which report
@@ -99,6 +155,9 @@ export const inspections = sqliteTable('inspections', {
     // resolveReportTier — "auto light, user elevates"); 'full_pca' is the
     // ASTM E2018 deliverable. See "Commercial PCA Phase T".
     reportTier:          text('report_tier', { enum: ['light_commercial', 'full_pca'] }),
+    // The county as the Property Facts strip edits it — written ONLY by
+    // updatePropertyFacts, never at intake. Distinct from `address_county` above,
+    // which is the untouched Places component; the two can legitimately disagree.
     county:              text('county'),
     // Selling Agent — see inspection_people (sellingAgentId column DROPPED, superseded).
     disableAutomations:  integer('is_automations_disabled', { mode: 'boolean' }).notNull().default(false),
@@ -207,7 +266,12 @@ export const inspections = sqliteTable('inspections', {
     // so existing rows do not need one.
     // Appended at table end for D1 rebuild safety.
     unlockedAt:          integer('unlocked_at', { mode: 'timestamp_ms' }),
+    // users.id, app-layer soft ref; getReportGate resolves it to `name ?? email`
+    // as unlockedByName for the Hub banner. Cleared with unlocked_at on re-lock.
     unlockedBy:          text('unlocked_by'),
+    // Shown verbatim in that banner and nowhere else — no code branches on it.
+    // A second unlock on an already-unlocked order is a no-op, so this holds the
+    // FIRST reason given until someone re-locks.
     unlockReason:        text('unlock_reason'),
     // When the sold service lines were turned into `reports` rows.
     //
@@ -268,11 +332,20 @@ export const inspectionRequests = sqliteTable('inspection_requests', {
     tenantId:         text('tenant_id').notNull().references(() => tenants.id),
     clientName:       text('client_name').notNull(),
     clientEmail:      text('client_email'),
+    // The one place a phone is a column of its own, which is why the DSAR
+    // assembler widens its match to (email OR phone) here and on no other table.
+    // Erasure NULLs it in place while the row survives (anonymize-pii.ts).
     clientPhone:      text('client_phone'),
+    // Copied verbatim onto every inspection this request spawns, by both create
+    // and addSubInspection — the children never read back through the request.
+    // Retained through erasure alongside the inspection addresses.
     propertyAddress:  text('property_address').notNull(),
+    // Resolved from the Places pick when a public booking is fulfilled, or
+    // patched through the request API. Nothing branches on them: they ride the
+    // request read projection out to the API/MCP contract and stop there.
     propertyCity:     text('property_city'),
-    propertyState:    text('property_state'),
-    propertyZip:      text('property_zip'),
+    propertyState:    text('property_state'),   // filled with city/zip from the Places pick; nothing branches on it
+    propertyZip:      text('property_zip'),   // not the coverage input — booking-admission uses the submitted zip
     scheduledAt:      integer('scheduled_at', { mode: 'timestamp_ms' }).notNull(),
     status:           text('status', {
         enum: ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'],
@@ -305,6 +378,11 @@ export const inspectionResults = sqliteTable('inspection_results', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     inspectionId: text('inspection_id').notNull().references(() => inspections.id),
+    // Item id -> { rating, value, photos[], customComments, ... }, plus reserved
+    // `_`-prefixed keys (`_inspector_signature`). The Durable Object writes
+    // projectResults(doc) here on every persist; the photo, annotation and
+    // offline-sync paths patch the same map directly, but only when no doc owns
+    // it — with collab on they skip the write so the next persist cannot clobber.
     data: text('data', { mode: 'json' }).notNull(),
     // Authoritative Yjs CRDT state for collaborative results editing (#181). The
     // Durable Object persists Y.encodeStateAsUpdate here; `data` above is the

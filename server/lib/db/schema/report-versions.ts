@@ -18,6 +18,10 @@ export const reportVersions = sqliteTable('report_versions', {
     inspectionId:   text('inspection_id').notNull(),
     versionNumber:  integer('version_number').notNull(),
     snapshotJson:   text('snapshot_json').notNull(),
+    // NOT a summary of the report. It is the per-publish AMENDMENT REASON: the
+    // free-text "what changed" note (max 500 chars) the publish request carries,
+    // NULL on a first publish. Surfaced as `reason` in the report page's
+    // amendment trail and as {{summary}} in the report.amended email.
     summary:        text('summary'),
     // #120 — integrity layer. content_hash = SHA-256(snapshot_json); prev_hash
     // chains to the previous version's content_hash; signature = Ed25519 over
@@ -26,11 +30,24 @@ export const reportVersions = sqliteTable('report_versions', {
     // so pre-#120 rows load (verifier shows a "predates verification" notice).
     contentHash:       text('content_hash'),
     prevHash:          text('prev_hash'),
+    // Verified against the tenant's CURRENT signing key, not against a key named
+    // by this row — rotating that key makes every earlier signature report
+    // `signatureValid: false`.
     signature:         text('signature'),
+    // SHA-256 of the public key that signed this row. Nothing verifies with it;
+    // it is published on the verifier page so a reader can tell whether two
+    // reports were signed by the same key.
     keyFingerprint:    text('key_fingerprint'),
     isAmendment:       integer('is_amendment', { mode: 'boolean' }).notNull().default(false),
+    // The bearer credential for the public verifier: a random UUID minted per
+    // publish and the SOLE lookup key for the /v/:token page and the frozen-PDF
+    // endpoint (both unauthenticated). Never reused across versions.
     verificationToken: text('verification_token'),
     publishedAt:    integer('published_at', { mode: 'timestamp_ms' }).notNull(),
+    // users.id of the publisher, straight from the JWT and never resolved to a
+    // name. A publish with no authenticated user writes no version row at all,
+    // so this is never a placeholder. Returned by the versions list endpoint;
+    // no surface currently renders it.
     publishedBy:    text('published_by').notNull(),
     createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull().default(sql`(unixepoch() * 1000)`),
     // The report this version belongs to. Two reports on one order publish

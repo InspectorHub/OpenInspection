@@ -18,7 +18,16 @@ export const inspectionUnits = sqliteTable('inspection_units', {
     tenantId:     text('tenant_id').notNull(),
     inspectionId: text('inspection_id').notNull(),
     parentUnitId: text('parent_unit_id'),
+    // Which level of the tree this node is. Only `kind='unit'` rows are
+    // SCOPES: the editor's scope switcher, the unit-progress endpoint and the
+    // tagged/unit conversion all filter on it, so building and floor rows carry
+    // structure and attributes but never own findings.
     kind:         text('kind', { enum: ['building', 'floor', 'unit'] }).notNull(),
+    // What the unit is FOR. A common area scopes findings exactly like a
+    // regular unit; the only behaviour keyed on it is the hint shown beside the
+    // name in the editor's scope dropdown. Settable through the single-unit
+    // create endpoint — every bulk path (pattern expansion, tagged→unit
+    // promotion, clone-from-sibling) writes 'unit'.
     type:         text('type', { enum: ['unit', 'common'] }).notNull().default('unit'),
     name:         text('name').notNull(),
     sortOrder:    integer('sort_order').notNull().default(0),

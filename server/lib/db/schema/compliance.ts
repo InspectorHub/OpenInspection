@@ -79,14 +79,23 @@ export const smsConsentLog = sqliteTable('sms_consent_log', {
      * ISV filing rests on — see docs/superpowers/specs/2026-07-30-sms-consent-isv-strategy.md.
      */
     recipientType:     text('recipient_type', { enum: ['client', 'agent', 'other', 'staff'] }).notNull(),
+    // The consent VERDICT. The latest row per subject is the whole answer the
+    // send gate reads (`sms/send-gate.ts`, `notifications/channel-consent.ts`):
+    // one 'revoked' blocks every later SMS until a new 'granted' is appended.
     action:            text('action', { enum: ['granted', 'revoked'] }).notNull(),
     disclosureVersion: integer('disclosure_version').notNull(),
     // `settings_page` is a grant made inline on the notifications screen, with
     // the disclosure rendered there. Type-layer only — the DDL is plain text,
     // so widening this costs no migration.
     capturedVia:       text('captured_via', { enum: ['booking_form', 'optin_link', 'admin', 'settings_page'] }).notNull(),
+    // Request evidence for the grant, taken from CF-Connecting-IP / User-Agent
+    // at the capture site (the booking form is the only path that supplies
+    // them today) — NULL wherever there is no browser request, e.g. an inbound
+    // STOP or an admin-recorded event. Both are declared `retain` under
+    // art_17_3_b in ERASURE_MANIFEST: a DSAR erasure deliberately leaves them,
+    // because they are the proof the consent happened.
     ip:                text('ip'),
-    userAgent:         text('user_agent'),
+    userAgent:         text('user_agent'),   // captured with `ip`; retained through erasure on the same basis
     createdAt:         integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     /**
      * WHO the consent is about, generalised beyond `contacts`.
@@ -106,35 +115,63 @@ export const smsConsentLog = sqliteTable('sms_consent_log', {
     index('idx_sms_consent_subject').on(t.tenantId, t.subjectKind, t.subjectId, t.createdAt),
 ]);
 
-// SMS provider compliance state — one row per tenant, tracks Twilio (or
-// future provider) TCR registration progress through the managed-pool flow.
-// `mode` mirrors the tenant's sms_mode but only records managed/own tenants
-// (platform passthrough has no per-tenant compliance entities to track).
+// SMS provider compliance state — one row per tenant, tracks carrier (Twilio /
+// Telnyx) registration progress through the managed-pool flow.
 // `provider` records which carrier the SIDs belong to.
-// All SID/status columns are nullable: filled in progressively as each
-// registration step completes (see #181 compliance orchestration).
-// `complianceStatus` is the rolled-up gate: 'approved' = fully cleared to send.
+// Every SID/status column below is nullable and written by ONE step of the
+// provisioning chain (`lib/messaging/providers/*.ts`, driven through
+// `D1ComplianceStateStore`), which is what makes a crashed run resumable: each
+// step is skipped when its SID is already present. A NULL therefore says the
+// flow never reached that step. Status columns hold the carrier's RAW string,
+// not our enum, and are refreshed by the compliance webhook + cron sweep.
 export const messagingCompliance = sqliteTable('messaging_compliance', {
     tenantId: text('tenant_id').notNull().primaryKey(),
+    // Which flow this row belongs to — NOT the tenant's send mode, which lives
+    // on `tenant_configs.sms_mode`. Only two values are ever written: the state
+    // store stamps 'managed_dedicated' when provisioning starts, syncOwnStatus
+    // stamps 'own'. The cron sweep selects on it, so an 'own' row is never
+    // polled against (and overwritten from) the platform ISV account.
     mode: text('mode', { enum: ['own', 'managed_shared', 'managed_dedicated'] }).notNull().default('own'),
     provider: text('provider', { enum: ['twilio', 'telnyx'] }), // which provider holds this tenant's entities
     // `subaccount_sid` was here. Unlike its neighbours it was never written by
     // any provisioning step and never read by any resolver — the one column of
     // this table with no code on either side of it.
+    // Step 1 of both Twilio channels: the TrustHub CustomerProfile, created with
+    // the tenant's legal name and the per-tenant compliance webhook URL (which
+    // is registered ONLY on this call, so a resume never re-registers it).
+    // Always NULL on a Telnyx row — that flow opens at the brand instead.
     customerProfileSid: text('customer_profile_sid'),
-    customerProfileStatus: text('customer_profile_status'),
+    customerProfileStatus: text('customer_profile_status'),  // step-1 verdict for the SID above
+    // The 10DLC brand registration (Twilio step 2, Telnyx step 1). Approval here
+    // is NOT tenant approval: the campaign is the terminal entity, and both the
+    // webhook and the poll are explicitly guarded so a late brand-approved
+    // callback cannot roll a campaign_pending/approved row backwards.
     brandSid: text('brand_sid'),
-    brandStatus: text('brand_status'),
+    brandStatus: text('brand_status'),      // 10DLC brand verdict; approval here is not tenant approval
+    // The 10DLC campaign — terminal entity for the sp10dlc channel, so its
+    // approval is what sets complianceStatus='approved'. Twilio exposes no REST
+    // read for the status (webhook only); Telnyx does poll it in syncStatus.
     campaignSid: text('campaign_sid'),
-    campaignStatus: text('campaign_status'),
+    campaignStatus: text('campaign_status'),  // 10DLC campaign verdict; Twilio learns it by webhook only
+    // Toll-free verification — terminal entity for the tollfree channel; NULL on
+    // every sp10dlc row. `tfvSid` is the id the status read keys on, which on
+    // Telnyx is the create response's `id`, not its verificationRequestId.
     tfvSid: text('tfv_sid'),
-    tfvStatus: text('tfv_status'),
+    tfvStatus: text('tfv_status'),          // toll-free verification verdict; NULL on the sp10dlc path
+    // The sending container the provisioned number is attached to (Twilio
+    // Messaging Service SID / Telnyx messaging-profile id). Also read at SEND
+    // time: `resolve-twilio.buildManagedBag` uses it for managed_dedicated
+    // tenants, and NULL there means no managed credential bag is built at all.
     messagingResourceSid: text('messaging_resource_sid'),
     // Provider-specific metadata stored as a JSON string. Used by non-Twilio
     // providers (e.g. Telnyx) to persist vetting or compliance entity IDs that
     // do not map to the Twilio-shaped SID columns above. Nullable: absent for
     // Twilio tenants and for rows that pre-date multi-provider support.
     providerMeta: text('provider_meta'),
+    // The purchased DID in E.164, persisted together with its SID before the
+    // attach step. Displayed to the tenant by the Settings compliance wizard,
+    // and it is the VALUE (not the SID) that Telnyx's campaign assignment and
+    // toll-free submission take.
     provisionedNumber: text('provisioned_number'),
     // The Twilio phone-number SID (PN...) returned by numbers.buy. Required for
     // attachSender and tollfree.create; persisted before those calls so a crash-
@@ -145,9 +182,18 @@ export const messagingCompliance = sqliteTable('messaging_compliance', {
     // marker lets a crash-resumed run re-run only the attach (without re-buying) —
     // attachSender is not assumed idempotent, so it is guarded on its own flag.
     senderAttached: integer('has_sender_attached', { mode: 'boolean' }).notNull().default(false),
+    // The rolled-up gate, and a live authorization: `managedSendAllowed` blocks
+    // EVERY managed_dedicated send unless this reads 'approved' (a missing row
+    // blocks too — fail closed). Provisioning only ever advances it to a
+    // *_pending value; 'approved' comes exclusively from the carrier webhook or
+    // the cron sweep, and neither is allowed to move it backwards.
     complianceStatus: text('compliance_status', {
         enum: ['not_started', 'profile_pending', 'brand_pending', 'campaign_pending', 'tfv_pending', 'approved', 'rejected'],
     }).notNull().default('not_started'),
+    // The carrier's own words for the latest rejection ("code=…: message"),
+    // stored verbatim because the tenant has to act on it — the wizard shows it
+    // under the rejected state. Cleared back to NULL when a terminal entity is
+    // approved. NULL while nothing has been rejected.
     rejectionReason: text('rejection_reason'),
     lastSyncAt: integer('last_sync_at', { mode: 'timestamp_ms' }),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),

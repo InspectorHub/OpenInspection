@@ -13,7 +13,7 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | Columns | 1112 |
 | Indexes (excluding primary keys) | 160 |
 | Database foreign keys (all legacy, frozen) | 52 |
-| Columns carrying a source comment | 334 (30%) |
+| Columns carrying a source comment | 510 (46%) |
 
 **Reading the tables.** SQLite has four storage types; the semantic type is a
 Drizzle layer on top — `integer{mode:timestamp_ms}` is epoch milliseconds,
@@ -47,14 +47,14 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `signed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `viewed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `sent_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
-| `last_error` | text |  |  |  |  |
+| `last_error` | text |  |  |  | The decline REASON, truncated to 500 chars. Written only by markDeclinedBySigner, and only when the signer's decline actually drags the envelope aggregate to 'declined' — a decline that leaves a 'one'-policy envelope live records nothing here. **[more]** |
 | `inspector_signature_base64` | text |  |  |  | Spec 5H D1 — optional inspector pre-sign. NULL until inspector signs. |
 | `inspector_signed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `inspector_user_id` | text | FK→`users.id` |  |  | *App-layer reference to another row — no database foreign key.* |
 | `verification_token` | text | UQ |  |  | Spec 5H P2 — opaque public-verifier token. Set on the sign event. |
 | `content_snapshot` | text |  |  |  | Track I-a (#116) — immutable content snapshot pinned at envelope creation. Public sign page + checkout + verifier + signed.pdf ALL render this, never the live template. |
-| `content_hash` | text |  |  | `all, one` | SHA-256 hex of contentSnapshot |
-| `completion_policy` | text | NN | `'all'` | `all, one` |  |
+| `content_hash` | text |  |  |  | SHA-256 hex of contentSnapshot |
+| `completion_policy` | text | NN | `'all'` | `all, one` | The reduction computeEnvelopeStatus applies to the signer rows to derive this envelope's status. |
 | `token_hash` | text | UQ |  |  | lazy hash upgrade of legacy plaintext `token` |
 | `purged_at` | integer |  |  |  | Track I-a GDPR (spec §7) — final-destruction marker. NULL while the signed evidence is within its retention window; set to the sweep timestamp when the daily retention sweep destroys signature_base64 past the window. **[more]** |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
@@ -83,17 +83,17 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX |  |  | → tenants.id (app-layer; FK intentionally omitted per Schema Rules) |
 | `request_id` | text | NN UQ IX |  |  | → agreement_requests.id (app-layer) |
 | `name` | text | NN |  |  |  |
-| `email` | text | NN UQ |  | `client, co_client, agent, other` |  |
-| `role` | text | NN | `'client'` | `client, co_client, agent, other` |  |
+| `email` | text | NN UQ |  |  |  |
+| `role` | text | NN | `'client'` | `client, co_client, agent, other` | A LABEL on the signing party, not a permission: nothing branches on it. Every signer holds the same token-scoped rights. |
 | `contact_id` | text |  |  |  | → contacts.id (app-layer, optional) |
 | `token_hash` | text | UQ |  |  | SHA-256 hex; NULL on backfilled rows until first link build |
 | `token_enc` | text |  |  | `pending, sent, viewed, signed, declined, expired` | 't1:iv:cipher' sealed plaintext (config-crypto sealToken) |
 | `status` | text | NN | `'pending'` | `pending, sent, viewed, signed, declined, expired` | *State-machine column — see the Values column for the vocabulary.* |
-| `signature_base64` | text |  |  |  |  |
+| `signature_base64` | text |  |  |  | The drawn signature image. Bare base64 OR a full `data:` URL — both are accepted, and agreements-render prefixes the bare form when composing the signed PDF. |
 | `signed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `viewed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
-| `ip_address` | text |  |  |  |  |
-| `user_agent` | text |  |  | `remote, in_person` |  |
+| `ip_address` | text |  |  |  | Captured from cf-connecting-ip (x-forwarded-for as fallback) at sign time and printed in the signed-confirmation email and the audit trail. |
+| `user_agent` | text |  |  | `remote, in_person` | The signer's User-Agent, truncated to 200 chars at the route. Evidence only: nothing branches on it, and it is anonymized with ipAddress above. |
 | `channel` | text |  |  | `remote, in_person` | set at sign time |
 | `on_behalf_of` | text |  |  |  | client name an authorized agent signs for |
 | `on_behalf_disclaimer` | text |  |  |  | disclaimer text snapshot shown at sign time |
@@ -120,7 +120,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN |  |  |  |
-| `content` | text | NN |  |  |  |
+| `content` | text | NN |  |  | The tenant's template body, run through sanitizeAgreementHtml on EVERY create/update (never trusted as stored). |
 | `version` | integer | NN | `1` |  | *An integer value.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 
@@ -186,10 +186,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text |  |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
 | `action` | text | NN |  |  | e.g. 'inspection.create' |
-| `entity_type` | text | NN IX |  |  |  |
+| `entity_type` | text | NN IX |  |  | The entity family the action touched ('inspection', 'widget', 'agent', …). Free-form — each caller passes its own string, there is no registry — and exposed as the `?entityType=` filter on the admin audit list. |
 | `entity_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `metadata` | text |  |  |  | *Structured extra context, JSON-encoded.* |
-| `ip_address` | text |  |  |  |  |
+| `ip_address` | text |  |  |  | `CF-Connecting-IP`, and only on the `auditFromContext` path — a direct `writeAuditLog` caller passes its own or nothing, so NULL means "no request context", not "no IP". |
 | `inspector_slug` | text |  |  |  | Sprint B-3 — populated on inspector-facing events (writeAuditLogWithSlug helper); NULL otherwise so the column stays signal-rich for the audit dashboard's per-inspector grouping. |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
 
@@ -240,7 +240,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN |  |  |  |
-| `trigger` | text | NN |  |  |  |
+| `trigger` | text | NN |  |  | THE EVENT THAT ENQUEUES THIS RULE. `AutomationService.trigger()` matches the tenant's active rules whose trigger equals the fired `ctx.triggerEvent` and writes one pending `automation_logs` row per (recipient, channel); the same value is stamped onto the notice header's `notifications.type`. |
 | `recipient_kind` | text | NN |  | `role, inspector, all, staff` | Recipient discriminator (replaces the fixed `recipient` enum). `role` means "the role profile named by recipientRoleProfileId"; `inspector` and `all` are role-independent and always carry a null profile id. **[more]** |
 | `recipient_role_profile_id` | text |  |  |  | *App-layer reference to another row — no database foreign key.* |
 | `delay_minutes` | integer | NN | `0` |  | *An integer value.* |
@@ -362,12 +362,12 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `user_id` | text | NN UQ IX |  | `google, microsoft, apple` | *The staff user this belongs to (`users.id`). App-layer reference.* |
-| `provider` | text | NN UQ |  | `google, microsoft, apple` |  |
-| `auth_type` | text | NN |  | `oauth, caldav` |  |
+| `user_id` | text | NN UQ IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
+| `provider` | text | NN UQ |  | `google, microsoft, apple` | Which system holds the calendar. `getCalendarProvider(provider)` is the only dispatch: it picks the API client that reads busy time and pushes events. |
+| `auth_type` | text | NN |  | `oauth, caldav` | How credentialsEnc authenticates. Written from the provider descriptor's own constant (google → 'oauth', apple → 'caldav'), never chosen by a user. |
 | `credentials_enc` | text | NN |  |  | v2 envelope blob (AES-GCM under per-tenant DEK). OAuth or CalDAV JSON inside. |
-| `credentials_dek_enc` | text | NN |  | `availability_read, events_read_write` | Wrapped DEK for credentials_enc (k1:… envelope). Paired column like tenant_configs.dek_enc. |
-| `capabilities` | text | NN |  | `availability_read, events_read_write` |  |
+| `credentials_dek_enc` | text | NN |  |  | Wrapped DEK for credentials_enc (k1:… envelope). Paired column like tenant_configs.dek_enc. |
+| `capabilities` | text | NN |  | `availability_read, events_read_write` | Singular despite the name: exactly ONE of the two, picked by the inspector on the connect panel and mirrored by the OAuth scopes actually granted. |
 | `calendar_id` | text | NN |  |  | *App-layer reference to another row — no database foreign key.* |
 | `connected_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
@@ -391,9 +391,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `user_id` | text | NN IX |  | `google, microsoft, apple` | *The staff user this belongs to (`users.id`). App-layer reference.* |
-| `provider` | text | NN UQ IX |  | `google, microsoft, apple` |  |
-| `entity_type` | text | NN UQ |  | `inspection, calendar_block` |  |
+| `user_id` | text | NN IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
+| `provider` | text | NN UQ IX |  | `google, microsoft, apple` | Which system `external_id` belongs to — a fact about the ROW, not about whatever connection the user holds today. |
+| `entity_type` | text | NN UQ |  | `inspection, calendar_block` | Namespaces `entity_id`, which is otherwise just a UUID: without it an inspection and a calendar block could collide on the upsert key and one push would overwrite the other's remote id. |
 | `entity_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
 | `external_id` | text | NN |  |  | Provider event id (Google `event.id`). |
 | `etag` | text |  |  |  | Provider concurrency tag when it gives one; advisory, never required. |
@@ -417,15 +417,15 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `inspection_id` | text | NN IX |  | `UPLOADER_KINDS` | *The inspection (order) this belongs to. App-layer reference.* |
-| `uploaded_by_kind` | text | NN |  | `UPLOADER_KINDS` |  |
+| `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `uploaded_by_kind` | text | NN |  | `UPLOADER_KINDS` | Who put the file here — and, with `visibility`, the read gate: the client list and download drop inspector+internal rows, and a client may DELETE only rows whose `uploaded_by_ref` is their own. |
 | `uploaded_by_ref` | text | NN |  |  | client: recipient email; inspector: user id |
-| `uploaded_by_name` | text |  |  | `DOCUMENT_CATEGORIES` | *A name.* |
-| `category` | text | NN |  | `DOCUMENT_CATEGORIES` |  |
-| `visibility` | text | NN |  | `DOCUMENT_VISIBILITIES` |  |
+| `uploaded_by_name` | text |  |  |  | *A name.* |
+| `category` | text | NN |  | `DOCUMENT_CATEGORIES` | Filing only: the uploader picks it at upload time (required query param) and the documents list groups rows by it in DOCUMENT_CATEGORIES order. |
+| `visibility` | text | NN |  | `DOCUMENT_VISIBILITIES` | Means something only on an INSPECTOR row: 'internal' hides the file from the client list and 404s its download. |
 | `r2_key` | text | NN |  |  | *Object key in the R2 bucket.* |
 | `filename` | text | NN |  |  | ORIGINAL name (display + download) |
-| `content_type` | text | NN |  |  |  |
+| `content_type` | text | NN |  |  | The request's declared content-type, checked against the service allow-list (CAD extensions exempt) and also written onto the R2 object. |
 | `size_bytes` | integer | NN |  |  | *A size in bytes.* |
 | `label` | text |  |  |  |  |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
@@ -465,13 +465,13 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `text` | text | NN |  |  |  |
-| `category` | text |  |  |  |  |
+| `category` | text |  |  |  | The repair-item vocabulary (safety / maintenance / recommendation, plus tenant-custom values), read and filtered on by RecommendationService and ranked on by the agent repair-items view. |
 | `section` | text |  |  |  | Section label (Roof, Electrical, ...) — same shape as canned-comments.js entries. Free-text so tenants can grow their own taxonomy. |
 | `library_id` | text | IX |  |  | Sprint 2 S2-7 — provenance for marketplace-imported comments. Set when MarketplaceService.importLibrary inserts rows; null for tenant-authored comments. |
-| `section_ids` | text |  |  |  |  |
-| `item_labels` | text |  |  |  |  |
-| `trigger_code` | text |  |  |  |  |
-| `search_keywords` | text |  |  |  |  |
+| `section_ids` | text |  |  |  | The Library drawer's matching aids. All four are READ by the drawer's list query and NONE is written by any path in this repo — create, update and marketplace import all leave them NULL — so on any database this repo populates, every filter below narrows nothing. **[more]** |
+| `item_labels` | text |  |  |  | Plural and inert: SELECTed into the list response, but nothing filters, sorts or renders it. |
+| `trigger_code` | text |  |  |  | Short code (e.g. 'NI') matched EXACTLY. |
+| `search_keywords` | text |  |  |  | Curated synonyms, OR'd with `text` in the drawer's search LIKE so a snippet is findable by words it does not contain. |
 | `item_label` | text |  |  |  | Comments Library Upgrade — canonical single item label for the sort + filter UI in the inspection-edit Library drawer. |
 | `severity` | text |  |  |  | Module F single severity vocabulary: 'good' \| 'marginal' \| 'significant' \| 'minor' \| null (= uncategorized / "All"). |
 | `repair_summary` | text |  |  |  | Comments-repair fold (2026-06-12): deficiency comments carry repair fields. Intended for severity='significant'; enforced in UI/validation, not DDL. **[more]** |
@@ -496,7 +496,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN UQ |  |  |  |
-| `based_on` | text |  |  |  |  |
+| `based_on` | text |  |  |  | NO READER OR WRITER FOUND — nothing outside the schema barrel touches this column or this table. |
 | `description` | text |  |  |  |  |
 | `is_disabled` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
@@ -542,8 +542,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `key` | text | NN UQ |  |  | stable machine id, unique per tenant |
-| `label` | text | NN |  | `client, agent, other` | tenant-editable display name |
-| `kind` | text | NN |  | `client, agent, other` |  |
+| `label` | text | NN |  |  | tenant-editable display name |
+| `kind` | text | NN |  | `client, agent, other` | The capability baseline every tenant-named role resolves to: report delivery, self-retrieval, whether the person may hold an account, agent- portal visibility, repair-list access. |
 | `email_template_id` | text |  |  |  | → message_templates.id (optional) |
 | `sms_template_id` | text |  |  |  | *App-layer reference to another row — no database foreign key.* |
 | `is_system` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
@@ -567,12 +567,12 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ IX FK→`tenants.id` |  | `agent, client, other` | *Tenant isolation key. Every read and write must filter on it.* |
-| `type` | text | NN IX | `'client'` | `agent, client, other` |  |
+| `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `type` | text | NN IX | `'client'` | `agent, client, other` | Load-bearing, not descriptive. Agent signup will only bind an account to a contact already typed 'agent', and the booking path's auto-create only reuses an existing 'client' — so retyping a row changes what it can be matched to. |
 | `name` | text | NN |  |  |  |
 | `email` | text | UQ |  |  |  |
 | `phone` | text |  |  |  |  |
-| `agency` | text |  |  |  |  |
+| `agency` | text |  |  |  | The agent's brokerage or firm. Free text, and the one contact field that leaves the product: it is sent as QuickBooks CompanyName on customer sync, groups the agent-referral leaderboard, and is a mapped column in both CSV import and export. |
 | `notes` | text |  |  |  |  |
 | `created_by_user_id` | text |  |  |  | *App-layer reference to another row — no database foreign key.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
@@ -627,21 +627,21 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `unit_id` | text |  |  |  | Phase U per-unit scope — nullable (null = common / tagged scope). |
 | `finding_key` | text | IX |  |  | Link to the originating finding — same shape as repair_request_items.finding_key. |
 | `system` | text | NN |  |  | ASTM grouping (site/roof/mep/...) — TABLE 2 row grouping + SECTION back-ref. |
-| `component` | text | NN |  |  |  |
-| `location` | text | NN | `''` | `repair, replace, further_study` | Tagged-mode scope (mirrors DefectState.location); '' when unscoped. |
-| `action` | text | NN |  | `repair, replace, further_study` |  |
-| `cost_method` | text | NN |  | `unit, lump_sum` |  |
+| `component` | text | NN |  |  | Free text, and half the like-group key (`system` + `component`) that applyThreshold groups on: 4+ sub-threshold lines sharing one pair are rescued together rather than each dropped (ASTM §10.3.1). |
+| `location` | text | NN | `''` |  | Tagged-mode scope (mirrors DefectState.location); '' when unscoped. |
+| `action` | text | NN |  | `repair, replace, further_study` | 'further_study' is the one value with behaviour: at a zero total it is ALWAYS kept by applyThreshold, so a deficiency that needs a specialist survives the materiality cut instead of vanishing for costing nothing. |
+| `cost_method` | text | NN |  | `unit, lump_sum` | Selects which money columns are real, and lineTotal is the only place that branches on it: 'unit' => quantity x unit_cost_cents, 'lump_sum' => lump_sum_cents. |
 | `quantity` | integer |  |  |  | unit method |
-| `uom` | text |  |  |  |  |
+| `uom` | text |  |  |  | Display label for `quantity` ('sf', 'ea', ...) — never arithmetic; lineTotal ignores it entirely. |
 | `unit_cost_cents` | integer |  |  |  | *Money, integer cents — never a float.* |
 | `lump_sum_cents` | integer |  |  |  | lump_sum method |
 | `eul` | integer |  |  |  | reserve placement (Expected / Effective Age / Remaining Useful Life, years) |
 | `eff_age` | integer |  |  |  | *An integer value.* |
 | `rul` | integer |  |  |  | *An integer value.* |
-| `suggested_remedy` | text | NN | `''` | `immediate, short_term, long_term` | ASTM §11.2.1 — per material physical deficiency. |
-| `bucket` | text | NN |  | `immediate, short_term, long_term` |  |
-| `section_ref` | text |  |  |  |  |
-| `photo_ref` | text |  |  |  |  |
+| `suggested_remedy` | text | NN | `''` |  | ASTM §11.2.1 — per material physical deficiency. |
+| `bucket` | text | NN |  | `immediate, short_term, long_term` | Which schedule the line lands in, and they are different documents: immediate + short_term are TABLE 1's two blocks, long_term is TABLE 2's reserve schedule (placed at currentYear + RUL, and only when the tenant enabled the schedule at all). |
+| `section_ref` | text |  |  |  | Report section anchor. Accepted by the cost-items API but the editor panel never sends it, and its only reader is the CSV export column. |
+| `photo_ref` | text |  |  |  | The photo's R2 storage `key`. resolvePhotoRef maps it through the appendix index to the reserve table's PHOTO NO.; a key absent from the appendix resolves to null so no broken pointer prints. |
 | `sort_order` | integer | NN | `0` |  | *Display order within its tenant; lower sorts first.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 
@@ -683,8 +683,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `code` | text | NN |  | `fixed, percent` |  |
-| `type` | text | NN |  | `fixed, percent` |  |
+| `code` | text | NN |  |  |  |
+| `type` | text | NN |  | `fixed, percent` | Decides how `value` below is READ: 'fixed' = integer cents, clamped to the subtotal so a big code cannot make a booking negative; 'percent' = whole percent, floor(subtotal * value / 100). |
 | `value` | integer | NN |  |  | *An integer value.* |
 | `max_uses` | integer |  |  |  | *An integer value.* |
 | `uses_count` | integer | NN | `0` |  | *A count.* |
@@ -736,8 +736,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `email` | text | NN IX |  | `hard_bounce, complaint` | normalized lower-cased + trimmed |
-| `reason` | text | NN |  | `hard_bounce, complaint` |  |
+| `email` | text | NN IX |  |  | normalized lower-cased + trimmed |
+| `reason` | text | NN |  | `hard_bounce, complaint` | The ADMISSION criterion, not a label: a row exists only because an inbound event resolved to one of these two (a soft bounce resolves to neither and writes nothing). |
 | `source_provider` | text | NN |  |  | resend\|sendgrid\|postmark\|mailgun |
 | `provider_event_id` | text |  |  |  | *App-layer reference to another row — no database foreign key.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
@@ -757,9 +757,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `tenant_id` | text | PK NN FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `trigger` | text | PK NN |  |  |  |
+| `trigger` | text | PK NN |  |  | Names the registry descriptor this row overrides (`getDescriptor`) and is half the PK. An override whose trigger matches no descriptor is never consulted — the renderer resolves the descriptor before the overrides. |
 | `subject` | text |  |  |  |  |
-| `blocks` | text |  |  |  |  |
+| `blocks` | text |  |  |  | Sparse `blockKey → text` map, merged over the descriptor's block defaults one KEY at a time: an absent key keeps following the default, a present one pins the tenant's wording. |
 | `is_enabled` | integer | NN | `true` |  | *Boolean flag, stored as integer 0/1.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
 
@@ -802,13 +802,13 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `request_id` | text | NN UQ IX |  | `request.created, request.sent, request.viewed, agreement.signed, agree…` | *App-layer reference to another row — no database foreign key.* |
-| `event` | text | NN UQ |  | `request.created, request.sent, request.viewed, agreement.signed, agree…` |  |
+| `request_id` | text | NN UQ IX |  |  | *App-layer reference to another row — no database foreign key.* |
+| `event` | text | NN UQ |  | `request.created, request.sent, request.viewed, agreement.signed, agree…` | The dedup key (with tenant + request) for the partial index below, and the label the admin audit trail and the downloadable evidence JSON print. |
 | `payload_json` | text | NN |  |  | *Serialized JSON snapshot.* |
 | `prev_hash` | text |  |  |  | *Hash used for lookup and comparison; not reversible.* |
-| `hash` | text | NN |  |  |  |
-| `signature` | text | NN |  |  |  |
-| `key_fingerprint` | text | NN |  |  |  |
+| `hash` | text | NN |  |  | The chain link: the next row's prev_hash is a copy of this. verifyChain recomputes it, so a rewritten payload_json fails as reason:'hash' and an unlinked or reordered row fails as reason:'chain', naming brokenAt. |
+| `signature` | text | NN |  |  | base64url Ed25519 over the HEX-DECODED hash bytes. This is what makes the chain more than a checksum: recomputing hashes after editing a payload still fails (reason:'signature') without the tenant's private key. |
+| `key_fingerprint` | text | NN |  |  | Which signing_keys row signed THIS row, stamped from ensureKeypair. verifyChain does not read it — it always verifies against the tenant's current key — so it exists to tell a reader (and a future rotation) which key a row was sealed with. |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
 
 **Indexes**
@@ -851,11 +851,11 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `tenant_id` | text | PK NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `key` | text | PK NN |  |  |  |
-| `fingerprint` | text | NN |  | `in_flight, done` |  |
-| `state` | text | NN | `'in_flight'` | `in_flight, done` |  |
+| `key` | text | PK NN |  |  | The caller's `Idempotency-Key` header, verbatim. Clients mint one per INTENT and hold it across failures, which is why `releaseKey` DELETES the row on a non-2xx: the corrected retry has to be able to reclaim the key. |
+| `fingerprint` | text | NN |  |  | SHA-256 of `METHOD path <canonicalized JSON body>`. Compared BEFORE `state`: a key replayed with a different payload gets 422 IDEMPOTENCY_KEY_REUSED, never the stored response — handing back a pre-edit result is a lost write. |
+| `state` | text | NN | `'in_flight'` | `in_flight, done` | 'in_flight' IS the claim — it is what the insert writes, and a conflicting caller gets 409. |
 | `response_status` | integer |  |  |  | *An integer value.* |
-| `response_body` | text |  |  |  |  |
+| `response_body` | text |  |  |  | The 2xx response text, buffered off a clone of the live response and replayed verbatim with an `Idempotency-Replayed: true` header. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `expires_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 
@@ -931,8 +931,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `inspection_id` | text | PK NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `user_id` | text | PK NN IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
-| `tenant_id` | text | NN IX |  | `lead, helper` | *Tenant isolation key. Every read and write must filter on it.* |
-| `role` | text | NN | `'lead'` | `lead, helper` |  |
+| `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `role` | text | NN | `'lead'` | `lead, helper` | 'lead' is the value everything keys on: the ICS feed takes the lead's row as the calendar owner, roster.ts hangs the rest off it, inspector metrics split led-vs-assisted from it, and version-diff calls the lead "the" inspector of a report version. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 
 **Indexes**
@@ -974,11 +974,11 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `r2_key` | text | NN |  |  | *Object key in the R2 bucket.* |
-| `url` | text | NN |  |  |  |
+| `url` | text | NN |  |  | Denormalized RELATIVE fetch path derived from `r2Key` at upload, handed to the Media Center grid so it never rebuilds one. |
 | `uploaded_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `exif_data` | text |  |  |  | JSON envelope: { takenAt?: number, gps?: {lat,lng}, cameraModel?: string } |
 | `annotations` | text |  |  |  | Design System 0520 M14 — PhotoStudio annotation overlay (subsystem A, phase 4). `annotations` is opaque JSON-encoded shape array (≤8 KB) consumed exclusively client-side. |
-| `caption` | text |  |  |  |  |
+| `caption` | text |  |  |  | Written only by the PhotoStudio save, which sets it and `annotations` together. It does NOT follow the photo out of the pool: attachPoolPhoto copies `r2Key` alone into inspection_results and then deletes this row, so a caption written before placement is dropped at placement. |
 | `media_type` | text | NN | `'photo'` | `photo, video` | Plan 7 — video walk-through. A pool row is a photo (default) or a video. |
 | `stream_uid` | text |  |  |  | Cloudflare Stream UID for video rows; NULL for photos. |
 | `poster_pct` | real |  |  |  | Poster timestamp as a fraction of duration (0..1); NULL for photos. |
@@ -1003,11 +1003,11 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `inspection_id` | text | IX FK→`inspections.id` ⊗ |  | `inspector, client, agent, other` | *The inspection (order) this belongs to. App-layer reference.* |
-| `from_role` | text | NN IX |  | `inspector, client, agent, other` |  |
+| `inspection_id` | text | IX FK→`inspections.id` ⊗ |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `from_role` | text | NN IX |  | `inspector, client, agent, other` | Every consumer tests `!= 'inspector'` rather than naming the counterparty roles — the unread rollup, the mark-read pass, and the notification that fires only for inbound messages — so adding a counterparty role needs no code change, while renaming 'inspector' silently inverts all three. |
 | `from_name` | text |  |  |  | *A name.* |
 | `body` | text | NN |  |  |  |
-| `attachments` | text |  |  |  |  |
+| `attachments` | text |  |  |  | R2 object metadata written whole at create. It is also the authorization record: resolveAttachmentForInspection scans the messages of an inspection the caller already holds and returns the `key` from here, so an R2 key is never taken from a request. |
 | `read_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
 | `contact_id` | text | NN IX |  |  | *The contact this belongs to (`contacts.id`). App-layer reference.* |
@@ -1055,11 +1055,11 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `client_name` | text | NN |  |  | *A name.* |
 | `client_email` | text | IX |  |  | *An email address.* |
-| `client_phone` | text |  |  |  |  |
-| `property_address` | text | NN |  |  |  |
-| `property_city` | text |  |  |  |  |
-| `property_state` | text |  |  |  |  |
-| `property_zip` | text |  |  |  |  |
+| `client_phone` | text |  |  |  | The one place a phone is a column of its own, which is why the DSAR assembler widens its match to (email OR phone) here and on no other table. |
+| `property_address` | text | NN |  |  | Copied verbatim onto every inspection this request spawns, by both create and addSubInspection — the children never read back through the request. |
+| `property_city` | text |  |  |  | Resolved from the Places pick when a public booking is fulfilled, or patched through the request API. |
+| `property_state` | text |  |  |  | filled with city/zip from the Places pick; nothing branches on it |
+| `property_zip` | text |  |  |  | not the coverage input — booking-admission uses the submitted zip |
 | `scheduled_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `status` | text | NN IX | `'pending'` | `pending, confirmed, in_progress, completed, cancelled` | *State-machine column — see the Values column for the vocabulary.* |
 | `notes` | text |  |  |  |  |
@@ -1082,7 +1082,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX FK→`inspections.id` |  |  | *The inspection (order) this belongs to. App-layer reference.* |
-| `data` | text | NN |  |  |  |
+| `data` | text | NN |  |  | Item id -> { rating, value, photos[], customComments, ... }, plus reserved `_`-prefixed keys (`_inspector_signature`). |
 | `ydoc_state` | blob |  |  |  | Authoritative Yjs CRDT state for collaborative results editing (#181). The Durable Object persists Y.encodeStateAsUpdate here; `data` above is the materialized JSON projection of this doc that all readers consume. |
 | `last_synced_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `rating_system_id` | text |  |  |  | Sprint 2 S2-1 — denormalized rating system reference and a frozen snapshot of the levels array at inspection creation. |
@@ -1109,8 +1109,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_service_id` | text | NN UQ IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `user_id` | text | NN UQ IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
-| `amount_cents` | integer | NN |  | `rule, manual` | *Money, integer cents — never a float.* |
-| `source` | text | NN |  | `rule, manual` |  |
+| `amount_cents` | integer | NN |  |  | *Money, integer cents — never a float.* |
+| `source` | text | NN |  | `rule, manual` | Whether a rule put this number here or a person did — and it is a ONE-WAY door: any amount edit rewrites it to 'manual'. |
 | `locked_at` | integer |  |  |  | Set when this split was included in a payroll export. From that moment the row is read-only: editing it would desynchronise the books from what was actually paid, with nothing surfacing the divergence. |
 | `corrects_split_id` | text |  |  |  | Set on a correction row; points at the locked split being adjusted. The correction carries the DELTA (often negative), so the two rows sum to what the inspector is actually owed and neither one has been rewritten. |
 | `reason` | text |  |  |  | Why a human moved this number — the audit answer for a disputed payout. |
@@ -1158,7 +1158,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN UQ |  |  |  |
-| `based_on` | text |  |  |  |  |
+| `based_on` | text |  |  |  | Platform commercial-subtype slug this tenant subtype derives from, chosen from a dropdown in Settings → Inspection Types; NULL when left blank. |
 | `description` | text |  |  |  |  |
 | `is_enabled` | integer | NN | `true` |  | *Boolean flag, stored as integer 0/1.* |
 | `sort_order` | integer | NN | `0` |  | *Display order within its tenant; lower sorts first.* |
@@ -1179,9 +1179,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
-| `parent_unit_id` | text | IX |  | `building, floor, unit` | *App-layer reference to another row — no database foreign key.* |
-| `kind` | text | NN |  | `building, floor, unit` |  |
-| `type` | text | NN | `'unit'` | `unit, common` |  |
+| `parent_unit_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
+| `kind` | text | NN |  | `building, floor, unit` | Which level of the tree this node is. Only `kind='unit'` rows are SCOPES: the editor's scope switcher, the unit-progress endpoint and the tagged/unit conversion all filter on it, so building and floor rows carry structure and attributes but never own findings. |
+| `type` | text | NN | `'unit'` | `unit, common` | What the unit is FOR. A common area scopes findings exactly like a regular unit; the only behaviour keyed on it is the hint shown beside the name in the editor's scope dropdown. |
 | `name` | text | NN |  |  |  |
 | `sort_order` | integer | NN | `0` |  | *Display order within its tenant; lower sorts first.* |
 | `created_at` | integer | NN | `(unixepoch() * 1000)` |  | *Creation time, epoch milliseconds.* |
@@ -1203,21 +1203,21 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN IX |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspector_id` | text | IX FK→`users.id` |  |  | *App-layer reference to another row — no database foreign key.* |
-| `property_address` | text | NN |  |  |  |
-| `address_place_id` | text |  |  |  | Spec 5D — geocoded address fields populated by Google Places Details when the inspector picks an autocomplete result. |
-| `address_street` | text |  |  |  |  |
-| `address_city` | text |  |  |  |  |
-| `address_state` | text |  |  |  |  |
-| `address_zip` | text |  |  |  |  |
-| `address_county` | text |  |  |  |  |
-| `address_lat` | real |  |  |  |  |
-| `address_lng` | real |  |  |  |  |
+| `property_address` | text | NN |  |  | The free-text address every surface actually shows: dashboard rows, the command palette's LIKE search, ICS/calendar summaries, agreement envelopes, notification templates, the report header. |
+| `address_place_id` | text |  |  |  | Spec 5D — geocoded address fields populated by Google Places Details when the inspector picks an autocomplete result. **[more]** |
+| `address_street` | text |  |  |  | street line only; the whole address stays in property_address |
+| `address_city` | text |  |  |  | Places locality component |
+| `address_state` | text |  |  |  | Places admin-area-1 short form (e.g. TX) |
+| `address_zip` | text |  |  |  | not the coverage input: booking eligibility matches the zip the booker submitted |
+| `address_county` | text |  |  |  | raw Places component; the strip-editable one is `county` below |
+| `address_lat` | real |  |  |  | No reader found for either: the wizard's map draws from the live Places pick held in component state, not from the stored row. |
+| `address_lng` | real |  |  |  | written with address_lat; likewise no reader |
 | `address_geocoded_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `template_id` | text | FK→`templates.id` |  |  | IA-1 — WHO is captured via inspection_people (client/agent rows); see schema/inspection/people.ts. |
 | `date` | text | NN IX |  | `...INSPECTION_STATUSES` | Calendar-semantic YYYY-MM-DD (inspection date, no time component) — intentionally TEXT per the Schema Rules calendar-field exception, not an epoch timestamp. |
 | `status` | text | NN IX | `'requested'` | `...INSPECTION_STATUSES` | *State-machine column — see the Values column for the vocabulary.* |
-| `report_status` | text | NN | `'in_progress'` | `...REPORT_STATUSES` |  |
-| `payment_status` | text | NN | `'unpaid'` | `unpaid,partial,paid` |  |
+| `report_status` | text | NN | `'in_progress'` | `...REPORT_STATUSES` | The report's lifecycle, tracked apart from `status` (the appointment). Every anonymous surface — public report, share link, /verify, repair builder — gates on isReportPublished() of this value, and only InspectionStatusService moves it, each transition asserting the current value first. |
+| `payment_status` | text | NN | `'unpaid'` | `unpaid,partial,paid` | Order-level payment state. Every reader tests `=== 'paid'` (publish pre-flight, the report gate, automation conditions), so 'partial' behaves exactly as 'unpaid' here — the finer states live on `invoices`. |
 | `price_cents` | integer | NN | `0` |  | Buyer's Agent — see inspection_people (referredByAgentId column DROPPED, superseded). P-4 authority chain: denormalized cache only — never reconcile back from invoice or service-snapshot tiers. |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
 | `confirmed_at` | integer |  |  |  | Phase 0 parity additions |
@@ -1229,24 +1229,24 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `discount_code_id` | text | FK→`discount_codes.id` |  |  | *App-layer reference to another row — no database foreign key.* |
 | `discount_amount_cents` | integer |  |  |  | *Money, integer cents — never a float.* |
 | `closing_date` | text |  |  |  | Calendar-semantic YYYY-MM-DD (real-estate closing date, no time) — intentionally TEXT per the Schema Rules calendar-field exception, not an epoch timestamp. |
-| `referral_source` | text |  |  |  |  |
-| `reference_number` | text |  |  |  |  |
-| `internal_notes` | text |  |  |  |  |
+| `referral_source` | text |  |  |  | Free text, not an id: the Hub's Order-details dropdown offers the tenant's configured list but keeps an off-list value the operator typed. |
+| `reference_number` | text |  |  |  | The TENANT's own order number, for cross-referencing their other systems — we never generate it, parse it, or enforce uniqueness. |
+| `internal_notes` | text |  |  |  | Staff-private note. NOTHING WRITES IT: no request schema accepts it and no UI edits it. |
 | `year_built` | integer |  |  |  | *An integer value.* |
-| `sqft` | integer |  |  |  | *An integer value.* |
-| `foundation_type` | text |  |  |  |  |
+| `sqft` | integer |  |  | `getPropertyFacts` | *An integer value.* |
+| `foundation_type` | text |  |  |  | Plain text rather than an enum: getPropertyFacts coerces anything outside basement/slab/crawlspace/other to 'other' on read, so an Estated autofill value can land here without the write path having to reject it. |
 | `bedrooms` | integer |  |  |  | *An integer value.* |
-| `bathrooms` | real |  |  |  |  |
+| `bathrooms` | real |  |  |  | `real` because half-baths are normal (2.5). One of the six Property Facts columns patched together by updatePropertyFacts; Estated autofill fills it from `structure.baths`. |
 | `lot_size` | text |  |  |  | Round-2 backlog G1 (Spectora §E.2) — free-text lot size so inspectors can enter "0.25 acres", "10,000 sqft", etc. |
 | `property_facts` | text |  |  |  | Round-2 backlog G1 — JSON envelope for future property facts that don't warrant their own column. |
 | `cover_photo_id` | text |  |  |  | Design System 0520 subsystem E P1 — id of the inspection_media_pool row used as the report cover image. |
-| `cover_crop` | text |  |  |  | Media Studio (cover crop) — re-editable crop transform applied to the SOURCE image (cover_photo_id), in source-pixel coords. |
+| `cover_crop` | text |  |  |  | Media Studio (cover crop) — the crop transform applied to the SOURCE image (cover_photo_id), in source-pixel coords. **[more]** |
 | `cover_image_key` | text |  |  |  | Media Studio (cover crop) — R2 key of the baked cropped derivative (JPEG, 2048px long edge). |
-| `unit` | text |  |  |  |  |
-| `property_type` | text |  |  |  |  |
-| `commercial_subtype` | text |  |  |  |  |
+| `unit` | text |  |  |  | Suite / unit designation of the ONE subject property ("Suite 200"). Not a link to `inspection_units` and nothing to do with per-unit mode. |
+| `property_type` | text |  |  |  | Decides what the report becomes: resolveReportTier() reads it to tell commercial from residential, section applicability filters on it, and the editor's Property Info preset resolves only when it is 'commercial'. |
+| `commercial_subtype` | text |  |  |  | Plain text because org-custom subtypes live alongside the platform ids. Meaningful only when property_type = 'commercial': it selects the editor's metadata preset (`commercial:<id>`) and gates template sections through applicableTo.commercialSubtypes (org ids match via their platform parent). |
 | `report_tier` | text |  |  | `light_commercial, full_pca` | Commercial PCA Phase T — report tier. Meaningful only for commercial inspections (NULL on residential/multi-unit). |
-| `county` | text |  |  |  |  |
+| `county` | text |  |  |  | The county as the Property Facts strip edits it — written ONLY by updatePropertyFacts, never at intake. |
 | `is_automations_disabled` | integer | NN | `false` |  | Selling Agent — see inspection_people (sellingAgentId column DROPPED, superseded). |
 | `template_snapshot` | text |  |  |  | *Serialized JSON snapshot.* |
 | `template_snapshot_version` | integer |  | `1` |  | *An integer value.* |
@@ -1271,8 +1271,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `report_photo_columns` | integer |  |  |  | *An integer value.* |
 | `referred_by_contact_id` | text |  |  |  | Who sent us this job. Distinct from `referral_source`, which records the CHANNEL (Google, Realtor, Past Client) and names nobody. **[more]** |
 | `unlocked_at` | integer |  |  |  | Manual release of the report gate for THIS inspection. The gate is order-wide by design: any required agreement left unsigned, or payment outstanding, blocks every report on the inspection. **[more]** |
-| `unlocked_by` | text |  |  |  |  |
-| `unlock_reason` | text |  |  |  |  |
+| `unlocked_by` | text |  |  |  | users.id, app-layer soft ref; getReportGate resolves it to `name ?? email` as unlockedByName for the Hub banner. |
+| `unlock_reason` | text |  |  |  | Shown verbatim in that banner and nowhere else — no code branches on it. A second unlock on an already-unlocked order is a no-op, so this holds the FIRST reason given until someone re-locks. |
 | `reports_generated_at` | integer |  |  |  | When the sold service lines were turned into `reports` rows. Generation runs ONCE, at the point the work is scheduled to begin, and this column is what makes that true. **[more]** |
 | `deposit_required_cents` | integer |  |  |  | What this ORDER was asked for up front, frozen at booking. A SNAPSHOT, not a policy reference. **[more]** |
 | `is_deposit_overridden` | integer | NN | `false` |  | Tier 3 — a human set the number above, so nothing may recompute it. Without this flag one column has to mean two things, and a later re-resolve silently overwrites the figure an operator agreed with a client over the phone. |
@@ -1325,7 +1325,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text | NN UQ |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
-| `zip_prefix` | text | NN UQ |  |  |  |
+| `zip_prefix` | text | NN UQ |  |  | Uppercased and shape-checked at the API: 3-10 chars, `[A-Z0-9]+` rather than digits-only, so ZIP+4 and a Canadian FSA both fit. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 
 **Indexes**
@@ -1370,15 +1370,15 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `client_name` | text |  |  |  | *A name.* |
 | `client_email` | text |  |  |  | *An email address.* |
 | `amount_cents` | integer | NN | `0` |  | P-4 authority chain (tier 1): when an invoice exists its amountCents is authoritative over service-snapshot sums and inspections.price. |
-| `line_items` | text | NN | `'[]'` |  |  |
+| `line_items` | text | NN | `'[]'` |  | The breakdown shown to the client, snapshotted at creation from the ACTIVE inspection_services rows (a declined line must not appear) or, when there are none, a single "Inspection services" line off inspections.price. |
 | `due_date` | text |  |  |  | Calendar-semantic YYYY-MM-DD (invoice due date, no time component) — intentionally TEXT per the Schema Rules calendar-field exception, not an epoch timestamp. |
 | `notes` | text |  |  |  |  |
 | `sent_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `paid_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `payment_method` | text |  |  | `card, check, cash, offline, other` | How the invoice was paid — 'card' (online Stripe) or an offline method (check / cash / offline) recorded by the inspector via "Mark as paid". |
 | `partial_paid_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
-| `voided_at` | integer |  |  | `synced, pending, failed` | Accounting void (QuickBooks-style): a voided invoice stays in the ledger at $0 with its audit trail intact and is excluded from all revenue rollups. |
-| `qbo_sync_status` | text |  |  | `synced, pending, failed` |  |
+| `voided_at` | integer |  |  |  | Accounting void (QuickBooks-style): a voided invoice stays in the ledger at $0 with its audit trail intact and is excluded from all revenue rollups. |
+| `qbo_sync_status` | text |  |  | `synced, pending, failed` | Outcome of the LAST QuickBooks push. NULL = never pushed (no connection, sync off, or the tenant does not use QBO) — the common state, not an error. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `currency` | text | NN | `'USD'` |  | i18n Phase B — the currency (ISO 4217) this invoice was created in, snapshot from tenant_configs.currency at creation. |
 | `amount_paid_cents` | integer |  |  |  | How much has actually been received on a partially-paid invoice. NULL on draft/sent/paid/void — only a 'partial' invoice carries one, and it is cleared whenever the invoice reaches paid or is refunded so the amount can never contradict the status derived from paidAt/partialPaidAt. **[more]** |
@@ -1399,19 +1399,19 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `name` | text | NN |  | `comments, templates` |  |
-| `kind` | text | NN IX |  | `comments, templates` |  |
-| `semver` | text | NN |  |  |  |
-| `schema` | text | NN |  |  |  |
+| `name` | text | NN |  |  |  |
+| `kind` | text | NN IX |  | `comments, templates` | Also the only browse axis that is an enum — property_type reuses the template validator's, and the two below are bounded free text. |
+| `semver` | text | NN |  |  | The catalogue's current version. Never ordered or range-compared, only tested for EQUALITY against tenant_library_imports.imported_semver: unequal is what list() reports as `hasUpdate`, equal is what the update paths refuse. |
+| `schema` | text | NN |  |  | The pack ITSELF, not a description of one: a v2 template document for kind='templates' (validated at import time, never on write) or the entries parseLibraryComments explodes into N rows. |
 | `author_id` | text | NN | `'system'` |  | *App-layer reference to another row — no database foreign key.* |
-| `changelog` | text |  |  |  |  |
+| `changelog` | text |  |  |  | Release note for the entry. Written only by the starter-content seeder; NO READER FOUND in server/ or app/ — nothing renders or returns it. |
 | `download_count` | integer | NN | `0` |  | *A count.* |
 | `is_featured` | integer | NN IX | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
 | `property_type` | text |  |  |  | The legacy `category` did not survive as one column. It was free text mixing three independent concepts (a property type / a jurisdiction's form standard / an inspection kind), so a single column could only ever describe one of the three: a Texas inspector looking for the TREC form and a new-build … **[more]** |
-| `jurisdiction` | text |  |  |  |  |
-| `inspection_kind` | text |  |  |  |  |
+| `jurisdiction` | text |  |  |  | Both are exact-match conditions in list() and are reachable only as /api/marketplace query params — the browse page ships no control for either, so today they narrow nothing a user can click. |
+| `inspection_kind` | text |  |  |  | exact-match browse filter, reachable only as an API query param |
 
 **Indexes**
 
@@ -1450,28 +1450,28 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/compliance.ts · 21 columns · primary key `tenant_id`</sub>
 
-> SMS provider compliance state — one row per tenant, tracks Twilio (or future provider) TCR registration progress through the managed-pool flow.
+> SMS provider compliance state — one row per tenant, tracks carrier (Twilio / Telnyx) registration progress through the managed-pool flow.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `tenant_id` | text | PK NN |  | `own, managed_shared, managed_dedicated` | *Tenant isolation key. Every read and write must filter on it.* |
-| `mode` | text | NN | `'own'` | `own, managed_shared, managed_dedicated` |  |
+| `tenant_id` | text | PK NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `mode` | text | NN | `'own'` | `own, managed_shared, managed_dedicated` | Which flow this row belongs to — NOT the tenant's send mode, which lives on `tenant_configs.sms_mode`. |
 | `provider` | text |  |  | `twilio, telnyx` | which provider holds this tenant's entities |
-| `customer_profile_sid` | text |  |  |  | `subaccount_sid` was here. Unlike its neighbours it was never written by any provisioning step and never read by any resolver — the one column of this table with no code on either side of it. |
-| `customer_profile_status` | text |  |  |  |  |
-| `brand_sid` | text |  |  |  |  |
-| `brand_status` | text |  |  |  |  |
-| `campaign_sid` | text |  |  |  |  |
-| `campaign_status` | text |  |  |  |  |
-| `tfv_sid` | text |  |  |  |  |
-| `tfv_status` | text |  |  |  |  |
-| `messaging_resource_sid` | text |  |  |  |  |
+| `customer_profile_sid` | text |  |  |  | `subaccount_sid` was here. Unlike its neighbours it was never written by any provisioning step and never read by any resolver — the one column of this table with no code on either side of it. **[more]** |
+| `customer_profile_status` | text |  |  |  | step-1 verdict for the SID above |
+| `brand_sid` | text |  |  |  | The 10DLC brand registration (Twilio step 2, Telnyx step 1). Approval here is NOT tenant approval: the campaign is the terminal entity, and both the webhook and the poll are explicitly guarded so a late brand-approved callback cannot roll a campaign_pending/approved row backwards. |
+| `brand_status` | text |  |  |  | 10DLC brand verdict; approval here is not tenant approval |
+| `campaign_sid` | text |  |  |  | The 10DLC campaign — terminal entity for the sp10dlc channel, so its approval is what sets complianceStatus='approved'. |
+| `campaign_status` | text |  |  |  | 10DLC campaign verdict; Twilio learns it by webhook only |
+| `tfv_sid` | text |  |  |  | Toll-free verification — terminal entity for the tollfree channel; NULL on every sp10dlc row. |
+| `tfv_status` | text |  |  |  | toll-free verification verdict; NULL on the sp10dlc path |
+| `messaging_resource_sid` | text |  |  |  | The sending container the provisioned number is attached to (Twilio Messaging Service SID / Telnyx messaging-profile id). |
 | `provider_meta` | text |  |  |  | Provider-specific metadata stored as a JSON string. Used by non-Twilio providers (e.g. |
-| `provisioned_number` | text |  |  |  |  |
+| `provisioned_number` | text |  |  |  | The purchased DID in E.164, persisted together with its SID before the attach step. Displayed to the tenant by the Settings compliance wizard, and it is the VALUE (not the SID) that Telnyx's campaign assignment and toll-free submission take. |
 | `provisioned_number_sid` | text |  |  |  | The Twilio phone-number SID (PN...) returned by numbers.buy. Required for attachSender and tollfree.create; persisted before those calls so a crash- resumed run can reuse the already-purchased number instead of buying again. |
 | `has_sender_attached` | integer | NN | `false` |  | True once the provisioned number is attached to the messaging service. The buy step persists provisionedNumberSid BEFORE attachSender, so this separate marker lets a crash-resumed run re-run only the attach (without re-buying) — attachSender is not assumed idempotent, so it is guarded on its own … |
-| `compliance_status` | text | NN | `'not_started'` | `not_started, profile_pending, brand_pending, campaign_pending, tfv_pen…` |  |
-| `rejection_reason` | text |  |  |  |  |
+| `compliance_status` | text | NN | `'not_started'` | `not_started, profile_pending, brand_pending, campaign_pending, tfv_pen…` | The rolled-up gate, and a live authorization: `managedSendAllowed` blocks EVERY managed_dedicated send unless this reads 'approved' (a missing row blocks too — fail closed). |
+| `rejection_reason` | text |  |  |  | The carrier's own words for the latest rejection ("code=…: message"), stored verbatim because the tenant has to act on it — the wizard shows it under the rejected state. |
 | `last_sync_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
@@ -1490,8 +1490,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `subject_kind` | text | NN UQ |  | `user, contact` | Which id space `subjectId` belongs to. |
 | `subject_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
-| `class_id` | text | NN UQ |  | `email, sms, in_app` | A `NOTIFICATION_CLASSES` id. Not a template trigger — those are a subset. |
-| `channel` | text | NN UQ |  | `email, sms, in_app` |  |
+| `class_id` | text | NN UQ |  |  | A `NOTIFICATION_CLASSES` id. Not a template trigger — those are a subset. |
+| `channel` | text | NN UQ |  | `email, sms, in_app` | Which delivery channel this answer covers. The screen offers all three and `assertChoosable` deliberately has NO channel check, so a row may exist for a channel nothing sends yet. |
 | `is_enabled` | integer | NN |  |  | DB column is `is_enabled` per the naming rule; the drizzle property stays `enabled` so every call site and the API field keep reading as the plain English question they answer. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
@@ -1511,10 +1511,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` ⊗ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text | IX FK→`users.id` ⊗ |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
-| `type` | text | NN |  |  |  |
+| `type` | text | NN |  |  | The automation trigger event that produced the notice (`ctx.triggerEvent`), or 'manual.send' for an operator press. |
 | `title` | text | NN |  |  |  |
 | `body` | text |  |  |  |  |
-| `entity_type` | text |  |  |  |  |
+| `entity_type` | text |  |  |  | Qualifies `entity_id`. Notice headers always write 'inspection', and both inboxes build the inspection link only when this reads exactly that — any other value renders an unlinked row. |
 | `entity_id` | text |  |  |  | *App-layer reference to another row — no database foreign key.* |
 | `metadata` | text |  |  |  | *Structured extra context, JSON-encoded.* |
 | `read_at` | integer | IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
@@ -1544,13 +1544,13 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `inspection_id` | text | IX |  |  | The ORDER is the primary key of a payment. A booking deposit is taken before any invoice exists (`booking.service.ts` creates none), so keying this table on the invoice would make `kind: 'deposit'` unrepresentable — and this table is append-only and financial, the worst kind to re-key. **[more]** |
 | `invoice_id` | text | IX |  |  | A LINK, not identity: null until an invoice exists, then set — and backfilled onto the deposit rows that predate it. |
 | `kind` | text | NN |  | `deposit, balance, adjustment, refund` | Direction lives here, not in the sign of amountCents — an unfiltered SUM over a signed column is a wrong total nobody notices. |
-| `amount_cents` | integer | NN |  | `card, check, cash, offline, other` | always positive |
-| `method` | text | NN |  | `card, check, cash, offline, other` |  |
+| `amount_cents` | integer | NN |  |  | always positive |
+| `method` | text | NN |  | `card, check, cash, offline, other` | How the money arrived, recorded for the person reading the ledger: the offline route takes it from the operator's form, a refund row is always 'card', the invoice backfill copies `invoices.payment_method`. |
 | `provider` | text | UQ |  | `stripe, qbo` | null = offline |
 | `provider_ref` | text | UQ |  |  | Idempotency key. Stripe redelivers webhooks; the unique index below is the guard, in the database rather than in a handler someone can refactor. |
 | `recorded_by` | text |  |  |  | user id, null when automated |
 | `refunds_id` | text |  |  |  | kind='refund' -> the row it reverses |
-| `note` | text |  |  |  |  |
+| `note` | text |  |  |  | Operator memo on an offline entry; on a `refund` row it carries the REASON (`refund.ts` passes `input.reason` here). |
 | `occurred_at` | integer | NN |  |  | When the money MOVED, not when the row was written — an inspector records Tuesday's cash on Thursday, and reporting periods key on the former. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 
@@ -1591,8 +1591,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `envelope` | text | NN |  |  |  |
-| `reason` | text | NN |  |  |  |
+| `envelope` | text | NN |  |  | A FINGERPRINT, never the message: `parkedFingerprint()` allow-lists the routing fields plus size + sha256 and marks the format `v:1`. |
+| `reason` | text | NN |  |  | Which park path wrote the row — 'parse-failed' or 'unknown-type-or-version'. Either way core and portal disagree about a command shape. |
 | `received_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 
 **Indexes**
@@ -1610,7 +1610,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `event_id` | text | PK NN |  |  | *App-layer reference to another row — no database foreign key.* |
-| `cmd_type` | text | NN |  |  |  |
+| `cmd_type` | text | NN |  |  | The applied command's CloudEvent type, for the human reading the ledger: dedup keys on `event_id` alone, and every branch (`isSubjectCmd`, `replyTypeFor`) reads the live envelope rather than this column. |
 | `processed_at` | integer | NN |  |  | Epoch ms — same convention as sync_outbox.created_at. |
 
 ---
@@ -1639,7 +1639,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN UQ |  |  | *The inspection (order) this belongs to. App-layer reference.* |
-| `responses` | text |  |  | `sent, received, declined` |  |
+| `responses` | text |  |  | `sent, received, declined` | A free-form question -> answer map, NOT a fixed catalogue: whatever keys the upsert sends are rendered verbatim as the Appendix E definition list, so the question wording lives in the data. |
 | `status` | text | NN | `'sent'` | `sent, received, declined` | *State-machine column — see the Values column for the vocabulary.* |
 | `share_token` | text | UQ |  |  | Persistent per-inspection share token for the no-login PSQ form (mirrors the inspection_access_tokens model; opaque, server-issued). |
 | `sent_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
@@ -1681,11 +1681,11 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `oi_type` | text | NN UQ |  |  |  |
+| `oi_type` | text | NN UQ |  |  | Which OI entity `oi_id` names — 'contact' \| 'invoice' \| 'refund' at the three insert sites. |
 | `oi_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
-| `qbo_type` | text | NN UQ |  |  |  |
+| `qbo_type` | text | NN UQ |  |  | The QuickBooks-side entity name of the twin, spelled as Intuit spells it ('Customer' \| 'Invoice' \| 'CreditMemo'). |
 | `qbo_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
-| `qbo_sync_token` | text | NN |  |  |  |
+| `qbo_sync_token` | text | NN |  |  | QuickBooks' optimistic-concurrency counter for the mapped entity, not an id: it changes on every remote edit. |
 | `synced_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 
 **Indexes**
@@ -1703,10 +1703,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `oi_type` | text | NN |  |  |  |
+| `oi_type` | text | NN |  |  | The OI entity this open flag is about ('invoice' \| 'refund' \| 'contact'), part of the (tenant, oi_type, oi_id, error_code) identity of one open row. |
 | `oi_id` | text | NN |  |  | *App-layer reference to another row — no database foreign key.* |
-| `error_code` | text | NN |  |  |  |
-| `error_msg` | text | NN |  |  |  |
+| `error_code` | text | NN |  |  | WHAT kind of thing a human has to look at, and part of the open-row identity: a failed push ('SYNC_ERROR') and a payment discrepancy (QBO_PAYMENT_DISCREPANCY) on the same invoice are two separate open rows, and sharing one would overwrite each other. |
+| `error_msg` | text | NN |  |  | Not always prose: on a discrepancy row it is the JSON codec payload ({ledgerCents, qboCents}) that the panel decodes to show both figures — the table has no column per figure. |
 | `retries` | integer | NN | `0` |  | *An integer value.* |
 | `is_resolved` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
@@ -1727,7 +1727,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `name` | text | NN |  |  |  |
 | `slug` | text | NN UQ |  |  |  |
 | `description` | text |  |  |  |  |
-| `levels` | text | NN |  |  |  |
+| `levels` | text | NN |  |  | The ordered RatingLevel array (id / abbreviation / label / color / severity / isDefect / order). **[more]** |
 | `is_default` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `is_seed` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
@@ -1748,12 +1748,12 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `repair_request_id` | text | NN IX |  |  | *App-layer reference to another row — no database foreign key.* |
-| `finding_key` | text | NN |  |  |  |
-| `section_title` | text | NN |  |  |  |
-| `item_label` | text | NN |  |  |  |
+| `finding_key` | text | NN |  |  | `unitId:sectionId:itemId` (`lib/finding-key.ts`; `_default` when the template has no units) — one item's entry in `inspection_results.data`, the same key shape `cost_items.finding_key` points at. |
+| `section_title` | text | NN |  |  | Snapshots of the report's `section.title` / `item.label` at add time, so a contractor reading the shared list still knows where the defect is after the template or the report has been edited under it. |
+| `item_label` | text | NN |  |  | add-time snapshot of item.label, beside section_title |
 | `comment_snapshot` | text |  |  |  | *Serialized JSON snapshot.* |
 | `requested_credit_cents` | integer |  |  |  | *Money, integer cents — never a float.* |
-| `note` | text |  |  |  |  |
+| `note` | text |  |  |  | The REQUESTER's own words on this line (buyer or agent, quick-phrase assisted) — the inspector's text is `comment_snapshot`. |
 | `sort_order` | integer | NN | `0` |  | *Display order within its tenant; lower sorts first.* |
 | `defect_title_snapshot` | text |  |  |  | IA-55 — defect title / location / category snapshots so the public share page shows a locatable, distinguishable, priority-tagged list that stays stable after the report changes. |
 | `location_snapshot` | text |  |  |  | *Serialized JSON snapshot.* |
@@ -1777,11 +1777,11 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `inspection_id` | text | NN IX |  | `client, agent, inspector` | *The inspection (order) this belongs to. App-layer reference.* |
-| `created_by_kind` | text | NN |  | `client, agent, inspector` |  |
+| `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `created_by_kind` | text | NN |  | `client, agent, inspector` | With `created_by_ref`, the list's OWNER identity: `listMine` filters on the pair and `assertCanEdit` refuses on a mismatch of either, so this is an authorization input, not a label. |
 | `created_by_ref` | text | NN |  |  | WHO built this list, as resolved by `repair-access.ts`. NOT an opaque id: on the portal-token path (how a client always arrives, and most agents) it is the recipient's EMAIL ADDRESS. **[more]** |
-| `custom_intro` | text |  |  |  |  |
-| `share_token` | text | NN UQ |  |  |  |
+| `custom_intro` | text |  |  |  | Document-level intro the creator writes (set and cleared by `setIntro`), shown above the item list on the public share page and in the inspector's repair-request log. |
+| `share_token` | text | NN UQ |  |  | The bearer credential for `/repair-request/<token>`: the share view, its PDF and the share email authenticate on this ALONE — no session, no tenant in the path — which is why it is uniquely indexed and gated by the pair below. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
 | `expires_at` | integer |  |  |  | IA-37 — share-token lifecycle (mirrors agreement_signers). Appended at the table end (reference_d1_add_column_at_end). |
@@ -1804,8 +1804,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `inspection_id` | text | NN IX |  | `docx` | *The inspection (order) this belongs to. App-layer reference.* |
-| `format` | text | NN |  | `docx` |  |
+| `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `format` | text | NN |  | `docx` | Never accepted from a request and never read back: the enqueue route passes the one literal, and no query filters on it. |
 | `status` | text | NN |  | `queued, building, ready, failed` | *State-machine column — see the Values column for the vocabulary.* |
 | `r2_key` | text |  |  |  | *Object key in the R2 bucket.* |
 | `size_bytes` | integer |  |  |  | *A size in bytes.* |
@@ -1829,8 +1829,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `inspection_id` | text | NN UQ IX |  | `summary, full` | *The inspection (order) this belongs to. App-layer reference.* |
-| `type` | text | NN UQ IX |  | `summary, full` |  |
+| `inspection_id` | text | NN UQ IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `type` | text | NN UQ IX |  | `summary, full` | Selects the RENDER, not just a label: 'summary' appends `&summary=1` to the report URL so print-mode CSS drops everything but defects + safety. |
 | `r2_key` | text | NN |  |  | *Object key in the R2 bucket.* |
 | `rendered_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `source_version` | integer | NN |  |  | inspection.updatedAt timestamp at render time |
@@ -1859,8 +1859,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `inspection_id` | text | NN UQ IX |  | `field_observer, pcr_reviewer` | *The inspection (order) this belongs to. App-layer reference.* |
-| `role` | text | NN UQ |  | `field_observer, pcr_reviewer` |  |
+| `inspection_id` | text | NN UQ IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `role` | text | NN UQ |  | `field_observer, pcr_reviewer` | Which ASTM seat signed — and the UPSERT KEY with inspection_id, so re-signing REPLACES the prior attestation rather than appending one. |
 | `person_id` | text | NN |  |  | The user/identity sub of the signer (accountability). Free text — no FK. |
 | `name` | text | NN |  |  |  |
 | `license` | text |  |  |  | Professional license number as displayed in Appendix D qualifications. |
@@ -1887,15 +1887,15 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `inspection_id` | text | NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `version_number` | integer | NN UQ |  |  | *An integer value.* |
 | `snapshot_json` | text | NN |  |  | *Serialized JSON snapshot.* |
-| `summary` | text |  |  |  |  |
+| `summary` | text |  |  |  | NOT a summary of the report. It is the per-publish AMENDMENT REASON: the free-text "what changed" note (max 500 chars) the publish request carries, NULL on a first publish. |
 | `content_hash` | text |  |  |  | #120 — integrity layer. content_hash = SHA-256(snapshot_json); prev_hash chains to the previous version's content_hash; signature = Ed25519 over content_hash by the tenant signing key (reused from e-sign). |
 | `prev_hash` | text |  |  |  | *Hash used for lookup and comparison; not reversible.* |
-| `signature` | text |  |  |  |  |
-| `key_fingerprint` | text |  |  |  |  |
+| `signature` | text |  |  |  | Verified against the tenant's CURRENT signing key, not against a key named by this row — rotating that key makes every earlier signature report `signatureValid: false`. |
+| `key_fingerprint` | text |  |  |  | SHA-256 of the public key that signed this row. Nothing verifies with it; it is published on the verifier page so a reader can tell whether two reports were signed by the same key. |
 | `is_amendment` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
-| `verification_token` | text | UQ |  |  |  |
+| `verification_token` | text | UQ |  |  | The bearer credential for the public verifier: a random UUID minted per publish and the SOLE lookup key for the /v/:token page and the frozen-PDF endpoint (both unauthenticated). |
 | `published_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
-| `published_by` | text | NN |  |  |  |
+| `published_by` | text | NN |  |  | users.id of the publisher, straight from the JWT and never resolved to a name. A publish with no authenticated user writes no version row at all, so this is never a placeholder. |
 | `created_at` | integer | NN | `(unixepoch() * 1000)` |  | *Creation time, epoch milliseconds.* |
 | `report_id` | text | UQ |  |  | The report this version belongs to. Two reports on one order publish independently and each needs its OWN v1 and its own prev_hash chain — interleaving them into one chain fails verification for both, including for versions published before the second report existed. |
 
@@ -2036,11 +2036,11 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `tenant_id` | text | PK NN FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `public_key` | text | NN |  |  |  |
+| `public_key` | text | NN |  |  | base64url SPKI. Stored in the clear on purpose: it is what a third party needs to check the seal, served as PEM from /.well-known and embedded in the audit-trail export so an offline verifier needs nothing from us. |
 | `private_key_enc` | text | NN |  |  | *Encrypted at rest (AES-GCM envelope).* |
-| `private_key_iv` | text | NN |  |  |  |
-| `fingerprint` | text | NN |  |  |  |
-| `algorithm` | text | NN | `'Ed25519'` |  |  |
+| `private_key_iv` | text | NN |  |  | base64url 12-byte AES-GCM IV for privateKeyEnc, freshly random per keypair. Not a secret, but not optional either: without it the private key cannot be decrypted and the tenant can never sign again under this fingerprint. |
+| `fingerprint` | text | NN |  |  | SHA-256 hex of the raw SPKI bytes. Copied onto every audit row's key_fingerprint at append time and published by the verifier, so a reader can say WHICH key signed rather than trusting that one exists. |
+| `algorithm` | text | NN | `'Ed25519'` |  | NO READER FOUND. Every surface that reports an algorithm — /.well-known, the public verifier JSON, the audit-trail export — emits the 'Ed25519' literal instead of reading this column. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `rotated_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 
@@ -2055,7 +2055,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `slug` | text | PK NN |  |  |  |
-| `reason` | text | NN |  |  |  |
+| `reason` | text | NN |  |  | NO READER FOUND. Both lookups (`UserService.checkSlug`, `api/public-slug.ts`) only test that a row EXISTS and return their own 'reserved' literal; the latter selects `slug` alone. |
 
 ---
 
@@ -2071,11 +2071,11 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `contact_id` | text | IX |  |  | The contact this consent attaches to — NULL when the subject is a staff `users` row (see `subjectKind` below). |
 | `recipient_type` | text | NN |  | `client, agent, other, staff` | The BASIS the recipient was reachable under, for a carrier audit. `staff` is internal-operational: an employee under account/employment terms, never consumer consent. |
-| `action` | text | NN |  | `granted, revoked` |  |
+| `action` | text | NN |  | `granted, revoked` | The consent VERDICT. The latest row per subject is the whole answer the send gate reads (`sms/send-gate.ts`, `notifications/channel-consent.ts`): one 'revoked' blocks every later SMS until a new 'granted' is appended. |
 | `disclosure_version` | integer | NN |  |  | *An integer value.* |
 | `captured_via` | text | NN |  | `booking_form, optin_link, admin, settings_page` | `settings_page` is a grant made inline on the notifications screen, with the disclosure rendered there. |
-| `ip` | text |  |  |  |  |
-| `user_agent` | text |  |  |  |  |
+| `ip` | text |  |  |  | Request evidence for the grant, taken from CF-Connecting-IP / User-Agent at the capture site (the booking form is the only path that supplies them today) — NULL wherever there is no browser request, e.g. **[more]** |
+| `user_agent` | text |  |  |  | captured with `ip`; retained through erasure on the same basis |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
 | `subject_kind` | text | NN IX | `'contact'` | `contact, user` | WHO the consent is about, generalised beyond `contacts`. Staff are `users` rows and have no contact, so a ledger keyed only on `contact_id` could not record their STOP at all. **[more]** |
 | `subject_id` | text | NN IX | `''` |  | *App-layer reference to another row — no database foreign key.* |
@@ -2099,7 +2099,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `provider_message_id` | text | NN IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `status` | text | NN |  | `queued, sent, delivered, undelivered, failed` | *State-machine column — see the Values column for the vocabulary.* |
-| `error_code` | text |  |  |  |  |
+| `error_code` | text |  |  |  | Twilio's numeric `ErrorCode` when the callback carries one; Telnyx sends no code, so the receiver stores its raw failure word (delivery_failed, expired, rejected, …) instead — two vocabularies in one column. |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
 
 **Indexes**
@@ -2131,13 +2131,13 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `event_type` | text | NN |  |  |  |
-| `payload` | text | NN |  |  |  |
+| `event_type` | text | NN |  |  | Short event name (`user.invited`). `toCloudEvent` expands it to the envelope's `io.inspectorhub.<type>` and picks the `dataschema` from it. |
+| `payload` | text | NN |  |  | The event's `data`, stringified ONCE at append and JSON.parsed straight back into the envelope at publish — never re-serialized from a re-read row, so the bytes portal receives are the ones the producing write made. |
 | `status` | text | NN IX | `'pending'` | `...SYNC_OUTBOX_STATUSES` | Schema Rules: state-machine column declares its enum (type-layer only). |
 | `attempts` | integer | NN | `0` |  | *An integer value.* |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
 | `last_tried_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
-| `last_error` | text |  |  |  |  |
+| `last_error` | text |  |  |  | Written only by the DLQ writeback (`markFailedFromDlq`, capped at 1000 chars) and cleared again on publish and on redrive. |
 
 **Indexes**
 
@@ -2176,11 +2176,11 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN |  |  |  |
 | `version` | integer | NN | `1` |  | *An integer value.* |
-| `schema` | text | NN |  |  |  |
+| `schema` | text | NN |  |  | The LIVE authoring structure (TemplateSchemaV2 — sections, items, rating system, applicability), revalidated on every save. **[more]** |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `rating_system_id` | text | IX |  |  | Sprint 2 S2-1 — selects the active rating system. Null = use tenant default. |
-| `property_type` | text |  |  |  |  |
-| `commercial_subtype` | text |  |  |  |  |
+| `property_type` | text |  |  |  | MIRRORS of `schema.propertyType` / `schema.commercialSubtype`, recomputed by deriveTemplateMirrorColumns on every create and every schema-bearing update — the schema is the source of truth, these can never be edited apart from it, and the subtype is forced NULL unless the type is 'commercial'. **[more]** |
+| `commercial_subtype` | text |  |  |  | forced NULL unless propertyType is 'commercial'; no reader either |
 | `description` | text |  |  |  |  |
 | `is_featured` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `default_profile_id` | text |  |  |  | Report Style Presets — ties a report type to a default appearance profile. NULL = inherit tenant default. |
@@ -2200,7 +2200,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `tenant_id` | text | PK NN FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `company_name` | text |  |  |  | *A name.* |
-| `primary_color` | text |  |  |  |  |
+| `primary_color` | text |  |  |  | Tenant brand hex, validated as `#rrggbb` by the settings form. Never used raw: `brandTokens()` derives the hover shades and a contrast-safe foreground from it, and NULL emits no tokens at all (platform defaults stand). |
 | `logo_url` | text |  |  |  | *A URL.* |
 | `support_email` | text |  |  |  | *An email address.* |
 | `company_address` | text |  |  |  | Report PDF settings (2026-06-18) — print-layout chrome the tenant can toggle. companyAddress is shown in the PDF footer/header block; the three booleans gate footer / page-number / inspector-license rendering. |
@@ -2208,7 +2208,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `is_pdf_page_numbers_shown` | integer | NN | `true` |  | *Boolean flag, stored as integer 0/1.* |
 | `is_pdf_license_shown` | integer | NN | `true` |  | *Boolean flag, stored as integer 0/1.* |
 | `sender_email` | text |  |  |  | C-10 ③-D (B-4 / A-7) — tenant transactional-email identity. `senderEmail` is the From: address; `replyTo` is the Reply-To: header. |
-| `reply_to` | text |  |  |  |  |
+| `reply_to` | text |  |  |  | Beats the inspector's own address even when pointOfContact='inspector' (`resolveSenderIdentity`: configured replyTo ?? inspector email). |
 | `email_mode` | text | NN | `'platform'` | `platform, own` | Phase 1 (B-4/A-7) — sender identity. `email_mode` switches between the platform Resend account ('platform', default) and the tenant's own ('own'). |
 | `video_mode` | text | NN | `'r2'` | `r2, stream` | Self-host video backend selection (mirrors emailMode). Default 'r2' (free). |
 | `sms_mode` | text | NN | `'platform'` | `platform, own, managed_shared, managed_dedicated` | Track L (D3) — SMS sender mode, mirrors email_mode. 'platform' uses the platform Twilio env; 'own' uses the tenant's three TWILIO_* secrets (only when all three are present, else platform fallback — see resolve-twilio.ts). **[more]** |
@@ -2220,8 +2220,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `integration_config` | text |  |  |  | plaintext JSON: {appBaseUrl, turnstileSiteKey, googleClientId} |
 | `secrets_enc` | text |  |  |  | Settings-managed secrets — AES-256-GCM encrypted JSON holding all 14 integration API keys configurable via Settings UI. |
 | `dek_enc` | text |  |  |  | Envelope encryption (2026-06-07) — the tenant's wrapped DEK (`k1:iv:wrapped`, AES-GCM under the HKDF KEK from JWT_SECRET, AAD=tenantId). |
-| `ics_token` | text |  |  |  |  |
-| `widget_allowed_origins` | text |  |  |  |  |
+| `ics_token` | text |  |  |  | The ONLY credential on the public company calendar feed `/api/ics/:token` (no auth, 90 days of inspections including addresses). |
+| `widget_allowed_origins` | text |  |  |  | Cross-origin allowlist for the embeddable booking widget; an entry may carry ONE `*` in the host (`https://*.acme.com`), and protocol/port must match exactly. |
 | `default_profile_id` | text | NN | `'signature'` |  | Report Style Presets — default appearance profile id (built-in: signature\|meridian\|terra). |
 | `attention_thresholds` | text | NN | `'{"agreement_unsigned_h":72,"invoi…` |  | handoff-decisions §1 — per-team attention thresholds in hours. Default 72h applies uniformly to the three categories. |
 | `inspection_prefs` | text |  |  |  | Workflow shortcuts PR — { cloneDefault, autoAdvanceDelayMs, pinnedTagIds } Nullable; server applies hard-coded defaults when NULL. |
@@ -2260,9 +2260,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `custom_privacy_url` | text |  |  |  | *A URL.* |
 | `custom_terms_url` | text |  |  |  | *A URL.* |
 | `privacy_body` | text |  |  |  | Optional full-page body for hosted mode; null = built-in template. |
-| `terms_body` | text |  |  |  |  |
+| `terms_body` | text |  |  |  | Whitespace-only is stored as NULL. Every PATCH that mentions this column also records a legal-version publish row (content-hash de-duped, non-fatal if it fails), and THAT registry — not this row's updated_at — is the "Last updated" the public /legal/:tenant/terms page shows. |
 | `date_format` | text | NN | `'us'` | `us, iso, eu` | #270 — display SHAPE, independent of language. A US user wanting a 24-hour clock has no locale that expresses it: en-US implies 12h, en-GB implies 24h but also DD/MM and British spellings. |
-| `time_format` | text | NN | `'12h'` | `12h, 24h` |  |
+| `time_format` | text | NN | `'12h'` | `12h, 24h` | Becomes `hourCycle` h23/h12 in the shared date formatter. `users.time_format` overrides it for workspace CHROME only; inspection, report and appointment times resolve from the tenant value alone, so an edit here changes the clock every party reads off the same document. |
 | `booking_conflict_policy` | text | NN | `'advisory'` | `advisory, block` | How internal scheduling treats a DOUBLE-BOOKING — the same inspector already busy at the proposed instant. **[more]** |
 | `cancellation_policy` | text |  |  |  | The tenant's cancellation ladder. NULL = no policy configured, which is how every workspace ships: the platform charges nothing and cancellations are free until the tenant says otherwise. **[more]** |
 | `cancellation_clause_agreement_id` | text |  |  |  | The tenant's confirmation that their OWN agreement contains a cancellation clause covering those fees. **[more]** |
@@ -2273,14 +2273,14 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `booking_min_lead_hours` | integer | NN | `0` |  | Minimum hours between NOW and the start of a bookable slot. 0 (the default) preserves the prior behaviour of accepting any future slot. |
 | `booking_same_day_cutoff_time` | text |  |  |  | Wall-clock `HH:MM` in the TENANT timezone after which today's remaining slots stop being offered. |
 | `company_lat` | real |  |  |  | Coordinates of `company_address`, resolved ONCE through the Places details path when an admin saves the address. **[more]** |
-| `company_lng` | real |  |  |  |  |
+| `company_lng` | real |  |  |  | Both coordinates must be `typeof number` before `closest` anchors anything — a lone lat is no anchor — and 0 is a legitimate longitude, which is why the routing check is a typeof and never truthiness. |
 | `company_geocoded_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `ai_key_attestation_provider` | text |  |  | `gemini` | What the workspace confirmed when it saved its OWN AI provider key. The key and the provider account belong to the tenant, but this codebase ships the client that calls the provider, so the arrangement is worth recording rather than assuming. **[more]** |
-| `ai_key_attestation_mode` | text |  |  | `tenant_key` |  |
-| `ai_key_attestation_account_owner` | text |  |  | `tenant` |  |
-| `ai_key_attestation_terms_version` | text |  |  |  |  |
+| `ai_key_attestation_mode` | text |  |  | `tenant_key` | The arrangement attested: the tenant's OWN key, not a managed one. All six are written in the same statement as `secrets_enc` by the secrets save, and every one must be non-null before a BYO AI call is allowed. |
+| `ai_key_attestation_account_owner` | text |  |  | `tenant` | Whose provider account the key bills to — and therefore whose provider terms govern the content sent to it. |
+| `ai_key_attestation_terms_version` | text |  |  |  | Stamped from AI_PROVIDER_TERMS_VERSION at write time. A later bump of that constant does NOT invalidate stored rows — the runtime check requires the column non-null and ignores its value — so re-confirmation stays a deliberate pass rather than an outage caused by a one-character edit. |
 | `ai_key_attestation_attested_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
-| `ai_key_attestation_policy_version` | text |  |  |  |  |
+| `ai_key_attestation_policy_version` | text |  |  |  | Stamped from AI_KEY_ATTESTATION_POLICY_VERSION — the revision of OUR statements, which moves independently of the provider terms above. |
 | `repair_quick_phrases` | text |  |  |  | #275 — quick-insert phrases for repair-request notes, maintained by the tenant. Same shape and storage idiom as `custom_referral_sources` above. **[more]** |
 | `legal_name` | text |  |  |  | The registered legal entity, as it appears on the licence — distinct from `companyName`, which is the trading brand / DBA. **[more]** |
 
@@ -2341,8 +2341,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `email` | text | NN UQ |  | `ROLES` |  |
-| `role` | text | NN | `'inspector'` | `ROLES` |  |
+| `email` | text | NN UQ |  |  |  |
+| `role` | text | NN | `'inspector'` | `ROLES` | The role the invitee GETS: `joinTeam` copies it straight onto users.role, for a brand-new row and for a reactivated soft-deleted one alike, and emits it on the `user.invited` outbox event that drives portal seat sync. |
 | `status` | text | NN | `'pending'` | `pending, accepted` | Schema Rules: state-machine column declares its enum (type-layer only). |
 | `expires_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `permission_overrides` | text |  |  |  | `mentor_id` and `assigned_section_ids` were here, mirroring the columns of the same name on `users` so an invite could carry them through accept. **[more]** |
@@ -2363,8 +2363,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ IX |  | `privacy, terms` | *Tenant isolation key. Every read and write must filter on it.* |
-| `doc` | text | NN UQ IX |  | `privacy, terms` |  |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `doc` | text | NN UQ IX |  | `privacy, terms` | Which document. It is the discriminator in the uniqueness key and in every "latest in force" lookup, so the two version independently — saving Terms never mints a Privacy row. |
 | `version` | text | NN UQ |  |  | `YYYY-MM-DD` in the tenant's own timezone — the date a reader is shown. |
 | `body_snapshot` | text |  |  |  | The document body as published. NULL means the tenant cleared their override and reverted to the built-in template — which is a publish, and is recorded as one, because "they went back to the default" is exactly the kind of change a missing row would silently hide. |
 | `content_hash` | text | NN |  |  | SHA-256 hex of `bodySnapshot` (of the empty string when it is NULL). |
@@ -2388,7 +2388,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `library_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
-| `imported_semver` | text | NN |  |  |  |
+| `imported_semver` | text | NN |  |  | The catalogue semver this tenant is currently ON. Re-pointed in place by every update, so it is a position and never a history. |
 | `imported_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `row_count` | integer | NN | `0` |  | *A count.* |
 | `local_entity_id` | text |  |  |  | An import produces ONE local row for a 1:1 kind (templates, tracked by this id) or N tagged rows for a 1:N kind (comments, tracked by row_count). **[more]** |
@@ -2412,12 +2412,12 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `library_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `template_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `action` | text | NN |  |  | 'install' \| 'update' \| 'replace' \| 'migrate' |
-| `source_version` | text |  |  |  |  |
-| `target_version` | text |  |  |  |  |
+| `source_version` | text |  |  |  | The semver the tenant moved FROM / TO. source is NULL for 'install' (there was nothing to move from); BOTH are NULL for 'migrate', which moves between two LOCAL templates and has no catalogue version on either side — so a reader must not treat a null pair as missing data. |
+| `target_version` | text |  |  |  | NULL on a migrate: local -> local has no catalogue version either side |
 | `rows_affected` | integer | NN | `0` |  | *An integer value.* |
 | `metadata` | text |  |  |  | JSON-encoded action-specific context (deleted ids, migration counts, …). Stored as TEXT so we can keep parity with raw SQL inserts in tests. |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
-| `created_by` | text | NN |  |  |  |
+| `created_by` | text | NN |  |  | The JWT sub of whoever caused the event — but only the library REPLACE and template MIGRATE routes actually pass one. |
 
 **Indexes**
 
@@ -2435,7 +2435,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `old_slug` | text | PK NN |  |  |  |
+| `old_slug` | text | PK NN |  |  | The slug as it appears in an old public link — the LOOKUP KEY, matched exactly by `resolveByPathParam` after the live-slug and KV lookups miss, and never cached (a history hit must not warm `tenant:<slug>` for whoever claims that slug next). **[more]** |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `changed_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `retired_until` | integer | NN |  |  | *An integer value.* |
@@ -2455,8 +2455,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `slug` | text | NN UQ |  | `free,pro,enterprise` |  |
-| `tier` | text | NN | `'free'` | `free,pro,enterprise` |  |
+| `slug` | text | NN UQ |  |  |  |
+| `tier` | text | NN | `'free'` | `free,pro,enterprise` | Commercial plan. Written ONLY by the portal command seam (`portal.provider` handleTenantUpdate) — core has no UI for it, so a standalone deploy stays 'free'. |
 | `stripe_connect_account_id` | text |  |  | `pending,active,suspended,trial` | *App-layer reference to another row — no database foreign key.* |
 | `status` | text | NN | `'pending'` | `pending,active,suspended,trial` | *State-machine column — see the Values column for the vocabulary.* |
 | `max_users` | integer | NN | `5` |  | *An integer value.* |
@@ -2480,8 +2480,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `tenant_id` | text | PK NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `metric` | text | PK NN |  |  |  |
-| `period_key` | text | PK NN |  |  |  |
+| `metric` | text | PK NN |  |  | Type-layer enum only (see above), so an unlisted string reaches D1 and just opens a separate primary-key bucket nobody reads. |
+| `period_key` | text | PK NN |  |  | Third leg of the primary key, so this alone decides what "the same counter" means: `record()` adds into the bucket, `setGauge()` overwrites it, and `lifetimeTotal()` sums every bucket for a metric and ignores it entirely. |
 | `value` | integer | NN | `0` |  | *An integer value.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
 
@@ -2508,11 +2508,11 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `is_signature_enabled` | integer | NN | `true` |  | 2026-06-14 — per-inspector opt-in for the business-card email footer (independent of Point of Contact). |
 | `slug` | text | UQ |  |  | FROZEN for inspectors (2026-06-06, DB-12/IA-26): the per-inspector booking slug is retired — /book/:tenant is the canonical public entry and no inspector-facing route writes this column anymore. **[more]** |
 | `role` | text | NN | `'manager'` | `ROLES` | DDL default is FROZEN (D1 cannot alter column defaults without a table rebuild and users is FK-referenced). |
-| `onboarding_state` | text |  |  |  |  |
+| `onboarding_state` | text |  |  |  | Sparse map of one-time UI flags — an ABSENT key means "not done yet", so a NULL column is simply a fresh account and nothing has to backfill it. **[more]** |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `totp_secret` | text |  |  |  | Spec 4A — TOTP 2FA. All fields are per-user opt-in; nullable until enabled. |
 | `is_totp_enabled` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
-| `totp_recovery_codes` | text |  |  |  |  |
+| `totp_recovery_codes` | text |  |  |  | JSON array of HASHED recovery codes — never the codes themselves, which are shown once at enrollment and never recoverable. |
 | `totp_verified_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `last_active_at` | integer |  |  |  | Agent Accounts A2 — per-user notification preferences. Default ON for referral + report (high signal); default OFF for paid (high noise — the inspector forwards the receipt manually if the agent wants visibility). **[more]** |
 | `deleted_at` | integer | IX |  |  | `mentor_id`, `assigned_section_ids` and `expires_at` were here — the role-extension columns of the apprentice / specialist / guest subsystems, all three removed 2026-06-13. **[more]** |
@@ -2521,10 +2521,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `timezone` | text |  |  |  | Per-user display-timezone override (IANA name). NULL = inherit the tenant's default_timezone. |
 | `locale` | text |  |  |  | Per-user display-locale override (BCP-47). NULL = inherit the tenant's default_locale. |
 | `date_format` | text |  |  | `us, iso, eu` | #270 — per-user override. NULL = inherit the tenant's setting, the same convention as `timezone` directly above. |
-| `time_format` | text |  |  | `12h, 24h` |  |
+| `time_format` | text |  |  | `12h, 24h` | Same override contract as `date_format` above, cleared by submitting an empty value. `/api/session-context` ships the RAW stored value (null and all) beside the tenant's; the client hook, not the server, resolves which of the two wins — so nothing here is baked into a rendered document. |
 | `service_origin_address` | text |  |  |  | Where this inspector STARTS their day, for `closest` routing. NULL on all three columns = inherit the company address coordinates (`tenant_configs.company_lat/lng`), which is the right answer for the single-office workspace and the only reason the strategy is usable without per-person setup. **[more]** |
-| `service_origin_lat` | real |  |  |  |  |
-| `service_origin_lng` | real |  |  |  |  |
+| `service_origin_lat` | real |  |  |  | Geocoded from the address by PUT /api/admin/booking-routing/service-origin — and NULL while the address itself is set, whenever that address did not geocode. |
+| `service_origin_lng` | real |  |  |  | written only as a pair with _lat; a lone value is no anchor |
 
 **Indexes**
 

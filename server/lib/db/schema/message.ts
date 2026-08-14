@@ -37,9 +37,18 @@ export const inspectionMessages = sqliteTable('inspection_messages', {
     id:           text('id').primaryKey(),
     tenantId:     text('tenant_id').notNull().references(() => tenants.id),
     inspectionId: text('inspection_id').references(() => inspections.id, { onDelete: 'cascade' }),
+    // Every consumer tests `!= 'inspector'` rather than naming the counterparty
+    // roles — the unread rollup, the mark-read pass, and the notification that
+    // fires only for inbound messages — so adding a counterparty role needs no
+    // code change, while renaming 'inspector' silently inverts all three.
     fromRole:     text('from_role', { enum: ['inspector', 'client', 'agent', 'other'] }).notNull(),
     fromName:     text('from_name'),
     body:         text('body').notNull(),
+    // R2 object metadata written whole at create. It is also the authorization
+    // record: resolveAttachmentForInspection scans the messages of an inspection
+    // the caller already holds and returns the `key` from here, so an R2 key is
+    // never taken from a request. createMessage always writes an array (possibly
+    // empty), so NULL is a row no current writer produced.
     attachments:  text('attachments', { mode: 'json' }).$type<MessageAttachment[]>(),
     readAt:       integer('read_at', { mode: 'timestamp_ms' }),
     createdAt:    integer('created_at', { mode: 'timestamp_ms' }).notNull(),

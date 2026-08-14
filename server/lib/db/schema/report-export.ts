@@ -35,6 +35,10 @@ export const reportExports = sqliteTable('report_exports', {
     id:            text('id').primaryKey(),
     tenantId:      text('tenant_id').notNull(),
     inspectionId:  text('inspection_id').notNull(),
+    // Never accepted from a request and never read back: the enqueue route
+    // passes the one literal, and no query filters on it. This enum (with the
+    // service's ReportExportFormat) is the whole enforcement that the table is
+    // Word-only — the generic name promises a breadth that does not exist.
     format:        text('format', { enum: ['docx'] }).notNull(),
     status:        text('status', { enum: ['queued', 'building', 'ready', 'failed'] }).notNull(),
     r2Key:         text('r2_key'),
