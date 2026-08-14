@@ -34,7 +34,6 @@ export {
     inspectorServiceAreas,
 } from './inspection';
 export { inspectorCredentials } from './inspection/inspector-credentials';
-export { commercialSubtypes } from './commercial-subtypes';
 export { contacts } from './contact';
 export { contractorTypes } from './contractor-types';
 export { invoices } from './invoice';

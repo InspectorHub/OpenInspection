@@ -9,11 +9,11 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 95 |
-| Columns | 1112 |
-| Indexes (excluding primary keys) | 160 |
-| Database foreign keys (all legacy, frozen) | 52 |
-| Columns carrying a source comment | 510 (46%) |
+| Tables | 94 |
+| Columns | 1105 |
+| Indexes (excluding primary keys) | 159 |
+| Database foreign keys (all legacy, frozen) | 51 |
+| Columns carrying a source comment | 509 (46%) |
 
 **Reading the tables.** SQLite has four storage types; the semantic type is a
 Drizzle layer on top — `integer{mode:timestamp_ms}` is epoch milliseconds,
@@ -484,26 +484,6 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_comments_tenant` (tenant_id)
 - `idx_comments_library_id` (library_id)
-
----
-
-## `commercial_subtypes`
-
-<sub>server/lib/db/schema/commercial-subtypes.ts · 7 columns · primary key `id`</sub>
-
-| Column | Type | Flags | Default | Values | Description |
-|---|---|---|---|---|---|
-| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN UQ FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `name` | text | NN UQ |  |  |  |
-| `based_on` | text |  |  |  | NO READER OR WRITER FOUND — nothing outside the schema barrel touches this column or this table. |
-| `description` | text |  |  |  |  |
-| `is_disabled` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
-| `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
-
-**Indexes**
-
-- **UNIQUE** `idx_commercial_subtypes_tenant_name` (tenant_id, name)
 
 ---
 
