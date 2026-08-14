@@ -1,5 +1,5 @@
 {
-  "app/routes/inspection-edit.tsx": 2532,
+  "app/routes/inspection-edit.tsx": 2541,
   "app/routes/inspector-portal.tsx": 1270,
   "server/services/inspection/inspection-report.service.ts": 954,
   "server/durable-objects/inspection-doc.ts": 928,
@@ -14,7 +14,7 @@
   "app/routes/template-edit.tsx": 719,
   "server/index.ts": 712,
   "app/components/media-studio/PhotoAnnotator.tsx": 692,
-  "app/hooks/usePhotoOps.ts": 661,
+  "app/hooks/usePhotoOps.ts": 670,
   "server/services/inspection/inspection-publish.service.ts": 660,
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,
   "app/components/editor/ItemEditor.tsx": 651,
@@ -60,7 +60,8 @@
   "app/routes/public/portal-inspection.tsx": 430,
   "app/hooks/useStructureEdit.ts": 424,
   "server/data/automation-seeds.ts": 423,
-  "server/lib/db/schema/inspection/core.ts": 412,
+  "server/lib/db/schema/inspection/core.ts": 415,
+  "app/components/editor/InspectionSettingsSheet.tsx": 413,
   "app/routes/calendar.tsx": 410,
   "server/lib/compliance/erasure-manifest.ts": 406,
   "server/services/agreement/signer-state.ts": 401

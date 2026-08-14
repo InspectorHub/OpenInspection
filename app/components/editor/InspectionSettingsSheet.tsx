@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { Drawer, Button } from "@core/shared-ui";
 import { TemplateCombobox } from "~/components/TemplateCombobox";
-import { CoverCropper } from "~/components/media-studio/CoverCropper";
+import { CoverCropper, coverCropFor, type StoredCoverCrop } from "~/components/media-studio/CoverCropper";
 import { fullResUrl } from "~/components/media-studio/cropImage";
 import { ORIGINAL_QUALITY_KEY } from "~/routes/inspection-edit";
 import { m } from "~/paraglide/messages";
@@ -132,6 +132,13 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
     setCoverKey(((insp?.coverPhotoId ?? insp?.coverPhoto) as string | null) ?? "");
     setLoading(false);
   }, [loadFetcher.data]);
+
+  // The crop the reader saved during THIS sheet session. Needed because the
+  // `crop-cover` round-trip deliberately does not reload the sheet loader (see
+  // below), so `loadFetcher.data` keeps describing the row as it was when the
+  // sheet opened. Without this, re-cropping twice in one sitting would re-open
+  // on the crop from before the last save — a frame the reader already replaced.
+  const [sessionCrop, setSessionCrop] = useState<{ key: string; crop: StoredCoverCrop } | null>(null);
 
   function selectCover(key: string) {
     if (coverKey === key) {
@@ -381,12 +388,19 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
         <CoverCropper
           sourceUrl={fullResUrl(cropSource.url)}
           sourceKey={cropSource.key}
+          initialCrop={
+            sessionCrop?.key === cropSource.key
+              ? sessionCrop.crop
+              : coverCropFor(loadFetcher.data?.inspection, cropSource.key)
+          }
           onCancel={() => setCropSource(null)}
           onSave={(blob, c) => {
+            const crop = { aspect: c.aspect, orientation: c.orientation, ...c.pixels };
+            setSessionCrop({ key: cropSource.key, crop });
             const fd = new FormData();
             fd.append("intent", "crop-cover");
             fd.append("sourceKey", cropSource.key);
-            fd.append("crop", JSON.stringify({ aspect: c.aspect, orientation: c.orientation, ...c.pixels }));
+            fd.append("crop", JSON.stringify(crop));
             fd.append("image", new File([blob], "cover.jpg", { type: "image/jpeg" }));
             coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
             setCropSource(null);

@@ -118,13 +118,16 @@ export const inspections = sqliteTable('inspections', {
     // Media Studio (cover crop) — the crop transform applied to the SOURCE image
     // (cover_photo_id), in source-pixel coords. NULL = uncropped.
     //
-    // ⚠️ It says "re-editable" nowhere any more, because it is not. The value is
-    // written by the cover cropper and read back by NOTHING: it rides the single
-    // inspection GET to the browser, but `CoverCropper` takes no initial-crop
-    // prop and `PhotoCropper` beneath it accepts no initial region, so re-opening
-    // the cropper starts from the default 3:2 frame every time. The data to
-    // restore the previous crop is here and has always been here; the two props
-    // to carry it are what is missing.
+    // Re-editable: re-opening the cropper starts from this rect rather than the
+    // default frame (`coverCropFor()` in `CoverCropper.tsx` → react-easy-crop's
+    // `initialCroppedAreaPixels`). Source-pixel coords are what makes that
+    // possible — a {crop, zoom} pair only means something against one display
+    // size, so it could not survive the round trip through here.
+    //
+    // ⚠️ The rect is only meaningful against `cover_photo_id`. Restoring it while
+    // cropping a different photo frames a region of an image it was never
+    // measured on, which looks deliberate and is not — hence the source-equality
+    // guard, and its spec in `CoverCropper.test.ts`.
     coverCrop:           text('cover_crop', { mode: 'json' }).$type<{
         aspect: '3:2' | '16:9' | '1.91:1' | '4:3';
         orientation: 'landscape' | 'portrait';
