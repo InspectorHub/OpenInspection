@@ -20,7 +20,7 @@
   "app/components/editor/ItemEditor.tsx": 651,
   "app/components/inspection-edit/CompliancePanel.tsx": 623,
   "app/hooks/useInspection.ts": 600,
-  "server/services/concierge.service.ts": 589,
+  "server/services/concierge.service.ts": 595,
   "server/api/public-report.ts": 566,
   "server/services/agent/referral.ts": 566,
   "server/api/auth.ts": 565,

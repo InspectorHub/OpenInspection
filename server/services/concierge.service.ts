@@ -381,12 +381,18 @@ export class ConciergeService {
                     eq(inspections.tenantId, row.tenantId),
                 ),
             );
-        // Mark token used. Keyed on the row id: `resolveConfirmToken` just
-        // returned this row by hash, so the id is exact and needs no re-derivation.
+        // Mark token used. Keyed on the row id — `resolveConfirmToken` just
+        // returned this row by hash, so the id is exact. The tenant filter is
+        // restated from that same row rather than assumed: the hash index is
+        // global (a confirm link arrives with no tenant in the URL), so the id
+        // alone would be a by-id write with nothing scoping it.
         await db
             .update(conciergeConfirmTokens)
             .set({ confirmedAt: new Date() })
-            .where(eq(conciergeConfirmTokens.id, row.id));
+            .where(and(
+                eq(conciergeConfirmTokens.id, row.id),
+                eq(conciergeConfirmTokens.tenantId, row.tenantId),
+            ));
 
         // Notify the originating agent. The buyer's-agent contact is resolved
         // via the inspection_people (buyer_agent) join (Task 9c-X2) — not the
