@@ -6,6 +6,13 @@ import { tenants } from './tenant';
  * Spec 5A — Report PDF Pipeline. Renderer reuses server/lib/pdf.ts:generatePdfFromUrl;
  * this table tracks R2 storage metadata + render lifecycle (queued / rendering /
  * ready / failed) + source_version for stale detection vs inspection.updatedAt.
+ *
+ * ⚠️ NOT `report_exports`, which is the WORD (`.docx`) export and looks almost
+ * identical column-for-column. That one is a one-shot job ticket; this one is a
+ * durable archive keyed to a published version — hence the uniqueness on
+ * (inspection, type, version_number), the content hash, and the source version,
+ * none of which a job ticket has. The full comparison, and why the two must not
+ * become one table with a `kind` column, is in `schema/report-export.ts`.
  */
 export const reportPdfs = sqliteTable('report_pdfs', {
     id:            text('id').primaryKey(),
