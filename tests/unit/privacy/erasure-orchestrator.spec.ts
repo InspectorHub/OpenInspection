@@ -49,7 +49,7 @@ async function seedSignedEnvelope(db: BetterSQLite3Database<typeof schema>, sign
     });
     await db.insert(schema.agreementRequests).values({
         id: reqId, tenantId: TENANT_A, inspectionId: inspId, agreementId: 'agr-1',
-        clientEmail: SUBJECT_EMAIL, clientName: 'Jane Subject', status: 'signed', signatureBase64: 'env-sig-keep', signedAt: new Date(signedAtMs),
+        clientEmail: SUBJECT_EMAIL, clientName: 'Jane Subject', status: 'signed', signedAt: new Date(signedAtMs),
         completionPolicy: 'all', contentSnapshot: 'Agreement text', contentHash: 'hash-keep',
         createdAt: new Date(),
     });
@@ -136,12 +136,12 @@ describe('runErasure', () => {
         expect(subjectSigner!.role).toBe('client');
         expect(subjectSigner!.channel).toBe('remote');
 
-        // Envelope: clientName/clientEmail cleared, signature + snapshot/hash kept.
+        // Envelope: clientName/clientEmail cleared, snapshot/hash kept. The
+        // signature is asserted on the signer row above — the envelope has none.
         const env = await db.select().from(schema.agreementRequests)
             .where(eq(schema.agreementRequests.id, 'req-signed')).get();
         expect(env!.clientName).toBeNull();
         expect(env!.clientEmail).toBe('[erased]'); // NOT NULL -> sentinel-cleared
-        expect(env!.signatureBase64).toBe('env-sig-keep');
         expect(env!.contentSnapshot).toBe('Agreement text');
         expect(env!.contentHash).toBe('hash-keep');
         expect(env!.status).toBe('signed');

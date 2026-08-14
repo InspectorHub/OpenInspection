@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 94 |
-| Columns | 1104 |
+| Columns | 1103 |
 | Indexes (excluding primary keys) | 159 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 509 (46%) |
+| Columns carrying a source comment | 508 (46%) |
 
 **Reading the tables.** SQLite has four storage types; the semantic type is a
 Drizzle layer on top — `integer{mode:timestamp_ms}` is epoch milliseconds,
@@ -31,7 +31,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `agreement_requests`
 
-<sub>server/lib/db/schema/inspection/agreements.ts · 24 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/inspection/agreements.ts · 23 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -42,8 +42,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `client_email` | text | NN |  |  | *An email address.* |
 | `client_name` | text |  |  | `pending, sent, viewed, signed, declined, expired` | *A name.* |
 | `status` | text | NN | `'pending'` | `pending, sent, viewed, signed, declined, expired` | *State-machine column — see the Values column for the vocabulary.* |
-| `signature_base64` | text |  |  |  | Envelope-level client signature — HISTORICAL now: no code writes it. A signature belongs to the person who made it and lives on their `agreement_signers` row; completion used to copy one up to here, which on a multi-signer envelope meant whichever signature won the race, presented as though the … **[more]** |
-| `signed_at` | integer |  |  |  | Envelope completion time, and — unlike the column above — the one the rest of the system genuinely reads: the GDPR retention sweep computes its window from it, publish-readiness reports it, the data export carries it. |
+| `signed_at` | integer |  |  |  | Envelope completion time — THAT it completed and WHEN, which is the envelope's own fact. The signature is not: it belongs to the person who made it and lives on their `agreement_signers` row. |
 | `viewed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `sent_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `last_error` | text |  |  |  | The decline REASON, truncated to 500 chars. Written only by markDeclinedBySigner, and only when the signer's decline actually drags the envelope aggregate to 'declined' — a decline that leaves a 'one'-policy envelope live records nothing here. **[more]** |
@@ -55,7 +54,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `content_hash` | text |  |  |  | SHA-256 hex of contentSnapshot |
 | `completion_policy` | text | NN | `'all'` | `all, one` | The reduction computeEnvelopeStatus applies to the signer rows to derive this envelope's status. |
 | `token_hash` | text | UQ |  |  | lazy hash upgrade of legacy plaintext `token` |
-| `purged_at` | integer |  |  |  | Track I-a GDPR (spec §7) — final-destruction marker. NULL while the signed evidence is within its retention window; set to the sweep timestamp when the daily retention sweep destroys signature_base64 past the window. **[more]** |
+| `purged_at` | integer |  |  |  | Track I-a GDPR (spec §7) — final-destruction marker. NULL while the signed evidence is within its retention window; set to the sweep timestamp when the daily retention sweep destroys the signer rows' signatures past the window (the envelope holds none of its own). **[more]** |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `signer_legal_name` | text |  |  |  | The contracting identity AS OF envelope creation. Separate columns, NOT folded into contentSnapshot: contentHash is SHA-256 over the stored snapshot string, so adding a field there would invalidate every signature ever collected. **[more]** |
 | `signer_company_name` | text |  |  |  | *A name.* |

@@ -79,9 +79,7 @@ describe('runRetentionSweep', () => {
             agreementId: opts.agreementId,
             clientEmail: req.clientEmail,
             clientName: req.clientName,
-            token: `tok-${opts.id}`,
             status: 'signed',
-            signatureBase64: 'data:image/png;base64,ENVSIG',
             signedAt: new Date(opts.signedAtMs),
             createdAt: new Date(opts.signedAtMs),
         } as any);
@@ -122,7 +120,6 @@ describe('runRetentionSweep', () => {
         expect(summary.purgedEnvelopes).toBe(1);
 
         const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-old')).get();
-        expect(env!.signatureBase64).toBeNull();
         expect(env!.purgedAt).not.toBeNull();
         // status stays the truthful 'signed' (the agreement WAS signed).
         expect(env!.status).toBe('signed');
@@ -148,7 +145,6 @@ describe('runRetentionSweep', () => {
         // Envelope: client_email sentinel, client_name NULL, signature destroyed.
         expect(env!.clientEmail).toBe('[erased]');
         expect(env!.clientName).toBeNull();
-        expect(env!.signatureBase64).toBeNull();
         expect(env!.purgedAt).not.toBeNull();
         expect(env!.status).toBe('signed');
 
@@ -179,7 +175,6 @@ describe('runRetentionSweep', () => {
         const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-pre')).get();
         expect(env!.clientEmail).toBe('[erased]');
         expect(env!.clientName).toBeNull();
-        expect(env!.signatureBase64).toBeNull();
         expect(env!.purgedAt).not.toBeNull();
 
         const signer = await testDb.select().from(agreementSigners).where(eq(agreementSigners.id, 'e-pre-s1')).get();
@@ -196,7 +191,6 @@ describe('runRetentionSweep', () => {
         expect(summary.purgedEnvelopes).toBe(0);
 
         const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-recent')).get();
-        expect(env!.signatureBase64).toBe('data:image/png;base64,ENVSIG');
         expect(env!.purgedAt).toBeNull();
         // PII fully intact within window.
         expect(env!.clientEmail).toBe('jane@example.com');
@@ -218,8 +212,9 @@ describe('runRetentionSweep', () => {
         const summary = await runRetentionSweep(testDb as any, NOW);
         expect(summary.purgedEnvelopes).toBe(1);
         const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-t2')).get();
-        expect(env!.signatureBase64).toBeNull();
         expect(env!.purgedAt).not.toBeNull();
+        const t2Signer = await testDb.select().from(agreementSigners).where(eq(agreementSigners.id, 'e-t2-s1')).get();
+        expect(t2Signer!.signatureBase64).toBeNull();
     });
 
     it('applies the DEFAULT 6y when a tenant has NO tenant_configs row (leftJoin null -> coalesce 6)', async () => {
@@ -241,19 +236,21 @@ describe('runRetentionSweep', () => {
         expect(summary.purgedEnvelopes).toBe(1);
 
         const old = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-noconf-old')).get();
-        expect(old!.signatureBase64).toBeNull();
         expect(old!.purgedAt).not.toBeNull();
+        const oldSigner = await testDb.select().from(agreementSigners).where(eq(agreementSigners.id, 'e-noconf-old-s1')).get();
+        expect(oldSigner!.signatureBase64).toBeNull();
 
         const young = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-noconf-young')).get();
-        expect(young!.signatureBase64).toBe('data:image/png;base64,ENVSIG');
         expect(young!.purgedAt).toBeNull();
+        const youngSigner = await testDb.select().from(agreementSigners).where(eq(agreementSigners.id, 'e-noconf-young-s1')).get();
+        expect(youngSigner!.signatureBase64).toBe('data:image/png;base64,SIGNERSIG');
     });
 
     it('leaves never-signed (draft) rows untouched', async () => {
         await testDb.insert(agreementRequests).values({
             id: 'e-draft', tenantId: 't1', inspectionId: 'insp-t1', agreementId: 'agr-tpl',
-            clientEmail: 'client@example.com', token: 'tok-draft',
-            status: 'sent', signatureBase64: null, signedAt: null,
+            clientEmail: 'client@example.com',
+            status: 'sent', signedAt: null,
             createdAt: new Date(NOW - 7 * YEAR_MS),
         } as any);
 

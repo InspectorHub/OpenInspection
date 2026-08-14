@@ -27,26 +27,11 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     clientEmail: text('client_email').notNull(),
     clientName: text('client_name'),
     status: text('status', { enum: ['pending', 'sent', 'viewed', 'signed', 'declined', 'expired'] }).notNull().default('pending'),
-    // Envelope-level client signature — HISTORICAL now: no code writes it. A
-    // signature belongs to the person who made it and lives on their
-    // `agreement_signers` row; completion used to copy one up to here, which on
-    // a multi-signer envelope meant whichever signature won the race, presented
-    // as though the envelope had an author of its own.
-    //
-    // Still READ, for rows written before that stopped: the renderer falls back
-    // to a single Client block when no signer row carries a signature
-    // (agreements-render.ts), and the tenant data export carries it
-    // (admin.service.ts). The retention sweep only NULLs it — it SELECTs on
-    // `signedAt` below, never on this.
-    //
-    // Retiring it needs a backfill, and the backfill needs a decision, not a
-    // script: an envelope with several signer rows and one signature here has no
-    // recorded author, and naming one is a rule about signing evidence.
-    signatureBase64: text('signature_base64'),
-    // Envelope completion time, and — unlike the column above — the one the rest
-    // of the system genuinely reads: the GDPR retention sweep computes its window
-    // from it, publish-readiness reports it, the data export carries it. Do not
-    // read the two as a pair; almost nothing reads both.
+    // Envelope completion time — THAT it completed and WHEN, which is the
+    // envelope's own fact. The signature is not: it belongs to the person who
+    // made it and lives on their `agreement_signers` row. Read by the GDPR
+    // retention sweep (its window is computed from this), publish-readiness,
+    // and the data export.
     signedAt: integer('signed_at', { mode: 'timestamp_ms' }),
     viewedAt: integer('viewed_at', { mode: 'timestamp_ms' }),
     sentAt: integer('sent_at', { mode: 'timestamp_ms' }),
@@ -79,7 +64,8 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     tokenHash:       text('token_hash'),                  // lazy hash upgrade of legacy plaintext `token`
     // Track I-a GDPR (spec §7) — final-destruction marker. NULL while the signed
     // evidence is within its retention window; set to the sweep timestamp when the
-    // daily retention sweep destroys signature_base64 past the window. Distinct
+    // daily retention sweep destroys the signer rows' signatures past the window
+    // (the envelope holds none of its own). Distinct
     // from `status` (which stays the truthful 'signed' — the agreement WAS signed
     // and the esign_audit_logs chain still attests it); this is the idempotency
     // guard so a re-run skips already-purged rows. No PII.

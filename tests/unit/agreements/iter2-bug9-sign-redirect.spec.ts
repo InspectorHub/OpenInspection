@@ -127,7 +127,6 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
             clientEmail: 'jane@test.com',
             status: 'signed',
             signedAt: new Date(),
-            signatureBase64: 'data:image/png;base64,XX',
             createdAt: new Date(),
         });
         const result = await svc.findPendingByInspectionId(TENANT_A, INSP_ID);

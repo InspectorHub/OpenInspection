@@ -199,41 +199,23 @@ export async function agreementRenderHandler(
   // Track I-a — one signature block PER SIGNED SIGNER (name, role, timestamp,
   // in-person badge, on-behalf-of line).
   //
-  // ONE place decides whether there is a signature to render, and it asks the
-  // signer rows first. The status check above used to also require
-  // `reqRow.signatureBase64`, which is not where a signature has lived since the
-  // multi-signer model — and it only worked because completion double-writes
-  // that column, so the gate was answered by a copy of what these rows say.
-  // Deciding here instead is what lets the copy go, and it keeps the decision
-  // next to the data it is about rather than two branches apart.
+  // The signer rows are the ONLY source. There used to be a second branch here
+  // reading an envelope-level copy for pre-signer-model envelopes; the migration
+  // that dropped that column moved those signatures onto signer rows first, so
+  // the shape this served no longer exists.
   const signers = await db.select().from(schema.agreementSigners)
     .where(eq(schema.agreementSigners.requestId, reqRow.id))
     .orderBy(asc(schema.agreementSigners.createdAt))
     .all();
   const signedSigners = signers.filter((s) => s.status === 'signed' && s.signatureBase64);
-
-  let signerCellsHtml: string;
-  if (signedSigners.length > 0) {
-    signerCellsHtml = signedSigners.map((s) => signerCellHtml(s, escapeHtml)).join('');
-  } else if (reqRow.signatureBase64) {
-    // Legacy single block, for envelopes that predate signer rows.
-    const clientName = reqRow.clientName ? escapeHtml(reqRow.clientName) : escapeHtml(reqRow.clientEmail);
-    const signedAt = reqRow.signedAt ? utcDisplay(reqRow.signedAt) : '';
-    const sigData = reqRow.signatureBase64.startsWith('data:')
-      ? reqRow.signatureBase64
-      : `data:image/png;base64,${reqRow.signatureBase64}`;
-    signerCellsHtml = `<div class="sig-cell">` +
-        `<div class="label">Client</div>` +
-        `<img src="${escapeHtml(sigData)}" alt="Client signature">` +
-        `<div class="meta">${clientName} · ${escapeHtml(signedAt)}</div>` +
-    `</div>`;
-  } else {
-    // Signed, but no signature in either place. `synthesizeDefaultSigner` copies
-    // an envelope's `status` onto a row it creates and not its signature, so
-    // this state is reachable — and a signed agreement rendered with an empty
-    // signature block is worse than one that is not served at all.
+  if (signedSigners.length === 0) {
+    // Signed, and no signature to show. `synthesizeDefaultSigner` copies an
+    // envelope's `status` onto a row it creates without its signature, so this
+    // is reachable — and a signed agreement drawn with an empty signature block
+    // is worse than one that is not served.
     return new Response('Not Found', { status: 404 });
   }
+  const signerCellsHtml = signedSigners.map((s) => signerCellHtml(s, escapeHtml)).join('');
 
   const inspectorBlock = reqRow.inspectorSignatureBase64 ? (() => {
       const sig = reqRow.inspectorSignatureBase64!;
@@ -253,8 +235,8 @@ export async function agreementRenderHandler(
   const html = HTML_HEAD +
     `<h1>${escapeHtml(agreement.name)}</h1>` +
     `<div class="body">${escapeHtml(snapshotContent)}</div>` +
-    // Legacy envelope-level fallback above leaves `signedSigners` empty, which
-    // is exactly the "no version on the record" case — the note drops out.
+    // A backfilled signer row records no disclosure version, which is exactly
+    // the "no version on the record" case — the note drops out.
     languageNoteHtml(signedSigners.map((s) => s.languageDisclosureVersion)) +
     `<div class="sig-block">` +
       `<div class="sig-row">` +

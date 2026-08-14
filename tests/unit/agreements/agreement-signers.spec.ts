@@ -163,10 +163,10 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const env = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, r.requestId)).get();
         expect(env!.status).toBe('signed');
         expect(env!.signedAt).toBeTruthy();
-        // The envelope records THAT it completed and WHEN, not the signature.
-        // Each signature stays on the row of the person who made it — a copy on
-        // the envelope could only name one of two signers as its author.
-        expect(env!.signatureBase64).toBeNull();
+        // The envelope records THAT it completed and WHEN. Each signature stays
+        // on the row of the person who made it; the envelope has no column for
+        // one, which is the point — a single copy could only name one of two
+        // signers as its author.
         const sigRows = await testDb.select().from(schema.agreementSigners)
             .where(eq(schema.agreementSigners.requestId, r.requestId))
             .orderBy(asc(schema.agreementSigners.createdAt)).all();
@@ -418,10 +418,13 @@ describe('AgreementService — signer-level envelope state machine', () => {
 
         const env = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, r.requestId)).get();
         expect(env!.status).toBe('signed');
-        // The race decides which writer reports completion. It no longer decides
-        // whose signature the envelope shows, because it shows none — that was
-        // the copy's real defect, not just its redundancy.
-        expect(env!.signatureBase64).toBeNull();
+        // The race decides which writer reports completion, and nothing else.
+        // It used to also decide whose signature the envelope showed, which was
+        // the copy's real defect rather than its redundancy; there is no longer
+        // a column for that question to be answered wrongly in.
+        const raceSigners = await testDb.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, r.requestId)).all();
+        expect(raceSigners.every((x) => x.signatureBase64 !== null)).toBe(true);
     });
 
     it('concurrent: Promise.all two markSignedBySigner for the same last signer -> at most one envelopeCompletedNow=true', async () => {

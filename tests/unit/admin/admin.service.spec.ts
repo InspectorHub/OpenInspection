@@ -99,8 +99,8 @@ describe('AdminService', () => {
         await testDb.insert(agreementRequests).values({
             id: 'req-1', tenantId, inspectionId: 'insp-export', agreementId: 'agr-tpl',
             clientEmail: 'client@example.com', clientName: 'Client',
-            token: 'PLAINTEXT-TOKEN-XYZ', tokenHash: 'HASH-REQ-ABC',
-            status: 'signed', signatureBase64: 'data:image/png;base64,SIG',
+            tokenHash: 'HASH-REQ-ABC',
+            status: 'signed',
             signedAt: new Date(), createdAt: new Date(),
         } as any);
         await testDb.insert(agreementSigners).values({
@@ -117,13 +117,13 @@ describe('AdminService', () => {
         expect(result.agreementRequests).toHaveLength(1);
         expect(Array.isArray(result.agreementSigners)).toBe(true);
         expect(result.agreementSigners).toHaveLength(1);
-        // Subject signature + content survive the export (it's their data).
-        expect(result.agreementRequests[0].signatureBase64).toBe('data:image/png;base64,SIG');
+        // Subject signature + content survive the export (it's their data). The
+        // signature is on the signer row — the envelope has no column for one.
+        expect(result.agreementSigners[0].signatureBase64).toBe('data:image/png;base64,SIG2');
         expect(result.agreementSigners[0].email).toBe('client@example.com');
 
         // NO token material anywhere in the serialized export.
         const serialized = JSON.stringify(result);
-        expect(serialized).not.toContain('PLAINTEXT-TOKEN-XYZ');
         expect(serialized).not.toContain('HASH-REQ-ABC');
         expect(serialized).not.toContain('HASH-SGN-DEF');
         expect(serialized).not.toContain('CIPHER-GHI');

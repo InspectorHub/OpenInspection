@@ -35,7 +35,6 @@ describe('downloadAgreementPdf', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', status: 'signed',
-      signatureBase64: 'data:image/png;base64,abc',
       signedAt: new Date(), createdAt: new Date(),
     });
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
@@ -101,7 +100,6 @@ describe('downloadCertPdf', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', status: 'signed',
-      signatureBase64: 'data:image/png;base64,abc',
       signedAt: new Date(), createdAt: new Date(),
     });
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
@@ -152,7 +150,6 @@ describe('downloadEvidenceZip', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', status: 'signed',
-      signatureBase64: 'data:image/png;base64,abc',
       signedAt: new Date(), createdAt: new Date(),
     });
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
