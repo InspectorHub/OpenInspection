@@ -13,7 +13,7 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | Columns | 1114 |
 | Indexes (excluding primary keys) | 160 |
 | Database foreign keys (all legacy, frozen) | 52 |
-| Columns carrying a source comment | 291 (26%) |
+| Columns carrying a source comment | 293 (26%) |
 
 **Reading the tables.** SQLite has four storage types; the semantic type is a
 Drizzle layer on top — `integer{mode:timestamp_ms}` is epoch milliseconds,
@@ -1063,8 +1063,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `scheduled_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `status` | text | NN IX | `'pending'` | `pending, confirmed, in_progress, completed, cancelled` | *State-machine column — see the Values column for the vocabulary.* |
 | `notes` | text |  |  |  |  |
-| `total_amount_cents` | integer | NN | `0` |  | *Money, integer cents — never a float.* |
-| `payment_status` | text | NN | `'unpaid'` | `unpaid, partial, paid` |  |
+| `total_amount_cents` | integer | NN | `0` |  | What the sub-services summed to WHEN THE REQUEST WAS CREATED. A snapshot, and outside the money-authority chain entirely. **[more]** |
+| `payment_status` | text | NN | `'unpaid'` | `unpaid, partial, paid` | ⚠️ Written by both creation paths and read by NOTHING. A grep for `inspectionRequests.paymentStatus` returns no reader: payment state that anyone acts on lives on the ORDER (`inspections.payment_status`) and in the `order_payments` ledger. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
 
