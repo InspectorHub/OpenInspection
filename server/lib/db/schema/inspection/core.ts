@@ -251,6 +251,15 @@ export const inspections = sqliteTable('inspections', {
     index('idx_inspections_tenant_date').on(t.tenantId, t.date),
     index('idx_inspections_inspector_date').on(t.inspectorId, t.date),
     index('idx_inspections_root').on(t.rootInspectionId),
+    // The dashboard list. It filters by tenant and orders by
+    // `(created_at DESC, id DESC)` — which is also its cursor key — and until
+    // this index existed NOTHING started with `created_at`, so every page load
+    // sorted the tenant's whole partition in a temp B-tree. EXPLAIN QUERY PLAN
+    // against a database built from the baseline: `USE TEMP B-TREE FOR ORDER
+    // BY` before, nothing at all after. `id` is in the key because it is the
+    // tie-break half of the cursor; with only `(tenant_id, created_at)` the
+    // planner still needs a temp B-tree for the right part of the sort.
+    index('idx_inspections_tenant_created').on(t.tenantId, t.createdAt, t.id),
 ]);
 
 // Sprint 2 S2-2 — A single customer booking can spawn multiple inspections
