@@ -57,8 +57,16 @@ interface PrefsLike {
     reportLinkTtl?: unknown;
 }
 
-/** The unset default. Two years — see the header for why this figure. */
-export const REPORT_LINK_TTL_DEFAULT: ReportLinkTtlDuration = { count: 2, unit: 'years' };
+/**
+ * The unset default. Two years — see the header for why this figure.
+ *
+ * NOT exported, and the spec that pins it does not import it: a test asserting
+ * `resolveReportLinkTtl(null) === REPORT_LINK_TTL_DEFAULT` would pass whatever
+ * the constant said, which is the one thing the test exists to catch. It spells
+ * out `{ count: 2, unit: 'years' }` instead, so changing this line turns a spec
+ * red — which is what makes the default a decision rather than a detail.
+ */
+const REPORT_LINK_TTL_DEFAULT: ReportLinkTtlDuration = { count: 2, unit: 'years' };
 
 /**
  * Read the policy out of the `inspection_prefs` JSON blob.
