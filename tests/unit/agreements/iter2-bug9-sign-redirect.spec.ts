@@ -79,7 +79,9 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
             createdAt: new Date(),
         });
         const result = await svc.findPendingByInspectionId(TENANT_A, INSP_ID);
-        expect(result?.token).toBe(token);
+        // `token` is no longer returned — the redirect must not offer a link the
+// hash-only lookup cannot resolve. What the caller needs is the row.
+        expect(result?.requestId).toBeTruthy();
     });
 
     it('returns the token for a sent request', async () => {
@@ -97,7 +99,9 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
             createdAt: new Date(),
         });
         const result = await svc.findPendingByInspectionId(TENANT_A, INSP_ID);
-        expect(result?.token).toBe(token);
+        // `token` is no longer returned — the redirect must not offer a link the
+// hash-only lookup cannot resolve. What the caller needs is the row.
+        expect(result?.requestId).toBeTruthy();
     });
 
     it('returns the token for a viewed request', async () => {
@@ -115,7 +119,9 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
             createdAt: new Date(),
         });
         const result = await svc.findPendingByInspectionId(TENANT_A, INSP_ID);
-        expect(result?.token).toBe(token);
+        // `token` is no longer returned — the redirect must not offer a link the
+// hash-only lookup cannot resolve. What the caller needs is the row.
+        expect(result?.requestId).toBeTruthy();
     });
 
     it('returns null when the only request is signed (terminal)', async () => {
@@ -205,6 +211,8 @@ describe('iter-2 #9 — AgreementService.findPendingByInspectionId', () => {
             },
         ]);
         const result = await svc.findPendingByInspectionId(TENANT_A, INSP_ID);
-        expect(result?.token).toBe('newer-token');
+        // Identified by the ROW, not by the token it used to return: the
+        // ordering claim (newest live request wins) is what this pins.
+        expect(result?.requestId).toBe('00000000-0000-0000-0000-000000000108');
     });
 });

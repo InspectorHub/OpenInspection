@@ -7,7 +7,7 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { sealToken } from '../../../server/lib/config-crypto';
-import { mintToken, hashToken, deadTokenSentinel } from '../../../server/lib/token-hash';
+import { mintToken, hashToken } from '../../../server/lib/token-hash';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';

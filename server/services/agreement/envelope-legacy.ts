@@ -44,9 +44,11 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
          * the public `/sign/:id` redirect deliberately stays read-only so an
          * unauthenticated customer cannot trigger row inserts.
          */
-        async findPendingByInspectionId(tenantId: string, inspectionId: string): Promise<{ token: string; status: string; requestId: string } | null> {
+        async findPendingByInspectionId(tenantId: string, inspectionId: string): Promise<{ status: string; requestId: string } | null> {
+            // No `token`: the caller used to redirect to it as a last resort, and
+            // envelope tokens now resolve by hash only, so the column could only
+            // have produced a link that 404s. Returning it invited that.
             const row = await this.getDrizzle().select({
-                token:  agreementRequests.token,
                 status: agreementRequests.status,
                 requestId: agreementRequests.id,
             })

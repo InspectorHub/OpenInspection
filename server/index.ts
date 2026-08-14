@@ -560,16 +560,16 @@ app.get('/sign/:tenant/:id', async (c) => {
     try {
         const pending = await c.var.services.agreement.findPendingByInspectionId(tenantId as string, id);
         if (pending) {
-            // Prefer the first outstanding signer's real tier-2 link — the
-            // envelope's `token` is an UNDISTRIBUTED placeholder for envelope-v2
-            // (real tokens live per-signer) so redirecting to it would 404.
-            // `c.var.services.agreement` is DI-constructed with the JWT secret,
-            // so it can reconstruct the sealed signer token server-side. Fall
-            // back to the envelope token only as a last resort (legacy
-            // `createSigningRequest` envelopes whose plaintext token IS
-            // distributed still resolve).
+            // The signer's real tier-2 link is the ONLY thing worth redirecting
+            // to; the service is DI-constructed with the JWT secret so it can
+            // reconstruct the sealed token server-side. The old fallback to the
+            // envelope's own `token` column is gone with the plaintext lookup
+            // that resolved it — it could now only send a customer to a 404, and
+            // no link beats a broken one.
             const signerLink = await c.var.services.agreement.getFirstOutstandingSignerLink(tenantId as string, id);
-            return c.redirect(agreementSignPath(tenantSlugFromPath as string, signerLink ?? pending.token), 302);
+            if (signerLink) {
+                return c.redirect(agreementSignPath(tenantSlugFromPath as string, signerLink), 302);
+            }
         }
     } catch (e) {
         logger.warn('sign-redirect: lookup failed', { inspectionId: id.slice(0, 8), error: (e as Error).message });

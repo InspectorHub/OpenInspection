@@ -4,7 +4,7 @@ import { AgreementService } from '../../../server/services/agreement.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { deadTokenSentinel, hashToken } from '../../../server/lib/token-hash';
+import { hashToken } from '../../../server/lib/token-hash';
 import { TENANT_A, INSP_ID, AGR_ID, seedBase } from '../helpers/agreement-signers-setup';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -102,13 +102,19 @@ describe('AgreementService — signer-level envelope state machine', () => {
         expect(signers.length).toBe(0);
     });
 
-    it('legacy envelope plaintext token resolves to first signer AND upgrades envelope', async () => {
-        // Hand-build a legacy envelope (plaintext token, no tokenHash) with one signer that has no token
+    it('an envelope resolves by token HASH, and a bare plaintext token no longer opens it', async () => {
+        // This used to assert the opposite: that a legacy plaintext token
+        // resolved and the row was upgraded to a sentinel in passing. Envelope
+        // lookup is hash-only now — production's only plaintext-bearing rows
+        // were all `expired`, so the fallback could not reach a signable
+        // envelope — and a token that resolves to nothing must resolve to
+        // nothing, which is what the second half of this test pins.
         const legacyToken = 'legacy-plain-token-123';
         const reqId = crypto.randomUUID();
         await testDb.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
             clientEmail: 'jane@test.com', clientName: 'Jane', token: legacyToken,
+            tokenHash: await hashToken(legacyToken),
             status: 'sent', completionPolicy: 'all', createdAt: new Date(),
         });
         await testDb.insert(schema.agreementSigners).values({
@@ -116,13 +122,22 @@ describe('AgreementService — signer-level envelope state machine', () => {
             name: 'Jane', email: 'jane@test.com', role: 'client', status: 'sent', createdAt: new Date(),
         });
 
+        // With the hash present, the envelope resolves and hands back its first signer.
         const resolved = await svc.getSignerByPresentedToken(legacyToken);
         expect(resolved).not.toBeNull();
         expect(resolved!.signer.email).toBe('jane@test.com');
 
-        const env = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, reqId)).get();
-        expect(env!.tokenHash).toBe(await hashToken(legacyToken));
-        expect(env!.token).toBe(deadTokenSentinel(reqId));
+        // The control that keeps the assertion above honest: an envelope whose
+        // plaintext is stored but whose hash is NOT resolves to nothing. Without
+        // this, a lookup that had silently kept a plaintext path would pass the
+        // first half just as greenly.
+        const orphanId = crypto.randomUUID();
+        await testDb.insert(schema.agreementRequests).values({
+            id: orphanId, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+            clientEmail: 'no@test.com', clientName: 'No', token: 'plaintext-only-token-456',
+            status: 'sent', completionPolicy: 'all', createdAt: new Date(),
+        });
+        expect(await svc.getSignerByPresentedToken('plaintext-only-token-456')).toBeNull();
     });
 
     it("'all' policy: sign 1/2 -> not complete, envelope viewed; sign 2/2 -> complete, signed + signedAt + mirror", async () => {
