@@ -149,7 +149,16 @@ for (const file of walk(join(root, 'server', 'lib', 'db', 'schema'))) {
                 const c = s.match(/^(\w+):\s*(?:text|integer|real|blob)\(\s*['"]([a-z_0-9]+)['"]/);
                 if (c) {
                     const en = (ln + ' ' + (lines[k + 1] || '')).match(/enum:\s*(\[[^\]]*\]|[\w.]+)/);
-                    entry.cols[c[2]] = { prop: c[1], raw: buf.join(' '), enum: en ? en[1] : null };
+                    // A TRAILING comment documents its column just as well as a
+                    // preceding one, and this file is full of them
+                    // (`tokenHash: text('token_hash'), // SHA-256 hex; NULL on …`).
+                    // Reading only the lines above counted those columns as
+                    // undocumented and would have sent someone to write a second
+                    // comment beside the one already there.
+                    const tail = s.match(/,\s*\/\/\s*(.+)$/);
+                    const parts = buf.slice();
+                    if (tail) parts.push(tail[1].trim());
+                    entry.cols[c[2]] = { prop: c[1], raw: parts.join(' '), enum: en ? en[1] : null };
                 }
                 buf = [];
             }

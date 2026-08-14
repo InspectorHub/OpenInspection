@@ -13,7 +13,7 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | Columns | 1112 |
 | Indexes (excluding primary keys) | 160 |
 | Database foreign keys (all legacy, frozen) | 52 |
-| Columns carrying a source comment | 292 (26%) |
+| Columns carrying a source comment | 334 (30%) |
 
 **Reading the tables.** SQLite has four storage types; the semantic type is a
 Drizzle layer on top — `integer{mode:timestamp_ms}` is epoch milliseconds,
@@ -53,9 +53,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `inspector_user_id` | text | FK→`users.id` |  |  | *App-layer reference to another row — no database foreign key.* |
 | `verification_token` | text | UQ |  |  | Spec 5H P2 — opaque public-verifier token. Set on the sign event. |
 | `content_snapshot` | text |  |  |  | Track I-a (#116) — immutable content snapshot pinned at envelope creation. Public sign page + checkout + verifier + signed.pdf ALL render this, never the live template. |
-| `content_hash` | text |  |  | `all, one` | *Hash used for lookup and comparison; not reversible.* |
+| `content_hash` | text |  |  | `all, one` | SHA-256 hex of contentSnapshot |
 | `completion_policy` | text | NN | `'all'` | `all, one` |  |
-| `token_hash` | text | UQ |  |  | *Hash used for lookup and comparison; not reversible.* |
+| `token_hash` | text | UQ |  |  | lazy hash upgrade of legacy plaintext `token` |
 | `purged_at` | integer |  |  |  | Track I-a GDPR (spec §7) — final-destruction marker. NULL while the signed evidence is within its retention window; set to the sweep timestamp when the daily retention sweep destroys signature_base64 past the window. **[more]** |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `signer_legal_name` | text |  |  |  | The contracting identity AS OF envelope creation. Separate columns, NOT folded into contentSnapshot: contentHash is SHA-256 over the stored snapshot string, so adding a field there would invalidate every signature ever collected. **[more]** |
@@ -80,23 +80,23 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `request_id` | text | NN UQ IX |  |  | *App-layer reference to another row — no database foreign key.* |
+| `tenant_id` | text | NN IX |  |  | → tenants.id (app-layer; FK intentionally omitted per Schema Rules) |
+| `request_id` | text | NN UQ IX |  |  | → agreement_requests.id (app-layer) |
 | `name` | text | NN |  |  |  |
 | `email` | text | NN UQ |  | `client, co_client, agent, other` |  |
 | `role` | text | NN | `'client'` | `client, co_client, agent, other` |  |
-| `contact_id` | text |  |  |  | *The contact this belongs to (`contacts.id`). App-layer reference.* |
-| `token_hash` | text | UQ |  |  | *Hash used for lookup and comparison; not reversible.* |
-| `token_enc` | text |  |  | `pending, sent, viewed, signed, declined, expired` | *Encrypted at rest (AES-GCM envelope).* |
+| `contact_id` | text |  |  |  | → contacts.id (app-layer, optional) |
+| `token_hash` | text | UQ |  |  | SHA-256 hex; NULL on backfilled rows until first link build |
+| `token_enc` | text |  |  | `pending, sent, viewed, signed, declined, expired` | 't1:iv:cipher' sealed plaintext (config-crypto sealToken) |
 | `status` | text | NN | `'pending'` | `pending, sent, viewed, signed, declined, expired` | *State-machine column — see the Values column for the vocabulary.* |
 | `signature_base64` | text |  |  |  |  |
 | `signed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `viewed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `ip_address` | text |  |  |  |  |
 | `user_agent` | text |  |  | `remote, in_person` |  |
-| `channel` | text |  |  | `remote, in_person` |  |
-| `on_behalf_of` | text |  |  |  |  |
-| `on_behalf_disclaimer` | text |  |  |  |  |
+| `channel` | text |  |  | `remote, in_person` | set at sign time |
+| `on_behalf_of` | text |  |  |  | client name an authorized agent signs for |
+| `on_behalf_disclaimer` | text |  |  |  | disclaimer text snapshot shown at sign time |
 | `last_reminded_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `expires_at` | integer |  |  |  | IA-37 — signer-token lifecycle. Appended at the table end (D1 can't add a column mid-table on a referenced table — reference_d1_add_column_at_end). |
@@ -185,7 +185,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text |  |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
-| `action` | text | NN |  |  |  |
+| `action` | text | NN |  |  | e.g. 'inspection.create' |
 | `entity_type` | text | NN IX |  |  |  |
 | `entity_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `metadata` | text |  |  |  | *Structured extra context, JSON-encoded.* |
@@ -210,7 +210,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `automation_id` | text | UQ |  |  | Nullable since Communication A2: `automation_id IS NULL` means a MANUAL send (an operator pressing Send report), logged into the same ledger so the Outbox answers "what left this office" regardless of who pressed it. |
 | `inspection_id` | text | NN UQ IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
-| `recipient` | text | NN UQ |  |  | Track L — holds the email address for email logs, the E.164 phone for sms logs. |
+| `recipient` | text | NN UQ |  |  | Track L — holds the email address for email logs, the E.164 phone for sms logs. RENAMED from recipient_email (0025) |
 | `recipient_role_key` | text |  |  |  | Spec 2 — the recipient's role-profile key (e.g. 'buyer_agent'), captured at enqueue so the flush/send path can mint a role-keyed portal token per recipient. |
 | `channel` | text | NN UQ | `'email'` | `email, sms, in_app` | Track L — the log's own delivery channel (a multi-channel rule emits one log each). B1 — `in_app` joined email/sms. **[more]** |
 | `send_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
@@ -338,10 +338,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `connection_id` | text | NN UQ IX |  |  | *App-layer reference to another row — no database foreign key.* |
-| `external_calendar_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
-| `summary` | text |  |  |  |  |
-| `access_role` | text |  |  |  |  |
+| `connection_id` | text | NN UQ IX |  |  | calendar_connections.id (app-layer) |
+| `external_calendar_id` | text | NN UQ |  |  | Google calendar id |
+| `summary` | text |  |  |  | cached display name |
+| `access_role` | text |  |  |  | owner\|writer\|reader\|freeBusyReader |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
 
@@ -419,12 +419,12 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN IX |  | `UPLOADER_KINDS` | *The inspection (order) this belongs to. App-layer reference.* |
 | `uploaded_by_kind` | text | NN |  | `UPLOADER_KINDS` |  |
-| `uploaded_by_ref` | text | NN |  |  |  |
+| `uploaded_by_ref` | text | NN |  |  | client: recipient email; inspector: user id |
 | `uploaded_by_name` | text |  |  | `DOCUMENT_CATEGORIES` | *A name.* |
 | `category` | text | NN |  | `DOCUMENT_CATEGORIES` |  |
 | `visibility` | text | NN |  | `DOCUMENT_VISIBILITIES` |  |
 | `r2_key` | text | NN |  |  | *Object key in the R2 bucket.* |
-| `filename` | text | NN |  |  |  |
+| `filename` | text | NN |  |  | ORIGINAL name (display + download) |
 | `content_type` | text | NN |  |  |  |
 | `size_bytes` | integer | NN |  |  | *A size in bytes.* |
 | `label` | text |  |  |  |  |
@@ -541,10 +541,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `key` | text | NN UQ |  |  |  |
-| `label` | text | NN |  | `client, agent, other` |  |
+| `key` | text | NN UQ |  |  | stable machine id, unique per tenant |
+| `label` | text | NN |  | `client, agent, other` | tenant-editable display name |
 | `kind` | text | NN |  | `client, agent, other` |  |
-| `email_template_id` | text |  |  |  | *App-layer reference to another row — no database foreign key.* |
+| `email_template_id` | text |  |  |  | → message_templates.id (optional) |
 | `sms_template_id` | text |  |  |  | *App-layer reference to another row — no database foreign key.* |
 | `is_system` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `sort_order` | integer | NN | `0` |  | *Display order within its tenant; lower sorts first.* |
@@ -736,9 +736,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `email` | text | NN IX |  | `hard_bounce, complaint` |  |
+| `email` | text | NN IX |  | `hard_bounce, complaint` | normalized lower-cased + trimmed |
 | `reason` | text | NN |  | `hard_bounce, complaint` |  |
-| `source_provider` | text | NN |  |  |  |
+| `source_provider` | text | NN |  |  | resend\|sendgrid\|postmark\|mailgun |
 | `provider_event_id` | text |  |  |  | *App-layer reference to another row — no database foreign key.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 
@@ -879,8 +879,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `recipient_email` | text | NN UQ |  |  | *An email address.* |
 | `role` | text | NN | `'client'` |  | Free-form role-profile KEY (validated against the tenant's contact_role_profiles by PortalAccessService.issueToken) — NOT a fixed drizzle enum. |
 | `created_at` | integer | NN |  |  | The plaintext `token` column was here. It was NOT NULL + UNIQUE, so every insert had to put something in it, and what it put was a per-row sentinel — the real token has only ever lived in the link, in `token_hash` for lookup and in `token_enc` for reconstruction. **[more]** |
-| `expires_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
-| `revoked_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `expires_at` | integer |  |  |  | null = open (order active) |
+| `revoked_at` | integer |  |  |  | null = live |
 | `token_hash` | text | UQ |  |  | *Hash used for lookup and comparison; not reversible.* |
 | `token_enc` | text |  |  |  | *Encrypted at rest (AES-GCM envelope).* |
 | `view_tracking_objected_at` | integer |  |  |  | GDPR Art. 21 objection to VIEW MEASUREMENT, per recipient (OI #271). **[more]** |
@@ -1032,8 +1032,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | NN UQ |  |  | *The inspection (order) this belongs to. App-layer reference.* |
-| `contact_id` | text | NN UQ |  |  | *The contact this belongs to (`contacts.id`). App-layer reference.* |
-| `role_profile_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
+| `contact_id` | text | NN UQ |  |  | → contacts.id |
+| `role_profile_id` | text | NN UQ |  |  | → contact_role_profiles.id |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 
 **Indexes**
@@ -1222,7 +1222,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
 | `confirmed_at` | integer |  |  |  | Phase 0 parity additions |
 | `cancel_reason` | text |  |  | `...CANCELLATION_REASONS` | The reason drives the cancellation ladder: `classifyCancellationReason` (server/lib/cancellation-reason.ts) derives WHO ended the appointment and WHAT happened from this one value, so no second column is needed and the two can never disagree. |
-| `cancel_notes` | text |  |  |  |  |
+| `cancel_notes` | text |  |  |  | Spec 3A |
 | `is_payment_required` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `is_agreement_required` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `is_auto_sign_on_publish` | integer | NN | `false` |  | Spec 5H D2 — when true, InspectionService.publish() auto-injects the inspector's users.default_signature_base64 into inspection_results.data._inspector_signature. |
@@ -1299,9 +1299,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text | NN IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
-| `label` | text | NN |  |  |  |
-| `member_number` | text |  |  |  |  |
-| `image_r2_key` | text |  |  |  |  |
+| `label` | text | NN |  |  | e.g. "InterNACHI CPI"; '' for a pure image row |
+| `member_number` | text |  |  |  | NULL ok |
+| `image_r2_key` | text |  |  |  | NULL = text-only credential |
 | `sort_order` | integer | NN | `0` |  | *Display order within its tenant; lower sorts first.* |
 | `is_active` | integer | NN | `true` |  | *Boolean flag, stored as integer 0/1.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
@@ -1431,9 +1431,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `name` | text | NN IX |  |  |  |
 | `channel` | text | NN IX |  | `email, sms, in_app` | B1 — `in_app` templates carry a notice's wording. Type-layer only. |
-| `subject` | text |  |  |  | `subject` is REUSED as the in-app notice TITLE rather than given a column of its own: a notice header has exactly one short line above its body, which is the same shape and the same authoring job as an email subject. |
-| `body` | text | NN |  |  |  |
-| `variables` | text |  |  |  |  |
+| `subject` | text |  |  |  | `subject` is REUSED as the in-app notice TITLE rather than given a column of its own: a notice header has exactly one short line above its body, which is the same shape and the same authoring job as an email subject. **[more]** |
+| `body` | text | NN |  |  | email HTML / sms plain-text / in_app notice body |
+| `variables` | text |  |  |  | JSON string[] of declared merge vars |
 | `is_seeded` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
@@ -1456,7 +1456,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `tenant_id` | text | PK NN |  | `own, managed_shared, managed_dedicated` | *Tenant isolation key. Every read and write must filter on it.* |
 | `mode` | text | NN | `'own'` | `own, managed_shared, managed_dedicated` |  |
-| `provider` | text |  |  | `twilio, telnyx` |  |
+| `provider` | text |  |  | `twilio, telnyx` | which provider holds this tenant's entities |
 | `customer_profile_sid` | text |  |  |  | `subaccount_sid` was here. Unlike its neighbours it was never written by any provisioning step and never read by any resolver — the one column of this table with no code on either side of it. |
 | `customer_profile_status` | text |  |  |  |  |
 | `brand_sid` | text |  |  |  |  |
@@ -1544,12 +1544,12 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `inspection_id` | text | IX |  |  | The ORDER is the primary key of a payment. A booking deposit is taken before any invoice exists (`booking.service.ts` creates none), so keying this table on the invoice would make `kind: 'deposit'` unrepresentable — and this table is append-only and financial, the worst kind to re-key. **[more]** |
 | `invoice_id` | text | IX |  |  | A LINK, not identity: null until an invoice exists, then set — and backfilled onto the deposit rows that predate it. |
 | `kind` | text | NN |  | `deposit, balance, adjustment, refund` | Direction lives here, not in the sign of amountCents — an unfiltered SUM over a signed column is a wrong total nobody notices. |
-| `amount_cents` | integer | NN |  | `card, check, cash, offline, other` | *Money, integer cents — never a float.* |
+| `amount_cents` | integer | NN |  | `card, check, cash, offline, other` | always positive |
 | `method` | text | NN |  | `card, check, cash, offline, other` |  |
-| `provider` | text | UQ |  | `stripe, qbo` |  |
+| `provider` | text | UQ |  | `stripe, qbo` | null = offline |
 | `provider_ref` | text | UQ |  |  | Idempotency key. Stripe redelivers webhooks; the unique index below is the guard, in the database rather than in a handler someone can refactor. |
-| `recorded_by` | text |  |  |  |  |
-| `refunds_id` | text |  |  |  | *App-layer reference to another row — no database foreign key.* |
+| `recorded_by` | text |  |  |  | user id, null when automated |
+| `refunds_id` | text |  |  |  | kind='refund' -> the row it reverses |
 | `note` | text |  |  |  |  |
 | `occurred_at` | integer | NN |  |  | When the money MOVED, not when the row was written — an inspector records Tuesday's cash on Thursday, and reporting periods key on the former. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
@@ -1833,7 +1833,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `type` | text | NN UQ IX |  | `summary, full` |  |
 | `r2_key` | text | NN |  |  | *Object key in the R2 bucket.* |
 | `rendered_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
-| `source_version` | integer | NN |  |  | *An integer value.* |
+| `source_version` | integer | NN |  |  | inspection.updatedAt timestamp at render time |
 | `version_number` | integer | UQ |  |  | #120 — the report_versions.version_number this PDF renders. Nullable for pre-#120 rows; new publishes always set it. |
 | `size_bytes` | integer |  |  | `queued, rendering, ready, failed` | *A size in bytes.* |
 | `status` | text | NN IX | `'ready'` | `queued, rendering, ready, failed` | *State-machine column — see the Values column for the vocabulary.* |
@@ -2217,7 +2217,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `billing_url` | text |  |  |  | *A URL.* |
 | `review_url` | text |  |  |  | Track J (#122) — per-company Google/Yelp/Facebook review link. The "Review request" automation stays inert until this is set (fail-closed). |
 | `company_phone` | text |  |  |  | Track L — company contact phone shown in client SMS ({{company_phone}}). |
-| `integration_config` | text |  |  |  |  |
+| `integration_config` | text |  |  |  | plaintext JSON: {appBaseUrl, turnstileSiteKey, googleClientId} |
 | `secrets_enc` | text |  |  |  | Settings-managed secrets — AES-256-GCM encrypted JSON holding all 14 integration API keys configurable via Settings UI. |
 | `dek_enc` | text |  |  |  | Envelope encryption (2026-06-07) — the tenant's wrapped DEK (`k1:iv:wrapped`, AES-GCM under the HKDF KEK from JWT_SECRET, AAD=tenantId). |
 | `ics_token` | text |  |  |  |  |
@@ -2316,8 +2316,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `tenant_slug` | text |  |  |  |  |
+| `tenant_id` | text | NN IX |  |  | string snapshot — intentionally NOT an FK (tenant row is gone) |
+| `tenant_slug` | text |  |  |  | non-personal label for the destroyed tenant |
 | `rows_deleted` | integer | NN | `0` |  | *An integer value.* |
 | `r2_objects` | integer | NN | `0` |  | *An integer value.* |
 | `r2_bytes` | integer | NN | `0` |  | *A size in bytes.* |
@@ -2460,7 +2460,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `stripe_connect_account_id` | text |  |  | `pending,active,suspended,trial` | *App-layer reference to another row — no database foreign key.* |
 | `status` | text | NN | `'pending'` | `pending,active,suspended,trial` | *State-machine column — see the Values column for the vocabulary.* |
 | `max_users` | integer | NN | `5` |  | *An integer value.* |
-| `deployment_mode` | text | NN | `'shared'` |  |  |
+| `deployment_mode` | text | NN | `'shared'` |  | shared, silo |
 | `applied_cmd_seq` | integer | NN | `0` |  | A-21 — high-water mark of the portal→core command sequence applied to this tenant (envelope `tenantseq`). |
 | `applied_cred_seq` | integer | NN | `0` |  | A-21 batch 2 — high-water mark of the CREDENTIAL stream (envelope `credseq`). Admin credentials ride `cmd.tenant.update` sparsely, so the shared tenantseq can't guard them; this independent sequence ensures a stale credential never overwrites a newer one (closes the batch-1 residual). |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
