@@ -27,21 +27,21 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     clientEmail: text('client_email').notNull(),
     clientName: text('client_name'),
     status: text('status', { enum: ['pending', 'sent', 'viewed', 'signed', 'declined', 'expired'] }).notNull().default('pending'),
-    // Envelope-level client signature. Reads as legacy and is not: authority
-    // for signatures moved to `agreement_signers`, but `markSignedBySigner`
-    // still writes this on every completion, and it has to. `agreements-render`
-    // GATES on it — a signed envelope whose column is NULL renders 404 even when
-    // the signature is sitting on a signer row. That gate, not back-compat, is
-    // what keeps the write alive, so "superseded" would be the wrong word for it.
+    // Envelope-level client signature — HISTORICAL now: no code writes it. A
+    // signature belongs to the person who made it and lives on their
+    // `agreement_signers` row; completion used to copy one up to here, which on
+    // a multi-signer envelope meant whichever signature won the race, presented
+    // as though the envelope had an author of its own.
     //
-    // Read by the render gate and by its single-block fallback for envelopes
-    // with no signed signer row (both agreements-render.ts), and carried by the
-    // tenant data export (admin.service.ts). The retention sweep only NULLs it;
-    // it SELECTS on `signedAt` below, never on this. Retiring it means moving
-    // the gate onto the signer rows first, then backfilling the envelopes whose
-    // signature exists only here — including the ambiguous case of several
-    // signer rows and one envelope signature, which needs a stated rule about
-    // whose signature it is before any script can run.
+    // Still READ, for rows written before that stopped: the renderer falls back
+    // to a single Client block when no signer row carries a signature
+    // (agreements-render.ts), and the tenant data export carries it
+    // (admin.service.ts). The retention sweep only NULLs it — it SELECTs on
+    // `signedAt` below, never on this.
+    //
+    // Retiring it needs a backfill, and the backfill needs a decision, not a
+    // script: an envelope with several signer rows and one signature here has no
+    // recorded author, and naming one is a rule about signing evidence.
     signatureBase64: text('signature_base64'),
     // Envelope completion time, and — unlike the column above — the one the rest
     // of the system genuinely reads: the GDPR retention sweep computes its window

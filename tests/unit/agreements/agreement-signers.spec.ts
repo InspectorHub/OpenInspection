@@ -139,7 +139,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         expect(await svc.getSignerByPresentedToken('plaintext-only-token-456')).toBeNull();
     });
 
-    it("'all' policy: sign 1/2 -> not complete, envelope viewed; sign 2/2 -> complete, signed + signedAt + mirror", async () => {
+    it("'all' policy: sign 1/2 -> not complete, envelope viewed; sign 2/2 -> complete, signed + signedAt, signature stays on the signer row", async () => {
         const r = await svc.findOrCreate(TENANT_A, INSP_ID, {
             signers: [
                 { name: 'Jane', email: 'jane@test.com' },
@@ -163,7 +163,14 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const env = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, r.requestId)).get();
         expect(env!.status).toBe('signed');
         expect(env!.signedAt).toBeTruthy();
-        expect(env!.signatureBase64).toBe('sig-john');
+        // The envelope records THAT it completed and WHEN, not the signature.
+        // Each signature stays on the row of the person who made it — a copy on
+        // the envelope could only name one of two signers as its author.
+        expect(env!.signatureBase64).toBeNull();
+        const sigRows = await testDb.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, r.requestId))
+            .orderBy(asc(schema.agreementSigners.createdAt)).all();
+        expect(sigRows.map((x) => x.signatureBase64)).toEqual(['sig-jane', 'sig-john']);
     });
 
     it("'one' policy: first sign -> completedNow=true", async () => {
@@ -411,8 +418,10 @@ describe('AgreementService — signer-level envelope state machine', () => {
 
         const env = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, r.requestId)).get();
         expect(env!.status).toBe('signed');
-        // Envelope signature is the WINNING write's signature, not the loser's.
-        expect(env!.signatureBase64).toBe('sig-john');
+        // The race decides which writer reports completion. It no longer decides
+        // whose signature the envelope shows, because it shows none — that was
+        // the copy's real defect, not just its redundancy.
+        expect(env!.signatureBase64).toBeNull();
     });
 
     it('concurrent: Promise.all two markSignedBySigner for the same last signer -> at most one envelopeCompletedNow=true', async () => {

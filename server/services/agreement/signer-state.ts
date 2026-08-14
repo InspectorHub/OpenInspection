@@ -304,11 +304,16 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
             // win: `WHERE status NOT IN (terminal)`.
             let envelopeCompletedNow = false;
             if (aggregate === 'signed') {
+                // The envelope records THAT it completed and WHEN — not the
+                // signature. Copying one up from a signer row answered a question
+                // it could not answer: on a multi-signer envelope it held whichever
+                // signature won this race, as if the envelope had an author. Now
+                // nothing reads the copy either (the renderer asks the rows).
+                // `signedAt` stays; that one IS read.
                 const res: unknown = await db.update(agreementRequests)
                     .set({
                         status: 'signed',
                         signedAt: new Date(opts.signedAtMs),
-                        signatureBase64, // legacy reader compat
                     })
                     .where(and(
                         eq(agreementRequests.id, envelope.id),

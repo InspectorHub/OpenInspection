@@ -42,7 +42,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `client_email` | text | NN |  |  | *An email address.* |
 | `client_name` | text |  |  | `pending, sent, viewed, signed, declined, expired` | *A name.* |
 | `status` | text | NN | `'pending'` | `pending, sent, viewed, signed, declined, expired` | *State-machine column — see the Values column for the vocabulary.* |
-| `signature_base64` | text |  |  |  | Envelope-level client signature. Reads as legacy and is not: authority for signatures moved to `agreement_signers`, but `markSignedBySigner` still writes this on every completion, and it has to. **[more]** |
+| `signature_base64` | text |  |  |  | Envelope-level client signature — HISTORICAL now: no code writes it. A signature belongs to the person who made it and lives on their `agreement_signers` row; completion used to copy one up to here, which on a multi-signer envelope meant whichever signature won the race, presented as though the … **[more]** |
 | `signed_at` | integer |  |  |  | Envelope completion time, and — unlike the column above — the one the rest of the system genuinely reads: the GDPR retention sweep computes its window from it, publish-readiness reports it, the data export carries it. |
 | `viewed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `sent_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
