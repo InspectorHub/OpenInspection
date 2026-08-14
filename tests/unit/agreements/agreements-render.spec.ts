@@ -197,6 +197,68 @@ describe('agreement-render handler', () => {
     expect(body).not.toContain('envelopesig');
   });
 
+  // The gate has to ask the signer rows, because that is where a signature has
+  // lived since the multi-signer model. Every other spec in this file sets the
+  // envelope column too, which is exactly why a gate reading only that column
+  // never showed up as broken: the fixtures all happened to satisfy it.
+  it('renders a signed envelope whose signature exists ONLY on a signer row', async () => {
+    await db.insert(schema.agreementRequests).values({
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+      clientEmail: 'jane@x', clientName: 'Jane Doe',
+      status: 'signed',
+      signatureBase64: null,           // <- the envelope-level column is empty
+      signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
+      createdAt: new Date(),
+    });
+    await db.insert(schema.agreementSigners).values({
+      id: 'sig-1', tenantId: TENANT_A, requestId: REQ_ID,
+      name: 'Jane Doe', email: 'jane@x', role: 'client',
+      status: 'signed', signatureBase64: 'data:image/png;base64,signersig',
+      channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
+    });
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain('signersig');
+    expect(body).toContain('Jane Doe');
+  });
+
+  // The envelope column still answers for envelopes that predate signer rows,
+  // so widening the gate must not have narrowed this one.
+  it('still renders a signed envelope whose only signature is envelope-level', async () => {
+    await db.insert(schema.agreementRequests).values({
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+      clientEmail: 'jane@x', clientName: 'Jane Doe',
+      status: 'signed',
+      signatureBase64: 'data:image/png;base64,envelopesig',
+      signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
+      createdAt: new Date(),
+    });
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('envelopesig');
+  });
+
+  // A signed envelope with no signature anywhere is still a 404: the gate was
+  // widened to a second source, not removed.
+  it('404s a signed envelope with no signature in either place', async () => {
+    await db.insert(schema.agreementRequests).values({
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+      clientEmail: 'jane@x', clientName: 'Jane Doe',
+      status: 'signed', signatureBase64: null,
+      signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
+      createdAt: new Date(),
+    });
+    await db.insert(schema.agreementSigners).values({
+      id: 'sig-1', tenantId: TENANT_A, requestId: REQ_ID,
+      name: 'Jane Doe', email: 'jane@x', role: 'client',
+      status: 'signed', signatureBase64: null,   // self-healed row, no signature
+      channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
+    });
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    expect(res.status).toBe(404);
+  });
+
   // Track I-a — an in-person signer shows the in-person indicator.
   it('shows the in-person indicator for an in_person signer', async () => {
     await db.insert(schema.agreementRequests).values({

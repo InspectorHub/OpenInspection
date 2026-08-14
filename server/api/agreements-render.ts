@@ -169,26 +169,22 @@ export async function agreementRenderHandler(
   requestId: string,
   baseUrl: string = '',  // pass from route wrapper; tests pass '' which omits QR
 ): Promise<Response> {
-  // Track I-a — resolved by the stable envelope requestId (NOT the legacy
-  // plaintext `token` column, which is now a never-distributed UUID
-  // placeholder). The unguessable requestId is the URL secret, same posture
-  // as /verify/:requestId and the R2 object keys.
+  // Track I-a — resolved by the stable envelope requestId. The unguessable
+  // requestId is the URL secret, same posture as /verify/:requestId and the R2
+  // object keys.
   const db = drizzle(d1, { schema });
   const reqRow = await db.select().from(schema.agreementRequests)
     .where(eq(schema.agreementRequests.id, requestId)).get();
-  if (!reqRow || reqRow.status !== 'signed' || !reqRow.signatureBase64) {
+  if (!reqRow || reqRow.status !== 'signed') {
     return new Response('Not Found', { status: 404 });
   }
-  // The unguessable envelope `requestId` (UUIDv4) IS the access credential —
-  // identical posture to /m2m/cert-render/:id and the public /verify/:id surface
-  // (both resolve by id alone). The `tenantSlug` path segment is INFORMATIONAL
-  // only and MUST NOT gate the render. A slug gate here caused a production
-  // incident: the public sign route POSTs to /api/public/agreements/:token/sign
-  // (no :tenant segment) so requestedTenantSlug was '', the sign-completion
-  // workflow built /m2m/agreement-render//<id> (empty slug → router 404), and
-  // Browser Rendering rasterized that "Not found" page straight into the emailed
-  // signed.pdf. The public tenant slug adds no real entropy over the requestId,
-  // so gating on it bought nothing but this failure mode.
+  // The unguessable `requestId` (UUIDv4) IS the access credential, same posture
+  // as /m2m/cert-render/:id and /verify/:id. `tenantSlug` is INFORMATIONAL and
+  // MUST NOT gate the render. A slug gate here caused a production incident: the
+  // public sign route has no :tenant segment, so the slug arrived '', the
+  // sign-completion workflow built /m2m/agreement-render//<id> (router 404), and
+  // Browser Rendering rasterized that "Not found" page into the emailed
+  // signed.pdf. The slug adds no entropy over the requestId — only that failure.
   void tenantSlug;
   const agreement = await db.select().from(schema.agreements)
     .where(eq(schema.agreements.id, reqRow.agreementId)).get();
@@ -201,9 +197,15 @@ export async function agreementRenderHandler(
   const { content: snapshotContent } = await svc.getSnapshotForRequest(reqRow);
 
   // Track I-a — one signature block PER SIGNED SIGNER (name, role, timestamp,
-  // in-person badge, on-behalf-of line). Backward-compat: an envelope with zero
-  // signer rows but a legacy envelope-level signature falls back to a single
-  // Client block built from the envelope columns.
+  // in-person badge, on-behalf-of line).
+  //
+  // ONE place decides whether there is a signature to render, and it asks the
+  // signer rows first. The status check above used to also require
+  // `reqRow.signatureBase64`, which is not where a signature has lived since the
+  // multi-signer model — and it only worked because completion double-writes
+  // that column, so the gate was answered by a copy of what these rows say.
+  // Deciding here instead is what lets the copy go, and it keeps the decision
+  // next to the data it is about rather than two branches apart.
   const signers = await db.select().from(schema.agreementSigners)
     .where(eq(schema.agreementSigners.requestId, reqRow.id))
     .orderBy(asc(schema.agreementSigners.createdAt))
@@ -213,8 +215,8 @@ export async function agreementRenderHandler(
   let signerCellsHtml: string;
   if (signedSigners.length > 0) {
     signerCellsHtml = signedSigners.map((s) => signerCellHtml(s, escapeHtml)).join('');
-  } else {
-    // Legacy single-block fallback (pre-backfill envelopes with no signer rows).
+  } else if (reqRow.signatureBase64) {
+    // Legacy single block, for envelopes that predate signer rows.
     const clientName = reqRow.clientName ? escapeHtml(reqRow.clientName) : escapeHtml(reqRow.clientEmail);
     const signedAt = reqRow.signedAt ? utcDisplay(reqRow.signedAt) : '';
     const sigData = reqRow.signatureBase64.startsWith('data:')
@@ -225,6 +227,12 @@ export async function agreementRenderHandler(
         `<img src="${escapeHtml(sigData)}" alt="Client signature">` +
         `<div class="meta">${clientName} · ${escapeHtml(signedAt)}</div>` +
     `</div>`;
+  } else {
+    // Signed, but no signature in either place. `synthesizeDefaultSigner` copies
+    // an envelope's `status` onto a row it creates and not its signature, so
+    // this state is reachable — and a signed agreement rendered with an empty
+    // signature block is worse than one that is not served at all.
+    return new Response('Not Found', { status: 404 });
   }
 
   const inspectorBlock = reqRow.inspectorSignatureBase64 ? (() => {
