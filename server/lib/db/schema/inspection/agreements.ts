@@ -27,15 +27,26 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     clientEmail: text('client_email').notNull(),
     clientName: text('client_name'),
     status: text('status', { enum: ['pending', 'sent', 'viewed', 'signed', 'declined', 'expired'] }).notNull().default('pending'),
-    // LEGACY envelope-level client signature — superseded for NEW writes by
-    // agreement_signers.signatureBase64 / .signedAt (findOrCreate no longer
-    // writes these). NOT frozen: still READ by live paths — the render fallback
-    // for pre-signer-model envelopes (agreements-render.ts), the GDPR retention
-    // sweep (retention-sweep.ts filters/destroys on signed_at), publish-readiness
-    // (inspection-publish.service.ts), and the tenant data export
-    // (admin.service.ts). Migrate those readers to signer-level data before
-    // freezing/retiring these columns.
+    // Envelope-level client signature. Reads as legacy and is not: authority
+    // for signatures moved to `agreement_signers`, but `markSignedBySigner`
+    // still writes this on every completion, and it has to. `agreements-render`
+    // GATES on it — a signed envelope whose column is NULL renders 404 even when
+    // the signature is sitting on a signer row. That gate, not back-compat, is
+    // what keeps the write alive, so "superseded" would be the wrong word for it.
+    //
+    // Read by the render gate and by its single-block fallback for envelopes
+    // with no signed signer row (both agreements-render.ts), and carried by the
+    // tenant data export (admin.service.ts). The retention sweep only NULLs it;
+    // it SELECTS on `signedAt` below, never on this. Retiring it means moving
+    // the gate onto the signer rows first, then backfilling the envelopes whose
+    // signature exists only here — including the ambiguous case of several
+    // signer rows and one envelope signature, which needs a stated rule about
+    // whose signature it is before any script can run.
     signatureBase64: text('signature_base64'),
+    // Envelope completion time, and — unlike the column above — the one the rest
+    // of the system genuinely reads: the GDPR retention sweep computes its window
+    // from it, publish-readiness reports it, the data export carries it. Do not
+    // read the two as a pair; almost nothing reads both.
     signedAt: integer('signed_at', { mode: 'timestamp_ms' }),
     viewedAt: integer('viewed_at', { mode: 'timestamp_ms' }),
     sentAt: integer('sent_at', { mode: 'timestamp_ms' }),

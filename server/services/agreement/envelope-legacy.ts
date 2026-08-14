@@ -64,15 +64,6 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
             return row ?? null;
         }
 
-        /**
-         * Lists all signing requests for a tenant (most recent first).
-         */
-        async listRequests(tenantId: string) {
-            return this.getDrizzle().select().from(agreementRequests)
-                .where(eq(agreementRequests.tenantId, tenantId))
-                .all();
-        }
-
         // -------------------------------------------------------------------------
         // State machine — Spec 2A
         // -------------------------------------------------------------------------

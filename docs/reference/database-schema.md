@@ -13,7 +13,7 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | Columns | 1104 |
 | Indexes (excluding primary keys) | 159 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 508 (46%) |
+| Columns carrying a source comment | 509 (46%) |
 
 **Reading the tables.** SQLite has four storage types; the semantic type is a
 Drizzle layer on top — `integer{mode:timestamp_ms}` is epoch milliseconds,
@@ -42,8 +42,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `client_email` | text | NN |  |  | *An email address.* |
 | `client_name` | text |  |  | `pending, sent, viewed, signed, declined, expired` | *A name.* |
 | `status` | text | NN | `'pending'` | `pending, sent, viewed, signed, declined, expired` | *State-machine column — see the Values column for the vocabulary.* |
-| `signature_base64` | text |  |  |  | LEGACY envelope-level client signature — superseded for NEW writes by agreement_signers.signatureBase64 / .signedAt (findOrCreate no longer writes these). **[more]** |
-| `signed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `signature_base64` | text |  |  |  | Envelope-level client signature. Reads as legacy and is not: authority for signatures moved to `agreement_signers`, but `markSignedBySigner` still writes this on every completion, and it has to. **[more]** |
+| `signed_at` | integer |  |  |  | Envelope completion time, and — unlike the column above — the one the rest of the system genuinely reads: the GDPR retention sweep computes its window from it, publish-readiness reports it, the data export carries it. |
 | `viewed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `sent_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `last_error` | text |  |  |  | The decline REASON, truncated to 500 chars. Written only by markDeclinedBySigner, and only when the signer's decline actually drags the envelope aggregate to 'declined' — a decline that leaves a 'one'-policy envelope live records nothing here. **[more]** |
