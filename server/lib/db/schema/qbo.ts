@@ -17,10 +17,22 @@ export const qboConnections = sqliteTable('qbo_connections', {
 export const qboEntityMap = sqliteTable('qbo_entity_map', {
     id:           text('id').primaryKey(),
     tenantId:     text('tenant_id').notNull(),
+    // Which OI entity `oi_id` names — 'contact' | 'invoice' | 'refund' at the
+    // three insert sites. Part of the (tenant, oi_type, oi_id) unique key, so it
+    // is what makes a lookup ask for the QBO twin of THIS row rather than
+    // another kind of row that happens to carry the same id.
     oiType:       text('oi_type').notNull(),
     oiId:         text('oi_id').notNull(),
+    // The QuickBooks-side entity name of the twin, spelled as Intuit spells it
+    // ('Customer' | 'Invoice' | 'CreditMemo'). Paired with `qbo_id` in the
+    // reverse unique key — the lookup used when QBO hands back an id and the
+    // sync has to find which OI row it belongs to.
     qboType:      text('qbo_type').notNull(),
     qboId:        text('qbo_id').notNull(),
+    // QuickBooks' optimistic-concurrency counter for the mapped entity, not an
+    // id: it changes on every remote edit. Each update must send the token QBO
+    // last returned and store the new one back here; a stale token is the 400
+    // the invoice push refetches and retries (up to 3 attempts).
     qboSyncToken: text('qbo_sync_token').notNull(),
     syncedAt:     integer('synced_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
@@ -31,9 +43,23 @@ export const qboEntityMap = sqliteTable('qbo_entity_map', {
 export const qboSyncErrors = sqliteTable('qbo_sync_errors', {
     id:        text('id').primaryKey(),
     tenantId:  text('tenant_id').notNull(),
+    // The OI entity this open flag is about ('invoice' | 'refund' | 'contact'),
+    // part of the (tenant, oi_type, oi_id, error_code) identity of one open row.
+    // The bootstrap probe writes ('invoice', 'bootstrap') — an oi_id that is a
+    // sentinel, not an invoice id, so joins on oi_id must tolerate a miss.
     oiType:    text('oi_type').notNull(),
     oiId:      text('oi_id').notNull(),
+    // WHAT kind of thing a human has to look at, and part of the open-row
+    // identity: a failed push ('SYNC_ERROR') and a payment discrepancy
+    // (QBO_PAYMENT_DISCREPANCY) on the same invoice are two separate open rows,
+    // and sharing one would overwrite each other. The integrations panel reads
+    // this to split the discrepancy list out of the plain error list.
     errorCode: text('error_code').notNull(),
+    // Not always prose: on a discrepancy row it is the JSON codec payload
+    // ({ledgerCents, qboCents}) that the panel decodes to show both figures —
+    // the table has no column per figure. On 'SYNC_ERROR' it is the thrown
+    // Error's message. Re-detection REFRESHES it in place (and bumps `retries`)
+    // instead of appending a row.
     errorMsg:  text('error_msg').notNull(),
     retries:   integer('retries').notNull().default(0),
     resolved:  integer('is_resolved', { mode: 'boolean' }).notNull().default(false),

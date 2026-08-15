@@ -5,10 +5,18 @@ import { tenants } from './tenant';
 export const contacts = sqliteTable('contacts', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
+    // Load-bearing, not descriptive. Agent signup will only bind an account to a
+    // contact already typed 'agent', and the booking path's auto-create only
+    // reuses an existing 'client' — so retyping a row changes what it can be
+    // matched to. (tenant, type) is indexed because that is the list query.
     type: text('type', { enum: ['agent', 'client', 'other'] }).notNull().default('client'),
     name: text('name').notNull(),
     email: text('email'),
     phone: text('phone'),
+    // The agent's brokerage or firm. Free text, and the one contact field that
+    // leaves the product: it is sent as QuickBooks CompanyName on customer
+    // sync, groups the agent-referral leaderboard, and is a mapped column in
+    // both CSV import and export.
     agency: text('agency'),
     notes: text('notes'),
     createdByUserId: text('created_by_user_id'),
@@ -51,7 +59,6 @@ export const contacts = sqliteTable('contacts', {
     locale: text('locale'),
 }, (t) => [
     index('idx_contacts_type').on(t.tenantId, t.type),
-    index('idx_contacts_tenant').on(t.tenantId),
     // DB-9: one ACTIVE contact per (tenant,email); NULL emails and archived rows don't collide.
     uniqueIndex('uq_contacts_tenant_email').on(t.tenantId, t.email).where(sql`email IS NOT NULL AND archived_at IS NULL`),
     // IA-104 — replaces agent_tenant_links' UNIQUE (agent_user_id, tenant_id).

@@ -1,0 +1,32 @@
+-- Drop `agreement_requests.token` — the last plaintext token column, and by now
+-- one nothing could redeem.
+--
+-- It was NOT NULL + UNIQUE, so every insert had to put something there. What it
+-- held changed three times: real 32-byte tokens when envelopes carried the
+-- distributed link, then `x:<uuid>` tombstones as the self-draining upgrade
+-- replaced them, then a throwaway `crypto.randomUUID()` handle once new
+-- envelopes stopped having a link of their own.
+--
+-- None of those resolve. Envelope lookup goes through `token_hash`, and
+-- `findOrCreate` never wrote a matching hash — so presenting the value in this
+-- column has matched no row for as long as the hash-only path has existed.
+-- Production bears that out: of five rows, three hold real 64-hex tokens with
+-- `token_hash` NULL (all `expired`) and two hold tombstones; not one is a UUID
+-- handle, because no envelope has been created since that code shipped.
+--
+-- Dropping it is a security improvement rather than a neutral cleanup: those
+-- three rows are plaintext copies of secrets that were mailed to real people,
+-- kept in a column that no longer buys any behavior.
+--
+-- Three code paths were still handing this value out as if it were a link — the
+-- `findOrCreate` reuse fallback, the publish gate's fallback URL, and the
+-- verification page's "view the signed document" redirect. Each produced a link
+-- that could only 404. They are fixed in the same change; this migration is
+-- what makes the dead state unrepresentable rather than merely unused.
+--
+-- Order matters: SQLite refuses to drop a column while an index references it,
+-- so the UNIQUE index goes first. The uniqueness lives in a separate index
+-- (`agreement_requests_token_unique`) rather than an inline column constraint,
+-- which is what makes a native DROP COLUMN legal here at all.
+DROP INDEX IF EXISTS `agreement_requests_token_unique`;--> statement-breakpoint
+ALTER TABLE `agreement_requests` DROP COLUMN `token`;

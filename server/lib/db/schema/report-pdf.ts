@@ -6,11 +6,22 @@ import { tenants } from './tenant';
  * Spec 5A — Report PDF Pipeline. Renderer reuses server/lib/pdf.ts:generatePdfFromUrl;
  * this table tracks R2 storage metadata + render lifecycle (queued / rendering /
  * ready / failed) + source_version for stale detection vs inspection.updatedAt.
+ *
+ * ⚠️ NOT `report_exports`, which is the WORD (`.docx`) export and looks almost
+ * identical column-for-column. That one is a one-shot job ticket; this one is a
+ * durable archive keyed to a published version — hence the uniqueness on
+ * (inspection, type, version_number), the content hash, and the source version,
+ * none of which a job ticket has. The full comparison, and why the two must not
+ * become one table with a `kind` column, is in `schema/report-export.ts`.
  */
 export const reportPdfs = sqliteTable('report_pdfs', {
     id:            text('id').primaryKey(),
     tenantId:      text('tenant_id').notNull().references(() => tenants.id),
     inspectionId:  text('inspection_id').notNull(),
+    // Selects the RENDER, not just a label: 'summary' appends `&summary=1` to
+    // the report URL so print-mode CSS drops everything but defects + safety.
+    // Also prefixes the R2 key and joins (inspection, version_number) in the
+    // uniqueness below, so one summary and one full archive coexist per version.
     type:          text('type', { enum: ['summary', 'full'] }).notNull(),
     r2Key:         text('r2_key').notNull(),
     renderedAt:    integer('rendered_at', { mode: 'timestamp_ms' }).notNull(),

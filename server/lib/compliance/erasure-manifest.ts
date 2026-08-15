@@ -218,7 +218,6 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // Signature evidence kept on a DSAR (the retention sweep destroys it past
     // the window); the esign audit chain is NEVER touched.
     { table: 'agreement_signers',  column: 'signature_base64', category: 'user.biometric.signature', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'enforced' },
-    { table: 'agreement_requests', column: 'signature_base64', category: 'user.biometric.signature', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'enforced' },
     { table: 'esign_audit_logs',   column: 'signature',        category: 'system.integrity',         action: 'retain', legalBasis: 'art_17_3_e' },
 
     // ── reports ───────────────────────────────────────────────────────────────

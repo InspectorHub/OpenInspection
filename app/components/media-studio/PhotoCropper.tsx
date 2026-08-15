@@ -24,6 +24,21 @@ export interface PhotoCropperProps {
   allowFree?: boolean;
   /** Initial selected aspect ('free' or a preset key). */
   initialAspect?: string;
+  /**
+   * Re-open on a crop that was already saved, rather than on the default frame.
+   *
+   * The rect is in SOURCE-pixel coordinates — the same shape `onSave` hands back
+   * — and `react-easy-crop` turns it into its own pan/zoom via
+   * `initialCroppedAreaPixels`. That indirection is the reason this is a rect
+   * and not a `{crop, zoom}` pair: the pair only means something against a
+   * known display size, so it could not survive a round trip through the
+   * database or a different viewport.
+   *
+   * `aspect` and `orientation` come with it because the saved rect is only
+   * reachable while the same preset is selected; restoring the rect under a
+   * different ratio would silently re-frame it.
+   */
+  initialCrop?: PhotoCrop | null;
   /** Title for the dialog (accessibility). */
   title?: string;
   /** Save button label. */
@@ -50,6 +65,7 @@ export function PhotoCropper({
   presets = DEFAULT_PRESETS,
   allowFree = true,
   initialAspect,
+  initialCrop = null,
   title = m.media_cropper_title(),
   saveLabel = m.media_cropper_save(),
   cropShape = "rect",
@@ -59,8 +75,10 @@ export function PhotoCropper({
   onSave,
 }: PhotoCropperProps) {
   const options = allowFree ? ["free", ...presets] : presets;
-  const [aspectKey, setAspectKey] = useState<string>(initialAspect ?? options[0]);
-  const [portrait, setPortrait] = useState(false);
+  // A saved crop wins over the caller's default: the ratio it was framed at is
+  // part of the crop, not a preference to re-apply.
+  const [aspectKey, setAspectKey] = useState<string>(initialCrop?.aspect ?? initialAspect ?? options[0]);
+  const [portrait, setPortrait] = useState(initialCrop?.orientation === "portrait");
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   /**
@@ -113,6 +131,10 @@ export function PhotoCropper({
       <div className="relative flex-1">
         <Cropper image={sourceUrl} crop={crop} zoom={zoom} aspect={ratio} rotation={rotation}
           cropShape={cropShape} showGrid={cropShape === "rect"} restrictPosition
+          // Applied once, when the media has loaded and the crop box is sized —
+          // after that `crop`/`zoom` are the live state and this is ignored, so
+          // panning away from a restored frame is not fought.
+          initialCroppedAreaPixels={initialCrop?.pixels}
           onMediaLoaded={onMediaLoaded} onRotationChange={setRotation}
           onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={onCropComplete} />
       </div>

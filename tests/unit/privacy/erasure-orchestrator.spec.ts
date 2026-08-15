@@ -49,8 +49,7 @@ async function seedSignedEnvelope(db: BetterSQLite3Database<typeof schema>, sign
     });
     await db.insert(schema.agreementRequests).values({
         id: reqId, tenantId: TENANT_A, inspectionId: inspId, agreementId: 'agr-1',
-        clientEmail: SUBJECT_EMAIL, clientName: 'Jane Subject', token: 'tok-signed',
-        status: 'signed', signatureBase64: 'env-sig-keep', signedAt: new Date(signedAtMs),
+        clientEmail: SUBJECT_EMAIL, clientName: 'Jane Subject', status: 'signed', signedAt: new Date(signedAtMs),
         completionPolicy: 'all', contentSnapshot: 'Agreement text', contentHash: 'hash-keep',
         createdAt: new Date(),
     });
@@ -137,12 +136,12 @@ describe('runErasure', () => {
         expect(subjectSigner!.role).toBe('client');
         expect(subjectSigner!.channel).toBe('remote');
 
-        // Envelope: clientName/clientEmail cleared, signature + snapshot/hash kept.
+        // Envelope: clientName/clientEmail cleared, snapshot/hash kept. The
+        // signature is asserted on the signer row above — the envelope has none.
         const env = await db.select().from(schema.agreementRequests)
             .where(eq(schema.agreementRequests.id, 'req-signed')).get();
         expect(env!.clientName).toBeNull();
         expect(env!.clientEmail).toBe('[erased]'); // NOT NULL -> sentinel-cleared
-        expect(env!.signatureBase64).toBe('env-sig-keep');
         expect(env!.contentSnapshot).toBe('Agreement text');
         expect(env!.contentHash).toBe('hash-keep');
         expect(env!.status).toBe('signed');
@@ -188,8 +187,7 @@ describe('runErasure', () => {
         });
         await db.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: inspId, agreementId: 'agr-1',
-            clientEmail: SUBJECT_EMAIL, clientName: 'Drafty', token: 'tok-draft',
-            status: 'viewed', completionPolicy: 'all', createdAt: new Date(),
+            clientEmail: SUBJECT_EMAIL, clientName: 'Drafty', status: 'viewed', completionPolicy: 'all', createdAt: new Date(),
         });
         await db.insert(schema.agreementSigners).values({
             id: 'signer-draft', tenantId: TENANT_A, requestId: reqId,
@@ -226,8 +224,7 @@ describe('runErasure', () => {
         });
         await db.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: inspId, agreementId: 'agr-1',
-            clientEmail: SUBJECT_EMAIL, clientName: 'Jane Subject', token: 'tok-partial',
-            status: 'viewed', signedAt: null, completionPolicy: 'all',
+            clientEmail: SUBJECT_EMAIL, clientName: 'Jane Subject', status: 'viewed', signedAt: null, completionPolicy: 'all',
             contentSnapshot: 'Agreement text', contentHash: 'hash-partial', createdAt: new Date(),
         });
         await db.insert(schema.agreementSigners).values([
@@ -458,20 +455,20 @@ describe('runErasure — the residences the original manifest missed (#88)', () 
 
     it('concierge_confirm_tokens: the subject rows are deleted, other recipients kept', async () => {
         await db.insert(schema.conciergeConfirmTokens).values([
-            { token: 'cct-subject', inspectionId: INSP, tenantId: TENANT_A, clientEmail: SUBJECT_EMAIL, expiresAt: new Date(Date.now() + 86400_000), createdAt: new Date() },
-            { token: 'cct-other', inspectionId: INSP, tenantId: TENANT_A, clientEmail: OTHER_EMAIL, expiresAt: new Date(Date.now() + 86400_000), createdAt: new Date() },
+            { id: 'cct-subject', tokenHash: 's'.repeat(64), inspectionId: INSP, tenantId: TENANT_A, clientEmail: SUBJECT_EMAIL, expiresAt: new Date(Date.now() + 86400_000), createdAt: new Date() },
+            { id: 'cct-other', tokenHash: 'o'.repeat(64), inspectionId: INSP, tenantId: TENANT_A, clientEmail: OTHER_EMAIL, expiresAt: new Date(Date.now() + 86400_000), createdAt: new Date() },
         ]);
 
         await run();
 
         const rows = await db.select().from(schema.conciergeConfirmTokens).all();
-        expect(rows.map((r) => r.token)).toEqual(['cct-other']);
+        expect(rows.map((r) => r.id)).toEqual(['cct-other']);
     });
 
     it('inspection_access_tokens: the subject rows are deleted — portal access is revoked', async () => {
         await db.insert(schema.inspectionAccessTokens).values([
-            { id: 'iat-subject', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: SUBJECT_EMAIL, token: 'tok-s', createdAt: new Date() },
-            { id: 'iat-other', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: OTHER_EMAIL, token: 'tok-o', createdAt: new Date() },
+            { id: 'iat-subject', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: SUBJECT_EMAIL, createdAt: new Date() },
+            { id: 'iat-other', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: OTHER_EMAIL, createdAt: new Date() },
         ]);
 
         await run();
@@ -494,8 +491,8 @@ describe('runErasure — the residences the original manifest missed (#88)', () 
         // permanently unreachable — no later DSAR, and no repair pass, can ever
         // find them again.
         await db.insert(schema.inspectionAccessTokens).values([
-            { id: 'iat-subject', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: SUBJECT_EMAIL, token: 'tok-s', createdAt: new Date() },
-            { id: 'iat-other', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: OTHER_EMAIL, token: 'tok-o', createdAt: new Date() },
+            { id: 'iat-subject', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: SUBJECT_EMAIL, createdAt: new Date() },
+            { id: 'iat-other', tenantId: TENANT_A, inspectionId: INSP, recipientEmail: OTHER_EMAIL, createdAt: new Date() },
         ]);
         await db.insert(schema.reportViews).values([
             { id: 'rv-subject', tenantId: TENANT_A, inspectionId: INSP, accessTokenId: 'iat-subject', firstViewedAt: new Date(), lastViewedAt: new Date(), viewCount: 4 },

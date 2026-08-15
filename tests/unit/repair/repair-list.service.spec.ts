@@ -289,16 +289,19 @@ describe('Track E1 — InspectionService.getRepairList', () => {
         expect(result.defects[0]!.trade).toBeNull();
     });
 
-    it('reports showEstimates=false regardless of tenant_configs', async () => {
-        // The repair list does not read tenant_configs itself — it forwards
-        // getReportData's `showEstimates`, so it inherits the render-side pin
-        // that keeps embedded estimates out of the report while they are
+    it('reports showEstimates=false, with or without a tenant config row', async () => {
+        // The repair list does not decide this — it forwards getReportData's
+        // `showEstimates`, which is pinned false while embedded estimates are
         // redesigned as a standalone deliverable.
+        //
+        // The second half used to insert `show_estimates = 1` and assert the pin
+        // held anyway. That column is gone (nothing ever read it), so the
+        // opted-in row cannot be written; what is still worth asserting is that
+        // the presence of a config row changes nothing.
         let result = await svc.getRepairList(INSPECTION_ID, TENANT);
         expect(result.showEstimates).toBe(false);
-        // Insert config with show_estimates = 1 — still false downstream.
         await testDb.insert(schema.tenantConfigs).values({
-            tenantId: TENANT, showEstimates: true, updatedAt: new Date(),
+            tenantId: TENANT, updatedAt: new Date(),
         });
         result = await svc.getRepairList(INSPECTION_ID, TENANT);
         expect(result.showEstimates).toBe(false);

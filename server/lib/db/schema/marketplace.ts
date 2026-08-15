@@ -18,10 +18,23 @@ import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqli
 export const marketplaceLibraries = sqliteTable('marketplace_libraries', {
   id:            text('id').primaryKey(),
   name:          text('name').notNull(),
+  // Also the only browse axis that is an enum — property_type reuses the
+  // template validator's, and the two below are bounded free text. Backed by
+  // idx(kind, featured), which serves list()'s featured-then-downloads order.
   kind:          text('kind', { enum: ['comments', 'templates'] }).notNull(),
+  // The catalogue's current version. Never ordered or range-compared, only
+  // tested for EQUALITY against tenant_library_imports.imported_semver:
+  // unequal is what list() reports as `hasUpdate`, equal is what the update
+  // paths refuse. A downgrade therefore reads as an update.
   semver:        text('semver').notNull(),
+  // The pack ITSELF, not a description of one: a v2 template document for
+  // kind='templates' (validated at import time, never on write) or the entries
+  // parseLibraryComments explodes into N rows. list() strips it from every
+  // response — ~50KB per row that no client reads.
   schema:        text('schema', { mode: 'json' }).notNull(),
   authorId:      text('author_id').notNull().default('system'),
+  // Release note for the entry. Written only by the starter-content seeder;
+  // NO READER FOUND in server/ or app/ — nothing renders or returns it.
   changelog:     text('changelog'),
   downloadCount: integer('download_count').notNull().default(0),
   featured:      integer('is_featured', { mode: 'boolean' }).notNull().default(false),
@@ -42,8 +55,11 @@ export const marketplaceLibraries = sqliteTable('marketplace_libraries', {
   // property_type is nullable even for templates: a row may genuinely not
   // commit to one.
   propertyType:   text('property_type'),
+  // Both are exact-match conditions in list() and are reachable only as
+  // /api/marketplace query params — the browse page ships no control for
+  // either, so today they narrow nothing a user can click.
   jurisdiction:   text('jurisdiction'),
-  inspectionKind: text('inspection_kind'),
+  inspectionKind: text('inspection_kind'),   // exact-match browse filter, reachable only as an API query param
 }, (t) => [
   index('idx_marketplace_libraries_kind_featured').on(t.kind, t.featured),
 ]);
@@ -52,6 +68,10 @@ export const tenantLibraryImports = sqliteTable('tenant_library_imports', {
   id:             text('id').primaryKey(),
   tenantId:       text('tenant_id').notNull(),
   libraryId:      text('library_id').notNull(),
+  // The catalogue semver this tenant is currently ON. Re-pointed in place by
+  // every update, so it is a position and never a history. Its whole job is the
+  // equality test against marketplace_libraries.semver: unequal raises the
+  // "update available" badge, equal makes both update paths throw.
   importedSemver: text('imported_semver').notNull(),
   importedAt:     integer('imported_at', { mode: 'timestamp_ms' }).notNull(),
   rowCount:       integer('row_count').notNull().default(0),
@@ -65,7 +85,6 @@ export const tenantLibraryImports = sqliteTable('tenant_library_imports', {
   localEntityId: text('local_entity_id'),
 }, (t) => [
   uniqueIndex('uq_tenant_library_import').on(t.tenantId, t.libraryId),
-  index('idx_tenant_library_imports_tenant').on(t.tenantId),
 ]);
 
 // Sprint 2 Track 3 (S2-8) — per-import history. One row per
@@ -78,13 +97,21 @@ export const tenantMarketplaceImportHistory = sqliteTable('tenant_marketplace_im
   templateId:    text('template_id'),
   // 'install' | 'update' | 'replace' | 'migrate'
   action:        text('action').notNull(),
+  // The semver the tenant moved FROM / TO. source is NULL for 'install' (there
+  // was nothing to move from); BOTH are NULL for 'migrate', which moves between
+  // two LOCAL templates and has no catalogue version on either side — so a
+  // reader must not treat a null pair as missing data.
   sourceVersion: text('source_version'),
-  targetVersion: text('target_version'),
+  targetVersion: text('target_version'),   // NULL on a migrate: local -> local has no catalogue version either side
   rowsAffected:  integer('rows_affected').notNull().default(0),
   // JSON-encoded action-specific context (deleted ids, migration counts, …).
   // Stored as TEXT so we can keep parity with raw SQL inserts in tests.
   metadata:      text('metadata'),
   createdAt:     integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  // The JWT sub of whoever caused the event — but only the library REPLACE and
+  // template MIGRATE routes actually pass one. Install and plain update call the
+  // service with no userId, so their rows carry the literal 'system': a
+  // 'system' value means "the route did not say", not "no human did it".
   createdBy:     text('created_by').notNull(),
 }, (t) => [
   index('idx_marketplace_history_tenant').on(t.tenantId, t.createdAt),

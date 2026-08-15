@@ -65,7 +65,9 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
 
         expect(result.id).toBeTruthy();
         expect(result.inspections).toHaveLength(2);
-        expect(result.totalAmount).toBe(57000);
+        // The cached request-level total is gone; the money lives on the sub-
+        // inspections, which is what the caller can actually act on.
+        expect(result.inspections.reduce((n, i) => n + (i.price ?? 0), 0)).toBe(57000);
         expect(result.status).toBe('pending');
         expect(result.inspections.every(i => i.propertyAddress === '123 Main St')).toBe(true);
     });
@@ -90,7 +92,7 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
 
         const after = await svc.addSubInspection(TENANT, created.id, { templateId: TPL2, price: 12000 });
         expect(after.inspections).toHaveLength(2);
-        expect(after.totalAmount).toBe(57000);
+        expect(after.inspections.reduce((n, i) => n + (i.price ?? 0), 0)).toBe(57000);
     });
 
     it('addSubInspection refuses cross-tenant access', async () => {

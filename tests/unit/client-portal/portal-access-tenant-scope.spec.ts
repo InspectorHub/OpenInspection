@@ -7,7 +7,7 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { sealToken } from '../../../server/lib/config-crypto';
-import { mintToken, hashToken, deadTokenSentinel } from '../../../server/lib/token-hash';
+import { mintToken, hashToken } from '../../../server/lib/token-hash';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -67,7 +67,6 @@ describe('PortalAccessService tenant scoping', () => {
             inspectionId: 'i-1',
             recipientEmail: 'jane@x.com',
             role: 'client',
-            token: deadTokenSentinel(id),
             tokenHash: t1TokenHash,
             tokenEnc: t1TokenEnc,
             createdAt: new Date(),
@@ -104,7 +103,6 @@ describe('PortalAccessService tenant scoping', () => {
             inspectionId: 'i-1',
             recipientEmail: 'jane@x.com',
             role: 'client',
-            token: `dead:${id}`,
             createdAt: new Date(),
             expiresAt: null,
             revokedAt: null,
@@ -128,7 +126,6 @@ describe('PortalAccessService tenant scoping', () => {
             inspectionId: 'i-1',
             recipientEmail: 'jane@x.com',
             role: 'client',
-            token: `dead:${id}`,
             createdAt: new Date(),
             expiresAt: null,
             revokedAt: null,

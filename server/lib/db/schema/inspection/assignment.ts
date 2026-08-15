@@ -16,6 +16,11 @@ export const inspectionInspectors = sqliteTable('inspection_inspectors', {
     inspectionId: text('inspection_id').notNull(),
     userId:       text('user_id').notNull(),
     tenantId:     text('tenant_id').notNull(),
+    // 'lead' is the value everything keys on: the ICS feed takes the lead's row
+    // as the calendar owner, roster.ts hangs the rest off it, inspector metrics
+    // split led-vs-assisted from it, and version-diff calls the lead "the"
+    // inspector of a report version. syncInspectionAssignments writes at most one
+    // lead per inspection and dedupes helpers against them.
     role:         text('role', { enum: ['lead', 'helper'] }).notNull().default('lead'),
     createdAt:    integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
@@ -48,7 +53,6 @@ export const availability = sqliteTable('availability', {
     endTime: text('end_time').notNull(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
-    index('idx_availability_inspector').on(t.inspectorId),
     // DB-9 — duplicate weekly windows were silently accepted; dedup'd in the
     // 0016 migration before this index lands.
     uniqueIndex('idx_availability_window_unique').on(t.inspectorId, t.dayOfWeek, t.startTime),
@@ -75,7 +79,6 @@ export const availabilityOverrides = sqliteTable('availability_overrides', {
     // 'transparent' rows are kept for provenance but never mark a slot busy.
     transparency: text('transparency', { enum: ['opaque', 'transparent'] }),
 }, (t) => [
-    index('idx_avail_overrides_insp').on(t.inspectorId),
     // DB-9 — contradictory same-day rows policy: at most ONE blocking
     // (is_available = 0) override per inspector per date. A blocking row wins
     // over recurring windows (see BookingService slot computation); multiple

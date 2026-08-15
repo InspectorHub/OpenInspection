@@ -42,7 +42,7 @@
   "report_verify_notpublished_body": "Este informe no está publicado.",
   "report_verify_failed_heading": "❌ Verificación fallida",
   "report_verify_failed_body": "No se pudo verificar la firma criptográfica de este informe. El contenido puede haber sido alterado.",
-  "report_verify_verified_heading": "✅ Verificado",
+  "report_verify_verified_heading": "✅ Integridad del informe verificada",
   "report_verify_detail_property": "Propiedad",
   "report_verify_detail_content_hash": "Hash del contenido",
   "report_verify_detail_algorithm": "Algoritmo",

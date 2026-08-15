@@ -6,6 +6,10 @@ export const agreements = sqliteTable('agreements', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     name: text('name').notNull(),
+    // The tenant's template body, run through sanitizeAgreementHtml on EVERY
+    // create/update (never trusted as stored). findOrCreate copies it into
+    // agreement_requests.contentSnapshot, so editing it here can never change
+    // what an already-sent envelope shows or what its contentHash covers.
     content: text('content').notNull(),
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
@@ -22,24 +26,21 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     agreementId: text('agreement_id').notNull().references(() => agreements.id),
     clientEmail: text('client_email').notNull(),
     clientName: text('client_name'),
-    // Internal envelope handle: a throwaway, NEVER-distributed UUID written by
-    // findOrCreate to satisfy NOT NULL + UNIQUE. Public links use per-signer
-    // tokenHash; the /sign/:id redirect resolves an envelope via this through
-    // getSignerByPresentedToken's synthesize fallback. Not a distributed secret.
-    token: text('token').notNull().unique(),
     status: text('status', { enum: ['pending', 'sent', 'viewed', 'signed', 'declined', 'expired'] }).notNull().default('pending'),
-    // LEGACY envelope-level client signature — superseded for NEW writes by
-    // agreement_signers.signatureBase64 / .signedAt (findOrCreate no longer
-    // writes these). NOT frozen: still READ by live paths — the render fallback
-    // for pre-signer-model envelopes (agreements-render.ts), the GDPR retention
-    // sweep (retention-sweep.ts filters/destroys on signed_at), publish-readiness
-    // (inspection-publish.service.ts), and the tenant data export
-    // (admin.service.ts). Migrate those readers to signer-level data before
-    // freezing/retiring these columns.
-    signatureBase64: text('signature_base64'),
+    // Envelope completion time — THAT it completed and WHEN, which is the
+    // envelope's own fact. The signature is not: it belongs to the person who
+    // made it and lives on their `agreement_signers` row. Read by the GDPR
+    // retention sweep (its window is computed from this), publish-readiness,
+    // and the data export.
     signedAt: integer('signed_at', { mode: 'timestamp_ms' }),
     viewedAt: integer('viewed_at', { mode: 'timestamp_ms' }),
     sentAt: integer('sent_at', { mode: 'timestamp_ms' }),
+    // The decline REASON, truncated to 500 chars. Written only by
+    // markDeclinedBySigner, and only when the signer's decline actually drags the
+    // envelope aggregate to 'declined' — a decline that leaves a 'one'-policy
+    // envelope live records nothing here. No UI reads it; it reaches the admin
+    // envelope-detail JSON as part of the full row and is deliberately left out
+    // of the tenant data export. Not an error from a send attempt.
     lastError: text('last_error'),
     // Spec 5H D1 — optional inspector pre-sign. NULL until inspector signs.
     inspectorSignatureBase64: text('inspector_signature_base64'),
@@ -53,11 +54,18 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     // shows a "snapshot predates this feature" notice).
     contentSnapshot: text('content_snapshot'),
     contentHash:     text('content_hash'),                // SHA-256 hex of contentSnapshot
+    // The reduction computeEnvelopeStatus applies to the signer rows to derive
+    // this envelope's status. Set by findOrCreate from the send modal's radio;
+    // the send endpoints default a SINGLE-recipient envelope to 'one' and any
+    // multi-recipient one to 'all'. mergeSignersIntoEnvelope may still change it
+    // while nothing has been signed, never after — it decides whether an already
+    // collected signature was enough.
     completionPolicy: text('completion_policy', { enum: ['all', 'one'] }).notNull().default('all'),
     tokenHash:       text('token_hash'),                  // lazy hash upgrade of legacy plaintext `token`
     // Track I-a GDPR (spec §7) — final-destruction marker. NULL while the signed
     // evidence is within its retention window; set to the sweep timestamp when the
-    // daily retention sweep destroys signature_base64 past the window. Distinct
+    // daily retention sweep destroys the signer rows' signatures past the window
+    // (the envelope holds none of its own). Distinct
     // from `status` (which stays the truthful 'signed' — the agreement WAS signed
     // and the esign_audit_logs chain still attests it); this is the idempotency
     // guard so a re-run skips already-purged rows. No PII.
@@ -93,15 +101,31 @@ export const agreementSigners = sqliteTable('agreement_signers', {
     requestId:          text('request_id').notNull(),     // → agreement_requests.id (app-layer)
     name:               text('name').notNull(),
     email:              text('email').notNull(),
+    // A LABEL on the signing party, not a permission: nothing branches on it.
+    // Every signer holds the same token-scoped rights. It is rendered as a Pill
+    // on the admin SignerList, in the public verifier roster, and under each
+    // signature cell of the signed PDF. Distinct axis from users.role (RBAC) and
+    // contact_role_profiles.kind (portal capabilities).
     role:               text('role', { enum: ['client', 'co_client', 'agent', 'other'] }).notNull().default('client'),
     contactId:          text('contact_id'),               // → contacts.id (app-layer, optional)
     tokenHash:          text('token_hash'),               // SHA-256 hex; NULL on backfilled rows until first link build
     tokenEnc:           text('token_enc'),                // 't1:iv:cipher' sealed plaintext (config-crypto sealToken)
     status:             text('status', { enum: ['pending', 'sent', 'viewed', 'signed', 'declined', 'expired'] }).notNull().default('pending'),
+    // The drawn signature image. Bare base64 OR a full `data:` URL — both are
+    // accepted, and agreements-render prefixes the bare form when composing the
+    // signed PDF. Written only by markSignedBySigner. A DSAR erase KEEPS it (it
+    // is the retained evidence); the retention sweep NULLs it past the window,
+    // which is the one column that separates those two paths.
     signatureBase64:    text('signature_base64'),
     signedAt:           integer('signed_at', { mode: 'timestamp_ms' }),
     viewedAt:           integer('viewed_at', { mode: 'timestamp_ms' }),
+    // Captured from cf-connecting-ip (x-forwarded-for as fallback) at sign time
+    // and printed in the signed-confirmation email and the audit trail. NULL
+    // means either header-less (in-person API sign) or already anonymized —
+    // ANONYMIZE_SIGNER_PII nulls both this and userAgent.
     ipAddress:          text('ip_address'),
+    // The signer's User-Agent, truncated to 200 chars at the route. Evidence
+    // only: nothing branches on it, and it is anonymized with ipAddress above.
     userAgent:          text('user_agent'),
     channel:            text('channel', { enum: ['remote', 'in_person'] }), // set at sign time
     onBehalfOf:         text('on_behalf_of'),             // client name an authorized agent signs for
@@ -129,6 +153,36 @@ export const agreementSigners = sqliteTable('agreement_signers', {
     //
     // Appended at the table end (see the expiresAt/revokedAt note above).
     languageDisclosureVersion: integer('language_disclosure_version'),
+    // ── Attribution provenance (counsel round 16B, 2026-08-15) ───────────────
+    //
+    // How this row came to say that THIS person's signature is THIS image. A
+    // record produced by a migration is not the same fact as one captured at
+    // signing, and counsel's rule is that the two must stay distinguishable —
+    // so that nobody reading `signature -> Alice` years from now mistakes an
+    // attribution we derived for an identity the signing event recorded.
+    //
+    //   signing_event                 the signer signed here; `markSignedBySigner`
+    //                                 wrote the image and the identity together.
+    //   relocated_single_signer       the signature came off the envelope, and
+    //                                 this was the envelope's ONLY signer row.
+    //   relocated_envelope_recipient  the envelope had NO signer rows; this row
+    //                                 was created for it, and the identity comes
+    //                                 from the envelope's recipient fields.
+    //
+    // NULL on rows that predate the field and on rows carrying no signature —
+    // there is no attribution to describe. NOT a `{ enum }` on purpose: a value
+    // this column has already written must stay readable after the code that
+    // wrote it is gone, and a narrowing enum would make an old basis a type
+    // error rather than a fact.
+    attributionBasis:  text('attribution_basis'),
+    // For a relocated row, WHERE the attribution came from, in durable terms
+    // (table + column names, which survive renumbering). NULL when the basis is
+    // `signing_event` — nothing was derived, so there is no source to cite.
+    attributionSource: text('attribution_source'),
+    // When the attribution was made: the signing time for a captured one, the
+    // migration's run time for a relocated one. Distinct from `signedAt`, which
+    // is when the person signed — for a relocated row those differ by years.
+    attributedAt:      integer('attributed_at', { mode: 'timestamp_ms' }),
 }, (t) => [
     index('idx_agreement_signers_tenant_request').on(t.tenantId, t.requestId),
     uniqueIndex('idx_agreement_signers_request_email').on(t.requestId, t.email),

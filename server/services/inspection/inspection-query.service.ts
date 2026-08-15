@@ -93,8 +93,23 @@ export class InspectionQueryService extends InspectionSubService {
         // is joined BEFORE inspection_people (filtered to the 'client' role)
         // so the join stays scoped to the primary client, mirroring the join
         // order already used for top-agents in api/metrics.ts.
+        // Project the NINE columns `InspectionSchema` publishes, not the row.
+        //
+        // This used to pass the whole `inspections` table object, which drizzle
+        // expands to every column — all seventy-six, including
+        // `template_snapshot` (an entire template document), `pca_narrative`,
+        // `deviations`, `location_options` and `property_facts`. The response
+        // contract declares nine fields; the handler spread the row into it, and
+        // TypeScript's structural typing does not object to extra properties, so
+        // the list shipped documents nobody asked for on every page.
         const rows = await db.select({
-            inspection: inspections,
+            id:              inspections.id,
+            propertyAddress: inspections.propertyAddress,
+            status:          inspections.status,
+            date:            inspections.date,
+            inspectorId:     inspections.inspectorId,
+            templateId:      inspections.templateId,
+            createdAt:       inspections.createdAt,
             primaryClientName: contacts.name,
             primaryClientEmail: contacts.email,
         })
@@ -122,16 +137,15 @@ export class InspectionQueryService extends InspectionSubService {
 
         let nextCursor: string | null = null;
         if (hasMore) {
-            const last = page[page.length - 1].inspection;
+            const last = page[page.length - 1];
             nextCursor = btoa(JSON.stringify({ createdAt: safeTimestamp(last.createdAt), id: last.id }));
         }
 
-        const inspectionsFormatted: Inspection[] = page.map(({ inspection: row, primaryClientName, primaryClientEmail }) => ({
-            ...row,
+        const inspectionsFormatted: Inspection[] = page.map((row) => ({
             id: row.id as string,
             propertyAddress: row.propertyAddress as string,
-            clientName: primaryClientName ?? null,
-            clientEmail: primaryClientEmail ?? null,
+            clientName: row.primaryClientName ?? null,
+            clientEmail: row.primaryClientEmail ?? null,
             status: row.status,
             date: row.date as string,
             inspectorId: row.inspectorId as string | null,

@@ -74,7 +74,7 @@ describe('GET /api/portal/:tenant/redeem — find-my-report agent destination', 
     async function seedToken(inspectionId: string, email: string, role: string) {
         await testDb.insert(schema.inspectionAccessTokens).values({
             id: crypto.randomUUID(), tenantId: TENANT, inspectionId, recipientEmail: email, role,
-            token: crypto.randomUUID(), createdAt: new Date(), expiresAt: null, revokedAt: null,
+            createdAt: new Date(), expiresAt: null, revokedAt: null,
         } as never);
     }
 

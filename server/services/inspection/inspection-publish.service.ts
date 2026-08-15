@@ -76,8 +76,9 @@ export class InspectionPublishService extends InspectionSubService {
      * page ('Sign & pay') instead of the agreement-only sign page. `reason` stays
      * 'agreement' (the first-reported gate) for consumer compatibility. The signer
      * token is reconstructed server-side via the optional `agreementService`
-     * (tier-2 link); when it is absent or yields no outstanding signer the gate
-     * falls back to the legacy single-gate agreement URL.
+     * (tier-2 link); when it is absent or yields no outstanding signer there is
+     * no signing URL to offer, and the CTA routes to the report rather than to a
+     * link that cannot resolve.
      */
     async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string, agreementService?: AgreementService): Promise<{
         reason: 'payment' | 'agreement';
@@ -135,7 +136,6 @@ export class InspectionPublishService extends InspectionSubService {
 
         // Resolve the outstanding gate. Agreement before payment (signed first).
         let reason: 'payment' | 'agreement' | null = null;
-        let agreementToken: string | null = null;
         if (insp.agreementRequired === true) {
             const signed = await db.select({ id: agreementRequests.id })
                 .from(agreementRequests)
@@ -147,16 +147,6 @@ export class InspectionPublishService extends InspectionSubService {
                 .limit(1);
             if (signed.length === 0) {
                 reason = 'agreement';
-                const pending = await db.select({ token: agreementRequests.token })
-                    .from(agreementRequests)
-                    .where(and(
-                        eq(agreementRequests.inspectionId, inspectionId),
-                        eq(agreementRequests.tenantId, tenantId),
-                    ))
-                    .orderBy(desc(agreementRequests.createdAt))
-                    .limit(1)
-                    .get();
-                agreementToken = pending?.token ?? null;
             }
         }
         // Payment-outstanding is computed independently of `reason` so the
@@ -206,17 +196,20 @@ export class InspectionPublishService extends InspectionSubService {
 
         // Reconstruct the first outstanding signer's tier-2 link token
         // server-side. Used by BOTH the combined "Sign & pay" checkout URL and
-        // the agreement-only sign URL — `agreementRequests.token` is an
-        // UNDISTRIBUTED placeholder for envelope-v2 (real tokens live per-signer),
-        // so routing the customer to it would 404. When the helper is unavailable
-        // or yields no outstanding signer, fall back to the legacy envelope token
-        // (still resolves for legacy `createSigningRequest` envelopes whose
-        // plaintext token IS distributed) — last resort, never break those.
+        // the agreement-only sign URL. Real tokens live per-signer, so this is
+        // the only source: there is no envelope-level token to fall back to.
+        //
+        // There used to be one, guarded by "still resolves for legacy envelopes
+        // whose plaintext token IS distributed". That stopped being true when
+        // envelope lookup went hash-only — those rows resolve by `token_hash`,
+        // which is NULL on exactly the envelopes the fallback was there for. It
+        // was handing the customer a link that could only 404, which is worse
+        // than offering no link: no link routes them to their report instead.
         let signerLink: string | null = null;
         if ((bothOutstanding || reason === 'agreement') && agreementService) {
             signerLink = await agreementService.getFirstOutstandingSignerLink(tenantId, inspectionId);
         }
-        const agreementLinkToken = signerLink ?? agreementToken;
+        const agreementLinkToken = signerLink;
 
         let actionUrl: string;
         let actionLabel: string;

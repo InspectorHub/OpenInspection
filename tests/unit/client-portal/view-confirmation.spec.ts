@@ -321,14 +321,19 @@ describe('OI #271 — report view confirmation', () => {
 
     it('an objection never writes revokedAt or expiresAt', async () => {
         const token = await issue();
+        // Captured BEFORE, not asserted null: a freshly issued link now carries
+        // the default report-link TTL, so the claim under test is that the
+        // objection LEAVES BOTH ALONE — suppression, not revocation.
+        const before = (await testDb.select().from(schema.inspectionAccessTokens))[0];
         await buildApp().request(`/api/public/inspections/${INSP}/view-tracking-objection?token=${token}`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ objected: true }),
         });
         const row = (await testDb.select().from(schema.inspectionAccessTokens))[0];
+        expect(row.revokedAt).toEqual(before.revokedAt);
         expect(row.revokedAt).toBeNull();
-        expect(row.expiresAt).toBeNull();
+        expect(row.expiresAt).toEqual(before.expiresAt);
         expect(row.viewTrackingObjectedAt).not.toBeNull();
     });
 

@@ -35,6 +35,10 @@ export const orderPayments = sqliteTable('order_payments', {
     // SUM over a signed column is a wrong total nobody notices.
     kind: text('kind', { enum: ['deposit', 'balance', 'adjustment', 'refund'] }).notNull(),
     amountCents: integer('amount_cents').notNull(),          // always positive
+    // How the money arrived, recorded for the person reading the ledger: the
+    // offline route takes it from the operator's form, a refund row is always
+    // 'card', the invoice backfill copies `invoices.payment_method`. Nothing
+    // branches on it — `provider` is what says a processor was involved.
     method: text('method', { enum: ['card', 'check', 'cash', 'offline', 'other'] }).notNull(),
     provider: text('provider', { enum: ['stripe', 'qbo'] }), // null = offline
     // Idempotency key. Stripe redelivers webhooks; the unique index below is the
@@ -42,6 +46,9 @@ export const orderPayments = sqliteTable('order_payments', {
     providerRef: text('provider_ref'),
     recordedBy: text('recorded_by'),                         // user id, null when automated
     refundsId: text('refunds_id'),                           // kind='refund' -> the row it reverses
+    // Operator memo on an offline entry; on a `refund` row it carries the REASON
+    // (`refund.ts` passes `input.reason` here). Rendered verbatim under the
+    // amount in the payments ledger, so it is read by the customer's inspector.
     note: text('note'),
     // When the money MOVED, not when the row was written — an inspector records
     // Tuesday's cash on Thursday, and reporting periods key on the former.

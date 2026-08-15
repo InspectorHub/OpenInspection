@@ -16,10 +16,29 @@ import {
 const JAN_31 = Date.UTC(2026, 0, 31, 12, 0, 0);
 
 describe('resolveReportLinkTtl', () => {
-    it('defaults to never when the prefs blob has no policy', () => {
-        expect(resolveReportLinkTtl(null)).toBe('never');
-        expect(resolveReportLinkTtl(undefined)).toBe('never');
-        expect(resolveReportLinkTtl({})).toBe('never');
+    // Was `never` until 2026-08-14 — an open-ended link to a homebuyer's report
+    // at a company that never chose one. Continuity for migrated companies did
+    // not describe companies created afterwards. Two years is the one preset
+    // with published vendor precedent.
+    it('defaults to two years when the prefs blob has no policy', () => {
+        expect(resolveReportLinkTtl(null)).toEqual({ count: 2, unit: 'years' });
+        expect(resolveReportLinkTtl(undefined)).toEqual({ count: 2, unit: 'years' });
+        expect(resolveReportLinkTtl({})).toEqual({ count: 2, unit: 'years' });
+    });
+
+    // The two absences answer differently ON PURPOSE. Nothing stored means the
+    // company has not chosen, so the default applies. Stored-but-unreadable
+    // means acting on it could shorten links already in customers' inboxes, so
+    // it stays `never` — that argument is about not acting on a value we cannot
+    // read, which survives the default changing.
+    it('reads a malformed policy as never, not as the default', () => {
+        expect(resolveReportLinkTtl({ reportLinkTtl: 'garbage' })).toBe('never');
+        expect(resolveReportLinkTtl({ reportLinkTtl: { count: 0, unit: 'days' } })).toBe('never');
+        expect(resolveReportLinkTtl({ reportLinkTtl: { count: 5, unit: 'fortnights' } })).toBe('never');
+    });
+
+    it('honours an explicit never as a choice', () => {
+        expect(resolveReportLinkTtl({ reportLinkTtl: 'never' })).toBe('never');
     });
 
     it('returns a stored duration policy', () => {

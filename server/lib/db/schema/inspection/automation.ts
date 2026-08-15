@@ -8,6 +8,11 @@ export const automations = sqliteTable('automations', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     name: text('name').notNull(),
+    // THE EVENT THAT ENQUEUES THIS RULE. `AutomationService.trigger()` matches the
+    // tenant's active rules whose trigger equals the fired `ctx.triggerEvent` and
+    // writes one pending `automation_logs` row per (recipient, channel); the same
+    // value is stamped onto the notice header's `notifications.type`. Each event's
+    // owning service fires it — except `inspection.reminder`, enqueued by cron.
     trigger: text('trigger', {
         enum: [
             'inspection.created', 'inspection.confirmed', 'inspection.cancelled',
@@ -226,6 +231,11 @@ export const inspectionTypes = sqliteTable('inspection_types', {
     id:          text('id').primaryKey(),
     tenantId:    text('tenant_id').notNull(),
     name:        text('name').notNull(),
+    // Platform commercial-subtype slug this tenant subtype derives from, chosen
+    // from a dropdown in Settings → Inspection Types; NULL when left blank.
+    // Display only today — the settings list resolves it to the platform
+    // subtype's name, and the inheritance that would read it (`sectionApplies`)
+    // is frozen dead code with no production caller.
     basedOn:     text('based_on'),
     description: text('description'),
     enabled:     integer('is_enabled', { mode: 'boolean' }).notNull().default(true),

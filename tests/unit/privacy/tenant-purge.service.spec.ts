@@ -306,7 +306,7 @@ describe('TenantPurgeService.purge', () => {
         } as never);
         await testDb.insert(schema.inspectionAccessTokens).values({
             id: 'tok-1', tenantId: TENANT, inspectionId: 'i-1', recipientEmail: 'jane@test.com',
-            role: 'client', token: crypto.randomUUID(), createdAt: new Date(),
+            role: 'client', createdAt: new Date(),
         } as never);
 
         const svc = new TenantPurgeService({} as D1Database, makeR2([]).bucket, makeKv().ns);

@@ -52,9 +52,10 @@ describe('TeamService.createInvite — canonical roles', () => {
         const row = await testDb.select().from(schema.tenantInvites)
             .where(eq(schema.tenantInvites.id, out.token)).get();
         expect(row?.role).toBe('inspector');
-        // Extension columns default to empty/null — no longer written.
-        expect(row?.mentorId).toBeNull();
-        expect(JSON.parse(row?.assignedSectionIds ?? '[]')).toEqual([]);
+        // The `mentor_id` / `assigned_section_ids` extension columns were
+        // asserted null here for as long as they existed. They were dropped —
+        // nothing wrote them and accept never replayed them — so there is
+        // nothing left to assert about.
     });
 
     // 'manager' is the administrator-tier role that is not the account owner
@@ -68,8 +69,6 @@ describe('TeamService.createInvite — canonical roles', () => {
         const row = await testDb.select().from(schema.tenantInvites)
             .where(eq(schema.tenantInvites.id, out.token)).get();
         expect(row?.role).toBe('manager');
-        expect(row?.mentorId).toBeNull();
-        expect(JSON.parse(row?.assignedSectionIds ?? '[]')).toEqual([]);
     });
 
     it('stores only the overrides that differ from the role template', async () => {

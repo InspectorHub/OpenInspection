@@ -145,9 +145,10 @@ export const aiContentReviews = sqliteTable('ai_content_reviews', {
     aiCallId: text('ai_call_id').notNull(),
 }, (t) => ({
     /** "Has this artifact been reviewed?" — the question a publication path
-     *  asks, and the only one that has to be fast. */
-    byArtifact: index('idx_ai_content_reviews_tenant_artifact')
-        .on(t.tenantId, t.artifactType, t.artifactId),
+     *  asks, and the only one that has to be fast. It is answered by the unique
+     *  index below, whose first three columns are exactly these; the separate
+     *  narrower index that used to sit here could serve no query that one
+     *  cannot, and cost a second b-tree write on every insert. */
     /** The reverse walk: every review citing one AI call. */
     byAiCall: index('idx_ai_content_reviews_ai_call').on(t.aiCallId),
     /**

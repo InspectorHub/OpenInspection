@@ -75,7 +75,7 @@ describe('listReportLinkStatus', () => {
     async function token(id: string, email: string, role = 'client', objectedAt: Date | null = null) {
         await db.insert(schema.inspectionAccessTokens).values({
             id, tenantId: TENANT, inspectionId: INSP, recipientEmail: email, role,
-            token: `tok-${id}`, createdAt: new Date(NOW - 10 * HOUR),
+            createdAt: new Date(NOW - 10 * HOUR),
             viewTrackingObjectedAt: objectedAt,
         });
     }

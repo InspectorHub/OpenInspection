@@ -46,7 +46,7 @@ import { CompliancePanel } from "~/components/inspection-edit/CompliancePanel";
 import { CommercialReportControls, type ReportTier } from "~/components/editor/CommercialReportControls";
 import type { PcaNarrativeData } from "~/components/portal/sections/report/types";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
-import { CoverCropper } from "~/components/media-studio/CoverCropper";
+import { CoverCropper, coverCropFor } from "~/components/media-studio/CoverCropper";
 import { PhotoCropper } from "~/components/media-studio/PhotoCropper";
 import { MediaViewer } from "~/components/media-studio/MediaViewer";
 import { PosterPicker } from "~/components/media-studio/PosterPicker";
@@ -756,6 +756,8 @@ export default function InspectionEditPage() {
   setRecropWarn,
   galleryCropSource,
   setGalleryCropSource,
+  sessionCoverCrop,
+  setSessionCoverCrop,
   posterTarget,
   setPosterTarget,
   coverKey,
@@ -2118,12 +2120,19 @@ export default function InspectionEditPage() {
  <CoverCropper
   sourceUrl={fullResUrl(galleryCropSource.url)}
   sourceKey={galleryCropSource.key}
+  initialCrop={
+   sessionCoverCrop?.key === galleryCropSource.key
+    ? sessionCoverCrop.crop
+    : coverCropFor(state.inspection as Record<string, unknown>, galleryCropSource.key)
+  }
   onCancel={() => setGalleryCropSource(null)}
   onSave={(blob, c) => {
+   const crop = { aspect: c.aspect, orientation: c.orientation, ...c.pixels };
+   setSessionCoverCrop({ key: galleryCropSource.key, crop });
    const fd = new FormData();
    fd.append("intent", "crop-cover");
    fd.append("sourceKey", galleryCropSource.key);
-   fd.append("crop", JSON.stringify({ aspect: c.aspect, orientation: c.orientation, ...c.pixels }));
+   fd.append("crop", JSON.stringify(crop));
    fd.append("image", new File([blob], "cover.jpg", { type: "image/jpeg" }));
    coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
    setGalleryCropSource(null);

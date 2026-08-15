@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /**
  * Which ZIPs an inspector will travel to.
@@ -20,11 +20,13 @@ export const inspectorServiceAreas = sqliteTable('inspector_service_areas', {
     id:        text('id').primaryKey(),
     tenantId:  text('tenant_id').notNull(),
     userId:    text('user_id').notNull(),
+    // Uppercased and shape-checked at the API: 3-10 chars, `[A-Z0-9]+` rather
+    // than digits-only, so ZIP+4 and a Canadian FSA both fit. Rows are written
+    // as a whole-list REPLACEMENT (delete the inspector's rows, then chunked
+    // insert), never patched one prefix at a time.
     zipPrefix: text('zip_prefix').notNull(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
-    index('idx_inspector_service_areas_tenant').on(t.tenantId),
-    index('idx_inspector_service_areas_user').on(t.tenantId, t.userId),
     // One row per (tenant, inspector, prefix). Saving the same list twice must
     // not double it; the replace-list write deletes then inserts, and this
     // index is what makes a partially-applied replace impossible to paper over.

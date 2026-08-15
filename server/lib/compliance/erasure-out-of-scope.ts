@@ -81,6 +81,14 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'audit_logs',          column: 'ip_address',                reason: 'staff-action security audit trail' },
     { table: 'report_signoff',      column: 'signature_ref',             reason: 'inspector (staff) signoff reference' },
     { table: 'agreement_requests',  column: 'inspector_signature_base64', reason: 'inspector (staff) countersignature' },
+    // Provenance ABOUT the signature evidence, not evidence itself: which rule
+    // attributed a signature to a person, what that rule read, and when it ran.
+    // Declared rather than left to the heuristic because they sit on the table
+    // holding Art. 17(3)(e) retained evidence, where a future reader is entitled
+    // to see that every column was ruled on (counsel round 16B, 2026-08-15).
+    { table: 'agreement_signers',   column: 'attribution_basis',         reason: 'provenance metadata — names a rule, carries no personal data' },
+    { table: 'agreement_signers',   column: 'attribution_source',        reason: 'provenance metadata — names source COLUMNS, never their values' },
+    { table: 'agreement_signers',   column: 'attributed_at',             reason: 'provenance metadata — when the attribution was made, not a subject event' },
     // The staff identity columns the heuristic never asked about. Each one sits
     // beside a column that WAS declared, which is the tell: `users.email` and
     // `users.phone` were ruled on while `users.name` was not, and

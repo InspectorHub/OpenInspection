@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /**
  * One recipient's answer to "send me this or don't", per notification class
@@ -36,6 +36,13 @@ export const notificationPreferences = sqliteTable('notification_preferences', {
     subjectId:   text('subject_id').notNull(),
     /** A `NOTIFICATION_CLASSES` id. Not a template trigger — those are a subset. */
     classId:     text('class_id').notNull(),
+    /**
+     * Which delivery channel this answer covers. The screen offers all three and
+     * `assertChoosable` deliberately has NO channel check, so a row may exist for
+     * a channel nothing sends yet. The send boundary consults `email`
+     * (`buildNotificationPreferences`) and `in_app` (notice headers); an `sms`
+     * row is stored and inert until an SMS path asks the same question.
+     */
     channel:     text('channel', { enum: ['email', 'sms', 'in_app'] }).notNull(),
     // DB column is `is_enabled` per the naming rule; the drizzle property stays
     // `enabled` so every call site and the API field keep reading as the plain
@@ -49,7 +56,6 @@ export const notificationPreferences = sqliteTable('notification_preferences', {
     uniqueIndex('idx_notification_prefs_unique')
         .on(t.tenantId, t.subjectKind, t.subjectId, t.classId, t.channel),
     // The send-boundary read: "what has this subject muted?"
-    index('idx_notification_prefs_subject').on(t.tenantId, t.subjectKind, t.subjectId),
 ]);
 
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;

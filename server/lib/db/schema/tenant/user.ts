@@ -39,11 +39,22 @@ export const users = sqliteTable('users', {
     // table rebuild and users is FK-referenced). Every insert path MUST pass an
     // explicit role — audited 2026-06-05; enforced by review, not DDL.
     role: text('role', { enum: ROLES }).notNull().default('manager'),
+    // Sparse map of one-time UI flags — an ABSENT key means "not done yet", so
+    // a NULL column is simply a fresh account and nothing has to backfill it.
+    // Written only by the three /auth profile endpoints (skip-setup → `skipped`,
+    // checklist/dismiss and onboarding/flag → `checklistDismissed` /
+    // `spectoraMappingSeen`, allowlisted); shipped on /auth/me and read by the
+    // inspections and templates loaders to hide their prompts.
     onboardingState: text('onboarding_state', { mode: 'json' }).$type<Record<string, boolean>>(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     // Spec 4A — TOTP 2FA. All fields are per-user opt-in; nullable until enabled.
     totpSecret:        text('totp_secret'),
     totpEnabled:       integer('is_totp_enabled', { mode: 'boolean' }).notNull().default(false),
+    // JSON array of HASHED recovery codes — never the codes themselves, which
+    // are shown once at enrollment and never recoverable. Single-use: the 2FA
+    // login path rewrites the array WITHOUT the matched hash before it issues
+    // the session cookie, so a failed write grants no session. Only its length
+    // leaves the server, as `recoveryCodesRemaining` on /auth/me.
     totpRecoveryCodes: text('totp_recovery_codes'),
     totpVerifiedAt:    integer('totp_verified_at', { mode: 'timestamp_ms' }),
     // Agent Accounts A2 — per-user notification preferences. Default ON for
@@ -56,21 +67,10 @@ export const users = sqliteTable('users', {
     // per worker isolate). Powers TeamStrip "last active Nm ago" pill and the
     // soft-presence fallback when WebSocket cannot connect.
     lastActiveAt:     integer('last_active_at', { mode: 'timestamp_ms' }),
-    // Design System 0520 subsystem C phase 1 — role-extension columns.
-    //   mentorId            = DEAD (2026-06-13, apprentice subsystem removed).
-    //                          Formerly the apprentice's mentor FK → users.id —
-    //                          no reads/writes.
-    //   assignedSectionIds  = DEAD (2026-06-13). Formerly: JSON array of
-    //                          section ids restricting a specialist's edit
-    //                          scope. Specialist scoping deferred — no reads/writes.
-    //   expiresAt           = DEAD (2026-06-13, guest removal). Formerly the
-    //                          guest-invite expiry epoch — no reads/writes.
-    // DEAD (2026-06-13, apprentice subsystem removed) — no reads/writes
-    mentorId:             text('mentor_id'),
-    // DEAD (2026-06-13, guest removal / specialist deferred) — no reads/writes
-    assignedSectionIds:   text('assigned_section_ids').notNull().default('[]'),
-    // DEAD (2026-06-13, guest removal / specialist deferred) — no reads/writes
-    expiresAt:            integer('expires_at'), // ts-lint-ok: DEAD frozen column (guest removal), no reads/writes
+    // `mentor_id`, `assigned_section_ids` and `expires_at` were here — the
+    // role-extension columns of the apprentice / specialist / guest subsystems,
+    // all three removed 2026-06-13. They were marked DEAD and kept, and stayed
+    // dead: a grep of every production path found no reader and no writer.
     // Account soft-delete marker — set by POST /api/account/delete after
     // the user retypes their email to confirm. NULL = active. Kept rather
     // than hard-deleted so audit-linked rows remain referentially intact.
@@ -99,6 +99,10 @@ export const users = sqliteTable('users', {
     // workspace chrome only; inspection/report/appointment rendering always
     // anchors to the tenant so all three parties read the same date aloud.
     dateFormat: text('date_format', { enum: ['us', 'iso', 'eu'] }),
+    // Same override contract as `date_format` above, cleared by submitting an
+    // empty value. `/api/session-context` ships the RAW stored value (null and
+    // all) beside the tenant's; the client hook, not the server, resolves which
+    // of the two wins — so nothing here is baked into a rendered document.
     timeFormat: text('time_format', { enum: ['12h', '24h'] }),
     // Where this inspector STARTS their day, for `closest` routing. NULL on
     // all three columns = inherit the company address coordinates
@@ -115,13 +119,17 @@ export const users = sqliteTable('users', {
     // Appended at END — users is FK-referenced, so a mid-table insert would
     // make drizzle rebuild the whole table.
     serviceOriginAddress: text('service_origin_address'),
+    // Geocoded from the address by PUT /api/admin/booking-routing/service-origin
+    // — and NULL while the address itself is set, whenever that address did not
+    // geocode. That pair is deliberate: the typed address is still stored so the
+    // admin can see and fix it, while `closest` treats the inspector as having
+    // no origin of their own and falls back to the company coordinates.
     serviceOriginLat:     real('service_origin_lat'),
-    serviceOriginLng:     real('service_origin_lng'),
+    serviceOriginLng:     real('service_origin_lng'),   // written only as a pair with _lat; a lone value is no anchor
 }, (t) => [
     index('idx_users_deleted_at').on(t.deletedAt),
     // DB-2: soft-deleted rows must not block re-inviting the same email.
     uniqueIndex('uq_users_tenant_email').on(t.tenantId, t.email).where(sql`deleted_at IS NULL`),
-    index('idx_users_tenant').on(t.tenantId),
     uniqueIndex('idx_users_slug_per_tenant').on(t.tenantId, t.slug),
     index('idx_users_email').on(t.email),
 ]);
@@ -130,16 +138,19 @@ export const tenantInvites = sqliteTable('tenant_invites', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     email: text('email').notNull(),
+    // The role the invitee GETS: `joinTeam` copies it straight onto users.role,
+    // for a brand-new row and for a reactivated soft-deleted one alike, and
+    // emits it on the `user.invited` outbox event that drives portal seat sync.
+    // It is the invite, not the accept form, that decides — nothing downstream
+    // re-derives it. Kept identical to `users.role` by the role-enum-drift spec.
     role: text('role', { enum: ROLES }).notNull().default('inspector'),
     // Schema Rules: state-machine column declares its enum (type-layer only).
     status: text('status', { enum: ['pending', 'accepted'] }).notNull().default('pending'),
     expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
-    // Design System 0520 subsystem C P5 — carry role-extension fields from the
-    // InviteSeatDrawer into the eventual users row at accept time.
-    // DEAD (2026-06-13, apprentice subsystem removed) — written on invite but
-    // never replayed onto the users row; no behavior depends on it.
-    mentorId:           text('mentor_id'),
-    assignedSectionIds: text('assigned_section_ids').notNull().default('[]'),
+    // `mentor_id` and `assigned_section_ids` were here, mirroring the columns of
+    // the same name on `users` so an invite could carry them through accept.
+    // They were dropped with those columns: nothing wrote them and accept never
+    // replayed them.
     // Role permission-template overrides (2026-06-13). Mirrors
     // users.permission_overrides — carries the inviter's chosen toggle diffs
     // through accept onto the new users row. Null = pure role template.

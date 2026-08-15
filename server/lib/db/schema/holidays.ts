@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /**
  * Tenant-defined company closed days merged into the holiday catalog when
@@ -13,6 +13,8 @@ export const tenantCustomHolidays = sqliteTable('tenant_custom_holidays', {
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
+    // One row per (tenant, date). The unique index is also the read index —
+    // there used to be a second, non-unique index on exactly these two columns,
+    // which could only ever duplicate this one's work and the writes to it.
     uniqueIndex('uq_tenant_custom_holidays_tenant_date').on(t.tenantId, t.date),
-    index('idx_tenant_custom_holidays_tenant_date').on(t.tenantId, t.date),
 ]);

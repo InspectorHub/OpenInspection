@@ -56,8 +56,28 @@ export function itemDrivesSummary(item: {
 /* Signature + verification pure helpers (exported for tests) */
 /* ------------------------------------------------------------------ */
 
+/**
+ * What the report may say about who stands behind it.
+ *
+ * `variant` mirrors a DOMAIN state the service decided — it is not inferred
+ * here. There used to be a `"typed"` variant that drew the inspector's NAME in
+ * a display font on a ruled line, captioned "Electronically signed by", and it
+ * was reached whenever a published report had no signature record at all. The
+ * report claimed a signing event that had not happened, on 7 of 7 published
+ * reports in production.
+ *
+ *   attribution  nobody signed. Name the author, with NO signing verb.
+ *   image        the inspector signed; render their signature.
+ *   auto         the inspector's signature, applied under the standing
+ *                authorisation they enabled — same signature, different
+ *                provenance, and the document has to say which.
+ *   draft        not published.
+ *
+ * Counsel ruling 18a (2026-08-15): "Never synthesize a signature from a
+ * person's name." That is the invariant this type exists to hold.
+ */
 export interface SignatureBlockResult {
-  variant: "image" | "typed" | "draft";
+  variant: "image" | "auto" | "attribution" | "draft";
   inspectorName?: string;
   license?: string | null;
   signedAt?: number | null;
@@ -68,6 +88,8 @@ export interface SignatureBlockResult {
 export function signatureBlockModel(d: {
   isPublished: boolean;
   signature: {
+    /** Domain state from the service. Never inferred from the other fields. */
+    method: "none" | "manual" | "authorized_auto";
     signatureBase64: string | null;
     signedAt?: number | null;
     inspectorName: string;
@@ -81,10 +103,18 @@ export function signatureBlockModel(d: {
     license: d.signature.inspectorLicense ?? null,
     signedAt: d.signature.signedAt ?? null,
   };
-  if (d.signature.signatureBase64) {
-    return { variant: "image", signatureBase64: d.signature.signatureBase64, showNudge: false, ...base };
+  // Read the state; do not re-derive it. `method` is the service's answer, and
+  // the presence of an image is a consequence of it rather than evidence for it.
+  switch (d.signature.method) {
+    case "manual":
+      return { variant: "image", signatureBase64: d.signature.signatureBase64 ?? null, showNudge: false, ...base };
+    case "authorized_auto":
+      return { variant: "auto", signatureBase64: d.signature.signatureBase64 ?? null, showNudge: false, ...base };
+    default:
+      // No signature. The nudge still shows the owner how to add one; what the
+      // READER sees is authorship, with nothing that reads as a signing act.
+      return { variant: "attribution", showNudge: d.ownerPreview, ...base, signedAt: null };
   }
-  return { variant: "typed", showNudge: d.ownerPreview, ...base };
 }
 
 export interface VerificationBlockResult {

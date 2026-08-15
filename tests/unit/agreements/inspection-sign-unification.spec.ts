@@ -175,7 +175,7 @@ describe('in-app on-site signing rides the envelope (Track I-a Task 5)', () => {
         await db.insert(schema.agreementRequests).values({
             id: legacyReqId, tenantId: TENANT_ID, inspectionId: INSP_ID, agreementId: AGR_ID,
             clientEmail: 'jane@test.com', clientName: 'Jane',
-            token: legacyPlainToken,
+            
             status: 'sent', completionPolicy: 'all', createdAt: new Date(),
         });
         const before = await db.select().from(schema.agreementSigners)

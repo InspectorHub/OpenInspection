@@ -13,11 +13,24 @@ interface InspectionPrefsLike {
 }
 
 /**
- * Unset means `readwrite`: agents could always use the repair builder, so a
- * company that never touched the setting keeps what it had.
+ * Unset means `read`.
+ *
+ * It meant `readwrite` until 2026-08-14, on the reasoning that agents could
+ * always use the repair builder so a company that never touched the setting
+ * kept what it had. That argument covers companies which predate the setting
+ * and nobody else: a company created afterwards never had anything to keep,
+ * so the value was our choice made on their behalf — and the choice let an
+ * external third party WRITE to a homebuyer's defect list at a company that
+ * had never been asked.
+ *
+ * The default is now the narrower one for every company, old and new alike,
+ * rather than a date-scoped split. Deliberate: two defaults for one setting
+ * means the answer to "what can an agent do here" depends on when the company
+ * signed up, which nobody can hold in their head. Agents keep read access;
+ * a company that wants them writing turns it on and knows it did.
  */
 export function resolveAgentRepairAccess(prefs: InspectionPrefsLike | null | undefined): AgentRepairAccess {
-    return prefs?.agentRepairAccess ?? 'readwrite';
+    return prefs?.agentRepairAccess ?? 'read';
 }
 
 /** Whether the agent may open the list at all. */

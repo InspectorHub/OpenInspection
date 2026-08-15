@@ -1,0 +1,26 @@
+-- Drop `commercial_subtypes`: a table with no reader and no writer.
+--
+-- It looked alive to a name search, and that is the only reason it survived an
+-- earlier audit. Every hit for `commercialSubtypes` in the codebase is the
+-- TEMPLATE-SCHEMA field `applicableTo.commercialSubtypes` (a string array on a
+-- section, see `server/types/template-schema.ts`) — same name, different thing.
+-- Nothing imports the drizzle table object; nothing selects, inserts or joins
+-- the table.
+--
+-- What actually holds tenant-defined subtypes is `inspection_types`
+-- (`schema/inspection/automation.ts`), which has a route, a settings page and a
+-- registration path. Comparing this table against that sibling is what settled
+-- it: one has three consumers, this one has none.
+--
+-- Production (`openinspection-db-saas`) holds 0 rows, so nothing is destroyed
+-- there. A self-hosted deployment could in principle hold rows — but nothing in
+-- any version of the engine could read them back, so they were never visible to
+-- anyone and losing them costs no behavior.
+--
+-- NOTE FOR THE PRE-COMMIT GREP: the rebuild-signature check
+-- (`PRAGMA|__new_|DROP TABLE|RENAME TO`) matches the `DROP TABLE` below ON
+-- PURPOSE. This is a real table drop, not drizzle's twelve-step table rebuild —
+-- there is no PRAGMA, no `__new_` copy and no RENAME, and D1 executes it
+-- natively. The signature exists to catch a generated rebuild; this is the
+-- statement it is named after.
+DROP TABLE `commercial_subtypes`;

@@ -247,7 +247,13 @@ export function CommandPalette({
       sources = []; // contacts would need a search endpoint
     } else {
       const recents: PaletteItem[] = (recentsFetcher.data?.inspections ?? []).slice(0, RECENTS_CAP).map((insp, i) => {
-        const addr = [insp.address1, insp.city, insp.state].filter(Boolean).join(", ") || m.command_palette_recent_fallback({ id: String(insp.id || "").slice(0, 6) });
+        // `propertyAddress` — the field the list endpoint actually publishes.
+        // This read used to be `[insp.address1, insp.city, insp.state]`, none of
+        // which the payload has ever carried (the columns are `address_street` /
+        // `address_city` / `address_state`, and none of them is in the response
+        // contract). Every entry therefore fell through to the id fallback, so
+        // "Recent" has been listing six hex characters instead of addresses.
+        const addr = (insp.propertyAddress as string | null) || m.command_palette_recent_fallback({ id: String(insp.id || "").slice(0, 6) });
         return {
           id: `ri-${i}`,
           label: addr as string,

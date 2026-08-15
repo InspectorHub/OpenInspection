@@ -5,6 +5,11 @@ export const comments = sqliteTable('comments', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     text: text('text').notNull(),
+    // The repair-item vocabulary (safety / maintenance / recommendation, plus
+    // tenant-custom values), read and filtered on by RecommendationService and
+    // ranked on by the agent repair-items view. Written only by the comment
+    // CRUD; a marketplace pack deliberately writes `section` and leaves this
+    // NULL, because a pack's word is a section label and not this vocabulary.
     category: text('category'),
     // Section label (Roof, Electrical, ...) — same shape as canned-comments.js
     // entries. Free-text so tenants can grow their own taxonomy.
@@ -14,9 +19,27 @@ export const comments = sqliteTable('comments', {
     // tenant-authored comments. Used by replace-mode update to delete only
     // prior-import rows, never touching the tenant's own comments.
     libraryId: text('library_id'),
+    // The Library drawer's matching aids. All four are READ by the drawer's
+    // list query and NONE is written by any path in this repo — create, update
+    // and marketplace import all leave them NULL — so on any database this
+    // repo populates, every filter below narrows nothing. They are live only
+    // for rows loaded from outside the application.
+    //
+    // JSON array of template section ids the snippet is offered for. Narrowed
+    // by the drawer's `sectionId` filter through a LIKE on the QUOTED id, so a
+    // section id that is a prefix of another cannot cross-match.
     sectionIds: text('section_ids'),
+    // Plural and inert: SELECTed into the list response, but nothing filters,
+    // sorts or renders it. The singular `itemLabel` below is the one the
+    // drawer actually filters on.
     itemLabels: text('item_labels'),
+    // Short code (e.g. 'NI') matched EXACTLY. Like `sectionId`, it is a
+    // user-typed filter and applies in both filter modes — unlike `section`
+    // and `itemLabel`, which are context-derived and apply only in auto mode.
     triggerCode: text('trigger_code'),
+    // Curated synonyms, OR'd with `text` in the drawer's search LIKE so a
+    // snippet is findable by words it does not contain. The search is pushed
+    // down to SQL, so this also moves the pagination total.
     searchKeywords: text('search_keywords'),
     // Comments Library Upgrade — canonical single item label for the sort
     // + filter UI in the inspection-edit Library drawer. Distinct from the
