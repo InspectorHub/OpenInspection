@@ -146,8 +146,13 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                 qboCustomerId = contactMap?.qboId ?? null;
             }
 
-            const today = new Date().toISOString().slice(0, 10);
-            const dueDate = invoice.dueDate ? invoice.dueDate.slice(0, 10) : today;
+            // The tenant's civil date, not UTC. An invoice pushed at 6pm Pacific
+            // on the last day of a month is still that month locally and the
+            // next one in UTC — a real one-period error on somebody's books.
+            // `txnDateFor` is the single date path every outbound transaction
+            // shares precisely so this site cannot grow a private fourth one.
+            const txnDate = await this.txnDateFor(tenantId, new Date());
+            const dueDate = invoice.dueDate ? invoice.dueDate.slice(0, 10) : txnDate;
 
             const lines = invoice.lineItems.map(item => {
                 const qty = item.quantity ?? 1;
@@ -164,7 +169,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
 
             const payload: Record<string, unknown> = {
                 DocNumber:   this.buildDocNumber(invoice.invoiceNumber ?? invoice.id),
-                TxnDate:     today,
+                TxnDate:     txnDate,
                 DueDate:     dueDate,
                 Line:        lines,
                 EmailStatus: invoice.status === 'sent' ? 'EmailSent' : 'NotSet',
@@ -178,17 +183,14 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
             try {
                 if (existing) {
                     let syncToken = existing.qboSyncToken;
+                    let updated: { Invoice: { Id: string; SyncToken: string } } | null = null;
                     for (let attempt = 0; attempt < 3; attempt++) {
                         try {
-                            const updated = await this.apiCall<{ Invoice: { Id: string; SyncToken: string } }>(
+                            updated = await this.apiCall<{ Invoice: { Id: string; SyncToken: string } }>(
                                 tenantId, 'PUT', 'invoice',
                                 { ...payload, Id: existing.qboId, SyncToken: syncToken },
                             );
-                            await db.update(qboEntityMap).set({
-                                qboSyncToken: updated.Invoice.SyncToken,
-                                syncedAt:     new Date(),
-                            }).where(eq(qboEntityMap.id, existing.id));
-                            return;
+                            break;
                         } catch (err: unknown) {
                             // 400 typically indicates a stale SyncToken — refetch and retry
                             const qboErr = err as { status?: number };
@@ -202,6 +204,19 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                             throw err;
                         }
                     }
+                    // Falling out of the loop with nothing pushed is a FAILURE.
+                    // It used to drop through to the 'synced' write below, so an
+                    // invoice QuickBooks never received read as healthy: no error
+                    // row, and the map still holding the token that was refused.
+                    if (!updated) throw new Error('QBO invoice update failed after 3 stale-token retries');
+
+                    await db.update(qboEntityMap).set({
+                        qboSyncToken: updated.Invoice.SyncToken,
+                        syncedAt:     new Date(),
+                    }).where(eq(qboEntityMap.id, existing.id));
+                    // No `return` here: the success path continues to the shared
+                    // status write below. Returning from inside the branch is
+                    // what left a once-failed invoice reading 'failed' forever.
                 } else {
                     const created = await this.apiCall<{ Invoice: { Id: string; SyncToken: string } }>(
                         tenantId, 'POST', 'invoice', payload,

@@ -52,16 +52,23 @@ let markPaid: ReturnType<typeof vi.fn>;
 let markPartial: ReturnType<typeof vi.fn>;
 /** Every `query=` value Intuit was asked for, in order. */
 let queries: string[];
+/** Every delay the sweep asked to wait, in order. See `runTimersInline`. */
+let sleeps: number[];
 
 /**
- * The sweep paces itself with `setTimeout(…, 100)` per invoice, and `apiCall`
- * backs off between retries the same way. A full page is 1000 invoices, so a
- * faithful pagination test would otherwise idle for 100 real seconds. Firing
- * every timer immediately keeps the ORDER of the awaits — which is what the
- * sweep's logic depends on — while removing only the wall clock.
+ * The sweep paces itself between page queries, and `apiCall` backs off between
+ * retries the same way. A full page is 1000 invoices, so a faithful pagination
+ * test would otherwise idle for real seconds. Firing every timer immediately
+ * keeps the ORDER of the awaits — which is what the sweep's logic depends on —
+ * while removing only the wall clock. The requested delays are recorded so a
+ * test can assert WHERE the throttle sits, which is the whole point of it.
  */
 function runTimersInline() {
-    vi.stubGlobal('setTimeout', ((fn: () => void) => { fn(); return 0; }) as unknown as typeof setTimeout);
+    vi.stubGlobal('setTimeout', ((fn: () => void, ms?: number) => {
+        sleeps.push(ms ?? 0);
+        fn();
+        return 0;
+    }) as unknown as typeof setTimeout);
 }
 
 /**
@@ -78,6 +85,20 @@ function stubPages(pages: InvoiceSummary[][]) {
             JSON.stringify({ QueryResponse: page.length ? { Invoice: page } : {} }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
         );
+    }));
+}
+
+/**
+ * A 200 whose body is not the shape we document. Intuit can change a payload
+ * without changing a status code, and the sweep runs inside `waitUntil`, where
+ * a rejection is unhandled rather than reported.
+ */
+function stubMalformedOk() {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+        queries.push(new URL(String(input)).searchParams.get('query') ?? '');
+        return new Response('{}', {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+        });
     }));
 }
 
@@ -106,6 +127,7 @@ beforeEach(async () => {
     await setupSchema(fixture.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     queries = [];
+    sleeps = [];
     runTimersInline();
 
     qbo = new QBOService({} as D1Database, 'cid', 'csec', 'whsec', 'a'.repeat(32), 'sandbox');
@@ -280,11 +302,10 @@ describe('when the cursor is allowed to move', () => {
         expect(connection()!.lastSyncAt!.getTime()).toBe(LAST_SYNC_AT.getTime());
     });
 
-    it('ADVANCES the cursor even though the query itself failed — pinned, not endorsed', async () => {
-        // A failed query is swallowed (`break`) and the cursor is written anyway,
-        // so an Intuit outage moves the window past changes nobody ever read and
-        // they are never offered again. This is pinned as CURRENT behaviour;
-        // see the report accompanying this spec.
+    it('leaves the cursor alone when a page query fails', async () => {
+        // The unread window must stay open. Advancing lastSyncAt past invoices we
+        // never read closes it forever — those invoices are only re-offered while
+        // they still fall inside the window.
         await db.update(schema.qboConnections).set({ lastSyncAt: LAST_SYNC_AT })
             .where(eq(schema.qboConnections.tenantId, TENANT));
         stubServerError();
@@ -293,6 +314,62 @@ describe('when the cursor is allowed to move', () => {
 
         expect(result).toEqual({ processed: 0 });
         expect(queries).toHaveLength(3); // apiCall retried, then gave up.
-        expect(connection()!.lastSyncAt!.getTime()).toBeGreaterThan(LAST_SYNC_AT.getTime());
+        expect(connection()!.lastSyncAt!.getTime()).toBe(LAST_SYNC_AT.getTime());
+    });
+
+    it('leaves the cursor alone when a LATER page fails, after earlier pages landed', async () => {
+        // Failing halfway is the case that decides whether "did the sweep
+        // finish" is tracked or merely inferred from having reached the end of
+        // the loop. The first page was read and applied; the second was not, so
+        // the window still has to cover it.
+        await db.update(schema.qboConnections).set({ lastSyncAt: LAST_SYNC_AT })
+            .where(eq(schema.qboConnections.tenantId, TENANT));
+        const full = Array.from({ length: CDC_PAGE_SIZE }, (_, i) => paidInFull(`unmapped-${i}`));
+        let call = 0;
+        vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+            queries.push(new URL(String(input)).searchParams.get('query') ?? '');
+            if (call++ === 0) {
+                return new Response(JSON.stringify({ QueryResponse: { Invoice: full } }), {
+                    status: 200, headers: { 'Content-Type': 'application/json' },
+                });
+            }
+            return new Response(JSON.stringify({ fault: {} }), {
+                status: 500, headers: { 'Content-Type': 'application/json' },
+            });
+        }));
+
+        await qbo.runCDCSync(TENANT, markPaid as never, markPartial as never);
+
+        expect(queries.length).toBeGreaterThan(1);
+        expect(connection()!.lastSyncAt!.getTime()).toBe(LAST_SYNC_AT.getTime());
+    });
+
+    it('survives a 200 whose body is not the documented shape', async () => {
+        // Dereferencing QueryResponse outside the try turned a malformed 200
+        // into a TypeError, and the caller runs this inside waitUntil where that
+        // rejection is unhandled rather than reported.
+        await db.update(schema.qboConnections).set({ lastSyncAt: LAST_SYNC_AT })
+            .where(eq(schema.qboConnections.tenantId, TENANT));
+        stubMalformedOk();
+
+        await expect(qbo.runCDCSync(TENANT, markPaid as never, markPartial as never))
+            .resolves.toEqual({ processed: 0 });
+    });
+});
+
+describe('where the sweep throttles itself', () => {
+    it('waits at the page boundary, not once per invoice', async () => {
+        // The API boundary is the page query; the per-invoice loop makes no
+        // Intuit calls at all. Sleeping 100ms per row made a single full page
+        // block for 100 seconds for nothing. Both numbers are asserted: a page
+        // count without a row count would pass on code that never waits.
+        const full = Array.from({ length: CDC_PAGE_SIZE }, (_, i) => paidInFull(`unmapped-${i}`));
+        stubPages([full, [paidInFull('unmapped-last')]]);
+
+        await qbo.runCDCSync(TENANT, markPaid as never, markPartial as never);
+
+        expect(queries).toHaveLength(2);
+        // One wait, between the two page queries — not CDC_PAGE_SIZE + 1 of them.
+        expect(sleeps).toHaveLength(1);
     });
 });

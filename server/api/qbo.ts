@@ -3,6 +3,7 @@ import type { HonoConfig } from '../types/hono';
 import { getCookie } from 'hono/cookie';
 import { verifyJwt } from '../lib/jwt-keyring';
 import { requireRole } from '../lib/middleware/rbac';
+import { logger } from '../lib/logger';
 import { QBOLinkCustomerBodySchema } from '../lib/validations/qbo.schema';
 
 const api = new Hono<HonoConfig>();
@@ -82,7 +83,12 @@ api.post('/sync', async (c) => {
             // where this figure came from, so it must not be pushed back.
             async (invoiceId, tid) => { await invoiceSvc.markPaid(invoiceId, tid, 'qbo'); },
             async (invoiceId, amountPaidCents, tid) => { await invoiceSvc.markPartial(invoiceId, tid, 'qbo', amountPaidCents); },
-        ),
+        // The response has already been sent by the time this settles, so a
+        // rejection here has no caller to reach — without this catch it is an
+        // unhandled rejection and the sweep fails with no trace at all.
+        ).catch((e: unknown) => {
+            logger.error('QBO CDC sweep failed', { tenantId }, e instanceof Error ? e : undefined);
+        }),
     );
     return c.json({ success: true, data: { message: 'Sync started' } });
 });

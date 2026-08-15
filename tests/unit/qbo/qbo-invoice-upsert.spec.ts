@@ -251,11 +251,11 @@ describe('updating an already-mapped invoice', () => {
         expect(rows).toHaveLength(1);
     });
 
-    it('SUSPECTED DEFECT: a successful update never clears an earlier failed status', async () => {
-        // The update branch `return`s from inside the retry loop, so it skips the
-        // `qboSyncStatus: 'synced'` write that follows the if/else. An invoice
-        // whose first push failed therefore reads 'failed' forever, however many
-        // times it is successfully pushed afterwards.
+    it('clears an earlier failed status once the update succeeds', async () => {
+        // The update branch used to `return` from inside the retry loop, so it
+        // skipped the `qboSyncStatus: 'synced'` write that follows the if/else.
+        // An invoice whose first push failed therefore read 'failed' forever,
+        // however many times it was successfully pushed afterwards.
         await seedInvoiceMapping('3');
         await db.update(schema.invoices).set({ qboSyncStatus: 'failed' })
             .where(eq(schema.invoices.id, INV));
@@ -264,7 +264,7 @@ describe('updating an already-mapped invoice', () => {
         await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
 
         expect((await mapRow('invoice', INV))?.qboSyncToken).toBe('4');   // the push DID succeed
-        expect((await invoiceRow())?.qboSyncStatus).toBe('failed');       // and the status did not move
+        expect((await invoiceRow())?.qboSyncStatus).toBe('synced');       // and the status followed it
     });
 });
 
@@ -292,9 +292,9 @@ describe('the stale-SyncToken retry', () => {
 
         const row = await mapRow('invoice', INV);
         expect(row?.qboSyncToken).toBe('10');
-        // Still NULL, not 'synced': the update branch returns from inside the
-        // loop and never reaches the status write. See the defect spec above.
-        expect((await invoiceRow())?.qboSyncStatus).toBeNull();
+        // A retry that lands is still a success, and the status write is the
+        // only thing a tenant sees say so.
+        expect((await invoiceRow())?.qboSyncStatus).toBe('synced');
     });
 
     it('does not loop forever — three attempts and it stops', async () => {
@@ -316,12 +316,12 @@ describe('the stale-SyncToken retry', () => {
         expect(puts().map((p) => p.body.SyncToken)).toEqual(['3', '9', '10']);
     });
 
-    it('SUSPECTED DEFECT: three exhausted attempts are recorded as a success', async () => {
-        // The loop falls out of its `for` without returning and without throwing,
-        // so control lands on the `qboSyncStatus: 'synced'` write below the
-        // if/else. Nothing reached QuickBooks, the map still holds the stale
-        // token, no `qbo_sync_errors` row is filed — and the invoice reads as
-        // synced. This is the failure mode a tenant cannot see.
+    it('does not report success when every stale-token retry is exhausted', async () => {
+        // The loop used to fall out of its `for` without returning and without
+        // throwing, so control landed on the `qboSyncStatus: 'synced'` write
+        // below the if/else. Nothing reached QuickBooks, the map still held the
+        // stale token, no `qbo_sync_errors` row was filed — and the invoice read
+        // as synced. That is the failure mode a tenant cannot see.
         await seedInvoiceMapping('3');
         replies = [
             STALE_TOKEN(), ok({ Invoice: { Id: QBO_INV, SyncToken: '9' } }),
@@ -331,9 +331,11 @@ describe('the stale-SyncToken retry', () => {
 
         await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
 
-        expect((await invoiceRow())?.qboSyncStatus).toBe('synced');
-        expect(await syncErrors()).toHaveLength(0);
-        // The map row was only ever written on success, so the three refetched
+        expect((await invoiceRow())?.qboSyncStatus).toBe('failed');
+        const errors = await syncErrors();
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatchObject({ oiType: 'invoice', oiId: INV, resolved: false });
+        // The map row is only ever written on success, so the three refetched
         // tokens are discarded and the stored one is still the stale '3'.
         expect((await mapRow('invoice', INV))?.qboSyncToken).toBe('3');
     });
@@ -365,6 +367,54 @@ describe('the stale-SyncToken retry', () => {
         expect(sent).toHaveLength(1);
         expect((await invoiceRow())?.qboSyncStatus).toBe('failed');
         expect((await mapRow('invoice', INV))?.qboSyncToken).toBe('3');   // untouched
+    });
+});
+
+// --- the accounting date -------------------------------------------------
+
+describe('the transaction date', () => {
+    beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        // 02:00 UTC on the 1st is still 18:00 on the 28th in Los Angeles. At a
+        // month boundary a one-day error is a one-PERIOD error: the invoice
+        // lands in March on books that closed February.
+        vi.setSystemTime(new Date('2026-03-01T02:00:00.000Z'));
+    });
+    afterEach(() => { vi.useRealTimers(); });
+
+    async function seedTimezone(tz: string) {
+        await db.insert(schema.tenantConfigs).values({
+            tenantId: TENANT, defaultTimezone: tz, updatedAt: T0,
+        } as never);
+    }
+
+    it("dates the transaction in the tenant's timezone, not UTC", async () => {
+        await seedTimezone('America/Los_Angeles');
+        replies = [ok({ Invoice: { Id: QBO_INV, SyncToken: '0' } })];
+
+        await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
+
+        expect(sent[0].body.TxnDate).toBe('2026-02-28');
+    });
+
+    it('sends the UTC date when the tenant IS in UTC', async () => {
+        // Positive control. Without it the assertion above would also pass on
+        // code that hard-coded a date, or that subtracted a fixed offset.
+        await seedTimezone('UTC');
+        replies = [ok({ Invoice: { Id: QBO_INV, SyncToken: '0' } })];
+
+        await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
+
+        expect(sent[0].body.TxnDate).toBe('2026-03-01');
+    });
+
+    it('falls back to that same date for DueDate when the invoice carries none', async () => {
+        await seedTimezone('America/Los_Angeles');
+        replies = [ok({ Invoice: { Id: QBO_INV, SyncToken: '0' } })];
+
+        await qbo.upsertInvoice(TENANT, { ...INVOICE_INPUT, dueDate: null });
+
+        expect(sent[0].body).toMatchObject({ TxnDate: '2026-02-28', DueDate: '2026-02-28' });
     });
 });
 
@@ -446,13 +496,13 @@ describe('a failed push', () => {
  * NOT COVERED HERE, DELIBERATELY.
  *
  * `buildDocNumber` is unit-tested in `tests/unit/integrations/qbo.service.spec.ts`
- * (truncation at 21 chars, both branches), and `txnDateFor` is exercised through
- * its two real callers in `payment-push.spec.ts` and `refund-push.spec.ts`
- * (occurred-at rather than push date, and the tenant timezone rather than UTC).
- * Restating either here would be a second copy to keep true.
+ * (truncation at 21 chars, both branches). Restating it here would be a second
+ * copy to keep true.
  *
- * Worth noting while reading the payload above: `upsertInvoice` does NOT use
- * `txnDateFor`. It sends `TxnDate: new Date().toISOString().slice(0, 10)` — the
- * push date in UTC — which is the fourth date path the `txnDateFor` docblock
- * says it exists to prevent.
+ * `txnDateFor` itself is exercised through its other callers in
+ * `payment-push.spec.ts` and `refund-push.spec.ts` (occurred-at rather than push
+ * date). What the timezone block above pins is narrower and belongs here: that
+ * `upsertInvoice` goes through that one helper at all. It used to send
+ * `new Date().toISOString().slice(0, 10)` — the push date in UTC — which was the
+ * fourth date path the `txnDateFor` docblock says it exists to prevent.
  */

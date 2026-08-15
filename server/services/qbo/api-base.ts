@@ -211,20 +211,46 @@ export class QBOServiceBase {
         };
         if (body !== undefined) opts.body = JSON.stringify(body);
 
+        /**
+         * Upper bound on a single throttle wait. Intuit may ask for more — it
+         * does not know it is talking to a Worker — and a Worker cannot give
+         * it: the request would die still holding the wait, having retried
+         * nothing and told the tenant nothing. Failing is the better answer.
+         */
+        const MAX_RETRY_AFTER_MS = 30_000;
+
+        /**
+         * Each failure branch owns its own wait, deliberately. A sleep at the
+         * top of the loop applies to EVERY retry, including one a 429 has
+         * already waited out, so the interval Intuit named was silently doubled
+         * by our backoff. It also fires before an attempt that will never
+         * happen, spending budget on nothing — hence the `attempt < 2` guard.
+         */
         let lastError: Error | null = null;
         for (let attempt = 0; attempt < 3; attempt++) {
-            if (attempt > 0) await new Promise(r => setTimeout(r, 2 ** attempt * 500));
             const resp = await fetch(url, opts);
             if (resp.ok) return resp.json() as T;
+
             if (resp.status === 429) {
-                const retryAfter = parseInt(resp.headers.get('Retry-After') ?? '60', 10);
-                await new Promise(r => setTimeout(r, retryAfter * 1000));
+                const header = parseInt(resp.headers.get('Retry-After') ?? '', 10);
+                const waitMs = Math.min(
+                    Number.isFinite(header) ? header * 1000 : 2 ** attempt * 500,
+                    MAX_RETRY_AFTER_MS,
+                );
+                // Named, so exhausting the retries reports throttling rather
+                // than a generic failure the caller cannot act on.
+                lastError = Object.assign(new Error('QBO 429'), { status: 429 });
+                if (attempt < 2) await new Promise(r => setTimeout(r, waitMs));
                 continue;
             }
+
             if (resp.status >= 500) {
-                lastError = new Error(`QBO ${resp.status}`);
+                // Same shape as the 4xx throw below — callers branch on `status`.
+                lastError = Object.assign(new Error(`QBO ${resp.status}`), { status: resp.status });
+                if (attempt < 2) await new Promise(r => setTimeout(r, 2 ** attempt * 500));
                 continue;
             }
+
             const err = await resp.json().catch(() => ({})) as Record<string, unknown>;
             throw Object.assign(new Error(`QBO ${resp.status}`), { qboResponse: err, status: resp.status });
         }

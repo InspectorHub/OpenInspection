@@ -43,6 +43,19 @@ class TestQbo extends withConnection(QBOServiceBase) {}
 let db: BetterSQLite3Database<typeof schema>;
 let svc: TestQbo;
 let fetchMock: ReturnType<typeof vi.fn>;
+/** QuickBooks-side SyncToken per customer id, as `GET customer/:id` reports it. */
+let qboSyncTokens: Map<string, string>;
+
+/** Make QuickBooks report `syncToken` for customer `id` on the next lookup. */
+function qboReports(customerId: string, syncToken: string) {
+    qboSyncTokens.set(customerId, syncToken);
+}
+
+const syncErrorRow = (id: string, tenantId: string, oiId: string) => ({
+    id, tenantId, oiType: 'invoice', oiId,
+    errorCode: 'SYNC_ERROR', errorMsg: 'QBO 500', retries: 0, resolved: false,
+    createdAt: T0, updatedAt: T0,
+});
 
 beforeEach(async () => {
     const fixture = createTestDb();
@@ -50,7 +63,19 @@ beforeEach(async () => {
     await setupSchema(fixture.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
-    fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    // `linkExistingCustomer` asks QuickBooks for the customer's own SyncToken,
+    // so the fixture has to answer that one route. Everything else keeps the
+    // empty-200 default the revoke path expects.
+    qboSyncTokens = new Map();
+    fetchMock = vi.fn(async (input: unknown) => {
+        const customerId = /\/customer\/([^?]+)/.exec(String(input))?.[1];
+        if (customerId) {
+            return new Response(JSON.stringify({
+                Customer: { Id: customerId, SyncToken: qboSyncTokens.get(customerId) ?? '0' },
+            }), { status: 200 });
+        }
+        return new Response('{}', { status: 200 });
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     svc = new TestQbo({} as D1Database, 'cid', 'csec', 'whsec', JWT_SECRET, 'sandbox');
@@ -208,25 +233,41 @@ describe('disconnect revokes, clears the mapping, and drops the connection', () 
     });
 
     it('is a no-op for a tenant that was never connected', async () => {
+        // The link calls in beforeEach each read a customer from QuickBooks, so
+        // the count before is the baseline this disconnect must not move.
+        const callsBefore = fetchMock.mock.calls.length;
+
         await svc.disconnect('00000000-0000-0000-0000-000000000003');
 
-        expect(fetchMock).not.toHaveBeenCalled();
+        expect(fetchMock.mock.calls).toHaveLength(callsBefore);
         expect(db.select().from(schema.qboConnections).all()).toHaveLength(2);
         expect(db.select().from(schema.qboEntityMap).all()).toHaveLength(3);
     });
 
-    it('leaves open sync errors behind — pinned as observed, not endorsed', async () => {
-        await db.insert(schema.qboSyncErrors).values({
-            id: 'err-1', tenantId: TENANT, oiType: 'invoice', oiId: 'inv-1',
-            errorCode: 'SYNC_ERROR', errorMsg: 'QBO 500', retries: 0, resolved: false,
-            createdAt: T0, updatedAt: T0,
-        });
+    it('clears the sync errors that described the connection it dropped', async () => {
+        await db.insert(schema.qboSyncErrors).values(syncErrorRow('err-1', TENANT, 'inv-1'));
 
         await svc.disconnect(TENANT);
 
-        // The rows outlive the connection they describe. Reconnecting shows the
-        // new owner errors from a company they are no longer connected to.
-        expect(db.select().from(schema.qboSyncErrors).all()).toHaveLength(1);
+        // The rows describe a connection that no longer exists. Left in place,
+        // a fresh reconnect opens with the previous connection's failures
+        // already on screen, attributed to a company nobody is connected to.
+        expect(db.select().from(schema.qboSyncErrors)
+            .where(eq(schema.qboSyncErrors.tenantId, TENANT)).all()).toHaveLength(0);
+    });
+
+    it('leaves another tenant\'s sync errors alone', async () => {
+        await db.insert(schema.qboSyncErrors).values([
+            syncErrorRow('err-1', TENANT, 'inv-1'),
+            syncErrorRow('err-other', OTHER, 'inv-9'),
+        ]);
+
+        await svc.disconnect(TENANT);
+
+        // Positive control for the assertion above, which passes just as well
+        // on a delete with no tenant predicate — one that takes every tenant's
+        // errors on a shared deployment with it.
+        expect(db.select().from(schema.qboSyncErrors).all().map(r => r.id)).toEqual(['err-other']);
     });
 });
 
@@ -267,17 +308,11 @@ describe('setSyncEnabled toggles the flag and touches nothing else', () => {
 });
 
 describe('resolveError closes one row, for one tenant', () => {
-    const errorRow = (id: string, tenantId: string, oiId: string) => ({
-        id, tenantId, oiType: 'invoice', oiId,
-        errorCode: 'SYNC_ERROR', errorMsg: 'QBO 500', retries: 0, resolved: false,
-        createdAt: T0, updatedAt: T0,
-    });
-
     beforeEach(async () => {
         await db.insert(schema.qboSyncErrors).values([
-            errorRow('err-a', TENANT, 'inv-a'),
-            errorRow('err-b', TENANT, 'inv-b'),
-            errorRow('err-other', OTHER, 'inv-c'),
+            syncErrorRow('err-a', TENANT, 'inv-a'),
+            syncErrorRow('err-b', TENANT, 'inv-b'),
+            syncErrorRow('err-other', OTHER, 'inv-c'),
         ]);
     });
 
@@ -300,14 +335,25 @@ describe('resolveError closes one row, for one tenant', () => {
             .where(eq(schema.qboSyncErrors.id, 'err-other')).get()!.resolved).toBe(false);
     });
 
-    it('leaves updatedAt at its old value — pinned as observed, not endorsed', async () => {
+    it('records when the error was resolved', async () => {
         await svc.resolveError(TENANT, 'err-a');
 
-        // clearPaymentDiscrepancy stamps updatedAt when it resolves a row and
-        // this path does not, so "when was this closed" is unanswerable here.
+        // clearPaymentDiscrepancy stamps updatedAt when it closes a row. Without
+        // the same stamp here, "when was this dealt with" has no answer at all —
+        // createdAt dates the failure, not the response to it.
         const row = db.select().from(schema.qboSyncErrors)
             .where(eq(schema.qboSyncErrors.id, 'err-a')).get()!;
-        expect(row.updatedAt.getTime()).toBe(T0.getTime());
+        expect(row.updatedAt.getTime()).toBeGreaterThan(T0.getTime());
+    });
+
+    it('does not stamp the rows it did not close', async () => {
+        await svc.resolveError(TENANT, 'err-a');
+
+        // Positive control for the stamp above: a table-wide update would
+        // satisfy it while rewriting every other row's history.
+        const sibling = db.select().from(schema.qboSyncErrors)
+            .where(eq(schema.qboSyncErrors.id, 'err-b')).get()!;
+        expect(sibling.updatedAt.getTime()).toBe(T0.getTime());
     });
 });
 
@@ -321,17 +367,22 @@ describe('linkExistingCustomer maps a contact onto a QuickBooks customer', () =>
         .where(and(eq(schema.qboEntityMap.tenantId, tenantId), eq(schema.qboEntityMap.oiId, oiId))).get();
 
     it('writes the mapping with the QuickBooks-side names Intuit uses', async () => {
+        qboReports('58', '3');
+
         await svc.linkExistingCustomer(TENANT, 'contact-1', '58');
 
+        // The token is QuickBooks' answer about customer 58, not a constant we
+        // chose. '0' is only correct for a customer that has never been edited.
         expect(mapping(TENANT, 'contact-1')).toMatchObject({
             tenantId: TENANT, oiType: 'contact', oiId: 'contact-1',
-            qboType: 'Customer', qboId: '58', qboSyncToken: '0',
+            qboType: 'Customer', qboId: '58', qboSyncToken: '3',
         });
     });
 
     it('OVERWRITES an existing mapping for the same contact', async () => {
         await svc.linkExistingCustomer(TENANT, 'contact-1', '58');
         const first = mapping(TENANT, 'contact-1')!;
+        qboReports('59', '4');
 
         await svc.linkExistingCustomer(TENANT, 'contact-1', '59');
 
@@ -339,43 +390,67 @@ describe('linkExistingCustomer maps a contact onto a QuickBooks customer', () =>
         expect(db.select().from(schema.qboEntityMap).all()).toHaveLength(1);
         expect(second.id).toBe(first.id);
         expect(second.qboId).toBe('59');
-        // Pinned as observed, not endorsed: the sync token is NOT reset by the
-        // overwrite. It is QuickBooks' optimistic-concurrency counter for the
-        // OLD customer, so after a relink it describes an entity this row no
-        // longer points at, and the next update sends a token from elsewhere.
-        expect(second.qboSyncToken).toBe('0');
+        // The conflict update has to carry the token too. Updating only qboId
+        // leaves the OLD customer's counter on a row that now points elsewhere.
+        expect(second.qboSyncToken).toBe('4');
     });
 
-    it('keeps a stale sync token when the mapping is repointed', async () => {
+    it('takes the SyncToken QuickBooks reports when a link is re-pointed', async () => {
         await svc.linkExistingCustomer(TENANT, 'contact-1', '58');
-        // Stand in for a sync having happened against customer 58.
+        // Stand in for syncs having happened against customer 58.
         await db.update(schema.qboEntityMap).set({ qboSyncToken: '7' })
             .where(eq(schema.qboEntityMap.oiId, 'contact-1'));
+        qboReports('59', '2');
 
         await svc.linkExistingCustomer(TENANT, 'contact-1', '59');
 
-        expect(mapping(TENANT, 'contact-1')!.qboSyncToken).toBe('7');
+        // Not 7, and not 0 either: 7 is customer 58's counter and 0 is a guess.
+        // Only QuickBooks knows where customer 59 currently stands.
+        expect(mapping(TENANT, 'contact-1')!.qboSyncToken).toBe('2');
     });
 
-    it('REFUSES to point a second contact at a customer already claimed', async () => {
+    it('allows re-linking a contact to the customer it already points at', async () => {
+        await svc.linkExistingCustomer(TENANT, 'contact-1', '58');
+
+        // The claim guard must not fire on the row it is about to update, or a
+        // re-link that changes nothing becomes an error the operator has to read.
+        await expect(svc.linkExistingCustomer(TENANT, 'contact-1', '58')).resolves.toBeUndefined();
+        expect(db.select().from(schema.qboEntityMap).all()).toHaveLength(1);
+    });
+
+    it('REFUSES to point a second contact at a customer already claimed, in words', async () => {
         await svc.linkExistingCustomer(TENANT, 'contact-1', '58');
 
         // The reverse unique key (tenant, qboType, qboId) is not the conflict
-        // target, so this surfaces as a raw constraint violation rather than a
-        // handled answer. Pinned as observed: the guard exists, its wording
-        // reaches the operator as a 500.
-        await expect(svc.linkExistingCustomer(TENANT, 'contact-2', '58')).rejects.toThrow(/UNIQUE/i);
+        // target, so this used to surface as a raw `UNIQUE constraint failed`.
+        // Whoever picked the customer is the one who reads this message; it has
+        // to say which contact already holds it.
+        await expect(svc.linkExistingCustomer(TENANT, 'contact-2', '58'))
+            .rejects.toThrow(/already linked to contact contact-1/i);
         expect(db.select().from(schema.qboEntityMap).all()).toHaveLength(1);
+    });
+
+    it('writes nothing when QuickBooks will not report the customer', async () => {
+        fetchMock.mockImplementation(async () => new Response('{"Fault":{}}', { status: 404 }));
+
+        // Reading the customer makes this method able to fail on an API error
+        // where before it could only fail on a constraint. That is the intended
+        // trade: a mapping carrying an invented token fails later instead, on
+        // someone else's invoice push, where nothing points back to this link.
+        await expect(svc.linkExistingCustomer(TENANT, 'contact-1', '58')).rejects.toThrow(/404/);
+        expect(db.select().from(schema.qboEntityMap).all()).toHaveLength(0);
     });
 
     it('is scoped to the tenant — the same contact id in another tenant is a separate mapping', async () => {
         await svc.linkExistingCustomer(TENANT, 'contact-1', '58');
-        await svc.linkExistingCustomer(OTHER, 'contact-1', '99');
+        // Deliberately the SAME QuickBooks id: two tenants' companies number
+        // their customers independently, so the claim guard is per tenant.
+        await svc.linkExistingCustomer(OTHER, 'contact-1', '58');
 
         expect(mapping(TENANT, 'contact-1')!.qboId).toBe('58');
-        expect(mapping(OTHER, 'contact-1')!.qboId).toBe('99');
+        expect(mapping(OTHER, 'contact-1')!.qboId).toBe('58');
 
         await svc.linkExistingCustomer(TENANT, 'contact-1', '60');
-        expect(mapping(OTHER, 'contact-1')!.qboId).toBe('99');
+        expect(mapping(OTHER, 'contact-1')!.qboId).toBe('58');
     });
 });

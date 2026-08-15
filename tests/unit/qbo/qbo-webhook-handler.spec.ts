@@ -22,6 +22,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
+import { logger } from '../../../server/lib/logger';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -55,6 +56,9 @@ let markPaid: ReturnType<typeof vi.fn>;
 let markPartial: ReturnType<typeof vi.fn>;
 /** Every QuickBooks API path the handler reached for, in order. */
 let apiPaths: string[];
+/** What the handler said about the events it decided not to process. */
+const silenceWarn = () => vi.spyOn(logger, 'warn').mockImplementation(() => {});
+let warnSpy: ReturnType<typeof silenceWarn>;
 
 /** Exactly what the route computes over: base64 HMAC-SHA256 of the raw bytes. */
 const sign = (rawBody: string) =>
@@ -104,6 +108,7 @@ beforeEach(async () => {
     await setupSchema(fixture.sqlite);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     apiPaths = [];
+    warnSpy = silenceWarn();
 
     qbo = new QBOService({} as D1Database, 'cid', 'csec', WEBHOOK_SECRET, 'a'.repeat(32), 'sandbox');
     invoiceSvc = new InvoiceService({} as D1Database);
@@ -137,7 +142,7 @@ beforeEach(async () => {
     stubInvoiceFetch();
 });
 
-afterEach(() => { vi.unstubAllGlobals(); });
+afterEach(() => { vi.unstubAllGlobals(); warnSpy.mockRestore(); });
 
 const deliver = (payload: unknown, signature?: string) => {
     const rawBody = typeof payload === 'string' ? payload : JSON.stringify(payload);
@@ -190,6 +195,31 @@ describe('nothing happens without a valid signature', () => {
         const result = await deliver(body, sign(`${body} `));
 
         expect(result).toEqual({ valid: false });
+        expect(apiPaths).toEqual([]);
+    });
+
+    it('verifies the signature without a short-circuiting comparison', async () => {
+        // This verifier is reachable from the open internet, so the comparison
+        // is done by `crypto.subtle.verify` rather than `===`. What a test can
+        // pin is the contract around it: the genuine signature is accepted, and
+        // a wrong one of exactly the right length — the shape a timing attack
+        // walks through — is still refused.
+        const body = JSON.stringify(cloudEvent());
+        const good = sign(body);
+        const bad = 'A'.repeat(good.length);
+
+        await expect(qbo.verifyWebhookSignature(body, good)).resolves.toBe(true);
+        await expect(qbo.verifyWebhookSignature(body, bad)).resolves.toBe(false);
+    });
+
+    it('rejects a signature header that is not base64 instead of throwing', async () => {
+        // Decoding the header to bytes is a step `===` never had to take, so it
+        // is a new way for this handler to throw. It runs in `waitUntil` behind
+        // an already-sent 200: a throw here is unobserved and never retried.
+        const body = JSON.stringify(cloudEvent());
+
+        await expect(qbo.verifyWebhookSignature(body, 'not base64 at all !!')).resolves.toBe(false);
+        await expect(deliver(body, 'not base64 at all !!')).resolves.toEqual({ valid: false });
         expect(apiPaths).toEqual([]);
     });
 });
@@ -249,6 +279,52 @@ describe('payloads the handler must survive', () => {
         expect(result).toEqual({ valid: true });
         expect(apiPaths).toEqual([`/v3/company/${REALM}/invoice/${QBO_ID}`]);
         expect(invoiceRow()!.paidAt).not.toBeNull();
+    });
+
+    it('reports how many events it dropped instead of dropping them in silence', async () => {
+        // Three of the four drop paths used to be completely silent, while the
+        // fourth (a failed invoice fetch) logged. So a payload shape we no
+        // longer recognise returned {valid:true} with no trace: the endpoint
+        // read as perfectly healthy while processing nothing at all.
+        const result = await deliver([
+            { specversion: '1.0' },
+            cloudEvent({ type: 'qbo.customer.updated.v1' }),
+            cloudEvent({ intuitaccountid: OTHER_REALM }),
+            cloudEvent(),
+        ]);
+
+        expect(result).toEqual({ valid: true });
+        expect(warnSpy).toHaveBeenCalledWith('QBO webhook dropped events', {
+            // Both numbers, always. A count of drops with an invisible
+            // denominator cannot tell "one of four" from "one of one".
+            received:     4,
+            handled:      1,
+            unparsed:     1,
+            notInvoice:   1,
+            unknownRealm: 1,
+        });
+    });
+
+    it('names a schema rejection as such, not as an unknown realm', async () => {
+        // `unparsed > 0` is the one that means Intuit's payload shape stopped
+        // matching ours — a different problem from a realm we never connected,
+        // and it must not be reported as the same number.
+        const incomplete: Record<string, unknown> = { ...cloudEvent() };
+        delete incomplete.intuitaccountid;
+
+        await deliver(incomplete);
+
+        expect(warnSpy).toHaveBeenCalledWith('QBO webhook dropped events',
+            expect.objectContaining({ received: 1, handled: 0, unparsed: 1, unknownRealm: 0 }));
+    });
+
+    it('stays quiet when every event in the batch was handled', async () => {
+        // Positive control: without it, an implementation that never warns at
+        // all would still satisfy the assertions above if they only checked
+        // that the counts were right when they happened to be logged.
+        await deliver(cloudEvent());
+
+        expect(warnSpy).not.toHaveBeenCalled();
     });
 
     it('survives QuickBooks refusing the invoice fetch', async () => {

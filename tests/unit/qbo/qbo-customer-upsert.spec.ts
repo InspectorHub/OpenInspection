@@ -267,10 +267,10 @@ describe('an unmapped contact QuickBooks already knows by email', () => {
         expect(await allMaps()).toHaveLength(1);
     });
 
-    it('SUSPECTED DEFECT: stores the pre-update SyncToken, so the map is stale on arrival', async () => {
-        // The adoption PUT returns SyncToken '8' and the map keeps '7' — the
-        // response is never read. Every other write site in this service stores
-        // the token the call handed back.
+    it('stores the SyncToken QuickBooks returned, not the one it was given', async () => {
+        // The adoption PUT is what settles the token: QuickBooks increments it
+        // on the write and hands the new value back. Persisting the pre-update
+        // value instead leaves the map stale the moment it is created.
         replies = [
             queryFound([{ Id: 'QBO-CUST-55', SyncToken: '7', DisplayName: 'Patricia Client' }]),
             ok({ Customer: { Id: 'QBO-CUST-55', SyncToken: '8' } }),
@@ -278,29 +278,29 @@ describe('an unmapped contact QuickBooks already knows by email', () => {
 
         await qbo.upsertCustomer(TENANT, PAT);
 
-        expect((await contactMap())?.qboSyncToken).toBe('7');
+        expect(puts()[0].body.SyncToken).toBe('7');   // sent with what we were told
+        expect((await contactMap())?.qboSyncToken).toBe('8');   // kept what came back
     });
 
-    it('SUSPECTED DEFECT: the very next push therefore fails on a stale token', async () => {
-        // The consequence of the row above, and why it matters: unlike
-        // `upsertInvoice`, `upsertCustomer` has NO stale-token refetch, so the
-        // push after an adoption cannot recover — it files a sync error and
-        // leaves the contact permanently one token behind.
+    it('so the very next push carries a token QuickBooks still accepts', async () => {
+        // Why it matters: unlike `upsertInvoice`, `upsertCustomer` has NO
+        // stale-token refetch, so a token that is one behind on arrival cannot
+        // be recovered from — the contact would file a sync error on every
+        // subsequent push, forever.
         replies = [
             queryFound([{ Id: 'QBO-CUST-55', SyncToken: '7', DisplayName: 'Patricia Client' }]),
             ok({ Customer: { Id: 'QBO-CUST-55', SyncToken: '8' } }),
-            fault(400, '5010', 'Stale Object Error'),
+            ok({ Customer: { Id: 'QBO-CUST-55', SyncToken: '9' } }),
         ];
 
         await qbo.upsertCustomer(TENANT, PAT);
         await qbo.upsertCustomer(TENANT, PAT);
 
         expect(puts()).toHaveLength(2);
-        expect(puts()[1].body.SyncToken).toBe('7');
-        expect(replies).toHaveLength(0);           // no refetch, no retry
-        const errors = await syncErrors();
-        expect(errors).toHaveLength(1);
-        expect(errors[0]).toMatchObject({ oiType: 'contact', oiId: CONTACT, errorCode: 'SYNC_ERROR' });
+        expect(puts()[1].body.SyncToken).toBe('8');
+        expect(replies).toHaveLength(0);
+        expect((await contactMap())?.qboSyncToken).toBe('9');
+        expect(await syncErrors()).toHaveLength(0);
     });
 
     it('falls through to creating when the email matches nothing', async () => {
@@ -409,21 +409,57 @@ describe('the duplicate-name ladder', () => {
         expect(await syncErrors()).toHaveLength(1);
     });
 
-    it('SUSPECTED DEFECT: with no email, rungs 2 and 3 send the identical name', async () => {
-        // `buildDisplayName` needs an email for rung 2 and falls through to the
-        // contactId form without one, so the ladder is really name →
-        // name (contactId) → name (contactId). The third rung cannot do anything
-        // the second did not, and must 6140 again: a guaranteed wasted write.
+    it('gives every rung a distinct name even when there is no email', async () => {
+        // `buildDisplayName` used to need an email for rung 2 and fell through
+        // to the contactId form without one, so the ladder was really name →
+        // name (contactId) → name (contactId). A third rung that repeats the
+        // second cannot do anything the second did not, and must 6140 again:
+        // a guaranteed wasted write against the tenant's books.
         replies = [
             DUPLICATE_NAME(), DUPLICATE_NAME(), DUPLICATE_NAME(),
         ];
 
         await qbo.upsertCustomer(TENANT, { id: CONTACT, name: 'Pat Client' });
 
-        expect(displayNames()).toEqual([
-            'Pat Client',
-            `Pat Client (${CONTACT})`,
-            `Pat Client (${CONTACT})`,
-        ]);
+        const names = displayNames();
+        expect(names).toHaveLength(3);
+        expect(new Set(names).size).toBe(3);
+        expect(names[0]).toBe('Pat Client');
+        expect(names[2]).toBe(`Pat Client (${CONTACT})`);
+    });
+});
+
+// --- the ladder's rungs, read directly -----------------------------------
+
+describe('buildDisplayName', () => {
+    it('keeps the email form for rung 2 when there is an email', () => {
+        // Positive control. Without it, "the rungs differ" could be satisfied
+        // by any change at all — including one that threw the email away.
+        expect(qbo.buildDisplayName('Pat', 'Client', 'pat@example.com', 1, CONTACT))
+            .toBe('Pat Client (pat@example.com)');
+        expect(qbo.buildDisplayName('Pat', 'Client', 'pat@example.com', 0, CONTACT))
+            .toBe('Pat Client');
+        expect(qbo.buildDisplayName('Pat', 'Client', 'pat@example.com', 2, CONTACT))
+            .toBe(`Pat Client (${CONTACT})`);
+    });
+
+    it('separates rungs 2 and 3 when there is no email', () => {
+        const rung2 = qbo.buildDisplayName('Pat', 'Client', null, 1, CONTACT);
+        const rung3 = qbo.buildDisplayName('Pat', 'Client', null, 2, CONTACT);
+
+        expect(rung2).not.toBe(rung3);
+        expect(rung3).toBe(`Pat Client (${CONTACT})`);
+    });
+
+    it('separates rung 2 between two contacts who share a name', () => {
+        // The rungs differing from each other is not the point. Escaping QBO's
+        // 6140 duplicate-name error is, and that only happens if two different
+        // contacts get two different names. A rung built from a slice of the id
+        // that happens to be constant — a shared prefix, say — satisfies the
+        // test above and still collides here.
+        const a = qbo.buildDisplayName('Pat', 'Client', null, 1, 'contact-aaaa-1111-2222-333333330001');
+        const b = qbo.buildDisplayName('Pat', 'Client', null, 1, 'contact-aaaa-1111-2222-333333330002');
+
+        expect(a).not.toBe(b);
     });
 });
