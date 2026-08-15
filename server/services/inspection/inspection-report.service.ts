@@ -714,10 +714,23 @@ export class InspectionReportService extends InspectionSubService {
         const resultsData = resultsRow?.data as Record<string, unknown> | null | undefined;
         const rawSig = resultsData?._inspector_signature as InspectorSig | undefined;
 
+        // Counsel ruling 18a/18c (2026-08-15). `method` is a DOMAIN state, decided
+        // here where the record is, and not inferrable downstream. It used to be
+        // an object built with `?? null` on every field, so "nobody signed this"
+        // and "signed, image missing" reached the renderer as the same value —
+        // and the renderer resolved that ambiguity by drawing the inspector's
+        // NAME as their signature. A published report therefore claimed a signing
+        // event that had not happened. Production: 7 of 7 published reports.
+        //
+        // 'none' is a state, not a missing value. The renderer must attribute
+        // authorship without any signing verb; a name is never a signature.
+        const signatureMethod: 'none' | 'manual' | 'authorized_auto' =
+            !rawSig?.signatureBase64 ? 'none' : (rawSig.auto === true ? 'authorized_auto' : 'manual');
         const signature = isPublished
             ? {
-                signatureBase64: rawSig?.signatureBase64 ?? null,
-                signedAt:        rawSig?.signedAt ?? null,
+                method:          signatureMethod,
+                signatureBase64: signatureMethod === 'none' ? null : rawSig!.signatureBase64!,
+                signedAt:        signatureMethod === 'none' ? null : (rawSig?.signedAt ?? null),
                 inspectorName,
                 inspectorLicense,
             }
