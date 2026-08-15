@@ -35,6 +35,34 @@ describe('verifyResultModel', () => {
     expect(result.state).toBe('failed');
   });
 
+  // `keyMissing` means no check ran, so the page must not reach the "failed"
+  // copy, which offers "the content may have been altered" as the explanation.
+  // Counsel ruling 17c: report what the check established and no more.
+  it('returns key_missing, not failed, when the signing key is not on file', () => {
+    const result = verifyResultModel({
+      legacy: false,
+      hashValid: true,
+      signatureValid: false,
+      keyMissing: true,
+      chainValid: true,
+    });
+    expect(result.state).toBe('key_missing');
+  });
+
+  // The precedence matters in the other direction too: a key we DO hold, whose
+  // check failed, is a real failure and must not be softened into "could not
+  // be completed".
+  it('still returns failed when the key was available and the check failed', () => {
+    const result = verifyResultModel({
+      legacy: false,
+      hashValid: true,
+      signatureValid: false,
+      keyMissing: false,
+      chainValid: true,
+    });
+    expect(result.state).toBe('failed');
+  });
+
   it('returns failed when hashValid is false', () => {
     const result = verifyResultModel({
       legacy: false,

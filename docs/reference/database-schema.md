@@ -803,7 +803,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `prev_hash` | text |  |  |  | *Hash used for lookup and comparison; not reversible.* |
 | `hash` | text | NN |  |  | The chain link: the next row's prev_hash is a copy of this. verifyChain recomputes it, so a rewritten payload_json fails as reason:'hash' and an unlinked or reordered row fails as reason:'chain', naming brokenAt. |
 | `signature` | text | NN |  |  | base64url Ed25519 over the HEX-DECODED hash bytes. This is what makes the chain more than a checksum: recomputing hashes after editing a payload still fails (reason:'signature') without the tenant's private key. |
-| `key_fingerprint` | text | NN |  |  | Which signing_keys row signed THIS row, stamped from ensureKeypair. verifyChain compares it against the tenant's current key BEFORE testing the signature, and stops with reason:'key_mismatch' if they differ — so a key change can never be reported as a bad signature. |
+| `key_fingerprint` | text | NN |  |  | Which signing_keys row signed THIS row, stamped from ensureKeypair. It is what SELECTS the key at verification time, so it is load-bearing rather than informational: verifyChain resolves this fingerprint against the tenant's key history instead of reading whatever key is active now, which is what … **[more]** |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
 
 **Indexes**

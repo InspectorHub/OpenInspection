@@ -96,12 +96,13 @@ export const esignAuditLogs = sqliteTable('esign_audit_logs', {
     // chain more than a checksum: recomputing hashes after editing a payload
     // still fails (reason:'signature') without the tenant's private key.
     signature:      text('signature').notNull(),
-    // Which signing_keys row signed THIS row, stamped from ensureKeypair.
-    // verifyChain compares it against the tenant's current key BEFORE testing
-    // the signature, and stops with reason:'key_mismatch' if they differ — so a
-    // key change can never be reported as a bad signature. Equal for every row
-    // today, since rotation is unsupported; this is what would notice if that
-    // ever stopped being true.
+    // Which signing_keys row signed THIS row, stamped from ensureKeypair. It is
+    // what SELECTS the key at verification time, so it is load-bearing rather
+    // than informational: verifyChain resolves this fingerprint against the
+    // tenant's key history instead of reading whatever key is active now, which
+    // is what lets a rotated-away key keep verifying the rows it sealed. A
+    // fingerprint with no key on file stops with reason:'key_mismatch' — we
+    // could not check, which is not the same as the signature being bad.
     keyFingerprint: text('key_fingerprint').notNull(),
     createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({

@@ -93,9 +93,13 @@ export class SigningKeyService {
         if (active) {
             // Retire BEFORE minting: the partial unique index allows one active
             // key per tenant, so doing it the other way round fails the insert.
+            // `active.id` already came from a tenant-scoped read, so the
+            // tenant filter here is redundant — and kept anyway. It costs one
+            // comparison, and the thing it would prevent is retiring another
+            // company's signing key.
             await this.getDrizzle().update(signingKeys)
                 .set({ retiredAt: new Date() })
-                .where(eq(signingKeys.id, active.id)).run();
+                .where(and(eq(signingKeys.id, active.id), eq(signingKeys.tenantId, tenantId))).run();
         }
 
         const minted = await this.mintActiveKey(tenantId);
