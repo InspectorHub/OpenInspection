@@ -24,7 +24,7 @@ Running the engine on your own Cloudflare account.
 | [`self-host/email-providers.md`](self-host/email-providers.md) | Transactional email adapters, platform-vs-own credentials (no SMTP) |
 | [`self-host/sms-compliance.md`](self-host/sms-compliance.md) | Privacy/Terms pages, carrier registration, TCPA/CTIA wording |
 | [`self-host/video-backend.md`](self-host/video-backend.md) | R2 (default, free) vs Cloudflare Stream |
-| [`self-host/rotate-secrets.md`](self-host/rotate-secrets.md) | Rotating the ES256 JWT keyring without invalidating live sessions |
+| [`self-host/rotate-secrets.md`](self-host/rotate-secrets.md) | Rotating the ES256 JWT keyring without invalidating live sessions, and the tenant e-signature key without invalidating signed evidence |
 | [`self-host/connecting-claude-mcp.md`](self-host/connecting-claude-mcp.md) | Connecting Claude or another MCP client over OAuth 2.1 |
 
 ## Using the product

@@ -59,10 +59,10 @@
   "server/services/template.service.ts": 432,
   "app/routes/public/portal-inspection.tsx": 430,
   "app/hooks/useStructureEdit.ts": 424,
+  "server/lib/compliance/erasure-manifest.ts": 424,
   "server/data/automation-seeds.ts": 423,
   "server/lib/db/schema/inspection/core.ts": 415,
   "app/components/editor/InspectionSettingsSheet.tsx": 413,
   "server/services/agreement/signer-state.ts": 413,
-  "app/routes/calendar.tsx": 410,
-  "server/lib/compliance/erasure-manifest.ts": 405
+  "app/routes/calendar.tsx": 410
 }

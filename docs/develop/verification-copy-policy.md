@@ -44,19 +44,33 @@ context — and, ultimately, by a tribunal applying the relevant law.
 
 ## The failure case has a benign cause we know about
 
-`verifyChain` always verifies against the tenant's **current** signing key. Each
-row records the key it was actually sealed with (`esign_audit_logs.key_fingerprint`)
-and the verifier does not read it. So rotating a company's signing key makes
-every earlier chain fail verification.
+The original one is now fixed, and the rule outlived it.
 
-A genuine signature by a real person can therefore fail today's check for a
-reason that has nothing to do with that person. This is why the failure rule
-exists, and why "Invalid Signature" was the more urgent of the two strings that
-prompted this policy.
+**What it was.** `verifyChain` verified every row against the tenant's *current*
+signing key, while each row recorded the key it was actually sealed with
+(`esign_audit_logs.key_fingerprint`) and the verifier never read it. Rotating a
+company's key would therefore have failed every earlier chain — a genuine
+signature by a real person failing today's check for a reason having nothing to
+do with that person. That is why the failure rule exists, and why "Invalid
+Signature" was the more urgent of the two strings that prompted this policy.
 
-Resolving historical verification against the historical key is tracked
-separately as engineering remediation — review decision explicitly asked that
-it not be folded into a copy change.
+**What changed (2026-08-15).** review decision asked that this be remediated
+in engineering rather than folded into a copy change, and it now has been.
+`signing_keys` is a key history, retiring a key keeps its public half, and both
+verifiers resolve the key named by the row they are checking. Rotation no longer
+breaks anything, and there is an owner-only endpoint for it.
+
+**Why the rule stands anyway.** A check can still fail to complete for causes
+that say nothing about the signer — a key genuinely absent from the history
+reports as `key_mismatch`, and hash and chain failures have their own causes.
+The principle was never "rotation specifically"; it is that a verification
+surface reports what its check established and no more.
+
+One consequence to put to review rather than act on: the failure copy still
+offers "the key may have changed" as the reassuring explanation, and that
+particular cause no longer produces a failure. The sentence is not false — it
+says *may* — but it now points at the least likely reason. The wording is
+review-approved and is not being changed here on our own initiative.
 
 ## Applied
 

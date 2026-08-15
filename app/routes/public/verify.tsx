@@ -126,9 +126,12 @@ function VerifyBody() {
         {/* The heading alone cannot carry this. review decision (2026-08-15):
             a verification surface may state what the check established and no
             more, and a failure must be attributed to the check rather than to
-            the signature or the signer — a chain can break because this company
-            rotated its signing key, and calling a real person's signature
-            "invalid" for that reason is a statement against their interest. */}
+            the signature or the signer — calling a real person's signature
+            "invalid" because OUR check could not complete is a statement against
+            their interest. The key-change case that once illustrated this is now
+            handled upstream: `verifyChain` reports `key_mismatch` rather than
+            `signature`, and rotation is unsupported by design. The rule stands
+            for every other reason a check can fail. */}
         {/* No opacity here. Dimming this to 90% put it at 4.22:1 on the dark
             failure background — under AA, and `lint:contrast` cannot see it
             because it checks token pairs and not what an opacity composites to.

@@ -58,6 +58,11 @@ export type AuditAction =
     | 'agreement.declined'
     | 'agreement.expired'
     | 'agreement.inspector_signed'
+    // The tenant retired its e-signature key and minted a replacement. Nothing
+    // already signed changes, but WHICH key covers which stretch of a company's
+    // evidence is exactly the question a later reader will have, and only this
+    // row answers it.
+    | 'signing_key.rotate'
     | 'recommendation.created'
     | 'recommendation.updated'
     | 'recommendation.deleted'

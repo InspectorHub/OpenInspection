@@ -97,7 +97,11 @@ for (const raw of sql.split('--> statement-breakpoint')) {
         continue;
     }
 
-    const di = stmt.match(/DROP INDEX `(\w+)`/);
+    // `IF EXISTS` is the right thing to write in a migration that may run against
+    // a database which already lacks the index — and it silently defeated this
+    // regex, so the reference kept describing an index production had dropped.
+    // 158 in the database, 159 on the page, and nothing compared the two.
+    const di = stmt.match(/DROP INDEX (?:IF EXISTS )?`(\w+)`/);
     if (di) {
         for (const t of Object.values(tables)) t.idx = t.idx.filter((i) => i.name !== di[1]);
         continue;
@@ -128,8 +132,15 @@ function walk(dir) {
         e.isDirectory() ? walk(join(dir, e.name)) : (e.name.endsWith('.ts') ? [join(dir, e.name)] : []));
 }
 const meta = {};
+// Counted from the schema text rather than the migrations: the storage type is
+// `integer` either way, and only the Drizzle mode says whether the integer is
+// seconds or milliseconds.
+let nTsMs = 0, nTsRaw = 0;
 for (const file of walk(join(root, 'server', 'lib', 'db', 'schema'))) {
-    const lines = readFileSync(file, 'utf8').split('\n');
+    const raw = readFileSync(file, 'utf8');
+    nTsMs  += (raw.match(/mode: 'timestamp_ms'/g) || []).length;
+    nTsRaw += (raw.match(/mode: 'timestamp'/g) || []).length;
+    const lines = raw.split('\n');
     const rel = file.slice(root.length + 1).replace(/\\/g, '/');
     for (let i = 0; i < lines.length; i++) {
         const t = lines[i].match(/export const \w+ = sqliteTable\(\s*'([a-z_0-9]+)'/);
@@ -222,6 +233,18 @@ function infer(col, type) {
 }
 
 // ── emit ────────────────────────────────────────────────────────────────────
+// A derived number that can silently reach zero is worse than a hand-written
+// one, because it prints with the authority of having been counted. The first
+// version of the timestamp census was wired in wrong and cheerfully emitted
+// "0 columns use timestamp_ms" into the reference. Every table here has a
+// `created_at`, so zero is not a schema state — it is a broken parser.
+if (nTsMs === 0) {
+    console.error('[schema-doc] the timestamp census counted 0 `timestamp_ms` columns.');
+    console.error('            Every table has a created_at, so this is a parser fault, not a fact.');
+    console.error('            Refusing to write a number that would be read as one.');
+    process.exit(1);
+}
+
 const names = Object.keys(tables).sort();
 const nCols = names.reduce((a, t) => a + tables[t].cols.length, 0);
 const nIdx = names.reduce((a, t) => a + tables[t].idx.length, 0);
@@ -242,6 +265,23 @@ L.push(`| Columns | ${nCols} |`);
 L.push(`| Indexes (excluding primary keys) | ${nIdx} |`);
 L.push(`| Database foreign keys (all legacy, frozen) | ${nFk} |`);
 L.push(`| Columns carrying a source comment | ${documented} (${Math.round(documented / nCols * 100)}%) |`);
+L.push('');
+// Facts a hand-written page kept getting wrong. `database.md` used to assert
+// "every table has tenant_id" and a table count, and both were false by the time
+// anyone read them. Anything countable belongs on this side of the split: the
+// prose page states the RULE, this page states what is actually there.
+const noTenant = names.filter((t) => !tables[t].cols.some((c) => c.name === 'tenant_id'));
+L.push('**Tables without `tenant_id`.** Every table holding tenant data must carry it —');
+L.push('`npm run lint:tenant-scope` is the gate. These are the tables that are not *about*');
+L.push('a tenant, which is the only reason to be missing it:', '');
+L.push(noTenant.map((t) => `\`${t}\``).join(' · ') || '_none_', '');
+L.push(`That is ${noTenant.length} of ${names.length}. If a table you just added appears here,`);
+L.push('that is the bug, not the list.', '');
+L.push(`**Timestamps.** ${nTsMs} column(s) use \`integer(..., { mode: 'timestamp_ms' })\` —`);
+L.push(`epoch MILLISECONDS${nTsRaw ? `, and ${nTsRaw} legacy column(s) still use \`mode: 'timestamp'\`` : ', with no legacy `mode: \'timestamp\'` columns left'}.`);
+L.push('Seconds and milliseconds are one multiplication apart and the mistake reads as a');
+L.push('date tens of thousands of years out, so the Schema Rules allow only the former for');
+L.push('new columns.');
 L.push('');
 L.push('**Reading the tables.** SQLite has four storage types; the semantic type is a');
 L.push('Drizzle layer on top — `integer{mode:timestamp_ms}` is epoch milliseconds,');
@@ -306,7 +346,13 @@ for (const name of names) {
 
 const out = L.join('\n') + '\n';
 if (check) {
-    const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : '';
+    // Compare CONTENT, not bytes. The generator writes LF; git hands a Windows
+    // checkout back with CRLF, so a byte comparison reports the doc as stale on
+    // a machine where nothing is stale — and only there, because CI runs on
+    // Linux and never sees the conversion. A gate that fails locally and passes
+    // in CI teaches people to stop reading it.
+    const norm = (s) => s.replace(/\r\n/g, '\n');
+    const current = existsSync(OUT) ? norm(readFileSync(OUT, 'utf8')) : '';
     if (current !== out) {
         console.error('[schema-doc] docs/reference/database-schema.md is out of date.');
         console.error(`            regenerated: ${out.length} chars over ${names.length} tables / ${nCols} columns`);

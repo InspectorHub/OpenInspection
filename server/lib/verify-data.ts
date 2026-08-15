@@ -22,7 +22,18 @@ export async function loadVerifyData(c: Context<HonoConfig>, envelopeId: string)
         .orderBy(asc(schema.esignAuditLogs.createdAt))
         .all();
     const verify = await c.var.services.auditLog.verifyChain(reqRow.tenantId, envelopeId);
-    const pubKey = await c.var.services.signingKey.getPublicKey(reqRow.tenantId);
+    // The key(s) THIS chain was sealed with, not the tenant's current one. An
+    // offline verifier is handed these to check the export by itself, so handing
+    // it a rotated-to key would make it conclude the evidence is bad when the
+    // evidence is fine. Ordinarily one key; a chain that spans a rotation has
+    // two, and both have to travel with the export or half of it cannot be read.
+    const chainFingerprints = [...new Set(auditRows.map((r) => r.keyFingerprint))];
+    const chainKeys = (await Promise.all(chainFingerprints.map((fp) =>
+        c.var.services.signingKey.getPublicKeyByFingerprint(reqRow.tenantId, fp),
+    ))).filter((k): k is NonNullable<typeof k> => k !== null);
+    // Falls back to the active key only when the envelope has no audit rows to
+    // name a key — a chain with rows always answers for itself.
+    const pubKey = chainKeys[0] ?? await c.var.services.signingKey.getPublicKey(reqRow.tenantId);
     const tenantRow = await db.select({ slug: schema.tenants.slug })
         .from(schema.tenants)
         .where(eq(schema.tenants.id, reqRow.tenantId))
@@ -45,7 +56,12 @@ export async function loadVerifyData(c: Context<HonoConfig>, envelopeId: string)
         .where(eq(schema.agreementSigners.requestId, envelopeId))
         .orderBy(asc(schema.agreementSigners.createdAt))
         .all();
-    return { reqRow, agreement, auditRows, verify, pubKey, tenantSlug, signers };
+    // One PEM holding every key this chain used — a PEM file legitimately holds
+    // several blocks. Assembled here rather than at the route so the endpoint
+    // cannot accidentally ship only the first one and leave an offline verifier
+    // unable to check rows it is entitled to check.
+    const pubKeyPem = (chainKeys.length > 0 ? chainKeys.map((k) => k.pem) : [pubKey?.pem ?? '']).join('');
+    return { reqRow, agreement, auditRows, verify, pubKey, chainKeys, pubKeyPem, tenantSlug, signers };
 }
 
 /**

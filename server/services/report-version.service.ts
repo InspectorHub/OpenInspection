@@ -257,10 +257,22 @@ export class ReportVersionService {
         const recomputed = await sha256Hex(row.snapshotJson);
         const hashValid = !legacy && recomputed === row.contentHash;
 
+        // Verified against the key THIS row was sealed with, resolved by the
+        // fingerprint it recorded — not the tenant's current key. Reading the
+        // current one would make every version published before a key rotation
+        // report `signatureValid: false` on the public verifier page, which says
+        // "this document does not check out" about a document that does.
         let signatureValid = false;
+        let keyMissing = false;
         if (!legacy) {
             const signing = new SigningKeyService(this.db, this.encryptionSecret);
-            const pub = await signing.getPublicKey(row.tenantId);
+            const pub = row.keyFingerprint
+                ? await signing.getPublicKeyByFingerprint(row.tenantId, row.keyFingerprint)
+                : null;
+            // No key on file for this row: unverifiable, which is a different
+            // finding from a signature that failed. Kept apart so the page can
+            // stop short of blaming the document.
+            keyMissing = !pub;
             if (pub) {
                 signatureValid = await crypto.subtle.verify(
                     { name: 'Ed25519' }, pub.publicKey,
@@ -300,6 +312,7 @@ export class ReportVersionService {
             legacy,
             hashValid,
             signatureValid,
+            keyMissing,
             chainValid,
         };
     }

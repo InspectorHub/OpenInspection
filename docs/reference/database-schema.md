@@ -10,10 +10,25 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 94 |
-| Columns | 1106 |
-| Indexes (excluding primary keys) | 159 |
+| Columns | 1107 |
+| Indexes (excluding primary keys) | 158 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 511 (46%) |
+| Columns carrying a source comment | 507 (46%) |
+
+**Tables without `tenant_id`.** Every table holding tenant data must carry it —
+`npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
+a tenant, which is the only reason to be missing it:
+
+`marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
+
+That is 8 of 94. If a table you just added appears here,
+that is the bug, not the list.
+
+**Timestamps.** 174 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
+Seconds and milliseconds are one multiplication apart and the mistake reads as a
+date tens of thousands of years out, so the Schema Rules allow only the former for
+new columns.
 
 **Reading the tables.** SQLite has four storage types; the semantic type is a
 Drizzle layer on top — `integer{mode:timestamp_ms}` is epoch milliseconds,
@@ -61,7 +76,6 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `agreement_requests_token_unique` (token)
 - **UNIQUE** `idx_agreement_requests_verify_token` (verification_token)
 - `idx_agreement_requests_tenant` (tenant_id)
 - `idx_agreement_requests_inspection` (inspection_id)
@@ -789,7 +803,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `prev_hash` | text |  |  |  | *Hash used for lookup and comparison; not reversible.* |
 | `hash` | text | NN |  |  | The chain link: the next row's prev_hash is a copy of this. verifyChain recomputes it, so a rewritten payload_json fails as reason:'hash' and an unlinked or reordered row fails as reason:'chain', naming brokenAt. |
 | `signature` | text | NN |  |  | base64url Ed25519 over the HEX-DECODED hash bytes. This is what makes the chain more than a checksum: recomputing hashes after editing a payload still fails (reason:'signature') without the tenant's private key. |
-| `key_fingerprint` | text | NN |  |  | Which signing_keys row signed THIS row, stamped from ensureKeypair. verifyChain does not read it — it always verifies against the tenant's current key — so it exists to tell a reader (and a future rotation) which key a row was sealed with. |
+| `key_fingerprint` | text | NN |  |  | Which signing_keys row signed THIS row, stamped from ensureKeypair. It is what SELECTS the key at verification time, so it is load-bearing rather than informational: verifyChain resolves this fingerprint against the tenant's key history instead of reading whatever key is active now, which is what … **[more]** |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
 
 **Indexes**
@@ -1871,8 +1885,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `summary` | text |  |  |  | NOT a summary of the report. It is the per-publish AMENDMENT REASON: the free-text "what changed" note (max 500 chars) the publish request carries, NULL on a first publish. |
 | `content_hash` | text |  |  |  | #120 — integrity layer. content_hash = SHA-256(snapshot_json); prev_hash chains to the previous version's content_hash; signature = Ed25519 over content_hash by the tenant signing key (reused from e-sign). |
 | `prev_hash` | text |  |  |  | *Hash used for lookup and comparison; not reversible.* |
-| `signature` | text |  |  |  | Verified against the tenant's CURRENT signing key, not against a key named by this row — rotating that key makes every earlier signature report `signatureValid: false`. |
-| `key_fingerprint` | text |  |  |  | SHA-256 of the public key that signed this row. Nothing verifies with it; it is published on the verifier page so a reader can tell whether two reports were signed by the same key. |
+| `signature` | text |  |  |  | Verified against the key named by THIS row's key_fingerprint, resolved from the tenant's key history — so a rotation leaves earlier versions verifying exactly as before. |
+| `key_fingerprint` | text |  |  |  | SHA-256 of the public key that signed this row. This is what selects the key at verification time, so it is load-bearing rather than decorative; it is also published on the verifier page, where a reader can tell whether two reports were signed by the same key. |
 | `is_amendment` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `verification_token` | text | UQ |  |  | The bearer credential for the public verifier: a random UUID minted per publish and the SOLE lookup key for the /v/:token page and the frozen-PDF endpoint (both unauthenticated). |
 | `published_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
@@ -2008,22 +2022,21 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ---
 
-## `signing_keys`
+## `signing_keys_new`
 
-<sub>server/lib/db/schema/esign.ts · 8 columns · primary key `tenant_id`</sub>
-
-> Spec 5H — Self-built e-signature audit foundation. Per-tenant Ed25519 keypair, lazy-created on first sign attempt.
+<sub>(no drizzle definition found) · 9 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `tenant_id` | text | PK NN FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `public_key` | text | NN |  |  | base64url SPKI. Stored in the clear on purpose: it is what a third party needs to check the seal, served as PEM from /.well-known and embedded in the audit-trail export so an offline verifier needs nothing from us. |
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `public_key` | text | NN |  |  |  |
 | `private_key_enc` | text | NN |  |  | *Encrypted at rest (AES-GCM envelope).* |
-| `private_key_iv` | text | NN |  |  | base64url 12-byte AES-GCM IV for privateKeyEnc, freshly random per keypair. Not a secret, but not optional either: without it the private key cannot be decrypted and the tenant can never sign again under this fingerprint. |
-| `fingerprint` | text | NN |  |  | SHA-256 hex of the raw SPKI bytes. Copied onto every audit row's key_fingerprint at append time and published by the verifier, so a reader can say WHICH key signed rather than trusting that one exists. |
-| `algorithm` | text | NN | `'Ed25519'` |  | NO READER FOUND. Every surface that reports an algorithm — /.well-known, the public verifier JSON, the audit-trail export — emits the 'Ed25519' literal instead of reading this column. |
+| `private_key_iv` | text | NN |  |  |  |
+| `fingerprint` | text | NN |  |  |  |
+| `algorithm` | text | NN | `'Ed25519'` |  |  |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
-| `rotated_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `retired_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 
 ---
 

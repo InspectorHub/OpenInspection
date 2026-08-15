@@ -33,7 +33,26 @@ export interface ErasureRule {
     table: string;
     /** Column to act on (snake_case DB name). */
     column: string;
-    /** Fideslang-style data category, e.g. 'user.contact.email'. */
+    /**
+     * Fideslang-style data category, e.g. 'user.contact.email'.
+     *
+     * ⚠️ THIS IS OUR CLASSIFICATION, NOT A LEGAL FINDING. review raised this
+     * directly (review full review, 2026-08-15): a category here records how
+     * WE choose to govern a column, and must never be cited downstream as a
+     * determination that the law classifies it that way.
+     *
+     * The live example is `user.biometric.signature` on the two signature
+     * columns. Whether a signature image is Art. 9 "biometric data" turns on
+     * whether it is processed by specific technical means FOR THE PURPOSE of
+     * uniquely identifying a natural person — which an image of a handwritten
+     * signature does not satisfy merely by being a signature. We keep the
+     * conservative label because governing it tightly costs us nothing; that
+     * choice is not a conclusion that Art. 9 applies, and a later document
+     * asserting so on the strength of this string would be wrong.
+     *
+     * review named the failure mode from our own history: an internal
+     * classification read by the next legal document as an established fact.
+     */
     category: string;
     /** Masking strategy for this column on erasure. */
     action: 'delete' | 'null' | 'hash' | 'retain' | 'anonymize';
