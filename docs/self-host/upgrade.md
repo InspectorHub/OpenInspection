@@ -111,6 +111,25 @@ signatures without reaching the envelope.
 3. Re-running after you have corrected the data is safe. The relocation is
    idempotent and can be applied again; it is a separate migration from the one
    that adds the columns for exactly this reason.
+4. **Check the result, do not assume it.** After upgrading, confirm that every
+   signed agreement still has a signature behind it:
+
+   ```bash
+   wrangler d1 execute <your-db> --remote --command      "SELECT COUNT(*) AS unexplained FROM agreement_requests r
+      WHERE r.status='signed' AND r.purged_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM agreement_signers s
+                        WHERE s.request_id=r.id AND s.signature_base64 IS NOT NULL)"
+   ```
+
+   It must return `0`. A later migration asserts the same thing and will refuse
+   to complete if it does not, so you will not be able to upgrade past a
+   deployment that lost signature evidence — but knowing early is better than
+   finding out at the next upgrade.
+
+**Nothing is deleted silently.** Retained signature evidence is moved, never
+discarded: the old column is removed only after every signature it held has been
+verified to sit on a signer row. If that verification fails the migration stops
+with your data intact, and the column stays until the situation is resolved.
 
 ---
 

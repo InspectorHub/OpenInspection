@@ -78,6 +78,13 @@
       "when": 1786753837559,
       "tag": "0010_move_envelope_signature_to_signer_rows",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1786753837560,
+      "tag": "0011_assert_no_signature_evidence_lost",
+      "breakpoints": true
     }
   ]
 }
