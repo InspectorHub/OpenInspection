@@ -14,11 +14,25 @@ and what an audit of every table concluded.
 Cloudflare D1 (SQLite). Migrations are **drizzle-kit schema-first**: the Drizzle ORM
 schema is the source of truth, and `db:generate` diffs against it.
 
-Generated SQL is the starting point, not the rule. A `DROP COLUMN` is **hand-written**,
-because drizzle emits a twelve-step table rebuild that needs `PRAGMA foreign_keys=OFF`
-outside a transaction and D1 cannot do that — see the Schema Rules in `CLAUDE.md`, which
-also give the grep that checks a hand-written drop carries none of the rebuild's
-signature. Most recent migrations here are hand-written for that reason.
+Generated SQL is the starting point, not the rule. Drop migrations here are
+**hand-written**, and it is worth being exact about why, because the reason
+recorded for years was wrong.
+
+The old rationale was that `db:generate` emits a twelve-step table rebuild for a
+`DROP COLUMN` — copy the table, retire the original, rename the copy — which needs
+`PRAGMA foreign_keys=OFF` outside a transaction and would lose referenced rows on
+D1. **On drizzle-kit 0.31.10 it does not.** Tested three ways against this schema:
+a plain column, a column carrying a unique index, and both on `agreement_requests`,
+which other tables reference. Every time the output was the native form — a
+`DROP INDEX` where one was needed, then `ALTER TABLE … DROP COLUMN` — with none of
+the rebuild's signature. Five such drops have been applied to production.
+
+So the rule survives on a different ground: a migration is where the reasoning
+lives, and a generated one-liner carries none. The migrations in this directory
+explain what they are doing and what they refuse to guess, which is the point of
+writing them by hand. The rebuild-signature grep in the Schema Rules stays too —
+not because generation is presumed dangerous, but because a future version could
+change its mind and the check costs nothing.
 
 ## Source of truth
 
