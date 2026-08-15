@@ -123,6 +123,22 @@ function VerifyBody() {
           {result.documentTitle ?? m.public_verify_document_fallback()}
           {result.clientName ? m.public_verify_for_client({ name: result.clientName }) : ""}
         </p>
+        {/* The heading alone cannot carry this. Counsel ruling 17c (2026-08-15):
+            a verification surface may state what the check established and no
+            more, and a failure must be attributed to the check rather than to
+            the signature or the signer — a chain can break because this company
+            rotated its signing key, and calling a real person's signature
+            "invalid" for that reason is a statement against their interest. */}
+        {/* No opacity here. Dimming this to 90% put it at 4.22:1 on the dark
+            failure background — under AA, and `lint:contrast` cannot see it
+            because it checks token pairs and not what an opacity composites to.
+            This is the sentence that stops a failed check reading as a verdict
+            on the signer; it does not get to be the faintest text on the page. */}
+        <p className="text-[12px] mt-2 text-left">
+          {result.chainValid
+            ? m.public_verify_result_valid_detail()
+            : m.public_verify_result_invalid_detail()}
+        </p>
       </div>
 
       {/* What was signed — pinned content snapshot */}

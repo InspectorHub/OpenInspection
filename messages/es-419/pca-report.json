@@ -95,7 +95,7 @@
   "pca_signature_nudge_before": "Suba su firma en ",
   "pca_signature_nudge_strong": "Configuración → Perfil",
   "pca_signature_nudge_after": " para mostrarla en los informes impresos.",
-  "pca_verification_title": "Documento verificado",
+  "pca_verification_title": "Verificación del documento",
   "pca_verification_published": "Publicado y firmado — versión v{version}",
   "pca_verification_verify_at": "Verifique en",
   "pca_verification_integrity_hash": "Hash de integridad: {hash}…",
