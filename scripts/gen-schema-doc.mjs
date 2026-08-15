@@ -306,7 +306,13 @@ for (const name of names) {
 
 const out = L.join('\n') + '\n';
 if (check) {
-    const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : '';
+    // Compare CONTENT, not bytes. The generator writes LF; git hands a Windows
+    // checkout back with CRLF, so a byte comparison reports the doc as stale on
+    // a machine where nothing is stale — and only there, because CI runs on
+    // Linux and never sees the conversion. A gate that fails locally and passes
+    // in CI teaches people to stop reading it.
+    const norm = (s) => s.replace(/\r\n/g, '\n');
+    const current = existsSync(OUT) ? norm(readFileSync(OUT, 'utf8')) : '';
     if (current !== out) {
         console.error('[schema-doc] docs/reference/database-schema.md is out of date.');
         console.error(`            regenerated: ${out.length} chars over ${names.length} tables / ${nCols} columns`);
