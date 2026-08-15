@@ -122,7 +122,11 @@ api.get('/callback', async (c) => {
     try {
         apiBase = resolveQboApiBase(c.env.QBO_ENV);
     } catch {
-        return c.redirect('/settings/integrations/qbo?error=not_configured');
+        // Its own code, not the credential one: QBO_ENV is env-only in every
+        // deployment mode — it is not in the secrets catalog and the settings
+        // form cannot set it — so telling this tenant to "add a Client ID
+        // above" would send them to a field that is already correct.
+        return c.redirect('/settings/integrations/qbo?error=missing_qbo_env');
     }
 
     // Byte-identical to the value `/connect` authorized with, and to what is

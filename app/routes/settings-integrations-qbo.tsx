@@ -1,26 +1,54 @@
 import { useState, useEffect } from "react";
-import { useLoaderData, useActionData, useNavigation, Form } from "react-router";
+import { useLoaderData, useActionData, useNavigation } from "react-router";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-integrations-qbo";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { getApiUrl } from "~/lib/api.server";
-import { SecretField } from "~/components/SecretField";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
-import { QboBooksHealth, type QboDiscrepancy } from "~/components/settings/QboBooksHealth";
+import { QboBooksHealth } from "~/components/settings/QboBooksHealth";
+import { QboCredentialsForm } from "~/components/settings/QboCredentialsForm";
+import {
+  QboOAuthOutcomeBanner,
+  type QboOAuthOutcome,
+} from "~/components/settings/QboOAuthOutcome";
+import type { QBOConnectionStatus } from "../../server/services/qbo/api-base";
 
-interface QboStatus {
-  connected: boolean;
-  companyName?: string;
-  syncEnabled?: boolean;
-  lastSyncAt?: number | null;
-  openErrors?: number;
-  /** Both figures, never one: the point is that a human compares them. */
-  paymentDiscrepancies?: QboDiscrepancy[];
-  heldDepositCount?: number;
-  refreshTokenExpiresAt?: number;
+/**
+ * The connection is represented by presence, not by a flag: `/status` answers
+ * with the connection or with nothing, so `status === null` IS "not connected".
+ *
+ * This page used to re-declare the payload locally with an extra
+ * `connected: boolean` and cast the JSON body to it. No such field is ever
+ * sent, so the flag read `undefined` forever and every connected-state control
+ * on this page was unreachable. Read the server's own type instead, so a
+ * divergence is a compile error rather than a blank page.
+ */
+export interface QboLoaderData {
+  status: QBOConnectionStatus | null;
+  secrets: { QBO_CLIENT_ID: string; QBO_CLIENT_SECRET: string; QBO_WEBHOOK_SECRET: string };
+  /**
+   * Which of the three the deployment already supplies through its Worker env.
+   * Booleans only — the values themselves never leave the server.
+   *
+   * The stored-secret form above can only show what is in the tenant's own
+   * row, so on a deployment that configures QuickBooks centrally all three
+   * read empty while the integration works. Without this the page told a
+   * working tenant they had configured nothing.
+   */
+  envProvided: { QBO_CLIENT_ID: boolean; QBO_CLIENT_SECRET: boolean; QBO_WEBHOOK_SECRET: boolean };
+  /**
+   * How the OAuth handshake ended, read off the query string that
+   * `api/qbo-oauth.ts` redirects back with. Both halves of that flow report
+   * exclusively this way — `?connected=1`, or `?error=<code>` for a missing
+   * credential, a missing/expired `state`, an unset `QBO_ENV`, a refused token
+   * exchange, or a user who declined at Intuit. Nothing used to read any of
+   * it, so every one of those outcomes returned the user to an unchanged page
+   * with no explanation, successes included.
+   */
+  oauth: QboOAuthOutcome;
 }
 
 export function meta() {
@@ -46,7 +74,7 @@ async function qboApiFetch(
   }
 }
 
-export async function loader({ request, context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs): Promise<QboLoaderData> {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
   const cookie = request.headers.get("Cookie") ?? "";
@@ -56,15 +84,19 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     api.secrets.secrets.$get().catch(() => null),
   ]);
 
-  let status: QboStatus | null = null;
+  let status: QBOConnectionStatus | null = null;
   if (qboRes?.ok) {
     const body = await qboRes.json();
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
-    status = (Object.keys(d).length > 0 ? d : null) as QboStatus | null;
+    status = (Object.keys(d).length > 0 ? d : null) as QBOConnectionStatus | null;
   }
 
   const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
   const secrets = (secretsBody.data ?? {}) as Record<string, string>;
+
+  const env = getCloudflareEnv(context);
+  const url = new URL(request.url);
+  const rawError = url.searchParams.get("error");
 
   return {
     status,
@@ -72,6 +104,18 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       QBO_CLIENT_ID: secrets.QBO_CLIENT_ID || "",
       QBO_CLIENT_SECRET: secrets.QBO_CLIENT_SECRET || "",
       QBO_WEBHOOK_SECRET: secrets.QBO_WEBHOOK_SECRET || "",
+    },
+    envProvided: {
+      QBO_CLIENT_ID: Boolean(env.QBO_CLIENT_ID),
+      QBO_CLIENT_SECRET: Boolean(env.QBO_CLIENT_SECRET),
+      QBO_WEBHOOK_SECRET: Boolean(env.QBO_WEBHOOK_SECRET),
+    },
+    oauth: {
+      connected: url.searchParams.get("connected") === "1",
+      // Bounded before it reaches the page: this value arrives from a
+      // redirect anyone can craft, and the renderer must never be handed
+      // arbitrary attacker text to echo back.
+      error: rawError ? rawError.slice(0, 64) : null,
     },
   };
 }
@@ -130,10 +174,10 @@ function timeSince(ts: number | null | undefined): string {
 }
 
 export default function SettingsIntegrationsQbo() {
-  const { status: initial, secrets } = useLoaderData<typeof loader>();
+  const { status: initial, secrets, envProvided, oauth } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
-  const [status, setStatus] = useState<QboStatus | null>(initial);
+  const [status, setStatus] = useState<QBOConnectionStatus | null>(initial);
 
   const savingSecrets =
     nav.state !== "idle" && nav.formData?.get("intent") === "save-qbo-secrets";
@@ -150,7 +194,6 @@ export default function SettingsIntegrationsQbo() {
   const { fetcher: qboFetcher, submit: submitQbo, busy: qboBusy } =
     useGuardedSubmit<{ success: boolean; intent?: string | null; error: string | null; syncEnabled?: boolean }>();
 
-  const connected = status?.connected;
   const discrepancies = status?.paymentDiscrepancies ?? [];
   const syncing = qboBusy && qboFetcher.formData?.get("intent") === "qbo-sync";
   const expiryWarning =
@@ -162,7 +205,11 @@ export default function SettingsIntegrationsQbo() {
     const d = qboFetcher.data;
     if (!d?.success) return;
     if (d.intent === "qbo-pause") {
-      setStatus((s) => (s ? { ...s, syncEnabled: d.syncEnabled } : s));
+      // Only when the action reported the new state. A pause whose response
+      // omitted it leaves the badge showing what we last knew, rather than
+      // flipping it to a value nobody confirmed.
+      const next = d.syncEnabled;
+      if (typeof next === "boolean") setStatus((s) => (s ? { ...s, syncEnabled: next } : s));
     } else if (d.intent === "qbo-disconnect") {
       setStatus(null);
     }
@@ -202,47 +249,16 @@ export default function SettingsIntegrationsQbo() {
         </div>
       )}
 
-      {/* QBO API credentials */}
-      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
-        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_qbo_api_credentials_heading()}</h3>
-        <p className="text-[13px] text-ih-fg-3">
-          {m.settings_qbo_credentials_desc_before()}{" "}
-          <a href="https://developer.intuit.com/app/developer/appdetail" target="_blank" rel="noopener noreferrer"
-            className="text-ih-primary-text hover:underline">
-            {m.settings_qbo_credentials_link()}
-          </a>.
-        </p>
-        <Form method="post" className="space-y-4 max-w-xl">
-          <input type="hidden" name="intent" value="save-qbo-secrets" />
-          <SecretField
-            name="QBO_CLIENT_ID"
-            label={m.settings_qbo_client_id_label()}
-            value={secrets.QBO_CLIENT_ID}
-            hint={m.settings_qbo_client_id_hint()}
-          />
-          <SecretField
-            name="QBO_CLIENT_SECRET"
-            label={m.settings_qbo_client_secret_label()}
-            value={secrets.QBO_CLIENT_SECRET}
-            hint={m.settings_qbo_client_secret_hint()}
-          />
-          <SecretField
-            name="QBO_WEBHOOK_SECRET"
-            label={m.settings_qbo_webhook_label()}
-            value={secrets.QBO_WEBHOOK_SECRET}
-            hint={m.settings_qbo_webhook_hint()}
-          />
-          <div className="flex justify-end pt-2 border-t border-ih-border">
-            <button type="submit" disabled={savingSecrets}
-              className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
-              {savingSecrets ? m.common_saving() : m.settings_qbo_save_credentials()}
-            </button>
-          </div>
-        </Form>
-      </section>
+      <QboOAuthOutcomeBanner outcome={oauth} />
+
+      <QboCredentialsForm
+        secrets={secrets}
+        envProvided={envProvided}
+        saving={savingSecrets}
+      />
 
       {/* Expiry warning */}
-      {connected && expiryWarning && (
+      {status && expiryWarning && (
         <div className="flex items-start gap-3 p-4 bg-ih-watch-bg border border-ih-watch-fg/20 rounded-lg text-ih-watch-fg text-[13px]">
           <svg
             className="w-5 h-5 flex-shrink-0 mt-0.5"
@@ -270,7 +286,7 @@ export default function SettingsIntegrationsQbo() {
       )}
 
       {/* Not connected */}
-      {!connected && (
+      {!status && (
         <div className="bg-ih-bg-card border border-ih-border rounded-lg p-8 text-center">
           <div className="w-16 h-16 bg-[#2CA01C]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <span className="text-[#2CA01C] text-2xl font-extrabold">QB</span>
@@ -302,7 +318,7 @@ export default function SettingsIntegrationsQbo() {
       )}
 
       {/* Connected */}
-      {connected && (
+      {status && (
         <div className="space-y-4">
           {/* Status card */}
           <div className="bg-ih-bg-card border border-ih-border rounded-lg p-6">
