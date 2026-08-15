@@ -64,7 +64,7 @@ Migrations are applied with wrangler (`wrangler d1 migrations apply`), not `driz
 | `invoices` | Billing with optional QuickBooks sync |
 | `agreements` / `agreement_requests` | E-sign workflow with Ed25519 audit chain |
 | `comments` | Canned comment library (250+ seed comments) |
-| `marketplace_templates` | A curated first-party catalogue beside the tenant's own templates (not community-contributed; the browsing UI is SaaS-only) |
+| `marketplace_libraries` | A curated first-party catalogue beside the tenant's own templates (not community-contributed; the browsing UI is SaaS-only) |
 | `availability` / `availability_overrides` | Inspector scheduling (weekly + date overrides) |
 | `tenant_configs` | Per-tenant settings, encrypted integration secrets |
 | `audit_logs` / `esign_audit_logs` | Immutable audit trail |
@@ -134,11 +134,16 @@ const results = await db.select()
   not being *about* a tenant. Which tables those are is listed in the generated
   reference, and `npm run lint:tenant-scope` is the gate; if a table you just added
   turns up on that list, the table is the bug.
-- Primary keys are random text IDs (not auto-increment)
+- Primary keys are random text IDs, never auto-increment. One table breaks it and
+  should be read as the exception rather than the pattern: `sms_disclosure_versions`
+  is keyed by its integer version number, because the version IS the identity there.
 - **Timestamps are epoch milliseconds** — `integer(..., { mode: 'timestamp_ms' })`,
   never seconds. The two are one multiplication apart and the mistake reads as a date
   tens of thousands of years out. A calendar date with no time component may be
   `YYYY-MM-DD` TEXT if its comment says so. The current census is in the generated
   reference.
 - JSON columns stored as `TEXT` (D1 has no native JSON type)
-- Indexes follow `idx_{table}_{column}` naming
+- Indexes are prefixed by intent: `idx_` for a plain index, `uq_` for a unique one.
+  Roughly a fifth carry the `uq_` form, so `idx_` is not universal and a grep for it
+  will miss them. Names drizzle generated itself (`<table>_<column>_unique`) are
+  legacy — do not add more.

@@ -97,7 +97,11 @@ for (const raw of sql.split('--> statement-breakpoint')) {
         continue;
     }
 
-    const di = stmt.match(/DROP INDEX `(\w+)`/);
+    // `IF EXISTS` is the right thing to write in a migration that may run against
+    // a database which already lacks the index — and it silently defeated this
+    // regex, so the reference kept describing an index production had dropped.
+    // 158 in the database, 159 on the page, and nothing compared the two.
+    const di = stmt.match(/DROP INDEX (?:IF EXISTS )?`(\w+)`/);
     if (di) {
         for (const t of Object.values(tables)) t.idx = t.idx.filter((i) => i.name !== di[1]);
         continue;

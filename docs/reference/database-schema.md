@@ -11,7 +11,7 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 |---|---|
 | Tables | 94 |
 | Columns | 1106 |
-| Indexes (excluding primary keys) | 159 |
+| Indexes (excluding primary keys) | 158 |
 | Database foreign keys (all legacy, frozen) | 51 |
 | Columns carrying a source comment | 511 (46%) |
 
@@ -76,7 +76,6 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 **Indexes**
 
-- **UNIQUE** `agreement_requests_token_unique` (token)
 - **UNIQUE** `idx_agreement_requests_verify_token` (verification_token)
 - `idx_agreement_requests_tenant` (tenant_id)
 - `idx_agreement_requests_inspection` (inspection_id)
