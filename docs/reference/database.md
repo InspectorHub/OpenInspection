@@ -1,5 +1,16 @@
 # Database Schema
 
+**This page holds the rules; [`database-schema.md`](database-schema.md) holds the
+facts.** Anything countable — how many tables, which ones lack `tenant_id`, how
+many timestamp columns and in what unit — is generated there from the migration
+chain and the Drizzle definitions, and `npm run lint:schema-doc` fails if the
+committed copy has fallen behind. Nothing countable is written here, because this
+page had four such claims and every one of them was wrong by the time anyone
+read it.
+
+What is here instead: why the schema is the way it is, how to change it safely,
+and what an audit of every table concluded.
+
 Cloudflare D1 (SQLite). Migrations are **drizzle-kit schema-first**: the Drizzle ORM
 schema is the source of truth, and `db:generate` diffs against it.
 
@@ -53,7 +64,7 @@ Migrations are applied with wrangler (`wrangler d1 migrations apply`), not `driz
 | `invoices` | Billing with optional QuickBooks sync |
 | `agreements` / `agreement_requests` | E-sign workflow with Ed25519 audit chain |
 | `comments` | Canned comment library (250+ seed comments) |
-| `templates` / `marketplace_templates` | Tenant-owned templates, plus a curated first-party catalogue (not community-contributed; the browsing UI is SaaS-only) |
+| `marketplace_templates` | A curated first-party catalogue beside the tenant's own templates (not community-contributed; the browsing UI is SaaS-only) |
 | `availability` / `availability_overrides` | Inspector scheduling (weekly + date overrides) |
 | `tenant_configs` | Per-tenant settings, encrypted integration secrets |
 | `audit_logs` / `esign_audit_logs` | Immutable audit trail |
@@ -119,15 +130,15 @@ const results = await db.select()
 
 ## Conventions
 
-- Almost every table has `tenant_id` for multi-tenant isolation, and any table holding
-  tenant data must. The exceptions are tables that are not *about* a tenant: `tenants`
-  itself, `slug_reservations`, the command and webhook dedup ledgers, `sync_outbox`,
-  `marketplace_libraries` and `sms_disclosure_versions`. Adding a tenant-scoped table
-  without the column is a bug the `lint:tenant-scope` gate is there to catch.
+- **Any table holding tenant data carries `tenant_id`.** A table may omit it only by
+  not being *about* a tenant. Which tables those are is listed in the generated
+  reference, and `npm run lint:tenant-scope` is the gate; if a table you just added
+  turns up on that list, the table is the bug.
 - Primary keys are random text IDs (not auto-increment)
-- Timestamps are epoch **milliseconds** in an integer column — `integer(..., { mode:
-  'timestamp_ms' })`, which is what all 174 of them use. Not seconds: the two are one
-  multiplication apart and the mistake reads as a date tens of thousands of years out.
-  A calendar date with no time component may be `YYYY-MM-DD` TEXT if its comment says so.
+- **Timestamps are epoch milliseconds** — `integer(..., { mode: 'timestamp_ms' })`,
+  never seconds. The two are one multiplication apart and the mistake reads as a date
+  tens of thousands of years out. A calendar date with no time component may be
+  `YYYY-MM-DD` TEXT if its comment says so. The current census is in the generated
+  reference.
 - JSON columns stored as `TEXT` (D1 has no native JSON type)
 - Indexes follow `idx_{table}_{column}` naming

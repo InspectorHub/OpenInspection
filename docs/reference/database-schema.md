@@ -15,6 +15,21 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | Database foreign keys (all legacy, frozen) | 51 |
 | Columns carrying a source comment | 511 (46%) |
 
+**Tables without `tenant_id`.** Every table holding tenant data must carry it —
+`npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
+a tenant, which is the only reason to be missing it:
+
+`marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
+
+That is 8 of 94. If a table you just added appears here,
+that is the bug, not the list.
+
+**Timestamps.** 174 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
+Seconds and milliseconds are one multiplication apart and the mistake reads as a
+date tens of thousands of years out, so the Schema Rules allow only the former for
+new columns.
+
 **Reading the tables.** SQLite has four storage types; the semantic type is a
 Drizzle layer on top — `integer{mode:timestamp_ms}` is epoch milliseconds,
 `integer{mode:boolean}` is 0/1, `text{mode:json}` is a JSON string. Flags:
