@@ -17145,6 +17145,22 @@
     "description": "Revokes an OAuth grant. Self-path revokes the caller's own grant; admin path (?admin=1) allows owner or manager to revoke any tenant member's grant with full audit logging."
   },
   {
+    "operationId": "rotateTenantSigningKey",
+    "method": "POST",
+    "pathTemplate": "/api/admin/agreements/signing-key/rotate",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Rotate the tenant e-signature signing key",
+    "description": "Retire the tenant's current Ed25519 e-signature key and mint a replacement. Previously signed agreements and report versions keep verifying: the retired public key is kept forever and every audit row is checked against the key its own fingerprint names. Nothing is re-signed and no existing evidence is modified."
+  },
+  {
     "operationId": "saveAgentNotificationPreference",
     "method": "PUT",
     "pathTemplate": "/api/agent/notification-preferences",

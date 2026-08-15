@@ -99,20 +99,38 @@ export class AuditLogService {
 
     /**
      * Verify the entire chain for a request. Returns {valid, brokenAt?, reason?}.
-     * Checks: prev_hash linkage, hash recomputation, Ed25519 signature.
+     * Checks: prev_hash linkage, hash recomputation, key identity, Ed25519 signature.
+     *
+     * **Each row is checked against the key that sealed IT**, resolved from the
+     * `key_fingerprint` the row recorded — never against whatever key the tenant
+     * happens to hold today. That is what makes rotation survivable: retiring a
+     * key leaves its public half on file, so chains signed under it keep
+     * verifying, including a chain that spans a rotation mid-envelope.
+     *
+     * `key_mismatch` means the row names a key this tenant does not hold at all.
+     * It is separate from `signature` on purpose, and the distinction is not
+     * academic: this result reaches the public verifier page. Reporting
+     * `signature` would tell a reader that a real signer's real signature failed
+     * to check out, when what actually happened is that we cannot produce the
+     * key — a statement against the signer's interest, which counsel ruling 17c
+     * forbids.
      */
     async verifyChain(tenantId: string, requestId: string): Promise<
         | { valid: true; events: number }
-        | { valid: false; reason: 'not_found' | 'chain' | 'hash' | 'signature' | 'no_key'; brokenAt?: string }
+        | { valid: false; reason: 'not_found' | 'chain' | 'hash' | 'key_mismatch' | 'signature' | 'no_key'; brokenAt?: string }
     > {
         const events = await this.getDrizzle().select().from(esignAuditLogs)
             .where(and(eq(esignAuditLogs.tenantId, tenantId), eq(esignAuditLogs.requestId, requestId)))
             .orderBy(asc(esignAuditLogs.createdAt)).all();
         if (events.length === 0) return { valid: false, reason: 'not_found' };
 
-        const keyInfo = await this.signingKeys.getPublicKey(tenantId);
-        if (!keyInfo) return { valid: false, reason: 'no_key' };
+        // Distinguishes "this tenant has never had a key" from "this row names a
+        // key we do not hold" — the second is a per-row answer, resolved below.
+        if (!await this.signingKeys.getPublicKey(tenantId)) return { valid: false, reason: 'no_key' };
 
+        // One lookup per distinct key, not per row: a chain that spans a
+        // rotation uses two, and every other chain uses one.
+        const keys = new Map<string, CryptoKey | null>();
         let prevHash: string | null = null;
         for (const ev of events) {
             if ((ev.prevHash ?? null) !== prevHash) {
@@ -122,8 +140,19 @@ export class AuditLogService {
             if (expected !== ev.hash) {
                 return { valid: false, reason: 'hash', brokenAt: ev.id };
             }
+            // Resolve THIS row's key before testing its signature. A row we have
+            // no key for is unverifiable, which is not the same finding as a
+            // signature that failed to verify.
+            if (!keys.has(ev.keyFingerprint)) {
+                const info = await this.signingKeys.getPublicKeyByFingerprint(tenantId, ev.keyFingerprint);
+                keys.set(ev.keyFingerprint, info?.publicKey ?? null);
+            }
+            const rowKey = keys.get(ev.keyFingerprint) ?? null;
+            if (!rowKey) {
+                return { valid: false, reason: 'key_mismatch', brokenAt: ev.id };
+            }
             const ok = await crypto.subtle.verify(
-                'Ed25519', keyInfo.publicKey,
+                'Ed25519', rowKey,
                 base64UrlDecode(ev.signature) as unknown as ArrayBuffer,
                 hexDecode(ev.hash) as unknown as ArrayBuffer,
             );

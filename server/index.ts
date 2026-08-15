@@ -589,7 +589,7 @@ app.get('/api/public/verify/:envelopeId/public-key', async (c) => {
     if (!data || !data.pubKey) return c.text('Not found', 404);
     c.header('Content-Type', 'application/x-pem-file');
     c.header('Content-Disposition', `attachment; filename="pubkey-${envelopeId.slice(0, 8)}.pem"`);
-    return c.body(data.pubKey.pem);
+    return c.body(data.pubKeyPem);
 });
 
 // Spec 5H D-patch — view the signed document.

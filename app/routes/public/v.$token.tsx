@@ -19,6 +19,7 @@ export interface VerifyInput {
   legacy: boolean;
   hashValid?: boolean;
   signatureValid?: boolean;
+  keyMissing?: boolean;
   chainValid?: boolean;
   notPublished?: boolean;
   versionNumber?: number;
@@ -28,7 +29,7 @@ export interface VerifyInput {
 }
 
 export interface VerifyModel {
-  state: "verified" | "legacy" | "failed" | "not_published";
+  state: "verified" | "legacy" | "failed" | "key_missing" | "not_published";
   versionNumber?: number;
   publishedAt?: number;
   contentHash?: string;
@@ -46,6 +47,11 @@ export function verifyResultModel(v: VerifyInput): VerifyModel {
   if (v.legacy) return { state: "legacy", ...base };
   if (v.hashValid && v.signatureValid && v.chainValid)
     return { state: "verified", ...base };
+  // Before "failed": when the signing key this version names is not on file, no
+  // check ran, so the page must not offer "the content may have been altered"
+  // as the explanation. Counsel ruling 17c — report what the check established
+  // and no more. Ordinarily unreachable, since retired keys are kept forever.
+  if (v.keyMissing) return { state: "key_missing", ...base };
   return { state: "failed", ...base };
 }
 
@@ -92,6 +98,7 @@ export async function loader({
           legacy: boolean;
           hashValid: boolean;
           signatureValid: boolean;
+          keyMissing?: boolean;
           chainValid: boolean;
           notPublished: boolean;
           versionNumber: number;
@@ -112,6 +119,7 @@ export async function loader({
             legacy: v.legacy,
             hashValid: v.hashValid,
             signatureValid: v.signatureValid,
+            keyMissing: v.keyMissing,
             chainValid: v.chainValid,
             notPublished: v.notPublished,
             versionNumber: v.versionNumber,
@@ -244,6 +252,24 @@ export default function VerifyTokenPage() {
             {model.publishedAt
               ? m.report_verify_published_suffix({ date: formatDate(model.publishedAt, timeZone, fmt) })
               : ""}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (model.state === "key_missing") {
+    return (
+      <div className="max-w-xl mx-auto p-6">
+        {/* `ih-watch-*`, not `ih-bad-*`: nothing here says the document is wrong.
+            The check could not run, and the tone has to match that. */}
+        <div className="rounded-lg bg-ih-watch-bg text-ih-watch-fg p-4 text-center mb-6">
+          <p className="text-lg font-bold">{m.report_verify_keymissing_heading()}</p>
+          <p className="text-[13px] mt-1">{m.report_verify_keymissing_body()}</p>
+        </div>
+        {model.versionNumber !== undefined && (
+          <p className="text-[13px] text-ih-fg-3 text-center">
+            {m.report_verify_version({ version: model.versionNumber })}
           </p>
         )}
       </div>

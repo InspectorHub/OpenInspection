@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { signingKeys } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 
@@ -13,6 +13,19 @@ import { logger } from '../lib/logger';
  * Verifies the signature chain via crypto.subtle Ed25519. Falls back to a
  * pure-JS implementation (@noble/ed25519) only if the runtime rejects the
  * Ed25519 algorithm at importKey time — current workerd supports it.
+ *
+ * **Rotation keeps history.** `rotateKeypair` retires the active key and mints a
+ * new one; the retired row stays forever. Old evidence keeps verifying because
+ * the verifiers resolve a key by the fingerprint recorded on each row they are
+ * checking (`getPublicKeyByFingerprint`), never by asking what the tenant's key
+ * is today. That is the same shape as the ES256 JWT keyring, which resolves a
+ * token by its `kid` — with one asymmetry that matters: a JWT kid may be pruned
+ * once its sessions expire, and an e-sign key may never be, because what it
+ * sealed is evidence rather than a session.
+ *
+ * `getPublicKey` means the ACTIVE key and is for signing and publication
+ * (/.well-known, admin). Verification must not use it: that is how a key change
+ * comes to read as a forged signature.
  */
 export class SigningKeyService {
     constructor(private db: D1Database, private encryptionSecret: string) {
@@ -27,8 +40,11 @@ export class SigningKeyService {
     }
 
     /**
-     * Returns the tenant's keypair as raw CryptoKeys, creating one if absent.
-     * Idempotent — safe to call on every sign attempt.
+     * Returns the tenant's ACTIVE keypair as raw CryptoKeys, creating one if the
+     * tenant has none. Idempotent — safe to call on every sign attempt.
+     *
+     * Retired keys are skipped: they can still verify (see
+     * `getPublicKeyByFingerprint`) but must never sign again.
      */
     async ensureKeypair(tenantId: string): Promise<{
         publicKey: CryptoKey;
@@ -36,7 +52,7 @@ export class SigningKeyService {
         fingerprint: string;
     }> {
         const existing = await this.getDrizzle().select().from(signingKeys)
-            .where(eq(signingKeys.tenantId, tenantId)).get();
+            .where(and(eq(signingKeys.tenantId, tenantId), isNull(signingKeys.retiredAt))).get();
 
         if (existing) {
             const publicKey = await crypto.subtle.importKey(
@@ -56,7 +72,45 @@ export class SigningKeyService {
             return { publicKey, privateKey, fingerprint: existing.fingerprint };
         }
 
-        // Generate new keypair
+        return this.mintActiveKey(tenantId);
+    }
+
+    /**
+     * Retire the tenant's active key and mint a replacement.
+     *
+     * **Nothing is deleted and nothing is re-signed.** The retired row keeps its
+     * public key so every chain sealed under it still verifies, and no existing
+     * audit row is touched — re-sealing old evidence with a new key would be
+     * manufacturing the very thing the chain exists to prove.
+     *
+     * Returns the new key. Safe on a tenant that has never signed: it simply
+     * mints the first one.
+     */
+    async rotateKeypair(tenantId: string): Promise<{ fingerprint: string; retired: string | null }> {
+        const active = await this.getDrizzle().select().from(signingKeys)
+            .where(and(eq(signingKeys.tenantId, tenantId), isNull(signingKeys.retiredAt))).get();
+
+        if (active) {
+            // Retire BEFORE minting: the partial unique index allows one active
+            // key per tenant, so doing it the other way round fails the insert.
+            await this.getDrizzle().update(signingKeys)
+                .set({ retiredAt: new Date() })
+                .where(eq(signingKeys.id, active.id)).run();
+        }
+
+        const minted = await this.mintActiveKey(tenantId);
+        logger.info('signing-key.rotated', {
+            tenantId, retired: active?.fingerprint ?? null, active: minted.fingerprint,
+        });
+        return { fingerprint: minted.fingerprint, retired: active?.fingerprint ?? null };
+    }
+
+    /** Generate, encrypt and store a fresh ACTIVE keypair for the tenant. */
+    private async mintActiveKey(tenantId: string): Promise<{
+        publicKey: CryptoKey;
+        privateKey: CryptoKey;
+        fingerprint: string;
+    }> {
         const kp = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']) as CryptoKeyPair;
         // exportKey's return type is `ArrayBuffer | JsonWebKey`; spki/pkcs8 always
         // return ArrayBuffer at runtime, so we narrow with a cast rather than a
@@ -74,6 +128,7 @@ export class SigningKeyService {
         ));
 
         await this.getDrizzle().insert(signingKeys).values({
+            id: crypto.randomUUID(),
             tenantId,
             publicKey: base64UrlEncode(pubBytes),
             privateKeyEnc: base64UrlEncode(privEnc),
@@ -81,7 +136,7 @@ export class SigningKeyService {
             fingerprint,
             algorithm: 'Ed25519',
             createdAt: new Date(),
-            rotatedAt: null,
+            retiredAt: null,
         });
 
         logger.info('signing-key.created', { tenantId, fingerprint });
@@ -89,12 +144,16 @@ export class SigningKeyService {
     }
 
     /**
-     * Returns just the public key + fingerprint (no private-key decryption).
-     * Used by the public verifier endpoint.
+     * The tenant's ACTIVE public key — what new signatures are made with, and
+     * what /.well-known publishes.
+     *
+     * **Not for verification.** Checking an old row against this is how a key
+     * rotation comes to look like a forged signature; use
+     * `getPublicKeyByFingerprint` with the fingerprint that row recorded.
      */
     async getPublicKey(tenantId: string): Promise<{ publicKey: CryptoKey; fingerprint: string; pem: string } | null> {
         const row = await this.getDrizzle().select().from(signingKeys)
-            .where(eq(signingKeys.tenantId, tenantId)).get();
+            .where(and(eq(signingKeys.tenantId, tenantId), isNull(signingKeys.retiredAt))).get();
         if (!row) return null;
         const spkiBytes = base64UrlDecode(row.publicKey);
         const publicKey = await crypto.subtle.importKey(
@@ -102,6 +161,31 @@ export class SigningKeyService {
         );
         const pem = spkiToPem(spkiBytes);
         return { publicKey, fingerprint: row.fingerprint, pem };
+    }
+
+    /**
+     * The key with this fingerprint, active or retired. **This is the one
+     * verification uses**, resolved from the fingerprint the row being checked
+     * recorded when it was sealed.
+     *
+     * Returns null when the tenant holds no such key. That is a real answer, not
+     * an error: it means the evidence names a key we cannot produce, which a
+     * verifier must report as "cannot check" and never as "signature invalid".
+     */
+    async getPublicKeyByFingerprint(
+        tenantId: string, fingerprint: string,
+    ): Promise<{ publicKey: CryptoKey; fingerprint: string; pem: string; retiredAt: Date | null } | null> {
+        const row = await this.getDrizzle().select().from(signingKeys)
+            .where(and(eq(signingKeys.tenantId, tenantId), eq(signingKeys.fingerprint, fingerprint))).get();
+        if (!row) return null;
+        const spkiBytes = base64UrlDecode(row.publicKey);
+        const publicKey = await crypto.subtle.importKey(
+            'spki', spkiBytes as unknown as ArrayBuffer, { name: 'Ed25519' }, true, ['verify']
+        );
+        return {
+            publicKey, fingerprint: row.fingerprint, pem: spkiToPem(spkiBytes),
+            retiredAt: row.retiredAt ?? null,
+        };
     }
 
     private async deriveAesKey(): Promise<CryptoKey> {

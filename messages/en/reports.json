@@ -42,6 +42,8 @@
   "report_verify_notpublished_body": "This report is not published.",
   "report_verify_failed_heading": "❌ Verification Failed",
   "report_verify_failed_body": "This report's cryptographic signature could not be verified. The content may have been altered.",
+  "report_verify_keymissing_heading": "⚠️ Verification Could Not Be Completed",
+  "report_verify_keymissing_body": "We no longer hold the signing key this report version names, so its signature could not be checked either way. This does not indicate that the report was altered.",
   "report_verify_verified_heading": "✅ Report integrity verified",
   "report_verify_detail_property": "Property",
   "report_verify_detail_content_hash": "Content hash",

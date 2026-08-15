@@ -6,9 +6,28 @@ import { tenants } from './tenant';
  * Spec 5H — Self-built e-signature audit foundation.
  * Per-tenant Ed25519 keypair, lazy-created on first sign attempt.
  * Private key encrypted at rest with AES-GCM under KEY_ENCRYPTION_SECRET.
+ *
+ * **This is a key HISTORY, one row per key, and retiring one never deletes it.**
+ * It used to be keyed by `tenant_id` — one row, so rotating meant overwriting,
+ * which would have destroyed the public key that sealed every existing chain.
+ * Those chains would not have verified as tampered; they would have had no key
+ * to check against at all, on the PUBLIC verifier page, for documents real
+ * people really signed.
+ *
+ * What makes rotation safe is not this table alone but the pairing: every audit
+ * row records `key_fingerprint`, and the verifiers resolve THAT key rather than
+ * the tenant's current one (`audit-log.service.ts`, `report-version.service.ts`).
+ * A retired key stays here forever precisely so old evidence keeps verifying —
+ * it is evidence about a signature, not a credential, and the private half being
+ * retired does not make the public half safe to lose.
+ *
+ * Two indexes carry the invariants: one key may appear once per tenant, and at
+ * most one key per tenant is active (`retired_at IS NULL`, enforced by a PARTIAL
+ * unique index, since a plain unique index does not constrain NULLs).
  */
 export const signingKeys = sqliteTable('signing_keys', {
-    tenantId:      text('tenant_id').primaryKey().references(() => tenants.id),
+    id:            text('id').primaryKey(),
+    tenantId:      text('tenant_id').notNull().references(() => tenants.id),
     // base64url SPKI. Stored in the clear on purpose: it is what a third party
     // needs to check the seal, served as PEM from /.well-known and embedded in
     // the audit-trail export so an offline verifier needs nothing from us.
@@ -27,8 +46,31 @@ export const signingKeys = sqliteTable('signing_keys', {
     // literal instead of reading this column.
     algorithm:     text('algorithm').notNull().default('Ed25519'),
     createdAt:     integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-    rotatedAt:     integer('rotated_at', { mode: 'timestamp_ms' }),
-});
+    // NULL = this is the tenant's active key, the one new signatures are made
+    // with. Set once, on rotation, and never unset. Replaces the old
+    // `rotated_at`, which was written as NULL and read by nothing — the rename
+    // is not cosmetic: `retired_at` says what is true of the ROW (this key no
+    // longer signs), where `rotated_at` read as a fact about the tenant and
+    // invited a single-row UPDATE, which is exactly what must never happen here.
+    //
+    // A retired key is never deleted. Unlike the JWT keyring, whose old kids can
+    // be pruned once their sessions expire (`scripts/rotate-jwt-keys.js`), the
+    // evidence this key sealed is permanent — so the public half has to outlive
+    // the private half by as long as the signatures matter.
+    retiredAt:     integer('retired_at', { mode: 'timestamp_ms' }),
+}, (t) => ({
+    // One row per (tenant, key). Re-running key creation cannot silently fork a
+    // tenant's history into two keys with the same fingerprint.
+    uqTenantFingerprint: uniqueIndex('uq_signing_keys_tenant_fingerprint')
+        .on(t.tenantId, t.fingerprint),
+    // At most ONE active key per tenant. Partial on purpose: a plain unique
+    // index over (tenant_id, retired_at) would let unlimited rows through,
+    // because SQLite treats every NULL as distinct — which is precisely the
+    // state this has to forbid.
+    uqTenantActive: uniqueIndex('uq_signing_keys_tenant_active')
+        .on(t.tenantId)
+        .where(sql`retired_at IS NULL`),
+}));
 
 /**
  * Spec 5H — Hash-chained, Ed25519-signed audit events.
@@ -55,9 +97,11 @@ export const esignAuditLogs = sqliteTable('esign_audit_logs', {
     // still fails (reason:'signature') without the tenant's private key.
     signature:      text('signature').notNull(),
     // Which signing_keys row signed THIS row, stamped from ensureKeypair.
-    // verifyChain does not read it — it always verifies against the tenant's
-    // current key — so it exists to tell a reader (and a future rotation) which
-    // key a row was sealed with.
+    // verifyChain compares it against the tenant's current key BEFORE testing
+    // the signature, and stops with reason:'key_mismatch' if they differ — so a
+    // key change can never be reported as a bad signature. Equal for every row
+    // today, since rotation is unsupported; this is what would notice if that
+    // ever stopped being true.
     keyFingerprint: text('key_fingerprint').notNull(),
     createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({

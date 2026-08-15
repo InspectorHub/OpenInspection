@@ -21,6 +21,7 @@
 import { createApiRouter } from '../lib/openapi-router';
 import adminAgreementsRoutes from './admin/admin-agreements';
 import adminEsignRoutes from './admin/admin-esign';
+import adminSigningKeyRoutes from './admin/admin-signing-key';
 import adminCommentsRoutes from './admin/admin-comments';
 import adminDataRoutes from './admin/admin-data';
 import adminAiAssuranceRoutes from './admin/admin-ai-assurance';
@@ -35,6 +36,7 @@ import adminBookingRoutingRoutes from './admin/admin-booking-routing';
 const adminRoutes = createApiRouter()
     .route('/', adminAgreementsRoutes)
     .route('/', adminEsignRoutes)
+    .route('/', adminSigningKeyRoutes)
     .route('/', adminCommentsRoutes)
     .route('/', adminDataRoutes)
     .route('/', adminAiAssuranceRoutes)
