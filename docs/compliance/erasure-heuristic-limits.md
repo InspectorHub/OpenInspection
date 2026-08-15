@@ -7,7 +7,11 @@ reasoned entry in `ERASURE_OUT_OF_SCOPE` (`erasure-out-of-scope.ts`, split out
 when the manifest hit its line cap). The gate concatenates both sources before
 parsing either, so the split cannot halve what it sees.
 
-It is green today: `44 rules, 57 out-of-scope declarations`, exit 0.
+It is green, and prints its two counts side by side when it runs — the rules it
+holds and the columns explicitly ruled out of scope. Those numbers are not
+quoted here: this document was written when they were `44 rules, 57 out-of-scope
+declarations`, and by the time anyone read that sentence they had roughly
+doubled. Run `npm run lint:erasure` for the current pair.
 
 This document exists because that sentence is easy to read as "erasure covers
 the schema", and it does not mean that. It means no column *whose name the
