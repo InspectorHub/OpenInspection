@@ -4,7 +4,7 @@ import { AgreementService } from '../../../server/services/agreement.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { deadTokenSentinel, hashToken } from '../../../server/lib/token-hash';
+import { hashToken } from '../../../server/lib/token-hash';
 import { TENANT_A, INSP_ID, AGR_ID, seedBase } from '../helpers/agreement-signers-setup';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -102,13 +102,19 @@ describe('AgreementService — signer-level envelope state machine', () => {
         expect(signers.length).toBe(0);
     });
 
-    it('legacy envelope plaintext token resolves to first signer AND upgrades envelope', async () => {
-        // Hand-build a legacy envelope (plaintext token, no tokenHash) with one signer that has no token
+    it('an envelope resolves by token HASH, and a bare plaintext token no longer opens it', async () => {
+        // This used to assert the opposite: that a legacy plaintext token
+        // resolved and the row was upgraded to a sentinel in passing. Envelope
+        // lookup is hash-only now — production's only plaintext-bearing rows
+        // were all `expired`, so the fallback could not reach a signable
+        // envelope — and a token that resolves to nothing must resolve to
+        // nothing, which is what the second half of this test pins.
         const legacyToken = 'legacy-plain-token-123';
         const reqId = crypto.randomUUID();
         await testDb.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-            clientEmail: 'jane@test.com', clientName: 'Jane', token: legacyToken,
+            clientEmail: 'jane@test.com', clientName: 'Jane', 
+            tokenHash: await hashToken(legacyToken),
             status: 'sent', completionPolicy: 'all', createdAt: new Date(),
         });
         await testDb.insert(schema.agreementSigners).values({
@@ -116,16 +122,24 @@ describe('AgreementService — signer-level envelope state machine', () => {
             name: 'Jane', email: 'jane@test.com', role: 'client', status: 'sent', createdAt: new Date(),
         });
 
+        // With the hash present, the envelope resolves and hands back its first signer.
         const resolved = await svc.getSignerByPresentedToken(legacyToken);
         expect(resolved).not.toBeNull();
         expect(resolved!.signer.email).toBe('jane@test.com');
 
-        const env = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, reqId)).get();
-        expect(env!.tokenHash).toBe(await hashToken(legacyToken));
-        expect(env!.token).toBe(deadTokenSentinel(reqId));
+        // The control that keeps the assertion above honest: an envelope whose
+        // plaintext is stored but whose hash is NOT resolves to nothing. Without
+        // this, a lookup that had silently kept a plaintext path would pass the
+        // first half just as greenly.
+        const orphanId = crypto.randomUUID();
+        await testDb.insert(schema.agreementRequests).values({
+            id: orphanId, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+            clientEmail: 'no@test.com', clientName: 'No', status: 'sent', completionPolicy: 'all', createdAt: new Date(),
+        });
+        expect(await svc.getSignerByPresentedToken('plaintext-only-token-456')).toBeNull();
     });
 
-    it("'all' policy: sign 1/2 -> not complete, envelope viewed; sign 2/2 -> complete, signed + signedAt + mirror", async () => {
+    it("'all' policy: sign 1/2 -> not complete, envelope viewed; sign 2/2 -> complete, signed + signedAt, signature stays on the signer row", async () => {
         const r = await svc.findOrCreate(TENANT_A, INSP_ID, {
             signers: [
                 { name: 'Jane', email: 'jane@test.com' },
@@ -149,7 +163,14 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const env = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, r.requestId)).get();
         expect(env!.status).toBe('signed');
         expect(env!.signedAt).toBeTruthy();
-        expect(env!.signatureBase64).toBe('sig-john');
+        // The envelope records THAT it completed and WHEN. Each signature stays
+        // on the row of the person who made it; the envelope has no column for
+        // one, which is the point — a single copy could only name one of two
+        // signers as its author.
+        const sigRows = await testDb.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, r.requestId))
+            .orderBy(asc(schema.agreementSigners.createdAt)).all();
+        expect(sigRows.map((x) => x.signatureBase64)).toEqual(['sig-jane', 'sig-john']);
     });
 
     it("'one' policy: first sign -> completedNow=true", async () => {
@@ -227,7 +248,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const reqId = crypto.randomUUID();
         await testDb.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-            clientEmail: 'b@test.com', clientName: 'B', token: crypto.randomUUID(),
+            clientEmail: 'b@test.com', clientName: 'B', 
             status: 'sent', completionPolicy: 'all', createdAt: new Date(),
         });
         const backfillId = crypto.randomUUID();
@@ -288,7 +309,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const reqId = crypto.randomUUID();
         await testDb.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-            clientEmail: 'c@test.com', token: crypto.randomUUID(),
+            clientEmail: 'c@test.com', 
             status: 'viewed', completionPolicy: 'all', contentSnapshot: null, contentHash: null, createdAt: new Date(),
         });
         const nullEnv = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, reqId)).get();
@@ -397,8 +418,13 @@ describe('AgreementService — signer-level envelope state machine', () => {
 
         const env = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, r.requestId)).get();
         expect(env!.status).toBe('signed');
-        // Envelope signature is the WINNING write's signature, not the loser's.
-        expect(env!.signatureBase64).toBe('sig-john');
+        // The race decides which writer reports completion, and nothing else.
+        // It used to also decide whose signature the envelope showed, which was
+        // the copy's real defect rather than its redundancy; there is no longer
+        // a column for that question to be answered wrongly in.
+        const raceSigners = await testDb.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, r.requestId)).all();
+        expect(raceSigners.every((x) => x.signatureBase64 !== null)).toBe(true);
     });
 
     it('concurrent: Promise.all two markSignedBySigner for the same last signer -> at most one envelopeCompletedNow=true', async () => {
@@ -449,6 +475,55 @@ describe('AgreementService — signer-level envelope state machine', () => {
 
         // getSignerLink cannot reconstruct the link without a sealing key.
         await expect(noSecretSvc.getSignerLink(TENANT_A, r.requestId, signers[0].id))
+            .rejects.toThrow(/Token sealing key unavailable/);
+    });
+
+    // review decision (2026-08-15): a record produced by a migration is not
+    // the same fact as one captured at signing, and the two have to stay
+    // distinguishable. A signature we watched arrive says so on its own row, so
+    // that a NULL basis anywhere reads as "not recorded" rather than "captured,
+    // probably" — the reading that would let a derived attribution pass for a
+    // witnessed one.
+    it('a signature captured at signing records itself as a signing_event, citing no derived source', async () => {
+        const r = await svc.findOrCreate(TENANT_A, INSP_ID, {
+            signers: [{ name: 'Jane', email: 'jane@test.com' }],
+            completionPolicy: 'one',
+        });
+        await svc.markSignedBySigner(r.token, 'sig-jane', { signedAtMs: 4242, channel: 'remote', languageDisclosureVersion: null });
+
+        const signer = (await testDb.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, r.requestId)).all())[0];
+        expect(signer.signatureBase64).toBe('sig-jane');
+        expect(signer.attributionBasis).toBe('signing_event');
+        // The attribution and the signature are the same event here, so the two
+        // timestamps agree. On a relocated row they differ by however long the
+        // evidence sat on the envelope.
+        expect(signer.attributedAt?.getTime()).toBe(4242);
+        // Nothing was derived, so there is nothing to cite. A source on a
+        // signing_event row would be describing a derivation that never happened.
+        expect(signer.attributionSource).toBeNull();
+    });
+
+    it('no-secrets REUSE path: findOrCreate surfaces the failure instead of handing back a dead link', async () => {
+        // The create path can return the plaintext it just minted. The REUSE
+        // path has nothing minted to hand back, so it has to reconstruct via
+        // getSignerLink — and when that cannot work, there is no link.
+        //
+        // It used to swallow the error and return `agreement_requests.token`
+        // instead. That column was never resolvable through the hash-only
+        // lookup, so the caller built a sign URL that could only 404. A caller
+        // that is told "no link" routes the customer somewhere real; a caller
+        // handed a dead link cannot tell the difference until the customer does.
+        const withSecrets = new AgreementService({} as D1Database, { jwtSecret: 'test-secret' });
+        const first = await withSecrets.findOrCreate(TENANT_A, INSP_ID, {
+            signers: [{ name: 'Jane', email: 'jane@test.com' }],
+        });
+        expect(first.alreadyExists).toBe(false);
+
+        // Same inspection, non-terminal envelope -> the reuse branch. Without a
+        // sealing key the sealed token cannot be opened.
+        const noSecretSvc = new AgreementService({} as D1Database);
+        await expect(noSecretSvc.findOrCreate(TENANT_A, INSP_ID))
             .rejects.toThrow(/Token sealing key unavailable/);
     });
 

@@ -76,7 +76,7 @@ describe('PortalService', () => {
         await testDb.insert(schema.agreementRequests).values({
             id: crypto.randomUUID(), tenantId: TENANT, inspectionId: 'insp1',
             agreementId, clientEmail: 'a@x.com',
-            token: crypto.randomUUID(), status: 'signed', createdAt: new Date(),
+            status: 'signed', createdAt: new Date(),
         });
         await testDb.insert(schema.inspectionMessages).values([
             { id: crypto.randomUUID(), tenantId: TENANT, inspectionId: 'insp1', contactId: 'c-portal', fromRole: 'inspector', body: 'hi', readAt: null, createdAt: new Date() },

@@ -52,6 +52,68 @@ D1 migrations in this project are **forward-only**, matching the schema-first Dr
 
 ---
 
+## This release moves signature evidence between tables
+
+Two migrations relocate the client's signature on a signed agreement. Read this
+before you upgrade, because one of them can **stop** — deliberately — and what
+you do then matters.
+
+### What moves
+
+```
+agreement_requests.signature_base64   →   agreement_signers.signature_base64
+```
+
+The signature used to be written twice: once on the row of the person who signed
+and once on the agreement envelope. The envelope copy is removed and the column
+dropped.
+
+### Why
+
+The envelope copy could not say whose signature it was. An agreement can be sent
+to several people, each signing on their own row; the envelope has one signature
+field and no author, so when two people signed it held whichever signature was
+written last. Nothing read it as evidence, and keeping a second copy that cannot
+identify its signer is worse than keeping one that can.
+
+Nothing about how the signature is treated changes: same retention period, same
+legal basis, same destruction behaviour, same appearance on the signed PDF. Each
+signer row now also records **how** its signature came to be attributed to that
+person — captured at signing, or relocated by these migrations, and from what.
+
+### What the migrations will and will not do
+
+| your data | what happens |
+|---|---|
+| envelope signature, exactly one signer row | the signature moves to that row |
+| envelope signature, no signer rows | a client signer row is created for it, using the recipient name and email the envelope recorded |
+| envelope signature, several signer rows, none holding a signature | **the migration stops** |
+
+The last case has no recorded author, and the migration will not pick one. It
+counts the signatures that did not reach a signer row and **aborts before
+dropping the column**, leaving your data exactly as it was. You get a failed
+migration, not a silent loss.
+
+The stopping case is not produced by anything the software itself does. If you
+hit it, the likeliest cause is a retention sweep that destroyed signer-level
+signatures without reaching the envelope.
+
+### What you should do
+
+1. **Back up your database before upgrading** — the usual export plus a Time
+   Travel bookmark, as in [Before upgrading](#before-upgrading). There is no
+   down migration.
+2. If the migration stops, **do not resolve it by assigning the signature to a
+   signer you think is the right one.** Naming an author the record does not
+   name creates a fact about who signed, in data that exists precisely to
+   evidence who signed. Restore from backup, or work out from your own records
+   and your own legal advice what the row should say, before re-running.
+3. Re-running after you have corrected the data is safe. The relocation is
+   idempotent and can be applied again; it is a separate migration from the one
+   that adds the columns for exactly this reason.
+
+---
+
 ## Upgrading across a rebuilt baseline
 
 **Do this before `npm run db:migrate:remote` or `npm run deploy`, not after.**

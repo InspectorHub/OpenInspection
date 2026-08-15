@@ -15,6 +15,18 @@ const REQ_ID   = '00000000-0000-0000-0000-000000000100';
 const AGR_ID   = '00000000-0000-0000-0000-000000000020';
 const TOKEN_A  = 'live-token-abcdef0123456789';
 
+/**
+ * The client signer row that carries the signature. There is exactly one place
+ * a signature lives now, so a render fixture that wants one has to put it here —
+ * the envelope column these specs used to set is gone.
+ */
+const clientSigner = (sig: string, name = 'Jane Doe') => ({
+  id: 'sig-client', tenantId: TENANT_A, requestId: REQ_ID,
+  name, email: 'jane@x', role: 'client' as const,
+  status: 'signed' as const, signatureBase64: sig,
+  channel: 'remote' as const, signedAt: new Date(), createdAt: new Date(1),
+});
+
 describe('agreement-render handler', () => {
   let db: BetterSQLite3Database<typeof schema>;
 
@@ -47,7 +59,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane',
-      token: TOKEN_A, status: 'sent', signatureBase64: null,
+      status: 'sent',
       createdAt: new Date(),
     });
     const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
@@ -58,11 +70,11 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
-      signatureBase64: 'data:image/png;base64,iVBORw0KGgo=',
+      status: 'signed',
       signedAt: new Date(),
       createdAt: new Date(),
     });
+    await db.insert(schema.agreementSigners).values(clientSigner('iVBORw0KGgo='));
     const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/html');
@@ -83,9 +95,10 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane',
-      token: TOKEN_A, status: 'signed', signatureBase64: 'data:image/png;base64,xyz',
+      status: 'signed',
       signedAt: new Date(), createdAt: new Date(),
     });
+    await db.insert(schema.agreementSigners).values(clientSigner('anysig', 'Jane'));
     const res = await agreementRenderHandler({} as D1Database, 'wrongslug', REQ_ID);
     expect(res.status).toBe(200);
   });
@@ -94,9 +107,10 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane',
-      token: TOKEN_A, status: 'signed', signatureBase64: 'data:image/png;base64,xyz',
+      status: 'signed',
       signedAt: new Date(), createdAt: new Date(),
     });
+    await db.insert(schema.agreementSigners).values(clientSigner('anysig', 'Jane'));
     const res = await agreementRenderHandler({} as D1Database, '', REQ_ID);
     expect(res.status).toBe(200);
   });
@@ -105,13 +119,13 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
-      signatureBase64: 'data:image/png;base64,clientsig',
+      status: 'signed',
       signedAt: new Date(),
       inspectorSignatureBase64: 'data:image/png;base64,inspectorsig',
       inspectorSignedAt: new Date(),
       createdAt: new Date(),
     });
+    await db.insert(schema.agreementSigners).values(clientSigner('data:image/png;base64,clientsig'));
     const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
     expect(res.status).toBe(200);
     const body = await res.text();
@@ -124,11 +138,11 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
-      signatureBase64: 'data:image/png;base64,clientsig',
+      status: 'signed',
       signedAt: new Date(),
       createdAt: new Date(),
     });
+    await db.insert(schema.agreementSigners).values(clientSigner('data:image/png;base64,clientsig'));
     const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
     expect(res.status).toBe(200);
     const body = await res.text();
@@ -142,13 +156,13 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
-      signatureBase64: 'data:image/png;base64,clientsig',
+      status: 'signed',
       signedAt: new Date(),
       contentSnapshot: '<p>Snapshot at sign time</p>',
       contentHash: 'deadbeef',
       createdAt: new Date(),
     });
+    await db.insert(schema.agreementSigners).values(clientSigner('anysig'));
     // Mutate the live template AFTER the envelope was created/signed.
     await db.update(schema.agreements)
       .set({ content: '<p>Edited later — must NOT appear</p>' })
@@ -165,8 +179,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
-      signatureBase64: 'data:image/png;base64,envelopesig',
+      status: 'signed',
       signedAt: new Date(),
       contentSnapshot: '<p>Body</p>', contentHash: 'h',
       createdAt: new Date(),
@@ -197,13 +210,58 @@ describe('agreement-render handler', () => {
     expect(body).not.toContain('envelopesig');
   });
 
+  // The gate has to ask the signer rows, because that is where a signature has
+  // lived since the multi-signer model. Every other spec in this file sets the
+  // envelope column too, which is exactly why a gate reading only that column
+  // never showed up as broken: the fixtures all happened to satisfy it.
+  it('renders a signed envelope whose signature exists ONLY on a signer row', async () => {
+    await db.insert(schema.agreementRequests).values({
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+      clientEmail: 'jane@x', clientName: 'Jane Doe',
+      status: 'signed',
+      // <- the envelope-level column is empty
+      signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
+      createdAt: new Date(),
+    });
+    await db.insert(schema.agreementSigners).values({
+      id: 'sig-1', tenantId: TENANT_A, requestId: REQ_ID,
+      name: 'Jane Doe', email: 'jane@x', role: 'client',
+      status: 'signed', signatureBase64: 'data:image/png;base64,signersig',
+      channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
+    });
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain('signersig');
+    expect(body).toContain('Jane Doe');
+  });
+
+  // A signed envelope with no signature anywhere is still a 404: the gate was
+  // widened to a second source, not removed.
+  it('404s a signed envelope with no signature in either place', async () => {
+    await db.insert(schema.agreementRequests).values({
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+      clientEmail: 'jane@x', clientName: 'Jane Doe',
+      status: 'signed',
+      signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
+      createdAt: new Date(),
+    });
+    await db.insert(schema.agreementSigners).values({
+      id: 'sig-1', tenantId: TENANT_A, requestId: REQ_ID,
+      name: 'Jane Doe', email: 'jane@x', role: 'client',
+      status: 'signed', signatureBase64: null,   // self-healed row, no signature
+      channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
+    });
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    expect(res.status).toBe(404);
+  });
+
   // Track I-a — an in-person signer shows the in-person indicator.
   it('shows the in-person indicator for an in_person signer', async () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
-      signatureBase64: 'data:image/png;base64,envelopesig',
+      status: 'signed',
       signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
       createdAt: new Date(),
     });
@@ -223,8 +281,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
-      signatureBase64: 'data:image/png;base64,envelopesig',
+      status: 'signed',
       signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
       createdAt: new Date(),
     });
@@ -246,8 +303,7 @@ describe('agreement-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
-      signatureBase64: 'data:image/png;base64,envelopesig',
+      status: 'signed',
       signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
       createdAt: new Date(),
     });
@@ -264,26 +320,6 @@ describe('agreement-render handler', () => {
     expect(body).toContain('&quot; onerror=&quot;x');
     // ...and the raw attribute-injection sequence is NOT present as live markup.
     expect(body).not.toContain('" onerror=');
-  });
-
-  // Track I-a — zero-signer legacy envelope with an envelope-level signature
-  // still renders a single Client block (backward compat).
-  it('falls back to a single client block for a zero-signer legacy envelope', async () => {
-    await db.insert(schema.agreementRequests).values({
-      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-      clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
-      signatureBase64: 'data:image/png;base64,legacysig',
-      signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
-      createdAt: new Date(),
-    });
-    // No agreement_signers rows inserted.
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
-    expect(res.status).toBe(200);
-    const body = await res.text();
-    expect(body).toContain('legacysig');
-    expect(body).toContain('Jane Doe');
-    expect(body).toContain('Client');
   });
 });
 
@@ -319,7 +355,7 @@ describe('cert-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane',
-      token: TOKEN_A, status: 'sent', signatureBase64: null,
+      status: 'sent',
       createdAt: new Date(),
     });
     const res = await certRenderHandler({} as D1Database, REQ_ID);
@@ -330,8 +366,7 @@ describe('cert-render handler', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
-      signatureBase64: 'data:image/png;base64,abc',
+      status: 'signed',
       signedAt: new Date(),
       createdAt: new Date(),
     });
@@ -434,8 +469,7 @@ describe('agreement-render handler — language disclosure', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
-      signatureBase64: 'data:image/png;base64,clientsig',
+      status: 'signed',
       signedAt: new Date(),
       contentSnapshot: '<p>Snapshot at sign time</p>',
       contentHash: 'deadbeef',
@@ -522,16 +556,6 @@ describe('agreement-render handler — language disclosure', () => {
     const html = await res.text();
     expect(html).not.toMatch(/provided in English/i);
   });
-
-  it('the legacy envelope-level signature (no signer rows) carries no claim', async () => {
-    await db.delete(schema.agreementSigners).where(eq(schema.agreementSigners.requestId, REQ_ID));
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
-    const html = await res.text();
-    // Fallback block still renders the signature…
-    expect(html).toContain('Jane Doe');
-    // …and says nothing about a notice nobody recorded.
-    expect(html).not.toMatch(/provided in English/i);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -563,8 +587,7 @@ describe('cert-render handler — language disclosure version', () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
-      token: TOKEN_A, status: 'signed',
-      signatureBase64: 'data:image/png;base64,clientsig',
+      status: 'signed',
       signedAt: new Date(), createdAt: new Date(),
     });
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);

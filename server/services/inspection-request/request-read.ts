@@ -164,8 +164,6 @@ function shapeRequest(req: RequestRow, subs: SubInspectionRow[], tplNameById?: M
         scheduledAt:      safeISODate(req.scheduledAt),
         status:           req.status,
         notes:            req.notes,
-        totalAmount:      req.totalAmount,
-        paymentStatus:    req.paymentStatus,
         createdAt:        safeISODate(req.createdAt),
         updatedAt:        safeISODate(req.updatedAt),
         inspections:      subs.map(s => ({

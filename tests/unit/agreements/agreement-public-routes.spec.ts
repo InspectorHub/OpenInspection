@@ -182,13 +182,16 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         expect(jane.status).toBe('viewed');
     });
 
-    it('GET by legacy ENVELOPE token (plaintext, single synthesized signer) still 200s', async () => {
-        // Hand-insert a legacy-style envelope row with a plaintext token + NO signer rows.
-        const legacyToken = 'legacyplaintexttoken1234567890';
+    it('GET by ENVELOPE token opens the page when the row carries the HASH, and 404s on plaintext alone', async () => {
+        // A signer-less envelope: the route synthesizes one. It used to resolve
+        // from the plaintext column; envelope lookup is hash-only now, so the
+        // row has to carry `token_hash` to be reachable at all.
+        const envToken = 'envelopetoken1234567890';
         const reqId = '00000000-0000-0000-0000-0000000000aa';
         await db.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_ID, inspectionId: INSP_ID, agreementId: AGR_ID,
-            clientEmail: 'jane@test.com', clientName: 'Jane', token: legacyToken,
+            clientEmail: 'jane@test.com', clientName: 'Jane', token: envToken,
+            tokenHash: await hashToken(envToken),
             status: 'sent', completionPolicy: 'all',
             contentSnapshot: 'LEGACY SNAPSHOT', contentHash: await hashToken('LEGACY SNAPSHOT'),
             createdAt: new Date(),
@@ -196,12 +199,26 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
 
         const { app } = buildApp(db);
         const { ctx } = makeExecCtx();
-        const res = await app.request(`/agreements/${legacyToken}`, {}, FAKE_ENV, ctx);
+        const res = await app.request(`/agreements/${envToken}`, {}, FAKE_ENV, ctx);
         expect(res.status).toBe(200);
         const body = await res.json() as any;
         expect(body.data.agreementContent).toBe('LEGACY SNAPSHOT');
         expect(body.data.signer.name).toBe('Jane');
         expect(body.data.progress.total).toBe(1);
+
+        // The control. Same shape, plaintext stored but no hash — the state
+        // every remaining un-upgraded row in production is in, all of them
+        // expired. It must not open.
+        const plainOnly = 'plaintextonlytoken0987654321';
+        await db.insert(schema.agreementRequests).values({
+            id: '00000000-0000-0000-0000-0000000000ab', tenantId: TENANT_ID,
+            inspectionId: INSP_ID, agreementId: AGR_ID,
+            clientEmail: 'no@test.com', clientName: 'No', token: plainOnly,
+            status: 'sent', completionPolicy: 'all',
+            contentSnapshot: 'X', contentHash: await hashToken('X'), createdAt: new Date(),
+        } as any);
+        const denied = await app.request(`/agreements/${plainOnly}`, {}, FAKE_ENV, makeExecCtx().ctx);
+        expect(denied.status).toBe(404);
     });
 
     it('POST sign signer 1 of 2 (all): envelope NOT signed, workflow NOT created; signer 2 completes -> envelope signed, workflow once, verificationToken set, notification + email fire', async () => {

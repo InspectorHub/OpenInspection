@@ -48,6 +48,7 @@ Running the engine on your own Cloudflare account.
 | [`develop/logo-design.md`](develop/logo-design.md) | Logo construction and brand asset spec |
 | [`develop/conventions/route-metadata.md`](develop/conventions/route-metadata.md) | Metadata every `createRoute()` must declare, and the gate that enforces it |
 | [`develop/conventions/i18n-glossary.md`](develop/conventions/i18n-glossary.md) | One es-419 equivalent per term, enforced by `lint:i18n-glossary` |
+| [`develop/verification-copy-policy.md`](develop/verification-copy-policy.md) | What a verification surface may say about what it checked, enforced by `lint:verification-copy` |
 | [`develop/conventions/mcp-oauth-notes.md`](develop/conventions/mcp-oauth-notes.md) | MCP + OAuth server internals and pinned package symbols |
 | [`develop/spikes/`](develop/spikes/) | GO/FALLBACK decision records for questions answered by throwaway code — the code is gone, the write-up is the deliverable |
 
@@ -61,6 +62,7 @@ auth, validation, logging, tenancy, schema).
 |---|---|
 | [`reference/api.md`](reference/api.md) | REST endpoints and auth patterns. Live OpenAPI at `/doc`, Swagger UI at `/ui` |
 | [`reference/database.md`](reference/database.md) | D1 schema, drizzle-kit schema-first migration flow |
+| [`reference/database-schema.md`](reference/database-schema.md) | Every table and column, generated from the schema (`npm run docs:schema`) |
 | [`reference/roles.md`](reference/roles.md) | The four roles, the nine capability toggles, mapping from Spectora / ISN |
 | [`reference/deployment-modes.md`](reference/deployment-modes.md) | What differs between `standalone` and `saas`, capability by capability (generated) |
 

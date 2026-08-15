@@ -178,8 +178,12 @@ const INVENTORY = [
       reason: "Invoicing: how much of that invoice has been paid." },
     { kind: "column", id: "order_payments.amount_cents", disposition: "allowed",
       reason: "Payments: one ledger row per charge or refund against an order." },
-    { kind: "column", id: "inspection_requests.total_amount_cents", disposition: "allowed",
-      reason: "Booking: the quoted total on an inbound inspection request." },
+    // `inspection_requests.total_amount_cents` was inventoried here as "the
+    // quoted total on an inbound request". It was dropped: written at booking,
+    // read only by its own accumulator, and never authoritative for anything —
+    // the price of an order is `getEffectivePriceCents()`. The entry goes with
+    // the column, because a stale permit is a permit waiting for the next thing
+    // to land on that name.
     { kind: "column", id: "service_pay_rules.deduction_cents", disposition: "allowed",
       reason: "Pay splits: a fixed deduction from the inspector's share of the tenant's fee." },
     { kind: "column", id: "inspection_service_pay_splits.amount_cents", disposition: "allowed",

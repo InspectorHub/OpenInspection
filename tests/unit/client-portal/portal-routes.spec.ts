@@ -23,6 +23,7 @@ import { signPortalSession, signMagicLink } from '../../../server/lib/portal-ses
 import portalRoutes from '../../../server/api/portal';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { hashToken } from '../../../server/lib/token-hash';
 
 const SECRET = 'test-jwt-secret';
 
@@ -44,6 +45,16 @@ describe('portal API', () => {
         });
     }
 
+    // The row keeps only `token_hash`; the plaintext lives in the link. These
+    // specs need the plaintext back to present it, so the fixtures remember it
+    // here — the test-side stand-in for the service's `token_enc`.
+    const mintedTokens = new Map<string, string>();
+    async function remember(token: string): Promise<string> {
+        const hash = await hashToken(token);
+        mintedTokens.set(hash, token);
+        return hash;
+    }
+
     async function seedToken(inspectionId: string, recipientEmail: string, role: 'client' | 'co_client' | 'agent' = 'client', revokedAt: Date | null = null) {
         await testDb.insert(schema.inspectionAccessTokens).values({
             id: crypto.randomUUID(),
@@ -51,7 +62,7 @@ describe('portal API', () => {
             inspectionId,
             recipientEmail,
             role,
-            token: crypto.randomUUID(),
+            tokenHash: await remember(crypto.randomUUID()),
             createdAt: new Date(),
             expiresAt: null,
             revokedAt,
@@ -65,7 +76,8 @@ describe('portal API', () => {
         return {
             resolveToken: async (token: string) => {
                 const rows = await testDb.select().from(schema.inspectionAccessTokens);
-                const row = rows.find((r) => r.token === token);
+                const presented = await hashToken(token);
+                const row = rows.find((r) => r.tokenHash === presented);
                 if (!row) return null;
                 return {
                     id: row.id,
@@ -77,9 +89,11 @@ describe('portal API', () => {
                     expiresAt: row.expiresAt ? row.expiresAt.getTime() : null,
                 };
             },
-            // Idempotent get-or-create stub: returns the seeded row's plaintext
-            // token for (inspection, recipient). The overview tests seed live rows
-            // with a real `token` value, so this hands back that stable string.
+            // Idempotent get-or-create stub: returns the SAME plaintext for
+            // (inspection, recipient) across calls, which is what makes the
+            // portal link stable. The row stores only a hash, so the plaintext
+            // comes back out of `mintedTokens` here — standing in for the real
+            // service's `token_enc` reconstruction.
             issueToken: async (input: { tenantId: string; inspectionId: string; recipientEmail: string }) => {
                 const rows = await testDb.select().from(schema.inspectionAccessTokens);
                 const row = rows.find(
@@ -87,7 +101,8 @@ describe('portal API', () => {
                         && r.recipientEmail === input.recipientEmail
                         && r.revokedAt == null,
                 );
-                if (row) return row.token;
+                const known = row ? mintedTokens.get(row.tokenHash ?? '') : undefined;
+                if (known) return known;
                 const token = crypto.randomUUID();
                 await testDb.insert(schema.inspectionAccessTokens).values({
                     id: crypto.randomUUID(),
@@ -95,7 +110,7 @@ describe('portal API', () => {
                     inspectionId: input.inspectionId,
                     recipientEmail: input.recipientEmail,
                     role: 'client',
-                    token,
+                    tokenHash: await remember(token),
                     createdAt: new Date(),
                     expiresAt: null,
                     revokedAt: null,
@@ -139,7 +154,7 @@ describe('portal API', () => {
             inspectionId,
             recipientEmail,
             role,
-            token,
+            tokenHash: await remember(token),
             createdAt: new Date(),
             expiresAt: null,
             revokedAt: null,

@@ -15,9 +15,10 @@ import {
  * write whatever key it was handed. `POST /api/admin/branding` hands it a spread
  * of the whole request body, so every column the service could name was one
  * owner/manager call away — and, where the MCP `extended` tier is on, one tool
- * call away. `showEstimates` got its own refusal in the writer; the property
- * that made it reachable did not change, so the next sensitive column inherited
- * it. This list is that property, fixed once for all columns.
+ * call away. Refusing one column in the writer (as `is_estimates_shown` did,
+ * before it was dropped) never changed the property that made it reachable, so
+ * the next sensitive column inherited it. This list is that property, fixed
+ * once for all columns.
  *
  * The list is DERIVED, never typed out. Two sources:
  *

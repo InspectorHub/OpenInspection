@@ -22,6 +22,62 @@
       "when": 1786579648894,
       "tag": "0002_destruction_record_two_phase",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1786691292490,
+      "tag": "0003_drop_redundant_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786697361531,
+      "tag": "0004_inspections_list_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1786698675528,
+      "tag": "0005_drop_prefix_redundant_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1786702451474,
+      "tag": "0006_drop_request_money_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1786716202923,
+      "tag": "0007_drop_commercial_subtypes",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1786717210513,
+      "tag": "0008_drop_agreement_request_plaintext_token",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1786753725543,
+      "tag": "0009_record_signature_attribution_provenance",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786753837559,
+      "tag": "0010_move_envelope_signature_to_signer_rows",
+      "breakpoints": true
     }
   ]
 }

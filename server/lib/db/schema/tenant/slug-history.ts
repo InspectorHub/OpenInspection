@@ -35,6 +35,12 @@ export const SLUG_RETIREMENT_MS = 365 * 24 * 60 * 60 * 1000;
  * many times and every reader asks "who did THIS slug belong to".
  */
 export const tenantSlugHistory = sqliteTable('tenant_slug_history', {
+    // The slug as it appears in an old public link — the LOOKUP KEY, matched
+    // exactly by `resolveByPathParam` after the live-slug and KV lookups miss,
+    // and never cached (a history hit must not warm `tenant:<slug>` for whoever
+    // claims that slug next). Written by `portal.provider.ts` BEFORE the rename
+    // lands, as an upsert on this key: a slug that comes round again re-points
+    // to its latest owner instead of colliding.
     oldSlug:      text('old_slug').primaryKey(),
     tenantId:     text('tenant_id').notNull(),
     changedAt:    integer('changed_at', { mode: 'timestamp_ms' }).notNull(),

@@ -24,8 +24,9 @@
  *    then swept stays byte-identical — '[erased]' sentinel for NOT NULL columns,
  *    NULL for nullable). Idempotent on already-anonymized rows (re-setting the
  *    same values is a no-op in effect).
- *  - NULL `signature_base64` on the envelope AND on its `agreement_signers` rows
- *    (the orchestrator KEEPS the signature on a DSAR; the sweep destroys it).
+ *  - NULL `signature_base64` on the envelope's `agreement_signers` rows — the
+ *    only place a signature lives (the orchestrator KEEPS it on a DSAR; the
+ *    sweep destroys it).
  *  - Set `agreement_requests.purged_at = now` (the destruction marker / idempotency
  *    guard). `status` STAYS 'signed' — the agreement WAS signed; the truthful state
  *    plus the surviving esign_audit_logs chain remain the tamper-evident attestation.
@@ -115,12 +116,13 @@ export async function runRetentionSweep(
         .run();
     const purgedSigners = changeCount(signerRes);
 
-    // Anonymize denormalized client identity + destroy envelope signature + mark
-    // purged. The `purged_at IS NULL` guard in the WHERE keeps the count truthful
-    // and the operation idempotent under a race. PII SET = shared
-    // `ANONYMIZE_REQUEST_PII`; signature_base64 + purged_at layered on here.
+    // Anonymize denormalized client identity + mark purged. The signatures were
+    // destroyed on the signer rows above — the envelope has none of its own since
+    // the column moved there. The `purged_at IS NULL` guard in the WHERE keeps
+    // the count truthful and the operation idempotent under a race. PII SET =
+    // shared `ANONYMIZE_REQUEST_PII`; purged_at layered on here.
     const envRes = await db.update(agreementRequests)
-        .set({ ...ANONYMIZE_REQUEST_PII, signatureBase64: null, purgedAt: new Date(now) })
+        .set({ ...ANONYMIZE_REQUEST_PII, purgedAt: new Date(now) })
         .where(and(inArray(agreementRequests.id, dueIds), isNull(agreementRequests.purgedAt)))
         .run();
     const purgedEnvelopes = changeCount(envRes);

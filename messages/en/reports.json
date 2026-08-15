@@ -42,7 +42,7 @@
   "report_verify_notpublished_body": "This report is not published.",
   "report_verify_failed_heading": "❌ Verification Failed",
   "report_verify_failed_body": "This report's cryptographic signature could not be verified. The content may have been altered.",
-  "report_verify_verified_heading": "✅ Verified",
+  "report_verify_verified_heading": "✅ Report integrity verified",
   "report_verify_detail_property": "Property",
   "report_verify_detail_content_hash": "Content hash",
   "report_verify_detail_algorithm": "Algorithm",

@@ -12,6 +12,7 @@ import portalRoutes from '../../../server/api/portal';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { hashToken } from '../../../server/lib/token-hash';
 
 // Spec 3 Task 6, Part A — GET /api/portal/:tenant/exchange must NEVER mint a
 // client __Host-portal_session for an agent-kind token, even though the
@@ -30,7 +31,8 @@ describe('GET /api/portal/:tenant/exchange — agent tokens never mint a client 
         return {
             resolveToken: async (token: string) => {
                 const rows = await testDb.select().from(schema.inspectionAccessTokens);
-                const row = rows.find((r) => r.token === token);
+                const presented = await hashToken(token);
+                const row = rows.find((r) => r.tokenHash === presented);
                 if (!row) return null;
                 return {
                     inspectionId: row.inspectionId,
@@ -72,7 +74,7 @@ describe('GET /api/portal/:tenant/exchange — agent tokens never mint a client 
         const token = crypto.randomUUID();
         await testDb.insert(schema.inspectionAccessTokens).values({
             id: crypto.randomUUID(), tenantId: TENANT, inspectionId, recipientEmail: email, role,
-            token, createdAt: new Date(), expiresAt: null, revokedAt: null,
+            tokenHash: await hashToken(token), createdAt: new Date(), expiresAt: null, revokedAt: null,
         } as never);
         return token;
     }

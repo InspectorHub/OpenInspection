@@ -36,6 +36,13 @@ import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqli
 export const tenantLegalVersions = sqliteTable('tenant_legal_versions', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull(),
+    /**
+     * Which document. It is the discriminator in the uniqueness key and in every
+     * "latest in force" lookup, so the two version independently — saving Terms
+     * never mints a Privacy row. The retention sweep deletes a row only when a
+     * NEWER version exists for the same `(tenant, doc)`, which is what keeps the
+     * current text of each one undeletable.
+     */
     doc: text('doc', { enum: ['privacy', 'terms'] }).notNull(),
     /** `YYYY-MM-DD` in the tenant's own timezone — the date a reader is shown. */
     version: text('version').notNull(),

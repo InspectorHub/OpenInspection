@@ -22,6 +22,10 @@ export const smsDeliveryStatus = sqliteTable('sms_delivery_status', {
     status:            text('status', {
         enum: ['queued', 'sent', 'delivered', 'undelivered', 'failed'],
     }).notNull(),
+    // Twilio's numeric `ErrorCode` when the callback carries one; Telnyx sends
+    // no code, so the receiver stores its raw failure word (delivery_failed,
+    // expired, rejected, …) instead — two vocabularies in one column. NULL on
+    // any non-failed status. Write-only today: nothing reads it back.
     errorCode:         text('error_code'),
     updatedAt:         integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
@@ -64,6 +68,10 @@ export const emailSuppressions = sqliteTable('email_suppressions', {
     id:              text('id').primaryKey(),
     tenantId:        text('tenant_id').notNull(),
     email:           text('email').notNull(), // normalized lower-cased + trimmed
+    // The ADMISSION criterion, not a label: a row exists only because an inbound
+    // event resolved to one of these two (a soft bounce resolves to neither and
+    // writes nothing). Nothing branches on the value — the send gate tests row
+    // EXISTENCE — and it leaves the system only in the DSAR subject export.
     reason:          text('reason', { enum: ['hard_bounce', 'complaint'] }).notNull(),
     sourceProvider:  text('source_provider').notNull(), // resend|sendgrid|postmark|mailgun
     providerEventId: text('provider_event_id'),

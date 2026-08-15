@@ -79,8 +79,13 @@ describe('the count is the blast radius', () => {
         await mint(TENANT, 1);
         await mint(OTHER_TENANT, 2);
         expect(await svc.countLiveLinksForTenant(TENANT)).toBe(1);
+        // UNCHANGED, not null. A freshly minted link now carries the default
+        // report-link TTL, so "the other tenant was not touched" has to be
+        // asserted against what that row held before the bulk apply — asserting
+        // null would only be testing that the default is still `never`.
+        const before = allRows(OTHER_TENANT)[0].expiresAt;
         await svc.setExpiryForTenant(TENANT, Date.now() + 30 * DAY);
-        expect(allRows(OTHER_TENANT)[0].expiresAt).toBeNull();
+        expect(allRows(OTHER_TENANT)[0].expiresAt).toEqual(before);
     });
 });
 

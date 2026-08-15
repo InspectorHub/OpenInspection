@@ -23,10 +23,6 @@ import { ROLE, isAdminRole } from '../auth/roles';
 export interface CanEditUser {
     id:                 string;
     role:               string;
-    // Legacy field kept for back-compat with existing callers. Section-scope
-    // edit restrictions were removed when the specialist role was collapsed
-    // into a plain inspector (2026-06-13) — this is no longer consulted.
-    assignedSectionIds: string;   // JSON-encoded string array
 }
 
 export interface CanEditInspection {

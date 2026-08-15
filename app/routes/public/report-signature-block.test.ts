@@ -17,17 +17,27 @@ import {
 /* ------------------------------------------------------------------ */
 
 describe('signatureBlockModel', () => {
+  // review decision (2026-08-15). The previous version of this spec asserted
+  // that a published report with NO signature image renders variant "typed" —
+  // the inspector's name set as a signature, captioned "Electronically signed
+  // by". It pinned the defect as a feature, with a test name that read like one,
+  // which is why nothing caught it: production had 7 published reports and all 7
+  // took that branch.
+  //
+  // The invariant now is one sentence: never synthesize a signature from a
+  // person's name.
   const baseSignature = {
+    method: 'none' as const,
     signatureBase64: null,
     signedAt: 1718000000000,
     inspectorName: 'Jane Smith',
     inspectorLicense: 'HI-12345',
   };
 
-  it('returns variant:"image" when published + signatureBase64 present', () => {
+  it('renders the inspector signature when they signed', () => {
     const result = signatureBlockModel({
       isPublished: true,
-      signature: { ...baseSignature, signatureBase64: 'data:image/png;base64,abc=' },
+      signature: { ...baseSignature, method: 'manual', signatureBase64: 'data:image/png;base64,abc=' },
       ownerPreview: false,
     });
     expect(result.variant).toBe('image');
@@ -37,32 +47,54 @@ describe('signatureBlockModel', () => {
     expect(result.license).toBe('HI-12345');
   });
 
-  it('returns variant:"typed" when published + signature present but signatureBase64 null', () => {
+  it('ATTRIBUTES authorship — and claims no signature — when nobody signed', () => {
     const result = signatureBlockModel({
       isPublished: true,
       signature: baseSignature,
       ownerPreview: false,
     });
-    expect(result.variant).toBe('typed');
-    expect(result.showNudge).toBe(false);
+    expect(result.variant).toBe('attribution');
+    // The name is a name. Nothing is handed to the renderer that it could draw
+    // as a signature, and no timestamp is offered for a signing that never was.
+    expect(result.signatureBase64).toBeFalsy();
+    expect(result.signedAt).toBeNull();
     expect(result.inspectorName).toBe('Jane Smith');
-    expect(result.license).toBe('HI-12345');
   });
 
-  it('sets showNudge:true when published + no image + ownerPreview:true', () => {
+  it('distinguishes an automatically applied signature from a hand-applied one', () => {
+    const auto = signatureBlockModel({
+      isPublished: true,
+      signature: { ...baseSignature, method: 'authorized_auto', signatureBase64: 'data:image/png;base64,xyz=' },
+      ownerPreview: false,
+    });
+    // Same image, same person. Different provenance, and the document says so —
+    // the reader should not take a standing authorisation for an act at
+    // publication time.
+    expect(auto.variant).toBe('auto');
+    expect(auto.signatureBase64).toBe('data:image/png;base64,xyz=');
+    const manual = signatureBlockModel({
+      isPublished: true,
+      signature: { ...baseSignature, method: 'manual', signatureBase64: 'data:image/png;base64,xyz=' },
+      ownerPreview: false,
+    });
+    expect(manual.variant).toBe('image');
+    expect(auto.variant).not.toBe(manual.variant);
+  });
+
+  it('still nudges the OWNER to upload a signature, without claiming one to the reader', () => {
     const result = signatureBlockModel({
       isPublished: true,
       signature: baseSignature,
       ownerPreview: true,
     });
-    expect(result.variant).toBe('typed');
+    expect(result.variant).toBe('attribution');
     expect(result.showNudge).toBe(true);
   });
 
-  it('does NOT set showNudge when published + image present (even if ownerPreview)', () => {
+  it('does NOT set showNudge when a signature exists (even if ownerPreview)', () => {
     const result = signatureBlockModel({
       isPublished: true,
-      signature: { ...baseSignature, signatureBase64: 'data:image/png;base64,xyz=' },
+      signature: { ...baseSignature, method: 'manual', signatureBase64: 'data:image/png;base64,xyz=' },
       ownerPreview: true,
     });
     expect(result.variant).toBe('image');
@@ -89,22 +121,26 @@ describe('signatureBlockModel', () => {
     expect(result.showNudge).toBe(false);
   });
 
-  it('carries signedAt through for image variant', () => {
+  it('carries signedAt through when there was a signing to timestamp', () => {
     const result = signatureBlockModel({
       isPublished: true,
-      signature: { ...baseSignature, signatureBase64: 'data:image/png;base64,abc=', signedAt: 1718000000000 },
+      signature: { ...baseSignature, method: 'manual', signatureBase64: 'data:image/png;base64,abc=', signedAt: 1718000000000 },
       ownerPreview: false,
     });
     expect(result.signedAt).toBe(1718000000000);
   });
 
-  it('carries signedAt through for typed variant', () => {
+  it('DROPS a signedAt that arrives on an unsigned report', () => {
+    // This spec used to assert the opposite, and that is the whole point: a
+    // timestamp on a report nobody signed dates an event that did not happen.
+    // Publishing writes a timestamp readily; signing is what has to earn one.
     const result = signatureBlockModel({
       isPublished: true,
       signature: { ...baseSignature, signedAt: 1718000000000 },
       ownerPreview: false,
     });
-    expect(result.signedAt).toBe(1718000000000);
+    expect(result.variant).toBe('attribution');
+    expect(result.signedAt).toBeNull();
   });
 
   it('license is null when inspectorLicense is null', () => {

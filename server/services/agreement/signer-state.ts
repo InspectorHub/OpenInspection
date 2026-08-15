@@ -2,7 +2,7 @@ import { eq, and, inArray, sql, desc, asc } from 'drizzle-orm';
 import { agreementRequests, agreementSigners } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
-import { mintToken, hashToken, deadTokenSentinel, resolveTokenRow } from '../../lib/token-hash';
+import { mintToken, hashToken } from '../../lib/token-hash';
 import { isTokenRevokedOrExpired } from '../../lib/token-ttl';
 import { sealToken, openToken } from '../../lib/config-crypto';
 import { computeEnvelopeStatus, type Constructor, type ResolvedSigner } from './base';
@@ -35,21 +35,23 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
 
         /**
          * Resolve a presented public token to a signer + its envelope. Signer
-         * tokens resolve first (tier-2 hash-at-rest; plaintext is NEVER stored, so
-         * the byPlaintext branch is always null). On a miss we fall back to legacy
-         * envelope tokens (tokenHash, then permanent plaintext fallback with a lazy
-         * hash-upgrade) and load that envelope's first signer.
+         * tokens resolve first (tier-2 hash-at-rest); on a miss we try legacy
+         * envelope tokens and load that envelope's first signer.
+         *
+         * Both lookups are hash-only. The envelope path used to carry a plaintext
+         * fallback with a lazy hash-upgrade, for envelopes minted before the hash
+         * existed. Production held three such rows and every one of them was
+         * `expired` — an expired envelope is not signable, so the branch could
+         * only ever resolve something the caller must refuse anyway.
+         * The column itself is gone now: nothing could present a value that
+         * resolved, because `findOrCreate` never wrote the matching `token_hash`.
          */
         async getSignerByPresentedToken(presented: string): Promise<ResolvedSigner | null> {
             const db = this.getDrizzle();
+            const hash = await hashToken(presented);
             // 1) Signer-token path
-            const signer = await resolveTokenRow<typeof agreementSigners.$inferSelect>({
-                presented,
-                byHash: async (hash) =>
-                    (await db.select().from(agreementSigners).where(eq(agreementSigners.tokenHash, hash)).limit(1))[0] ?? null,
-                byPlaintext: async () => null, // signer plaintext is never persisted
-                upgrade: async () => { /* nothing to upgrade — hash is the only key */ },
-            });
+            const signer = (await db.select().from(agreementSigners)
+                .where(eq(agreementSigners.tokenHash, hash)).limit(1))[0] ?? null;
             if (signer) {
                 // IA-37 — fail closed on a revoked or expired signer link. A dead
                 // token must resolve to nothing (NotFound at the route), never to a
@@ -61,18 +63,8 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
             }
 
             // 2) Legacy envelope-token path
-            const envelope = await resolveTokenRow<typeof agreementRequests.$inferSelect>({
-                presented,
-                byHash: async (hash) =>
-                    (await db.select().from(agreementRequests).where(eq(agreementRequests.tokenHash, hash)).limit(1))[0] ?? null,
-                byPlaintext: async (token) =>
-                    (await db.select().from(agreementRequests).where(eq(agreementRequests.token, token)).limit(1))[0] ?? null,
-                upgrade: async (row, hash) => {
-                    await db.update(agreementRequests)
-                        .set({ tokenHash: hash, token: deadTokenSentinel(row.id) })
-                        .where(eq(agreementRequests.id, row.id));
-                },
-            });
+            const envelope = (await db.select().from(agreementRequests)
+                .where(eq(agreementRequests.tokenHash, hash)).limit(1))[0] ?? null;
             if (!envelope) return null;
 
             // Load the envelope's first signer; synthesize one for weird legacy data.
@@ -291,6 +283,13 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
                     onBehalfOf: opts.onBehalfOf ?? null,
                     onBehalfDisclaimer: opts.onBehalfDisclaimer ?? null,
                     languageDisclosureVersion: opts.languageDisclosureVersion,
+                    // This row is the signing event, not a later reading of one.
+                    // Stated rather than left NULL so that a NULL basis anywhere
+                    // reads as "not recorded" and never as "captured, probably" —
+                    // the distinction review asked us to keep legible between a
+                    // signature we watched arrive and one a migration attributed.
+                    attributionBasis: 'signing_event',
+                    attributedAt: new Date(opts.signedAtMs),
                 })
                 .where(and(
                     eq(agreementSigners.id, signer.id),
@@ -312,11 +311,16 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
             // win: `WHERE status NOT IN (terminal)`.
             let envelopeCompletedNow = false;
             if (aggregate === 'signed') {
+                // The envelope records THAT it completed and WHEN — not the
+                // signature. Copying one up from a signer row answered a question
+                // it could not answer: on a multi-signer envelope it held whichever
+                // signature won this race, as if the envelope had an author. Now
+                // nothing reads the copy either (the renderer asks the rows).
+                // `signedAt` stays; that one IS read.
                 const res: unknown = await db.update(agreementRequests)
                     .set({
                         status: 'signed',
                         signedAt: new Date(opts.signedAtMs),
-                        signatureBase64, // legacy reader compat
                     })
                     .where(and(
                         eq(agreementRequests.id, envelope.id),

@@ -7,6 +7,9 @@ export const repairRequests = sqliteTable('repair_requests', {
   id: text('id').primaryKey(),
   tenantId: text('tenant_id').notNull(),
   inspectionId: text('inspection_id').notNull(),
+  // With `created_by_ref`, the list's OWNER identity: `listMine` filters on the
+  // pair and `assertCanEdit` refuses on a mismatch of either, so this is an
+  // authorization input, not a label. Also the Pill on the inspector's log entry.
   createdByKind: text('created_by_kind', { enum: ['client', 'agent', 'inspector'] }).notNull(),
   // WHO built this list, as resolved by `repair-access.ts`. NOT an opaque id:
   // on the portal-token path (how a client always arrives, and most agents) it
@@ -15,7 +18,13 @@ export const repairRequests = sqliteTable('repair_requests', {
   // token string for the legacy KV agent link. Personal data in the common
   // case, which is why it carries an erasure rule (erasure-manifest.ts).
   createdByRef: text('created_by_ref').notNull(),
+  // Document-level intro the creator writes (set and cleared by `setIntro`),
+  // shown above the item list on the public share page and in the inspector's
+  // repair-request log. NULL = the list opens straight into items.
   customIntro: text('custom_intro'),
+  // The bearer credential for `/repair-request/<token>`: the share view, its PDF
+  // and the share email authenticate on this ALONE — no session, no tenant in
+  // the path — which is why it is uniquely indexed and gated by the pair below.
   shareToken: text('share_token').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
@@ -33,11 +42,22 @@ export const repairRequestItems = sqliteTable('repair_request_items', {
   id: text('id').primaryKey(),
   tenantId: text('tenant_id').notNull(),
   repairRequestId: text('repair_request_id').notNull(),
+  // `unitId:sectionId:itemId` (`lib/finding-key.ts`; `_default` when the template
+  // has no units) — one item's entry in `inspection_results.data`, the same key
+  // shape `cost_items.finding_key` points at. Also `addItem`'s idempotency key:
+  // (repair_request_id, finding_key) is matched before insert, so re-toggling a
+  // defect updates the row instead of double-counting its requested credit.
   findingKey: text('finding_key').notNull(),
+  // Snapshots of the report's `section.title` / `item.label` at add time, so a
+  // contractor reading the shared list still knows where the defect is after the
+  // template or the report has been edited under it.
   sectionTitle: text('section_title').notNull(),
-  itemLabel: text('item_label').notNull(),
+  itemLabel: text('item_label').notNull(),   // add-time snapshot of item.label, beside section_title
   commentSnapshot: text('comment_snapshot'),
   requestedCreditCents: integer('requested_credit_cents'),
+  // The REQUESTER's own words on this line (buyer or agent, quick-phrase
+  // assisted) — the inspector's text is `comment_snapshot`. Rendered on the
+  // public share page; one of the three fields `updateItem` will PATCH.
   note: text('note'),
   sortOrder: integer('sort_order').notNull().default(0),
   // IA-55 — defect title / location / category snapshots so the public share

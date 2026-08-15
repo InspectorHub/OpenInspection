@@ -128,7 +128,6 @@ export class AdminService {
                 clientEmail: agreementRequests.clientEmail,
                 clientName: agreementRequests.clientName,
                 status: agreementRequests.status,
-                signatureBase64: agreementRequests.signatureBase64,
                 signedAt: agreementRequests.signedAt,
                 viewedAt: agreementRequests.viewedAt,
                 sentAt: agreementRequests.sentAt,

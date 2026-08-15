@@ -39,7 +39,8 @@ export const ANONYMIZE_SIGNER_PII = {
 /**
  * Satellite-PII SET for `agreement_requests` (denormalized client identity).
  * `client_email` is NOT NULL → sentinel; `client_name` is nullable → NULL. Does
- * NOT include `signature_base64` / `purged_at` (the sweep layers those on).
+ * NOT include `purged_at` (the sweep layers that on). The envelope carries no
+ * signature of its own — that lives on `agreement_signers`.
  */
 export const ANONYMIZE_REQUEST_PII = {
     clientName: null,

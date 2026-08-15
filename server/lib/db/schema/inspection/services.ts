@@ -81,6 +81,10 @@ export const discountCodes = sqliteTable('discount_codes', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     code: text('code').notNull(),
+    // Decides how `value` below is READ: 'fixed' = integer cents, clamped to the
+    // subtotal so a big code cannot make a booking negative; 'percent' = whole
+    // percent, floor(subtotal * value / 100). One column carrying two units —
+    // neither column means anything without the other.
     type: text('type', { enum: ['fixed', 'percent'] }).notNull(),
     value: integer('value').notNull(),
     maxUses: integer('max_uses'),

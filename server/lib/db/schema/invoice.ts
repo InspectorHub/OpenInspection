@@ -14,6 +14,11 @@ export const invoices = sqliteTable('invoices', {
     // authoritative over service-snapshot sums and inspections.price. See
     // getEffectivePriceCents() in server/lib/effective-price.ts.
     amountCents: integer('amount_cents').notNull().default(0),
+    // The breakdown shown to the client, snapshotted at creation from the ACTIVE
+    // inspection_services rows (a declined line must not appear) or, when there
+    // are none, a single "Inspection services" line off inspections.price. Never
+    // re-derived afterwards and NOT the money authority — amountCents above is,
+    // so these need not still sum to it. Also mapped 1:1 onto QuickBooks lines.
     lineItems: text('line_items', { mode: 'json' }).notNull().$type<Array<{ description: string; amountCents: number; quantity?: number; unitAmountCents?: number }>>().default([]),
     // Calendar-semantic YYYY-MM-DD (invoice due date, no time component) — intentionally
     // TEXT per the Schema Rules calendar-field exception, not an epoch timestamp.
@@ -29,6 +34,11 @@ export const invoices = sqliteTable('invoices', {
     // with its audit trail intact and is excluded from all revenue rollups. Distinct
     // from refund (paid->unpaid). See spec 2026-06-22 #182.
     voidedAt: integer('voided_at', { mode: 'timestamp_ms' }),
+    // Outcome of the LAST QuickBooks push. NULL = never pushed (no connection,
+    // sync off, or the tenant does not use QBO) — the common state, not an
+    // error. Only the invoice push writes it, setting 'synced' or 'failed';
+    // 'pending' is declared but no code path produces it. Internal: deliberately
+    // stripped from the public client invoice projection.
     qboSyncStatus: text('qbo_sync_status', { enum: ['synced', 'pending', 'failed'] }),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     // i18n Phase B — the currency (ISO 4217) this invoice was created in, snapshot
@@ -49,7 +59,6 @@ export const invoices = sqliteTable('invoices', {
     // invoice. Appended at table end. See #273.
     amountPaidCents: integer('amount_paid_cents'),
 }, (t) => [
-    index('idx_invoices_tenant').on(t.tenantId),
     index('idx_invoices_inspection').on(t.inspectionId),
     index('idx_invoices_contact').on(t.tenantId, t.contactId),
 ]);

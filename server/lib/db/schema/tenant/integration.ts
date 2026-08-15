@@ -19,13 +19,22 @@ import { DESTRUCTION_STATUS, DESTRUCTION_STATUSES } from '../../../status/destru
  */
 export const syncOutbox = sqliteTable('sync_outbox', {
     id:           text('id').primaryKey(),
+    // Short event name (`user.invited`). `toCloudEvent` expands it to the
+    // envelope's `io.inspectorhub.<type>` and picks the `dataschema` from it.
+    // Core never branches on the value; portal routes on it.
     eventType:    text('event_type').notNull(),
+    // The event's `data`, stringified ONCE at append and JSON.parsed straight
+    // back into the envelope at publish — never re-serialized from a re-read
+    // row, so the bytes portal receives are the ones the producing write made.
     payload:      text('payload').notNull(),
     // Schema Rules: state-machine column declares its enum (type-layer only).
     status:       text('status', { enum: [...SYNC_OUTBOX_STATUSES] }).notNull().default(SYNC_OUTBOX_STATUS.PENDING),
     attempts:     integer('attempts').notNull().default(0),
     createdAt:    integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     lastTriedAt:  integer('last_tried_at', { mode: 'timestamp_ms' }),
+    // Written only by the DLQ writeback (`markFailedFromDlq`, capped at 1000
+    // chars) and cleared again on publish and on redrive. NULL never means
+    // "never failed" — it means "not failed now"; `attempts` is the durable count.
     lastError:    text('last_error'),
 }, (t) => [
     index('idx_sync_outbox_status_created').on(t.status, t.createdAt),
@@ -37,6 +46,9 @@ export const syncOutbox = sqliteTable('sync_outbox', {
 // FROZEN for the inspector namespace (2026-06-06, DB-12); still consulted for agent slugs.
 export const slugReservations = sqliteTable('slug_reservations', {
     slug: text('slug').primaryKey(),
+    // NO READER FOUND. Both lookups (`UserService.checkSlug`, `api/public-slug.ts`)
+    // only test that a row EXISTS and return their own 'reserved' literal; the
+    // latter selects `slug` alone. Operator-facing note on a hand-seeded row.
     reason: text('reason').notNull(),
 });
 
@@ -87,9 +99,17 @@ export const auditLogs = sqliteTable('audit_logs', {
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     userId: text('user_id'),
     action: text('action').notNull(),       // e.g. 'inspection.create'
+    // The entity family the action touched ('inspection', 'widget', 'agent', …).
+    // Free-form — each caller passes its own string, there is no registry — and
+    // exposed as the `?entityType=` filter on the admin audit list. Survives the
+    // retention anonymize, which clears the actor columns and keeps the event.
     entityType: text('entity_type').notNull(),
     entityId: text('entity_id'),
     metadata: text('metadata', { mode: 'json' }),
+    // `CF-Connecting-IP`, and only on the `auditFromContext` path — a direct
+    // `writeAuditLog` caller passes its own or nothing, so NULL means "no request
+    // context", not "no IP". Out of scope for a consumer erasure (staff actor),
+    // but cleared by the retention sweep, whose idempotency guard reads it.
     ipAddress: text('ip_address'),
     // Sprint B-3 — populated on inspector-facing events (writeAuditLogWithSlug
     // helper); NULL otherwise so the column stays signal-rich for the audit
@@ -106,9 +126,17 @@ export const notifications = sqliteTable('notifications', {
     id:          text('id').primaryKey().notNull(),
     tenantId:    text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     userId:      text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    // The automation trigger event that produced the notice (`ctx.triggerEvent`),
+    // or 'manual.send' for an operator press. No enum, because it is read as a
+    // hint: `noticeTitle()` (app/lib/notice-view.ts) switches on the ones it knows
+    // to give the recipient a sentence about their own inspection, and falls back
+    // to the stored staff-worded `title` for anything else.
     type:        text('type').notNull(),
     title:       text('title').notNull(),
     body:        text('body'),
+    // Qualifies `entity_id`. Notice headers always write 'inspection', and both
+    // inboxes build the inspection link only when this reads exactly that — any
+    // other value renders an unlinked row.
     entityType:  text('entity_type'),
     entityId:    text('entity_id'),
     metadata:    text('metadata', { mode: 'json' }).$type<Record<string, unknown>>(),
@@ -153,6 +181,9 @@ export const notifications = sqliteTable('notifications', {
  *  processed_sync_events). Insert-first: a PK conflict means already applied. */
 export const processedCmdEvents = sqliteTable('processed_cmd_events', {
     eventId:     text('event_id').primaryKey(),
+    // The applied command's CloudEvent type, for the human reading the ledger:
+    // dedup keys on `event_id` alone, and every branch (`isSubjectCmd`,
+    // `replyTypeFor`) reads the live envelope rather than this column.
     cmdType:     text('cmd_type').notNull(),
     // Epoch ms — same convention as sync_outbox.created_at.
     processedAt: integer('processed_at', { mode: 'timestamp_ms' }).notNull(),
@@ -164,7 +195,14 @@ export const processedCmdEvents = sqliteTable('processed_cmd_events', {
  *  parked_sync_events. */
 export const parkedCmdEvents = sqliteTable('parked_cmd_events', {
     id:         text('id').primaryKey(),
+    // A FINGERPRINT, never the message: `parkedFingerprint()` allow-lists the
+    // routing fields plus size + sha256 and marks the format `v:1`.
+    // `cmd.tenant.update` sparsely carries an admin credential, and nothing
+    // prunes this table.
     envelope:   text('envelope').notNull(),
+    // Which park path wrote the row — 'parse-failed' or 'unknown-type-or-version'.
+    // Either way core and portal disagree about a command shape. No production
+    // reader: the row is for a human (and the cmd-* workers specs).
     reason:     text('reason').notNull(),
     receivedAt: integer('received_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [

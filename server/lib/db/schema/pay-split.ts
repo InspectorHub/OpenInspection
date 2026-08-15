@@ -73,6 +73,11 @@ export const inspectionServicePaySplits = sqliteTable('inspection_service_pay_sp
     inspectionServiceId: text('inspection_service_id').notNull(),
     userId:              text('user_id').notNull(),
     amountCents:         integer('amount_cents').notNull(),
+    // Whether a rule put this number here or a person did — and it is a ONE-WAY
+    // door: any amount edit rewrites it to 'manual'. That is what the automatic
+    // paths key on. Only a 'rule' row that is unlocked and not itself a
+    // correction may be re-derived by refreshSplits or removed by the orphan
+    // sweep; a 'manual' row is never recomputed or deleted behind anyone's back.
     source:              text('source', { enum: ['rule', 'manual'] }).notNull(),
     // Set when this split was included in a payroll export. From that moment
     // the row is read-only: editing it would desynchronise the books from what

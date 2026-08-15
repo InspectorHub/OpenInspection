@@ -107,7 +107,6 @@ describe('B-28 booking TOCTOU', () => {
                 id: opts.requestId, tenantId: TENANT_ID,
                 clientName: 'Rival', propertyAddress: '9 Other St',
                 scheduledAt: new Date(opts.dateIso ?? SLOT_ISO), status: 'pending',
-                totalAmount: 0, paymentStatus: 'unpaid',
                 createdAt: opts.createdAt, updatedAt: opts.createdAt,
             });
         }

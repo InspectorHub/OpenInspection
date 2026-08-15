@@ -18,10 +18,24 @@ import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlit
  */
 export const idempotencyKeys = sqliteTable('idempotency_keys', {
     tenantId:       text('tenant_id').notNull(),
+    // The caller's `Idempotency-Key` header, verbatim. Clients mint one per
+    // INTENT and hold it across failures, which is why `releaseKey` DELETES the
+    // row on a non-2xx: the corrected retry has to be able to reclaim the key.
     key:            text('key').notNull(),
+    // SHA-256 of `METHOD path <canonicalized JSON body>`. Compared BEFORE
+    // `state`: a key replayed with a different payload gets 422
+    // IDEMPOTENCY_KEY_REUSED, never the stored response — handing back a
+    // pre-edit result is a lost write. Non-JSON bodies fingerprint as `null`.
     fingerprint:    text('fingerprint').notNull(),
+    // 'in_flight' IS the claim — it is what the insert writes, and a conflicting
+    // caller gets 409. Nothing sweeps aged-out rows, so `claimKey` STEALS an
+    // 'in_flight' row past expiresAt with one conditional UPDATE; otherwise a
+    // holder killed mid-request would lock a webhook out forever.
     state:          text('state', { enum: ['in_flight', 'done'] }).notNull().default('in_flight'),
     responseStatus: integer('response_status'),
+    // The 2xx response text, buffered off a clone of the live response and
+    // replayed verbatim with an `Idempotency-Replayed: true` header. NULL while
+    // in_flight; only `state = 'done'` makes it meaningful.
     responseBody:   text('response_body'),
     createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     expiresAt:      integer('expires_at', { mode: 'timestamp_ms' }).notNull(),

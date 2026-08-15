@@ -5,12 +5,33 @@ export const calendarConnections = sqliteTable('calendar_connections', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull(),
     userId: text('user_id').notNull(),
+    /**
+     * Which system holds the calendar. `getCalendarProvider(provider)` is the
+     * only dispatch: it picks the API client that reads busy time and pushes
+     * events. Half of `uq_calendar_connections_user_provider`, but that index is
+     * not the real rule — the connect endpoints refuse a SECOND provider for a
+     * user who already holds one (see loadOpenCalendarConnection).
+     */
     provider: text('provider', { enum: ['google', 'microsoft', 'apple'] }).notNull(),
+    /**
+     * How credentialsEnc authenticates. Written from the provider descriptor's
+     * own constant (google → 'oauth', apple → 'caldav'), never chosen by a user.
+     * NOTHING branches on it — dispatch keys on `provider` — and its one reader
+     * echoes it back in the calendar status response.
+     */
     authType: text('auth_type', { enum: ['oauth', 'caldav'] }).notNull(),
     /** v2 envelope blob (AES-GCM under per-tenant DEK). OAuth or CalDAV JSON inside. */
     credentialsEnc: text('credentials_enc').notNull(),
     /** Wrapped DEK for credentials_enc (k1:… envelope). Paired column like tenant_configs.dek_enc. */
     credentialsDekEnc: text('credentials_dek_enc').notNull(),
+    /**
+     * Singular despite the name: exactly ONE of the two, picked by the inspector
+     * on the connect panel and mirrored by the OAuth scopes actually granted.
+     * `canPushEvents()` gates every write to the remote calendar on
+     * 'events_read_write', and the sync engine forwards it to listBusy, which
+     * chooses the freeBusy endpoint or the events endpoint — only the latter
+     * carries enough detail to import events back.
+     */
     capabilities: text('capabilities', { enum: ['availability_read', 'events_read_write'] }).notNull(),
     calendarId: text('calendar_id').notNull(),
     connectedAt: integer('connected_at', { mode: 'timestamp_ms' }).notNull(),
@@ -83,7 +104,18 @@ export const calendarExternalLinks = sqliteTable('calendar_external_links', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull(),
     userId: text('user_id').notNull(),
+    /**
+     * Which system `external_id` belongs to — a fact about the ROW, not about
+     * whatever connection the user holds today. `deleteLink` aims the remote
+     * DELETE with it, and `findEntityLink` deliberately omits it so a user who
+     * reconnected under a different provider still deletes the right event.
+     */
     provider: text('provider', { enum: ['google', 'microsoft', 'apple'] }).notNull(),
+    /**
+     * Namespaces `entity_id`, which is otherwise just a UUID: without it an
+     * inspection and a calendar block could collide on the upsert key and one
+     * push would overwrite the other's remote id.
+     */
     entityType: text('entity_type', { enum: ['inspection', 'calendar_block'] }).notNull(),
     entityId: text('entity_id').notNull(),
     /** Provider event id (Google `event.id`). */

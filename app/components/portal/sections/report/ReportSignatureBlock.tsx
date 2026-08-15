@@ -38,22 +38,25 @@ export function ReportSignatureBlock({ isPublished, signature, ownerPreview, tim
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-8 mb-4">
       <div className="border border-ih-border rounded-xl p-6 bg-ih-bg-card">
+        {/* The heading is part of the claim. "Inspected & Signed By" over a
+            report nobody signed is the defect review ruled on, so the wording
+            follows the state rather than sitting above it. */}
         <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-4">
-          {m.pca_signature_signed_by()}
+          {sig.variant === "attribution" ? m.pca_signature_inspected_by() : m.pca_signature_signed_by()}
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
-          {sig.variant === "image" && sig.signatureBase64 && (
+          {(sig.variant === "image" || sig.variant === "auto") && sig.signatureBase64 && (
             <img
               src={sig.signatureBase64}
               alt={m.pca_signature_img_alt()}
               className="h-16 object-contain border border-ih-border rounded bg-ih-bg-card p-1"
             />
           )}
-          {sig.variant === "typed" && (
-            <div className="italic text-2xl text-ih-fg-1 border-b border-ih-border pb-1 min-w-[160px]" style={{ fontFamily: "var(--report-heading-font)" }}>
-              {sig.inspectorName}
-            </div>
-          )}
+          {/* Nothing is drawn where no signature exists. There was a variant
+              here that set the inspector's NAME in the report's display font on
+              a ruled line — the visual language of a handwritten signature, for
+              a signature that did not exist. review decision: never
+              synthesize a signature from a person's name. */}
           <div className="text-sm text-ih-fg-2 space-y-0.5">
             <div className="font-semibold text-ih-fg-1">{sig.inspectorName}</div>
             {sig.license && (
@@ -68,8 +71,13 @@ export function ReportSignatureBlock({ isPublished, signature, ownerPreview, tim
             {sig.signedAt != null && (
               <div className="text-[10px] text-ih-fg-3">{m.pca_signature_timezone_note({ tz: timeZone.replace(/_/g, " ") })}</div>
             )}
-            {sig.variant === "typed" && (
-              <div className="text-[10px] text-ih-fg-3">{m.pca_signature_electronically_signed({ name: sig.inspectorName ?? "" })}</div>
+            {/* An automatically applied signature is a real signature with a
+                different provenance, and the reader is entitled to the
+                difference: the inspector authorised it in advance, they did not
+                sign at publication. Phrased as the inspector's own standing
+                authorisation — NOT as the platform signing on their behalf. */}
+            {sig.variant === "auto" && (
+              <div className="text-[10px] text-ih-fg-3">{m.pca_signature_auto_applied()}</div>
             )}
           </div>
         </div>

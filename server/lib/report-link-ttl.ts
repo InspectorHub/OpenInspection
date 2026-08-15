@@ -11,11 +11,23 @@
  * to revoke instead. Wanting a link dead NOW is a different verb (Reset /
  * Remove), not an expiry of zero.
  *
- * Default is `never`: the shipped behaviour was an open-ended link, and
- * customers of migrated companies keep report links for years. A company opts
- * into expiry; nobody is opted in silently. Applying a policy to links ALREADY
- * issued is likewise never automatic — see PortalAccessService, which reads the
- * policy only on the mint/rotate path.
+ * Default is TWO YEARS.
+ *
+ * It was `never` until 2026-08-14, because the shipped behaviour was an
+ * open-ended link and migrated companies' customers had been holding those
+ * links for years. That reasoning covers companies which predate the setting;
+ * for one created afterwards, "keeps what it had" describes nothing, and an
+ * open-ended link to a homebuyer's report was our decision on their behalf.
+ *
+ * Two years is not a figure we invented — it is the one preset below with
+ * published vendor precedent, and it now applies to every company rather than
+ * splitting the default by signup date.
+ *
+ * This is far less disruptive than it sounds, and the reason is structural:
+ * the policy is read only on the mint/rotate path (see PortalAccessService),
+ * so links ALREADY in customers' inboxes keep the `expires_at` they were
+ * stamped with. Changing the default changes what the NEXT link gets. A
+ * company that wants open-ended links selects `never` and knows it did.
  */
 export type ReportLinkTtlUnit = 'days' | 'months' | 'years';
 
@@ -46,13 +58,36 @@ interface PrefsLike {
 }
 
 /**
- * Read the policy out of the `inspection_prefs` JSON blob. Anything that is not
- * a well-formed duration reads as `never` — a corrupted policy must not silently
- * shorten links that are already in customers' inboxes.
+ * The unset default. Two years — see the header for why this figure.
+ *
+ * NOT exported, and the spec that pins it does not import it: a test asserting
+ * `resolveReportLinkTtl(null) === REPORT_LINK_TTL_DEFAULT` would pass whatever
+ * the constant said, which is the one thing the test exists to catch. It spells
+ * out `{ count: 2, unit: 'years' }` instead, so changing this line turns a spec
+ * red — which is what makes the default a decision rather than a detail.
+ */
+const REPORT_LINK_TTL_DEFAULT: ReportLinkTtlDuration = { count: 2, unit: 'years' };
+
+/**
+ * Read the policy out of the `inspection_prefs` JSON blob.
+ *
+ * Two different absences, two different answers, and the difference is the
+ * whole point:
+ *
+ *   - **Nothing stored** → the default. The company has not chosen, so the
+ *     platform default applies.
+ *   - **Stored but malformed** → `never`, NOT the default. A corrupted policy
+ *     must not silently shorten links already in customers' inboxes, and that
+ *     argument survives the default changing: it is about not acting on a value
+ *     we cannot read, which is a different question from what to do when there
+ *     is no value at all.
+ *
+ * An explicit `'never'` is a choice and is honoured as one.
  */
 export function resolveReportLinkTtl(prefs: PrefsLike | null | undefined): ReportLinkTtl {
     const raw = prefs?.reportLinkTtl;
-    if (raw === 'never' || raw == null) return 'never';
+    if (raw == null) return REPORT_LINK_TTL_DEFAULT;
+    if (raw === 'never') return 'never';
     if (typeof raw !== 'object') return 'never';
     const { count, unit } = raw as Partial<ReportLinkTtlDuration>;
     if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > REPORT_LINK_TTL_MAX_COUNT) return 'never';

@@ -18,7 +18,6 @@ export const tags = sqliteTable('tags', {
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({
     tenantNameUnique: uniqueIndex('idx_tags_tenant_name').on(t.tenantId, t.name),
-    tenantIdx:        index('idx_tags_tenant').on(t.tenantId),
 }));
 
 export const inspectionItemTagLinks = sqliteTable('inspection_item_tag_links', {
@@ -43,6 +42,10 @@ export const inspectionMediaPool = sqliteTable('inspection_media_pool', {
     inspectionId:  text('inspection_id').notNull(),
     tenantId:      text('tenant_id').notNull(),
     r2Key:         text('r2_key').notNull(),
+    // Denormalized RELATIVE fetch path derived from `r2Key` at upload, handed
+    // to the Media Center grid so it never rebuilds one. NOT NULL but EMPTY on
+    // video rows, which are served through their own routes — and the photo
+    // picker skips entries with a falsy url, so an empty one hides the row.
     url:           text('url').notNull(),
     uploadedAt:    integer('uploaded_at', { mode: 'timestamp_ms' }).notNull(),
     // JSON envelope: { takenAt?: number, gps?: {lat,lng}, cameraModel?: string }
@@ -55,6 +58,12 @@ export const inspectionMediaPool = sqliteTable('inspection_media_pool', {
     // phase 4). `annotations` is opaque JSON-encoded shape array (≤8 KB)
     // consumed exclusively client-side. `caption` is user-supplied, ≤200 chars.
     annotations:   text('annotations'),
+    // Written only by the PhotoStudio save, which sets it and `annotations`
+    // together. It does NOT follow the photo out of the pool: attachPoolPhoto
+    // copies `r2Key` alone into inspection_results and then deletes this row,
+    // so a caption written before placement is dropped at placement. The
+    // caption a published report shows is the separate one on the results
+    // photo entry.
     caption:       text('caption'),
     // Plan 7 — video walk-through. A pool row is a photo (default) or a video.
     // Video rows keep r2Key/url = '' (Cloudflare Stream owns the bytes) and set

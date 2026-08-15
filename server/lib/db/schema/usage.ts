@@ -19,10 +19,17 @@ import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlit
  */
 export const usageCounters = sqliteTable('usage_counters', {
   tenantId: text('tenant_id').notNull(),
+  // Type-layer enum only (see above), so an unlisted string reaches D1 and just
+  // opens a separate primary-key bucket nobody reads. Note that `aggregateUsage`
+  // recognises six of these: the four `ai_*` metrics are recorded and enforced
+  // against AI quota, but never roll up into a TenantUsage summary.
   metric: text('metric', { enum: [
     'sms', 'email', 'r2_bytes', 'inspections', 'sms_byo', 'email_byo',
     'ai_translate', 'ai_translate_byo', 'ai_assist', 'ai_assist_byo',
   ] }).notNull(),
+  // Third leg of the primary key, so this alone decides what "the same counter"
+  // means: `record()` adds into the bucket, `setGauge()` overwrites it, and
+  // `lifetimeTotal()` sums every bucket for a metric and ignores it entirely.
   periodKey: text('period_key').notNull(),
   value: integer('value').notNull().default(0),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),

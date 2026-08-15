@@ -6,6 +6,7 @@ import { streamThumbUrl } from "~/components/media-studio/PosterPicker";
 import type { GalleryPhoto } from "~/lib/inspection-media";
 import { findingKey } from "~/hooks/findings/shared";
 import type { PhotoCrop } from "~/components/media-studio/PhotoCropper";
+import type { StoredCoverCrop } from "~/components/media-studio/CoverCropper";
 import type { useInspectionState } from "~/hooks/useInspection";
 import type { useFindings } from "~/hooks/useFindings";
 import {
@@ -80,6 +81,12 @@ export function usePhotoOps(ctx: {
 
   // Media Studio — gallery "Set as cover" opens an editor-level CoverCropper.
   const [galleryCropSource, setGalleryCropSource] = useState<{ key: string; url: string } | null>(null);
+  // The cover crop saved during THIS editor session, which the cropper re-opens
+  // on in preference to the row. `useInspectionState` freezes `inspection` at
+  // mount and the route skips revalidation, so the row's `coverCrop` describes
+  // the inspection as it was when the page loaded — recropping twice without a
+  // reload would otherwise re-open on the frame the reader already replaced.
+  const [sessionCoverCrop, setSessionCoverCrop] = useState<{ key: string; crop: StoredCoverCrop } | null>(null);
   // Plan 4 (Task 8) — per-photo crop. `photoCropTarget` opens the PhotoCropper for
   // an item/defect photo (cropping ALWAYS re-derives from the ORIGINAL key).
   const [photoCropTarget, setPhotoCropTarget] = useState<{
@@ -641,6 +648,8 @@ export function usePhotoOps(ctx: {
     setRecropWarn,
     galleryCropSource,
     setGalleryCropSource,
+    sessionCoverCrop,
+    setSessionCoverCrop,
     posterTarget,
     setPosterTarget,
     coverKey,

@@ -44,9 +44,11 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
          * the public `/sign/:id` redirect deliberately stays read-only so an
          * unauthenticated customer cannot trigger row inserts.
          */
-        async findPendingByInspectionId(tenantId: string, inspectionId: string): Promise<{ token: string; status: string; requestId: string } | null> {
+        async findPendingByInspectionId(tenantId: string, inspectionId: string): Promise<{ status: string; requestId: string } | null> {
+            // No `token`: the caller used to redirect to it as a last resort, and
+            // envelope tokens now resolve by hash only, so the column could only
+            // have produced a link that 404s. Returning it invited that.
             const row = await this.getDrizzle().select({
-                token:  agreementRequests.token,
                 status: agreementRequests.status,
                 requestId: agreementRequests.id,
             })
@@ -60,15 +62,6 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                 .limit(1)
                 .get();
             return row ?? null;
-        }
-
-        /**
-         * Lists all signing requests for a tenant (most recent first).
-         */
-        async listRequests(tenantId: string) {
-            return this.getDrizzle().select().from(agreementRequests)
-                .where(eq(agreementRequests.tenantId, tenantId))
-                .all();
         }
 
         // -------------------------------------------------------------------------
@@ -103,11 +96,10 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                     inArray(agreementRequests.status, ['pending', 'sent', 'viewed']),
                 )).limit(1);
             if (existing.length > 0) {
-                // Reuse: hand back the FIRST signer's plaintext link when we can
-                // reconstruct it (tier-2 token_enc); otherwise fall back to the
-                // legacy envelope token (still satisfies the public lookup path).
+                // Reuse: hand back the FIRST signer's plaintext link, reconstructed
+                // from its sealed copy (tier-2 token_enc). There is no second
+                // source — the envelope has no distributable token of its own.
                 const env = existing[0];
-                let token = env.token;
                 let firstSigner = (await db.select().from(agreementSigners)
                     .where(eq(agreementSigners.requestId, env.id))
                     .orderBy(asc(agreementSigners.createdAt)).limit(1))[0];
@@ -119,10 +111,21 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                     firstSigner = await this.synthesizeDefaultSigner(env);
                 }
                 const addedSignerIds = await this.mergeSignersIntoEnvelope(env, opts?.signers ?? [], opts?.completionPolicy);
+                // A failure here is a failure, and it has to read as one. This used
+                // to swallow the error and hand back the envelope-level `token`
+                // instead — a value the public lookup path stopped resolving when
+                // envelope tokens went hash-only, so the caller built a sign link
+                // that could only 404. `getFirstOutstandingSignerLink` in this same
+                // service already gets this right by returning null rather than a
+                // token nothing can redeem; the one caller that reads this token
+                // (the concierge confirm route) has a catch that lands the customer
+                // on their report instead of a dead signing page.
+                let token: string;
                 try {
                     token = await this.getSignerLink(env.tenantId, env.id, firstSigner.id);
                 } catch (e) {
                     logger.warn('AgreementService.findOrCreate reuse-link failed', { requestId: env.id, error: e instanceof Error ? e.message : String(e) });
+                    throw e;
                 }
                 return { token, status: env.status, alreadyExists: true, requestId: env.id, addedSignerIds };
             }
@@ -184,8 +187,6 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                 agreementId: agreement.id,
                 clientEmail: resolvedClientEmail,
                 clientName: resolvedClientName,
-                // Never distributed — satisfies NOT NULL + UNIQUE on the legacy column.
-                token: crypto.randomUUID(),
                 status: 'sent' as const,
                 signatureBase64: null,
                 signedAt: null,

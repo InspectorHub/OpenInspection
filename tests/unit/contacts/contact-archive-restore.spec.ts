@@ -98,7 +98,7 @@ describe('ContactService — archive / restore round trip', () => {
         await db.insert(schema.inspectionAccessTokens).values({
             id: 'tok-archived', tenantId: TENANT, inspectionId: 'i-x',
             recipientEmail: 'archived@example.com', role: 'buyer_agent',
-            token: 'plain', createdAt: new Date(), revokedAt: new Date(),
+            createdAt: new Date(), revokedAt: new Date(),
         } as never);
 
         await svc.restoreContact('c-archived', TENANT);

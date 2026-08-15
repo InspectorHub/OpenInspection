@@ -11,8 +11,16 @@ import { tenants } from './core';
  */
 export const emailTemplates = sqliteTable('email_templates', {
     tenantId:  text('tenant_id').notNull().references(() => tenants.id),
+    // Names the registry descriptor this row overrides (`getDescriptor`) and is
+    // half the PK. An override whose trigger matches no descriptor is never
+    // consulted — the renderer resolves the descriptor before the overrides.
     trigger:   text('trigger').notNull(),
     subject:   text('subject'),
+    // Sparse `blockKey → text` map, merged over the descriptor's block defaults
+    // one KEY at a time: an absent key keeps following the default, a present one
+    // pins the tenant's wording. Values may carry `{{var}}` tokens, interpolated
+    // against that descriptor's declared variables only. System blocks are not
+    // here and are not overridable.
     blocks:    text('blocks', { mode: 'json' }).$type<Record<string, string>>(),
     enabled:   integer('is_enabled', { mode: 'boolean' }).notNull().default(true),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),

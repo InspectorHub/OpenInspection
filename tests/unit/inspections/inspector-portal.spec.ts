@@ -97,8 +97,8 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
         ]);
         // Two agreement requests — newest first ordering must surface.
         await testDb.insert(schema.agreementRequests).values([
-            { id: 'ar-old', tenantId: TENANT, inspectionId: 'insp-full', agreementId: 'agr-1', clientEmail: 'jane@example.com', token: 'tok-old', status: 'sent',   createdAt: new Date(1000) },
-            { id: 'ar-new', tenantId: TENANT, inspectionId: 'insp-full', agreementId: 'agr-1', clientEmail: 'jane@example.com', token: 'tok-new', status: 'signed', signedAt: new Date(5000), createdAt: new Date(2000) },
+            { id: 'ar-old', tenantId: TENANT, inspectionId: 'insp-full', agreementId: 'agr-1', clientEmail: 'jane@example.com', status: 'sent',   createdAt: new Date(1000) },
+            { id: 'ar-new', tenantId: TENANT, inspectionId: 'insp-full', agreementId: 'agr-1', clientEmail: 'jane@example.com', status: 'signed', signedAt: new Date(5000), createdAt: new Date(2000) },
         ]);
         // An invoice.
         await testDb.insert(schema.invoices).values({

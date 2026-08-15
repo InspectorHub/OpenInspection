@@ -6,7 +6,7 @@ import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profil
 import { createTestDb, setupSchema } from '../db';
 import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
-import { hashToken, deadTokenSentinel } from '../../../server/lib/token-hash';
+import { hashToken } from '../../../server/lib/token-hash';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 const live = { id: 'tok1', inspectionId: 'insp1', tenantId: 't1', role: 'client' as const, recipientEmail: 'a@b.com', revokedAt: null, expiresAt: null };
@@ -67,15 +67,18 @@ describe('PortalAccessService — token hash-at-rest (tier-2)', () => {
         svc = new PortalAccessService({} as D1Database, { jwtSecret: JWT });
     });
 
-    it('(a) issueToken stores hash + enc, NOT plaintext (legacy column is a sentinel)', async () => {
+    it('(a) issueToken stores hash + enc, and the row holds no plaintext at all', async () => {
         const token = await svc.issueToken({ tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: 'c@x.com' });
         const rows = await testDb.select().from(schema.inspectionAccessTokens).all();
         expect(rows).toHaveLength(1);
         const row = rows[0];
-        expect(row.token).toBe(deadTokenSentinel(row.id));
-        expect(row.token).not.toBe(token);
         expect(row.tokenHash).toBe(await hashToken(token));
         expect(row.tokenEnc).toMatch(/^t1:/);
+        // This used to assert the plaintext column equalled a sentinel, because
+        // it was NOT NULL + UNIQUE and had to hold something. The column is gone,
+        // so the assertion can be the one that was always meant: the emitted
+        // token appears nowhere in the stored row.
+        expect(JSON.stringify(row)).not.toContain(token);
     });
 
     it('(b) presenting the plaintext resolves via the hash path', async () => {
@@ -96,34 +99,18 @@ describe('PortalAccessService — token hash-at-rest (tier-2)', () => {
         expect(rows).toHaveLength(1);
     });
 
-    it('(c) legacy plaintext row resolves AND is upgraded in place (+ enc seeded)', async () => {
-        const legacyToken = 'legacy-portal-plaintext-token-123456';
-        const id = crypto.randomUUID();
-        await testDb.insert(schema.inspectionAccessTokens).values({
-            id, tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: 'old@x.com',
-            role: 'client', token: legacyToken, createdAt: new Date(),
-            expiresAt: null, revokedAt: null,
-        });
-        const grant = await svc.resolveToken(legacyToken);
-        expect(grant?.recipientEmail).toBe('old@x.com');
-        const row = await testDb.select().from(schema.inspectionAccessTokens)
-            .where(eq(schema.inspectionAccessTokens.id, id)).get();
-        expect(row?.tokenHash).toBe(await hashToken(legacyToken));
-        expect(row?.token).toBe(deadTokenSentinel(id));
-        expect(row?.tokenEnc).toMatch(/^t1:/);
-    });
+    // (c) and (d) covered the legacy plaintext row: resolve one, upgrade it in
+    // place, and re-issue the ORIGINAL link afterwards. Both the column and the
+    // upgrade are gone. Production had no such row left — every one of the two
+    // live grants carried a hash — so the branch could only ever miss, and a
+    // spec that constructs the row by hand would be testing a state the schema
+    // can no longer represent.
+    //
+    // A token that resolves to nothing is still covered, below and in (b).
 
-    it('(d) re-issue reconstructs the original plaintext for an upgraded legacy row', async () => {
-        const legacyToken = 'legacy-portal-plaintext-token-abcdef';
-        const id = crypto.randomUUID();
-        await testDb.insert(schema.inspectionAccessTokens).values({
-            id, tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: 'old@x.com',
-            role: 'client', token: legacyToken, createdAt: new Date(),
-            expiresAt: null, revokedAt: null,
-        });
-        await svc.resolveToken(legacyToken); // triggers upgrade + enc seal
-        const reissued = await svc.issueToken({ tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: 'old@x.com' });
-        expect(reissued).toBe(legacyToken);
+    it('an unknown token resolves to nothing', async () => {
+        await svc.issueToken({ tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: 'c@x.com' });
+        expect(await svc.resolveToken('not-a-token-anyone-issued')).toBeNull();
     });
 
     it('revoked row re-issue rotates to a fresh token (resolves, old does not)', async () => {

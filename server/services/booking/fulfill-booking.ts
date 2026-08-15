@@ -132,8 +132,6 @@ export async function fulfillBooking(
             propertyZip:     place?.zip ?? body.addressZip ?? null,
             scheduledAt:     new Date(startIso),
             status:          'pending',
-            totalAmount:     0,
-            paymentStatus:   'unpaid',
             createdAt:       now,
             updatedAt:       now,
         });

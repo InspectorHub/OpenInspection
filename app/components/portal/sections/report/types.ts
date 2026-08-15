@@ -143,6 +143,19 @@ export const printThumbWidth = (isPrint: boolean): number => (isPrint ? 480 : 80
 export const REPORT_HEADING_STYLE = { fontFamily: "var(--report-heading-font)", fontWeight: "var(--report-heading-weight)" as unknown as number, letterSpacing: "var(--report-heading-spacing)", textTransform: "var(--report-heading-transform)" as unknown as "none" };
 
 export interface ReportSignature {
+  /**
+   * How the report came to be signed, decided by the service where the record
+   * lives. NOT derivable from the fields below: a report nobody signed and a
+   * report signed without a stored image once arrived here identically, and the
+   * renderer settled the ambiguity by drawing the inspector's name as their
+   * signature (review decision, 2026-08-15).
+   *
+   *   none             nobody signed. Attribute authorship, use no signing verb.
+   *   manual           the inspector signed.
+   *   authorized_auto  the inspector's own signature, applied at publication
+   *                    under the standing authorisation they enabled.
+   */
+  method: "none" | "manual" | "authorized_auto";
   signatureBase64: string | null;
   signedAt: number | null; // epoch ms
   inspectorName: string;

@@ -26,7 +26,7 @@
  * ACTOR columns, which the DSAR path deliberately keeps — see the comment on
  * `ANONYMIZE_AUDIT_ACTOR` below. That delta is layered at this call site rather
  * than pushed into the shared module, exactly as `retention-sweep.ts` layers
- * `signature_base64` on top of the shared agreement SET.
+ * `signature_base64` on top of the shared signer SET.
  *
  * ── Idempotent, count-only ──────────────────────────────────────────────────
  * Every statement carries a predicate that stops matching once it has run, so a
