@@ -67,6 +67,12 @@ export function itemDrivesSummary(item: {
  * reports in production.
  *
  *   attribution  nobody signed. Name the author, with NO signing verb.
+ *   none         nobody signed AND there is no name — render nothing at all.
+ *                "Inspected & Signed By" over an empty name attributes the
+ *                report to nobody, which is the composed-signature defect one
+ *                field along. Distinct from `draft`, which says the report is
+ *                unpublished; this one is published and simply has no author to
+ *                name.
  *   image        the inspector signed; render their signature.
  *   auto         the inspector's signature, applied under the standing
  *                authorisation they enabled — same signature, different
@@ -77,7 +83,7 @@ export function itemDrivesSummary(item: {
  * person's name." That is the invariant this type exists to hold.
  */
 export interface SignatureBlockResult {
-  variant: "image" | "auto" | "attribution" | "draft";
+  variant: "image" | "auto" | "attribution" | "none" | "draft";
   inspectorName?: string;
   license?: string | null;
   signedAt?: number | null;
@@ -92,14 +98,15 @@ export function signatureBlockModel(d: {
     method: "none" | "manual" | "authorized_auto";
     signatureBase64: string | null;
     signedAt?: number | null;
-    inspectorName: string;
+    /** NULL when the account carries no name. Never synthesised — see `none`. */
+    inspectorName: string | null;
     inspectorLicense?: string | null;
   } | null;
   ownerPreview: boolean;
 }): SignatureBlockResult {
   if (!d.isPublished || !d.signature) return { variant: "draft", showNudge: false };
   const base = {
-    inspectorName: d.signature.inspectorName,
+    inspectorName: d.signature.inspectorName ?? undefined,
     license: d.signature.inspectorLicense ?? null,
     signedAt: d.signature.signedAt ?? null,
   };
@@ -111,8 +118,11 @@ export function signatureBlockModel(d: {
     case "authorized_auto":
       return { variant: "auto", signatureBase64: d.signature.signatureBase64 ?? null, showNudge: false, ...base };
     default:
-      // No signature. The nudge still shows the owner how to add one; what the
-      // READER sees is authorship, with nothing that reads as a signing act.
+      // No signature. With a name, the READER sees authorship and nothing that
+      // reads as a signing act; the nudge still shows the owner how to add one.
+      // With no name there is nothing to attribute, so nothing is drawn — a
+      // heading over an empty name is an assertion about nobody.
+      if (!d.signature.inspectorName) return { variant: "none", showNudge: false };
       return { variant: "attribution", showNudge: d.ownerPreview, ...base, signedAt: null };
   }
 }
