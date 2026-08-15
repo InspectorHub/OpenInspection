@@ -1,11 +1,20 @@
 # Database Schema
 
-Cloudflare D1 (SQLite). Migrations are **drizzle-kit schema-first**: the Drizzle ORM schema is the source of truth, and migration SQL is generated from it.
+Cloudflare D1 (SQLite). Migrations are **drizzle-kit schema-first**: the Drizzle ORM
+schema is the source of truth, and `db:generate` diffs against it.
+
+Generated SQL is the starting point, not the rule. A `DROP COLUMN` is **hand-written**,
+because drizzle emits a twelve-step table rebuild that needs `PRAGMA foreign_keys=OFF`
+outside a transaction and D1 cannot do that — see the Schema Rules in `CLAUDE.md`, which
+also give the grep that checks a hand-written drop carries none of the rebuild's
+signature. Most recent migrations here are hand-written for that reason.
 
 ## Source of truth
 
 - **Drizzle schema**: `server/lib/db/schema/` — TypeScript table definitions (the source of truth)
-- **Baseline migration**: `migrations/0000_baseline.sql` — the full baseline schema (95 tables, plus indexes)
+- **Baseline migration**: `migrations/0000_baseline.sql` — the full baseline schema, plus indexes.
+  The table and column counts live in [`database-schema.md`](database-schema.md), which is
+  generated and gated; repeating them here would only give them somewhere to drift.
 - **Schema re-export**: `server/lib/db/schema/index.ts`
 
 ## Running migrations
@@ -61,6 +70,40 @@ change; do not edit it by hand.
 The sources it derives from remain the authority if the two ever disagree:
 `migrations/` for structure, `server/lib/db/schema/` for meaning.
 
+## What a 2026-08 audit of every table concluded
+
+Recorded here because the answers cost real measurement and would otherwise be
+re-derived from scratch by the next person to ask.
+
+**Do not merge tables to make queries faster.** The obvious candidates —
+`report_pdfs` with `report_exports`, the several artifact tables — share a shape
+but not a lifecycle, and merging them trades a join nobody was waiting on for a
+wider row that every reader then pays for. The list endpoint's cost was never the
+join count: it was selecting 76 columns to publish 9, which is a projection
+problem and was fixed as one. Measure the query before reshaping the schema.
+
+**Prefix-redundant indexes are dead weight, but prove it per index.** Seventeen
+went: two exact duplicates and fifteen strict left-prefixes of a wider index.
+The theory that a narrower index scans fewer pages and may still be preferred is
+real, so each was checked with `EXPLAIN QUERY PLAN` rather than reasoned about.
+One caveat cost an hour and is worth passing on: sqlite3 caches statements, so an
+"after" plan read on the same connection can still name an index that has already
+been dropped. Read it on a fresh connection.
+
+**A dead column is not the same as an unused one.** Ten came out on the first
+pass; the ones that survived it did so because a name search made them look alive.
+`commercial_subtypes` (the table) matched only because a template-schema FIELD
+shares its name; `agreement_requests.token` looked like a throwaway handle because
+that is what the code wrote, while production still held real tokens from before
+that code shipped. Compare against a sibling that IS alive, and check the data,
+not only the code.
+
+**The schema reference is generated for this reason.** Hand-written schema facts
+drift silently — this file claimed 95 tables and universal `tenant_id` while
+neither was true. Facts that can be derived should be derived, and the ones that
+cannot (why a column exists) belong in a comment next to the column, where they
+travel with it.
+
 ## Drizzle ORM usage
 
 ```typescript
@@ -76,8 +119,15 @@ const results = await db.select()
 
 ## Conventions
 
-- Every table has `tenant_id` for multi-tenant isolation
+- Almost every table has `tenant_id` for multi-tenant isolation, and any table holding
+  tenant data must. The exceptions are tables that are not *about* a tenant: `tenants`
+  itself, `slug_reservations`, the command and webhook dedup ledgers, `sync_outbox`,
+  `marketplace_libraries` and `sms_disclosure_versions`. Adding a tenant-scoped table
+  without the column is a bug the `lint:tenant-scope` gate is there to catch.
 - Primary keys are random text IDs (not auto-increment)
-- Timestamps are Unix integers (`created_at`, `updated_at`)
+- Timestamps are epoch **milliseconds** in an integer column — `integer(..., { mode:
+  'timestamp_ms' })`, which is what all 174 of them use. Not seconds: the two are one
+  multiplication apart and the mistake reads as a date tens of thousands of years out.
+  A calendar date with no time component may be `YYYY-MM-DD` TEXT if its comment says so.
 - JSON columns stored as `TEXT` (D1 has no native JSON type)
 - Indexes follow `idx_{table}_{column}` naming
