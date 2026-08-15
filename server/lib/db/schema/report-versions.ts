@@ -30,13 +30,17 @@ export const reportVersions = sqliteTable('report_versions', {
     // so pre-#120 rows load (verifier shows a "predates verification" notice).
     contentHash:       text('content_hash'),
     prevHash:          text('prev_hash'),
-    // Verified against the tenant's CURRENT signing key, not against a key named
-    // by this row — rotating that key makes every earlier signature report
-    // `signatureValid: false`.
+    // Verified against the key named by THIS row's key_fingerprint, resolved
+    // from the tenant's key history — so a rotation leaves earlier versions
+    // verifying exactly as before. Reading the tenant's current key instead is
+    // the bug this replaced: it reported every pre-rotation version as
+    // `signatureValid: false` on a public page.
     signature:         text('signature'),
-    // SHA-256 of the public key that signed this row. Nothing verifies with it;
-    // it is published on the verifier page so a reader can tell whether two
-    // reports were signed by the same key.
+    // SHA-256 of the public key that signed this row. This is what selects the
+    // key at verification time, so it is load-bearing rather than decorative;
+    // it is also published on the verifier page, where a reader can tell whether
+    // two reports were signed by the same key. NULL only on pre-#120 rows, which
+    // carry no signature to check.
     keyFingerprint:    text('key_fingerprint'),
     isAmendment:       integer('is_amendment', { mode: 'boolean' }).notNull().default(false),
     // The bearer credential for the public verifier: a random UUID minted per

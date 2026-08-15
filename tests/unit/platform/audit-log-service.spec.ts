@@ -80,4 +80,82 @@ describe('AuditLogService.append — partial dedup index', () => {
     const result = await svc.verifyChain(TENANT_A, REQ_ID);
     expect(result).toEqual({ valid: true, events: 4 });
   });
+
+  /**
+   * Key rotation, and the property that makes it safe: **rotating a tenant's
+   * e-sign key must not invalidate anything already signed under the old one.**
+   *
+   * It holds because two things line up. `signing_keys` is a history — retiring
+   * a key keeps its public half on file — and `verifyChain` resolves the key for
+   * each row from the `key_fingerprint` that row recorded, rather than asking
+   * what the tenant's key is today. Break either half and every pre-rotation
+   * envelope starts reporting as failed on the PUBLIC verifier page, about
+   * documents real people really signed.
+   */
+  it('keeps pre-rotation chains verifying after the key is rotated', async () => {
+    await svc.append(TENANT_A, REQ_ID, 'request.created', { at: 1 });
+    await svc.append(TENANT_A, REQ_ID, 'agreement.signed', { at: 2 });
+
+    const keys = new SigningKeyService({} as D1Database, KEY_SECRET);
+    const before = (await keys.getPublicKey(TENANT_A))!.fingerprint;
+    const rotation = await keys.rotateKeypair(TENANT_A);
+    expect(rotation.retired).toBe(before);
+    expect(rotation.fingerprint).not.toBe(before);
+
+    // The whole point of the exercise.
+    expect(await svc.verifyChain(TENANT_A, REQ_ID)).toEqual({ valid: true, events: 2 });
+    // And the reason it holds: the retired key was kept, not overwritten.
+    expect(await keys.getPublicKeyByFingerprint(TENANT_A, before)).not.toBeNull();
+  });
+
+  it('signs new events with the new key and verifies a chain spanning the rotation', async () => {
+    await svc.append(TENANT_A, REQ_ID, 'request.created', { at: 1 });
+    const keys = new SigningKeyService({} as D1Database, KEY_SECRET);
+    await keys.rotateKeypair(TENANT_A);
+    await svc.append(TENANT_A, REQ_ID, 'agreement.signed', { at: 2 });
+
+    const rows = await db.select().from(schema.esignAuditLogs)
+      .where(and(
+        eq(schema.esignAuditLogs.tenantId, TENANT_A),
+        eq(schema.esignAuditLogs.requestId, REQ_ID),
+      )).all();
+    // An envelope open across a rotation really does carry two keys — this is
+    // the case a single-key verifier gets wrong.
+    expect(new Set(rows.map((r) => r.keyFingerprint)).size).toBe(2);
+    expect(await svc.verifyChain(TENANT_A, REQ_ID)).toEqual({ valid: true, events: 2 });
+  });
+
+  /**
+   * If the key a row names cannot be produced, the honest answer is "we cannot
+   * check this", not "this signature is bad". Counsel ruling 17c: a verification
+   * surface may report what its check established and no more, and this result
+   * reaches a public page where the second phrasing would be a statement against
+   * the signer's interest.
+   */
+  it('reports an unresolvable key as key_mismatch, never as a bad signature', async () => {
+    await svc.append(TENANT_A, REQ_ID, 'request.created', { at: 1 });
+    // The key that sealed the row is gone from the history — the state the
+    // history exists to prevent, asserted here so its handling stays honest.
+    await db.delete(schema.signingKeys).where(eq(schema.signingKeys.tenantId, TENANT_A));
+    await new SigningKeyService({} as D1Database, KEY_SECRET).ensureKeypair(TENANT_A);
+
+    const result = await svc.verifyChain(TENANT_A, REQ_ID);
+    expect(result.valid).toBe(false);
+    expect((result as { reason: string }).reason).toBe('key_mismatch');
+  });
+
+  it('allows at most one active key per tenant', async () => {
+    const keys = new SigningKeyService({} as D1Database, KEY_SECRET);
+    await keys.ensureKeypair(TENANT_A);
+    // A second un-retired row for the same tenant must be refused by the PARTIAL
+    // unique index. Without the `WHERE retired_at IS NULL` predicate this insert
+    // succeeds, because SQLite treats each NULL as distinct — and the tenant
+    // then has two "current" keys with nothing to say which one signs.
+    await expect(db.insert(schema.signingKeys).values({
+      id: 'second-active', tenantId: TENANT_A,
+      publicKey: 'x', privateKeyEnc: 'x', privateKeyIv: 'x',
+      fingerprint: 'ffff', algorithm: 'Ed25519',
+      createdAt: new Date(), retiredAt: null,
+    })).rejects.toThrow();
+  });
 });

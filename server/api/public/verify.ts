@@ -73,6 +73,11 @@ const reportVerifyRoute = createRoute(withMcpMetadata({
             contentHash: z.string().nullable(), keyFingerprint: z.string().nullable(),
             keyAlgorithm: z.string(), legacy: z.boolean(),
             hashValid: z.boolean(), signatureValid: z.boolean(), chainValid: z.boolean(),
+            // True when the key this version names is not on file, so the
+            // signature could not be checked either way. Separate from
+            // `signatureValid: false`, which asserts a check that RAN and failed
+            // — a distinction the reader is entitled to (counsel ruling 17c).
+            keyMissing: z.boolean(),
             propertyAddressMasked: z.string(),
             notPublished: z.boolean(),
             // #270 — lets the verifier page resolve the tenant brand and render
@@ -157,6 +162,7 @@ const publicVerifyRoutes = createApiRouter()
             legacy:        data.verify.legacy,
             hashValid:     data.verify.hashValid,
             signatureValid: data.verify.signatureValid,
+            keyMissing:    data.verify.keyMissing,
             chainValid:    data.verify.chainValid,
             propertyAddressMasked: data.propertyAddressMasked,
             notPublished: data.notPublished,
