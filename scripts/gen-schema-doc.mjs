@@ -282,7 +282,15 @@ for (const name of names) {
         let dv = c.default || ''; if (dv.length > 34) dv = dv.slice(0, 34) + '…';
         let ev = (cm.enum || '').replace(/\s+/g, ' ').replace(/'/g, '').replace(/^\[|\]$/g, '');
         if (ev.length > 70) ev = ev.slice(0, 70) + '…';
-        const esc = (s) => s.replace(/\|/g, '\\|');
+        // Escape the escape character FIRST. Replacing pipes alone leaves an
+        // input backslash free to consume the escape that follows it: a comment
+        // containing a backslash-pipe came out as backslash-backslash-pipe,
+        // which markdown reads as a literal backslash plus a LIVE cell
+        // separator, and the row splits. A trailing backslash eats the row's own
+        // closing pipe the same way, and an embedded newline ends the row
+        // outright. Three of five sample inputs broke a table row; CodeQL
+        // flagged this as js/incomplete-sanitization and was right.
+        const esc = (s) => s.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
         L.push(`| \`${c.name}\` | ${c.type} | ${flags.join(' ')} | ${dv ? '`' + esc(dv) + '`' : ''} | ${ev ? '`' + esc(ev) + '`' : ''} | ${esc(desc)} |`);
     }
     L.push('');
