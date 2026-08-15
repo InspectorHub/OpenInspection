@@ -68,8 +68,15 @@
     {
       "idx": 9,
       "version": "6",
-      "when": 1786721792773,
-      "tag": "0009_move_envelope_signature_to_signer_rows",
+      "when": 1786753725543,
+      "tag": "0009_record_signature_attribution_provenance",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786753837559,
+      "tag": "0010_move_envelope_signature_to_signer_rows",
       "breakpoints": true
     }
   ]

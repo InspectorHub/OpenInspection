@@ -103,7 +103,12 @@ for (const raw of sql.split('--> statement-breakpoint')) {
         continue;
     }
 
-    const ac = stmt.match(/ALTER TABLE `(\w+)` ADD `(\w+)` (text|integer|real|blob)(.*?);/);
+    // `ADD COLUMN` and `ADD` are both valid SQLite and both appear in this
+    // directory: drizzle generates the short form, hand-written migrations tend
+    // to spell it out. Matching only one silently drops the other's columns from
+    // this reference — the doc still builds, still passes its own drift gate, and
+    // is simply missing a field nobody notices is missing.
+    const ac = stmt.match(/ALTER TABLE `(\w+)` ADD (?:COLUMN )?`(\w+)` (text|integer|real|blob)(.*?);/);
     if (ac && tables[ac[1]] && !tables[ac[1]].cols.some((c) => c.name === ac[2])) {
         const dv = ac[4].match(/DEFAULT (.+?)(?: NOT NULL)?$/);
         tables[ac[1]].cols.push({ name: ac[2], type: ac[3], notnull: ac[4].includes('NOT NULL'),
@@ -111,7 +116,7 @@ for (const raw of sql.split('--> statement-breakpoint')) {
         continue;
     }
 
-    const dc = stmt.match(/ALTER TABLE `(\w+)` DROP COLUMN `(\w+)`/);
+    const dc = stmt.match(/ALTER TABLE `(\w+)` DROP (?:COLUMN )?`(\w+)`/);
     if (dc && tables[dc[1]]) {
         tables[dc[1]].cols = tables[dc[1]].cols.filter((c) => c.name !== dc[2]);
     }

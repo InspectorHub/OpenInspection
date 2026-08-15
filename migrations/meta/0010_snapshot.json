@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "407c3a30-df32-454e-920e-f0334ab32f39",
-  "prevId": "9fae4ad8-e3db-4586-a9c0-18fd106e26e2",
+  "id": "c132dc1d-a6ea-4a6a-b942-229e43ed4104",
+  "prevId": "407c3a30-df32-454e-920e-f0334ab32f39",
   "tables": {
     "agreement_requests": {
       "name": "agreement_requests",
@@ -56,13 +56,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'pending'"
-        },
-        "signature_base64": {
-          "name": "signature_base64",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "signed_at": {
           "name": "signed_at",

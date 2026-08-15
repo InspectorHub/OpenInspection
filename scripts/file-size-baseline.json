@@ -62,7 +62,7 @@
   "server/data/automation-seeds.ts": 423,
   "server/lib/db/schema/inspection/core.ts": 415,
   "app/components/editor/InspectionSettingsSheet.tsx": 413,
+  "server/services/agreement/signer-state.ts": 413,
   "app/routes/calendar.tsx": 410,
-  "server/lib/compliance/erasure-manifest.ts": 406,
-  "server/services/agreement/signer-state.ts": 406
+  "server/lib/compliance/erasure-manifest.ts": 405
 }

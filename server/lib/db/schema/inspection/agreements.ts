@@ -153,6 +153,36 @@ export const agreementSigners = sqliteTable('agreement_signers', {
     //
     // Appended at the table end (see the expiresAt/revokedAt note above).
     languageDisclosureVersion: integer('language_disclosure_version'),
+    // ── Attribution provenance (counsel round 16B, 2026-08-15) ───────────────
+    //
+    // How this row came to say that THIS person's signature is THIS image. A
+    // record produced by a migration is not the same fact as one captured at
+    // signing, and counsel's rule is that the two must stay distinguishable —
+    // so that nobody reading `signature -> Alice` years from now mistakes an
+    // attribution we derived for an identity the signing event recorded.
+    //
+    //   signing_event                 the signer signed here; `markSignedBySigner`
+    //                                 wrote the image and the identity together.
+    //   relocated_single_signer       the signature came off the envelope, and
+    //                                 this was the envelope's ONLY signer row.
+    //   relocated_envelope_recipient  the envelope had NO signer rows; this row
+    //                                 was created for it, and the identity comes
+    //                                 from the envelope's recipient fields.
+    //
+    // NULL on rows that predate the field and on rows carrying no signature —
+    // there is no attribution to describe. NOT a `{ enum }` on purpose: a value
+    // this column has already written must stay readable after the code that
+    // wrote it is gone, and a narrowing enum would make an old basis a type
+    // error rather than a fact.
+    attributionBasis:  text('attribution_basis'),
+    // For a relocated row, WHERE the attribution came from, in durable terms
+    // (table + column names, which survive renumbering). NULL when the basis is
+    // `signing_event` — nothing was derived, so there is no source to cite.
+    attributionSource: text('attribution_source'),
+    // When the attribution was made: the signing time for a captured one, the
+    // migration's run time for a relocated one. Distinct from `signedAt`, which
+    // is when the person signed — for a relocated row those differ by years.
+    attributedAt:      integer('attributed_at', { mode: 'timestamp_ms' }),
 }, (t) => [
     index('idx_agreement_signers_tenant_request').on(t.tenantId, t.requestId),
     uniqueIndex('idx_agreement_signers_request_email').on(t.requestId, t.email),

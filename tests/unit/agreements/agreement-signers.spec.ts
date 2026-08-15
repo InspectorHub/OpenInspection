@@ -478,6 +478,32 @@ describe('AgreementService — signer-level envelope state machine', () => {
             .rejects.toThrow(/Token sealing key unavailable/);
     });
 
+    // Counsel ruling 16B (2026-08-15): a record produced by a migration is not
+    // the same fact as one captured at signing, and the two have to stay
+    // distinguishable. A signature we watched arrive says so on its own row, so
+    // that a NULL basis anywhere reads as "not recorded" rather than "captured,
+    // probably" — the reading that would let a derived attribution pass for a
+    // witnessed one.
+    it('a signature captured at signing records itself as a signing_event, citing no derived source', async () => {
+        const r = await svc.findOrCreate(TENANT_A, INSP_ID, {
+            signers: [{ name: 'Jane', email: 'jane@test.com' }],
+            completionPolicy: 'one',
+        });
+        await svc.markSignedBySigner(r.token, 'sig-jane', { signedAtMs: 4242, channel: 'remote', languageDisclosureVersion: null });
+
+        const signer = (await testDb.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, r.requestId)).all())[0];
+        expect(signer.signatureBase64).toBe('sig-jane');
+        expect(signer.attributionBasis).toBe('signing_event');
+        // The attribution and the signature are the same event here, so the two
+        // timestamps agree. On a relocated row they differ by however long the
+        // evidence sat on the envelope.
+        expect(signer.attributedAt?.getTime()).toBe(4242);
+        // Nothing was derived, so there is nothing to cite. A source on a
+        // signing_event row would be describing a derivation that never happened.
+        expect(signer.attributionSource).toBeNull();
+    });
+
     it('no-secrets REUSE path: findOrCreate surfaces the failure instead of handing back a dead link', async () => {
         // The create path can return the plaintext it just minted. The REUSE
         // path has nothing minted to hand back, so it has to reconstruct via

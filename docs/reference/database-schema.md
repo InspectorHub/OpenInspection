@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 94 |
-| Columns | 1103 |
+| Columns | 1106 |
 | Indexes (excluding primary keys) | 159 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 508 (46%) |
+| Columns carrying a source comment | 511 (46%) |
 
 **Reading the tables.** SQLite has four storage types; the semantic type is a
 Drizzle layer on top — `integer{mode:timestamp_ms}` is epoch milliseconds,
@@ -71,7 +71,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `agreement_signers`
 
-<sub>server/lib/db/schema/inspection/agreements.ts · 23 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/inspection/agreements.ts · 26 columns · primary key `id`</sub>
 
 > Track I-a (#117) — 1:N signer records under an agreement_requests envelope. App-layer refs only (no DB FKs per Schema Rules).
 
@@ -100,6 +100,9 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `expires_at` | integer |  |  |  | IA-37 — signer-token lifecycle. Appended at the table end (D1 can't add a column mid-table on a referenced table — reference_d1_add_column_at_end). |
 | `revoked_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `language_disclosure_version` | integer |  |  |  | Which version of the platform language DISCLOSURE this signer was shown. Not a contractual term (counsel, 2026-08-02) — but still the only way to answer "what was this person actually shown", which is the question a dispute turns on. **[more]** |
+| `attribution_basis` | text |  |  |  | ── Attribution provenance (counsel round 16B, 2026-08-15) ─────────────── How this row came to say that THIS person's signature is THIS image. **[more]** |
+| `attribution_source` | text |  |  |  | For a relocated row, WHERE the attribution came from, in durable terms (table + column names, which survive renumbering). |
+| `attributed_at` | integer |  |  |  | When the attribution was made: the signing time for a captured one, the migration's run time for a relocated one. |
 
 **Indexes**
 
