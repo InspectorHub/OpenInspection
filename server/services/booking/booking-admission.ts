@@ -3,6 +3,8 @@ import { eq, and } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
+import { logger } from '../../lib/logger';
+import { resolveTurnstile, TURNSTILE_TEST_KEY_WARNING } from '../../lib/middleware/bot-protection';
 import { resolvePublicHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import type { HonoConfig } from '../../types/hono';
 import type { PublicBookingSchema } from '../../lib/validations/booking.schema';
@@ -83,10 +85,19 @@ export async function admitBooking(
 ): Promise<BookingClaim> {
     const service = c.var.services.booking;
 
-    // Bot Protection — always enforce when secret is configured
-    if (c.env.TURNSTILE_SECRET_KEY) {
+    // Bot protection. Whether a challenge applies is a deployment capability,
+    // not a test on whether someone remembered to set a key: saas always
+    // challenges (on the published test key when unconfigured), standalone
+    // leaves it to the operator. See `resolveTurnstile`.
+    const turnstile = resolveTurnstile(c.env);
+    if (turnstile.enforced) {
+        if (turnstile.usingTestKey) {
+            logger.warn('booking.turnstile.test_key', {
+                tenantId, detail: TURNSTILE_TEST_KEY_WARNING,
+            });
+        }
         if (!body.turnstileToken) throw Errors.Forbidden('Security verification token missing.');
-        const isValid = await service.verifyBotProtection(body.turnstileToken, c.env.TURNSTILE_SECRET_KEY);
+        const isValid = await service.verifyBotProtection(body.turnstileToken, turnstile.secret);
         if (!isValid) throw Errors.Forbidden('Security verification failed.');
     }
 

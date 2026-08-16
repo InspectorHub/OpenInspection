@@ -1,7 +1,7 @@
 # Testing — apps/openinspection
 
 The single Worker serves both the typed JSON API and the React Router v8 UI, so
-tests cover both surfaces. There are four suites, each pinned to a **location**:
+tests cover both surfaces. There are five suites, each pinned to a **location**:
 a spec's directory alone decides which config runs it. This document is the
 canonical reference for the three things you need to get right: **where a spec
 lives**, **how to write it**, and **how the run is initialized**.
@@ -18,6 +18,8 @@ fails the build on a misplaced spec, and it runs in `npm run lint` + pre-commit.
 | `app/**/*.test.{ts,tsx}` (co-located) | web unit | `test:web` | `vitest.config.ts` | happy-dom |
 | `tests/unit/<domain>/**/*.spec.ts` | api/service unit | `test:unit` | `vitest.api.config.ts` | node (+ better-sqlite3) |
 | `tests/workers/**/*.spec.ts` | worker-runtime | `test:workers` | `vitest.workers.config.ts` | real `workerd` |
+| `tests/contract/<party>/*.contract.spec.ts` | contract (offline) | `test:contract` | `vitest.contract.config.ts` | node, no network |
+| `tests/contract/<party>/*.live.spec.ts` | contract (live) | `test:contract:live` | `vitest.contract.live.config.ts` | node + the real third-party API |
 | `tests/e2e/*.spec.ts` | end-to-end | `test:e2e` | `playwright.config.ts` (seeds real D1) | built worker + browser |
 | `tests/**/*.spec-d.ts` | type-level | `test:types` | `vitest.typecheck.config.ts` | tsc typecheck |
 
@@ -33,7 +35,11 @@ fails the build on a misplaced spec, and it runs in `npm run lint` + pre-commit.
      `@cloudflare/vitest-pool-workers`; miniflare bindings are declared inline in
      the config, no wrangler file needed).
    - **No** → `tests/unit/<domain>/` (node env, stubs + `better-sqlite3`).
-3. **Full-stack / browser / anything that hits a running worker** →
+3. **Asserting on a THIRD PARTY's contract rather than our behaviour?** →
+   `tests/contract/<party>/`. The distinguishing question is what a red run
+   means: if the fix is usually "change our code to match theirs" rather than
+   "fix our bug", it is a contract spec. See §2 for the two halves.
+4. **Full-stack / browser / anything that hits a running worker** →
    `tests/e2e/`. One flat directory; `globalSetup` seeds real D1 so every E2E
    exercises the actual database.
 
@@ -105,6 +111,69 @@ tests/
 - When a workers spec hand-maintains DDL (e.g. a `tenant_configs` table), assert
   it against the Drizzle schema instead of trusting a "keep in sync" comment —
   `tests/unit/inline-ddl-schema-sync.spec.ts` is the pattern.
+
+### Contract (`tests/contract/<party>/`)
+
+A contract spec asks a different question from every other suite. A unit spec
+asks *does this code do what we intended*; a contract spec asks *is what we
+intended what the other side accepts*. When one goes red the fix is usually to
+change our code, not the assertion.
+
+The suite exists because of a measured failure. Six paths in the QuickBooks
+integration had **never once worked in production** while the unit suite stayed
+green, and all six share one cause: the tests supplied the upstream's answers.
+A fabricated fault carried a code QuickBooks never returns; fixtures inserted
+rows with a field production never sets; no fixture ever described a voided
+invoice. A test that invents the response it asserts on can only prove the code
+agrees with itself.
+
+**Two halves, split by whether they need credentials.**
+
+`*.contract.spec.ts` — **offline, runs in CI for everyone.** It checks our
+outbound payloads against the third party's own published description of its
+API. For QuickBooks that is four XSDs Intuit ships in its SDK repositories,
+vendored under `tests/contract/qbo/vendor/` with their provenance and hashes in
+`SOURCES.md`. It reads them as text rather than validating XML, because the REST
+API is JSON and the mapping is name-for-name — and because, as
+`intuit-schema.contract.spec.ts` pins, the schema requires **neither** of the
+two fields whose absence broke every invoice push. Those rules live in the
+type's prose, so the specs quote the prose verbatim; a refresh that rewords it
+turns them red, which is the point.
+
+`*.live.spec.ts` — **needs a connected sandbox, never runs in CI.** For the
+things the offline half cannot reach in principle: fault CODES (`6240`, the
+duplicate-name fault our ladder read as `6140` for its whole life, appears in no
+schema), unsupported verbs, and character rules. It borrows the local
+`qbo_connections` row and decrypts it exactly as the worker does — it mints
+nothing and writes nothing back, and it will NOT refresh an expired token,
+because a test that silently rotates your credentials is doing something a test
+has no business doing.
+
+`.githooks/pre-push` runs it when a push touches `server/services/qbo/`. Without
+a sandbox it fails, names what is missing, and prints the opt-out:
+
+```bash
+SKIP_QBO_CONTRACT=1 git push   # announced in the output, never silent
+```
+
+That is deliberate. A silent skip is indistinguishable from a pass, and a gate
+nobody can satisfy gets bypassed wholesale instead of argued with. Individual
+specs skip (they do not pass) when there is no connection, so a run reports
+`1 failed | 4 skipped` rather than four green ticks over nothing.
+
+**Writing one.**
+
+- Every fabricated upstream response is a bug waiting. Prefer a captured one,
+  and say in a comment when and how it was captured.
+- Assert on Intuit's words, not a paraphrase. `expect(doc).toContain('An
+  invoice must have at least one line …')` fails usefully when the source
+  changes; `expect(rules.invoiceNeedsLine).toBe(true)` cannot.
+- Pair every negative claim with a positive control. "We send nothing
+  undeclared" passes vacuously against a parser returning an empty set, so
+  `intuit-schema.contract.spec.ts` checks the parser's own counts first.
+
+**Refreshing a vendored schema** is a deliberate act, not a chore: follow
+`tests/contract/qbo/vendor/SOURCES.md`, then read what went red.
 
 ### E2E (`tests/e2e/*.spec.ts`)
 

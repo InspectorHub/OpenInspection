@@ -59,6 +59,9 @@ export class RecordingEmailProvider implements EmailProvider {
     return { ok: true };
   }
 
+  // sigcompare-allow: nothing is compared here. The sink accepts no inbound
+  // webhook at all, so this is fail-closed rather than a verification whose
+  // timing could leak — there is no secret and no candidate to compare.
   async verifyWebhookSignature(_ctx: EmailWebhookContext): Promise<boolean> {
     return false;
   }

@@ -508,7 +508,10 @@ export class InspectionReportService extends InspectionSubService {
         } else if (inspection.inspectorId) {
             const inspector = await db.select({ name: users.name, email: users.email })
                 .from(users).where(eq(users.id, inspection.inspectorId)).get();
-            inspectorName = inspector?.name || (inspector?.email?.split('@')[0] ?? null);
+            // Only the recorded name — never derived from the address, which
+            // once printed a mailbox prefix as the inspector on a published
+            // report. Absent renders as absent (`lint:fabricated-names`).
+            inspectorName = inspector?.name ?? null;
             credentialSnapshot = await new CredentialService(this.db)
                 .listRenderable(tenantId, inspection.inspectorId);
             inspectorLicense = primaryLicenseOf(credentialSnapshot);

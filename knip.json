@@ -21,6 +21,7 @@
     "vitest.workers.config.ts",
     "vite.config.ts",
     "app/components/media-studio/react-konva.ssr-stub.tsx",
+    "server/lib/compliance/retention-policy.ts",
     "**/*.test.{ts,tsx}",
     "**/*.spec.{ts,tsx}",
     "tests/**/*.ts",

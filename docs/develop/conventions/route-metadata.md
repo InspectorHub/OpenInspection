@@ -7,7 +7,7 @@ malformed metadata fails the build.
 
 This document codifies the standard. For the broader integration architecture
 see [mcp-oauth-notes.md](mcp-oauth-notes.md) (server internals) and
-[connecting-claude-mcp.md](../../self-host/connecting-claude-mcp.md) (how a user connects Claude).
+[connecting-claude-mcp.md](../../integrations/mcp.md) (how a user connects Claude).
 
 ## Required fields
 

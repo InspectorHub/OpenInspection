@@ -164,3 +164,11 @@ Beyond tools, the connection also exposes:
   data it needs (e.g. the follow-up-email prompt requires the Contacts module).
   Prompts carry no data themselves — they hand the model a starting instruction
   that uses the tools and resources above.
+
+---
+
+## Related
+
+- [Integrations index](README.md) — note this is the one INBOUND integration
+- [Route metadata](../develop/conventions/route-metadata.md) — what a route must declare to be exposed as a tool
+- [MCP + OAuth notes](../develop/conventions/mcp-oauth-notes.md) — server internals

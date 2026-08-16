@@ -1,9 +1,12 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
-import { qboConnections, qboSyncErrors } from '../../lib/db/schema/qbo';
+import { qboConnections, qboEntityMap, qboSyncErrors } from '../../lib/db/schema/qbo';
 import { encryptToken, decryptToken } from '../../lib/qbo-crypto';
 import { QBOTokenResponseSchema } from '../../lib/validations/qbo.schema';
-import { QBO_PAYMENT_DISCREPANCY, encodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
+import { QBO_PAYMENT_DISCREPANCY, QBO_VOIDED_IN_QBO, encodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
+import { describeQboError } from './error-detail';
+
+export { describeQboError };
 
 /**
  * QuickBooks serves sandbox companies and real companies from two different
@@ -129,6 +132,31 @@ export class QBOServiceBase {
         return { accessToken, realmId: row.realmId, tenantId };
     }
 
+    /**
+     * Everything that stops being true when a connection ends.
+     *
+     * Two paths retire one: the tenant clicking Disconnect, and Intuit refusing
+     * the grant. They must leave the same thing behind, and they used to
+     * disagree — the refusal path dropped only the connection row.
+     *
+     * What survives is not clutter. The next authorization can land on a
+     * DIFFERENT QuickBooks company, and a mapping that outlived its connection
+     * still names entity ids belonging to the old one; the first invoice push
+     * would then address a customer in books we no longer hold. Open errors
+     * are the milder half — they reappear on reconnect describing a company
+     * nobody is connected to.
+     *
+     * It lives on the base class because `refreshToken` is here and
+     * `disconnect()` is in the connection mixin above it: only the base is
+     * reachable from both.
+     */
+    public async retireConnection(tenantId: string): Promise<void> {
+        const db = this.getDrizzle();
+        await db.delete(qboEntityMap).where(eq(qboEntityMap.tenantId, tenantId));
+        await db.delete(qboSyncErrors).where(eq(qboSyncErrors.tenantId, tenantId));
+        await db.delete(qboConnections).where(eq(qboConnections.tenantId, tenantId));
+    }
+
     public async refreshToken(tenantId: string): Promise<QBOToken> {
         const db = this.getDrizzle();
         const row = await db.select().from(qboConnections)
@@ -169,7 +197,7 @@ export class QBOServiceBase {
             // status code already distinguishes the two cases; the field would
             // only let us disconnect EARLIER, which is not the useful direction.
             if (resp.status === 400 || resp.status === 401) {
-                await db.delete(qboConnections).where(eq(qboConnections.tenantId, tenantId));
+                await this.retireConnection(tenantId);
                 throw new Error('QBO refresh token rejected — reconnect required');
             }
             throw new Error(`QBO token refresh failed with ${resp.status} — connection left intact`);
@@ -190,7 +218,14 @@ export class QBOServiceBase {
 
     public async apiCall<T>(
         tenantId: string,
-        method: 'GET' | 'POST' | 'PUT',
+        /**
+         * No PUT. QuickBooks v3 answers a PUT with
+         * `"No resource method found for PUT"` — an UPDATE is a POST to the
+         * same entity path carrying `Id` and `SyncToken`. Narrowing the union
+         * is what stops the next person reaching for the verb their instincts
+         * expect; see the note on the update paths.
+         */
+        method: 'GET' | 'POST',
         path: string,
         body?: unknown,
     ): Promise<T> {
@@ -211,20 +246,46 @@ export class QBOServiceBase {
         };
         if (body !== undefined) opts.body = JSON.stringify(body);
 
+        /**
+         * Upper bound on a single throttle wait. Intuit may ask for more — it
+         * does not know it is talking to a Worker — and a Worker cannot give
+         * it: the request would die still holding the wait, having retried
+         * nothing and told the tenant nothing. Failing is the better answer.
+         */
+        const MAX_RETRY_AFTER_MS = 30_000;
+
+        /**
+         * Each failure branch owns its own wait, deliberately. A sleep at the
+         * top of the loop applies to EVERY retry, including one a 429 has
+         * already waited out, so the interval Intuit named was silently doubled
+         * by our backoff. It also fires before an attempt that will never
+         * happen, spending budget on nothing — hence the `attempt < 2` guard.
+         */
         let lastError: Error | null = null;
         for (let attempt = 0; attempt < 3; attempt++) {
-            if (attempt > 0) await new Promise(r => setTimeout(r, 2 ** attempt * 500));
             const resp = await fetch(url, opts);
             if (resp.ok) return resp.json() as T;
+
             if (resp.status === 429) {
-                const retryAfter = parseInt(resp.headers.get('Retry-After') ?? '60', 10);
-                await new Promise(r => setTimeout(r, retryAfter * 1000));
+                const header = parseInt(resp.headers.get('Retry-After') ?? '', 10);
+                const waitMs = Math.min(
+                    Number.isFinite(header) ? header * 1000 : 2 ** attempt * 500,
+                    MAX_RETRY_AFTER_MS,
+                );
+                // Named, so exhausting the retries reports throttling rather
+                // than a generic failure the caller cannot act on.
+                lastError = Object.assign(new Error('QBO 429'), { status: 429 });
+                if (attempt < 2) await new Promise(r => setTimeout(r, waitMs));
                 continue;
             }
+
             if (resp.status >= 500) {
-                lastError = new Error(`QBO ${resp.status}`);
+                // Same shape as the 4xx throw below — callers branch on `status`.
+                lastError = Object.assign(new Error(`QBO ${resp.status}`), { status: resp.status });
+                if (attempt < 2) await new Promise(r => setTimeout(r, 2 ** attempt * 500));
                 continue;
             }
+
             const err = await resp.json().catch(() => ({})) as Record<string, unknown>;
             throw Object.assign(new Error(`QBO ${resp.status}`), { qboResponse: err, status: resp.status });
         }
@@ -235,9 +296,9 @@ export class QBOServiceBase {
         return this.apiCall<T>(tenantId, 'GET', `query?query=${encodeURIComponent(query)}`);
     }
 
+
     public async logSyncError(tenantId: string, oiType: string, oiId: string, error: unknown): Promise<void> {
-        const msg = error instanceof Error ? error.message : String(error);
-        await this.upsertSyncFlag(tenantId, oiType, oiId, 'SYNC_ERROR', msg);
+        await this.upsertSyncFlag(tenantId, oiType, oiId, 'SYNC_ERROR', describeQboError(error));
     }
 
     /**
@@ -252,6 +313,22 @@ export class QBOServiceBase {
         await this.upsertSyncFlag(
             tenantId, 'invoice', invoiceId, QBO_PAYMENT_DISCREPANCY,
             encodePaymentDiscrepancy({ ledgerCents, qboCents }),
+        );
+    }
+
+    /**
+     * QuickBooks reports the document as worth nothing — voided on their side.
+     *
+     * Recorded, never applied. Mirroring a void inbound would reset this
+     * inspection's payment gate and retract a published report on the strength
+     * of a poll; voiding is a decision, not a reading. The sweep's job here is
+     * to make sure a human finds out.
+     */
+    public async noteVoidedInQuickBooks(tenantId: string, invoiceId: string): Promise<void> {
+        await this.upsertSyncFlag(
+            tenantId, 'invoice', invoiceId, QBO_VOIDED_IN_QBO,
+            'Voided in QuickBooks. OpenInspection left this invoice unchanged — '
+            + 'void it here too if that was intended.',
         );
     }
 

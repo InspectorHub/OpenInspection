@@ -18,6 +18,19 @@
  */
 export const QBO_PAYMENT_DISCREPANCY = 'PAYMENT_DISCREPANCY';
 
+/**
+ * QuickBooks zeroed the document — a void, in practice.
+ *
+ * Its own code because it is NOT a disagreement about money: nothing was
+ * collected and nothing is claimed to have been. It rides the same table for
+ * the same reason as above, and it exists because the two numbers a voided
+ * invoice reports (`TotalAmt` 0, `Balance` 0) are byte-identical to the ones a
+ * fully-settled invoice reports. Reading them as settlement marked a voided
+ * $555 invoice paid in full, against a ledger holding no payment at all
+ * (observed in the sandbox, 2026-08-16).
+ */
+export const QBO_VOIDED_IN_QBO = 'VOIDED_IN_QBO';
+
 export interface PaymentDiscrepancy {
     /** What our ledger says we received, in integer cents. */
     ledgerCents: number;

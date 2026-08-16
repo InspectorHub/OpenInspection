@@ -19,6 +19,7 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { users, services as servicesTable, tenants, availability, tenantConfigs } from '../../lib/db/schema';
 import { tenantDisplayName } from '../../lib/tenant-display-name';
 import { checkRateLimit } from '../../lib/rate-limit';
+import { resolveTurnstileSiteKey } from '../../lib/middleware/bot-protection';
 import { getDrizzle } from '../../lib/route-helpers';
 
 const bookingProfileRoutes = createApiRouter()
@@ -86,7 +87,7 @@ const bookingProfileRoutes = createApiRouter()
             success: true,
             data: {
                 company: tenantRow.name,
-                turnstileSiteKey: c.env.TURNSTILE_SITE_KEY || null,
+                turnstileSiteKey: resolveTurnstileSiteKey(c.env),
                 bookingOpen,
                 allowInspectorChoice: allowChoice,
                 conciergeReviewRequired: !!config?.conciergeReviewRequired,
@@ -148,7 +149,7 @@ const bookingProfileRoutes = createApiRouter()
                 name: inspector.name,
                 company: tenantRow.name,
                 avatar: inspector.photoUrl,
-                turnstileSiteKey: c.env.TURNSTILE_SITE_KEY || null,
+                turnstileSiteKey: resolveTurnstileSiteKey(c.env),
                 bookingOpen: !!hasHours,
                 services: svcRows.map(s => ({
                     id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),

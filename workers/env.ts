@@ -65,4 +65,25 @@ export type WorkerEnv = Env & {
    * per deployment rather than in the committed config.
    */
   GOOGLE_MAPS_JS_API_KEY?: string;
+  /**
+   * QuickBooks OAuth credentials. Secrets, so — like SESSION_SECRET — they are
+   * absent from the placeholder config typegen runs against.
+   *
+   * The settings loader reads these to say WHETHER the deployment supplies a
+   * credential, never to send one to the browser. Presence is the whole
+   * answer: the same three names can instead be stored per tenant, and a form
+   * that can only see the stored copy calls a centrally-configured deployment
+   * "not configured".
+   */
+  QBO_CLIENT_ID?: string;
+  QBO_CLIENT_SECRET?: string;
+  QBO_WEBHOOK_SECRET?: string;
+  /**
+   * Which Intuit host to talk to. Not a credential and not a secret, but it
+   * shares their fate: it is set per deployment rather than in the committed
+   * placeholder config, so typegen never sees it either. The settings loader
+   * reads it for the same reason as the three above — to say whether the
+   * deployment already supplies one.
+   */
+  QBO_ENV?: string;
 };

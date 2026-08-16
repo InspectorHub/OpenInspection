@@ -27,12 +27,18 @@ export function withWebhook<TBase extends Constructor<QBOServiceBase>>(Base: TBa
                     encoder.encode(this.webhookSecret),
                     { name: 'HMAC', hash: 'SHA-256' },
                     false,
-                    ['sign'],
+                    ['verify'],
                 );
-                const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
-                const computed = btoa(Array.from(new Uint8Array(sig), b => String.fromCharCode(b)).join(''));
-                return computed === headerSig;
+                // crypto.subtle.verify compares in constant time. The previous
+                // `computed === headerSig` short-circuited on the first
+                // differing character, leaking timing on a verifier that is
+                // reachable from the open internet.
+                const sigBytes = Uint8Array.from(atob(headerSig), ch => ch.charCodeAt(0));
+                return await crypto.subtle.verify('HMAC', key, sigBytes, encoder.encode(rawBody));
             } catch {
+                // A header that is not valid base64 lands here. Reject it — do
+                // not throw: this runs behind an already-sent 200, so a throw
+                // is unobserved and Intuit never retries it.
                 return false;
             }
         }
@@ -55,19 +61,22 @@ export function withWebhook<TBase extends Constructor<QBOServiceBase>>(Base: TBa
 
             const candidates = Array.isArray(raw) ? raw : [raw];
             const events: QBOCloudEvent[] = [];
+            let unparsed = 0;
             for (const c of candidates) {
                 const parsed = QBOCloudEventSchema.safeParse(c);
-                if (parsed.success) events.push(parsed.data);
+                if (parsed.success) events.push(parsed.data); else unparsed++;
             }
 
             const db = this.getDrizzle();
+            let notInvoice = 0;
+            let unknownRealm = 0;
             for (const event of events) {
                 const parsed = this.parseCloudEventType(event.type);
-                if (!parsed || parsed.entityType !== 'invoice') continue;
+                if (!parsed || parsed.entityType !== 'invoice') { notInvoice++; continue; }
 
                 const conn = await db.select().from(qboConnections)
                     .where(eq(qboConnections.realmId, event.intuitaccountid)).get();
-                if (!conn) continue;
+                if (!conn) { unknownRealm++; continue; }
 
                 try {
                     const data = await this.apiCall<{ Invoice: InvoiceSummary }>(
@@ -79,6 +88,21 @@ export function withWebhook<TBase extends Constructor<QBOServiceBase>>(Base: TBa
                         { tenantId: conn.tenantId, entityId: event.intuitentityid },
                         e instanceof Error ? e : undefined);
                 }
+            }
+
+            // Both numbers, always: a count of what was dropped is not evidence
+            // when the denominator is invisible — it cannot tell "one of four"
+            // from "one of one". `unparsed > 0` in particular means Intuit's
+            // payload shape no longer matches our schema, which used to surface
+            // as a perfectly healthy-looking {valid:true} that processed nothing.
+            if (unparsed > 0 || notInvoice > 0 || unknownRealm > 0) {
+                logger.warn('QBO webhook dropped events', {
+                    received: candidates.length,
+                    handled:  events.length - notInvoice - unknownRealm,
+                    unparsed,
+                    notInvoice,
+                    unknownRealm,
+                });
             }
 
             return { valid: true };

@@ -1,10 +1,13 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { invoices } from '../lib/db/schema/invoice';
+import { contacts } from '../lib/db/schema/contact';
 import { tenantConfigs } from '../lib/db/schema';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { AutomationService } from './automation.service';
+import { PeopleService } from './people.service';
 import { resolveAutomationCompanyName } from './automation/company-name';
 import { logger } from '../lib/logger';
 import type { PaymentMethod } from '../lib/payment-method';
@@ -99,8 +102,56 @@ export class InvoiceService {
         };
     }
 
+    /**
+     * Who the invoice is FOR, as a contact row rather than a name and an email
+     * copied onto it.
+     *
+     * `invoices.contact_id` has existed, indexed, since the table did, and no
+     * write path ever set it — this is the only insert. Exactly one consumer
+     * read it: the QuickBooks payload, where a null becomes a missing
+     * `CustomerRef`, which QuickBooks refuses with a 400 because CustomerRef is
+     * required on an Invoice. So every invoice this product ever pushed was
+     * rejected, and the rejection recorded itself as the string `QBO 400`.
+     *
+     * Resolution order is explicit, then the inspection's own client, then
+     * email. A caller that knows the contact says so. Failing that, an invoice
+     * raised against an inspection bills that inspection's primary client —
+     * `inspection_people` already answers "who is this job for", and the answer
+     * is a contact row rather than a copied string. Email is the last rung: it
+     * is the same identity key `upsertCustomer` adopts an existing QuickBooks
+     * customer by, so both sides agree on who a person is instead of guessing.
+     *
+     * A name is deliberately NOT a fallback at any rung: two clients called
+     * "John Smith" are two people, and billing the wrong one is worse than not
+     * linking at all.
+     *
+     * The inspection rung is what makes the dashboard's own "New invoice"
+     * dialog work. That form collects an inspection and an amount — no email,
+     * no contact — so before this rung every invoice it produced had a null
+     * `contact_id` and could never reach QuickBooks, while the inspection it
+     * was raised from named the client the whole time.
+     */
+    private async resolveContactId(
+        db: DrizzleD1Database, tenantId: string,
+        contactId: string | null | undefined,
+        clientEmail: string | null | undefined,
+        inspectionId?: string | null | undefined,
+    ): Promise<string | null> {
+        if (contactId) return contactId;
+        if (inspectionId) {
+            const client = await new PeopleService({ DB: this.db }).getPrimaryClient(tenantId, inspectionId);
+            if (client?.contactId) return client.contactId;
+        }
+        if (!clientEmail) return null;
+        const match = await db.select({ id: contacts.id }).from(contacts)
+            .where(and(eq(contacts.tenantId, tenantId), eq(contacts.email, clientEmail)))
+            .limit(1).get();
+        return match?.id ?? null;
+    }
+
     async createInvoice(tenantId: string, data: {
         inspectionId?: string | null | undefined;
+        contactId?: string | null | undefined;
         clientName: string;
         clientEmail?: string | null | undefined;
         amountCents: number;
@@ -120,6 +171,9 @@ export class InvoiceService {
             sentAt: null,
             paidAt: null,
             inspectionId: data.inspectionId ?? null,
+            contactId: await this.resolveContactId(
+                db, tenantId, data.contactId, data.clientEmail, data.inspectionId,
+            ),
             clientName: data.clientName,
             clientEmail: data.clientEmail ?? null,
             amountCents: data.amountCents,

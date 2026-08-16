@@ -2,7 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { setCookie } from 'hono/cookie';
 import { Errors } from '../lib/errors';
-import { verifyTurnstile } from '../lib/middleware/bot-protection';
+import { verifyTurnstile, resolveTurnstile, TURNSTILE_TEST_KEY_WARNING } from '../lib/middleware/bot-protection';
 import { signJwt } from '../lib/jwt-keyring';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -62,16 +62,21 @@ const agentSignupRoutes = createApiRouter()
     .openapi(signupRoute, async (c) => {
         const body = c.req.valid('json');
 
-        // Bot protection — only enforced when TURNSTILE_SECRET_KEY is configured.
-        // Local dev / open-source operators can ship without it; production gets
-        // automatic enforcement when the secret is set.
-        if (c.env.TURNSTILE_SECRET_KEY) {
+        // Bot protection. A deployment capability, not a test on whether someone
+        // remembered to set a key: saas always challenges (on Cloudflare's
+        // published test key when unconfigured, so the path stays live),
+        // standalone leaves it to the operator. See `resolveTurnstile`.
+        const turnstile = resolveTurnstile(c.env);
+        if (turnstile.enforced) {
+            if (turnstile.usingTestKey) {
+                logger.warn('agent.signup.turnstile.test_key', { detail: TURNSTILE_TEST_KEY_WARNING });
+            }
             if (!body.turnstileToken) {
                 throw Errors.BadRequest('Bot challenge required');
             }
             let ok = false;
             try {
-                ok = await verifyTurnstile(body.turnstileToken, c.env.TURNSTILE_SECRET_KEY);
+                ok = await verifyTurnstile(body.turnstileToken, turnstile.secret);
             } catch (err) {
                 logger.warn('agent.signup.turnstile.failed', {
                     error: err instanceof Error ? err.message : String(err),

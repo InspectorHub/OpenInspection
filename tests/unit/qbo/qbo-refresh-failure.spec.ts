@@ -107,4 +107,66 @@ describe('QBO refresh-token failure handling', () => {
         expect(connectionRow()).toBeUndefined();
         vi.unstubAllGlobals();
     });
+
+    /**
+     * A grant refused by Intuit retires the connection just as surely as a
+     * tenant clicking Disconnect. The two paths must therefore leave the same
+     * thing behind — nothing — and they used to disagree: `disconnect()` clears
+     * the mappings and the open errors, while this path dropped only the
+     * connection row.
+     *
+     * What that costs is not tidiness. The next authorization can land on a
+     * DIFFERENT QuickBooks company, and a surviving mapping still names entity
+     * ids belonging to the old one. The first invoice push then addresses a
+     * customer id in books we are no longer connected to.
+     */
+    describe('what a refused grant leaves behind', () => {
+        const mapRows = () =>
+            db.select().from(schema.qboEntityMap).where(eq(schema.qboEntityMap.tenantId, TENANT)).all();
+        const errorRows = () =>
+            db.select().from(schema.qboSyncErrors).where(eq(schema.qboSyncErrors.tenantId, TENANT)).all();
+
+        beforeEach(async () => {
+            await db.insert(schema.qboEntityMap).values({
+                id: 'map-1', tenantId: TENANT,
+                oiType: 'contact', oiId: 'contact-1',
+                qboType: 'Customer', qboId: '58',
+                qboSyncToken: '0', syncedAt: new Date(),
+            });
+            await db.insert(schema.qboSyncErrors).values({
+                id: 'err-1', tenantId: TENANT,
+                oiType: 'invoice', oiId: 'inv-1',
+                errorCode: 'SYNC_ERROR', errorMsg: 'boom',
+                retries: 0, resolved: false,
+                createdAt: new Date(), updatedAt: new Date(),
+            });
+        });
+
+        it('leaves no entity mappings pointing at a company we no longer hold', async () => {
+            vi.stubGlobal('fetch', respond(400, { error: 'invalid_grant' }));
+            await expect(svc.refresh(TENANT)).rejects.toThrow(/reconnect/i);
+            expect(mapRows()).toHaveLength(0);
+            vi.unstubAllGlobals();
+        });
+
+        it('leaves no open errors describing a connection that is gone', async () => {
+            vi.stubGlobal('fetch', respond(401));
+            await expect(svc.refresh(TENANT)).rejects.toThrow(/reconnect/i);
+            expect(errorRows()).toHaveLength(0);
+            vi.unstubAllGlobals();
+        });
+
+        it('keeps all of it when Intuit merely had an outage', async () => {
+            // The positive control, and the reason this cleanup cannot simply be
+            // hoisted above the status check: a 500 says nothing about the grant,
+            // and wiping the mappings there would turn every Intuit blip into a
+            // full resync of the tenant's books.
+            vi.stubGlobal('fetch', respond(500));
+            await expect(svc.refresh(TENANT)).rejects.toThrow();
+            expect(connectionRow()).toBeTruthy();
+            expect(mapRows()).toHaveLength(1);
+            expect(errorRows()).toHaveLength(1);
+            vi.unstubAllGlobals();
+        });
+    });
 });

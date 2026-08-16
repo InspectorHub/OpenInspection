@@ -640,9 +640,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
                 .from(users)
                 .where(and(eq(users.tenantId, tenantId), inArray(users.id, Array.from(inspectorIdSet))));
             for (const r of insRows) {
-                const nice = (r.name as string | null)
-                    || ((r.email as string | null)?.split('@')[0] ?? '')
-                    || '';
+                // Recorded names only; a nameless account is left out of the map.
+                const nice = (r.name as string | null) ?? '';
                 if (nice) inspectorNameMap.set(r.id as string, nice);
             }
         }

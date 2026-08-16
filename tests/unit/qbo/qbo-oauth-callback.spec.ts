@@ -189,16 +189,21 @@ describe('QBO OAuth callback authorization', () => {
         expect(body.get('redirect_uri')).toBe(`${APP_BASE_URL}/api/integrations/qbo/callback`);
     });
 
-    it('refuses to complete when QBO_ENV is unset', async () => {
+    it('refuses to complete when QBO_ENV is unset, and says so distinctly', async () => {
         // Storing a token against an API host the worker will refuse to call
         // would leave the page saying "connected" while nothing ever syncs.
+        //
+        // Its own code, not the credential one: QBO_ENV is env-only in every
+        // deployment mode, so `not_configured` — whose copy tells the reader
+        // to fix the Client ID on the settings form — would send them to a
+        // field that is already correct.
         kv.store.set('qbo_oauth_state:st-4', TENANT_ID);
         const env = { ...(ENV(kv) as object), QBO_ENV: undefined } as never;
 
         const res = await buildApp(kv).request(
             `${QBO_OAUTH_MOUNT}/callback?code=c1&state=st-4&realmId=${REALM_ID}`, {}, env, CTX);
 
-        expect(res.headers.get('location')).toBe('/settings/integrations/qbo?error=not_configured');
+        expect(res.headers.get('location')).toBe('/settings/integrations/qbo?error=missing_qbo_env');
         expect(qboService.saveConnection).not.toHaveBeenCalled();
     });
 
