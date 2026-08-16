@@ -27,6 +27,18 @@ import { getDeploymentProfile, type ProfileEnv } from '../deployment-profile';
 export const TURNSTILE_TEST_SITE_KEY = '1x00000000000000000000AA';
 export const TURNSTILE_TEST_SECRET_KEY = '1x0000000000000000000000000000000AA';
 
+/**
+ * What a caller logs when `usingTestKey` is set.
+ *
+ * Here rather than at each call site for the same reason the policy is: two
+ * copies of a sentence about a security posture is two things to keep true, and
+ * the pair drifts. The call sites choose their own EVENT NAME — a reader needs
+ * to know whether it was the booking form or agent signup — and share this.
+ */
+export const TURNSTILE_TEST_KEY_WARNING =
+    'TURNSTILE_SECRET_KEY is unset on a saas deployment — bot protection is running on '
+    + "Cloudflare's always-pass test key and is admitting everything.";
+
 export interface TurnstilePolicy {
     /** When true the caller MUST demand a token and verify it. */
     enforced: boolean;

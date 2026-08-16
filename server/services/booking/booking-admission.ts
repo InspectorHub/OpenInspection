@@ -4,7 +4,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
-import { resolveTurnstile } from '../../lib/middleware/bot-protection';
+import { resolveTurnstile, TURNSTILE_TEST_KEY_WARNING } from '../../lib/middleware/bot-protection';
 import { resolvePublicHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import type { HonoConfig } from '../../types/hono';
 import type { PublicBookingSchema } from '../../lib/validations/booking.schema';
@@ -93,9 +93,7 @@ export async function admitBooking(
     if (turnstile.enforced) {
         if (turnstile.usingTestKey) {
             logger.warn('booking.turnstile.test_key', {
-                tenantId,
-                detail: 'TURNSTILE_SECRET_KEY is unset on a saas deployment — bot protection is running on '
-                    + "Cloudflare's always-pass test key and is admitting everything.",
+                tenantId, detail: TURNSTILE_TEST_KEY_WARNING,
             });
         }
         if (!body.turnstileToken) throw Errors.Forbidden('Security verification token missing.');

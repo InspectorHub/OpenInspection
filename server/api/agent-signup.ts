@@ -2,7 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { setCookie } from 'hono/cookie';
 import { Errors } from '../lib/errors';
-import { verifyTurnstile, resolveTurnstile } from '../lib/middleware/bot-protection';
+import { verifyTurnstile, resolveTurnstile, TURNSTILE_TEST_KEY_WARNING } from '../lib/middleware/bot-protection';
 import { signJwt } from '../lib/jwt-keyring';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -69,10 +69,7 @@ const agentSignupRoutes = createApiRouter()
         const turnstile = resolveTurnstile(c.env);
         if (turnstile.enforced) {
             if (turnstile.usingTestKey) {
-                logger.warn('agent.signup.turnstile.test_key', {
-                    detail: 'TURNSTILE_SECRET_KEY is unset on a saas deployment — bot protection is running '
-                        + "on Cloudflare's always-pass test key and is admitting everything.",
-                });
+                logger.warn('agent.signup.turnstile.test_key', { detail: TURNSTILE_TEST_KEY_WARNING });
             }
             if (!body.turnstileToken) {
                 throw Errors.BadRequest('Bot challenge required');
