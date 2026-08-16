@@ -38,8 +38,8 @@ const CONNECTED: QBOConnectionStatus = {
   refreshTokenExpiresAt: NOW_SECONDS + 100 * 24 * HOUR,
 };
 
-const NO_SECRETS = { QBO_CLIENT_ID: "", QBO_CLIENT_SECRET: "", QBO_WEBHOOK_SECRET: "" };
-const NO_ENV = { QBO_CLIENT_ID: false, QBO_CLIENT_SECRET: false, QBO_WEBHOOK_SECRET: false };
+const NO_SECRETS = { QBO_CLIENT_ID: "", QBO_CLIENT_SECRET: "", QBO_WEBHOOK_SECRET: "", QBO_ENV: "" };
+const NO_ENV = { QBO_CLIENT_ID: false, QBO_CLIENT_SECRET: false, QBO_WEBHOOK_SECRET: false, QBO_ENV: false };
 const NO_OAUTH = { connected: false, error: null };
 
 function renderPage(
@@ -55,6 +55,9 @@ function renderPage(
         secrets: NO_SECRETS,
         envProvided: NO_ENV,
         oauth: NO_OAUTH,
+        // A platform deployment is the default: that is what almost every
+        // tenant is, and it is the case where the form must NOT appear.
+        selfHosted: false,
         ...overrides,
       }),
     },
@@ -174,6 +177,36 @@ describe("QuickBooks settings page — OAuth round-trip outcome", () => {
 });
 
 /**
+ * Who owns the Intuit app decides whether this form exists.
+ *
+ * A tenant on a platform deployment never supplies one — a single published app
+ * serves everyone, which is what every competitor does too. A self-hosted deploy
+ * answers on its own domain, and Intuit matches a redirect URI byte for byte, so
+ * the platform's app cannot work there. The form is therefore not a thing we
+ * hide from SaaS tenants; it is a question they are never asked.
+ */
+describe("QuickBooks settings page — who owns the Intuit app", () => {
+  it("asks a platform tenant for no credentials at all", async () => {
+    renderPage(null);
+
+    await screen.findByRole("link", { name: /connect to quickbooks/i });
+    expect(screen.queryByLabelText(/client id/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/intuit environment/i)).not.toBeInTheDocument();
+  });
+
+  it("gives a self-hosted deployment all four settings, environment included", async () => {
+    renderPage(null, { selfHosted: true });
+
+    expect(await screen.findByLabelText(/client id/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/client secret/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/webhook/i)).toBeInTheDocument();
+    // The fourth. QBO_ENV used to be settable only by redeploying, which is not
+    // something the operator of a one-click deploy can necessarily do.
+    expect(screen.getByLabelText(/intuit environment/i)).toBeInTheDocument();
+  });
+});
+
+/**
  * A deployment may supply the QuickBooks credentials through its Worker env,
  * in which case the tenant has nothing stored and the form has nothing to
  * mask. Calling that "Not configured" told a working tenant the opposite of
@@ -182,7 +215,11 @@ describe("QuickBooks settings page — OAuth round-trip outcome", () => {
 describe("QuickBooks settings page — credential provenance", () => {
   it("marks fields the deployment supplies rather than calling them unset", async () => {
     renderPage(null, {
-      envProvided: { QBO_CLIENT_ID: true, QBO_CLIENT_SECRET: true, QBO_WEBHOOK_SECRET: false },
+      selfHosted: true,
+      envProvided: {
+        QBO_CLIENT_ID: true, QBO_CLIENT_SECRET: true,
+        QBO_WEBHOOK_SECRET: false, QBO_ENV: false,
+      },
     });
 
     expect(await screen.findByLabelText(/client id/i)).toHaveAttribute(
@@ -194,7 +231,7 @@ describe("QuickBooks settings page — credential provenance", () => {
   });
 
   it("calls every field unset when the deployment supplies none", async () => {
-    renderPage(null);
+    renderPage(null, { selfHosted: true });
 
     expect(await screen.findByLabelText(/client id/i)).toHaveAttribute(
       "placeholder",

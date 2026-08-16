@@ -96,6 +96,18 @@ export interface DeploymentProfile {
      *  entitlement — the API handlers in `server/api/marketplace.ts` stay
      *  ungated in both modes (OI #293 reuses them). */
     hasContentMarketplace: boolean;
+
+    /** Whether the PLATFORM supplies the Intuit app a tenant connects through.
+     *  True in saas: one published app serves every tenant, and asking an
+     *  inspection company to register their own on developer.intuit.com would
+     *  be handing them a question none of our competitors ask. False in
+     *  standalone — not as a downgrade, but because Intuit matches a redirect
+     *  URI byte for byte and a self-hosted deploy answers on its own domain, so
+     *  the platform's app CANNOT work there whatever we prefer.
+     *
+     *  This is what decides whether the credential form renders at all. Read it
+     *  instead of branching on APP_MODE — see the file header. */
+    qboAppManaged: boolean;
 }
 
 const FIXED_TENANT_FALLBACK = '00000000-0000-0000-0000-000000000000';
@@ -113,6 +125,7 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
     videoBackendManaged: false,
     hasManagedCompliance: false,
     hasContentMarketplace: false,
+    qboAppManaged: false,
 };
 
 export const SAAS_PROFILE: DeploymentProfile = {
@@ -128,6 +141,7 @@ export const SAAS_PROFILE: DeploymentProfile = {
     videoBackendManaged: true,
     hasManagedCompliance: true,
     hasContentMarketplace: true,
+    qboAppManaged: true,
 };
 
 /**

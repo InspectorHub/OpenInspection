@@ -78,4 +78,12 @@ export type WorkerEnv = Env & {
   QBO_CLIENT_ID?: string;
   QBO_CLIENT_SECRET?: string;
   QBO_WEBHOOK_SECRET?: string;
+  /**
+   * Which Intuit host to talk to. Not a credential and not a secret, but it
+   * shares their fate: it is set per deployment rather than in the committed
+   * placeholder config, so typegen never sees it either. The settings loader
+   * reads it for the same reason as the three above — to say whether the
+   * deployment already supplies one.
+   */
+  QBO_ENV?: string;
 };

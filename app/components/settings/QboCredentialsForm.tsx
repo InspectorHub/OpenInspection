@@ -7,6 +7,10 @@ export interface QboCredentialTriple {
   QBO_CLIENT_ID: string;
   QBO_CLIENT_SECRET: string;
   QBO_WEBHOOK_SECRET: string;
+  /** Not a credential. It rides along because a self-hoster's own Intuit app
+   *  is either a Development app or a Production one, and that is a property
+   *  of their app rather than of this deployment. */
+  QBO_ENV: string;
 }
 
 /** Which of the three the deployment already supplies. Booleans, never values. */
@@ -14,6 +18,7 @@ export interface QboCredentialProvenance {
   QBO_CLIENT_ID: boolean;
   QBO_CLIENT_SECRET: boolean;
   QBO_WEBHOOK_SECRET: boolean;
+  QBO_ENV: boolean;
 }
 
 /**
@@ -81,6 +86,13 @@ export function QboCredentialsForm({
           value={secrets.QBO_WEBHOOK_SECRET}
           hint={m.settings_qbo_webhook_hint()}
           {...envProvidedProps(envProvided.QBO_WEBHOOK_SECRET)}
+        />
+        <SecretField
+          name="QBO_ENV"
+          label={m.settings_qbo_env_label()}
+          value={secrets.QBO_ENV}
+          hint={m.settings_qbo_env_hint()}
+          {...envProvidedProps(envProvided.QBO_ENV)}
         />
         <div className="flex justify-end pt-2 border-t border-ih-border">
           <button

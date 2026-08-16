@@ -8,6 +8,7 @@ import { createApi } from "~/lib/api-client.server";
 import { getApiUrl } from "~/lib/api.server";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
+import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 import { QboBooksHealth } from "~/components/settings/QboBooksHealth";
 import { QboCredentialsForm } from "~/components/settings/QboCredentialsForm";
 import { QboConnectCard } from "~/components/settings/QboConnectCard";
@@ -29,7 +30,25 @@ import type { QBOConnectionStatus } from "../../server/services/qbo/api-base";
  */
 export interface QboLoaderData {
   status: QBOConnectionStatus | null;
-  secrets: { QBO_CLIENT_ID: string; QBO_CLIENT_SECRET: string; QBO_WEBHOOK_SECRET: string };
+  secrets: {
+    QBO_CLIENT_ID: string;
+    QBO_CLIENT_SECRET: string;
+    QBO_WEBHOOK_SECRET: string;
+    QBO_ENV: string;
+  };
+  /**
+   * Whether this tenant supplies their own Intuit app.
+   *
+   * On a platform deployment they never do, and the credential form is not a
+   * thing we hide from them — it is a question they are never asked, because
+   * one published app serves everyone. A self-hosted deploy answers on its own
+   * domain, and Intuit matches a redirect URI byte for byte, so the platform's
+   * app cannot work there whatever anyone prefers.
+   *
+   * Read from the deployment profile's capability, never from an APP_MODE
+   * string compare.
+   */
+  selfHosted: boolean;
   /**
    * Which of the three the deployment already supplies through its Worker env.
    * Booleans only — the values themselves never leave the server.
@@ -39,7 +58,12 @@ export interface QboLoaderData {
    * read empty while the integration works. Without this the page told a
    * working tenant they had configured nothing.
    */
-  envProvided: { QBO_CLIENT_ID: boolean; QBO_CLIENT_SECRET: boolean; QBO_WEBHOOK_SECRET: boolean };
+  envProvided: {
+    QBO_CLIENT_ID: boolean;
+    QBO_CLIENT_SECRET: boolean;
+    QBO_WEBHOOK_SECRET: boolean;
+    QBO_ENV: boolean;
+  };
   /**
    * How the OAuth handshake ended, read off the query string that
    * `api/qbo-oauth.ts` redirects back with. Both halves of that flow report
@@ -105,11 +129,14 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<Qb
       QBO_CLIENT_ID: secrets.QBO_CLIENT_ID || "",
       QBO_CLIENT_SECRET: secrets.QBO_CLIENT_SECRET || "",
       QBO_WEBHOOK_SECRET: secrets.QBO_WEBHOOK_SECRET || "",
+      QBO_ENV: secrets.QBO_ENV || "",
     },
+    selfHosted: !getDeploymentProfile(env).qboAppManaged,
     envProvided: {
       QBO_CLIENT_ID: Boolean(env.QBO_CLIENT_ID),
       QBO_CLIENT_SECRET: Boolean(env.QBO_CLIENT_SECRET),
       QBO_WEBHOOK_SECRET: Boolean(env.QBO_WEBHOOK_SECRET),
+      QBO_ENV: Boolean(env.QBO_ENV),
     },
     oauth: {
       connected: url.searchParams.get("connected") === "1",
@@ -129,7 +156,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "save-qbo-secrets") {
     const body: Record<string, string> = {};
-    for (const key of ["QBO_CLIENT_ID", "QBO_CLIENT_SECRET", "QBO_WEBHOOK_SECRET"] as const) {
+    for (const key of ["QBO_CLIENT_ID", "QBO_CLIENT_SECRET", "QBO_WEBHOOK_SECRET", "QBO_ENV"] as const) {
       const val = fd.get(key);
       if (val && typeof val === "string" && val.trim()) body[key] = val;
     }
@@ -175,7 +202,7 @@ function timeSince(ts: number | null | undefined): string {
 }
 
 export default function SettingsIntegrationsQbo() {
-  const { status: initial, secrets, envProvided, oauth } = useLoaderData<typeof loader>();
+  const { status: initial, secrets, envProvided, oauth, selfHosted } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const [status, setStatus] = useState<QBOConnectionStatus | null>(initial);
@@ -252,11 +279,15 @@ export default function SettingsIntegrationsQbo() {
 
       <QboOAuthOutcomeBanner outcome={oauth} />
 
-      <QboCredentialsForm
-        secrets={secrets}
-        envProvided={envProvided}
-        saving={savingSecrets}
-      />
+      {/* Only where the tenant owns the Intuit app. On a platform deployment
+          these fields would be four questions with no right answer. */}
+      {selfHosted && (
+        <QboCredentialsForm
+          secrets={secrets}
+          envProvided={envProvided}
+          saving={savingSecrets}
+        />
+      )}
 
       {/* Expiry warning */}
       {status && expiryWarning && (
