@@ -5,6 +5,7 @@ import { users } from '../lib/db/schema';
 import { setCookie } from 'hono/cookie';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
+import { getDeploymentProfile } from '../lib/deployment-profile';
 import { getBaseUrl } from '../lib/url';
 import { checkRateLimit } from '../lib/rate-limit';
 import { requireCsrfToken } from '../lib/middleware/csrf';
@@ -279,7 +280,11 @@ const coreAuthRoutes = createApiRouter()
         await checkRateLimit(c, 'login');
 
         const body = c.req.valid('json');
-        const tenantId = c.env.SINGLE_TENANT_ID || '00000000-0000-0000-0000-000000000000';
+        // The profile owns this, fallback included — `getDeploymentProfile`
+        // resolves `SINGLE_TENANT_ID ?? FIXED_TENANT_FALLBACK`. Writing the
+        // literal here was a second copy of a decision, and the all-zero UUID
+        // appeared three times in this repo for two answers.
+        const tenantId = getDeploymentProfile(c.env).fixedTenantId!;
         const user = await c.var.services.auth.validateCredentials(body.email, body.password, tenantId);
 
         const keyring = await c.var.keyringPromise!;
@@ -497,7 +502,11 @@ const coreAuthRoutes = createApiRouter()
 
         // 3. Initialize Workspace
         const passwordHash = await c.var.services.auth.hashPassword(body.password);
-        const tenantId = c.env.SINGLE_TENANT_ID || '00000000-0000-0000-0000-000000000000';
+        // The profile owns this, fallback included — `getDeploymentProfile`
+        // resolves `SINGLE_TENANT_ID ?? FIXED_TENANT_FALLBACK`. Writing the
+        // literal here was a second copy of a decision, and the all-zero UUID
+        // appeared three times in this repo for two answers.
+        const tenantId = getDeploymentProfile(c.env).fixedTenantId!;
         const slug = body.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
         await c.var.services.admin.updateTenantStatus({
