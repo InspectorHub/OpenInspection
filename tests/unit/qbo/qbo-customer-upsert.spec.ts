@@ -13,15 +13,20 @@
  *     not get a second Customer — duplicates split one person's receivables in
  *     two. So an unmapped contact with an email is looked up first, and a match
  *     is adopted into the map rather than created.
- *  2. **The 6140 ladder.** QuickBooks enforces DisplayName uniqueness per
- *     company. Two different people called "John Smith" is ordinary, so the
+ *  2. **The duplicate-name ladder.** QuickBooks enforces DisplayName uniqueness
+ *     per company. Two different people called "John Smith" is ordinary, so the
  *     create retries with a disambiguated name rather than failing.
  *
  * These specs drive the REAL `apiCall` against a stubbed `fetch`, because the
- * ladder's condition reads `err.qboResponse.Fault.Error[0].code` — an object
- * `apiCall` builds. Stubbing at the method boundary would mean hand-writing
- * that shape, and a test that invents the shape it asserts on cannot fail when
- * production changes it.
+ * ladder's condition reads the codes inside `err.qboResponse.Fault.Error` — an
+ * object `apiCall` builds. Stubbing at the method boundary would mean
+ * hand-writing that shape, and a test that invents the shape it asserts on
+ * cannot fail when production changes it.
+ *
+ * Driving the real `apiCall` was still not enough on its own: the fault BODIES
+ * here were invented too, and carried a code (`6140`) that the sandbox never
+ * returns for this. The ladder passed every spec in this file while having
+ * never climbed a real rung. `DUPLICATE_NAME` is now a captured response.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { and, eq } from 'drizzle-orm';
@@ -70,8 +75,29 @@ const fault = (status: number, code: string, message: string): Reply => ({
     status,
     body: { Fault: { Error: [{ code, Message: message, Detail: message }], type: 'ValidationFault' } },
 });
-/** "Duplicate Name Exists Error" — the one the ladder climbs. */
-const DUPLICATE_NAME = () => fault(400, '6140', 'Duplicate Name Exists Error');
+/**
+ * "Duplicate Name Exists Error" — the one the ladder climbs.
+ *
+ * Copied verbatim off the wire (sandbox, 2026-08-16) rather than composed from
+ * the number the implementation happens to read. It matters: the code is
+ * **6240**, and while this helper said `6140` the ladder had never once climbed
+ * against the real API — the implementation and this file agreed with each
+ * other and with nothing else. A fabricated fault can only test that the code
+ * matches itself.
+ */
+const DUPLICATE_NAME = (): Reply => ({
+    status: 400,
+    body: {
+        Fault: {
+            Error: [{
+                Message: 'Duplicate Name Exists Error',
+                Detail:  'The name supplied already exists. : null',
+                code:    '6240',
+            }],
+            type: 'ValidationFault',
+        },
+    },
+});
 
 /** A QBO customer-query answer. */
 const queryFound = (customers: Array<{ Id: string; SyncToken: string; DisplayName: string }>) =>
@@ -397,13 +423,49 @@ describe('the duplicate-name ladder', () => {
         // status. It used to be the four characters `QBO 400` and nothing more,
         // for every distinct reason a push could be refused.
         expect(errors[0]!.errorMsg).toContain('QBO 400');
-        expect(errors[0]!.errorMsg).toContain('6140');
+        expect(errors[0]!.errorMsg).toContain('6240');
+    });
+
+    it('climbs for 6140 as well, not only the code the sandbox returns', async () => {
+        // Both numbers mean the same thing to this code path, and pinning only
+        // the observed one would make the set look like a single-value check
+        // that could be narrowed back without anyone noticing.
+        replies = [
+            queryFound([]),
+            fault(400, '6140', 'Duplicate Name Exists Error'),
+            ok({ Customer: { Id: 'QBO-CUST-71', SyncToken: '0' } }),
+        ];
+
+        await qbo.upsertCustomer(TENANT, PAT);
+
+        expect(displayNames()).toHaveLength(2);
+        expect((await contactMap())?.qboId).toBe('QBO-CUST-71');
+        expect(await syncErrors()).toHaveLength(0);
+    });
+
+    it('climbs when the duplicate is not the first error reported', async () => {
+        // One ValidationFault can carry several entries. Reading only `Error[0]`
+        // would drop the rung for any response that leads with something else.
+        replies = [
+            queryFound([]),
+            { status: 400, body: { Fault: { type: 'ValidationFault', Error: [
+                { Message: 'Business Validation Error', Detail: 'unrelated', code: '6000' },
+                { Message: 'Duplicate Name Exists Error', Detail: 'The name supplied already exists. : null', code: '6240' },
+            ] } } },
+            ok({ Customer: { Id: 'QBO-CUST-72', SyncToken: '0' } }),
+        ];
+
+        await qbo.upsertCustomer(TENANT, PAT);
+
+        expect((await contactMap())?.qboId).toBe('QBO-CUST-72');
+        expect(await syncErrors()).toHaveLength(0);
     });
 
     it('does not climb for any other fault code', async () => {
-        // The ladder is keyed on 6140 specifically. Re-sending a name that was
-        // rejected for a different reason cannot help, and each rung is another
-        // write attempt against the tenant's books.
+        // The ladder is keyed on the duplicate-name codes specifically.
+        // Re-sending a name that was rejected for a different reason cannot
+        // help, and each rung is another write attempt against the tenant's
+        // books.
         replies = [
             queryFound([]),
             fault(400, '6000', 'A business validation error has occurred'),

@@ -90,4 +90,68 @@ describe('InvoiceService — the invoice knows which contact it bills', () => {
         const inv = await svc.createInvoice(OTHER_TENANT, { ...base, clientEmail: 'pat@example.com' });
         expect(await contactIdOf(inv.id)).toBeNull();
     });
+
+    // --- the inspection rung ------------------------------------------------
+    //
+    // The dashboard's "New invoice" dialog collects an inspection, a name and
+    // an amount. No email, no contact. So the two rungs above cannot fire for
+    // the product's own main invoice-creation path, and every invoice raised
+    // through it had a null `contact_id` and could never reach QuickBooks —
+    // while the inspection it was raised from named the client all along.
+    describe('an invoice raised against an inspection', () => {
+        const INSPECTION = 'inspection-0000-0000-000000000001';
+        const ROLE_CLIENT = 'role-client-0000-000000000001';
+        const ROLE_AGENT  = 'role-agent-0000-0000000000002';
+
+        beforeEach(async () => {
+            await db.insert(schema.contactRoleProfiles).values([
+                { id: ROLE_CLIENT, tenantId: TENANT, key: 'client', label: 'Client',
+                  kind: 'client', isSystem: true, sortOrder: 0, active: true,
+                  createdAt: T0, updatedAt: T0 },
+                { id: ROLE_AGENT, tenantId: TENANT, key: 'buyer_agent', label: "Buyer's Agent",
+                  kind: 'agent', isSystem: true, sortOrder: 1, active: true,
+                  createdAt: T0, updatedAt: T0 },
+            ] as never);
+            await db.insert(schema.inspections).values({
+                id: INSPECTION, tenantId: TENANT, propertyAddress: '742 Evergreen Terrace',
+                date: '2026-03-01', status: 'scheduled', createdAt: T0,
+            } as never);
+        });
+
+        const link = (contactId: string, roleProfileId: string) =>
+            db.insert(schema.inspectionPeople).values({
+                id: `ip-${contactId}-${roleProfileId}`.slice(0, 36),
+                tenantId: TENANT, inspectionId: INSPECTION, contactId, roleProfileId,
+                createdAt: T0,
+            } as never);
+
+        it('bills that inspection\'s primary client when nothing else identifies one', async () => {
+            await link(PAT, ROLE_CLIENT);
+            const inv = await svc.createInvoice(TENANT, {
+                ...base, inspectionId: INSPECTION, clientEmail: null,
+            });
+            expect(await contactIdOf(inv.id)).toBe(PAT);
+        });
+
+        it('does not bill an agent on the inspection', async () => {
+            // Positive control for the rung's selectivity: an inspection with
+            // people on it but no CLIENT must still leave the link empty rather
+            // than invoice whoever happens to be attached. Without this, the
+            // query could be joining on the wrong thing and the spec above
+            // would still pass.
+            await link(SAM, ROLE_AGENT);
+            const inv = await svc.createInvoice(TENANT, {
+                ...base, inspectionId: INSPECTION, clientEmail: null,
+            });
+            expect(await contactIdOf(inv.id)).toBeNull();
+        });
+
+        it('still prefers a contact the caller named', async () => {
+            await link(PAT, ROLE_CLIENT);
+            const inv = await svc.createInvoice(TENANT, {
+                ...base, inspectionId: INSPECTION, contactId: SAM,
+            });
+            expect(await contactIdOf(inv.id)).toBe(SAM);
+        });
+    });
 });

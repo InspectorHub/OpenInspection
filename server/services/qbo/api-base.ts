@@ -3,7 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { qboConnections, qboEntityMap, qboSyncErrors } from '../../lib/db/schema/qbo';
 import { encryptToken, decryptToken } from '../../lib/qbo-crypto';
 import { QBOTokenResponseSchema } from '../../lib/validations/qbo.schema';
-import { QBO_PAYMENT_DISCREPANCY, encodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
+import { QBO_PAYMENT_DISCREPANCY, QBO_VOIDED_IN_QBO, encodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
 import { describeQboError } from './error-detail';
 
 export { describeQboError };
@@ -313,6 +313,22 @@ export class QBOServiceBase {
         await this.upsertSyncFlag(
             tenantId, 'invoice', invoiceId, QBO_PAYMENT_DISCREPANCY,
             encodePaymentDiscrepancy({ ledgerCents, qboCents }),
+        );
+    }
+
+    /**
+     * QuickBooks reports the document as worth nothing — voided on their side.
+     *
+     * Recorded, never applied. Mirroring a void inbound would reset this
+     * inspection's payment gate and retract a published report on the strength
+     * of a poll; voiding is a decision, not a reading. The sweep's job here is
+     * to make sure a human finds out.
+     */
+    public async noteVoidedInQuickBooks(tenantId: string, invoiceId: string): Promise<void> {
+        await this.upsertSyncFlag(
+            tenantId, 'invoice', invoiceId, QBO_VOIDED_IN_QBO,
+            'Voided in QuickBooks. OpenInspection left this invoice unchanged — '
+            + 'void it here too if that was intended.',
         );
     }
 

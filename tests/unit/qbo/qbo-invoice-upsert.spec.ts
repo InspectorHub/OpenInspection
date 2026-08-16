@@ -54,6 +54,7 @@ const INVOICE_INPUT = {
     contactId:     CONTACT,
     dueDate:       '2026-09-30',
     lineItems:     [{ description: 'Full home inspection', amountCents: 45000 }],
+    amountCents:   45000,
     status:        'sent',
 };
 
@@ -597,5 +598,55 @@ describe('a failing update reports what QuickBooks refused', () => {
         expect(msg).toContain('Invalid Reference Id');
         expect(msg).not.toContain('stale-token');
         expect((await invoiceRow())?.qboSyncStatus).toBe('failed');
+    });
+});
+
+/**
+ * An invoice with a total and no itemisation still becomes a QuickBooks invoice.
+ *
+ * The dashboard's own "New invoice" dialog collects an inspection, a name and
+ * an amount — it has no line-item editor, and the route it posts to sends
+ * `lineItems: []`. QuickBooks requires `Line`, so every invoice raised that way
+ * came back `Required parameter Line is missing in the request` (2020) and was
+ * recorded as `QBO 400`, exactly like the missing CustomerRef one layer up.
+ *
+ * Captured live from the sandbox on 2026-08-16 before the fallback existed.
+ */
+describe('an invoice with no line items', () => {
+    it('bills the invoice total as a single line', async () => {
+        replies = [ok({ Invoice: { Id: QBO_INV, SyncToken: '0' } })];
+
+        await qbo.upsertInvoice(TENANT, {
+            ...INVOICE_INPUT, lineItems: [], amountCents: 44400,
+        });
+
+        expect(sent).toHaveLength(1);
+        const line = sent[0]!.body.Line;
+        expect(line).toHaveLength(1);
+        expect(line[0].Amount).toBe(444);
+        expect(line[0].SalesItemLineDetail.UnitPrice).toBe(444);
+        expect(line[0].SalesItemLineDetail.Qty).toBe(1);
+        expect((await invoiceRow())?.qboSyncStatus).toBe('synced');
+    });
+
+    it('leaves an itemised invoice alone — the positive control', async () => {
+        // Without this, a fallback that fired unconditionally would look right:
+        // it would still produce one line for this fixture's single item.
+        replies = [ok({ Invoice: { Id: QBO_INV, SyncToken: '0' } })];
+
+        await qbo.upsertInvoice(TENANT, {
+            ...INVOICE_INPUT,
+            lineItems: [
+                { description: 'Full home inspection', amountCents: 40000 },
+                { description: 'Radon test',           amountCents:  5000 },
+            ],
+            amountCents: 45000,
+        });
+
+        const line = sent[0]!.body.Line;
+        expect(line).toHaveLength(2);
+        expect(line.map((l: { Amount: number }) => l.Amount)).toEqual([400, 50]);
+        // The descriptions are the tenant's, not the fallback's wording.
+        expect(line[1].SalesItemLineDetail.ItemRef.name).toBe('Radon test');
     });
 });

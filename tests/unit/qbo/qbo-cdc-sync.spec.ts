@@ -263,6 +263,31 @@ describe('what a swept invoice actually does', () => {
         expect(result).toEqual({ processed: 1 });
         expect(markPaid).toHaveBeenCalledTimes(1);
     });
+
+    it('does not read a voided QuickBooks invoice as payment', async () => {
+        // Voiding zeroes the document: `TotalAmt` 0 and `Balance` 0 — the same
+        // pair `paidInFull` above reports, which is exactly the problem. Read
+        // as settlement it stamped `paid_at` on a $555 invoice against a ledger
+        // holding no payment, unlocking the report and counting revenue nobody
+        // sent. Observed end to end in the sandbox on 2026-08-16.
+        stubPages([[{ Id: QBO_ID, SyncToken: '9', Balance: 0, TotalAmt: 0 } as InvoiceSummary]]);
+
+        const result = await qbo.runCDCSync(TENANT, markPaid as never, markPartial as never);
+
+        expect(result).toEqual({ processed: 1 });
+        expect(markPaid).not.toHaveBeenCalled();
+        expect(markPartial).not.toHaveBeenCalled();
+        expect(invoiceRow()!.paidAt).toBeNull();
+        // ...and the operator finds out, because a void nobody mirrors is a
+        // divergence between two sets of books.
+        const flags = db.select().from(schema.qboSyncErrors)
+            .where(eq(schema.qboSyncErrors.tenantId, TENANT)).all();
+        expect(flags).toHaveLength(1);
+        expect(flags[0]!.errorCode).toBe('VOIDED_IN_QBO');
+        expect(flags[0]!.oiId).toBe(INV_ID);
+        // The SyncToken still advanced: the document was read, just not believed.
+        expect(mapRow()!.qboSyncToken).toBe('9');
+    });
 });
 
 describe('when the cursor is allowed to move', () => {

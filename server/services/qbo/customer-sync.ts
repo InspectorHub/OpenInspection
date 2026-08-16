@@ -4,6 +4,28 @@ import { logger } from '../../lib/logger';
 import type { Constructor, QBOServiceBase } from './api-base';
 import { describeQboError } from './api-base';
 
+/**
+ * The ValidationFault codes QuickBooks uses to say "that DisplayName is taken".
+ *
+ * `6240` is the one a live company actually returns — captured from the sandbox
+ * on 2026-08-16 by POSTing a name that already existed:
+ *
+ *     { Message: 'Duplicate Name Exists Error',
+ *       Detail:  'The name supplied already exists. : null',
+ *       code:    '6240' }
+ *
+ * This set used to hold only `6140`, which no response in that capture carried,
+ * so the disambiguation ladder below never once ran against the real API: the
+ * first collision threw, the contact got a `qbo_sync_errors` row, and no second
+ * rung was ever attempted. The unit tests did not catch it because they built
+ * their own fault objects from the same wrong number the implementation read.
+ *
+ * `6140` stays because it costs nothing and this file cannot prove no Intuit
+ * surface emits it; a name collision is a name collision under either number.
+ * Anything ADDED here needs a captured response behind it, not a doc page.
+ */
+const DUPLICATE_NAME_FAULT_CODES: ReadonlySet<string> = new Set(['6240', '6140']);
+
 export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends Base {
         public buildDisplayName(
@@ -18,9 +40,9 @@ export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base
             if (retry === 1 && email) return `${base} (${email})`;
             const id = contactId ?? 'unknown';
             // Without an email, rungs 2 and 3 used to be the same string, so the
-            // third attempt re-collided on 6140 and burned an API call for
-            // nothing. Each rung has to differ from the one below it or it is
-            // not a rung.
+            // third attempt re-collided on the same duplicate-name fault and
+            // burned an API call for nothing. Each rung has to differ from the
+            // one below it or it is not a rung.
             //
             // The TAIL, not the head: a rung also has to differ between two
             // contacts who share a name, which is the collision it exists to
@@ -126,9 +148,14 @@ export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base
                         return;
                     } catch (err: unknown) {
                         const qboErr = err as { qboResponse?: { Fault?: { Error?: Array<{ code?: string }> } } };
-                        // 6140 = "Duplicate Name Exists Error" — retry with a disambiguated DisplayName
-                        const code = qboErr?.qboResponse?.Fault?.Error?.[0]?.code;
-                        if (code === '6140' && retry < 2) continue;
+                        // Retry with a disambiguated DisplayName when QuickBooks
+                        // says the name is taken. EVERY reported error is checked,
+                        // not just the first: one ValidationFault can carry several
+                        // and the duplicate need not lead.
+                        const isDuplicateName = (qboErr?.qboResponse?.Fault?.Error ?? []).some(
+                            (e) => e?.code !== undefined && DUPLICATE_NAME_FAULT_CODES.has(String(e.code)),
+                        );
+                        if (isDuplicateName && retry < 2) continue;
                         throw err;
                     }
                 }

@@ -14,6 +14,7 @@ import type {
 } from './api-base';
 import { describeQboError } from './api-base';
 import { applyInvoiceStatusFromQBO } from './inbound-reconcile';
+import { billableLines, toQboLines, buildInvoicePayload } from './invoice-payload';
 
 export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends Base {
@@ -75,6 +76,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
             return applyInvoiceStatusFromQBO(this.getDrizzle(), tenantId, inv, markPaid, markPartial, {
                 clearPaymentDiscrepancy:  (t, i) => this.clearPaymentDiscrepancy(t, i),
                 recordPaymentDiscrepancy: (t, i, l, q) => this.recordPaymentDiscrepancy(t, i, l, q),
+                noteVoidedInQuickBooks:   (t, i) => this.noteVoidedInQuickBooks(t, i),
             });
         }
 
@@ -86,6 +88,12 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                 contactId?: string | null;
                 dueDate?: string | null;
                 lineItems: Array<{ description: string; amountCents: number; quantity?: number }>;
+                /**
+                 * The invoice total. Authoritative per the money authority
+                 * chain, and the only thing there is to bill when the invoice
+                 * carries no itemisation — see the `Line` fallback below.
+                 */
+                amountCents: number;
                 status: string;
             },
         ): Promise<void> {
@@ -109,18 +117,12 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
             const txnDate = await this.txnDateFor(tenantId, new Date());
             const dueDate = invoice.dueDate ? invoice.dueDate.slice(0, 10) : txnDate;
 
-            const lines = invoice.lineItems.map(item => {
-                const qty = item.quantity ?? 1;
-                return {
-                    DetailType: 'SalesItemLineDetail',
-                    Amount:     item.amountCents / 100,
-                    SalesItemLineDetail: {
-                        ItemRef:   { value: conn.defaultItemId, name: item.description.slice(0, 100) },
-                        UnitPrice: item.amountCents / 100 / qty,
-                        Qty:       qty,
-                    },
-                };
-            });
+            // Shape decisions — including what an unitemised invoice becomes —
+            // live in `invoice-payload.ts`.
+            const lines = toQboLines(
+                billableLines(invoice.lineItems, invoice.amountCents),
+                conn.defaultItemId,
+            );
 
             // QuickBooks requires CustomerRef on an Invoice and refuses the
             // whole document without it. Saying so here — before the round trip
@@ -142,14 +144,11 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                 return;
             }
 
-            const payload: Record<string, unknown> = {
-                DocNumber:   this.buildDocNumber(invoice.invoiceNumber ?? invoice.id),
-                TxnDate:     txnDate,
-                DueDate:     dueDate,
-                Line:        lines,
-                EmailStatus: invoice.status === 'sent' ? 'EmailSent' : 'NotSet',
-            };
-            if (qboCustomerId) payload.CustomerRef = { value: qboCustomerId };
+            const payload = buildInvoicePayload({
+                docNumber: this.buildDocNumber(invoice.invoiceNumber ?? invoice.id),
+                txnDate, dueDate, lines, qboCustomerId,
+                status: invoice.status,
+            });
 
             const existing = await db.select().from(qboEntityMap).where(
                 and(eq(qboEntityMap.tenantId, tenantId), eq(qboEntityMap.oiType, 'invoice'), eq(qboEntityMap.oiId, invoice.id)),

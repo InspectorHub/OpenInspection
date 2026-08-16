@@ -17,6 +17,7 @@ export interface ReconcileDeps {
     recordPaymentDiscrepancy(
         tenantId: string, invoiceId: string, ledgerCents: number, qboCents: number,
     ): Promise<void>;
+    noteVoidedInQuickBooks(tenantId: string, invoiceId: string): Promise<void>;
 }
 
 /**
@@ -48,6 +49,21 @@ export async function applyInvoiceStatusFromQBO(
                 qboSyncToken: inv.SyncToken,
                 syncedAt:     new Date(),
             }).where(eq(qboEntityMap.id, mapped.id));
+
+            // A VOID first, because after one the numbers below stop meaning
+            // what they say. QuickBooks zeroes a voided invoice: `TotalAmt` 0
+            // and `Balance` 0 — the identical pair a fully-settled invoice
+            // reports. Falling through to the balance logic read a voided $555
+            // invoice as paid in full and stamped `paid_at` on a ledger holding
+            // no payment at all, which unlocks the report and counts $555 of
+            // revenue nobody sent (sandbox, 2026-08-16).
+            //
+            // Zero total, not zero balance: an invoice worth nothing has no
+            // settlement to report either way, so this costs no real case.
+            if (inv.TotalAmt === 0) {
+                await deps.noteVoidedInQuickBooks(tenantId, mapped.oiId);
+                return true;
+            }
 
             // QuickBooks amounts are dollars (see the reverse mapping in
             // upsertInvoice, `Amount: amountCents / 100`). Round each side to
