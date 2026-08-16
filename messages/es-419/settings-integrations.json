@@ -153,7 +153,7 @@
   "settings_qbo_credentials_selfhost_note": "Esta instalación se conecta mediante su propia aplicación de Intuit, así que estas credenciales son suyas. Los valores del entorno del Worker tienen prioridad; lo que se guarde aquí es el respaldo.",
   "settings_qbo_oauth_connected": "QuickBooks conectado.",
   "settings_qbo_oauth_error_not_configured": "Faltan las credenciales de QuickBooks. Agregue arriba un Client ID y un Client Secret, y vuelva a intentarlo.",
-  "settings_qbo_oauth_error_missing_qbo_env": "Esta instalación no tiene definido si debe usar los libros de prueba (sandbox) o de producción de QuickBooks. Pida a su administrador que defina QBO_ENV; no se puede configurar desde esta página.",
+  "settings_qbo_oauth_error_missing_qbo_env": "Esta instalación no tiene definido si debe usar los libros de prueba (sandbox) o de producción de QuickBooks. Defina el entorno de Intuit (QBO_ENV) y vuelva a intentarlo.",
   "settings_qbo_oauth_error_missing_base_url": "Esta instalación no tiene una URL pública configurada, así que QuickBooks no tiene adónde devolverlo. Pida a su administrador que defina APP_BASE_URL.",
   "settings_qbo_oauth_error_invalid_state": "Ese intento de conexión expiró. Vuelva a comenzar desde esta página.",
   "settings_qbo_oauth_error_failed": "QuickBooks rechazó la conexión. Verifique que las credenciales de arriba pertenezcan a la misma aplicación y al mismo entorno de Intuit, y vuelva a intentarlo.",

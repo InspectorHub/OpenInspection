@@ -16,9 +16,33 @@ export { InspectionPresenceDO } from '../../server/durable-objects/inspection-pr
 
 interface TestEnv {
     DB: D1Database;
+    /** Written only by the env-identity probe below. Never set by any config. */
+    __probeMarker?: string;
 }
 
 export default {
+    /**
+     * Probe: is `env` the SAME OBJECT on every invocation inside one isolate?
+     *
+     * Production code answers this question implicitly — `integrationSecretsMiddleware`
+     * merges a tenant's decrypted secrets into `c.env` IN PLACE. If the runtime
+     * hands every request the same object, that write outlives the request and
+     * the next tenant inherits it. Nothing in the node-env suites can see this;
+     * only real workerd can.
+     *
+     * Test-only. Reports what it found BEFORE writing, so two sequential calls
+     * distinguish a fresh env from a shared one.
+     */
+    async fetch(request: Request, env: TestEnv): Promise<Response> {
+        const url = new URL(request.url);
+        if (url.pathname === '/__probe/env-identity') {
+            const sawBefore = env.__probeMarker ?? null;
+            env.__probeMarker = 'written-by-a-previous-request';
+            return Response.json({ sawBefore });
+        }
+        return new Response('not found', { status: 404 });
+    },
+
     // The consumer for `inspectorhub-sync-saas` inside the test runtime. Records
     // each delivered envelope's id into `test_queue_log` so producer tests can
     // assert delivery against the real SYNC_QUEUE binding (not a mock).

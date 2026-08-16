@@ -152,11 +152,13 @@ describe("QuickBooks settings page — OAuth round-trip outcome", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/credentials are missing/i);
   });
 
-  it("points a missing QBO_ENV at the administrator, not at the form", async () => {
+  it("names the environment as the problem, not the credentials", async () => {
     renderPage(null, { oauth: { connected: false, error: "missing_qbo_env" } });
 
-    // QBO_ENV is env-only in every deployment mode; the credentials form on
-    // this page cannot set it, so the copy must not send the reader there.
+    // Who sets QBO_ENV differs by deployment — a self-hoster does it on the
+    // form beside their own credentials, a platform tenant never sees it. In
+    // neither case is a missing Client ID the problem, and pointing at a field
+    // that is already correct is how the reader loses an hour.
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("QBO_ENV");
     expect(alert).not.toHaveTextContent(/client id/i);

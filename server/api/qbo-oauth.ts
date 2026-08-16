@@ -107,10 +107,23 @@ api.get('/callback', async (c) => {
         const decrypted = await loadTenantSecrets(
             c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
         ).catch(() => null);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (decrypted) applyIntegrationSecrets(c.env as any, decrypted as Record<string, string | undefined>);
+        // Onto a COPY, never onto `c.env` itself: the runtime reuses one `env`
+        // object for every request in an isolate, so an in-place write would
+        // leave this tenant's client secret there for the next one. Same reason
+        // the secrets middleware copies — see the note there.
+        if (decrypted) {
+            const perRequest = { ...c.env };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            applyIntegrationSecrets(perRequest as any, decrypted as Record<string, string | undefined>);
+            c.env = perRequest;
+        }
     }
-    if (!c.env.QBO_CLIENT_ID || !c.env.QBO_CLIENT_SECRET) {
+    // `c.env` is final from here — the merge above may have replaced it with a
+    // per-request copy, which is why these are read once into locals rather
+    // than off the context repeatedly. The earlier guards narrowed an object
+    // that no longer exists.
+    const { QBO_CLIENT_ID: clientId, QBO_CLIENT_SECRET: clientSecret, APP_BASE_URL: appBaseUrl } = c.env;
+    if (!clientId || !clientSecret || !appBaseUrl) {
         return c.redirect('/settings/integrations/qbo?error=not_configured');
     }
 
@@ -122,17 +135,18 @@ api.get('/callback', async (c) => {
     try {
         apiBase = resolveQboApiBase(c.env.QBO_ENV);
     } catch {
-        // Its own code, not the credential one: QBO_ENV is env-only in every
-        // deployment mode — it is not in the secrets catalog and the settings
-        // form cannot set it — so telling this tenant to "add a Client ID
-        // above" would send them to a field that is already correct.
+        // Its own code, not the credential one. Whoever sets QBO_ENV differs by
+        // deployment — a self-hoster does it on the settings form beside their
+        // own credentials, a platform tenant never sees it at all — but in
+        // neither case is a missing Client ID the problem, and sending the
+        // reader to a field that is already correct is how they lose an hour.
         return c.redirect('/settings/integrations/qbo?error=missing_qbo_env');
     }
 
     // Byte-identical to the value `/connect` authorized with, and to what is
     // registered on the Intuit app — one function, no second literal.
-    const redirectUri = qboRedirectUri(c.env.APP_BASE_URL);
-    const basicAuth = 'Basic ' + btoa(`${c.env.QBO_CLIENT_ID}:${c.env.QBO_CLIENT_SECRET}`);
+    const redirectUri = qboRedirectUri(appBaseUrl);
+    const basicAuth = 'Basic ' + btoa(`${clientId}:${clientSecret}`);
 
     try {
         const tokenResp = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
