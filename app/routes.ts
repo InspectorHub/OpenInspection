@@ -34,6 +34,14 @@ export default [
     ),
     route("checkout/:tenant/:token", "routes/public/checkout.tsx"),
     route("invoice/:id", "routes/public/invoice.tsx"),
+    // Intuit's Disconnect URL, registered on their developer portal. QuickBooks
+    // redirects a user here after they disconnect the app from their side. It
+    // must be public: that navigation is cross-site and carries no cookie of
+    // ours, so there is no session to resolve. See the route's own note.
+    route(
+      "integrations/quickbooks/disconnected",
+      "routes/public/integrations-quickbooks-disconnected.tsx",
+    ),
     route("verify/:envelopeId", "routes/public/verify.tsx"),
     route("verify", "routes/public/verify-offline.tsx"),
     route("v/:token", "routes/public/v.$token.tsx"),
