@@ -57,6 +57,8 @@ const DESCRIPTIONS: Record<keyof DeploymentProfile, string> = {
         'The content marketplace surface exists. Standalone 404s the browse route rather than rendering an empty shelf: the catalogue is curated first-party and nothing can reach it.',
     qboAppManaged:
         'The platform supplies the Intuit app tenants connect through, so nobody is asked for a Client ID. Standalone brings its own: Intuit matches a redirect URI byte for byte and a self-hosted deploy answers on its own domain, so the platform app cannot work there — which is why the credential form, including `QBO_ENV`, renders only in standalone.',
+    botProtectionMandatory:
+        'Whether the public booking form and agent signup MUST carry a bot challenge. Saas always challenges — with no `TURNSTILE_SECRET_KEY` it uses Cloudflare\'s published test key rather than skipping, so the mechanism is permissive but never off. Standalone leaves it to the operator: no key, no challenge.',
 };
 
 /**

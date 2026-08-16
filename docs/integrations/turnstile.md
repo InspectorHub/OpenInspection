@@ -13,28 +13,43 @@ the public booking form and agent self-signup.
 For local development Cloudflare publishes a test secret that always passes:
 `1x0000000000000000000000000000000AA`.
 
-## Enforcement is conditional on the secret being set
+## Who has to solve a challenge
 
-Both call sites are guarded by `if (c.env.TURNSTILE_SECRET_KEY)`. **With no
-secret configured, no challenge is required and none is verified.** With one
-configured, a submission missing its token is refused before anything else
-happens, and a token the siteverify endpoint rejects is refused too.
+Decided by deployment mode, read as a capability (`botProtectionMandatory`),
+never by testing whether someone remembered to set a key:
 
-Stated plainly because the two states differ in kind, not degree:
-
-| `TURNSTILE_SECRET_KEY` | Booking form | Agent signup |
+| | `TURNSTILE_SECRET_KEY` set | unset |
 |---|---|---|
-| unset | open, no challenge | open, no challenge |
-| set | token required, verified server-side | token required, verified server-side |
+| **saas** | enforced against your key | **still enforced**, against Cloudflare's published test key |
+| **standalone** | enforced against your key | no challenge |
 
-A self-hosted single-company deployment behind a private URL may reasonably run
-without it. A deployment whose booking page is linked from a public website
-should not: an unguarded booking form is a way to create records in someone's
-schedule at no cost.
+**SaaS never skips.** The booking form and agent signup are reachable from the
+open internet on a platform we operate, so "nobody configured a key" is our
+misconfiguration to absorb rather than a reason to leave them open. With no key
+the challenge runs on Cloudflare's always-pass test key: the widget still
+renders, the token is still required, the server still verifies. That is
+permissive, not off — the path stays exercised, and turning on real protection
+is a configuration change rather than a code change. There is deliberately no
+bypass branch to forget to remove.
 
-`verifyTurnstile` itself throws when handed an empty secret — it never treats a
-missing secret as a pass. The skip is a decision made by the caller, in the
-open, one line above.
+It says so, every time: `booking.turnstile.test_key` /
+`agent.signup.turnstile.test_key` are logged with the reason, so a deployment
+running open is visible in the logs rather than only in someone's memory.
+
+**Standalone leaves it to the operator.** You run your own deployment on your
+own domain. A single-company install behind a private URL has a legitimate
+reason not to challenge anyone, and we are not in a position to overrule it. If
+your booking page is linked from a public website, set the key — an unguarded
+booking form is a way to create records in your schedule at no cost.
+
+The site key the page receives tracks the secret exactly. A page that renders no
+widget against a server that demands a token is a booking form nobody can
+submit, and that is the failure mode of resolving the two apart —
+`resolveTurnstileSiteKey` exists so they cannot drift.
+
+`verifyTurnstile` throws when handed an empty secret rather than treating one as
+a pass: whether a challenge applies is `resolveTurnstile`'s decision, and
+reaching that function with nothing means a caller ignored it.
 
 ## When it breaks
 

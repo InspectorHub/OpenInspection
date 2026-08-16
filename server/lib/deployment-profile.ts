@@ -108,6 +108,24 @@ export interface DeploymentProfile {
      *  This is what decides whether the credential form renders at all. Read it
      *  instead of branching on APP_MODE — see the file header. */
     qboAppManaged: boolean;
+
+    /** Whether the anonymous-submission surfaces (public booking, agent signup)
+     *  MUST carry a bot challenge.
+     *
+     *  True in saas: those forms are reachable from the open internet on a
+     *  platform we operate, and "nobody configured a key" is our misconfiguration
+     *  to absorb, not a reason to leave them open. When no key is set the
+     *  challenge runs on Cloudflare's public TEST keys — the widget still
+     *  renders, the token is still required, the server still verifies — so the
+     *  path stays exercised and switching to real keys is a config change rather
+     *  than a code change. There is deliberately no bypass branch to forget to
+     *  remove.
+     *
+     *  False in standalone: the operator runs their own deployment on their own
+     *  domain and decides. A single-company install behind a private URL has a
+     *  legitimate reason not to challenge anyone, and we are not in a position
+     *  to overrule it. */
+    botProtectionMandatory: boolean;
 }
 
 const FIXED_TENANT_FALLBACK = '00000000-0000-0000-0000-000000000000';
@@ -126,6 +144,7 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
     hasManagedCompliance: false,
     hasContentMarketplace: false,
     qboAppManaged: false,
+    botProtectionMandatory: false,
 };
 
 export const SAAS_PROFILE: DeploymentProfile = {
@@ -142,6 +161,7 @@ export const SAAS_PROFILE: DeploymentProfile = {
     hasManagedCompliance: true,
     hasContentMarketplace: true,
     qboAppManaged: true,
+    botProtectionMandatory: true,
 };
 
 /**
