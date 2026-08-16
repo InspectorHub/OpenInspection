@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
-import { qboConnections, qboSyncErrors } from '../../lib/db/schema/qbo';
+import { qboConnections, qboEntityMap, qboSyncErrors } from '../../lib/db/schema/qbo';
 import { encryptToken, decryptToken } from '../../lib/qbo-crypto';
 import { QBOTokenResponseSchema } from '../../lib/validations/qbo.schema';
 import { QBO_PAYMENT_DISCREPANCY, encodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
@@ -129,6 +129,31 @@ export class QBOServiceBase {
         return { accessToken, realmId: row.realmId, tenantId };
     }
 
+    /**
+     * Everything that stops being true when a connection ends.
+     *
+     * Two paths retire one: the tenant clicking Disconnect, and Intuit refusing
+     * the grant. They must leave the same thing behind, and they used to
+     * disagree — the refusal path dropped only the connection row.
+     *
+     * What survives is not clutter. The next authorization can land on a
+     * DIFFERENT QuickBooks company, and a mapping that outlived its connection
+     * still names entity ids belonging to the old one; the first invoice push
+     * would then address a customer in books we no longer hold. Open errors
+     * are the milder half — they reappear on reconnect describing a company
+     * nobody is connected to.
+     *
+     * It lives on the base class because `refreshToken` is here and
+     * `disconnect()` is in the connection mixin above it: only the base is
+     * reachable from both.
+     */
+    public async retireConnection(tenantId: string): Promise<void> {
+        const db = this.getDrizzle();
+        await db.delete(qboEntityMap).where(eq(qboEntityMap.tenantId, tenantId));
+        await db.delete(qboSyncErrors).where(eq(qboSyncErrors.tenantId, tenantId));
+        await db.delete(qboConnections).where(eq(qboConnections.tenantId, tenantId));
+    }
+
     public async refreshToken(tenantId: string): Promise<QBOToken> {
         const db = this.getDrizzle();
         const row = await db.select().from(qboConnections)
@@ -169,7 +194,7 @@ export class QBOServiceBase {
             // status code already distinguishes the two cases; the field would
             // only let us disconnect EARLIER, which is not the useful direction.
             if (resp.status === 400 || resp.status === 401) {
-                await db.delete(qboConnections).where(eq(qboConnections.tenantId, tenantId));
+                await this.retireConnection(tenantId);
                 throw new Error('QBO refresh token rejected — reconnect required');
             }
             throw new Error(`QBO token refresh failed with ${resp.status} — connection left intact`);

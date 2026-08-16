@@ -135,15 +135,13 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
         }
 
         async disconnect(tenantId: string): Promise<void> {
+            // Tell Intuit first, then forget. The order matters only for the
+            // token: revoking needs the credential this is about to delete.
             await this.revokeToken(tenantId);
-            const db = this.getDrizzle();
-            await db.delete(qboEntityMap).where(eq(qboEntityMap.tenantId, tenantId));
-            // The errors describe a connection that no longer exists. Left in
-            // place, a fresh reconnect opens with the previous connection's
-            // failures already on screen, naming a company nobody is connected
-            // to and invoices whose mapping was just deleted.
-            await db.delete(qboSyncErrors).where(eq(qboSyncErrors.tenantId, tenantId));
-            await db.delete(qboConnections).where(eq(qboConnections.tenantId, tenantId));
+            // One routine, shared with the path where Intuit refuses the grant.
+            // These two used to delete different sets of rows, and the drift was
+            // invisible because each looked complete on its own.
+            await this.retireConnection(tenantId);
         }
 
         async linkExistingCustomer(tenantId: string, contactId: string, qboCustomerId: string): Promise<void> {
