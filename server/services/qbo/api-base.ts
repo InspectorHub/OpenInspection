@@ -4,6 +4,9 @@ import { qboConnections, qboEntityMap, qboSyncErrors } from '../../lib/db/schema
 import { encryptToken, decryptToken } from '../../lib/qbo-crypto';
 import { QBOTokenResponseSchema } from '../../lib/validations/qbo.schema';
 import { QBO_PAYMENT_DISCREPANCY, encodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
+import { describeQboError } from './error-detail';
+
+export { describeQboError };
 
 /**
  * QuickBooks serves sandbox companies and real companies from two different
@@ -293,9 +296,9 @@ export class QBOServiceBase {
         return this.apiCall<T>(tenantId, 'GET', `query?query=${encodeURIComponent(query)}`);
     }
 
+
     public async logSyncError(tenantId: string, oiType: string, oiId: string, error: unknown): Promise<void> {
-        const msg = error instanceof Error ? error.message : String(error);
-        await this.upsertSyncFlag(tenantId, oiType, oiId, 'SYNC_ERROR', msg);
+        await this.upsertSyncFlag(tenantId, oiType, oiId, 'SYNC_ERROR', describeQboError(error));
     }
 
     /**

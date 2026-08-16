@@ -142,6 +142,10 @@ const invoiceRoutes = createApiRouter()
             c.executionCtx.waitUntil(
                 c.var.services.qbo.upsertInvoice(tenantId, {
                     id:        invoice.id,
+                    // Required by QuickBooks, and omitted here for as long as
+                    // this call existed. The push it produced was refused every
+                    // time with `CustomerRef is required`.
+                    contactId: invoice.contactId,
                     dueDate:   invoice.dueDate,
                     lineItems: invoice.lineItems,
                     status:    invoice.status,

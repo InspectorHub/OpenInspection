@@ -391,9 +391,13 @@ describe('the duplicate-name ladder', () => {
         const errors = await syncErrors();
         expect(errors).toHaveLength(1);
         expect(errors[0]).toMatchObject({
-            oiType: 'contact', oiId: CONTACT, errorCode: 'SYNC_ERROR',
-            errorMsg: 'QBO 400', resolved: false,
+            oiType: 'contact', oiId: CONTACT, errorCode: 'SYNC_ERROR', resolved: false,
         });
+        // The recorded message now carries QuickBooks' own words as well as the
+        // status. It used to be the four characters `QBO 400` and nothing more,
+        // for every distinct reason a push could be refused.
+        expect(errors[0]!.errorMsg).toContain('QBO 400');
+        expect(errors[0]!.errorMsg).toContain('6140');
     });
 
     it('does not climb for any other fault code', async () => {

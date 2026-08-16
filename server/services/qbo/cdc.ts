@@ -9,6 +9,7 @@ import {
     type MarkPartialFn,
     type QBOServiceBase,
 } from './api-base';
+import { describeQboError } from './api-base';
 import { withInvoiceSync } from './invoice-sync';
 
 export function withCdc<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
@@ -39,7 +40,7 @@ export function withCdc<TBase extends Constructor<QBOServiceBase>>(Base: TBase) 
                 try {
                     result = await this.qboQuery(tenantId, query);
                 } catch (e) {
-                    logger.error('QBO CDC query failed', { tenantId, startPosition }, e instanceof Error ? e : undefined);
+                    logger.error('QBO CDC query failed', { tenantId, startPosition, qbo: describeQboError(e) }, e instanceof Error ? e : undefined);
                     break;
                 }
 

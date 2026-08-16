@@ -2,6 +2,7 @@ import { eq, and } from 'drizzle-orm';
 import { qboEntityMap } from '../../lib/db/schema/qbo';
 import { logger } from '../../lib/logger';
 import type { Constructor, QBOServiceBase } from './api-base';
+import { describeQboError } from './api-base';
 
 export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends Base {
@@ -132,7 +133,7 @@ export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base
                     }
                 }
             } catch (e) {
-                logger.error('QBO upsertCustomer failed', { tenantId, contactId: contact.id }, e instanceof Error ? e : undefined);
+                logger.error('QBO upsertCustomer failed', { tenantId, contactId: contact.id, qbo: describeQboError(e) }, e instanceof Error ? e : undefined);
                 await this.logSyncError(tenantId, 'contact', contact.id, e);
             }
         }

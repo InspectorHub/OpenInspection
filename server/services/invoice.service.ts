@@ -1,7 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { invoices } from '../lib/db/schema/invoice';
+import { contacts } from '../lib/db/schema/contact';
 import { tenantConfigs } from '../lib/db/schema';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { AutomationService } from './automation.service';
@@ -99,8 +101,39 @@ export class InvoiceService {
         };
     }
 
+    /**
+     * Who the invoice is FOR, as a contact row rather than a name and an email
+     * copied onto it.
+     *
+     * `invoices.contact_id` has existed, indexed, since the table did, and no
+     * write path ever set it — this is the only insert. Exactly one consumer
+     * read it: the QuickBooks payload, where a null becomes a missing
+     * `CustomerRef`, which QuickBooks refuses with a 400 because CustomerRef is
+     * required on an Invoice. So every invoice this product ever pushed was
+     * rejected, and the rejection recorded itself as the string `QBO 400`.
+     *
+     * Resolution order is explicit-then-email: a caller that knows the contact
+     * says so, and otherwise the client's email is the identity key — the same
+     * key `upsertCustomer` adopts an existing QuickBooks customer by, so the
+     * two sides agree on who a person is instead of each guessing. A name is
+     * deliberately NOT a fallback: two clients called "John Smith" are two
+     * people, and billing the wrong one is worse than not linking at all.
+     */
+    private async resolveContactId(
+        db: DrizzleD1Database, tenantId: string,
+        contactId: string | null | undefined, clientEmail: string | null | undefined,
+    ): Promise<string | null> {
+        if (contactId) return contactId;
+        if (!clientEmail) return null;
+        const match = await db.select({ id: contacts.id }).from(contacts)
+            .where(and(eq(contacts.tenantId, tenantId), eq(contacts.email, clientEmail)))
+            .limit(1).get();
+        return match?.id ?? null;
+    }
+
     async createInvoice(tenantId: string, data: {
         inspectionId?: string | null | undefined;
+        contactId?: string | null | undefined;
         clientName: string;
         clientEmail?: string | null | undefined;
         amountCents: number;
@@ -120,6 +153,7 @@ export class InvoiceService {
             sentAt: null,
             paidAt: null,
             inspectionId: data.inspectionId ?? null,
+            contactId: await this.resolveContactId(db, tenantId, data.contactId, data.clientEmail),
             clientName: data.clientName,
             clientEmail: data.clientEmail ?? null,
             amountCents: data.amountCents,

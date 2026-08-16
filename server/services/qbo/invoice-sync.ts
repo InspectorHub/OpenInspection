@@ -5,7 +5,6 @@ import { tenantConfigs } from '../../lib/db/schema/tenant';
 import { epochMsToWallClockYmd, resolveTenantTimeZone } from '../../lib/tz';
 import { qboRefundKey } from '../../lib/qbo-payment-key';
 import { logger } from '../../lib/logger';
-import { getLedgerOpinion } from '../payment-ledger.service';
 import type {
     Constructor,
     InvoiceSummary,
@@ -13,6 +12,8 @@ import type {
     MarkPartialFn,
     QBOServiceBase,
 } from './api-base';
+import { describeQboError } from './api-base';
+import { applyInvoiceStatusFromQBO } from './inbound-reconcile';
 
 export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends Base {
@@ -71,56 +72,10 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
             markPaid: MarkPaidFn,
             markPartial: MarkPartialFn,
         ): Promise<boolean> {
-            const db = this.getDrizzle();
-            const mapped = await db.select().from(qboEntityMap).where(
-                and(
-                    eq(qboEntityMap.tenantId, tenantId),
-                    eq(qboEntityMap.qboType, 'Invoice'),
-                    eq(qboEntityMap.qboId, inv.Id),
-                ),
-            ).get();
-            if (!mapped) return false;
-
-            await db.update(qboEntityMap).set({
-                qboSyncToken: inv.SyncToken,
-                syncedAt:     new Date(),
-            }).where(eq(qboEntityMap.id, mapped.id));
-
-            // QuickBooks amounts are dollars (see the reverse mapping in
-            // upsertInvoice, `Amount: amountCents / 100`). Round each side to
-            // its own exact cent value before subtracting: a bare float
-            // multiply on the difference produces off-by-one-cent amounts
-            // that are impossible to explain to a customer. This is the ONLY
-            // place the conversion happens — adapters receive cents.
-            const qboPaidCents = Math.round(inv.TotalAmt * 100) - Math.round(inv.Balance * 100);
-
-            // Spec §6. Our ledger is authoritative for what WE collected;
-            // QuickBooks reports a balance and cannot reconstruct our rows. So
-            // once the ledger has an opinion, this sweep may only COMPARE:
-            // applying QuickBooks' figure here would append an adjusting row,
-            // and an adjusting row is money movement nobody performed that is
-            // indistinguishable afterwards from money that really moved.
-            const opinion = await getLedgerOpinion(db, tenantId, mapped.oiId);
-            if (opinion.rowCount > 0) {
-                if (opinion.netCents === qboPaidCents) {
-                    await this.clearPaymentDiscrepancy(tenantId, mapped.oiId);
-                } else {
-                    await this.recordPaymentDiscrepancy(tenantId, mapped.oiId, opinion.netCents, qboPaidCents);
-                }
-                return true;
-            }
-
-            // No rows means the ledger has NO OPINION — not that nothing was
-            // paid. (Same rule `recomputeInvoicePaymentState` applies to the
-            // cache.) There is nothing for QuickBooks to contradict, so it is
-            // the only account of this invoice there is and applying it is the
-            // first record rather than an adjustment.
-            if (inv.Balance === 0) {
-                await markPaid(mapped.oiId, tenantId);
-            } else if (inv.Balance < inv.TotalAmt) {
-                await markPartial(mapped.oiId, qboPaidCents, tenantId);
-            }
-            return true;
+            return applyInvoiceStatusFromQBO(this.getDrizzle(), tenantId, inv, markPaid, markPartial, {
+                clearPaymentDiscrepancy:  (t, i) => this.clearPaymentDiscrepancy(t, i),
+                recordPaymentDiscrepancy: (t, i, l, q) => this.recordPaymentDiscrepancy(t, i, l, q),
+            });
         }
 
         async upsertInvoice(
@@ -167,6 +122,26 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                 };
             });
 
+            // QuickBooks requires CustomerRef on an Invoice and refuses the
+            // whole document without it. Saying so here — before the round trip
+            // — names OUR missing data instead of reporting a validation fault
+            // the operator cannot act on, and it is the same statement whether
+            // the invoice has no contact or the contact has never synced.
+            if (!qboCustomerId) {
+                const why = invoice.contactId
+                    ? `contact ${invoice.contactId} has no QuickBooks customer yet`
+                    : 'invoice has no contact';
+                await db.update(invoices).set({ qboSyncStatus: 'failed' }).where(
+                    and(eq(invoices.id, invoice.id), eq(invoices.tenantId, tenantId)),
+                );
+                await this.logSyncError(
+                    tenantId, 'invoice', invoice.id,
+                    new Error(`Cannot send to QuickBooks: ${why}`),
+                );
+                logger.warn('QBO upsertInvoice skipped: no customer', { tenantId, invoiceId: invoice.id, why });
+                return;
+            }
+
             const payload: Record<string, unknown> = {
                 DocNumber:   this.buildDocNumber(invoice.invoiceNumber ?? invoice.id),
                 TxnDate:     txnDate,
@@ -184,6 +159,15 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                 if (existing) {
                     let syncToken = existing.qboSyncToken;
                     let updated: { Invoice: { Id: string; SyncToken: string } } | null = null;
+                    // The LAST thing QuickBooks said, kept so the failure below
+                    // can repeat it. Without this the loop reports its own
+                    // guess — "after 3 stale-token retries" — for every 400,
+                    // including the ones that were nothing of the kind: an
+                    // invalid CustomerRef refetches cleanly and fails
+                    // identically three times, and the row then blamed a token
+                    // that was never the problem. A wrong diagnosis is worse
+                    // than none; it sends the reader somewhere else.
+                    let lastQboError: unknown = null;
                     for (let attempt = 0; attempt < 3; attempt++) {
                         try {
                             updated = await this.apiCall<{ Invoice: { Id: string; SyncToken: string } }>(
@@ -195,6 +179,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                             // 400 typically indicates a stale SyncToken — refetch and retry
                             const qboErr = err as { status?: number };
                             if (qboErr?.status === 400) {
+                                lastQboError = err;
                                 const refetched = await this.apiCall<{ Invoice: { Id: string; SyncToken: string } }>(
                                     tenantId, 'GET', `invoice/${existing.qboId}`,
                                 );
@@ -208,7 +193,11 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                     // It used to drop through to the 'synced' write below, so an
                     // invoice QuickBooks never received read as healthy: no error
                     // row, and the map still holding the token that was refused.
-                    if (!updated) throw new Error('QBO invoice update failed after 3 stale-token retries');
+                    if (!updated) {
+                        throw new Error(
+                            `QBO invoice update failed after 3 attempts — ${describeQboError(lastQboError)}`,
+                        );
+                    }
 
                     await db.update(qboEntityMap).set({
                         qboSyncToken: updated.Invoice.SyncToken,
@@ -237,7 +226,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                 await db.update(invoices).set({ qboSyncStatus: 'failed' }).where(
                     and(eq(invoices.id, invoice.id), eq(invoices.tenantId, tenantId)),
                 );
-                logger.error('QBO upsertInvoice failed', { tenantId, invoiceId: invoice.id }, e instanceof Error ? e : undefined);
+                logger.error('QBO upsertInvoice failed', { tenantId, invoiceId: invoice.id, qbo: describeQboError(e) }, e instanceof Error ? e : undefined);
                 await this.logSyncError(tenantId, 'invoice', invoice.id, e);
             }
         }
@@ -259,7 +248,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                     syncedAt:     new Date(),
                 }).where(eq(qboEntityMap.id, mapped.id));
             } catch (e) {
-                logger.error('QBO voidInvoice failed', { tenantId, invoiceId }, e instanceof Error ? e : undefined);
+                logger.error('QBO voidInvoice failed', { tenantId, invoiceId, qbo: describeQboError(e) }, e instanceof Error ? e : undefined);
                 await this.logSyncError(tenantId, 'invoice', invoiceId, e);
             }
         }
@@ -304,7 +293,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                     Line:        [{ Amount: amountPaid, LinkedTxn: [{ TxnId: invoiceMap.qboId, TxnType: 'Invoice' }] }],
                 });
             } catch (e) {
-                logger.error('QBO recordPayment failed', { tenantId, invoiceId }, e instanceof Error ? e : undefined);
+                logger.error('QBO recordPayment failed', { tenantId, invoiceId, qbo: describeQboError(e) }, e instanceof Error ? e : undefined);
                 await this.logSyncError(tenantId, 'invoice', invoiceId, e);
             }
         }

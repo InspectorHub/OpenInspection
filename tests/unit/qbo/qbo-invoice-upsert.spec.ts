@@ -434,8 +434,14 @@ describe('a failed push', () => {
         expect(errors).toHaveLength(1);
         expect(errors[0]).toMatchObject({
             tenantId: TENANT, oiType: 'invoice', oiId: INV,
-            errorCode: 'SYNC_ERROR', errorMsg: 'QBO 403', resolved: false, retries: 0,
+            errorCode: 'SYNC_ERROR', resolved: false, retries: 0,
         });
+        // The status AND what QuickBooks said about it. This assertion used to
+        // read `errorMsg: 'QBO 403'` exactly — and passed, because that really
+        // was the whole of what got recorded for every failure the integration
+        // could produce.
+        expect(errors[0]!.errorMsg).toContain('QBO 403');
+        expect(errors[0]!.errorMsg).toContain('ApplicationAuthenticationFailed');
         // Nothing was created remotely, so nothing may be mapped: a map row here
         // would send every later push down the update branch against an id
         // QuickBooks does not have.
@@ -509,3 +515,87 @@ describe('a failed push', () => {
  * `new Date().toISOString().slice(0, 10)` — the push date in UTC — which was the
  * fourth date path the `txnDateFor` docblock says it exists to prevent.
  */
+
+/**
+ * The push refuses to run when it has no customer to name.
+ *
+ * QuickBooks requires `CustomerRef` on an Invoice and rejects the whole
+ * document without it. Production reached that state on EVERY invoice, because
+ * nothing wrote `invoices.contact_id` — the fixture above supplies it, which is
+ * why this suite could not see it (`tests/unit/invoices/invoice-contact-link.spec.ts`
+ * covers the write path itself).
+ *
+ * Refusing here rather than letting QuickBooks refuse is not just a saved round
+ * trip: the answer names OUR missing data, which is the thing the operator can
+ * actually fix, and it reads the same whether the invoice has no contact or the
+ * contact has never synced.
+ */
+describe('an invoice with no QuickBooks customer', () => {
+    async function dropContactMapping() {
+        await db.delete(schema.qboEntityMap)
+            .where(eq(schema.qboEntityMap.oiType, 'contact'));
+    }
+
+    it('makes no API call at all', async () => {
+        await dropContactMapping();
+        replies = [];   // installFetch throws on any unplanned call
+        await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
+        expect(sent).toEqual([]);
+    });
+
+    it('records the failure against the invoice, naming what is missing', async () => {
+        await dropContactMapping();
+        await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
+
+        expect((await invoiceRow())?.qboSyncStatus).toBe('failed');
+        const errors = syncErrors();
+        expect(errors).toHaveLength(1);
+        expect(errors[0]!.errorMsg).toContain('QuickBooks');
+        expect(errors[0]!.errorMsg).toContain(CONTACT);
+    });
+
+    it('says something different when the invoice has no contact at all', async () => {
+        await dropContactMapping();
+        await qbo.upsertInvoice(TENANT, { ...INVOICE_INPUT, contactId: null });
+        expect(syncErrors()[0]!.errorMsg).toContain('no contact');
+    });
+
+    it('still pushes normally once the contact has a twin — the positive control', async () => {
+        // Without this, deleting the whole push would satisfy the three above.
+        replies = [ok({ Invoice: { Id: QBO_INV, SyncToken: '0' } })];
+        await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
+        expect(sent).toHaveLength(1);
+        expect((await invoiceRow())?.qboSyncStatus).toBe('synced');
+    });
+});
+
+/**
+ * When the update runs out of attempts, the row repeats QuickBooks' words.
+ *
+ * It used to assert a cause instead: "after 3 stale-token retries". A stale
+ * token is only one of the things a 400 means, and the loop cannot tell which
+ * it got — an invalid reference refetches cleanly and fails the same way three
+ * times over. The reader was then sent to look at a token that was fine.
+ */
+describe('a failing update reports what QuickBooks refused', () => {
+    it('carries the fault detail into the error row', async () => {
+        await seedInvoiceMapping('3');
+        const invalidRef = () => fault(400, '2500', 'Invalid Reference Id : Names element id 999999 not found');
+        replies = [
+            invalidRef(), ok({ Invoice: { Id: QBO_INV, SyncToken: '3' } }),
+            invalidRef(), ok({ Invoice: { Id: QBO_INV, SyncToken: '3' } }),
+            // The third failure ALSO refetches before the loop condition ends
+            // it, so the sequence is three POSTs and three GETs, not three and
+            // two. Planning one fewer makes the suite report the shortfall
+            // instead of the assertion under test.
+            invalidRef(), ok({ Invoice: { Id: QBO_INV, SyncToken: '3' } }),
+        ];
+
+        await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
+
+        const msg = syncErrors()[0]!.errorMsg ?? '';
+        expect(msg).toContain('Invalid Reference Id');
+        expect(msg).not.toContain('stale-token');
+        expect((await invoiceRow())?.qboSyncStatus).toBe('failed');
+    });
+});
