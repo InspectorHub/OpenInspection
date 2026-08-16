@@ -67,7 +67,7 @@ export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base
                 if (existing) {
                     const displayName = this.buildDisplayName(firstName, lastName, contact.email ?? null, 0);
                     const updated = await this.apiCall<{ Customer: { Id: string; SyncToken: string } }>(
-                        tenantId, 'PUT', 'customer',
+                        tenantId, 'POST', 'customer',
                         { ...buildPayload(displayName), Id: existing.qboId, SyncToken: existing.qboSyncToken },
                     );
                     await db.update(qboEntityMap).set({
@@ -91,7 +91,7 @@ export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base
                         // make the map stale the moment it is created — and this
                         // path has no stale-token refetch to recover with.
                         const linked = await this.apiCall<{ Customer: { Id: string; SyncToken: string } }>(
-                            tenantId, 'PUT', 'customer',
+                            tenantId, 'POST', 'customer',
                             { ...buildPayload(match.DisplayName), Id: match.Id, SyncToken: match.SyncToken },
                         );
                         await db.insert(qboEntityMap).values({

@@ -215,7 +215,14 @@ export class QBOServiceBase {
 
     public async apiCall<T>(
         tenantId: string,
-        method: 'GET' | 'POST' | 'PUT',
+        /**
+         * No PUT. QuickBooks v3 answers a PUT with
+         * `"No resource method found for PUT"` — an UPDATE is a POST to the
+         * same entity path carrying `Id` and `SyncToken`. Narrowing the union
+         * is what stops the next person reaching for the verb their instincts
+         * expect; see the note on the update paths.
+         */
+        method: 'GET' | 'POST',
         path: string,
         body?: unknown,
     ): Promise<T> {

@@ -187,7 +187,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                     for (let attempt = 0; attempt < 3; attempt++) {
                         try {
                             updated = await this.apiCall<{ Invoice: { Id: string; SyncToken: string } }>(
-                                tenantId, 'PUT', 'invoice',
+                                tenantId, 'POST', 'invoice',
                                 { ...payload, Id: existing.qboId, SyncToken: syncToken },
                             );
                             break;

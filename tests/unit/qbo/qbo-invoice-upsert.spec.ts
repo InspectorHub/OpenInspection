@@ -74,7 +74,10 @@ const fault = (status: number, code: string, message: string): Reply => ({
 /** The specific 400 the retry exists for. */
 const STALE_TOKEN = () => fault(400, '5010', 'Stale Object Error');
 
-const puts = () => sent.filter((s) => s.method === 'PUT');
+// QuickBooks v3 has no PUT: an update is a POST carrying `Id` and `SyncToken`.
+// The verb therefore no longer separates create from update — the BODY does,
+// which is the honest discriminator in production too.
+const updates = () => sent.filter((s) => s.method === 'POST' && !!s.body?.Id);
 const gets = () => sent.filter((s) => s.method === 'GET');
 
 function installFetch() {
@@ -225,14 +228,14 @@ describe('creating the QuickBooks invoice', () => {
 // --- update --------------------------------------------------------------
 
 describe('updating an already-mapped invoice', () => {
-    it('PUTs with the SyncToken held in the map, and stores the one returned', async () => {
+    it('POSTs the update with the SyncToken held in the map, and stores the one returned', async () => {
         await seedInvoiceMapping('3');
         replies = [ok({ Invoice: { Id: QBO_INV, SyncToken: '4' } })];
 
         await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
 
         expect(sent).toHaveLength(1);
-        expect(sent[0].method).toBe('PUT');
+        expect(sent[0].method).toBe('POST');
         expect(sent[0].body).toMatchObject({ Id: QBO_INV, SyncToken: '3' });
 
         const row = await mapRow('invoice', INV);
@@ -284,11 +287,11 @@ describe('the stale-SyncToken retry', () => {
         await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
 
         expect(sent.map((s) => `${s.method} ${s.endpoint}`)).toEqual([
-            'PUT invoice', `GET invoice/${QBO_INV}`, 'PUT invoice',
+            'POST invoice', `GET invoice/${QBO_INV}`, 'POST invoice',
         ]);
-        expect(puts()[0].body.SyncToken).toBe('3');   // the stale one
-        expect(puts()[1].body.SyncToken).toBe('9');   // the refetched one
-        expect(puts()[1].body.Id).toBe(QBO_INV);
+        expect(updates()[0].body.SyncToken).toBe('3');   // the stale one
+        expect(updates()[1].body.SyncToken).toBe('9');   // the refetched one
+        expect(updates()[1].body.Id).toBe(QBO_INV);
 
         const row = await mapRow('invoice', INV);
         expect(row?.qboSyncToken).toBe('10');
@@ -309,11 +312,11 @@ describe('the stale-SyncToken retry', () => {
 
         // Bounded, and it consumed exactly the six replies queued — any unplanned
         // seventh call throws out of the fetch stub.
-        expect(puts()).toHaveLength(3);
+        expect(updates()).toHaveLength(3);
         expect(gets()).toHaveLength(3);
         expect(replies).toHaveLength(0);
         // Every PUT used the token the preceding GET handed back.
-        expect(puts().map((p) => p.body.SyncToken)).toEqual(['3', '9', '10']);
+        expect(updates().map((p) => p.body.SyncToken)).toEqual(['3', '9', '10']);
     });
 
     it('does not report success when every stale-token retry is exhausted', async () => {
@@ -354,7 +357,7 @@ describe('the stale-SyncToken retry', () => {
 
         await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
 
-        expect(puts()).toHaveLength(2);
+        expect(updates()).toHaveLength(2);
         expect(gets()).toHaveLength(1);
     });
 

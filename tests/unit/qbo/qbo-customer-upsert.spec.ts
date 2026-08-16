@@ -77,8 +77,11 @@ const DUPLICATE_NAME = () => fault(400, '6140', 'Duplicate Name Exists Error');
 const queryFound = (customers: Array<{ Id: string; SyncToken: string; DisplayName: string }>) =>
     ok({ QueryResponse: customers.length ? { Customer: customers } : {} });
 
-const posts = () => sent.filter((s) => s.method === 'POST');
-const puts = () => sent.filter((s) => s.method === 'PUT');
+// QuickBooks v3 has no PUT: an update is a POST carrying `Id` and `SyncToken`.
+// So the verb no longer separates create from update — the BODY does, and that
+// is the honest discriminator in production too.
+const posts   = () => sent.filter((s) => s.method === 'POST' && !s.body?.Id);
+const updates = () => sent.filter((s) => s.method === 'POST' && !!s.body?.Id);
 const displayNames = () => posts().map((p) => p.body.DisplayName);
 
 function installFetch() {
@@ -155,14 +158,14 @@ afterEach(() => { vi.unstubAllGlobals(); });
 // --- already mapped ------------------------------------------------------
 
 describe('a contact that already has a QuickBooks twin', () => {
-    it('PUTs with the stored SyncToken and stores the one returned', async () => {
+    it('POSTs the update with the stored SyncToken and stores the one returned', async () => {
         await seedContactMapping('QBO-CUST-9', '2');
         replies = [ok({ Customer: { Id: 'QBO-CUST-9', SyncToken: '3' } })];
 
         await qbo.upsertCustomer(TENANT, PAT);
 
         expect(sent).toHaveLength(1);
-        expect(sent[0].method).toBe('PUT');
+        expect(sent[0].method).toBe('POST');
         expect(sent[0].endpoint).toBe('customer');
         expect(sent[0].body).toMatchObject({ Id: 'QBO-CUST-9', SyncToken: '2' });
 
@@ -215,7 +218,7 @@ describe('an unmapped contact QuickBooks already knows by email', () => {
         // No POST anywhere: a second Customer would split this person's
         // receivables across two rows in the tenant's books.
         expect(posts()).toHaveLength(0);
-        expect(sent.map((s) => `${s.method} ${s.endpoint}`)).toEqual(['GET query', 'PUT customer']);
+        expect(sent.map((s) => `${s.method} ${s.endpoint}`)).toEqual(['GET query', 'POST customer']);
 
         const row = await contactMap();
         expect(row).toMatchObject({ qboType: 'Customer', qboId: 'QBO-CUST-55' });
@@ -244,7 +247,7 @@ describe('an unmapped contact QuickBooks already knows by email', () => {
 
         await qbo.upsertCustomer(TENANT, PAT);
 
-        expect(puts()[0].body).toMatchObject({
+        expect(updates()[0].body).toMatchObject({
             Id: 'QBO-CUST-55', SyncToken: '7', DisplayName: 'Patricia Client',
         });
     });
@@ -268,7 +271,7 @@ describe('an unmapped contact QuickBooks already knows by email', () => {
     });
 
     it('stores the SyncToken QuickBooks returned, not the one it was given', async () => {
-        // The adoption PUT is what settles the token: QuickBooks increments it
+        // The adoption update is what settles the token: QuickBooks increments it
         // on the write and hands the new value back. Persisting the pre-update
         // value instead leaves the map stale the moment it is created.
         replies = [
@@ -278,7 +281,7 @@ describe('an unmapped contact QuickBooks already knows by email', () => {
 
         await qbo.upsertCustomer(TENANT, PAT);
 
-        expect(puts()[0].body.SyncToken).toBe('7');   // sent with what we were told
+        expect(updates()[0].body.SyncToken).toBe('7');   // sent with what we were told
         expect((await contactMap())?.qboSyncToken).toBe('8');   // kept what came back
     });
 
@@ -296,8 +299,8 @@ describe('an unmapped contact QuickBooks already knows by email', () => {
         await qbo.upsertCustomer(TENANT, PAT);
         await qbo.upsertCustomer(TENANT, PAT);
 
-        expect(puts()).toHaveLength(2);
-        expect(puts()[1].body.SyncToken).toBe('8');
+        expect(updates()).toHaveLength(2);
+        expect(updates()[1].body.SyncToken).toBe('8');
         expect(replies).toHaveLength(0);
         expect((await contactMap())?.qboSyncToken).toBe('9');
         expect(await syncErrors()).toHaveLength(0);
