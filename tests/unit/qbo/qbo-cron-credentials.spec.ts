@@ -10,24 +10,22 @@
  * `QBO not configured`, and returned. The browser flow worked, Settings read
  * "Active", and inbound reconciliation had never run once.
  *
- * `loadTenantSecrets` is stubbed because decryption has its own tests.
- * `applyIntegrationSecrets` is REAL, because the precedence rule is the thing
- * the last spec here exists to pin: QuickBooks keys are not in
+ * Nothing about the credential path is stubbed. The fixture seals a real
+ * `secrets_enc` with the product's own `sealSecrets`, and this spec reads it
+ * back through the real `loadTenantSecrets` and the real
+ * `applyIntegrationSecrets`. Stubbing either would leave the last spec here
+ * asserting a precedence rule against a mock of that same rule — and the
+ * precedence is the whole point: QuickBooks keys are not in
  * `TENANT_OWNED_KEYS`, so env must keep winning over the tenant row.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-/** Installed per test; read by the `loadTenantSecrets` stub below. */
-let tenantSecrets: Record<string, string> | null = null;
 /** Credentials the QBOService was last constructed with. */
 let constructedWith: { clientId?: string; clientSecret?: string; qboEnv?: string } = {};
 const runCDCSync = vi.fn(async () => ({ processed: 0 }));
 const warn = vi.fn();
 const info = vi.fn();
 
-vi.mock('../../../server/lib/secrets-cache', () => ({
-    loadTenantSecrets: vi.fn(async () => tenantSecrets),
-}));
 vi.mock('../../../server/lib/logger', () => ({
     logger: {
         warn:  (...a: unknown[]) => warn(...a),
@@ -54,13 +52,14 @@ import { runQBOCDC } from '../../../server/services/qbo/cron-cdc';
 import { standaloneQboEnv, saasQboEnv, TENANT, PLATFORM_CLIENT_ID } from '../helpers/qbo-deployment-envs';
 
 async function install(fixture: Awaited<ReturnType<typeof standaloneQboEnv>>) {
-    tenantSecrets = fixture.tenantSecrets;
+    // One mocked drizzle handle serves both the sweep's own query and the
+    // secrets loader's, so the sealed row the fixture wrote is the row the real
+    // decryption path reads.
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fixture.db);
     return fixture;
 }
 
 beforeEach(() => {
-    tenantSecrets = null;
     constructedWith = {};
     runCDCSync.mockClear();
     warn.mockClear();

@@ -96,14 +96,27 @@ api.get('/callback', async (c) => {
     await c.env.TENANT_CACHE.delete(`qbo_oauth_state:${state}`);
     c.set('tenantId', tenantId);
 
-    // The client id/secret can be a per-tenant secret (Settings -> Integrations),
-    // and `integrationSecretsMiddleware` only merges those into `c.env` once a
-    // tenant is known. On this request the tenant was unknown until the line
-    // above — in saas mode nothing upstream could resolve it — so load them
-    // here for the tenant the state names. Same helper, same precedence rule
-    // (env wins, DB is the self-host fallback); a no-op when env already has
-    // them, which is the standalone case.
-    if (!c.env.QBO_CLIENT_ID || !c.env.QBO_CLIENT_SECRET) {
+    // Every QuickBooks credential can be a per-tenant secret (Settings ->
+    // Integrations), and `integrationSecretsMiddleware` only merges those into
+    // `c.env` once a tenant is known. On this request the tenant was unknown
+    // until the line above — in saas mode nothing upstream could resolve it —
+    // so load them here for the tenant the state names.
+    //
+    // UNCONDITIONALLY. This used to be guarded by
+    // `if (!QBO_CLIENT_ID || !QBO_CLIENT_SECRET)`, which was a second, partial
+    // copy of a precedence rule `applyIntegrationSecrets` already owns: env
+    // wins, the tenant row is the fallback, so the merge is already a no-op
+    // when env has the value. The guard named two of the four keys, so an
+    // operator with the id and secret on the Worker env but `QBO_ENV` on the
+    // settings form skipped the merge entirely and got `?error=missing_qbo_env`
+    // with that field correctly filled in.
+    //
+    // The comment here previously said the guard was "a no-op when env already
+    // has them, which is the standalone case" — with the modes inverted.
+    // Standalone is precisely the deployment where env has NOTHING: Intuit
+    // matches a redirect URI byte for byte, so the platform's app cannot serve
+    // someone else's domain and the operator registers their own.
+    {
         const decrypted = await loadTenantSecrets(
             c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
         ).catch(() => null);

@@ -13,16 +13,21 @@
  * needs "the self-hosted case" asks for it by name instead of assembling an env
  * and hoping it resembles one.
  *
- * `loadTenantSecrets` is stubbed; `applyIntegrationSecrets` is NOT. Decryption
- * has its own tests, and the thing worth pinning here is the PRECEDENCE — which
- * is `applyIntegrationSecrets`' rule and must stay its rule.
+ * The tenant row carries a REAL `secrets_enc`, sealed by the product's own
+ * `sealSecrets`. Hand-built ciphertext would only prove the test agrees with
+ * itself; sealing for real means the decryption path, the DEK envelope and the
+ * rotation fallback are all exercised by anything that reads this fixture.
  */
 import { vi } from 'vitest';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
+import { sealSecrets } from '../../../server/lib/config-crypto';
 import { createTestDb, setupSchema } from '../db';
 
 export const TENANT = '00000000-0000-0000-0000-000000000001';
+
+/** The KDF input the envelope is sealed and opened under. */
+export const JWT_SECRET = 'secret32chars_aaaaaaaaaaaaaaaaaa';
 
 /** What the platform supplies on a saas deployment's Worker env. */
 export const PLATFORM_CLIENT_ID = 'platform-client-id';
@@ -69,6 +74,21 @@ async function build(opts: BuildOpts): Promise<QboEnvFixture> {
         defaultItemId: '1', createdAt: now,
     });
 
+    // Sealed with the product's own envelope, not a hand-built blob. A test
+    // that writes ciphertext it invented can only prove the reader agrees with
+    // the writer — which is the exact pattern that let nine QuickBooks paths
+    // ship without ever working.
+    if (opts.tenantSecrets) {
+        const sealed = await sealSecrets(opts.tenantSecrets, TENANT, JWT_SECRET);
+        await db.insert(schema.tenantConfigs).values({
+            tenantId: TENANT,
+            secretsEnc: sealed.blob,
+            dekEnc: sealed.dekEnc,
+            createdAt: now,
+            updatedAt: now,
+        } as never);
+    }
+
     const spy: QboEnvFixture['spy'] = {
         runCDCSync: vi.fn(async () => ({ processed: 0 })),
         warn: vi.fn(),
@@ -78,7 +98,10 @@ async function build(opts: BuildOpts): Promise<QboEnvFixture> {
 
     const env: Record<string, unknown> = {
         DB: {} as D1Database,
-        JWT_SECRET: 'secret32chars_aaaaaaaaaaaaaaaaaa',
+        JWT_SECRET,
+        // No KV: `loadTenantSecrets` tolerates its absence and reads D1 directly,
+        // which is what a test wants — a cache hit would skip the decryption the
+        // fixture exists to exercise.
         TENANT_CACHE: undefined,
     };
     if (opts.platformEnv) {
