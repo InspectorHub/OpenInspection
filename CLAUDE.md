@@ -46,6 +46,7 @@ npm run test:unit    # API unit tests (vitest --config vitest.api.config.ts)
 npm run test:web     # Web unit tests (vitest --config vitest.config.ts)
 npm run test:workers # Real-runtime (workerd) queue-path tests (vitest.workers.config.ts)
 npm run test:contract # Our outbound payloads vs a third party's own schema — offline, no credentials
+npm run test:contract:live # The same payloads against the REAL API — needs a connected Intuit sandbox
 npm run test:e2e     # Playwright E2E
 
 # Database — drizzle-kit schema-first (server/lib/db/schema is the source of truth)
@@ -87,7 +88,7 @@ Directory = suite; a spec's location alone decides which config runs it
 | `tests/unit/<domain>/` | `test:unit` (CI) | `vitest.api.config.ts` |
 | `tests/workers/` | `test:workers` (CI) | `vitest.workers.config.ts` |
 | `tests/contract/<party>/*.contract.spec.ts` | `test:contract` (CI) | `vitest.contract.config.ts` |
-| `tests/contract/<party>/*.live.spec.ts` | live contract lane — **suffix reserved, lane not built yet** | (planned) |
+| `tests/contract/<party>/*.live.spec.ts` | `test:contract:live` (pre-push when `server/services/qbo/` changed; needs a connected sandbox) | `vitest.contract.live.config.ts` |
 | `tests/e2e/` | `test:e2e` (+ integration/remote modes) | `playwright.config.ts` (local, seeds D1) / `.integration` / `.remote` |
 | `tests/docs-shots/**/*.shots.ts` | `docs:shots` (NOT a test suite) | `playwright.docs-shots.config.ts` |
 

@@ -19,7 +19,7 @@ fails the build on a misplaced spec, and it runs in `npm run lint` + pre-commit.
 | `tests/unit/<domain>/**/*.spec.ts` | api/service unit | `test:unit` | `vitest.api.config.ts` | node (+ better-sqlite3) |
 | `tests/workers/**/*.spec.ts` | worker-runtime | `test:workers` | `vitest.workers.config.ts` | real `workerd` |
 | `tests/contract/<party>/*.contract.spec.ts` | contract (offline) | `test:contract` | `vitest.contract.config.ts` | node, no network |
-| `tests/contract/<party>/*.live.spec.ts` | contract (live) | **not built yet** — suffix reserved so the layout gate accepts it | (planned) | node + the real third-party API |
+| `tests/contract/<party>/*.live.spec.ts` | contract (live) | `test:contract:live` | `vitest.contract.live.config.ts` | node + the real third-party API |
 | `tests/e2e/*.spec.ts` | end-to-end | `test:e2e` | `playwright.config.ts` (seeds real D1) | built worker + browser |
 | `tests/**/*.spec-d.ts` | type-level | `test:types` | `vitest.typecheck.config.ts` | tsc typecheck |
 
@@ -140,12 +140,26 @@ two fields whose absence broke every invoice push. Those rules live in the
 type's prose, so the specs quote the prose verbatim; a refresh that rewords it
 turns them red, which is the point.
 
-`*.live.spec.ts` — **not built yet.** The suffix is reserved and the layout
-gate already accepts it, but no config collects it, so nothing runs. It is for
-the things the offline half cannot reach in principle: fault CODES (`6240`, the
+`*.live.spec.ts` — **needs a connected sandbox, never runs in CI.** For the
+things the offline half cannot reach in principle: fault CODES (`6240`, the
 duplicate-name fault our ladder read as `6140` for its whole life, appears in no
-schema), unsupported verbs, and void semantics. It will need real sandbox
-credentials and will therefore never run in CI.
+schema), unsupported verbs, and character rules. It borrows the local
+`qbo_connections` row and decrypts it exactly as the worker does — it mints
+nothing and writes nothing back, and it will NOT refresh an expired token,
+because a test that silently rotates your credentials is doing something a test
+has no business doing.
+
+`.githooks/pre-push` runs it when a push touches `server/services/qbo/`. Without
+a sandbox it fails, names what is missing, and prints the opt-out:
+
+```bash
+SKIP_QBO_CONTRACT=1 git push   # announced in the output, never silent
+```
+
+That is deliberate. A silent skip is indistinguishable from a pass, and a gate
+nobody can satisfy gets bypassed wholesale instead of argued with. Individual
+specs skip (they do not pass) when there is no connection, so a run reports
+`1 failed | 4 skipped` rather than four green ticks over nothing.
 
 **Writing one.**
 
