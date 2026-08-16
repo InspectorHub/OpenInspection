@@ -92,6 +92,6 @@ Mappings are cleared on purpose. Reconnecting can land on a **different** QuickB
 
 ## Related
 
-- [Deploy](deploy.md) — setting Worker secrets
-- [Rotate secrets](rotate-secrets.md)
+- [Deploy](../self-host/deploy.md) — setting Worker secrets
+- [Rotate secrets](../self-host/rotate-secrets.md)
 - [Invoicing and payments](../user-guide/invoicing-and-payments.md) — what syncs, from the user's side

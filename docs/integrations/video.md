@@ -96,3 +96,10 @@ PDF renders (via `env.BROWSER.quickAction('pdf', ...)`) cannot embed video. `ser
 | `tests/web/unit/video-capture.spec.ts` | `VideoCapture` — privacy checkbox present (R2), absent (Stream) |
 | `tests/web/unit/video-player.spec.ts` | `VideoPlayer` — iframe rendered for Stream, native `<video>` for R2 |
 | `tests/unit/session-context-video.spec.ts` | `sessionContext` video fields exposed to the frontend |
+
+---
+
+## Related
+
+- [Integrations index](README.md)
+- [Integration adapters](../develop/integration-adapters.md)
