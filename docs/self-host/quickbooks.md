@@ -84,7 +84,9 @@ Mappings are cleared on purpose. Reconnecting can land on a **different** QuickB
 
 - QuickBooks **Online** only. The REST API this integration uses does not cover QuickBooks Desktop or Self-Employed.
 - Intuit throttles per app **and** company: 500 requests per minute per company, and at most 10 concurrent requests to the same company.
-- Payment status is read back from QuickBooks; everything else flows one way, out of OpenInspection.
+- Two things are read back FROM QuickBooks: payment status, and whether an invoice was voided there. Everything else flows one way, out of OpenInspection.
+- A void in QuickBooks is **recorded, not mirrored**. OpenInspection files it under Sync Errors and leaves the invoice as it was, because voiding here resets the inspection's payment gate and can retract a published report — a decision, not something a poll should make for you. If the void was intended, void it here too.
+- QuickBooks rejects a colon in a customer's name, so the name sent over is the contact's with any colons removed. The contact's record here is unchanged.
 
 ---
 

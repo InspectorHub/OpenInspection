@@ -45,6 +45,7 @@ npm run lint
 npm run test:unit    # API unit tests (vitest --config vitest.api.config.ts)
 npm run test:web     # Web unit tests (vitest --config vitest.config.ts)
 npm run test:workers # Real-runtime (workerd) queue-path tests (vitest.workers.config.ts)
+npm run test:contract # Our outbound payloads vs a third party's own schema — offline, no credentials
 npm run test:e2e     # Playwright E2E
 
 # Database — drizzle-kit schema-first (server/lib/db/schema is the source of truth)
@@ -85,6 +86,8 @@ Directory = suite; a spec's location alone decides which config runs it
 | `app/**/*.test.{ts,tsx}` (co-located) | `test:web` (CI) | `vitest.config.ts` |
 | `tests/unit/<domain>/` | `test:unit` (CI) | `vitest.api.config.ts` |
 | `tests/workers/` | `test:workers` (CI) | `vitest.workers.config.ts` |
+| `tests/contract/<party>/*.contract.spec.ts` | `test:contract` (CI) | `vitest.contract.config.ts` |
+| `tests/contract/<party>/*.live.spec.ts` | live contract lane — **suffix reserved, lane not built yet** | (planned) |
 | `tests/e2e/` | `test:e2e` (+ integration/remote modes) | `playwright.config.ts` (local, seeds D1) / `.integration` / `.remote` |
 | `tests/docs-shots/**/*.shots.ts` | `docs:shots` (NOT a test suite) | `playwright.docs-shots.config.ts` |
 
@@ -95,7 +98,10 @@ Choosing a home for a new spec:
    delivery, Durable Objects, workerd-only APIs)? Yes → `tests/workers/`
    (real workerd via vitest-pool-workers); no → `tests/unit/<domain>/`
    (node env, stubs + better-sqlite3).
-3. Full-stack / browser / anything hitting a running worker → `tests/e2e/`
+3. Asserting on a THIRD PARTY's contract rather than our own behavior? →
+   `tests/contract/<party>/`. The test: if a red run usually means "change our
+   code to match theirs" rather than "fix our bug", it is a contract spec.
+4. Full-stack / browser / anything hitting a running worker → `tests/e2e/`
    (R8). One directory; default `playwright.config.ts` seeds real D1 via
    `globalSetup` so every E2E exercises the actual database. `*.integration.spec.ts`
    (self-resetting, serial) and remote/staging runs are just other configs

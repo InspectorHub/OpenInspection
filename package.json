@@ -83,6 +83,7 @@
     "test:unit:changed": "vitest run --changed --config vitest.api.config.ts",
     "test:web": "vitest run --config vitest.config.ts",
     "test:web:changed": "vitest run --changed --config vitest.config.ts",
+    "test:contract": "vitest run --config vitest.contract.config.ts",
     "test:workers": "vitest run --config vitest.workers.config.ts",
     "test:types": "cross-env NODE_OPTIONS=--max-old-space-size=8192 tsc -b tsconfig.api.json && cross-env NODE_OPTIONS=--max-old-space-size=8192 vitest run --typecheck --config vitest.typecheck.config.ts",
     "test:e2e": "playwright test",

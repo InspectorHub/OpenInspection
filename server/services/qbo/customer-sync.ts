@@ -3,6 +3,7 @@ import { qboEntityMap } from '../../lib/db/schema/qbo';
 import { logger } from '../../lib/logger';
 import type { Constructor, QBOServiceBase } from './api-base';
 import { describeQboError } from './api-base';
+import { splitName, buildCustomerPayload, sanitizeDisplayName } from './customer-payload';
 
 /**
  * The ValidationFault codes QuickBooks uses to say "that DisplayName is taken".
@@ -35,7 +36,10 @@ export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base
             retry: number,
             contactId?: string,
         ): string {
-            const base = `${firstName} ${lastName}`.trim() || 'Unknown';
+            // Sanitised at the BASE, so every rung inherits it — an email and a
+            // UUID cannot carry a colon, but the person's name can, and a rung
+            // built on an unsanitised base would carry it too.
+            const base = sanitizeDisplayName(`${firstName} ${lastName}`) || 'Unknown';
             if (retry === 0) return base;
             if (retry === 1 && email) return `${base} (${email})`;
             const id = contactId ?? 'unknown';
@@ -65,18 +69,10 @@ export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base
             },
         ): Promise<void> {
             const db = this.getDrizzle();
-            const nameParts = contact.name.trim().split(' ');
-            const firstName = nameParts[0] ?? '';
-            const lastName = nameParts.slice(1).join(' ') || firstName;
+            const { firstName, lastName } = splitName(contact.name);
 
-            const buildPayload = (displayName: string) => ({
-                DisplayName:      displayName,
-                GivenName:        firstName,
-                FamilyName:       lastName,
-                CompanyName:      contact.agency ?? undefined,
-                PrimaryEmailAddr: contact.email ? { Address: contact.email } : undefined,
-                PrimaryPhone:     contact.phone ? { FreeFormNumber: contact.phone } : undefined,
-            });
+            const buildPayload = (displayName: string) =>
+                buildCustomerPayload(displayName, firstName, lastName, contact);
 
             const existing = await db.select().from(qboEntityMap).where(
                 and(
