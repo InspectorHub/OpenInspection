@@ -19,6 +19,7 @@ import { Hono } from 'hono';
 
 import { QBOServiceBase } from '../../../server/services/qbo/api-base';
 import { withInvoiceSync } from '../../../server/services/qbo/invoice-sync';
+import { withCustomerSync } from '../../../server/services/qbo/customer-sync';
 
 const verifyWebhook = vi.fn();
 vi.mock('../../../server/services/stripe.service', () => ({
@@ -46,7 +47,7 @@ function stubDb(qboId: string | null, defaultTimezone?: string) {
     return chain;
 }
 
-class ProbeQbo extends withInvoiceSync(QBOServiceBase) {
+class ProbeQbo extends withInvoiceSync(withCustomerSync(QBOServiceBase)) {
     calls: Call[] = [];
     constructor(
         private readonly mappedQboId: string | null = 'QBO-INV-1',

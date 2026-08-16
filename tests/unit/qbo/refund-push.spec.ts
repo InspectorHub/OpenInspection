@@ -36,6 +36,7 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { QBOServiceBase } from '../../../server/services/qbo/api-base';
 import { withInvoiceSync } from '../../../server/services/qbo/invoice-sync';
+import { withCustomerSync } from '../../../server/services/qbo/customer-sync';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -81,7 +82,7 @@ function stubDb(defaultTimezone?: string) {
     return chain;
 }
 
-class ProbeQbo extends withInvoiceSync(QBOServiceBase) {
+class ProbeQbo extends withInvoiceSync(withCustomerSync(QBOServiceBase)) {
     calls: Call[] = [];
     constructor(private readonly tenantTz?: string) {
         super({} as never, 'cid', 'secret', 'whsec', 'jwt');
@@ -156,7 +157,7 @@ describe('createCreditMemo → QuickBooks', () => {
 // Part 2 — the map row, against the real database and the real customer join.
 // --------------------------------------------------------------------------
 
-class DbQbo extends withInvoiceSync(QBOServiceBase) {
+class DbQbo extends withInvoiceSync(withCustomerSync(QBOServiceBase)) {
     calls: Call[] = [];
     private n = 0;
     constructor(private readonly realDb: unknown) {

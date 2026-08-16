@@ -9,7 +9,8 @@ import { getApiUrl } from "~/lib/api.server";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { getDeploymentProfile } from "../../server/lib/deployment-profile";
-import { QboBooksHealth } from "~/components/settings/QboBooksHealth";
+import { QboConnectionPanel } from "~/components/settings/QboConnectionPanel";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { QboCredentialsForm } from "~/components/settings/QboCredentialsForm";
 import { QboConnectCard } from "~/components/settings/QboConnectCard";
 import {
@@ -178,6 +179,23 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { success: true, intent, error: null, syncEnabled: undefined };
   }
 
+  // Closing one open row. Kept out of the switch below because it is the only
+  // QBO action that names a specific record, and the id must be validated here
+  // rather than pasted into a path — this builds a URL.
+  if (intent === "qbo-dismiss-error") {
+    const errorId = String(fd.get("errorId") ?? "");
+    if (!errorId) {
+      return { success: false, intent, error: m.settings_unknown_action(), syncEnabled: undefined };
+    }
+    const res = await qboApiFetch(
+      context, cookie, `/errors/${encodeURIComponent(errorId)}/dismiss`, "POST",
+    );
+    if (!res?.ok) return { success: false, intent, error: m.settings_qbo_action_failed({ intent }), syncEnabled: undefined, errorId: undefined };
+    // The id travels back so the page can drop exactly the row the server
+    // closed, rather than re-deriving it from client state.
+    return { success: true, intent, error: null, syncEnabled: undefined, errorId };
+  }
+
   if (intent === "qbo-sync" || intent === "qbo-pause" || intent === "qbo-disconnect") {
     const path = intent === "qbo-sync" ? "/sync" : intent === "qbo-pause" ? "/pause" : "/disconnect";
     const res = await qboApiFetch(context, cookie, path, "POST");
@@ -191,14 +209,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   return { success: false, intent, error: m.settings_unknown_action(), syncEnabled: undefined };
-}
-
-function timeSince(ts: number | null | undefined): string {
-  if (!ts) return m.settings_qbo_time_never();
-  const diff = Math.floor(Date.now() / 1000) - ts;
-  if (diff < 60) return m.settings_qbo_time_just_now();
-  if (diff < 3600) return m.settings_qbo_time_minutes_ago({ minutes: Math.floor(diff / 60) });
-  return m.settings_qbo_time_hours_ago({ hours: Math.floor(diff / 3600) });
 }
 
 export default function SettingsIntegrationsQbo() {
@@ -220,7 +230,14 @@ export default function SettingsIntegrationsQbo() {
     }
   }, [actionData]);
   const { fetcher: qboFetcher, submit: submitQbo, busy: qboBusy } =
-    useGuardedSubmit<{ success: boolean; intent?: string | null; error: string | null; syncEnabled?: boolean }>();
+    useGuardedSubmit<{
+      success: boolean;
+      intent?: string | null;
+      error: string | null;
+      syncEnabled?: boolean;
+      /** Set only by `qbo-dismiss-error` — which row the server closed. */
+      errorId?: string;
+    }>();
 
   const discrepancies = status?.paymentDiscrepancies ?? [];
   const syncing = qboBusy && qboFetcher.formData?.get("intent") === "qbo-sync";
@@ -240,6 +257,13 @@ export default function SettingsIntegrationsQbo() {
       if (typeof next === "boolean") setStatus((s) => (s ? { ...s, syncEnabled: next } : s));
     } else if (d.intent === "qbo-disconnect") {
       setStatus(null);
+    } else if (d.intent === "qbo-dismiss-error" && d.errorId) {
+      // Drop the row the server just closed. The id comes back on the action
+      // result rather than being read from `dismissingId` here: that state is
+      // cleared when the fetcher goes idle, and which of the two happens first
+      // is not something this component should depend on.
+      const closed = d.errorId;
+      setStatus((s) => (s ? { ...s, openErrors: s.openErrors.filter((e) => e.id !== closed) } : s));
     }
   }, [qboFetcher.data]);
 
@@ -251,8 +275,28 @@ export default function SettingsIntegrationsQbo() {
     submitQbo({ intent: "qbo-pause" }, { method: "POST" });
   }
 
+  // Disconnect asks first. One click used to end the connection AND delete every
+  // entity mapping — irreversible in the sense that matters: reconnecting does
+  // not restore the links, so previously-synced records can be pushed again as
+  // new ones. A custom dialog rather than `window.confirm`, which this codebase
+  // does not use.
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   function disconnect() {
+    setConfirmDisconnect(false);
     submitQbo({ intent: "qbo-disconnect" }, { method: "POST" });
+  }
+
+  // Which row is being closed, so only its own button reads as busy. Cleared on
+  // the fetcher settling — including a FAILED dismiss, or the row would sit
+  // disabled forever with no way to retry it.
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
+  useEffect(() => {
+    if (qboFetcher.state === "idle") setDismissingId(null);
+  }, [qboFetcher.state]);
+
+  function dismissError(errorId: string) {
+    setDismissingId(errorId);
+    submitQbo({ intent: "qbo-dismiss-error", errorId }, { method: "POST" });
   }
 
   return (
@@ -322,72 +366,28 @@ export default function SettingsIntegrationsQbo() {
 
       {/* Connected */}
       {status && (
-        <div className="space-y-4">
-          {/* Status card */}
-          <div className="bg-ih-bg-card border border-ih-border rounded-lg p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <p className="font-bold text-[14px] text-ih-fg-1">
-                  {status.companyName ?? m.settings_qbo_connected_fallback()}
-                </p>
-                <p className="text-[12px] text-ih-fg-3 mt-0.5">
-                  {m.settings_qbo_last_synced({ time: timeSince(status.lastSyncAt) })}
-                </p>
-              </div>
-              <span
-                className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${
- status.syncEnabled
- ? "bg-ih-ok-bg text-ih-ok-fg"
- : "bg-ih-bg-muted text-ih-fg-3"
- }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
- status.syncEnabled
- ? "bg-ih-ok"
- : "bg-ih-fg-4"
- }`}
-                />
-                {status.syncEnabled ? m.settings_qbo_status_active() : m.settings_qbo_status_paused()}
-              </span>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={triggerSync}
-                disabled={qboBusy}
-                aria-busy={syncing || undefined}
-                className="px-4 py-2 text-[12px] font-bold bg-ih-primary-tint text-ih-primary-text rounded-md hover:bg-ih-primary-tint transition-colors disabled:opacity-50"
-              >
-                {syncing ? m.settings_qbo_syncing() : m.settings_qbo_sync_now()}
-              </button>
-              <button
-                onClick={togglePause}
-                disabled={qboBusy}
-                aria-busy={qboBusy || undefined}
-                className="px-4 py-2 text-[12px] font-bold bg-ih-bg-muted text-ih-fg-2 rounded-md hover:bg-ih-bg-muted transition-colors disabled:opacity-50"
-              >
-                {status.syncEnabled ? m.settings_qbo_pause_sync() : m.settings_qbo_resume_sync()}
-              </button>
-              <button
-                onClick={disconnect}
-                disabled={qboBusy}
-                aria-busy={qboBusy || undefined}
-                className="px-4 py-2 text-[12px] font-bold text-ih-bad-fg hover:bg-ih-bad-bg rounded-md transition-colors disabled:opacity-50"
-              >
-                {m.settings_qbo_disconnect()}
-              </button>
-            </div>
-          </div>
-
-          {/* Failed pushes, disagreements and what is never sent — see
-              QboBooksHealth for why a discrepancy shows both figures. */}
-          <QboBooksHealth
-            openErrors={status.openErrors ?? 0}
-            discrepancies={discrepancies}
-            heldDepositCount={status.heldDepositCount ?? 0}
-          />
-        </div>
+        <QboConnectionPanel
+          status={status}
+          discrepancies={discrepancies}
+          busy={qboBusy}
+          syncing={syncing}
+          dismissingId={dismissingId}
+          onSync={triggerSync}
+          onTogglePause={togglePause}
+          onRequestDisconnect={() => setConfirmDisconnect(true)}
+          onDismissError={dismissError}
+        />
       )}
+
+      <ConfirmDialog
+        open={confirmDisconnect}
+        title={m.settings_qbo_disconnect_confirm_title()}
+        message={m.settings_qbo_disconnect_confirm_body()}
+        confirmLabel={m.settings_qbo_disconnect_confirm_action()}
+        busy={qboBusy}
+        onConfirm={disconnect}
+        onCancel={() => setConfirmDisconnect(false)}
+      />
     </div>
   );
 }

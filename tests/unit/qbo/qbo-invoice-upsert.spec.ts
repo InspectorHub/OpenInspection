@@ -33,6 +33,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { QBOServiceBase } from '../../../server/services/qbo/api-base';
 import { withInvoiceSync } from '../../../server/services/qbo/invoice-sync';
+import { withCustomerSync } from '../../../server/services/qbo/customer-sync';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INSP = 'insp-aaaaaaaa-0000-0000-0000-000000000001';
@@ -45,7 +46,7 @@ const T0 = new Date('2026-03-01T10:00:00Z');
 /** Comfortably outside `getToken`'s 5-minute refresh window, so no token round-trip. */
 const TOKEN_GOOD_UNTIL = new Date(Date.now() + 24 * 3_600_000);
 
-class TestQbo extends withInvoiceSync(QBOServiceBase) {}
+class TestQbo extends withInvoiceSync(withCustomerSync(QBOServiceBase)) {}
 
 /** The invoice the push is handed — the shape `InvoiceService` passes it. */
 const INVOICE_INPUT = {
@@ -537,22 +538,56 @@ describe('an invoice with no QuickBooks customer', () => {
             .where(eq(schema.qboEntityMap.oiType, 'contact'));
     }
 
-    it('makes no API call at all', async () => {
+    // These two used to assert that an unmapped contact meant NO API call and a
+    // single filed error. Both were true, and both were the defect: nothing else
+    // in the product ever creates a contact's QuickBooks twin, so "refuse and
+    // file it" meant a company that connected QuickBooks with an existing client
+    // list could never send any invoice at all. The push now creates the
+    // customer first — see the describe below. What survives here is the case
+    // where that creation genuinely cannot succeed.
+
+    it('still refuses when QuickBooks will not create the customer', async () => {
         await dropContactMapping();
-        replies = [];   // installFetch throws on any unplanned call
+        // The name is taken and every rung of the disambiguation ladder is
+        // refused too, so the contact ends with no twin. `upsertCustomer` climbs
+        // three rungs before giving up.
+        replies = [
+            fault(400, '6240', 'Duplicate Name Exists Error'),
+            fault(400, '6240', 'Duplicate Name Exists Error'),
+            fault(400, '6240', 'Duplicate Name Exists Error'),
+        ];
+
         await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
-        expect(sent).toEqual([]);
+
+        // It tried — the whole point of the change — and then stopped rather
+        // than sending an invoice with no CustomerRef for QuickBooks to reject.
+        expect(sent.every((s) => s.endpoint === 'customer')).toBe(true);
+        expect((await invoiceRow())?.qboSyncStatus).toBe('failed');
     });
 
-    it('records the failure against the invoice, naming what is missing', async () => {
+    it('files one error per entity, each naming the thing its owner can act on', async () => {
         await dropContactMapping();
+        replies = [
+            fault(400, '6240', 'Duplicate Name Exists Error'),
+            fault(400, '6240', 'Duplicate Name Exists Error'),
+            fault(400, '6240', 'Duplicate Name Exists Error'),
+        ];
+
         await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
 
-        expect((await invoiceRow())?.qboSyncStatus).toBe('failed');
+        // TWO rows, not one, and that is deliberate: the contact could not be
+        // created, and the invoice could not be sent because of it. Collapsing
+        // them would leave whoever fixes the contact with nothing pointing at
+        // the contact.
         const errors = syncErrors();
-        expect(errors).toHaveLength(1);
-        expect(errors[0]!.errorMsg).toContain('QuickBooks');
-        expect(errors[0]!.errorMsg).toContain(CONTACT);
+        expect(errors).toHaveLength(2);
+
+        const onContact = errors.find((e) => e.oiType === 'contact');
+        const onInvoice = errors.find((e) => e.oiType === 'invoice');
+        expect(onContact?.oiId).toBe(CONTACT);
+        expect(onInvoice?.oiId).toBe(INV);
+        expect(onInvoice?.errorMsg).toContain('QuickBooks');
+        expect(onInvoice?.errorMsg).toContain(CONTACT);
     });
 
     it('says something different when the invoice has no contact at all', async () => {
@@ -648,5 +683,74 @@ describe('an invoice with no line items', () => {
         expect(line.map((l: { Amount: number }) => l.Amount)).toEqual([400, 50]);
         // The descriptions are the tenant's, not the fallback's wording.
         expect(line[1].SalesItemLineDetail.ItemRef.name).toBe('Radon test');
+    });
+});
+
+describe('a contact with no QuickBooks twin gets one, rather than blocking the invoice', () => {
+    /**
+     * The fixture seeds the contact mapping, which is what every other spec in
+     * this file needs. These two remove it, because the state that mattered in
+     * production is the one nothing here had ever set up: a company that
+     * connected QuickBooks with a client list already in the product.
+     *
+     * `upsertCustomer` is reached from the contact create and update endpoints
+     * and from nowhere else, so those contacts have no twin and never get one.
+     * The push refused them by design, correctly naming the missing data — and
+     * the effect was that no invoice such a company raised could ever be sent.
+     * Observed against a real Intuit sandbox on 2026-08-16: a freshly connected
+     * tenant, an invoice raised from the dashboard, `qbo_sync_status = 'failed'`
+     * and a `qbo_sync_errors` row reading `contact … has no QuickBooks customer
+     * yet`.
+     */
+    async function dropContactMapping() {
+        await db.delete(schema.qboEntityMap).where(and(
+            eq(schema.qboEntityMap.tenantId, TENANT),
+            eq(schema.qboEntityMap.oiType, 'contact'),
+        ));
+    }
+
+    it('creates the customer on demand and sends the invoice in the same call', async () => {
+        await dropContactMapping();
+        replies = [
+            ok({ Customer: { Id: 'QBO-CUST-9', SyncToken: '0' } }),
+            ok({ Invoice:  { Id: QBO_INV,      SyncToken: '0' } }),
+        ];
+
+        await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
+
+        // Two writes, in this order — the customer has to exist before the
+        // invoice can name it.
+        expect(sent.map((s) => s.endpoint)).toEqual(['customer', 'invoice']);
+        // The invoice carries the id QuickBooks just handed back, not a
+        // remembered one: this is the assertion that fails if the re-read after
+        // the create is dropped.
+        expect(sent[1]!.body.CustomerRef.value).toBe('QBO-CUST-9');
+
+        expect((await mapRow('contact', CONTACT))?.qboId).toBe('QBO-CUST-9');
+        expect((await mapRow('invoice', INV))?.qboId).toBe(QBO_INV);
+        expect((await invoiceRow())?.qboSyncStatus).toBe('synced');
+        expect(await syncErrors()).toHaveLength(0);
+    });
+
+    it('does not reach for a customer when the invoice names no contact', async () => {
+        // The boundary of the new behaviour. There is nothing to create a twin
+        // FOR, so the push must refuse exactly as before rather than inventing a
+        // customer — and it must make no API call while doing it.
+        //
+        // The obvious negative control — delete the contact ROW and leave the
+        // invoice pointing at it — is not written here because that state cannot
+        // exist: `invoices.contact_id` carries a foreign key, and the delete
+        // fails with `FOREIGN KEY constraint failed`. A test asserting behaviour
+        // in an unreachable state proves nothing about production.
+        await dropContactMapping();
+        replies = [];   // installFetch throws on any unplanned call
+
+        await qbo.upsertInvoice(TENANT, { ...INVOICE_INPUT, contactId: null });
+
+        expect(sent).toEqual([]);
+        expect((await invoiceRow())?.qboSyncStatus).toBe('failed');
+        const errs = syncErrors();
+        expect(errs).toHaveLength(1);
+        expect(errs[0]!.errorMsg).toContain('no contact');
     });
 });

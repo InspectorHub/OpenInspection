@@ -5,6 +5,29 @@ import type { Constructor, QBOServiceBase } from './api-base';
 import { describeQboError } from './api-base';
 import { splitName, buildCustomerPayload, sanitizeDisplayName } from './customer-payload';
 
+/** The fields a contact must carry to become a QuickBooks customer. */
+export interface CustomerSyncContact {
+    id: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    agency?: string | null;
+}
+
+/**
+ * What `withInvoiceSync` needs from the customer mixin BELOW it.
+ *
+ * Declared as a type so the composition order in `qbo.service.ts` is checked by
+ * the compiler instead of hoped for. Invoice sync creates a missing customer on
+ * demand, which means it calls into this mixin; if someone ever composes
+ * `withInvoiceSync` over a base that does not include `withCustomerSync`, that
+ * has to be a build error rather than a `this.upsertCustomer is not a function`
+ * the first time a tenant with an unmapped contact raises an invoice.
+ */
+export interface CustomerSyncSurface {
+    upsertCustomer(tenantId: string, contact: CustomerSyncContact): Promise<void>;
+}
+
 /**
  * The ValidationFault codes QuickBooks uses to say "that DisplayName is taken".
  *
@@ -60,13 +83,7 @@ export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base
 
         async upsertCustomer(
             tenantId: string,
-            contact: {
-                id: string;
-                name: string;
-                email?: string | null;
-                phone?: string | null;
-                agency?: string | null;
-            },
+            contact: CustomerSyncContact,
         ): Promise<void> {
             const db = this.getDrizzle();
             const { firstName, lastName } = splitName(contact.name);

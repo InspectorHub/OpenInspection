@@ -10,8 +10,15 @@ import type {
     QBOServiceBase,
 } from './api-base';
 import { withInvoiceSync } from './invoice-sync';
+import type { CustomerSyncSurface } from './customer-sync';
 
-export function withWebhook<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
+// The `CustomerSyncSurface` half of the bound is inherited from
+// `withInvoiceSync` below, which creates a missing QuickBooks customer on
+// demand. Stated here too so the requirement is visible where the composition
+// is, not only where it is used.
+export function withWebhook<
+    TBase extends Constructor<QBOServiceBase & CustomerSyncSurface>,
+>(Base: TBase) {
     return class extends withInvoiceSync(Base) {
         public parseCloudEventType(type: string): { entityType: string; operation: string } | null {
             const parts = type.split('.');

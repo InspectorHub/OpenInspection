@@ -1,10 +1,16 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNotNull } from 'drizzle-orm';
 import { qboConnections, qboEntityMap, qboSyncErrors } from '../../lib/db/schema/qbo';
+import { invoices } from '../../lib/db/schema/invoice';
 import { encryptToken, decryptToken } from '../../lib/qbo-crypto';
 import { QBOTokenResponseSchema } from '../../lib/validations/qbo.schema';
-import { QBO_PAYMENT_DISCREPANCY, QBO_VOIDED_IN_QBO, encodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
 import { describeQboError } from './error-detail';
+import {
+    upsertSyncFlag,
+    recordPaymentDiscrepancy,
+    noteVoidedInQuickBooks,
+    clearPaymentDiscrepancy,
+} from './sync-flags';
 
 export { describeQboError };
 
@@ -54,13 +60,51 @@ export interface QBOPaymentDiscrepancy {
     qboCents: number;
 }
 
+/**
+ * One open row a human has to look at, as the settings page needs to read it.
+ *
+ * This replaced a bare `openErrors: number`. A count is not a report: every
+ * defect this integration has produced ends up here, and for the whole life of
+ * the feature the page rendered the number and the sentence "check the sync
+ * error log for details" — pointing at a log that does not exist. Six failures
+ * and one count are indistinguishable from one failure and a bad guess.
+ *
+ * `errorCode` travels with the row rather than being flattened into prose
+ * because the kinds are not interchangeable: a failed push may be worth
+ * retrying, a `VOIDED_IN_QBO` flag is an acknowledgement, and rendering both as
+ * "error" is how the void flag would have gone unnoticed the same way.
+ */
+export interface QBOSyncErrorSummary {
+    id: string;
+    /** 'invoice' | 'refund' | 'contact' — what the row is about. */
+    oiType: string;
+    /**
+     * The OI entity id. NOT always a real id: the bootstrap probe writes the
+     * sentinel 'bootstrap', so a consumer that links this somewhere must
+     * tolerate a miss rather than render a dead link.
+     */
+    oiId: string;
+    /** `SYNC_ERROR`, `QBO_VOIDED_IN_QBO`, … — decides how the row reads. */
+    errorCode: string;
+    /** Whatever the failure actually said. Never a status code on its own. */
+    message: string;
+    /** How many times this same row has been re-detected. */
+    retries: number;
+    /** Epoch SECONDS, matching every other instant on this object. */
+    lastSeenAt: number;
+}
+
 export interface QBOConnectionStatus {
     realmId: string;
     companyName: string | null;
     lastSyncAt: number | null;
     syncEnabled: boolean;
-    /** Failed pushes only. Discrepancies are not errors and are counted below. */
-    openErrors: number;
+    /**
+     * Every open row that is not a payment discrepancy — failed pushes and
+     * acknowledgements alike. Discrepancies are split out below because they
+     * carry two figures and are not a failure of anything.
+     */
+    openErrors: QBOSyncErrorSummary[];
     paymentDiscrepancies: QBOPaymentDiscrepancy[];
     /**
      * Payments taken before an invoice existed. They are deliberately NOT sent
@@ -155,6 +199,23 @@ export class QBOServiceBase {
         await db.delete(qboEntityMap).where(eq(qboEntityMap.tenantId, tenantId));
         await db.delete(qboSyncErrors).where(eq(qboSyncErrors.tenantId, tenantId));
         await db.delete(qboConnections).where(eq(qboConnections.tenantId, tenantId));
+        // The invoice's own opinion of the push has to go with the rest of it.
+        //
+        // `qbo_sync_status` is the OUTCOME of the last push, and its schema
+        // comment defines NULL as "never pushed". Once the mapping row naming
+        // the QuickBooks invoice is gone and the connection with it, that is
+        // precisely the true statement: nothing this tenant holds has been
+        // pushed to any company they are currently connected to. Leaving
+        // 'synced' behind asserts a relationship to books we no longer have —
+        // and it survives a reconnect to a DIFFERENT company, where it reads as
+        // "already in QuickBooks" for invoices that company has never seen.
+        //
+        // Scoped by `isNotNull` so the statement touches only rows that make a
+        // claim; a tenant who never connected has nothing to clear.
+        await db.update(invoices).set({ qboSyncStatus: null }).where(and(
+            eq(invoices.tenantId, tenantId),
+            isNotNull(invoices.qboSyncStatus),
+        ));
     }
 
     public async refreshToken(tenantId: string): Promise<QBOToken> {
@@ -297,96 +358,32 @@ export class QBOServiceBase {
     }
 
 
+    // The open-row writers live in `sync-flags.ts`. These stay as methods
+    // because the mixins call them on `this`, and because `logSyncError` is the
+    // one that turns a thrown error into words — `describeQboError` belongs to
+    // the HTTP side, which is this class.
+
     public async logSyncError(tenantId: string, oiType: string, oiId: string, error: unknown): Promise<void> {
-        await this.upsertSyncFlag(tenantId, oiType, oiId, 'SYNC_ERROR', describeQboError(error));
+        await upsertSyncFlag(this.getDrizzle(), tenantId, oiType, oiId, 'SYNC_ERROR', describeQboError(error));
     }
 
-    /**
-     * QuickBooks and our ledger disagree about what was collected. Recorded, not
-     * corrected: an adjusting entry would manufacture money movement nobody
-     * performed, and a human reconciles money. Re-detecting the same
-     * disagreement refreshes the figures instead of stacking rows.
-     */
     public async recordPaymentDiscrepancy(
         tenantId: string, invoiceId: string, ledgerCents: number, qboCents: number,
     ): Promise<void> {
-        await this.upsertSyncFlag(
-            tenantId, 'invoice', invoiceId, QBO_PAYMENT_DISCREPANCY,
-            encodePaymentDiscrepancy({ ledgerCents, qboCents }),
-        );
+        await recordPaymentDiscrepancy(this.getDrizzle(), tenantId, invoiceId, ledgerCents, qboCents);
     }
 
-    /**
-     * QuickBooks reports the document as worth nothing — voided on their side.
-     *
-     * Recorded, never applied. Mirroring a void inbound would reset this
-     * inspection's payment gate and retract a published report on the strength
-     * of a poll; voiding is a decision, not a reading. The sweep's job here is
-     * to make sure a human finds out.
-     */
     public async noteVoidedInQuickBooks(tenantId: string, invoiceId: string): Promise<void> {
-        await this.upsertSyncFlag(
-            tenantId, 'invoice', invoiceId, QBO_VOIDED_IN_QBO,
-            'Voided in QuickBooks. OpenInspection left this invoice unchanged — '
-            + 'void it here too if that was intended.',
-        );
+        await noteVoidedInQuickBooks(this.getDrizzle(), tenantId, invoiceId);
     }
 
-    /** The two sides agree again — whoever reconciled it does not have to also tick it off. */
     public async clearPaymentDiscrepancy(tenantId: string, invoiceId: string): Promise<void> {
-        const db = this.getDrizzle();
-        await db.update(qboSyncErrors).set({ resolved: true, updatedAt: new Date() })
-            .where(and(
-                eq(qboSyncErrors.tenantId, tenantId),
-                eq(qboSyncErrors.oiType, 'invoice'),
-                eq(qboSyncErrors.oiId, invoiceId),
-                eq(qboSyncErrors.errorCode, QBO_PAYMENT_DISCREPANCY),
-                eq(qboSyncErrors.resolved, false),
-            ));
+        await clearPaymentDiscrepancy(this.getDrizzle(), tenantId, invoiceId);
     }
 
-    /**
-     * One open row per (entity, kind). `errorCode` is part of the identity: a
-     * failed push and a payment discrepancy on the same invoice are two
-     * different things to look at, and collapsing them would overwrite one
-     * with the other.
-     */
     public async upsertSyncFlag(
         tenantId: string, oiType: string, oiId: string, errorCode: string, errorMsg: string,
     ): Promise<void> {
-        const db = this.getDrizzle();
-        const now = new Date();
-        const existing = await db.select().from(qboSyncErrors)
-            .where(and(
-                eq(qboSyncErrors.tenantId, tenantId),
-                eq(qboSyncErrors.oiType, oiType),
-                eq(qboSyncErrors.oiId, oiId),
-                eq(qboSyncErrors.errorCode, errorCode),
-                eq(qboSyncErrors.resolved, false),
-            )).get();
-
-        if (existing) {
-            await db.update(qboSyncErrors).set({
-                retries:   existing.retries + 1,
-                errorMsg,
-                updatedAt: now,
-            }).where(and(
-                eq(qboSyncErrors.tenantId, tenantId),
-                eq(qboSyncErrors.id, existing.id),
-            ));
-        } else {
-            await db.insert(qboSyncErrors).values({
-                id:        crypto.randomUUID(),
-                tenantId,
-                oiType,
-                oiId,
-                errorCode,
-                errorMsg,
-                retries:   0,
-                resolved:  false,
-                createdAt: now,
-                updatedAt: now,
-            });
-        }
+        await upsertSyncFlag(this.getDrizzle(), tenantId, oiType, oiId, errorCode, errorMsg);
     }
 }

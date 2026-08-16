@@ -31,9 +31,10 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { QBOServiceBase } from '../../../server/services/qbo/api-base';
 import { withInvoiceSync } from '../../../server/services/qbo/invoice-sync';
+import { withCustomerSync } from '../../../server/services/qbo/customer-sync';
 
 // Minimal composed class — only the mixin under test, no other layers.
-class TestQBOService extends withInvoiceSync(QBOServiceBase) {}
+class TestQBOService extends withInvoiceSync(withCustomerSync(QBOServiceBase)) {}
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INV_ID = 'inv-aaaaaaaa-0000-0000-0000-000000000001';
