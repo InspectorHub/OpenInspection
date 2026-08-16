@@ -1,4 +1,5 @@
 import type { InboundSignatureContext, MessagingProvider } from './provider';
+import { constantTimeEquals } from '../email/webhook-crypto';
 
 export interface TwilioCreds {
     sid: string;
@@ -341,11 +342,12 @@ export async function validateTwilioSignature(
 ): Promise<boolean> {
     if (!presented) return false;
     const expected = await signParams(authToken, url, params);
-    // constant-time-ish compare
-    if (expected.length !== presented.length) return false;
-    let diff = 0;
-    for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ presented.charCodeAt(i);
-    return diff === 0;
+    // The shared helper, not a fourth hand-rolled loop. This was one — and it
+    // was the "-ish" kind: an early return on a length mismatch leaks the
+    // length before any byte is compared. Harmless for a fixed-width base64
+    // HMAC-SHA1, but the reason to use one implementation everywhere is that
+    // nobody has to re-derive that judgement per copy.
+    return constantTimeEquals(expected, presented);
 }
 
 /** Public constructor for non-send Twilio REST surfaces (toll-free list, TCR). */
