@@ -258,6 +258,26 @@ jobs:
       - run: npm run gen-version
       - run: npm run test:unit -- --shard=${{ matrix.shard }}/4
 
+  # Our outbound payloads against Intuit's own vendored schemas. No network, no
+  # credentials, ~0.3s — so it is its own job rather than a tail on another,
+  # and it reports separately: "the QuickBooks contract broke" and "a unit test
+  # broke" are different problems with different fixes.
+  #
+  # This is only the OFFLINE half. The live half (tests/contract/qbo/*.live.spec.ts)
+  # needs sandbox credentials CI does not have and runs from pre-push instead —
+  # see docs/develop/testing.md.
+  test-contract:
+    name: contract tests (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x, cache: npm }
+      - run: npm ci
+      - run: npm run test:contract
+
   test-workers:
     name: worker-runtime tests
     runs-on: ubuntu-latest
@@ -348,6 +368,7 @@ jobs:
       - lint-eslint
       - lint-gates
       - test-unit
+      - test-contract
       - test-workers
       - test-web
       - build

@@ -25,6 +25,10 @@ export interface ReportSignatureBlockProps {
 
 export function ReportSignatureBlock({ isPublished, signature, ownerPreview, timeZone = "UTC", credentialBadgeUrl = null }: ReportSignatureBlockProps) {
   const sig = signatureBlockModel({ isPublished, signature, ownerPreview });
+  // Published, unsigned, and no name to attribute it to. The panel's own heading
+  // is an assertion ("Inspected & Signed By"), so drawing it over an empty name
+  // states something about nobody. Nothing is the honest output.
+  if (sig.variant === "none") return null;
   if (sig.variant === "draft") {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-8 mb-4">

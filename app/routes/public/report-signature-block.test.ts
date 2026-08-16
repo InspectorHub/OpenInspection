@@ -101,6 +101,35 @@ describe('signatureBlockModel', () => {
     expect(result.showNudge).toBe(false);
   });
 
+  /**
+   * A published report whose inspector has no name must attribute nothing.
+   *
+   * The `attribution` block prints a name under "Inspected & Signed By". Given an
+   * empty name it prints that heading over nobody — which is the same defect the
+   * composed signature was, one field along: a rendering that asserts more than
+   * the record holds. Production had exactly this shape (a tenant whose
+   * `users.name` was NULL), and the old code covered it by printing the local
+   * part of the account's email address as though it were a person's name.
+   */
+  it('renders nothing when nobody signed AND there is no name to attribute', () => {
+    const result = signatureBlockModel({
+      isPublished: true,
+      signature: { ...baseSignature, inspectorName: null },
+      ownerPreview: false,
+    });
+    expect(result.variant).toBe('none');
+  });
+
+  it('still attributes when a name exists and nobody signed', () => {
+    const result = signatureBlockModel({
+      isPublished: true,
+      signature: { ...baseSignature, inspectorName: 'Dana Reyes' },
+      ownerPreview: false,
+    });
+    expect(result.variant).toBe('attribution');
+    expect(result.inspectorName).toBe('Dana Reyes');
+  });
+
   it('returns variant:"draft" when !isPublished (signature present)', () => {
     const result = signatureBlockModel({
       isPublished: false,

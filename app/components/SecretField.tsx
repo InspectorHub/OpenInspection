@@ -18,6 +18,8 @@ export function SecretField({
   value,
   hint,
   error,
+  emptyPlaceholder = "Not configured",
+  emptyBadge = "",
   type = "password",
 }: {
   name: string;
@@ -27,6 +29,16 @@ export function SecretField({
   hint?: string;
   /** Validation error to render under the field (conditional only). */
   error?: string;
+  /**
+   * What an empty field means, when it does not mean "unset". A key this
+   * deployment supplies through its Worker env is in force but has no stored
+   * value to mask, and the default copy would call a working integration
+   * unconfigured. The field stays writable: a stored value is the documented
+   * self-host override path.
+   */
+  emptyPlaceholder?: string;
+  /** Corner badge for that same case; "" leaves the corner blank. */
+  emptyBadge?: string;
   /**
    * Kept for API stability. Masking comes from the server-side masked VALUE,
    * not the input type — plaintext-while-typing is intentional (keys are
@@ -84,7 +96,7 @@ export function SecretField({
           id={`secret-${name}`}
           type="text"
           value={editing ? inputValue : (isSet ? value : "")}
-          placeholder={isSet ? "" : "Not configured"}
+          placeholder={isSet ? "" : emptyPlaceholder}
           onFocus={handleFocus}
           onBlur={handleBlur}
           onChange={(e) => setInputValue(e.target.value)}
@@ -107,7 +119,7 @@ export function SecretField({
               isSet ? "text-ih-ok-fg" : "text-ih-fg-4"
             }`}
           >
-            {isSet ? "Set" : ""}
+            {isSet ? "Set" : emptyBadge}
           </span>
         )}
       </div>

@@ -101,7 +101,10 @@ export const OverrideSchema = z.object({
  */
 export const InspectorsResponseSchema = createApiResponseSchema(z.array(z.object({
     id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
-    name: z.string().openapi({ example: 'Jane Smith' }).describe('TODO describe name field for the OpenInspection MCP integration'),
+    // Nullable because an account may carry no name. It used to be `string`,
+    // which the service satisfied by returning the local part of the mailbox —
+    // a contract that promised a name and was kept by inventing one.
+    name: z.string().nullable().openapi({ example: 'Jane Smith' }).describe("The inspector's name, or null when the account has none"),
 }))).openapi('InspectorsResponse');
 
 export const AvailabilityResponseSchema = createApiResponseSchema(z.object({

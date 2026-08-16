@@ -142,9 +142,14 @@ const invoiceRoutes = createApiRouter()
             c.executionCtx.waitUntil(
                 c.var.services.qbo.upsertInvoice(tenantId, {
                     id:        invoice.id,
-                    dueDate:   invoice.dueDate,
-                    lineItems: invoice.lineItems,
-                    status:    invoice.status,
+                    // Required by QuickBooks, and omitted here for as long as
+                    // this call existed. The push it produced was refused every
+                    // time with `CustomerRef is required`.
+                    contactId: invoice.contactId,
+                    dueDate:     invoice.dueDate,
+                    lineItems:   invoice.lineItems,
+                    amountCents: invoice.amountCents,
+                    status:      invoice.status,
                 }),
             );
         }
@@ -163,9 +168,10 @@ const invoiceRoutes = createApiRouter()
                     c.var.services.qbo.upsertInvoice(tenantId, {
                         id:        inv.id,
                         contactId: inv.contactId ?? null,
-                        dueDate:   inv.dueDate,
-                        lineItems: inv.lineItems,
-                        status:    'sent',
+                        dueDate:     inv.dueDate,
+                        lineItems:   inv.lineItems,
+                        amountCents: inv.amountCents,
+                        status:      'sent',
                     }),
                 );
             }

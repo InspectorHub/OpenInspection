@@ -204,7 +204,9 @@ export class ReportVersionService {
                 .from(users).where(and(eq(users.id, a.userId), eq(users.tenantId, tenantId))).get();
             out.push({
                 userId: a.userId,
-                name: u?.name || (u?.email?.split('@')[0] ?? null),
+                // Never derived from the address: this snapshot is hashed and
+                // signed, so an invented name is sealed into the integrity chain.
+                name: u?.name ?? null,
                 role: a.role,
                 // The shared mapper, so the badge URL in a snapshot and the badge
                 // URL on the live page cannot disagree about their form.

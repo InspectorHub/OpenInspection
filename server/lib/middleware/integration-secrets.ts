@@ -75,8 +75,26 @@ export const integrationSecretsMiddleware: MiddlewareHandler<HonoConfig> = async
             c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
         );
         if (decrypted) {
+            // COPY FIRST. The runtime hands every request in an isolate the SAME
+            // `env` object — verified in workerd, see
+            // tests/workers/env-mutation-crosses-requests.spec.ts — so writing a
+            // tenant's decrypted secrets into it in place left them there for
+            // whoever came next. The following tenant then inherited them for
+            // every key they had not stored themselves, because by that point
+            // `env` was no longer empty and the env-wins rule resolved to the
+            // PREVIOUS tenant's value.
+            //
+            // Stripe made that worst: its DB-wins rule protects a tenant who has
+            // their own key, and a tenant with none fell through to whatever was
+            // left on `env` — which is the money-misrouting that rule exists to
+            // prevent, reached by a different door.
+            //
+            // A shallow copy is enough and is what we want: bindings (DB, KV, R2)
+            // stay the same references, only the string slots become per-request.
+            const perRequest = { ...c.env };
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            applyIntegrationSecrets(c.env as any, decrypted as Record<string, string | undefined>);
+            applyIntegrationSecrets(perRequest as any, decrypted as Record<string, string | undefined>);
+            c.env = perRequest;
         }
     } catch (err) {
         // Non-fatal: if decryption fails (key rotation, corrupt data),

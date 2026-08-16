@@ -87,3 +87,11 @@ See the [environment variables table](../../CLAUDE.md) or the project README for
 |---|---|
 | SMTP / STARTTLS | Cloudflare Workers cannot open stateful TCP connections. |
 | Amazon SES | Requires AWS SigV4 request signing — planned as a fast-follow, not in this release. |
+
+---
+
+## Related
+
+- [Integrations index](README.md) — the conventions common to all of them
+- [SMS](sms.md) — the other channel, same own-vs-platform shape
+- [Integration adapters](../develop/integration-adapters.md) — for changing this code

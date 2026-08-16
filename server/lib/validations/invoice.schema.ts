@@ -17,6 +17,8 @@ const LineItemSchema = z.object({
 
 export const CreateInvoiceSchema = z.object({
     inspectionId: z.string().trim().min(1).optional().nullable().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    contactId: z.string().trim().min(1).optional().nullable()
+        .describe('Contact this invoice bills. When omitted, resolved from clientEmail; a name is never used to match.'),
     clientName: z.string().min(1).max(100).describe('TODO describe clientName field for the OpenInspection MCP integration'),
     clientEmail: z.string().email().optional().nullable().describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
     amountCents: z.number().int().min(0).describe('TODO describe amountCents field for the OpenInspection MCP integration'),

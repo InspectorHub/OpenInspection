@@ -158,7 +158,7 @@ export interface ReportSignature {
   method: "none" | "manual" | "authorized_auto";
   signatureBase64: string | null;
   signedAt: number | null; // epoch ms
-  inspectorName: string;
+  inspectorName: string | null;
   inspectorLicense: string | null;
 }
 

@@ -3,6 +3,7 @@ import { qboConnections, qboEntityMap, qboSyncErrors } from '../../lib/db/schema
 import { invoices } from '../../lib/db/schema/invoice';
 import { orderPayments } from '../../lib/db/schema/order-payment';
 import { encryptToken } from '../../lib/qbo-crypto';
+import { Errors } from '../../lib/errors';
 import { QBO_PAYMENT_DISCREPANCY, decodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
 import {
     ACCESS_TOKEN_TTL_SEC,
@@ -61,7 +62,10 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
 
         async resolveError(tenantId: string, errorId: string): Promise<void> {
             const db = this.getDrizzle();
-            await db.update(qboSyncErrors).set({ resolved: true })
+            // `updatedAt` is what dates the response; `createdAt` only dates the
+            // failure. Without the stamp — which clearPaymentDiscrepancy already
+            // writes on the same table — "when was this dealt with" has no answer.
+            await db.update(qboSyncErrors).set({ resolved: true, updatedAt: new Date() })
                 .where(and(eq(qboSyncErrors.id, errorId), eq(qboSyncErrors.tenantId, tenantId)));
         }
 
@@ -131,14 +135,50 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
         }
 
         async disconnect(tenantId: string): Promise<void> {
+            // Tell Intuit first, then forget. The order matters only for the
+            // token: revoking needs the credential this is about to delete.
             await this.revokeToken(tenantId);
-            const db = this.getDrizzle();
-            await db.delete(qboEntityMap).where(eq(qboEntityMap.tenantId, tenantId));
-            await db.delete(qboConnections).where(eq(qboConnections.tenantId, tenantId));
+            // One routine, shared with the path where Intuit refuses the grant.
+            // These two used to delete different sets of rows, and the drift was
+            // invisible because each looked complete on its own.
+            await this.retireConnection(tenantId);
         }
 
         async linkExistingCustomer(tenantId: string, contactId: string, qboCustomerId: string): Promise<void> {
             const db = this.getDrizzle();
+
+            // The reverse unique index (tenant, qboType, qboId) is NOT the
+            // conflict target below, so a second contact pointed at the same
+            // customer used to surface as a raw `UNIQUE constraint failed`.
+            // Whoever picked the customer reads this; it has to name the holder.
+            const takenBy = await db.select().from(qboEntityMap).where(and(
+                eq(qboEntityMap.tenantId, tenantId),
+                eq(qboEntityMap.qboType, 'Customer'),
+                eq(qboEntityMap.qboId, qboCustomerId),
+            )).get();
+            if (takenBy && takenBy.oiId !== contactId) {
+                // 409, not 500: the caller picked a customer someone else holds,
+                // which is a decision to revisit rather than a fault to report.
+                // A readable message that still arrives as a server error tells
+                // the operator the product broke when it did not.
+                throw Errors.Conflict(
+                    `QuickBooks customer ${qboCustomerId} is already linked to contact ${takenBy.oiId}`,
+                );
+            }
+
+            // Ask QuickBooks where this customer currently stands rather than
+            // assuming. '0' is only true of a customer never edited, and on a
+            // re-point the row kept the PREVIOUS customer's counter — either way
+            // the next update sends a token for the wrong entity and 400s.
+            //
+            // This makes linking able to fail on an API error, which it could
+            // not before. That is the intended trade: a mapping carrying an
+            // invented token fails later instead, on an invoice push, where
+            // nothing points back at the link that caused it.
+            const fetched = await this.apiCall<{ Customer: { Id: string; SyncToken: string } }>(
+                tenantId, 'GET', `customer/${qboCustomerId}`,
+            );
+
             const now = new Date();
             await db.insert(qboEntityMap).values({
                 id:           crypto.randomUUID(),
@@ -147,11 +187,15 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                 oiId:         contactId,
                 qboType:      'Customer',
                 qboId:        qboCustomerId,
-                qboSyncToken: '0',
+                qboSyncToken: fetched.Customer.SyncToken,
                 syncedAt:     now,
             }).onConflictDoUpdate({
                 target: [qboEntityMap.tenantId, qboEntityMap.oiType, qboEntityMap.oiId],
-                set:    { qboId: qboCustomerId, syncedAt: now },
+                set:    {
+                    qboId:        qboCustomerId,
+                    qboSyncToken: fetched.Customer.SyncToken,
+                    syncedAt:     now,
+                },
             });
         }
     };

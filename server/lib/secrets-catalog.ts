@@ -25,6 +25,11 @@ export const INTEGRATION_SECRET_KEYS = [
     'QBO_CLIENT_ID',
     'QBO_CLIENT_SECRET',
     'QBO_WEBHOOK_SECRET',
+    // Not a credential, but it travels with them and has nowhere else to
+    // live. A self-hoster's own Intuit app is either a Development app or
+    // a Production one, and that is a property of THEIR app, not of our
+    // deployment. Without this the only way to set it is a redeploy.
+    'QBO_ENV',
     'STRIPE_SECRET_KEY',
     'STRIPE_PUBLISHABLE_KEY',
     'STRIPE_WEBHOOK_SECRET',
@@ -75,6 +80,12 @@ const KEY_FORMATS: Array<{ key: IntegrationSecretKey; re: RegExp; hint: string }
     // Cloudflare Turnstile secrets: 0x = real, 1x/2x/3x = documented test secrets.
     { key: 'TURNSTILE_SECRET_KEY', re: /^[0-3]x/, hint: 'must start with 0x (or a 1x/2x/3x test secret)' },
     { key: 'APP_BASE_URL', re: /^https?:\/\//, hint: 'must be an http(s):// URL' },
+    // The only entry here that is not a credential, and the only one whose
+    // valid values are a closed set. Caught at the field rather than at
+    // connect time: `resolveQboApiBase` refuses anything else, and a tenant who
+    // typed "Sandbox" would otherwise learn about it from a failed OAuth round
+    // trip. Must stay in step with QBO_API_HOSTS in services/qbo/api-base.ts.
+    { key: 'QBO_ENV', re: /^(sandbox|production)$/, hint: 'must be exactly "sandbox" or "production"' },
     { key: 'TWILIO_ACCOUNT_SID', re: /^AC[0-9a-fA-F]{32}$/, hint: 'must be an Account SID (starts with AC, 34 chars)' },
     { key: 'TWILIO_FROM_NUMBER', re: /^\+[1-9]\d{6,14}$/, hint: 'must be an E.164 number (e.g. +15551234567)' },
     // TWILIO_AUTH_TOKEN has no stable public prefix — not format-gated.
@@ -101,6 +112,7 @@ export const CAMEL_TO_ENV: Record<string, IntegrationSecretKey> = {
     qboClientId: 'QBO_CLIENT_ID',
     qboClientSecret: 'QBO_CLIENT_SECRET',
     qboWebhookSecret: 'QBO_WEBHOOK_SECRET',
+    qboEnv: 'QBO_ENV',
     stripeSecretKey: 'STRIPE_SECRET_KEY',
     stripePublishableKey: 'STRIPE_PUBLISHABLE_KEY',
     stripeWebhookSecret: 'STRIPE_WEBHOOK_SECRET',

@@ -89,7 +89,7 @@ class ProbeQbo extends withInvoiceSync(QBOServiceBase) {
     public override getDrizzle() { return stubDb(this.tenantTz) as never; }
     public override async getQBOCustomerIdForInvoice(): Promise<string | null> { return 'QBO-CUST-9'; }
     public override async apiCall<T>(
-        _tenantId: string, method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown,
+        _tenantId: string, method: 'GET' | 'POST', path: string, body?: unknown,
     ): Promise<T> {
         this.calls.push({ method, path, body });
         return { CreditMemo: { Id: 'CM-1', SyncToken: '0' } } as T;
@@ -164,7 +164,7 @@ class DbQbo extends withInvoiceSync(QBOServiceBase) {
     }
     public override getDrizzle() { return this.realDb as never; }
     public override async apiCall<T>(
-        _tenantId: string, method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown,
+        _tenantId: string, method: 'GET' | 'POST', path: string, body?: unknown,
     ): Promise<T> {
         this.calls.push({ method, path, body });
         return { CreditMemo: { Id: `CM-${++this.n}`, SyncToken: '0' } } as T;

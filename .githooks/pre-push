@@ -19,6 +19,7 @@ case " $NODE_OPTIONS " in *"--max-old-space-size"*) : ;; *) export NODE_OPTIONS=
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 BOLD='\033[1m'
 NC='\033[0m'
 
@@ -69,6 +70,59 @@ else
     fail "Dependency-advisory gate failed"
     printf '\n%b\n' "${RED}Pre-push checks failed. Fix the errors before pushing.${NC}"
     exit 1
+fi
+
+# --- QuickBooks live contract ------------------------------------------------
+#
+# Runs only when this push touches the QuickBooks adapter, because it is the
+# only lane that can see the things no schema carries: which fault code a
+# duplicate name really returns, that v3 has no PUT, that a colon is refused.
+# Six paths in that adapter had never once worked in production while the unit
+# suite was green, and every one of them was invisible for the same reason —
+# the tests supplied the upstream's answers.
+#
+# It needs a connected Intuit SANDBOX. Contributors who have none get a failure
+# naming exactly what is missing plus the opt-out below; that is deliberate.
+# Silence would be indistinguishable from a pass, and a gate nobody can satisfy
+# gets bypassed wholesale rather than argued with:
+#
+#     SKIP_QBO_CONTRACT=1 git push       # says so, loudly, in the output
+#
+QBO_PATHS='^apps/openinspection/server/services/qbo/|^server/services/qbo/|^tests/contract/qbo/'
+QBO_CHANGED=""
+while read -r _l_ref l_sha _r_ref r_sha; do
+    [ -z "$l_sha" ] && continue
+    [ "$l_sha" = "$ZERO" ] && continue
+    if [ "$r_sha" = "$ZERO" ] || [ -z "$r_sha" ]; then
+        QBASE=$(git merge-base "$l_sha" origin/main 2>/dev/null) || QBASE=""
+        [ -z "$QBASE" ] && { QBO_CHANGED="unknown"; break; }
+        QRANGE="$QBASE..$l_sha"
+    else
+        QRANGE="$r_sha..$l_sha"
+    fi
+    QF=$(git diff --name-only "$QRANGE" 2>/dev/null) || { QBO_CHANGED="unknown"; break; }
+    QBO_CHANGED="$QBO_CHANGED
+$QF"
+done <<QREFS_EOF
+$REFS
+QREFS_EOF
+
+if [ "$QBO_CHANGED" = "unknown" ] || printf '%s\n' "$QBO_CHANGED" | grep -qE "$QBO_PATHS"; then
+    step "QuickBooks live contract"
+    if [ "${SKIP_QBO_CONTRACT:-0}" = "1" ]; then
+        pass "SKIPPED by SKIP_QBO_CONTRACT=1 — the QuickBooks adapter changed and nothing verified it against the real API"
+    else
+        QBO_OUT=$(npm run --silent test:contract:live 2>&1)
+        if [ $? -eq 0 ]; then
+            pass "$(printf '%s' "$QBO_OUT" | grep -E '^\s+Tests ' | tail -1)"
+        else
+            printf '%s\n' "$QBO_OUT" | tail -30
+            fail "QuickBooks live contract failed — or no sandbox is connected (the reason is printed above)"
+            printf '%b\n' "  No Intuit sandbox on this machine? ${YELLOW}SKIP_QBO_CONTRACT=1 git push${NC}"
+            printf '\n%b\n' "${RED}Pre-push checks failed. Fix the errors before pushing.${NC}"
+            exit 1
+        fi
+    fi
 fi
 
 # The gate runs a REAL build (~1-2 min). Nothing that cannot reach the worker
