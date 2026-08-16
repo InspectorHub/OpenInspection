@@ -46,8 +46,6 @@ const DESCRIPTIONS: Record<keyof DeploymentProfile, string> = {
     aiDevMockFallback: 'AI calls may fall back to a local mock when no credential resolves.',
     hasManagedAi:
         'A platform-provided AI credential can ever be resolved. Standalone has no platform, so the managed path is absent rather than disabled — use your own key in Settings → Advanced → AI.',
-    brandingSource:
-        'Where the company name and colour come from: `env` (`APP_NAME` / `PRIMARY_COLOR`) or per-tenant config edited in Settings.',
     mcpApiRoute: 'Where the MCP OAuth surface mounts.',
     videoBackendManaged:
         'Whether the platform picks the video backend. Standalone operators set `videoMode` themselves, which is why the self-host settings form exists and the saas one refuses to save.',

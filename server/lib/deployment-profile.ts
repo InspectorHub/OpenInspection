@@ -68,8 +68,6 @@ export interface DeploymentProfile {
      *  Read this instead of branching on APP_MODE — see the file header. */
     hasManagedAi: boolean;
 
-    brandingSource: 'env' | 'tenant-config';
-
     /** Where the MCP OAuth surface mounts. SaaS serves per-workspace endpoints
      *  under /company/{slug}/mcp, so the provider takes the broad '/company/'
      *  prefix; standalone has one fixed '/mcp'. The company-slug guard applies
@@ -159,7 +157,6 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
     hasSetupWizard: true,
     aiDevMockFallback: true,
     hasManagedAi: false,
-    brandingSource: 'env',
     mcpApiRoute: '/mcp',
     videoBackendManaged: false,
     hasManagedCompliance: false,
@@ -178,7 +175,6 @@ export const SAAS_PROFILE: DeploymentProfile = {
     hasSetupWizard: false,
     aiDevMockFallback: false,
     hasManagedAi: true,
-    brandingSource: 'tenant-config',
     mcpApiRoute: '/company/',
     videoBackendManaged: true,
     hasManagedCompliance: true,

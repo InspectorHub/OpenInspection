@@ -36,7 +36,6 @@ that way.
 | `hasSetupWizard` | yes | no | `/setup` exists, gated on the `SETUP_CODE` secret, to create the first account. |
 | `aiDevMockFallback` | yes | no | AI calls may fall back to a local mock when no credential resolves. |
 | `hasManagedAi` | no | yes | A platform-provided AI credential can ever be resolved. Standalone has no platform, so the managed path is absent rather than disabled — use your own key in Settings → Advanced → AI. |
-| `brandingSource` | `env` | `tenant-config` | Where the company name and colour come from: `env` (`APP_NAME` / `PRIMARY_COLOR`) or per-tenant config edited in Settings. |
 | `mcpApiRoute` | `/mcp` | `/company/` | Where the MCP OAuth surface mounts. |
 | `videoBackendManaged` | no | yes | Whether the platform picks the video backend. Standalone operators set `videoMode` themselves, which is why the self-host settings form exists and the saas one refuses to save. |
 | `hasManagedCompliance` | no | yes | A platform-operated compliance path (managed SMS 10DLC brand/campaign filing) exists. Absent in standalone — nobody can file on your behalf. |

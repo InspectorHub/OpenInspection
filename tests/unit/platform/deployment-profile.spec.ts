@@ -23,7 +23,6 @@ describe('deployment profile constants', () => {
         expect(STANDALONE_PROFILE.hasBilling).toBe(false);
         expect(STANDALONE_PROFILE.hasSeatQuota).toBe(false);
         expect(STANDALONE_PROFILE.hasSetupWizard).toBe(true);
-        expect(STANDALONE_PROFILE.brandingSource).toBe('env');
         expect(STANDALONE_PROFILE.billingPortalUrl).toBeNull();
     });
 
@@ -33,7 +32,6 @@ describe('deployment profile constants', () => {
         expect(SAAS_PROFILE.hasBilling).toBe(true);
         expect(SAAS_PROFILE.hasSeatQuota).toBe(true);
         expect(SAAS_PROFILE.hasSetupWizard).toBe(false);
-        expect(SAAS_PROFILE.brandingSource).toBe('tenant-config');
     });
 });
 
