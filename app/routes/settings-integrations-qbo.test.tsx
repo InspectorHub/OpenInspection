@@ -71,18 +71,61 @@ describe("QuickBooks settings page — connection state", () => {
     // And the actions that branch gates. "Pause Sync" is the third; it is not
     // asserted separately because it swaps to "Resume Sync" with syncEnabled.
     expect(screen.getByRole("button", { name: "Sync Now" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Disconnect" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Disconnect from QuickBooks" })).toBeInTheDocument();
     // The call-to-action for an unconnected tenant must be gone.
-    expect(screen.queryByRole("link", { name: /connect quickbooks/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /connect to quickbooks/i })).not.toBeInTheDocument();
   });
 
   it("shows the connect call-to-action when the API returns no connection", async () => {
     renderPage(null);
 
     expect(
-      await screen.findByRole("link", { name: /connect quickbooks/i }),
+      await screen.findByRole("link", { name: /connect to quickbooks/i }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Sandbox Company US baeb")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Intuit's listing requirements are specific about this control, and using
+ * outdated or unapproved QuickBooks imagery is among the most common reasons an
+ * app fails review. The artwork ships in `public/intuit/`, taken verbatim from
+ * Intuit's asset bundle; nothing here may recolour or resize it.
+ */
+describe("QuickBooks settings page — Intuit button requirements", () => {
+  it("uses Intuit's own artwork for the connect control", async () => {
+    renderPage(null);
+
+    const link = await screen.findByRole("link", { name: /connect to quickbooks/i });
+    const img = link.querySelector("img");
+    expect(img?.getAttribute("src")).toBe("/intuit/C2QB_green_btn_med_default.svg");
+  });
+
+  it("carries the hover artwork too, which the guidelines require", async () => {
+    renderPage(null);
+
+    const link = await screen.findByRole("link", { name: /connect to quickbooks/i });
+    const sources = [...link.querySelectorAll("img")].map((i) => i.getAttribute("src"));
+    expect(sources).toContain("/intuit/C2QB_green_btn_med_hover.svg");
+  });
+
+  it("titles the disconnect control the way Intuit requires", async () => {
+    // Not "Disconnect". The guidelines name the string: a button or link
+    // titled "Disconnect from QuickBooks".
+    renderPage(CONNECTED);
+
+    expect(
+      await screen.findByRole("button", { name: "Disconnect from QuickBooks" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no connect artwork once a company is connected", async () => {
+    // The same requirement from the other side: the button must disappear, not
+    // merely be pushed below the fold.
+    renderPage(CONNECTED);
+
+    await screen.findByText("Sandbox Company US baeb");
+    expect(document.querySelector('img[src^="/intuit/"]')).toBeNull();
   });
 });
 

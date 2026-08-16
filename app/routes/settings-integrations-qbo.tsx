@@ -10,6 +10,7 @@ import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { QboBooksHealth } from "~/components/settings/QboBooksHealth";
 import { QboCredentialsForm } from "~/components/settings/QboCredentialsForm";
+import { QboConnectCard } from "~/components/settings/QboConnectCard";
 import {
   QboOAuthOutcomeBanner,
   type QboOAuthOutcome,
@@ -286,36 +287,7 @@ export default function SettingsIntegrationsQbo() {
       )}
 
       {/* Not connected */}
-      {!status && (
-        <div className="bg-ih-bg-card border border-ih-border rounded-lg p-8 text-center">
-          <div className="w-16 h-16 bg-[#2CA01C]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-[#2CA01C] text-2xl font-extrabold">QB</span>
-          </div>
-          <h3 className="text-[16px] font-bold text-ih-fg-1 mb-2">
-            {m.settings_qbo_connect_heading()}
-          </h3>
-          <ul className="text-[13px] text-ih-fg-3 text-left max-w-xs mx-auto mb-6 space-y-2">
-            <li className="flex items-start gap-2">
-              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> {m.settings_qbo_feature_sync()}
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> {m.settings_qbo_feature_payments()}
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> {m.settings_qbo_feature_dedup()}
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> {m.settings_qbo_feature_void()}
-            </li>
-          </ul>
-          <a
-            href="/api/integrations/qbo/connect"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#2CA01C] text-white rounded-lg font-bold text-[13px] hover:bg-[#237a16] transition-colors"
-          >
-            {m.settings_qbo_connect_button()}
-          </a>
-        </div>
-      )}
+      {!status && <QboConnectCard />}
 
       {/* Connected */}
       {status && (
