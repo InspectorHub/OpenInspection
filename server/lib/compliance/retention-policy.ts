@@ -2,6 +2,14 @@
  * The retention POLICY header — whose decision the windows are, and whether
  * anyone approved them.
  *
+ * NOTHING IMPORTS THIS, AND THAT IS THE DESIGN. Its reader is
+ * `scripts/check-retention-policy.mjs`, which opens it BY PATH and parses the
+ * text — so the link is invisible to any tool that follows imports, and knip
+ * lists this file as an entry point for exactly that reason. If a dead-code
+ * sweep ever proposes deleting it, the sweep is wrong: the gate that verifies
+ * the digest would then have nothing to verify, and fourteen retention windows
+ * would go back to deleting production rows under nobody's signature.
+ *
  * `retention-manifest.ts` says which tables expire and `retention-windows.ts`
  * says after how long. Neither says who decided, when it took effect, or
  * whether it has been reviewed — so nothing in this repository could record

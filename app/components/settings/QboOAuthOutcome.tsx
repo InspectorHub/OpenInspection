@@ -21,7 +21,7 @@ export interface QboOAuthOutcome {
  * act on. An unrecognized code still renders — as itself — because a silent
  * unknown is the failure this component exists to prevent.
  */
-export function qboOAuthErrorMessage(code: string): string {
+function qboOAuthErrorMessage(code: string): string {
   switch (code) {
     case "not_configured":
       return m.settings_qbo_oauth_error_not_configured();
