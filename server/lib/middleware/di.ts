@@ -155,10 +155,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
             switch (prop) {
                 case 'admin':
                     {
-                        // Provider selection is a deployment-MODE decision
-                        // (PortalProvider never fetched the retired binding —
-                        // it only encodes saas semantics over DB+KV).
-                        const provider = c.env.APP_MODE === 'saas'
+                        // Who OWNS the tenant record, not the mode string.
+                        // `PortalProvider` encodes saas semantics over DB+KV (it
+                        // never fetched the retired binding).
+                        const provider = c.var.profile.tenantRecordOwnedByPortal
                             ? new PortalProvider(c.env.DB, c.env.TENANT_CACHE)
                             : new StandaloneProvider(c.env.DB, c.env.TENANT_CACHE);
                         target.admin = new AdminService(c.env.DB, provider);

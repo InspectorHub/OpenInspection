@@ -42,6 +42,8 @@ that way.
 | `hasManagedCompliance` | no | yes | A platform-operated compliance path (managed SMS 10DLC brand/campaign filing) exists. Absent in standalone — nobody can file on your behalf. |
 | `hasContentMarketplace` | no | yes | The content marketplace surface exists. Standalone 404s the browse route rather than rendering an empty shelf: the catalogue is curated first-party and nothing can reach it. |
 | `qboAppManaged` | no | yes | The platform supplies the Intuit app tenants connect through, so nobody is asked for a Client ID. Standalone brings its own: Intuit matches a redirect URI byte for byte and a self-hosted deploy answers on its own domain, so the platform app cannot work there — which is why the credential form, including `QBO_ENV`, renders only in standalone. |
+| `tenantRecordOwnedByPortal` | no | yes | Whether a platform stores the authoritative tenant record and this worker reads a projection of it. Decides which admin provider is constructed; in standalone this deployment owns the row outright. |
+| `hasPortalIntegrationApi` | no | yes | Whether the portal machine-to-machine surface (`/api/integration/*`) is mounted. Standalone 404s the whole prefix rather than answering on an API nobody can authenticate to. |
 | `botProtectionMandatory` | no | yes | Whether the public booking form and agent signup MUST carry a bot challenge. Saas always challenges — with no `TURNSTILE_SECRET_KEY` it uses Cloudflare's published test key rather than skipping, so the mechanism is permissive but never off. Standalone leaves it to the operator: no key, no challenge. |
 
 <!-- END GENERATED: capability table -->

@@ -54,14 +54,22 @@ describe('SaaS-Portal isolation', () => {
   // not the bare word: `APP_MODE?: string` on an env interface is a
   // declaration, not a branch, and there are seven of those that are fine.
   //
-  // Three files may read it, and no more:
-  //   deployment-profile.ts  the seam itself — this IS the one derivation
-  //   di.ts                  composition point #3 (see integration.module.ts:1-5)
-  //   workers/app.ts         the entry-level /api/integration/* 404 guard
+  // ONE file may read it: the seam itself, which is the one derivation.
+  //
+  // Two others were allowlisted and no longer are. `di.ts` was let in as
+  // "composition point #3", but that reason governs what it may IMPORT, not how
+  // it may test the mode — it already reads `c.var.profile` four times in the
+  // same file, and its actual question was "is the tenant record owned by a
+  // platform", now `tenantRecordOwnedByPortal`. `workers/app.ts` was let in as
+  // an entry-level guard running before middleware, which is true of
+  // `c.var.profile` but not of `getDeploymentProfile`: that takes `ProfileEnv`,
+  // not `AppEnv`, and the widening exists for exactly this caller. Its question
+  // was "does the portal M2M surface exist", now `hasPortalIntegrationApi`.
+  //
+  // An allowlist entry outlives the reason it was granted for. Both of these
+  // had reasons that were true of something adjacent to what they permitted.
   const APP_MODE_READERS = [
     'server/lib/deployment-profile.ts',
-    'server/lib/middleware/di.ts',
-    'workers/app.ts',
   ];
 
   // Empty, and it stays empty. An entry here means a new violation shipped.
