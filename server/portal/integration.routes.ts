@@ -12,6 +12,7 @@ import { tenantConfigs, inspectionAccessTokens, tenants, contactRoleProfiles } f
 import { tenantDisplayName } from '../lib/tenant-display-name';
 import { capabilitiesForProfile, type RoleKind } from '../lib/people/capabilities';
 import { reencryptAllTenantSecrets } from '../lib/secrets-reencrypt';
+import { buildTenantEmailService } from '../lib/email/build-email-service';
 import { secretsCacheKey } from '../lib/secrets-cache';
 import { OutboxService } from './outbox.service';
 import { requireServiceBinding } from './service-binding-guard';
@@ -113,7 +114,9 @@ api.post('/tenants/:slug/purge', requireServiceBinding, async (c) => {
     if (!t) return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
 
     const { TenantPurgeService } = await import('../services/tenant-purge.service');
-    const svc = new TenantPurgeService(c.env.DB, c.env.PHOTOS, c.env.TENANT_CACHE, { INSPECTION_DOC: c.env.INSPECTION_DOC, TENANT_PRESENCE: c.env.TENANT_PRESENCE });
+    // Platform sender (`undefined` tenant): the tenant's own email config is one
+    // of the things being destroyed, and this is our message about our failure.
+    const svc = new TenantPurgeService(c.env.DB, c.env.PHOTOS, c.env.TENANT_CACHE, { INSPECTION_DOC: c.env.INSPECTION_DOC, TENANT_PRESENCE: c.env.TENANT_PRESENCE }, await buildTenantEmailService(c.env, undefined));
     try {
         const result = await svc.purge(t.id as string);
         return c.json({ success: true, data: result });

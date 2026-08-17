@@ -163,6 +163,41 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
         }
 
         /**
+         * A workspace destruction that did not finish, told to the controller.
+         *
+         * review: without undue delay after the failure is KNOWN, not after
+         * it is remediated. The purge calls this the moment its incomplete list
+         * is final.
+         *
+         * The BODY is passed in rather than composed here, and that is
+         * deliberate: it is a compliance statement, built by the purge from
+         * what it actually observed, and re-composing it at the presentation
+         * layer would put a second author between the observation and the
+         * sentence. The template's only job is to wrap it.
+         *
+         * `required` in the class registry, so the renderer cannot hand back a
+         * disabled result — a workspace must not be able to switch off being
+         * told that its own data still exists.
+         *
+         * The recipient's workspace no longer exists when this sends, so the
+         * caller resolves the address before the cascade and passes it. This
+         * method makes no owner lookup of its own; there would be nothing left
+         * to look up.
+         */
+        async sendDestructionIncompleteNotice(
+            to: string,
+            details: { destroyedAt: Date; stores: string[]; body: string },
+        ): Promise<void> {
+            const rendered = this.renderOr('destruction-incomplete', {
+                noticeBody: details.body,
+            }, {
+                subject: 'Workspace deletion did not complete',
+                html: `<p>${escapeHtml(details.body)}</p>`,
+            });
+            await this.sendRendered(rendered, [to]);
+        }
+
+        /**
          * Phase T (T22): Send a notification email to the other party when a new message arrives.
          * Throttled per inspection per direction via TENANT_CACHE KV (5 min window).
          * recipient: 'client' = email client; 'inspector' = email inspector

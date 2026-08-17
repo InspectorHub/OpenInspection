@@ -109,6 +109,24 @@ export const tenantDestructionRecords = sqliteTable('tenant_destruction_records'
      * fact as a run that never finished.
      */
     storeResults: text('store_results', { mode: 'json' }).$type<Record<string, string>>(),
+    /**
+     * When the controller was told this destruction did not finish. Null when
+     * it finished, and null when the notice could not be sent.
+     *
+     * Deliberately a timestamp and NOT the address. This row outlives the
+     * tenant by three years, and the retention manifest sets that window on the
+     * stated ground that it is non-personal — tenant id, slug and counts.
+     * Storing the owner's email here would make the record certifying an
+     * erasure hold an identifier of the party erased, and would falsify the
+     * reason the window rests on. Who they were is answerable from the slug and
+     * the account record on the portal side, where the customer relationship
+     * lives; what this table has to evidence is that they were told.
+     *
+     * Null after a send failure is an alert, on the same principle as `status`
+     * stuck at 'started': writing the timestamp regardless would produce a
+     * record asserting a notification nobody received.
+     */
+    incompleteNotifiedAt: integer('incomplete_notified_at', { mode: 'timestamp_ms' }),
 }, (t) => [
     index('idx_destruction_tenant').on(t.tenantId),
     index('idx_destruction_destroyed_at').on(t.destroyedAt),

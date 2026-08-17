@@ -684,7 +684,7 @@ export default {
             // SYNC_QUEUE carries replies to portal (A-21 batch 2); PHOTOS/EXPORTS
             // serve offboarding (batch 3); the DO namespaces let purge empty them.
             await handleCmdBatch(env.DB, env.TENANT_CACHE, batch, env.SYNC_QUEUE,
-                { photos: env.PHOTOS, exports: env.EXPORTS_BUCKET }, { INSPECTION_DOC: env.INSPECTION_DOC, TENANT_PRESENCE: env.TENANT_PRESENCE });
+                { photos: env.PHOTOS, exports: env.EXPORTS_BUCKET }, { INSPECTION_DOC: env.INSPECTION_DOC, TENANT_PRESENCE: env.TENANT_PRESENCE }, env);
             return;
         }
         await handleSyncDlqBatch(env.DB, batch);

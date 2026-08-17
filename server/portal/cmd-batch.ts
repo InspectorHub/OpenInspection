@@ -14,6 +14,7 @@ import {
     type CmdConsumerBuckets,
     type PurgeDurableObjects,
 } from './cmd-consumer';
+import type { EmailServiceEnv } from '../lib/email/build-email-service';
 
 /** Mirror of portal's queue-loop backoff. */
 function backoffSeconds(attempts: number): number {
@@ -32,10 +33,11 @@ export async function handleCmdBatch(
     syncQueue?: Queue<SyncEnvelope>,
     buckets?: CmdConsumerBuckets,
     dos?: PurgeDurableObjects,
+    emailEnv?: EmailServiceEnv,
 ): Promise<void> {
     for (const msg of batch.messages) {
         try {
-            const result = await applyCmdEnvelope(dbBinding, kv, msg.body, syncQueue, buckets, dos);
+            const result = await applyCmdEnvelope(dbBinding, kv, msg.body, syncQueue, buckets, dos, emailEnv);
             logger.info('[cmd] queue message handled', { id: msg.id, attempts: msg.attempts, result });
             msg.ack();
         } catch (err) {

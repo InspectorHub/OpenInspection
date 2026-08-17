@@ -23,6 +23,7 @@ import { OutboxService, type OutboxRow } from './outbox.service';
  */
 export type { PurgeDurableObjects } from '../services/tenant-purge.service';
 import type { PurgeDurableObjects } from '../services/tenant-purge.service';
+import type { EmailServiceEnv } from '../lib/email/build-email-service';
 
 /** A-21 batch 3 — R2 bindings the offboarding commands need. Optional: absent
  *  in standalone (no portal direction at all) and in tests that don't
@@ -63,6 +64,7 @@ export async function applyCmdEnvelope(
     syncQueue?: Queue<SyncEnvelope>,
     buckets?: CmdConsumerBuckets,
     dos?: PurgeDurableObjects,
+    emailEnv?: EmailServiceEnv,
 ): Promise<CmdApplyResult> {
     const db = drizzle(dbBinding);
     const env = parseCmdEnvelope(raw);
@@ -161,7 +163,7 @@ export async function applyCmdEnvelope(
     }
 
     try {
-        const replyExtra = await applyKnownCmd(dbBinding, kv, env, buckets, dos);
+        const replyExtra = await applyKnownCmd(dbBinding, kv, env, buckets, dos, emailEnv);
         // Advance the high-water mark (guarded so a concurrent higher write wins).
         if (tenantId) {
             await db.update(tenants)
@@ -218,6 +220,7 @@ async function applyKnownCmd(
     env: CmdEnvelope,
     buckets?: CmdConsumerBuckets,
     dos?: PurgeDurableObjects,
+    emailEnv?: EmailServiceEnv,
 ): Promise<Record<string, unknown> | undefined> {
     switch (env.type) {
         case 'io.inspectorhub.cmd.tenant.update': {
@@ -278,7 +281,13 @@ async function applyKnownCmd(
             if (!buckets?.photos) throw new Error('purge: PHOTOS not bound');
             if (!kv) throw new Error('purge: TENANT_CACHE not bound');
             const { TenantPurgeService } = await import('../services/tenant-purge.service');
-            const result = await new TenantPurgeService(dbBinding, buckets.photos, kv, dos ?? {}).purge(data.tenantId);
+            // Platform sender, deliberately: the tenant's own email config is
+            // one of the things being destroyed, and this is our message about
+            // our failure. Absent emailEnv the purge still runs and logs that
+            // nobody could be told — see the else-branch in the service.
+            const { buildTenantEmailService } = await import('../lib/email/build-email-service');
+            const notifier = emailEnv ? await buildTenantEmailService(emailEnv, undefined) : undefined;
+            const result = await new TenantPurgeService(dbBinding, buckets.photos, kv, dos ?? {}, notifier).purge(data.tenantId);
             return { ...result };
         }
         case 'io.inspectorhub.cmd.tenant.ai_caps': {

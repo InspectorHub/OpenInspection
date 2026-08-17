@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, getTableColumns, getTableName } from 'drizzle-orm';
+import { eq, and, isNull, getTableColumns, getTableName } from 'drizzle-orm';
 import { logger } from '../lib/logger';
 import { tenants, tenantDestructionRecords, users, reports } from '../lib/db/schema';
 import { collabDocName } from '../lib/collab/doc-name';
@@ -53,12 +53,44 @@ export interface PurgeDurableObjects {
     TENANT_PRESENCE?: DurableObjectNamespace | undefined;
 }
 
+/**
+ * The one message this service sends.
+ *
+ * A narrow port rather than the whole `EmailService`, because what the purge
+ * needs is a single verb and a service that can send anything is a service a
+ * future edit can send anything WITH. The implementation lives in
+ * `services/email/transactional.ts` with every other outbound message, so the
+ * provider-helper rule holds and this file never touches a provider.
+ */
+export interface DestructionNotifier {
+    sendDestructionIncompleteNotice(
+        to: string,
+        details: { destroyedAt: Date; stores: string[]; body: string },
+    ): Promise<void>;
+}
+
+/**
+ * The notice text, built here because it is a compliance statement rather than
+ * presentation.
+ *
+ * Mechanical on purpose. A deletion that did not finish is not a security
+ * incident, and wording it as one would misinform the reader about both what
+ * happened and what they have to do about it (review).
+ */
+export function destructionIncompleteBody(destroyedAt: Date, stores: string[]): string {
+    const date = destroyedAt.toISOString().slice(0, 10);
+    return `Tenant destruction initiated on ${date} did not complete for the following `
+        + `stores: ${stores.join(', ')}. The database and cache portions completed. `
+        + 'The remaining deletion is being remediated, and we will confirm when it is complete.';
+}
+
 export class TenantPurgeService {
     constructor(
         private db: D1Database,
         private r2: R2Bucket,
         private kv: KVNamespace,
         private dos: PurgeDurableObjects = {},
+        private notifier?: DestructionNotifier,
     ) {}
 
     async purge(tenantId: string): Promise<PurgeResult> {
@@ -69,6 +101,16 @@ export class TenantPurgeService {
         const tenantSlug = t?.slug ?? null;
         const userIds = (await d.select({ id: users.id }).from(users).where(eq(users.tenantId, tenantId)).all())
             .map(u => u.id as string);
+
+        //    The owner's address, resolved HERE for the same reason as the
+        //    report ids: step 3 deletes `users`, so by the time we know a store
+        //    refused to purge there is nobody left to address. Held in memory,
+        //    used, and dropped — it is never written to the record. See the
+        //    `incomplete_notified_at` column comment for why not.
+        const owner = await d.select({ email: users.email }).from(users)
+            .where(and(eq(users.tenantId, tenantId), eq(users.role, 'owner'), isNull(users.deletedAt)))
+            .get();
+        const ownerEmail = owner?.email ?? null;
         const kvKeys: string[] = [];
         if (t?.slug) {
             kvKeys.push(`tenant:${t.slug}`);
@@ -111,11 +153,12 @@ export class TenantPurgeService {
         //    destroyed yet, so refusing to start a destruction we cannot
         //    evidence leaves the tenant exactly as it was.
         const recordId = crypto.randomUUID();
+        const destroyedAt = new Date();
         await d.insert(tenantDestructionRecords).values({
             id:          recordId,
             tenantId,
             tenantSlug,
-            destroyedAt: new Date(),
+            destroyedAt,
             status:      DESTRUCTION_STATUS.STARTED,
             //    The measurement universe is declared UP FRONT, with the same
             //    reasoning as the row itself: a purge that dies partway leaves
@@ -261,6 +304,34 @@ export class TenantPurgeService {
                 .where(eq(tenantDestructionRecords.id, recordId));
         } catch (err) {
             logger.error('Destruction record close failed', { tenantId, recordId }, err instanceof Error ? err : undefined);
+        }
+
+        // 8. Tell the controller, if there is anything to tell them.
+        //
+        //    review: without undue delay after the failure is KNOWN, not after
+        //    remediation completes. So it is sent here, at the moment the
+        //    incomplete list is final, and not deferred to whoever fixes it.
+        //
+        //    The timestamp is written only after the send returns. A send that
+        //    throws leaves it null, which is an alert on the same principle as
+        //    `status` stuck at 'started' — writing it regardless would produce a
+        //    record asserting a notification nobody received. And the purge
+        //    itself must not fail here: the rows are already gone.
+        if (incompleteStores.length > 0 && this.notifier && ownerEmail) {
+            try {
+                await this.notifier.sendDestructionIncompleteNotice(ownerEmail, {
+                    destroyedAt, stores: incompleteStores,
+                    body: destructionIncompleteBody(destroyedAt, incompleteStores),
+                });
+                await d.update(tenantDestructionRecords)
+                    .set({ incompleteNotifiedAt: new Date() })
+                    .where(eq(tenantDestructionRecords.id, recordId));
+            } catch (err) {
+                logger.error('Destruction incomplete notice failed', { tenantId, recordId }, err instanceof Error ? err : undefined);
+            }
+        } else if (incompleteStores.length > 0) {
+            logger.error('Destruction incomplete and no controller could be notified',
+                { tenantId, recordId, incompleteStores, hasNotifier: !!this.notifier, hasOwner: !!ownerEmail });
         }
 
         logger.info('Tenant purged', { tenantId, rows, r2: r2Count, r2Bytes, kv: kvCount, durableObjects, incompleteStores });
