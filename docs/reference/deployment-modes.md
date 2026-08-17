@@ -17,6 +17,15 @@ pure function that resolves one from the environment. Nothing else in the worker
 reads `APP_MODE`; a gate in `tests/unit/sync/portal-isolation.spec.ts` keeps it
 that way.
 
+> **Branding is not one of these differences, in either mode.** An earlier
+> version of this table carried a `brandingSource` row saying standalone took
+> its company name and colour from `APP_NAME` / `PRIMARY_COLOR`. That was never
+> true. Both modes read `tenant_configs` and let it win; `APP_NAME` and
+> `PRIMARY_COLOR` are the values used until something is set. **Change your
+> company name and primary colour in Settings → Workspace** — no redeploy, in
+> either mode. The row is gone because the distinction it described did not
+> exist.
+
 > The table below is **generated** from those two constants by
 > `npm run docs:modes`. Do not edit it by hand — edit the constants, then
 > regenerate. `tests/unit/platform/deployment-modes-doc.spec.ts` fails if the
