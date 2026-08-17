@@ -2390,7 +2390,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `doc` | text | NN UQ IX |  | `privacy, terms` | Which document. It is the discriminator in the uniqueness key and in every "latest in force" lookup, so the two version independently — saving Terms never mints a Privacy row. |
+| `doc` | text | NN UQ IX |  | `privacy, terms, agent_terms` | Which document. It is the discriminator in the uniqueness key and in every "latest in force" lookup, so the two version independently — saving Terms never mints a Privacy row. **[more]** |
 | `version` | text | NN UQ |  |  | `YYYY-MM-DD` in the tenant's own timezone — the date a reader is shown. |
 | `body_snapshot` | text |  |  |  | The document body as published. NULL means the tenant cleared their override and reverted to the built-in template — which is a publish, and is recorded as one, because "they went back to the default" is exactly the kind of change a missing row would silently hide. |
 | `content_hash` | text | NN |  |  | SHA-256 hex of `bodySnapshot` (of the empty string when it is NULL). |
@@ -2542,7 +2542,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `totp_verified_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `last_active_at` | integer |  |  |  | Agent Accounts A2 — per-user notification preferences. Default ON for referral + report (high signal); default OFF for paid (high noise — the inspector forwards the receipt manually if the agent wants visibility). **[more]** |
 | `deleted_at` | integer | IX |  |  | `mentor_id`, `assigned_section_ids` and `expires_at` were here — the role-extension columns of the apprentice / specialist / guest subsystems, all three removed 2026-06-13. **[more]** |
-| `terms_accepted` | text |  |  |  | Legal-links feature — set when the account was created through a public form (agent signup / agent invite) while the operator had TERMS_URL/PRIVACY_URL configured. |
+| `terms_accepted` | text |  |  |  | The acceptance an agent gave, as evidence rather than as a link. `{at, version, contentHash, ip?, country?}`. **[more]** |
 | `permission_overrides` | text |  |  |  | Role permission-template overrides (2026-06-13). Nullable JSON map of the four toggleable capabilities; absent/null = pure role template. |
 | `timezone` | text |  |  |  | Per-user display-timezone override (IANA name). NULL = inherit the tenant's default_timezone. |
 | `locale` | text |  |  |  | Per-user display-locale override (BCP-47). NULL = inherit the tenant's default_locale. |

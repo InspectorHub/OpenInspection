@@ -75,13 +75,23 @@ export const users = sqliteTable('users', {
     // the user retypes their email to confirm. NULL = active. Kept rather
     // than hard-deleted so audit-linked rows remain referentially intact.
     deletedAt:            integer('deleted_at', { mode: 'timestamp_ms' }),
-    // Legal-links feature — set when the account was created through a public
-    // form (agent signup / agent invite) while the operator had
-    // TERMS_URL/PRIVACY_URL configured. JSON: {at, ip, country, termsUrl, privacyUrl}.
-    // Nullable: absent for accounts created before the feature or when the
-    // operator runs without configured legal docs.
+    /**
+     * The acceptance an agent gave, as evidence rather than as a link.
+     *
+     * `{at, version, contentHash, ip?, country?}`. The two URL fields are gone:
+     * a URL records where the text WAS, not what it SAID, and the page behind it
+     * can be edited so that the acceptance ends up pointing at something the
+     * signer never read. Version plus content hash is the pair that survives the
+     * text changing, and it is the standard every other legal artefact in this
+     * repository already meets.
+     *
+     * Removing the URL fields costs nothing here: production holds NULL on every
+     * row, so the old shape was never written. Nullable stays — a staff account
+     * has no agent terms, and the null is what says so rather than an empty
+     * object pretending to be an acceptance.
+     */
     termsAccepted: text('terms_accepted', { mode: 'json' }).$type<{
-        at: string; ip?: string; country?: string; termsUrl?: string; privacyUrl?: string;
+        at: string; version: string; contentHash: string; ip?: string; country?: string;
     } | null>(),
     // Role permission-template overrides (2026-06-13). Nullable JSON map of the
     // four toggleable capabilities; absent/null = pure role template.

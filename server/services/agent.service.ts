@@ -57,7 +57,9 @@ export class AgentService {
         email: string;
         password: string;
         name: string;
-        termsAccepted?: { at: string; ip?: string; country?: string; termsUrl?: string; privacyUrl?: string };
+        termsAccepted?: {
+            at: string; version: string; contentHash: string; ip?: string; country?: string;
+        } | undefined;
     }): Promise<{ userId: string; email: string }> {
         return signup(this.db, input);
     }
