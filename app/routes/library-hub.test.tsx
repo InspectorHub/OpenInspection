@@ -58,6 +58,28 @@ describe("library hub marketplace tile", () => {
     expect(queryByText("Marketplace")).toBeNull();
   });
 
+  it("survives a session context that carries no deployment block at all", async () => {
+    // Fail closed means HIDE the tile, not crash the route. `?.deployment.x`
+    // guards the context and not the block, so a payload written before the
+    // capability shipped — every older fixture, and any cached session from a
+    // previous deploy — threw on the property access and replaced the page with
+    // "Unexpected Application Error!". The existing CommandPalette test caught
+    // this only because its fixture happened to omit the block; this one says so
+    // on purpose.
+    const Stub = createRoutesStub([
+      {
+        id: "routes/auth-layout",
+        path: "/",
+        loader: () => ({ context: { branding: { isSaas: true } } }),
+        Component: () => <Outlet />,
+        children: [{ path: "library", Component: LibraryHub }],
+      },
+    ]);
+    const { findByText, queryByText } = render(<Stub initialEntries={["/library"]} />);
+    await findByText("Templates");
+    expect(queryByText("Marketplace")).toBeNull();
+  });
+
   it("follows the capability when the capability and the mode disagree", async () => {
     // The only test here that can fail for the right reason. The two above pass
     // against BOTH implementations, because a session where `isSaas` and

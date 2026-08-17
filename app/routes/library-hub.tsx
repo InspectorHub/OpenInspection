@@ -76,9 +76,11 @@ export default function LibraryHub() {
   // answers to one question — and it was the only reachable answer until that
   // capability was put on the session-context wire.
   //
-  // Fail closed is unchanged: no session context (fetch failed) hides the tile
-  // rather than offering a door that 404s.
-  const hasMarketplace = useSessionContext()?.deployment.hasContentMarketplace === true;
+  // Fail closed: no session context, or one without `deployment`, hides the
+  // tile rather than offering a door that 404s. BOTH `?.` are load-bearing —
+  // guarding only the context throws on a payload that predates the capability,
+  // and a crashed route is not a closed door.
+  const hasMarketplace = useSessionContext()?.deployment?.hasContentMarketplace === true;
   return (
     <div className={HUB_GRID_CLASS}>
       {getTiles(hasMarketplace).map((t) => (

@@ -119,9 +119,15 @@ export function CommandPalette({
   /**
    * The capability, not the mode — `marketplace.tsx` enforces this same one.
    * Reading `branding.isSaas` here was the only answer REACHABLE until the
-   * capability was put on the session-context payload. Fail closed unchanged.
+   * capability was put on the session-context payload.
+   *
+   * Both `?.` are load-bearing. Guarding only the context reads as fail-closed
+   * and is not: a session context WITHOUT `deployment` — which is every fixture
+   * written before that field shipped, and any cached payload from an older
+   * deploy — throws on the property access and takes the whole route down. A
+   * crash is not a closed door.
    */
-  const hasMarketplace = sessionCtx?.deployment.hasContentMarketplace === true;
+  const hasMarketplace = sessionCtx?.deployment?.hasContentMarketplace === true;
 
   // F6 — Build booking link action dynamically from session context
   const bookingActions = useMemo(() => {
