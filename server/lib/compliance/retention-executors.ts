@@ -48,7 +48,7 @@ export type AnyDb = DrizzleD1Database<Record<string, unknown>> | { [k: string]: 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * The audit-row anonymize SET for the RETENTION clock.
+ * The audit-row in-place-erasure SET for the RETENTION clock.
  *
  * The shared `ANONYMIZE_AUDIT_PII` clears the free text and stops there,
  * because on a consumer DSAR `user_id` and `ip_address` are a STAFF actor on a
@@ -58,8 +58,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * Storage limitation asks a different question. At the two-year mark nobody has
  * requested anything; the basis for holding the identifiers has simply run out,
  * and that applies to the staff actor too. Keeping an IP address on a row
- * labelled "anonymized" would make the label false — an IP is an identifier,
- * and the manifest's own risk note is that a narrowed anonymize rule claims a
+ * labelled as cleared would make the label false — an IP is an identifier,
+ * and the manifest's own risk note is that a narrowed erase rule claims a
  * legal outcome it no longer delivers. What survives is the structured event:
  * action, entity_type, entity_id, and the timestamp that made the row due.
  */

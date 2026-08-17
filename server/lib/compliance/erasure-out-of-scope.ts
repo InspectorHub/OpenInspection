@@ -192,8 +192,8 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // ── reports ───────────────────────────────────────────────────────────────
     // A report is findings about a named person's property. `title` is the only
     // non-id column, and it is system-written — a literal or a snapshot of a
-    // tenant catalogue service name — so it has its own `anonymize` rule rather
-    // than an entry here. The rest of the row is ids, enums and a timestamp,
+    // tenant catalogue service name — so it has its own `erase_in_place` rule
+    // rather than an entry here. The rest of the row is ids, enums and a stamp,
     // declared out of scope below.
     //
     // (Corrected 2026-08-07 — this said `title` is "free text a human writes"
@@ -216,7 +216,7 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // said at a date, which is the one thing it exists to answer. Listed rather
     // than left silent because the PII heuristic does not flag any column here,
     // and silence is not the same as a decision.
-    // The payment ledger. The `note` column has its own anonymize rule above;
+    // The payment ledger. The `note` column has its own in-place erase rule;
     // everything that carries a figure or an actor reference is declared here
     // rather than left silent, because the heuristic flags none of it and
     // silence is not the same as a decision.
@@ -316,7 +316,7 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // `report` -> `reports.inspector_narrative`. The classification is unaffected;
     // what changes is that the reason now names the tables that exist.
     { table: 'ai_content_reviews', column: 'artifact_id',
-      reason: 'opaque primary key of the inspection_results or reports row that received the text; that row carries its own rules (reports.inspector_narrative has an anonymize rule in erasure-manifest.ts), the same answer as reports.inspection_id. Holds no part of the reviewed prose' },
+      reason: 'opaque primary key of the inspection_results or reports row that received the text; that row carries its own rules (reports.inspector_narrative is erased in place by its own rule in the erasure manifest), the same answer as reports.inspection_id. Holds no part of the reviewed prose' },
     { table: 'ai_content_reviews', column: 'artifact_type',
       reason: 'two-value enum (inspection_result | report) naming WHICH table artifact_id points into — a pointer discriminator, not personal data' },
     { table: 'ai_content_reviews', column: 'ai_call_id',

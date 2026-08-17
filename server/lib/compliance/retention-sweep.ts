@@ -2,10 +2,10 @@
  * Track I-a GDPR (spec §7) — the retention sweep (daily Cron step).
  *
  * Past-retention-window data-minimization of signed agreements. The orchestrator
- * (`erasure-orchestrator.ts`) anonymizes the SATELLITE PII on a DSAR while
+ * (`erasure-orchestrator.ts`) erases the SATELLITE PII in place on a DSAR while
  * KEEPING signature_base64 + the audit chain as the retained evidence; this
  * sweep is the back-end clock that, once the tenant's retention window has
- * elapsed past `signedAt`, ANONYMIZES that same satellite PII AND destroys the
+ * elapsed past `signedAt`, CLEARS that same satellite PII AND destroys the
  * signature in one pass. Retention-expiry is therefore a SELF-CONTAINED
  * data-minimization clock — independent of whether any DSAR was ever filed
  * (GDPR Art. 5(1)(e) storage limitation; we must not keep PII forever just
@@ -18,11 +18,11 @@
  * scope). Already-purged rows (`purged_at IS NOT NULL`) are skipped → idempotent.
  *
  * Action per due envelope:
- *  - ANONYMIZE the satellite PII on the envelope + its `agreement_signers` rows
- *    using the SHARED `ANONYMIZE_REQUEST_PII` / `ANONYMIZE_SIGNER_PII` SETs (the
+ *  - ERASE IN PLACE the satellite PII on the envelope + its `agreement_signers`
+ *    rows using the SHARED `ANONYMIZE_REQUEST_PII` / `ANONYMIZE_SIGNER_PII` SETs (the
  *    SAME column→value mapping the erase orchestrator uses, so a row erased first
  *    then swept stays byte-identical — '[erased]' sentinel for NOT NULL columns,
- *    NULL for nullable). Idempotent on already-anonymized rows (re-setting the
+ *    NULL for nullable). Idempotent on already-cleared rows (re-setting the
  *    same values is a no-op in effect).
  *  - NULL `signature_base64` on the envelope's `agreement_signers` rows — the
  *    only place a signature lives (the orchestrator KEEPS it on a DSAR; the

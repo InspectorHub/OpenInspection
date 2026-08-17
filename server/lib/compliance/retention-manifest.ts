@@ -15,13 +15,19 @@
  * two it came from. That file is where you go to change HOW LONG; this one is
  * WHICH TABLES and WHAT ACTION.
  *
- * ── Anonymize means the actor does not survive ──────────────────────────────
- * `anonymize` on this list is the same verb the erasure orchestrator uses, and
- * it has to keep meaning the same thing: the structured event survives, the
+ * ── Erase-in-place means the actor does not survive ─────────────────────────
+ * `erase_in_place` on this list is the same verb the erasure orchestrator uses,
+ * and it has to keep meaning the same thing: the structured event survives, the
  * identifiers do not — including free text. A rule that scrubbed identifier
  * columns and left prose behind would claim a legal outcome it does not
- * deliver. The column sets come from the shared `anonymize-pii.ts` module for
+ * deliver. The column sets come from the shared satellite-PII module for
  * exactly that reason (see `retention-logs.ts`).
+ *
+ * The verb is deliberately NOT called `anonymize`, here or in the erasure
+ * manifest. review (review, CA-08) ruled the old name out: writing a
+ * sentinel over identifier columns in a surviving row is not CCPA
+ * deidentification and not GDPR anonymisation, and the name invited a future
+ * reader to cite it as proof that it was.
  *
  * ── Scope: platform-operational logs ────────────────────────────────────────
  * This catalogue governs the platform's own operational record surface. A
@@ -76,7 +82,7 @@ export interface RetentionRule {
     /** The column the window is measured from (snake_case). */
     timestampColumn: string;
     window: RetentionWindow;
-    action: 'delete' | 'anonymize';
+    action: 'delete' | 'erase_in_place';
     /** Why THIS period for THIS table. Enforced non-empty by the gate. */
     purpose: string;
     /**
@@ -97,7 +103,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         table: 'audit_logs',
         timestampColumn: 'created_at',
         window: { unit: 'months', value: AUDIT_LOG_ANONYMIZE_MONTHS },
-        action: 'anonymize',
+        action: 'erase_in_place',
         purpose: 'PII-bearing audit trail. Two years covers a dispute cycle plus the audit that follows it; past that the structured event (action, entity_type, entity_id) is the only part worth keeping, so the actor and the free-text metadata go and the row stays.',
     },
     {

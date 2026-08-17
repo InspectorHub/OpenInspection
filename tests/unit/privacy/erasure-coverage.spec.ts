@@ -18,8 +18,8 @@ import type { ErasureDecision } from '../../../server/lib/compliance/erasure-orc
  */
 describe('erasure coverage disclosure', () => {
     const decisions: ErasureDecision[] = [
-        { table: 'agreement_signers', action: 'anonymize', count: 1, legalBasis: 'art_17_3_e' },
-        { table: 'agreement_requests', action: 'anonymize', count: 1, legalBasis: 'art_17_3_e' },
+        { table: 'agreement_signers', action: 'erase_in_place', count: 1, legalBasis: 'art_17_3_e' },
+        { table: 'agreement_requests', action: 'erase_in_place', count: 1, legalBasis: 'art_17_3_e' },
         { table: 'contacts', action: 'delete', count: 1 },
         // Same table twice — the orchestrator emits one decision per envelope.
         { table: 'agreement_signers', action: 'delete', count: 2 },
