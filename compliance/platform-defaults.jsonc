@@ -1,0 +1,524 @@
+// Platform-defaults register — the values a fresh workspace receives, and who
+// decided them.
+//
+// review review B5: a default is a decision, and a decision made quietly on a
+// controller's behalf is the one nobody can point at afterwards. Each entry
+// carries B5's three fields — `default_owner`, `decision_type`,
+// `controller_override` — for one shipped default.
+//
+// ── THE LIMIT, FIRST, BECAUSE IT IS THE POINT ───────────────────────────────
+// This register is NOT complete and its gate says so on every run. There is no
+// binding table for "every default we ship". Defaults live in three places:
+// Drizzle `.default()` declarations, module constants, and `??` / `if` branches
+// inside services. Only the first is enumerable, and only for one table.
+//
+// So this register is anchored on exactly one input — the `tenant_configs`
+// `.default()` set in `server/lib/db/schema/tenant/core.ts` — and claims nothing
+// about the rest. `lint:platform-defaults` prints the anchored count beside the
+// number of `.default()` declarations elsewhere in the schema that are out of
+// scope, and states that branch defaults cannot be counted at all, so a green run
+// can never be read as "every default is classified".
+//
+// It is a SEPARATE FILE from `processing-stores.jsonc` for that reason. That
+// registry has a real denominator: both wrangler configs declare every store the
+// worker can reach, so a missing entry is a provable omission. Filing these
+// alongside it and gating them alike would lend this register a completeness it
+// cannot prove, which is the exact failure the whole program exists to fix.
+//
+// ── SIX RULES ───────────────────────────────────────────────────────────────
+//
+// 1. `decision_type` takes review three values, plus an honest fourth:
+//      · `technical`         — processor service design. Retry counts, display
+//                              formats, scheduling mechanics, sequence seeds.
+//      · `service_safeguard` — a service characteristic the Terms/DPA must
+//                              state. Sub-processor selection lives here.
+//      · `controller_choice` — the controller's substantive decision, not ours
+//                              to make quietly.
+//      · `unreviewed`        — the classification turns on a legal judgement
+//                              nobody has made yet. Written down rather than
+//                              guessed, with a null basis, and COUNTED by the
+//                              gate on every run. An unreviewed default that
+//                              reads as reviewed is the failure mode here.
+// 2. RETENTION-SHAPED DEFAULTS ARE `controller_choice` WITH
+//    `controller_override: required`. review was explicit that how long client
+//    data is kept is not ours to decide on a controller's behalf without
+//    surfacing it. The gate enforces this on the column name rather than
+//    trusting the classifier.
+// 3. `basis` is mandatory for every asserted classification and must be null for
+//    `unreviewed`. An assertion with no reasoning is a guess with a confident
+//    face; a guess with a citation attached is worse.
+// 4. `default_value` is a COPY, and uniquely among this program's registers that
+//    is deliberate: the gate re-reads the literal from the schema and fails when
+//    the two disagree. A default silently moving from 7 years to 10 is precisely
+//    what a register of static prose cannot catch, so here the copy is the
+//    tripwire rather than a second source of truth.
+// 5. `default_owner` names who can change the value a fresh workspace receives
+//    WITHOUT a code change to this repository:
+//      · `engine`         — only a change to this schema changes it.
+//      · `deployment`     — the deploying party sets it (env or deploy config).
+//      · `platform-write` — a platform process overwrites it after provisioning,
+//                            so the literal is only a starting position.
+//    WHOSE responsibility that is depends on the deployment mode and is the same
+//    answer for every row, so it is stated once here rather than repeated 42
+//    times: in SaaS the platform answers for an `engine` default; in standalone
+//    the OPERATOR does. "Platform default" is the operator's default on a
+//    self-hosted instance (review, deployment-mode split).
+// 6. `override_surface` is a POINTER to where a controller can actually change
+//    the value; the gate checks the file exists and mentions the column or the
+//    property. An `unreviewed` entry may keep its surface — whether a settings
+//    screen exists is a fact about the code, while whether an override is
+//    legally required is a judgement about the default, and the first should not
+//    be thrown away waiting on the second. `controller_override: none` with a
+//    surface named is a contradiction and fails.
+//
+// Verified against the schema and the write sites on 2026-08-17.
+{
+  "defaults": [
+    // ── Report print chrome ─────────────────────────────────────────────────
+    {
+      "column": "is_pdf_footer_shown",
+      "property": "pdfShowFooter",
+      "default_value": "true",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Print-layout chrome. Decides whether the company's own footer block renders; touches no personal data of any subject and carries no legal consequence either way.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-workspace.tsx"
+    },
+    {
+      "column": "is_pdf_page_numbers_shown",
+      "property": "pdfShowPageNumbers",
+      "default_value": "true",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Print-layout chrome; pagination only.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-workspace.tsx"
+    },
+    {
+      "column": "is_pdf_license_shown",
+      "property": "pdfShowLicense",
+      "default_value": "true",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Print-layout chrome. The licence number is a professional credential the inspector publishes by trade, and the report is already attributed to them by name.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-workspace.tsx"
+    },
+    {
+      "column": "default_profile_id",
+      "property": "defaultProfileId",
+      "default_value": "'signature'",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Which built-in report appearance profile a new workspace starts on. Presentation only.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-workspace.tsx"
+    },
+    // ── Communication routing: where a client's data leaves the estate ──────
+    {
+      "column": "email_mode",
+      "property": "emailMode",
+      "default_value": "'platform'",
+      "default_owner": "engine",
+      "decision_type": "service_safeguard",
+      "basis": "Selects WHICH sub-processor carries mail to the tenant's own contacts. Sub-processor identity is a service characteristic the Terms must state, not a private implementation detail — the store registry files the four adapters as external processors for the same reason.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-communication.tsx",
+      "note": "The value 'platform' means the DEPLOYMENT's configured provider account, so the effective sender is a deployment fact while the stored default is an engine one. In standalone the operator is that deployment."
+    },
+    {
+      "column": "email_byo_provider",
+      "property": "emailByoProvider",
+      "default_value": "'resend'",
+      "default_owner": "engine",
+      "decision_type": "service_safeguard",
+      "basis": "The sub-processor a workspace lands on when it moves to its own email account. Same Terms-disclosure question as email_mode, one level down.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-communication.tsx"
+    },
+    {
+      "column": "sms_mode",
+      "property": "smsMode",
+      "default_value": "'platform'",
+      "default_owner": "engine",
+      "decision_type": "service_safeguard",
+      "basis": "Selects which carrier path carries messages to the tenant's contacts, and whether a platform-funded sender is involved at all. A shared sender is a disclosure item in its own right.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-communication.tsx",
+      "note": "'platform' is reserved for first-party use and the admin settings schema REFUSES it when a tenant submits it, so this default is one a controller can move away from but not back to."
+    },
+    {
+      "column": "managed_provider",
+      "property": "managedProvider",
+      "default_value": "'twilio'",
+      "default_owner": "engine",
+      "decision_type": "service_safeguard",
+      "basis": "Which ISV runs managed compliance provisioning, sweep and webhook reception for a workspace — a sub-processor selection the Terms must name.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-communication.tsx",
+      "note": "Inert in standalone and in unconfigured SaaS: with no ISV credentials the resolver fails closed, so the default names a provider nothing yet calls."
+    },
+    {
+      "column": "is_managed_eligible",
+      "property": "managedEligible",
+      "default_value": "false",
+      "default_owner": "platform-write",
+      "decision_type": "service_safeguard",
+      "basis": "Gates the platform-funded managed compliance path. Default false is the fail-closed position: provisioning routes refuse until the platform grants eligibility, so nobody is enrolled in a platform-funded sender by omission.",
+      "controller_override": "none",
+      "override_surface": null,
+      "note": "The one entry that is not `engine`: the schema comment records that portal billing sync or a platform admin writes it, so the literal is a starting position rather than the effective value. Not a controller override — a workspace cannot grant itself eligibility, by design."
+    },
+    {
+      "column": "video_mode",
+      "property": "videoMode",
+      "default_value": "'r2'",
+      "default_owner": "engine",
+      "decision_type": "service_safeguard",
+      "basis": "Decides which store inspection video rests in. The store registry records the R2 path as tenant-prefixed and purge-reachable and the Stream path's purge reach as UNKNOWN, so which backend is the default is a safeguard the Terms description depends on.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-integrations.tsx"
+    },
+    // ── Retention (rule 2) ──────────────────────────────────────────────────
+    {
+      "column": "agreement_retention_years",
+      "property": "agreementRetentionYears",
+      "default_value": "6",
+      "default_owner": "engine",
+      "decision_type": "controller_choice",
+      "basis": "A retention period. review review B5: how long client data is kept is the controller's substantive decision. The window itself lives in the retention manifest, and the disclosed derivation (the UK Limitation Act simple-contract period) is the platform's suggestion, never an instruction.",
+      "controller_override": "required",
+      "override_surface": "app/routes/settings-compliance.tsx"
+    },
+    {
+      "column": "report_pdf_retention_years",
+      "property": "reportPdfRetentionYears",
+      "default_value": "7",
+      "default_owner": "engine",
+      "decision_type": "controller_choice",
+      "basis": "A retention period, and the one review named explicitly (review B1a): the platform default is prominently disclosed and the controller may choose longer or indefinite. An explicit tenant choice, 0 (indefinite) included, is a controller instruction and always wins.",
+      "controller_override": "required",
+      "override_surface": "app/routes/settings-compliance.tsx",
+      "note": "The market default among competitors is indefinite storage even after cancellation, so this default diverges from tenant expectation and has to be disclosed prominently rather than buried."
+    },
+    // ── review own rulings ────────────────────────────────────────────────
+    {
+      "column": "is_report_view_counting_enabled",
+      "property": "reportViewCountingEnabled",
+      "default_value": "false",
+      "default_owner": "engine",
+      "decision_type": "controller_choice",
+      "basis": "review review B4 assigns the legitimate interest in counting report opens to the COMPANY, not to us, so the company has to be able to decline it — and a default of false is the only position where nobody is counted until somebody chose to be.",
+      "controller_override": "required",
+      "override_surface": "app/routes/settings-compliance.tsx"
+    },
+    // ── Open questions: who may see whose data (rule 1, `unreviewed`) ───────
+    // Six defaults whose classification turns on a disclosure question no
+    // review round has answered. Each has a working settings surface, recorded
+    // and verified; what is missing is the ruling, not the switch.
+    {
+      "column": "point_of_contact",
+      "property": "pointOfContact",
+      "default_value": "'company'",
+      "default_owner": "engine",
+      "decision_type": "unreviewed",
+      "basis": null,
+      "controller_override": "unreviewed",
+      "override_surface": "app/routes/settings-communication.tsx",
+      "note": "Decides whether client-facing messages carry the individual inspector's identity or the company's. That is a disclosure decision about STAFF personal data, which looks like controller_choice — but review controller_choice examples are all about the client's data, and extending them to staff would be our inference, not their ruling. Default 'company' is the narrower disclosure either way."
+    },
+    {
+      "column": "is_archive_revoking_access",
+      "property": "archiveRevokesAccess",
+      "default_value": "false",
+      "default_owner": "engine",
+      "decision_type": "unreviewed",
+      "basis": null,
+      "controller_override": "unreviewed",
+      "override_surface": "app/routes/settings-inspection.tsx",
+      "note": "Decides whether archiving a contact also cuts that person's live links to their own report. A data subject's continued access to a record about them is not a question any round has reached; false (access survives archiving) is the default that takes nothing away."
+    },
+    {
+      "column": "is_customer_repair_export_enabled",
+      "property": "enableCustomerRepairExport",
+      "default_value": "false",
+      "default_owner": "engine",
+      "decision_type": "unreviewed",
+      "basis": null,
+      "controller_override": "unreviewed",
+      "override_surface": "app/routes/settings-workspace.tsx",
+      "note": "Enables an export of repair items for the client to hand onward to contractors — an onward disclosure of inspection content about a property and its occupants. Off by default, which is the position that needs no ruling to defend."
+    },
+    {
+      "column": "legal_mode",
+      "property": "legalMode",
+      "default_value": "'hosted'",
+      "default_owner": "engine",
+      "decision_type": "unreviewed",
+      "basis": null,
+      "controller_override": "unreviewed",
+      "override_surface": "app/routes/settings-compliance.tsx",
+      "note": "Decides whose Privacy and Terms govern the workspace's own clients: our hosted templates, or documents the tenant points at. Whether a controller MUST be able to publish its own notice — and what a hosted default commits us to when they do not — is a live question, not a settled one."
+    },
+    {
+      "column": "is_unpaid_blocked",
+      "property": "blockUnpaid",
+      "default_value": "false",
+      "default_owner": "engine",
+      "decision_type": "unreviewed",
+      "basis": null,
+      "controller_override": "unreviewed",
+      "override_surface": "server/lib/validations/admin/settings.ts",
+      "note": "The report pay-gate. Withholding a report from the person it is about until an invoice is paid is a commercial decision with a data-subject-access shadow, and nobody has ruled on which frame governs. Default false = no gate. The surface is the admin API contract; there is no settings screen for it."
+    },
+    {
+      "column": "is_unsigned_agreement_blocked",
+      "property": "blockUnsignedAgreement",
+      "default_value": "false",
+      "default_owner": "engine",
+      "decision_type": "unreviewed",
+      "basis": null,
+      "controller_override": "unreviewed",
+      "override_surface": "app/routes/settings-booking.tsx",
+      "note": "Same shape as the pay-gate, on signature instead of payment: a booking is refused until the agreement is signed. Default false."
+    },
+    // ── Workflow and feature mechanics ──────────────────────────────────────
+    {
+      "column": "attention_thresholds",
+      "property": "attentionThresholds",
+      "default_value": "sql`'{\"agreement_unsigned_h\":72,\"invoice_overdue_h\":72,\"report_unpublished_h\":72}'`",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Hours before an item enters the INTERNAL 'Needs Attention' bucket on the tenant's own dashboard. Nothing is sent to anybody on this timer, which is what keeps it out of review automated-client-messaging category.",
+      "controller_override": "available",
+      "override_surface": "server/api/admin/admin-settings.ts",
+      "note": "The 72-hour value is ALSO written as a module constant in the admin settings validations, so this default already exists twice in the codebase. That second copy is exactly the class of default this register cannot enumerate — a constant, not a schema declaration — and it is named here as the worked example of the limit in the header."
+    },
+    {
+      "column": "is_repair_list_enabled",
+      "property": "enableRepairList",
+      "default_value": "false",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Whether the repair-list feature appears at all. A product surface toggle; it changes what the tenant's staff can build, not who sees anybody's data.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-workspace.tsx"
+    },
+    {
+      "column": "is_pdf_pipeline_enabled",
+      "property": "enablePdfPipeline",
+      "default_value": "false",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Selects the rendering pipeline a report PDF is produced by. Processor service design: the output is the same document either way.",
+      "controller_override": "available",
+      "override_surface": "server/lib/validations/admin/settings.ts"
+    },
+    {
+      "column": "is_team_mode_default",
+      "property": "teamModeDefault",
+      "default_value": "false",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Whether new inspections start in team mode. A workflow default over the tenant's own staff assignment.",
+      "controller_override": "available",
+      "override_surface": "server/lib/validations/admin/settings.ts"
+    },
+    {
+      "column": "require_defect_fields",
+      "property": "requireDefectFields",
+      "default_value": "'none'",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "How strictly the editor validates a defect before it can be saved. Data-entry discipline over the tenant's own work product.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-inspection.tsx"
+    },
+    {
+      "column": "is_concierge_review_required",
+      "property": "conciergeReviewRequired",
+      "default_value": "false",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Whether an agent-submitted booking waits for owner approval before the client is sent a confirmation link. An internal approval step in the tenant's own intake.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-booking.tsx"
+    },
+    {
+      "column": "is_inspector_choice_allowed",
+      "property": "allowInspectorChoice",
+      "default_value": "false",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Whether the public booking page offers an inspector dropdown. Intake mechanics; the assignment is made either way.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-booking.tsx"
+    },
+    {
+      "column": "is_collab_editing_enabled",
+      "property": "collabEditing",
+      "default_value": "true",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Whether the editor routes reads and writes through the collaborative document instead of the per-field path. A transport choice inside the tenant's own workspace.",
+      "controller_override": "none",
+      "override_surface": null,
+      "note": "The schema calls this a 'per-tenant operator toggle', but there is NO write site: every reference reads it, and no settings screen or API sets it. So the shipped default is currently the only value any workspace can have, and the store registry's Durable Object entry is reachable for every tenant as a consequence. Recorded as `none` because that is what the code does, not what the comment says."
+    },
+    {
+      "column": "is_reserve_schedule_enabled",
+      "property": "reserveScheduleEnabled",
+      "default_value": "false",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Whether a commercial assessment renders the capital-reserve table alongside the baseline cost table. Report content over the tenant's own findings.",
+      "controller_override": "none",
+      "override_surface": null,
+      "note": "Read-only in the same way as the collab toggle: every reference reads it and nothing writes it, so the opt-in it documents cannot presently be exercised."
+    },
+    {
+      "column": "reserve_term_years",
+      "property": "reserveTermYears",
+      "default_value": "12",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "The projection horizon of the capital-reserve table — how far forward a cost forecast runs. NOT a retention period: nothing is kept for this long, and the gate's retention rule matches the word rather than the `_years` suffix so that this entry is not mislabelled by shape.",
+      "controller_override": "none",
+      "override_surface": null,
+      "note": "Industry convention rather than an ASTM requirement, and read with a duplicated `?? 12` fallback at two call sites — a second and third copy of the same number that this register cannot enumerate."
+    },
+    // ── Scheduling mechanics ────────────────────────────────────────────────
+    {
+      "column": "booking_slot_mode",
+      "property": "bookingSlotMode",
+      "default_value": "'fixed'",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "How the public booking grid is aligned. Scheduling mechanics.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-booking.tsx"
+    },
+    {
+      "column": "booking_slot_interval_min",
+      "property": "bookingSlotIntervalMin",
+      "default_value": "30",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Step of the public booking grid, in minutes. Scheduling mechanics.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-booking.tsx"
+    },
+    {
+      "column": "booking_min_lead_hours",
+      "property": "bookingMinLeadHours",
+      "default_value": "0",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Minimum notice a public booking must give. Scheduling mechanics; 0 accepts same-day.",
+      "controller_override": "available",
+      "override_surface": "server/api/admin/admin-booking-routing.ts"
+    },
+    {
+      "column": "booking_routing_strategy",
+      "property": "bookingRoutingStrategy",
+      "default_value": "'first_available'",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Which of the tenant's qualified inspectors an auto-assigned booking goes to. Allocation of the tenant's own staff, and the strategy records a named reason when it degrades rather than degrading silently.",
+      "controller_override": "available",
+      "override_surface": "server/api/admin/admin-booking-routing.ts"
+    },
+    {
+      "column": "booking_conflict_policy",
+      "property": "bookingConflictPolicy",
+      "default_value": "'advisory'",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Whether internal scheduling warns about a double-booking or refuses the write. Scheduling mechanics; the conflict list is shown either way.",
+      "controller_override": "available",
+      "override_surface": "server/lib/validations/admin/settings.ts"
+    },
+    {
+      "column": "holiday_public_policy",
+      "property": "holidayPublicPolicy",
+      "default_value": "'open'",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "How the public booking page treats resolved closed dates. Scheduling mechanics.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-booking.tsx"
+    },
+    {
+      "column": "holiday_internal_policy",
+      "property": "holidayInternalPolicy",
+      "default_value": "'advisory'",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "How internal scheduling treats resolved closed dates. Scheduling mechanics.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-booking.tsx"
+    },
+    // ── Locale, formats and counters ────────────────────────────────────────
+    {
+      "column": "default_timezone",
+      "property": "defaultTimezone",
+      "default_value": "'UTC'",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "The workspace's display anchor for reports, reminders and calendar events. Presentation: UTC is the neutral starting point, and a user's own timezone overrides it where set.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-workspace.tsx"
+    },
+    {
+      "column": "default_locale",
+      "property": "defaultLocale",
+      "default_value": "'en-US'",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Display locale for a new workspace. Presentation only.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-workspace.tsx"
+    },
+    {
+      "column": "currency",
+      "property": "currency",
+      "default_value": "'USD'",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Currency amounts are denominated and rendered in. Presentation over integer cents; the admin schema currently accepts only USD, so the default is also the product's present limit.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-workspace.tsx"
+    },
+    {
+      "column": "date_format",
+      "property": "dateFormat",
+      "default_value": "'us'",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Date order shown to readers. Presentation only.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-workspace.tsx"
+    },
+    {
+      "column": "time_format",
+      "property": "timeFormat",
+      "default_value": "'12h'",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Clock shown to readers. Presentation only.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-workspace.tsx"
+    },
+    {
+      "column": "invoice_seq",
+      "property": "invoiceSeq",
+      "default_value": "1000",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Seed of the per-workspace invoice number sequence, allocated by an atomic increment. A counter's starting value: cosmetic, and deliberately not 1 so a first invoice does not advertise itself as one.",
+      "controller_override": "none",
+      "override_surface": null
+    }
+  ]
+}
