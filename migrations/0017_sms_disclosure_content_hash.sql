@@ -1,0 +1,30 @@
+-- A consent proves what was shown, not which row number was current.
+--
+-- `sms_consent_log.disclosure_version` is an integer pointing at a row in
+-- `sms_disclosure_versions` whose `text` nothing prevents rewriting. So "the
+-- consumer consented to version 1" is only worth as much as the assumption that
+-- version 1 still says what it said. In a TCPA dispute that assumption is
+-- exactly what the other side is contesting, which makes it the wrong thing to
+-- rest on. This is evidentiary weight, not governance hygiene.
+--
+-- Be precise about what is being fixed: nothing in the engine UPDATEs
+-- `sms_disclosure_versions` today. There are inserts and one retention delete,
+-- and no edit path anywhere. This migration and the service change that
+-- accompanies it close a door that is standing open, not one somebody is
+-- currently walking through. The immutability test is what keeps it shut, and
+-- the hash is what makes a later edit detectable rather than merely forbidden.
+--
+-- Both columns are nullable, and NULL is load-bearing. SQLite has no SHA-256,
+-- so this migration computes nothing, and a backfill from the application would
+-- have to hash whatever the text says TODAY and stamp it on a row published
+-- earlier — asserting the two are the same words, which is the precise claim
+-- the column exists to support and which nobody can verify after the fact. A
+-- NULL therefore reads as "published before disclosures were hashed", which is
+-- true, and never as a hash of something.
+--
+-- The plan's summary table also promised this table would gain a "status"
+-- column. No step of that plan ever specified one — not its meaning, its
+-- values, or its readers — so none is added here. A guessed state machine on a
+-- legal-evidence table is worse than an absent one.
+ALTER TABLE `sms_consent_log` ADD `disclosure_content_hash` text;--> statement-breakpoint
+ALTER TABLE `sms_disclosure_versions` ADD `content_hash` text;

@@ -5,6 +5,8 @@ import type { IntegrationProvider, TenantUpdateParams } from '../integration';
 import { logger } from '../logger';
 import { SQL_UUID_V4 } from './standalone-uuid';
 import { seedDefaultAutomations } from './standalone-seed-automations';
+import { SmsConsentService } from '../../services/sms-consent.service';
+import { SMS_DISCLOSURE_V1 } from '../../services/automation/shared';
 
 // Default Comment Library entries seeded into every new tenant. The same set
 // is also backfilled into existing tenants by the default-comments seed
@@ -61,17 +63,32 @@ async function seedDefaultComments(db: D1Database, tenantId: string): Promise<vo
 // INSERT). See that file for the seed data and the SP2 template-cutover
 // rationale.
 
-// Track L (D7) — seed the default TCPA SMS disclosure (version 1) once. Idempotent:
-// inserts only when no version exists yet (max-version guard via NOT EXISTS).
+// Track L (D7) — seed the default TCPA SMS disclosure (version 1) once.
+//
+// THREE things used to be wrong here, and all three came from this path writing
+// the row itself instead of asking the service that owns the table:
+//
+//  1. The disclosure text was a STRING LITERAL duplicated from
+//     `SMS_DISCLOSURE_V1`. Two copies of the exact words a consumer consents to,
+//     drifting independently, is the shape of a consent record pointing at text
+//     that no longer says what it said.
+//  2. It wrote no `content_hash`, so every self-hosted install started life with
+//     an unhashed version — and a NULL hash never matches, so republishing the
+//     identical text would mint a second version rather than being a no-op.
+//  3. Its `NOT EXISTS` guard and the publish path's de-duplication answer
+//     DIFFERENT questions — "does any version exist" versus "is this the same
+//     text as the current one" — so having only the first one here meant the
+//     platform default could be appended on top of a workspace's own wording.
+//
+// It now delegates, keeping the existence guard (which the service does not
+// have) and inheriting the hashing and de-duplication (which this path did not).
 async function seedSmsDisclosureV1(db: D1Database): Promise<void> {
     try {
-        await db.prepare(`
-            INSERT INTO sms_disclosure_versions (version, text, published_at)
-            SELECT 1, ?, unixepoch('now') * 1000
-            WHERE NOT EXISTS (SELECT 1 FROM sms_disclosure_versions)
-        `).bind(
-            'By providing your phone number and opting in, you agree to receive appointment and report text messages from {{company_name}}. Message frequency varies by your inspection activity. Message and data rates may apply. Reply STOP to opt out, HELP for help.',
-        ).run();
+        const existing = await db.prepare(
+            'SELECT 1 FROM sms_disclosure_versions LIMIT 1',
+        ).first();
+        if (existing) return;
+        await new SmsConsentService(db).publishDisclosure(SMS_DISCLOSURE_V1);
     } catch (err) {
         // non-fatal: setup wizard must not fail because of seed data
         logger.warn('seedSmsDisclosureV1.failed', {

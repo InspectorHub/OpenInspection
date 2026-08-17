@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 94 |
-| Columns | 1109 |
+| Columns | 1116 |
 | Indexes (excluding primary keys) | 159 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 509 (46%) |
+| Columns carrying a source comment | 516 (46%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -24,7 +24,7 @@ a tenant, which is the only reason to be missing it:
 That is 8 of 94. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 174 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 175 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -2057,7 +2057,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `sms_consent_log`
 
-<sub>server/lib/db/schema/compliance.ts · 12 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/compliance.ts · 13 columns · primary key `id`</sub>
 
 > Track L (D7) — append-only SMS consent ledger (mirrors erasure_log). Current consent state = latest event per (tenant_id, contact_id).
 
@@ -2075,6 +2075,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
 | `subject_kind` | text | NN IX | `'contact'` | `contact, user` | WHO the consent is about, generalised beyond `contacts`. Staff are `users` rows and have no contact, so a ledger keyed only on `contact_id` could not record their STOP at all. **[more]** |
 | `subject_id` | text | NN IX | `''` |  | *App-layer reference to another row — no database foreign key.* |
+| `disclosure_content_hash` | text |  |  |  | The disclosure's `content_hash`, copied at consent time. `disclosure_version` alone is a pointer, and a pointer proves nothing about the words if the pointed-at text can move; this column is what makes "the consumer consented to this text" survive as evidence independent of the other table. **[more]** |
 
 **Indexes**
 
@@ -2106,7 +2107,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `sms_disclosure_versions`
 
-<sub>server/lib/db/schema/compliance.ts · 3 columns · primary key `version`</sub>
+<sub>server/lib/db/schema/compliance.ts · 4 columns · primary key `version`</sub>
 
 > Track L (D7) — the TCPA disclosure shown at SMS opt-in. version is monotonic; the current (max) version is shown to clients and stamped on each consent event.
 
@@ -2115,6 +2116,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `version` | integer | PK NN |  |  | *An integer value.* |
 | `text` | text | NN |  |  |  |
 | `published_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `content_hash` | text |  |  |  | SHA-256 of `text` at publication, lowercase hex. The consent row copies it, so a consent proves WHAT was shown rather than which row number was current at the time. **[more]** |
 
 ---
 
@@ -2190,7 +2192,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `tenant_configs`
 
-<sub>server/lib/db/schema/tenant/core.ts · 86 columns · primary key `tenant_id`</sub>
+<sub>server/lib/db/schema/tenant/core.ts · 87 columns · primary key `tenant_id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2280,6 +2282,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `repair_quick_phrases` | text |  |  |  | #275 — quick-insert phrases for repair-request notes, maintained by the tenant. Same shape and storage idiom as `custom_referral_sources` above. **[more]** |
 | `legal_name` | text |  |  |  | The registered legal entity, as it appears on the licence — distinct from `companyName`, which is the trading brand / DBA. **[more]** |
 | `invoice_seq` | integer | NN | `1000` |  | The last invoice number handed out for this tenant. Default 1000, so the first invoice is **1001** — Jobber's convention, and the category's; starting at 1 tells a homebuyer they are this company's first customer. **[more]** |
+| `report_pdf_retention_years` | integer | NN | `7` |  | Years a rendered report PDF is kept. `0` = indefinite, which is an explicit controller instruction the platform executes rather than an absence of a setting. **[more]** |
 
 ---
 
@@ -2306,7 +2309,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `tenant_destruction_records`
 
-<sub>server/lib/db/schema/tenant/integration.ts · 10 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/tenant/integration.ts · 14 columns · primary key `id`</sub>
 
 > Privacy & Compliance P3 (§3.2) — durable, non-personal proof that a tenant's data was physically destroyed during offboarding purge.
 
@@ -2322,6 +2325,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `destroyed_at` | integer | NN IX |  |  | When destruction was INITIATED. The row is written before the cascade, not after — see `status`. |
 | `status` | text | NN | `'completed'` | `DESTRUCTION_STATUSES` | Written BEFORE the D1/R2/KV cascade as 'started', updated to 'completed' with the real counts once every step has run. **[more]** |
 | `completed_at` | integer |  |  |  | Null while 'started'. The gap between this and `destroyed_at` is how long the purge took; its absence is how you find one that never finished. |
+| `record_version` | integer | NN | `1` |  | ── Measurement universe (appended at table end for D1 rebuild safety) ── `status` answers "did the purge finish?". **[more]** |
+| `stores_measured` | text |  |  |  | JSON array of the stores this destruction attempted. Null on generation 1. |
+| `store_results` | text |  |  |  | JSON object of per-store outcome — `{"durable_objects":"incomplete"}`. This is where a store that refused to purge is recorded, rather than in `status`. |
+| `incomplete_notified_at` | integer |  |  |  | When the controller was told this destruction did not finish. Null when it finished, and null when the notice could not be sent. **[more]** |
 
 **Indexes**
 

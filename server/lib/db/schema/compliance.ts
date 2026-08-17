@@ -47,6 +47,23 @@ export const smsDisclosureVersions = sqliteTable('sms_disclosure_versions', {
     version:     integer('version').primaryKey(),
     text:        text('text').notNull(),
     publishedAt: integer('published_at', { mode: 'timestamp_ms' }).notNull(),
+    /**
+     * SHA-256 of `text` at publication, lowercase hex. The consent row copies it,
+     * so a consent proves WHAT was shown rather than which row number was current
+     * at the time.
+     *
+     * A published version is never edited — `SmsConsentService.amendDisclosure`
+     * exists only to say so. Publishing is also de-duplicated on this value: the
+     * same words republished return the existing version instead of minting a
+     * second one that a reader would have to diff to understand.
+     *
+     * NULL means "published before disclosures were hashed", which is true and
+     * checkable. It is deliberately NOT backfilled: hashing today's text and
+     * stamping it on an older row would assert that the two are the same text,
+     * which is the exact claim the column exists to support and nobody can verify
+     * after the fact.
+     */
+    contentHash: text('content_hash'),
 });
 
 // Track L (D7) — append-only SMS consent ledger (mirrors erasure_log). Current
@@ -110,6 +127,18 @@ export const smsConsentLog = sqliteTable('sms_consent_log', {
      */
     subjectKind:       text('subject_kind', { enum: ['contact', 'user'] }).notNull().default('contact'),
     subjectId:         text('subject_id').notNull().default(''),
+    /**
+     * The disclosure's `content_hash`, copied at consent time. `disclosure_version`
+     * alone is a pointer, and a pointer proves nothing about the words if the
+     * pointed-at text can move; this column is what makes "the consumer consented
+     * to this text" survive as evidence independent of the other table.
+     *
+     * NULL where the version it points at carries no hash (published before
+     * hashing), and NULL where no disclosure existed at all — the same absence the
+     * `disclosure_version = 0` sentinel already records. Appended at the END so
+     * drizzle-kit does not rebuild a table holding legal evidence.
+     */
+    disclosureContentHash: text('disclosure_content_hash'),
 }, (t) => [
     index('idx_sms_consent_contact').on(t.tenantId, t.contactId, t.createdAt),
     index('idx_sms_consent_subject').on(t.tenantId, t.subjectKind, t.subjectId, t.createdAt),
