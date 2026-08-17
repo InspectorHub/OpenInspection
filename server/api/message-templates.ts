@@ -168,6 +168,11 @@ const messageTemplateRoutes = createApiRouter()
                 : undefined;
             const gate = await smsSendGate({
                 db, tenantId, to: normalized, purpose: 'test', env: c.env,
+                // The template the author is testing, un-interpolated. A test
+                // send is exempt from express consent and from nothing else:
+                // the gate cannot verify that this number belongs to the
+                // operator, so it is not a hole to push a review link through.
+                bodyTemplate: body,
                 // `tenantTier` is not populated by session-context on this
                 // JWT-authenticated route, so fall back to a one-shot lookup.
                 ...(quotaGuard

@@ -156,6 +156,10 @@ export async function sendOneSms(args: SendOneSmsArgs): Promise<void> {
         contactId,
         roleKind,
         env,
+        // The un-interpolated body, so the gate can refuse marketing content on
+        // this channel. A tenant-written rule has no seeded class, so the
+        // category check cannot see it and this is the only thing that can.
+        bodyTemplate,
         // Lets the gate consult this recipient's own preference. Without it the
         // screen grows a text switch that writes a row nothing reads.
         ...(classId ? { classId } : {}),
@@ -171,6 +175,11 @@ export async function sendOneSms(args: SendOneSmsArgs): Promise<void> {
         ...buildBaseTemplateVars(inspection, tenant, appName, appHost),
         company_phone: gate.companyPhone ?? '',
     };
+    // SUBORDINATE TO THE GATE, and no longer the first answer. The gate refuses
+    // any body referencing a marketing variable, and that token is one — so a
+    // template reaching this line means the gate's denylist and this condition
+    // have diverged. Kept as the second line rather than deleted: it fails
+    // closed, and the cost of keeping it is one comparison.
     if (bodyTemplate.includes('{{review_url}}')) {
         if (!gate.reviewUrl) return void (await skip('review_url not configured'));
         vars.review_url = gate.reviewUrl;

@@ -30,6 +30,8 @@ import type { RoleKind } from '../people/role-kinds';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 import { logger } from '../logger';
 import { isPreferenceMuted } from '../notifications/preference-port';
+import { categoryOf } from '../notifications/classes';
+import { marketingVarsIn } from './marketing-content';
 
 /**
  * Why this message is being sent — and therefore which gates it is exempt from.
@@ -83,8 +85,27 @@ export interface SmsGateArgs {
      * A preference can only ever NARROW what consent already allows (§3.3):
      * it is checked AFTER consent, never instead of it, so muting a class can
      * never turn an un-consented number into a sendable one.
+     *
+     * A class id the registry does not know is REFUSED, not defaulted. See the
+     * marketing block below for why an unknown class cannot be assumed
+     * transactional.
      */
     classId?: string | undefined;
+    /**
+     * The body about to be sent, BEFORE `{{var}}` interpolation.
+     *
+     * REQUIRED, and deliberately so. This gate's marketing check only fires on
+     * what it is given, so an optional argument would make every future call
+     * site a silent bypass — the caller that forgets it would be the caller
+     * that sends the marketing text. Required makes forgetting a build error.
+     *
+     * A caller with no template still passes what it will actually send: the
+     * settings test-connection sends a fixed diagnostic sentence and hands that
+     * sentence over. `''` is accepted and means "nothing to inspect", but it
+     * has to be written down at the call site rather than arrived at by
+     * omission.
+     */
+    bodyTemplate: string;
     /** Absent ⇒ no quota enforcement (standalone, BYO, or a non-quota deployment). */
     quota?: { guard: PlanQuotaGuard; tier: string } | undefined;
 }
@@ -131,7 +152,7 @@ async function contactIdsForPhone(
 }
 
 export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
-    const { db, tenantId, to, purpose, contactId, roleKind, env, quota, classId } = args;
+    const { db, tenantId, to, purpose, contactId, roleKind, env, quota, classId, bodyTemplate } = args;
 
     // A tenant with no config row is 'platform' — the same default all three
     // chains already used. Wrapped rather than `.catch()`-chained because some
@@ -172,6 +193,57 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
         if (!contactId) return { allowed: false, reason: 'no sms consent' };
         if (await latestConsent(db, tenantId, contactId) !== 'granted') {
             return { allowed: false, reason: 'no sms consent' };
+        }
+    }
+
+    // ── Marketing may not ride a transactional consent.
+    //
+    // The consent we hold was captured under a disclosure describing
+    // appointment and report updates. A review request is promotional, which
+    // changes which consent the message needs, so counsel's ruling is to refuse
+    // marketing on this channel outright until a separate marketing-SMS consent
+    // exists. It is decided HERE and not in the template editor because a
+    // tenant can write any body they like: "do not leave the compliance
+    // decision to the content author."
+    //
+    // WHY BOTH CHECKS. The class check sees anything carrying a seeded class
+    // id. It cannot see a tenant-authored template, which has no class by
+    // construction — the content check is the half that can. Neither subsumes
+    // the other.
+    //
+    // WHY HERE — after revocation and consent, before the preference lookup.
+    // Placed after the preference check instead, a muted-but-consented
+    // recipient would decide the question consent should have decided: the
+    // refusal would come back as "recipient switched this off" and the fact
+    // that we may not send this content AT ALL would never be recorded. A
+    // message that may not be sent must not have its reason chosen by whether
+    // someone happened to mute the class.
+    //
+    // The type says this cannot be absent, and that is the primary defence —
+    // an omitting call site does not compile. The runtime check is here for the
+    // callers a type cannot reach (an `as any` handle, a spec, a JS consumer of
+    // the built worker): absence must be a REFUSAL, never a skipped check.
+    if (typeof bodyTemplate !== 'string') {
+        logger.error('[sms-gate] called with no message body; refusing', { tenantId, classId });
+        return { allowed: false, reason: 'sms gate called with no message body' };
+    }
+    const marketing = marketingVarsIn(bodyTemplate);
+    if (marketing.length > 0) {
+        return { allowed: false, reason: `marketing content on sms: ${marketing.join(', ')}` };
+    }
+    if (classId) {
+        const category = categoryOf(classId);
+        // Undefined is NOT 'transactional'. `categoryOf` returns it for an id
+        // outside the registry — a typo, or a class deleted while a caller
+        // still names it — and a caller that cannot say what it is sending must
+        // not be able to send it on a consent that was never given for it.
+        // There is deliberately no default here.
+        if (category === undefined) {
+            logger.warn('[sms-gate] refusing an unknown notification class', { tenantId, classId });
+            return { allowed: false, reason: `unknown notification class on sms: ${classId}` };
+        }
+        if (category === 'marketing') {
+            return { allowed: false, reason: 'marketing class on sms' };
         }
     }
 
