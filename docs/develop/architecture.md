@@ -219,6 +219,38 @@ Browser Run requires `compatibility_date >= "2026-03-24"` in `wrangler.jsonc` an
 - **D1 — Inspector pre-sign**: inspector can sign the agreement before sending to the client via `POST /api/admin/agreement-requests/:id/inspector-sign`. The render handler conditionally adds an inspector signature block when present.
 - **D2 — Auto-sign on publish**: per-inspection `auto_sign_on_publish` flag (plus a tenant-level default). When an inspector has a saved `users.default_signature_base64` and the flag is set, `InspectionService.publishInspection` auto-injects the inspector's signature into `inspection_results.data` at publish time. The report viewer and print output render the signature block automatically.
 
+### Invariant: a signature is a picture, never a biometric template
+
+A rendered signature **image** may be persisted for execution and evidence
+purposes. A reusable biometric or behavioural signature template may not be
+persisted or derived — not stroke geometry, not pen pressure, not timing.
+
+This is not a hypothetical boundary. The pad already samples pointer pressure
+and coalesced events into `StrokePoint { x, y, p }` while you draw. Its handle
+exposes only `toDataURL`, `isEmpty` and `clear`, so **today the invariant holds
+because one accessor does not exist** — which is one refactor from being untrue.
+
+Two properties make it enforceable rather than aspirational:
+
+- The exemption is a **directory**, `app/components/media-studio/`. That is
+  where the data is legitimately handled and where it stops. An allowlist of
+  file names would grow one entry at a time until it described nothing.
+- The gate scans for the stroke **symbols and field shapes**, not for column
+  definitions. The inspector signature is written into `inspection_results.data`
+  as `_inspector_signature`, which is a JSON blob — a stroke payload could ride
+  there with no schema change at all, and a column grep would never see it.
+
+Enforced by `npm run lint:signature-dynamics`
+(`scripts/check-signature-dynamics.mjs`), in the `lint` chain and
+`lint:gates-full`. Not to be confused with `lint:sigcompare`, which enforces the
+opposite duty on cryptographic verification: that it goes through
+`crypto.subtle.verify` or a constant-time compare.
+
+The related half — that a signature image is never used or stored for biometric
+**authentication** — belongs in the same gate rather than beside it, because the
+statutory test turns on "used to authenticate" and two separate gates could each
+pass while the boundary broke between them. It is not built yet.
+
 ## Service layer
 
 Each domain has a service class with:
