@@ -9,22 +9,22 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 94 |
-| Columns | 1118 |
-| Indexes (excluding primary keys) | 159 |
+| Tables | 95 |
+| Columns | 1123 |
+| Indexes (excluding primary keys) | 160 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 518 (46%) |
+| Columns carrying a source comment | 521 (46%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
 a tenant, which is the only reason to be missing it:
 
-`marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
+`discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
 
-That is 8 of 94. If a table you just added appears here,
+That is 9 of 95. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 175 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 177 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -695,6 +695,26 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ---
 
+## `discovery_objections`
+
+<sub>server/lib/db/schema/tenant/core.ts · 5 columns · primary key `id`</sub>
+
+> People who told us not to look them up. `GET /api/integration/tenants/by-email` answers, for one address, WHICH inspection companies hold a live report grant for it.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `email_hash` | text | NN UQ |  |  | SHA-256 hex of the normalised address. The lookup key, and the only identifier in the row. |
+| `proved_by` | text | NN |  | `inspection_access_token` | How control of the address was proven when the objection was filed. One member today, declared as an enum because the answer is evidence: a future authenticated surface (a portal account, a verified-email challenge) is a DIFFERENT proof standard and must be distinguishable in the record from this … |
+| `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
+| `withdrawn_at` | integer |  |  |  | Set instead of deleting the row, so the period during which the objection was in force stays answerable. |
+
+**Indexes**
+
+- **UNIQUE** `uq_discovery_objections_email_hash` (email_hash)
+
+---
+
 ## `document_review_items`
 
 <sub>server/lib/db/schema/pca-compliance.ts · 11 columns · primary key `id`</sub>
@@ -799,7 +819,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `request_id` | text | NN UQ IX |  |  | *App-layer reference to another row — no database foreign key.* |
-| `event` | text | NN UQ |  | `request.created, request.sent, request.viewed, agreement.signed, agree…` | The dedup key (with tenant + request) for the partial index below, and the label the admin audit trail and the downloadable evidence JSON print. |
+| `event` | text | NN UQ |  | `request.created, request.sent, request.viewed, signer.presented, agree…` | The dedup key (with tenant + request) for the partial index below, and the label the admin audit trail and the downloadable evidence JSON print. |
 | `payload_json` | text | NN |  |  | *Serialized JSON snapshot.* |
 | `prev_hash` | text |  |  |  | *Hash used for lookup and comparison; not reversible.* |
 | `hash` | text | NN |  |  | The chain link: the next row's prev_hash is a copy of this. verifyChain recomputes it, so a rewritten payload_json fails as reason:'hash' and an unlinked or reordered row fails as reason:'chain', naming brokenAt. |

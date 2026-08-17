@@ -20,6 +20,9 @@ import { aiProvisioningHandler } from './ai-provisioning';
 import { findGlobalAgentByEmail } from '../services/agent/account';
 import { usageReportHandler } from './usage-report';
 import { destructionRecordsHandler } from './destruction-records';
+import {
+    fileDiscoveryObjectionHandler, withdrawDiscoveryObjectionHandler, hasDiscoveryObjection,
+} from './discovery-objection';
 import { getSeatUsage } from '../features/seat-quota/usage';
 
 const api = new Hono<HonoConfig>();
@@ -28,6 +31,7 @@ const api = new Hono<HonoConfig>();
 const SyncRedriveSchema = z.object({
     ids: z.array(z.string()).optional(),
 });
+
 
 /**
  * PATCH /api/integration/tenants/:slug
@@ -131,6 +135,11 @@ api.post('/tenants/:slug/purge', requireServiceBinding, async (c) => {
  * Handler + why it is deliberately NOT tenant-scoped: ./destruction-records.ts.
  */
 api.get('/destruction-records', requireServiceBinding, destructionRecordsHandler);
+// The objection to the cross-tenant lookup below. Its authorisation rule — a
+// grant token proving control of the address — lives with the handlers, because
+// the reasoning is the feature.
+api.post('/discovery-objections', requireServiceBinding, fileDiscoveryObjectionHandler);
+api.delete('/discovery-objections', requireServiceBinding, withdrawDiscoveryObjectionHandler);
 
 /**
  * POST /api/integration/sso-handoff
@@ -397,6 +406,7 @@ api.get('/usage', requireServiceBinding, usageReportHandler);
  */
 api.get('/ai-provisioning', requireServiceBinding, aiProvisioningHandler);
 
+
 /**
  * GET /api/integration/tenants/by-email?email=<email>
  * Cross-tenant client grant lookup: returns the slugs of tenants where the
@@ -406,6 +416,19 @@ api.get('/ai-provisioning', requireServiceBinding, aiProvisioningHandler);
  * role list). Platform-level read (raw drizzle, no tenant scope) — guarded by
  * requireServiceBinding. Enables a portal-side "find my report" fan-out that
  * triggers each tenant's own magic-link without a cross-tenant session layer.
+ *
+ * WHAT THIS ENDPOINT DISCLOSES, said plainly because the rest of the file reads
+ * as a routing convenience: given one address it answers which inspection
+ * companies hold a live report grant for that person. The relationship between
+ * an individual and a SET of companies is a fact no single company holds — the
+ * platform assembles it here, on a call the person never sees. It stays because
+ * it is how a homebuyer who lost the email reaches their own report; the notice
+ * saying so belongs beside the field where the address is typed, which lives in
+ * the portal repository (`app/routes/find-my-report.tsx`), not here.
+ *
+ * `discovery_objections` is the objection to it. It is consulted FIRST, and a
+ * hit returns the same `{ slugs: [] }` an unknown address returns — a distinct
+ * status or shape would out the objector to whoever is asking.
  */
 api.get('/tenants/by-email', requireServiceBinding, async (c) => {
     const email = c.req.query('email');
@@ -415,6 +438,12 @@ api.get('/tenants/by-email', requireServiceBinding, async (c) => {
     try {
         const d = drizzle(c.env.DB);
         const now = new Date();
+
+        // Before anything is scanned: has this person objected to the scan? The
+        // answer is deliberately the same one an address with no grants gets.
+        if (await hasDiscoveryObjection(d, email)) {
+            return c.json({ success: true, data: { slugs: [] } });
+        }
 
         // This scan is cross-tenant (no single tenantId in scope), so the
         // role→kind resolution is a per-row join against each grant's OWN

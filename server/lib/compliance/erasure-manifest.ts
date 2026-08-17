@@ -247,6 +247,15 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // the mechanism that keeps honoring the subject's objection — deleting it
     // would resume sending if the address ever re-enters the system.
     { table: 'email_suppressions', column: 'email', category: 'user.contact.email', action: 'retain', legalBasis: 'art_17_3_b' },
+    // Same shape as the suppression row above, and for the same reason: the ROW
+    // IS THE MECHANISM that honours the objection. A person who asked not to be
+    // discoverable across tenants, and whose objection row was then deleted on
+    // erasure, would silently become discoverable again — the erasure would have
+    // undone the very refusal it was supposed to respect. Stored as an unsalted
+    // hash of the normalised address, which is minimisation rather than a
+    // security control: enough to answer "did this address object", not enough
+    // to browse a directory of objectors.
+    { table: 'discovery_objections', column: 'email_hash', category: 'user.contact.email', action: 'retain', legalBasis: 'art_17_3_b' },
 
     // ── evidence ledgers retained under Art. 17(3) ────────────────────────────
     // automation_logs.recipient holds emails and E.164 numbers; the ledger is
