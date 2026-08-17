@@ -237,6 +237,10 @@ export interface RetentionOutOfScopeEntry {
 export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
     // ── Legally-required evidence ────────────────────────────────────────────
     {
+        table: 'deployment_legal_versions',
+        reason: 'The only copy of the text an acceptance points at. `users.terms_accepted` stores a version and a content hash, not the body — so deleting a row here does not shrink a record, it makes an existing one unverifiable, and the signer can no longer be shown what they agreed to. review review endorsed the version+hash design specifically because the accepted version can be reconstructed later; a retention sweep over this table is the one thing that would make that false. Growth is bounded by publications, not by usage: a handful of rows over the life of a deployment.',
+    },
+    {
         table: 'sms_consent_log',
         reason: 'TCPA consent evidence. Pruning it destroys the tenant own defence against a consent challenge — the direct analogue of portal P4-D5 on suppression lists, where the record IS the protection.',
     },

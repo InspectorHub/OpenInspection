@@ -6,6 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { createSessionWithToken } from "~/lib/session.server";
 import { makeAgentSignupSchema } from "~/lib/forms/auth.schema";
 import { safeReturnTo } from "../../../server/lib/mcp/safe-return-to";
+import { AgentTermsConsent, type AgentTermsInForce } from "~/components/agent/AgentTermsConsent";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -16,7 +17,7 @@ export function meta() {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   // Report-link conversion (Task 3's CTA): prefill the email of the
   // recipient the report was shared with, and preserve a same-origin
@@ -25,7 +26,31 @@ export async function loader({ request }: Route.LoaderArgs) {
   // ?returnTo=https://evil.com or //evil.com is discarded here.
   const email = url.searchParams.get("email") ?? "";
   const returnTo = safeReturnTo(url.searchParams.get("returnTo"), "");
-  return { email, returnTo };
+
+  // The terms have to be SHOWN, not referred to. The tick below says "I have read
+  // and accept the Agent Terms" and the account records the version and content
+  // hash of "the text shown" — while this page displayed nothing and linked
+  // nowhere, so the acceptance asserted a presentation that never happened. Same
+  // defect review review §26d-2 closed for e-signature: intent comes from a
+  // recorded act, never from an artefact existing.
+  //
+  // A null document is the deployment having published none, and signup is closed
+  // in that case (review). The page says so instead of offering a tick against
+  // nothing.
+  const api = createApi(context);
+  let terms: AgentTermsInForce | null = null;
+  try {
+    const res = await api.agentSignup.terms.$get();
+    if (res.ok) {
+      const json = (await res.json()) as { data?: AgentTermsInForce };
+      terms = json.data ?? null;
+    }
+  } catch {
+    // Treated as "unavailable", which closes signup. A page that swallowed this
+    // and rendered the tick anyway would be back to accepting an absent document.
+    terms = null;
+  }
+  return { email, returnTo, terms };
 }
 
 /* ------------------------------------------------------------------ */
@@ -57,6 +82,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     return submission.reply();
   }
   const { name, email, password } = submission.value;
+  const shownContentHashRaw = fd.get("shownContentHash");
+  const shownContentHash = typeof shownContentHashRaw === "string"
+    && /^[0-9a-f]{64}$/.test(shownContentHashRaw) ? shownContentHashRaw : "";
   const body = {
     name,
     email,
@@ -64,6 +92,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     // The tick, and only the tick. `agentTerms` is a literal "on" in the schema,
     // so reaching here means the box was checked.
     termsAccepted: true,
+    // What this page actually displayed. NOT evidence — the server records the
+    // hash it read itself, because a client-supplied hash is the client asserting
+    // what it read, which is what the record exists to replace. It is here so a
+    // page left open across a publish is REFUSED rather than recording an
+    // acceptance of a version the signer was never shown.
+    ...(shownContentHash ? { shownContentHash } : {}),
     ...(turnstileTokenRaw ? { turnstileToken: String(turnstileTokenRaw) } : {}),
   };
 
@@ -150,7 +184,7 @@ function makeValueProps() {
 /* ------------------------------------------------------------------ */
 
 export default function AgentSignupPage() {
-  const { email, returnTo } = useLoaderData<typeof loader>();
+  const { email, returnTo, terms } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
@@ -297,21 +331,12 @@ export default function AgentSignupPage() {
               recorded server-side from the document in force.
             */}
             <div className="mt-6">
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  id={fields.agentTerms.id}
-                  name={fields.agentTerms.name}
-                  aria-invalid={fields.agentTerms.errors ? true : undefined}
-                  className="mt-0.5 w-4 h-4 shrink-0 rounded border-ih-border text-ih-primary focus:shadow-ih-focus"
-                />
-                <span className="text-[13px] text-ih-fg-2 leading-relaxed">
-                  {m.auth_agent_terms_label()}
-                </span>
-              </label>
-              {fields.agentTerms.errors && (
-                <p className="mt-1.5 text-[13px] text-ih-bad-fg">{fields.agentTerms.errors[0]}</p>
-              )}
+              <AgentTermsConsent
+                terms={terms}
+                checkboxId={fields.agentTerms.id}
+                checkboxName={fields.agentTerms.name}
+                error={fields.agentTerms.errors?.[0]}
+              />
             </div>
 
             <button

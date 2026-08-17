@@ -44,15 +44,21 @@ export const tenantLegalVersions = sqliteTable('tenant_legal_versions', {
      * current text of each one undeletable.
      */
     /**
-     * `agent_terms` is the third value, and it is a different COUNTERPARTY
-     * rather than a third tenant document. An agent is a `users` row with
-     * `tenant_id IS NULL` — a global identity with no company behind it — so
-     * neither a tenant's Privacy text nor a company's contract governs them
-     * (review A3). In STANDALONE the counterparty is the operator, which is
-     * why the row lives here; the SaaS half, where a SaaS agent has no portal
-     * identity to hang a consent row on, is owned elsewhere.
+     * Two values, and `agent_terms` is deliberately NOT one of them any more.
+     *
+     * It was, on the reasoning that in standalone the operator IS the single
+     * tenant. review review settled the question the other way: one Agent
+     * acceptance covers the whole deployment, so the ledger is
+     * `agent × terms version` and never `agent × company × terms version`. An
+     * agent is a `users` row with `tenant_id IS NULL` and its counterparty is
+     * whoever operates the deployment, so the document has no tenant to be keyed
+     * on — it lives in `deployment_legal_versions` (schema/compliance.ts).
+     *
+     * The value is removed rather than left unused. Keeping it would leave a
+     * legal home that the ruling forbids using, and the next person wiring agent
+     * terms would find it and be right to assume it was the intended one.
      */
-    doc: text('doc', { enum: ['privacy', 'terms', 'agent_terms'] }).notNull(),
+    doc: text('doc', { enum: ['privacy', 'terms'] }).notNull(),
     /** `YYYY-MM-DD` in the tenant's own timezone — the date a reader is shown. */
     version: text('version').notNull(),
     /**

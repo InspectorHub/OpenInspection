@@ -25,6 +25,33 @@ honest, and one that says nothing reads as approved.
 
 ---
 
+## 2026-08-17.3 — one table declared out of scope, and nothing deleted
+
+**What changed.** `deployment_legal_versions` is declared `RETENTION_OUT_OF_SCOPE`.
+The table is new in the same change: it holds the deployment's own legal documents
+— the agent terms — which have no tenant, because an agent account is global and
+its counterparty is whoever operates the deployment (review review).
+
+**Why out of scope rather than a window.** The row is the ONLY copy of the text an
+acceptance points at. `users.terms_accepted` stores a version and a content hash,
+not the body, so deleting a row here does not shrink a record — it makes an
+existing one unverifiable, and the signer can no longer be shown what they agreed
+to. review review endorsed the version+hash design specifically because the
+accepted version can be reconstructed later, and a sweep over this table is the one
+thing that would make that claim false.
+
+The usual argument for a window does not apply either: the table grows with
+PUBLICATIONS, not with usage — a handful of rows over the life of a deployment.
+
+**What did not change.** No period, no table, no anchor column, no `decideBy` date,
+and nothing new is deleted or erased anywhere. The digest moved because the gate
+hashes the exclusion list too, which is the point: adding a table that production
+will never sweep is a decision, and it should not be possible to make it silently.
+
+**Not `tenant_legal_versions`' rule, deliberately.** That table's rule deletes a
+version once a NEWER one exists for the same `(tenant, doc)`. Copying it here would
+delete exactly the superseded bodies that older acceptances still name.
+
 ## 2026-08-17.2 — a rename, and nothing else
 
 **What changed.** One word. The retention action formerly written `anonymize` is
