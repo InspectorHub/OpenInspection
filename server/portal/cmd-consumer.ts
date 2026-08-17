@@ -14,6 +14,16 @@ import { applyCredentialIfFresh } from './admin-credential';
 import { parkedFingerprint } from './parked-fingerprint';
 import { OutboxService, type OutboxRow } from './outbox.service';
 
+/**
+ * Re-exported so the batch loop can name it without reaching past this module
+ * into a service. The purge's Durable Object namespaces travel as their own
+ * parameter and are deliberately NOT folded into `CmdConsumerBuckets`: they are
+ * not buckets, and a name that lies about what it holds is how the next reader
+ * learns the wrong thing.
+ */
+export type { PurgeDurableObjects } from '../services/tenant-purge.service';
+import type { PurgeDurableObjects } from '../services/tenant-purge.service';
+
 /** A-21 batch 3 — R2 bindings the offboarding commands need. Optional: absent
  *  in standalone (no portal direction at all) and in tests that don't
  *  exercise export/purge. */
@@ -52,6 +62,7 @@ export async function applyCmdEnvelope(
     raw: unknown,
     syncQueue?: Queue<SyncEnvelope>,
     buckets?: CmdConsumerBuckets,
+    dos?: PurgeDurableObjects,
 ): Promise<CmdApplyResult> {
     const db = drizzle(dbBinding);
     const env = parseCmdEnvelope(raw);
@@ -150,7 +161,7 @@ export async function applyCmdEnvelope(
     }
 
     try {
-        const replyExtra = await applyKnownCmd(dbBinding, kv, env, buckets);
+        const replyExtra = await applyKnownCmd(dbBinding, kv, env, buckets, dos);
         // Advance the high-water mark (guarded so a concurrent higher write wins).
         if (tenantId) {
             await db.update(tenants)
@@ -206,6 +217,7 @@ async function applyKnownCmd(
     kv: KVNamespace | undefined,
     env: CmdEnvelope,
     buckets?: CmdConsumerBuckets,
+    dos?: PurgeDurableObjects,
 ): Promise<Record<string, unknown> | undefined> {
     switch (env.type) {
         case 'io.inspectorhub.cmd.tenant.update': {
@@ -266,7 +278,7 @@ async function applyKnownCmd(
             if (!buckets?.photos) throw new Error('purge: PHOTOS not bound');
             if (!kv) throw new Error('purge: TENANT_CACHE not bound');
             const { TenantPurgeService } = await import('../services/tenant-purge.service');
-            const result = await new TenantPurgeService(dbBinding, buckets.photos, kv).purge(data.tenantId);
+            const result = await new TenantPurgeService(dbBinding, buckets.photos, kv, dos ?? {}).purge(data.tenantId);
             return { ...result };
         }
         case 'io.inspectorhub.cmd.tenant.ai_caps': {
@@ -364,36 +376,5 @@ async function emitReply(
     } catch (err) {
         logger.error('[cmd] reply emission failed — outbox sweeper will retry if appended',
             { id: env.id, replyType }, err instanceof Error ? err : undefined);
-    }
-}
-
-/** Mirror of portal's queue-loop backoff. */
-function backoffSeconds(attempts: number): number {
-    return Math.min(30 * 2 ** attempts, 3600);
-}
-
-/** Batch handler for the cmd queue. STRICTLY per-message ack/retry.
- *  `syncQueue` (A-21 batch 2) carries replies back to portal; `buckets`
- *  (batch 3) carries the R2 bindings the offboarding commands need — both
- *  optional so the standalone build type-checks unchanged. */
-export async function handleCmdBatch(
-    dbBinding: D1Database,
-    kv: KVNamespace | undefined,
-    batch: MessageBatch<unknown>,
-    syncQueue?: Queue<SyncEnvelope>,
-    buckets?: CmdConsumerBuckets,
-): Promise<void> {
-    for (const msg of batch.messages) {
-        try {
-            const result = await applyCmdEnvelope(dbBinding, kv, msg.body, syncQueue, buckets);
-            logger.info('[cmd] queue message handled', { id: msg.id, attempts: msg.attempts, result });
-            msg.ack();
-        } catch (err) {
-            const delaySeconds = backoffSeconds(msg.attempts);
-            logger.error('[cmd] queue message failed — retrying',
-                { id: msg.id, attempts: msg.attempts, delaySeconds },
-                err instanceof Error ? err : undefined);
-            msg.retry({ delaySeconds });
-        }
     }
 }

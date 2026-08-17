@@ -680,11 +680,11 @@ export default {
             return;
         }
         if (batch.queue.includes('-cmd-') && !batch.queue.includes('cmd-dlq')) {
-            const { handleCmdBatch } = await import('./portal/cmd-consumer');
-            // SYNC_QUEUE carries command replies back to portal (A-21 batch 2);
-            // PHOTOS/EXPORTS_BUCKET serve the offboarding commands (batch 3).
+            const { handleCmdBatch } = await import('./portal/cmd-batch');
+            // SYNC_QUEUE carries replies to portal (A-21 batch 2); PHOTOS/EXPORTS
+            // serve offboarding (batch 3); the DO namespaces let purge empty them.
             await handleCmdBatch(env.DB, env.TENANT_CACHE, batch, env.SYNC_QUEUE,
-                { photos: env.PHOTOS, exports: env.EXPORTS_BUCKET });
+                { photos: env.PHOTOS, exports: env.EXPORTS_BUCKET }, { INSPECTION_DOC: env.INSPECTION_DOC, TENANT_PRESENCE: env.TENANT_PRESENCE });
             return;
         }
         await handleSyncDlqBatch(env.DB, batch);

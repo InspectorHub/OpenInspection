@@ -113,7 +113,7 @@ api.post('/tenants/:slug/purge', requireServiceBinding, async (c) => {
     if (!t) return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
 
     const { TenantPurgeService } = await import('../services/tenant-purge.service');
-    const svc = new TenantPurgeService(c.env.DB, c.env.PHOTOS, c.env.TENANT_CACHE);
+    const svc = new TenantPurgeService(c.env.DB, c.env.PHOTOS, c.env.TENANT_CACHE, { INSPECTION_DOC: c.env.INSPECTION_DOC, TENANT_PRESENCE: c.env.TENANT_PRESENCE });
     try {
         const result = await svc.purge(t.id as string);
         return c.json({ success: true, data: result });
