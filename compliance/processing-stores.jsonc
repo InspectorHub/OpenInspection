@@ -142,12 +142,12 @@
       "data_categories": ["inspection_media", "agreement_pdf", "report_pdf", "evidence_pack"],
       "subjects": ["end_client", "staff"],
       "purpose": "Photographs, video, rendered report PDFs, signed agreements and evidence packs.",
-      "retention_rule": "none",
+      "retention_rule": "engine:RETENTION_MANIFEST",
       "deletion_mechanism": "tenant-purge.service.ts four-prefix sweep",
       "export_mechanism": "data-export.service.ts",
       "tenant_scope": "per-tenant",
       "evidence_level": "E2",
-      "note": "Destruction is covered; RETENTION is not — no object expires while the tenant lives. Closed by B1a and R26-4."
+      "note": "Both halves are now covered. Destruction: the four-prefix sweep. Retention: report PDFs expire on a per-tenant window (report_pdfs rule; 0 = indefinite is a controller instruction), and the three signed-agreement artefacts — signed.pdf, certificate.pdf, evidence.zip — are destroyed by the agreement sweep in the same pass that nulls the signature column, because nulling the column while the PDF still embeds the image is database retention wearing the name of retention (counsel round 26). What is still UNGOVERNED here is inspection media: photographs and video have no expiry rule of their own and live until the tenant does."
     },
     {
       "store_type": "r2",

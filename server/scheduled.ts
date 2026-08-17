@@ -300,8 +300,17 @@ export async function scheduled(
     //    tenant-batched (single grouped query joined to tenant_configs).
     try {
         const { runRetentionSweep } = await import('./lib/compliance/retention-sweep');
+         
+        // PHOTOS was already in scope here and simply never passed. The sweep
+        // now destroys signed.pdf, certificate.pdf and evidence.zip in the same
+        // pass that nulls the signature column — counsel round 26: nulling the
+        // column while the PDF still embeds the same image is database
+        // retention wearing the name of retention.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const summary = await runRetentionSweep(drizzle(env.DB) as any, Date.now());
+        const agreementSweepDb = drizzle(env.DB) as any;
+        const summary = await runRetentionSweep(
+            agreementSweepDb, Date.now(), { photos: env.PHOTOS },
+        );
         if (summary.purgedEnvelopes > 0) {
             logger.info('[cron] retention sweep purged signatures', summary);
         }
