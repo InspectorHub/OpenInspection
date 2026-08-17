@@ -139,6 +139,40 @@ describe('flush() — SMS branch (Track L)', () => {
         expect(fakeSendMessage).not.toHaveBeenCalled();
     });
 
+    it('a sent row records WHO sent it and ON WHOSE BEHALF', async () => {
+        // Counsel 26-5. Written in the same statement as the outcome, so a row
+        // that says 'sent' can never lack it — and snapshotted, because
+        // sms_mode and company_name both change and this row is evidence about
+        // one transmission at one moment.
+        const { logId } = await seedSmsLog({ contactId: 'c1' });
+        await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+
+        const row = await db.select().from(schema.automationLogs)
+            .where(eq(schema.automationLogs.id, logId)).get();
+        expect(row?.status).toBe('sent');
+        const id = row?.senderIdentity as Record<string, unknown> | null;
+        expect(id, 'a sent SMS row with no sender identity').toBeTruthy();
+        // Two roles, not one. The platform operated the transmission; the tenant
+        // is who it was sent for. Collapsing them is the defect.
+        expect(id!.platformSender).toBe('InspectorHub');
+        expect(id!.tenantOnWhoseBehalf).toBe(TENANT);
+        expect(id!.smsMode).toBe('platform');
+        expect(id!.channel).toBe('sms');
+    });
+
+    it('a SKIPPED row records no sender identity, because nothing was sent', async () => {
+        // The negative control that makes the assertion above mean something: a
+        // column populated on every row regardless of outcome would prove
+        // nothing about the send path.
+        const { logId } = await seedSmsLog({ contactId: 'c1' });
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+        const row = await db.select().from(schema.automationLogs)
+            .where(eq(schema.automationLogs.id, logId)).get();
+        expect(row?.status).toBe('skipped');
+        expect(row?.senderIdentity ?? null).toBeNull();
+    });
+
     it('client SMS with granted consent → sent via provider', async () => {
         const { logId } = await seedSmsLog({ contactId: 'c1' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
