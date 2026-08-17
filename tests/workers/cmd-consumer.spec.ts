@@ -3,7 +3,8 @@
 // Batch 2: credential-stream guard (credseq), seed command, reply emission.
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
-import { applyCmdEnvelope, handleCmdBatch } from '../../server/portal/cmd-consumer';
+import { applyCmdEnvelope } from '../../server/portal/cmd-consumer';
+import { handleCmdBatch } from '../../server/portal/cmd-batch';
 import { TENANT_CONFIGS_TEST_DDL, USERS_TEST_DDL } from '../helpers/inline-ddl';
 
 // Batch 2: the seed command delegates to the starter-content service, whose
