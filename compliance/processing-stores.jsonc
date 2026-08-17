@@ -187,11 +187,11 @@
       "subjects": ["end_client", "staff"],
       "purpose": "Collaborative editing host: one Yjs document per report, plus up to 25 projection snapshots.",
       "retention_rule": "none",
-      "deletion_mechanism": "none",
+      "deletion_mechanism": "tenant-purge.service.ts POSTs /purge to one object per report id, collected pre-cascade",
       "export_mechanism": "none",
       "tenant_scope": "per-tenant",
       "evidence_level": "E2",
-      "note": "Addressed by `${tenantId}:${reportId}` — see collabDocName — so it is the one presence/collab store a tenant purge could enumerate if it had a verb to call. Closed by B1c."
+      "note": "Addressed by `${tenantId}:${reportId}` — see collabDocName — so the purge collects the tenant's report ids BEFORE the cascade deletes the rows they come from. A purge that cannot confirm this store records `durable_objects` as incomplete on the destruction record rather than reporting success. RETENTION is still absent: nothing expires a document while the tenant lives."
     },
     {
       "store_type": "durable_object",
@@ -208,11 +208,11 @@
       "subjects": ["staff"],
       "purpose": "Which of a workspace's staff are online and what each is looking at, aggregated per tenant.",
       "retention_rule": "none",
-      "deletion_mechanism": "none",
+      "deletion_mechanism": "tenant-purge.service.ts POSTs /purge to idFromName(tenantId)",
       "export_mechanism": "none",
       "tenant_scope": "per-tenant",
       "evidence_level": "E2",
-      "note": "Persists a `state` key on every mutation (seven ctx.storage.put sites), so unlike its per-inspection sibling this one has an explicit object at rest. Addressed by idFromName(tenantId), so it IS enumerable by a tenant purge. Closed by B1c."
+      "note": "Persists a `state` key on every mutation (seven ctx.storage.put sites), so unlike its per-inspection sibling this one has an explicit object at rest. Addressed by idFromName(tenantId), so it needs no pre-cascade collection to be reachable."
     },
     {
       "store_type": "durable_object",
