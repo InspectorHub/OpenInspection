@@ -1,0 +1,69 @@
+// Every place that OBTAINS `isSaas` and the question it is really asking.
+//
+// `isSaas` is a sanctioned client-side read (see the header of
+// `deployment-profile.ts`), but "sanctioned" turned into "unexamined": three
+// surfaces used it to answer questions that had named capabilities, and one of
+// those had the capability read twelve lines away in the SAME file. The mode is
+// the right thing to read only when the question genuinely IS the mode.
+//
+// So each entry names the question, and then either:
+//   capability: "<name>"  the surface must actually read that capability — the
+//                         gate checks it does, which is the machine-checkable
+//                         form of "one question, one answer"
+//   capability: null      no capability exists because the question really is
+//                         about the mode itself; `reason` says why
+//
+// Enforced by `scripts/check-mode-disguises.mjs` (P4), bidirectionally: an
+// unregistered read is stray, and an entry whose file no longer reads `isSaas`
+// is stray too.
+//
+// SCOPE: obtain-sites only — `.isSaas` read off a context or branding object.
+// Components handed `isSaas` as a prop are downstream of a decision already
+// registered here, and the gate prints their count separately so this boundary
+// is visible rather than implied.
+{
+  "surfaces": [
+    {
+      "file": "server/api/session-context.ts",
+      "question": "What does the browser need to know about this deployment?",
+      "capability": null,
+      "reason": "Builds the wire payload. It is not deciding anything — it is transporting the mode so the client can, and the capabilities beside it come from `deploymentPayload`."
+    },
+    {
+      "file": "app/components/Sidebar.tsx",
+      "question": "Is there another workspace to switch to?",
+      "capability": null,
+      "reason": "The question really is the mode: only a platform has more than one workspace per identity, and the guard is paired with `portalBaseUrl` because the destination is the portal itself. No capability names this and inventing one would add a field with a single reader."
+    },
+    {
+      "file": "app/components/sidebar/MobileDrawer.tsx",
+      "question": "Is there another workspace to switch to?",
+      "capability": null,
+      "reason": "The mobile half of the same control as Sidebar.tsx. Deliberately identical — a fork here is how one of the two stops getting the next fix."
+    },
+    {
+      "file": "app/routes/settings-hub.tsx",
+      "question": "Should the Billing tile be offered?",
+      "capability": "hasBilling",
+      "reason": "Reads `deployment.hasBilling` first and falls back to `isSaas` only when the session payload predates that field. The fallback is the thing to remove once no cached session can be that old."
+    },
+    {
+      "file": "app/routes/settings-communication.tsx",
+      "question": "Whose Twilio credentials and inbound webhook does this tenant use?",
+      "capability": "hasManagedCompliance",
+      "reason": "Reads the capability for the managed-provisioning controls. The remaining `isSaas` reads are about WHICH inbound URL to display, which follows from who owns the number rather than from a capability."
+    },
+    {
+      "file": "app/routes/settings-connected-apps.tsx",
+      "question": "Is a platform-managed connection possible for this integration?",
+      "capability": null,
+      "reason": "Threads the mode into per-integration panels that each answer their own question. A capability per integration would be four fields with one reader each; the panels are where the specific questions live."
+    },
+    {
+      "file": "app/routes/settings-usage.tsx",
+      "question": "Does this deployment ever populate the inspections meter?",
+      "capability": null,
+      "reason": "The file states it: `caps` alone cannot tell standalone from a PAID saas tenant, because both are null. Only the mode separates them, and a standalone deploy never writes that counter — the card would sit at a permanent zero. This entry first claimed `hasUsageQuota` from assumption and the gate refused it, which is the check working."
+    }
+  ]
+}
