@@ -300,7 +300,7 @@ describe('payloads the handler must survive', () => {
             received:     4,
             handled:      1,
             unparsed:     1,
-            notInvoice:   1,
+            ignoredEntity: 1,
             unknownRealm: 1,
         });
     });
@@ -342,5 +342,109 @@ describe('payloads the handler must survive', () => {
         expect(result).toEqual({ valid: true });
         expect(mapRow()!.qboSyncToken).toBe('1');
         expect(invoiceRow()!.paidAt).toBeNull();
+    });
+});
+
+describe('a payment notification settles the invoices it names', () => {
+    /**
+     * Payment events were dropped outright — `entityType !== 'invoice'` skipped
+     * them, so the ONE event QuickBooks sends when money actually arrives was
+     * the one event we ignored. Inbound reconciliation happened only on the CDC
+     * sweep, hours later, or on a manual Sync.
+     *
+     * The shape below is a capture, not a guess: `SELECT * FROM Payment` on a
+     * live sandbox, 2026-08-17. `LinkedTxn` sits inside `Line`, not at the top
+     * of the Payment — a top-level read finds nothing and is indistinguishable
+     * from a payment we correctly ignored.
+     */
+    function stubPaymentThenInvoices(lines: Array<Array<{ TxnId: string; TxnType: string }>>) {
+        vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+            const url = new URL(String(input));
+            apiPaths.push(url.pathname);
+            if (url.pathname.includes('/payment/')) {
+                return new Response(JSON.stringify({
+                    Payment: {
+                        Id: 'PAY-1', TotalAmt: 450, UnappliedAmt: 0,
+                        Line: lines.map((linked) => ({ Amount: 450, LinkedTxn: linked })),
+                    },
+                }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            }
+            return new Response(JSON.stringify({
+                Invoice: { Id: QBO_ID, SyncToken: '9', Balance: 0, TotalAmt: 450 },
+            }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }));
+    }
+
+    const paymentEvent = () => cloudEvent({
+        type: 'qbo.payment.created.v1',
+        intuitentityid: 'PAY-1',
+        data: { name: 'Payment', operation: 'Create' },
+    });
+
+    it('reads the payment, then re-reads the invoice it linked, and marks it paid', async () => {
+        stubPaymentThenInvoices([[{ TxnId: QBO_ID, TxnType: 'Invoice' }]]);
+
+        const result = await deliver(paymentEvent());
+
+        expect(result).toEqual({ valid: true });
+        // The order matters and is asserted: the payment names the invoices, so
+        // it must be read first.
+        expect(apiPaths).toEqual([
+            `/v3/company/${REALM}/payment/PAY-1`,
+            `/v3/company/${REALM}/invoice/${QBO_ID}`,
+        ]);
+        // The row is the point. Asserting the fetch alone would pass against a
+        // handler that read both and applied neither.
+        expect(invoiceRow()!.paidAt).not.toBeNull();
+        expect(markPaid).toHaveBeenCalledWith(INV_ID, TENANT);
+    });
+
+    it('ignores linked transactions that are not invoices', async () => {
+        // The same array carries credit memos and deposits. Treating one as an
+        // invoice would re-read an id that is not an invoice id and apply
+        // whatever came back.
+        stubPaymentThenInvoices([[
+            { TxnId: 'CM-77', TxnType: 'CreditMemo' },
+            { TxnId: QBO_ID, TxnType: 'Invoice' },
+        ]]);
+
+        await deliver(paymentEvent());
+
+        expect(apiPaths).toEqual([
+            `/v3/company/${REALM}/payment/PAY-1`,
+            `/v3/company/${REALM}/invoice/${QBO_ID}`,
+        ]);
+    });
+
+    it('settles EVERY invoice on a multi-line payment, not just the first', async () => {
+        // One cheque against three invoices is one event and three invoices to
+        // re-read. A `Line[0]` implementation passes both tests above.
+        stubPaymentThenInvoices([
+            [{ TxnId: '100', TxnType: 'Invoice' }],
+            [{ TxnId: '200', TxnType: 'Invoice' }],
+        ]);
+
+        await deliver(paymentEvent());
+
+        expect(apiPaths).toEqual([
+            `/v3/company/${REALM}/payment/PAY-1`,
+            `/v3/company/${REALM}/invoice/100`,
+            `/v3/company/${REALM}/invoice/200`,
+        ]);
+    });
+
+    it('still ignores an entity we do not handle — the positive control', async () => {
+        // Without this, "handle everything" passes the three above and would
+        // fetch a customer as though it were an invoice.
+        stubPaymentThenInvoices([[{ TxnId: QBO_ID, TxnType: 'Invoice' }]]);
+
+        const result = await deliver(cloudEvent({
+            type: 'qbo.customer.updated.v1',
+            data: { name: 'Customer', operation: 'Update' },
+        }));
+
+        expect(result).toEqual({ valid: true });
+        expect(apiPaths).toEqual([]);
+        expect(markPaid).not.toHaveBeenCalled();
     });
 });
