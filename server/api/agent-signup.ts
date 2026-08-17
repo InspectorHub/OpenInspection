@@ -7,6 +7,7 @@ import { signJwt } from '../lib/jwt-keyring';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { authCookieOptions, AUTH_COOKIE_NAME } from '../lib/auth-helpers';
+import { getDrizzle } from '../lib/route-helpers';
 
 /**
  * Agent Accounts A1 — self-serve agent signup endpoint.
@@ -24,7 +25,11 @@ const SignupBodySchema = z
         turnstileToken: z.string().optional().describe('TODO describe turnstileToken field for the OpenInspection MCP integration'),
         // Legacy optional field — tenant Privacy/Terms are configured in Settings,
         // not via Worker env. SaaS agents accept portal Terms at registration.
-        termsAccepted: z.boolean().optional().describe('Optional; unused for env-based legal (removed).'),
+        // REQUIRED now, and it is the tick and only the tick. The version and
+        // content hash are resolved server-side from the text in force — see the
+        // handler. This field was previously documented as 'unused', which is how
+        // an account could be created with no acceptance at all.
+        termsAccepted: z.boolean().describe('Whether the agent accepted the agent terms shown to them. The version and content hash are recorded server-side from the text in force.'),
     })
     .openapi('AgentSignupBody');
 
@@ -86,10 +91,49 @@ const agentSignupRoutes = createApiRouter()
             if (!ok) throw Errors.BadRequest('Bot challenge failed');
         }
 
+        // The acceptance is assembled SERVER-SIDE from the text actually in
+        // force. `body.termsAccepted` is the user's tick — a fact about what they
+        // did — and nothing more: a client-supplied version or hash would be the
+        // client asserting what it read, which is precisely the evidence this
+        // record exists to replace.
+        //
+        // No published agent terms means no signup. That is the counsel gate
+        // (round 24c) expressed as behaviour rather than a note: a deployment
+        // that has not published a document written for agents cannot take an
+        // agent's agreement to one. The message says so plainly, because an
+        // operator hitting this needs to know it is their action that is missing.
+        // WHOSE terms. An agent has no tenant, so the counterparty is the
+        // OPERATOR — read as a capability (`profile.fixedTenantId`) rather than
+        // by branching on APP_MODE. Where there is no fixed tenant the operator
+        // is not a tenant of this deployment at all, and the document belongs in
+        // the platform's own ledger: a different plan's half, and refusing here
+        // is the honest answer rather than picking an arbitrary tenant's text.
+        const operatorTenantId = c.var.profile.fixedTenantId;
+        const { LegalVersionService } = await import('../services/legal-version.service');
+        const legal = new LegalVersionService(getDrizzle(c) as never);
+        const inForce = operatorTenantId
+            ? await legal.latest(operatorTenantId, 'agent_terms')
+            : null;
+        if (!inForce) {
+            throw Errors.BadRequest(
+                'Agent signup is unavailable until this workspace publishes its agent terms.',
+            );
+        }
+        if (body.termsAccepted !== true) {
+            throw Errors.BadRequest('The agent terms must be accepted to create an account');
+        }
+
         const result = await c.var.services.agent.signup({
             email: body.email,
             password: body.password,
             name: body.name,
+            termsAccepted: {
+                at: new Date().toISOString(),
+                version: inForce.version,
+                contentHash: inForce.contentHash,
+                ...(c.req.header('cf-connecting-ip') ? { ip: c.req.header('cf-connecting-ip')! } : {}),
+                ...(c.req.header('cf-ipcountry') ? { country: c.req.header('cf-ipcountry')! } : {}),
+            },
         });
 
         const keyring = await c.var.keyringPromise!;

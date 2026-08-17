@@ -5,7 +5,7 @@ import { tenantLegalVersions, tenantConfigs } from '../lib/db/schema';
 import { sha256Hex } from './signing-key.service';
 import { epochMsToWallClockYmd, resolveTenantTimeZone } from '../lib/tz';
 
-export type LegalDoc = 'privacy' | 'terms';
+export type LegalDoc = 'privacy' | 'terms' | 'agent_terms';
 
 export interface LegalVersionRow {
     version: string;

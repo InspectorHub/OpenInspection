@@ -61,6 +61,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     name,
     email,
     password,
+    // The tick, and only the tick. `agentTerms` is a literal "on" in the schema,
+    // so reaching here means the box was checked.
+    termsAccepted: true,
     ...(turnstileTokenRaw ? { turnstileToken: String(turnstileTokenRaw) } : {}),
   };
 
@@ -284,6 +287,31 @@ export default function AgentSignupPage() {
                   <p className="mt-1.5 text-[13px] text-ih-bad-fg">{fields.password.errors[0]}</p>
                 )}
               </div>
+            </div>
+
+            {/*
+              An agent is a third party. The tick is required and the account is
+              not created without it — recording a consent somebody did not give
+              is worse than lacking one (counsel round 20 A3). Only the tick is
+              submitted; the version and content hash of the text shown are
+              recorded server-side from the document in force.
+            */}
+            <div className="mt-6">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id={fields.agentTerms.id}
+                  name={fields.agentTerms.name}
+                  aria-invalid={fields.agentTerms.errors ? true : undefined}
+                  className="mt-0.5 w-4 h-4 shrink-0 rounded border-ih-border text-ih-primary focus:shadow-ih-focus"
+                />
+                <span className="text-[13px] text-ih-fg-2 leading-relaxed">
+                  {m.auth_agent_terms_label()}
+                </span>
+              </label>
+              {fields.agentTerms.errors && (
+                <p className="mt-1.5 text-[13px] text-ih-bad-fg">{fields.agentTerms.errors[0]}</p>
+              )}
             </div>
 
             <button

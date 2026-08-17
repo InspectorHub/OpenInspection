@@ -65,6 +65,11 @@ const VALID_SIGNUP = {
   name: "Alice Agent",
   email: "a@x.com",
   password: "SuperSecret123!",
+  // An agent is a third party and the tick is required — an account is not
+  // created without it (counsel round 20 A3). A fixture that omitted it would
+  // make every returnTo case below fail on the acceptance instead, which is what
+  // happened when the field landed.
+  agentTerms: "on",
 };
 
 beforeEach(() => {
@@ -145,5 +150,35 @@ describe("agent signup action redirect target", () => {
       actionArgs({ ...VALID_SIGNUP, returnTo: "/somewhere-else" }),
     );
     expect(res).toMatchObject({ redirect: "/agent-dashboard?welcome=insp1" });
+  });
+});
+
+describe("the agent terms tick is required", () => {
+  it("refuses a submission with the box unchecked, and calls no API", async () => {
+    // An unchecked checkbox submits NOTHING, so this is the shape a real
+    // browser produces — the field is absent, not "off".
+    const withoutTick = { ...VALID_SIGNUP };
+    delete (withoutTick as Partial<typeof VALID_SIGNUP>).agentTerms;
+    const res = await action(actionArgs(withoutTick as Record<string, string>));
+    expect(agentSignupPost).not.toHaveBeenCalled();
+    expect(JSON.stringify(res)).toMatch(/Agent Terms/i);
+  });
+
+  it("refuses a value that is not the tick", async () => {
+    const res = await action(actionArgs({ ...VALID_SIGNUP, agentTerms: "off" }));
+    expect(agentSignupPost).not.toHaveBeenCalled();
+    expect(JSON.stringify(res)).toMatch(/Agent Terms/i);
+  });
+
+  it("sends only the tick — never a client-asserted version or hash", async () => {
+    // The version and content hash are resolved server-side from the document in
+    // force. A client-supplied pair would be the client asserting what it read,
+    // which is exactly the evidence this record replaces.
+    await action(actionArgs(VALID_SIGNUP));
+    expect(agentSignupPost).toHaveBeenCalledTimes(1);
+    const body = agentSignupPost.mock.calls[0]![0]!.json as Record<string, unknown>;
+    expect(body.termsAccepted).toBe(true);
+    expect(Object.keys(body)).not.toContain("version");
+    expect(Object.keys(body)).not.toContain("contentHash");
   });
 });

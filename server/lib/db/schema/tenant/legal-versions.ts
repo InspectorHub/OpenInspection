@@ -43,7 +43,16 @@ export const tenantLegalVersions = sqliteTable('tenant_legal_versions', {
      * NEWER version exists for the same `(tenant, doc)`, which is what keeps the
      * current text of each one undeletable.
      */
-    doc: text('doc', { enum: ['privacy', 'terms'] }).notNull(),
+    /**
+     * `agent_terms` is the third value, and it is a different COUNTERPARTY
+     * rather than a third tenant document. An agent is a `users` row with
+     * `tenant_id IS NULL` — a global identity with no company behind it — so
+     * neither a tenant's Privacy text nor a company's contract governs them
+     * (round 20 A3). In STANDALONE the counterparty is the operator, which is
+     * why the row lives here; the SaaS half, where a SaaS agent has no portal
+     * identity to hang a consent row on, is owned elsewhere.
+     */
+    doc: text('doc', { enum: ['privacy', 'terms', 'agent_terms'] }).notNull(),
     /** `YYYY-MM-DD` in the tenant's own timezone — the date a reader is shown. */
     version: text('version').notNull(),
     /**
