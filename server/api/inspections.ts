@@ -31,6 +31,12 @@ import reportGateRoutes from './inspections/report-gate';
 import reportDeliveryRoutes from './inspections/report-delivery';
 import sendSmsRoutes from './inspections/send-sms';
 import agreementsRoutes from './inspections/agreements';
+// The in-person signing route, split out of agreements.ts at the 400-line
+// ceiling. Mounted HERE beside its sibling rather than nested inside it, so the
+// idempotency gate can resolve its path the same way it resolves every other —
+// a router reached only through another router's re-export is a route the gate
+// can see declared and cannot place.
+import agreementSignRoutes from './inspections/agreement-sign';
 import coreRoutes from './inspections/core';
 import resultsRoutes from './inspections/results';
 import collabRoutes from './inspections/collab';
@@ -63,6 +69,7 @@ export const inspectionsRoutes = createApiRouter()
     // Communication design §2 — messages + platform notices, two arrays.
     .route('/', communicationRoutes)
     .route('/', agreementsRoutes)
+    .route('/', agreementSignRoutes)
     .route('/', hierarchyRoutes)
     // Commercial PCA Phase C — cost line CSV export (Task 11).
     .route('/', costExportRoutes)

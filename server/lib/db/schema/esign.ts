@@ -85,7 +85,7 @@ export const esignAuditLogs = sqliteTable('esign_audit_logs', {
     // label the admin audit trail and the downloadable evidence JSON print. NOT
     // inside the hash — that covers payload_json + prev_hash only — so
     // verifyChain cannot detect an edited label. The payload is the evidence.
-    event:          text('event', { enum: ['request.created', 'request.sent', 'request.viewed', 'agreement.signed', 'agreement.inspector_signed', 'signer.signed', 'signer.declined', 'signer.reminded', 'workflow.complete'] }).notNull(),
+    event:          text('event', { enum: ['request.created', 'request.sent', 'request.viewed', 'signer.presented', 'agreement.signed', 'agreement.inspector_signed', 'signer.signed', 'signer.declined', 'signer.reminded', 'workflow.complete'] }).notNull(),
     payloadJson:    text('payload_json').notNull(),
     prevHash:       text('prev_hash'),
     // The chain link: the next row's prev_hash is a copy of this. verifyChain
