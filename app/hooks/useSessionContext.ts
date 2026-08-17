@@ -59,11 +59,23 @@ export interface SessionContext {
      */
     capabilities: CapabilitySet;
   };
+  /**
+   * Deployment capabilities the chrome may gate on.
+   *
+   * Kept in step with `deploymentPayload` in `server/api/session-context.ts`,
+   * which is the allowlist that decides what actually ships. A capability
+   * missing from that function is not readable here at any price — which is how
+   * two surfaces came to gate the marketplace on `branding.isSaas` while the
+   * page itself gated it on `hasContentMarketplace`.
+   */
   deployment: {
     mode: string;
     hasBilling: boolean;
     hasSeatQuota: boolean;
     mcpEnabled: boolean;
+    hasContentMarketplace: boolean;
+    videoBackendManaged: boolean;
+    hasManagedCompliance: boolean;
   };
   seatUsage: { used: number; limit: number } | null;
   /**

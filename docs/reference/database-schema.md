@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 94 |
-| Columns | 1107 |
-| Indexes (excluding primary keys) | 158 |
+| Columns | 1109 |
+| Indexes (excluding primary keys) | 159 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 507 (46%) |
+| Columns carrying a source comment | 509 (46%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -1354,12 +1354,12 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `invoices`
 
-<sub>server/lib/db/schema/invoice.ts · 19 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/invoice.ts · 20 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `inspection_id` | text | IX FK→`inspections.id` |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `contact_id` | text | IX FK→`contacts.id` |  |  | *The contact this belongs to (`contacts.id`). App-layer reference.* |
 | `client_name` | text |  |  |  | *A name.* |
@@ -1377,11 +1377,13 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `currency` | text | NN | `'USD'` |  | i18n Phase B — the currency (ISO 4217) this invoice was created in, snapshot from tenant_configs.currency at creation. |
 | `amount_paid_cents` | integer |  |  |  | How much has actually been received on a partially-paid invoice. NULL on draft/sent/paid/void — only a 'partial' invoice carries one, and it is cleared whenever the invoice reaches paid or is refunded so the amount can never contradict the status derived from paidAt/partialPaidAt. **[more]** |
+| `invoice_number` | integer | UQ |  |  | The number a human uses for this invoice — per tenant, sequential. There was no such column. **[more]** |
 
 **Indexes**
 
 - `idx_invoices_inspection` (inspection_id)
 - `idx_invoices_contact` (tenant_id, contact_id)
+- **UNIQUE** `uq_invoices_tenant_number` (tenant_id, invoice_number)
 
 ---
 
@@ -2188,7 +2190,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `tenant_configs`
 
-<sub>server/lib/db/schema/tenant/core.ts · 85 columns · primary key `tenant_id`</sub>
+<sub>server/lib/db/schema/tenant/core.ts · 86 columns · primary key `tenant_id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2277,6 +2279,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `ai_key_attestation_policy_version` | text |  |  |  | Stamped from AI_KEY_ATTESTATION_POLICY_VERSION — the revision of OUR statements, which moves independently of the provider terms above. |
 | `repair_quick_phrases` | text |  |  |  | #275 — quick-insert phrases for repair-request notes, maintained by the tenant. Same shape and storage idiom as `custom_referral_sources` above. **[more]** |
 | `legal_name` | text |  |  |  | The registered legal entity, as it appears on the licence — distinct from `companyName`, which is the trading brand / DBA. **[more]** |
+| `invoice_seq` | integer | NN | `1000` |  | The last invoice number handed out for this tenant. Default 1000, so the first invoice is **1001** — Jobber's convention, and the category's; starting at 1 tells a homebuyer they are this company's first customer. **[more]** |
 
 ---
 

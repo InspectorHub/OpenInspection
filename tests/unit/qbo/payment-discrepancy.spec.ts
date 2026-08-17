@@ -30,12 +30,13 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { QBOServiceBase } from '../../../server/services/qbo/api-base';
 import type { InvoiceSummary } from '../../../server/services/qbo/api-base';
 import { withInvoiceSync } from '../../../server/services/qbo/invoice-sync';
+import { withCustomerSync } from '../../../server/services/qbo/customer-sync';
 import { withConnection } from '../../../server/services/qbo/connection';
 import { InvoiceService } from '../../../server/services/invoice.service';
 import { QBO_PAYMENT_DISCREPANCY } from '../../../server/lib/qbo-discrepancy';
 
 /** Exposes the protected sweep step so the test drives the real decision. */
-class TestQbo extends withInvoiceSync(withConnection(QBOServiceBase)) {
+class TestQbo extends withInvoiceSync(withCustomerSync(withConnection(QBOServiceBase))) {
     apply(tenantId: string, inv: InvoiceSummary, markPaid: never, markPartial: never) {
         return this.applyInvoiceStatusFromQBO(tenantId, inv, markPaid, markPartial);
     }
@@ -220,8 +221,11 @@ describe('settings shows both figures and what is not synced at all', () => {
         expect(status?.paymentDiscrepancies).toEqual([
             expect.objectContaining({ invoiceId: INV_ID, ledgerCents: 36000, qboCents: 45000, currency: 'CAD' }),
         ]);
-        // A discrepancy is not a failed push; counting it as one buries it.
-        expect(status?.openErrors).toBe(0);
+        // A discrepancy is not a failed push; listing it as one buries it.
+        // Asserted as an empty LIST, not a zero count: `openErrors` carries the
+        // rows now, so the settings page can print what QuickBooks actually
+        // said instead of a number beside "check the sync error log".
+        expect(status?.openErrors).toEqual([]);
     });
 
     it('discloses deposits held before any invoice, which never reach QuickBooks', async () => {

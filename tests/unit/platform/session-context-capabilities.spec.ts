@@ -22,7 +22,8 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // eslint-disable-next-line import/order
-import sessionContextRoutes from '../../../server/api/session-context';
+import sessionContextRoutes, { deploymentPayload } from '../../../server/api/session-context';
+import { STANDALONE_PROFILE, SAAS_PROFILE } from '../../../server/lib/deployment-profile';
 
 const TENANT_ID = '00000000-0000-0000-0000-0000000000aa';
 const USER_ID = 'u-caps';
@@ -111,5 +112,51 @@ describe('session-context capabilities', () => {
     it('an owner cannot be reduced by an override', async () => {
         await seedUser('owner', { scheduleOthers: false });
         expect((await capabilities('owner')).scheduleOthers).toBe(true);
+    });
+});
+
+describe('the deployment payload carries every capability the chrome gates on', () => {
+    it('ships each capability that an app/ surface reads, for both profiles', () => {
+        // A client component cannot read a capability it was never sent, and the
+        // failure is silent: `ctx?.deployment?.whatever` is simply `undefined`,
+        // which reads as `false` and looks like a deliberate decision.
+        //
+        // That is not hypothetical. `library-hub.tsx` and `CommandPalette.tsx`
+        // both gated the marketplace on `branding.isSaas` while
+        // `marketplace.tsx` enforced `hasContentMarketplace` — one question with
+        // two answers — because the capability was not on this payload at all.
+        // The wrong answer was the only reachable one.
+        //
+        // Keep this list in step with what `app/` actually reads. A capability
+        // added here that nothing consumes is the OTHER failure this repo has
+        // recorded ten times over, so do not pad it.
+        const GATED_IN_APP = [
+            'hasContentMarketplace',
+            'videoBackendManaged',
+            'hasManagedCompliance',
+        ] as const;
+
+        for (const profile of [STANDALONE_PROFILE, SAAS_PROFILE]) {
+            const shipped = deploymentPayload(profile, {});
+            for (const capability of GATED_IN_APP) {
+                expect(
+                    Object.keys(shipped),
+                    `${capability} is gated on in app/ but absent from the ${profile.mode} payload`,
+                ).toContain(capability);
+                // Present AND a boolean: `undefined` on the wire is
+                // indistinguishable from absent once it reaches the client.
+                expect(typeof shipped[capability]).toBe('boolean');
+            }
+        }
+    });
+
+    it('does NOT ship the server-only fields of the profile', () => {
+        // The positive control for the assertion above. Without it, "ship
+        // everything" passes — and that would put `fixedTenantId` and the portal
+        // URLs in a payload the browser can read.
+        const shipped = Object.keys(deploymentPayload(SAAS_PROFILE, {}));
+        for (const serverOnly of ['fixedTenantId', 'billingPortalUrl', 'loginRedirectBase']) {
+            expect(shipped, `${serverOnly} must not reach the browser`).not.toContain(serverOnly);
+        }
     });
 });

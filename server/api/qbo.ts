@@ -93,7 +93,17 @@ api.post('/sync', async (c) => {
     return c.json({ success: true, data: { message: 'Sync started' } });
 });
 
-api.post('/errors/:id/retry', async (c) => {
+/**
+ * Close an open row: the tenant has looked at it and is done with it.
+ *
+ * It was `/errors/:id/retry`, and it retried nothing — `resolveError` sets
+ * `is_resolved` and stops. Nothing reached it (no surface listed the rows), so
+ * the lie was never caught by use; a name that describes an action the handler
+ * does not perform is the shape that produced most of this integration's
+ * never-worked paths. Re-attempting a push is what "Sync now" is for, and it
+ * re-detects anything still broken into a fresh row.
+ */
+api.post('/errors/:id/dismiss', async (c) => {
     await c.var.services.qbo.resolveError(c.get('tenantId'), c.req.param('id'));
     return c.json({ success: true });
 });

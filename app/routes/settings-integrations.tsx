@@ -245,7 +245,11 @@ export default function SettingsIntegrations() {
 
   const tenantSlug = ctx?.branding?.tenantSlug ?? null;
   const webhookUrl = tenantSlug ? `${webhookBase}/${tenantSlug}` : webhookBase;
-  const isSaas = ctx?.branding?.isSaas ?? false;
+  // The capability, not the mode — the same one the ACTION in this file already
+  // reads, with a comment saying to read the capability. The two halves of one
+  // file were answering the same question two ways; the half with the comment
+  // was the correct one.
+  const videoBackendManaged = ctx?.deployment?.videoBackendManaged ?? false;
 
   const saving = nav.state !== "idle" && nav.formData?.get("intent") === "save-stripe-secrets";
   const savingVideo = nav.state !== "idle" && nav.formData?.get("intent") === "save-video";
@@ -296,8 +300,10 @@ export default function SettingsIntegrations() {
         testResults={testResults}
       />
 
-      {/* Video backend — self-host only; hidden in SaaS (backend is plan-gated) */}
-      {!isSaas && (
+      {/* Video backend — shown only where the operator picks it. Where the
+          platform picks it (`videoBackendManaged`) the form has nothing to
+          offer, and the action in this file refuses to save from it. */}
+      {!videoBackendManaged && (
         <VideoIntegrationPanel
           videoMode={videoMode}
           streamCustomerSubdomain={streamCustomerSubdomain}

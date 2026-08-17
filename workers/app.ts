@@ -5,6 +5,11 @@
 import { Hono, type Context } from "hono";
 import { createRequestHandler, RouterContextProvider } from "react-router";
 import { buildOAuthHandler } from "../server/lib/mcp/oauth-provider";
+// Safe at the top level despite this entry's tiny-import-graph rule:
+// `deployment-profile.ts` imports nothing at all — it is two constants and a
+// resolver over `ProfileEnv`. Pulling it in does not drag the API graph in
+// behind it, which is the thing that rule protects.
+import { getDeploymentProfile } from "../server/lib/deployment-profile";
 // i18n Phase C — request-scoped locale. paraglideMiddleware establishes an
 // AsyncLocalStorage scope so getLocale()/m.*() resolve per-request (never a
 // module-global) across the multi-tenant Worker. Generated (git-ignored); the
@@ -89,11 +94,18 @@ const app = new Hono();
 
 // --- API-owned paths → the API app (with its middleware). Routing audit done. ---
 // Bulk API surface + genuine non-/api endpoints with no React Router page:
-// SaaS-Portal M2M integration: reachable ONLY in saas. Standalone gets 404 —
-// no machine-to-machine surface (no perceived backdoor). See server/portal/.
+// SaaS-Portal M2M integration: mounted only where the surface exists. Where it
+// does not, the prefix 404s — there is no platform on the other end, and a
+// surface that answers is a surface somebody probes. See server/portal/.
+//
+// This runs before any middleware, so `c.var.profile` is not available — but
+// `getDeploymentProfile` takes `ProfileEnv`, not `AppEnv`, and that widening
+// exists for exactly this class of caller. It was reading `APP_MODE` under an
+// allowlist entry whose stated reason ("runs before middleware") was true of
+// the context and not of the function.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.all("/api/integration/*", (c: any) =>
-    c.env.APP_MODE === "saas" ? toApi(c) : c.notFound(),
+    getDeploymentProfile(c.env).hasPortalIntegrationApi ? toApi(c) : c.notFound(),
 );
 app.all("/api/*", toApi);
 app.all("/status", toApi);

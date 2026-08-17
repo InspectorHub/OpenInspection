@@ -70,16 +70,23 @@ describe('QBOService.toIso8601', () => {
 });
 
 describe('QBOService.buildDocNumber', () => {
-    it('truncates to 21 characters', () => {
-        const svc = new QBOService({} as any, 'cid', 'csec', 'whsec', 'secret32chars_aaaaaaaaaaaaaaaa');
-        const result = (svc as any).buildDocNumber('INV-2025-VERY-LONG-NUMBER-001');
-        expect(result.length).toBeLessThanOrEqual(21);
+    // These used to pass a STRING invoice number and survived the signature
+    // change only because the call site casts through `as any`. They now assert
+    // the real contract: an integer number, or a truncated id for the rows that
+    // predate `invoices.invoice_number`.
+    const svc = () => new QBOService({} as any, 'cid', 'csec', 'whsec', 'secret32chars_aaaaaaaaaaaaaaaa');
+
+    it('sends the bare integer — QuickBooks styles its own document numbers', () => {
+        expect((svc() as any).buildDocNumber(1042, 'ignored')).toBe('1042');
     });
 
-    it('does not truncate short numbers', () => {
-        const svc = new QBOService({} as any, 'cid', 'csec', 'whsec', 'secret32chars_aaaaaaaaaaaaaaaa');
-        const result = (svc as any).buildDocNumber('INV-001');
-        expect(result).toBe('INV-001');
+    it('truncates the id fallback to Intuit’s 21-character limit', () => {
+        // A UUID is 36 characters. This fallback IS the defect the column
+        // fixed — it put `9ce7a7ba-c5e0-4678-86` in front of a paying customer
+        // — and it survives only for rows written before the column existed.
+        const result = (svc() as any).buildDocNumber(null, '9ce7a7ba-c5e0-4678-865c-85e241a43dec');
+        expect(result).toBe('9ce7a7ba-c5e0-4678-86');
+        expect(result.length).toBe(21);
     });
 });
 

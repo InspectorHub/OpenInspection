@@ -124,10 +124,23 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                 // the column's own Date storage type.
                 lastSyncAt:            row.lastSyncAt ? Math.floor(row.lastSyncAt.getTime() / 1000) : null,
                 syncEnabled:           row.syncEnabled,
-                // Failed pushes only. A discrepancy is not a failure — nothing
-                // went wrong on the wire — and filing it under "sync errors"
-                // would bury the one thing on this page that needs a human.
-                openErrors:            errorRows.length - discrepancyRows.length,
+                // The rows themselves, not a count of them. A discrepancy is not
+                // a failure — nothing went wrong on the wire — so it is filtered
+                // out here and rendered from `paymentDiscrepancies` with both
+                // figures. Everything else travels whole: `describeQboError`
+                // already writes a message naming what QuickBooks refused, and
+                // until now nothing on the page could show it.
+                openErrors:            errorRows
+                    .filter(r => r.errorCode !== QBO_PAYMENT_DISCREPANCY)
+                    .map(r => ({
+                        id:         r.id,
+                        oiType:     r.oiType,
+                        oiId:       r.oiId,
+                        errorCode:  r.errorCode,
+                        message:    r.errorMsg,
+                        retries:    r.retries,
+                        lastSeenAt: Math.floor(r.updatedAt.getTime() / 1000),
+                    })),
                 paymentDiscrepancies,
                 heldDepositCount:      heldDeposits.length,
                 refreshTokenExpiresAt: Math.floor(row.refreshTokenExpiresAt.getTime() / 1000),

@@ -7,11 +7,13 @@ import { m } from "~/paraglide/messages";
 // A function (not a module const) so the `m.*()` titles/descriptions resolve
 // inside the per-request paraglide locale scope, not once at import time.
 //
-// `isSaas` drops the Marketplace tile in standalone: there is no catalogue in
-// that mode and no path by which one arrives, so the tile only ever led to an
-// empty page. One line to revert if the marketplace unification work (OI #293)
-// makes the catalogue meaningful in standalone.
-function getTiles(isSaas: boolean) {
+// `hasMarketplace` drops the Marketplace tile where the catalogue does not
+// exist: the route itself 404s there rather than rendering an empty shelf, so
+// the tile only ever led to a dead end. It is the deployment CAPABILITY, which
+// is the same thing `marketplace.tsx` enforces — one question, one answer. If
+// the marketplace unification work (OI #293) makes the catalogue meaningful in
+// standalone, the capability moves and this follows for free.
+function getTiles(hasMarketplace: boolean) {
   return [
   {
     to: "/library/templates",
@@ -55,7 +57,7 @@ function getTiles(isSaas: boolean) {
     desc: m.library_hub_defect_categories_desc(),
     icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
   },
-  ...(isSaas
+  ...(hasMarketplace
     ? [
         {
           to: "/library/marketplace",
@@ -69,12 +71,19 @@ function getTiles(isSaas: boolean) {
 }
 
 export default function LibraryHub() {
-  // Fail closed: no session context (fetch failed) hides the SaaS-only tile
-  // rather than offering a door that 404s.
-  const isSaas = useSessionContext()?.branding.isSaas === true;
+  // The capability, not the mode. `marketplace.tsx` enforces
+  // `hasContentMarketplace`, so gating the door on `branding.isSaas` was two
+  // answers to one question — and it was the only reachable answer until that
+  // capability was put on the session-context wire.
+  //
+  // Fail closed: no session context, or one without `deployment`, hides the
+  // tile rather than offering a door that 404s. BOTH `?.` are load-bearing —
+  // guarding only the context throws on a payload that predates the capability,
+  // and a crashed route is not a closed door.
+  const hasMarketplace = useSessionContext()?.deployment?.hasContentMarketplace === true;
   return (
     <div className={HUB_GRID_CLASS}>
-      {getTiles(isSaas).map((t) => (
+      {getTiles(hasMarketplace).map((t) => (
         <HubCard key={t.to} to={t.to} title={t.title} desc={t.desc} icon={t.icon} />
       ))}
     </div>

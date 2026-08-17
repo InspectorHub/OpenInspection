@@ -311,6 +311,44 @@ green while testing nothing. Three shapes to reject in review:
 - **No-assert body.** A test that runs code but asserts nothing (or asserts a
   tautology). Every test must assert an observable outcome.
 
+### A suite that only builds one deployment shape
+
+**Twenty-two QuickBooks specs, and not one of them had ever run in standalone
+mode.** Every spec built a valid env; only one valid env had ever been written
+down. `qbo-oauth-callback.spec.ts` hardcoded `QBO_CLIENT_ID` /
+`QBO_CLIENT_SECRET` / `QBO_ENV` — the platform-supplied shape — and every other
+env in the domain descended from it. So the tenant-credential fallback in
+`qbo-oauth.ts` had a false guard on every run and was dead code inside a green
+suite. A real defect lived in that gap for the life of the feature: the CDC cron
+read credentials straight off the Worker env, could never see a self-hosted
+operator's, and logged `QBO not configured` at a deployment where they had
+configured it.
+
+Nothing was skipped and nothing failed. **The suite was complete for one of the
+two products this repo ships.**
+
+The rule, so a future author can apply it without knowing that story:
+
+> **If any `if` in the code under test has one branch per deployment, the spec
+> must construct two envs.** One env can only ever exercise one branch, and a
+> branch never taken cannot fail.
+
+If two envs are awkward to build, the seam is in the wrong place rather than the
+test being too much trouble — `getDeploymentProfile` takes `ProfileEnv` rather
+than `AppEnv` precisely so any caller holding an env can answer the question.
+`tests/unit/helpers/qbo-deployment-envs.ts` is the worked example: `saasQboEnv`
+and `standaloneQboEnv`, named after the deployment so a spec asks for "the
+self-hosted case" instead of assembling one and hoping it resembles one.
+
+**Never hand-build credential fixtures.** Not hand-written ciphertext, not
+hand-filled env values standing in for stored secrets. Seal them with the
+product's own writer (`sealSecrets`) and let the code under test open them the
+way production does. A fixture that writes what it then reads proves the reader
+agrees with the writer and nothing else — and fixtures supplying fields
+production never supplies is the single shared cause behind the QuickBooks
+defects that shipped without ever working. That includes MODE fixtures, not just
+response fixtures: an env is a fixture too.
+
 **Assert against the REAL contract, not a remembered one.** Specs rot when the
 API moves under them and the symptom is a silent 400/404, not a red assertion:
 

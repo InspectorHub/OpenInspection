@@ -711,6 +711,33 @@ describe('Managed compliance admin endpoints (Task 6)', () => {
         fetchSpy.mockRestore();
     });
 
+    it('refuses provisioning where the CAPABILITY is absent, even when the mode says saas', async () => {
+        // The test above cannot distinguish the two implementations: on
+        // STANDALONE_PROFILE the mode is 'standalone' AND the capability is
+        // false, so `mode !== 'saas'` and `!hasManagedCompliance` give the same
+        // answer. Only a profile where they DISAGREE can fail for the right
+        // reason.
+        //
+        // The asymmetry this closes was the worse direction: the settings page
+        // read `hasManagedCompliance` to decide whether to OFFER managed
+        // provisioning, while the endpoint that ENFORCES it compared the mode.
+        // The correct read lived only on the cosmetic half.
+        const fetchSpy = vi.spyOn(globalThis, 'fetch');
+        const app = buildSmsApp(db, { ...SAAS_PROFILE, hasManagedCompliance: false });
+        const res = await app.request('/api/admin/sms/compliance/provision', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                businessInfo: { legalName: 'Acme Inc', address: '1 Main St', repName: 'Jane' },
+                channel: 'tollfree',
+            }),
+        }, MANAGED_ENV, makeExecCtx());
+        expect(res.status).toBe(403);
+        expect((await res.json() as { error: string }).error).toBe('managed_provision_unavailable');
+        expect(fetchSpy).not.toHaveBeenCalled();
+        fetchSpy.mockRestore();
+    });
+
     it('POST /sms/compliance/provision on SaaS with missing managed keys → 409 and fetch never called', async () => {
         // Seed managedEligible=true so the managed-eligibility gate passes and we reach the env-keys check.
         await db.insert(schema.tenantConfigs).values({

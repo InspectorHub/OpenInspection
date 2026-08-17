@@ -46,8 +46,6 @@ const DESCRIPTIONS: Record<keyof DeploymentProfile, string> = {
     aiDevMockFallback: 'AI calls may fall back to a local mock when no credential resolves.',
     hasManagedAi:
         'A platform-provided AI credential can ever be resolved. Standalone has no platform, so the managed path is absent rather than disabled — use your own key in Settings → Advanced → AI.',
-    brandingSource:
-        'Where the company name and colour come from: `env` (`APP_NAME` / `PRIMARY_COLOR`) or per-tenant config edited in Settings.',
     mcpApiRoute: 'Where the MCP OAuth surface mounts.',
     videoBackendManaged:
         'Whether the platform picks the video backend. Standalone operators set `videoMode` themselves, which is why the self-host settings form exists and the saas one refuses to save.',
@@ -57,6 +55,10 @@ const DESCRIPTIONS: Record<keyof DeploymentProfile, string> = {
         'The content marketplace surface exists. Standalone 404s the browse route rather than rendering an empty shelf: the catalogue is curated first-party and nothing can reach it.',
     qboAppManaged:
         'The platform supplies the Intuit app tenants connect through, so nobody is asked for a Client ID. Standalone brings its own: Intuit matches a redirect URI byte for byte and a self-hosted deploy answers on its own domain, so the platform app cannot work there — which is why the credential form, including `QBO_ENV`, renders only in standalone.',
+    tenantRecordOwnedByPortal:
+        'Whether a platform stores the authoritative tenant record and this worker reads a projection of it. Decides which admin provider is constructed; in standalone this deployment owns the row outright.',
+    hasPortalIntegrationApi:
+        'Whether the portal machine-to-machine surface (`/api/integration/*`) is mounted. Standalone 404s the whole prefix rather than answering on an API nobody can authenticate to.',
     botProtectionMandatory:
         'Whether the public booking form and agent signup MUST carry a bot challenge. Saas always challenges — with no `TURNSTILE_SECRET_KEY` it uses Cloudflare\'s published test key rather than skipping, so the mechanism is permissive but never off. Standalone leaves it to the operator: no key, no challenge.',
 };

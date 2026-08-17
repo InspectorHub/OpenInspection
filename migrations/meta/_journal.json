@@ -92,6 +92,13 @@
       "when": 1786753837561,
       "tag": "0012_signing_key_history",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1786928749614,
+      "tag": "0013_military_stryfe",
+      "breakpoints": true
     }
   ]
 }
