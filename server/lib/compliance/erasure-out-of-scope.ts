@@ -66,7 +66,18 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // accounts; staff offboarding is a separate lifecycle.
     { table: 'users',               column: 'email',                     reason: 'staff account — not consumer-DSAR scope' },
     { table: 'users',               column: 'phone',                     reason: 'staff account — not consumer-DSAR scope' },
-    { table: 'users',               column: 'default_signature_base64',  reason: 'inspector (staff) signature asset' },
+    // review review. 'staff signature asset' said WHOSE it is and stopped
+    // there, which left the column indefinite by omission rather than by
+    // decision — and review is explicit that a staff signature may not inherit
+    // 'indefinite' from the client column having a six-year rule. Two different
+    // clocks, and they must say so:
+    //   - This one is an ACCOUNT ASSET. It is the inspector's saved default
+    //     drawing, reused across every future countersignature, so its purpose
+    //     lasts exactly as long as the account. It expires with the account
+    //     (tenant purge, or staff offboarding), not on an envelope's window.
+    //   - `agreement_requests.inspector_signature_base64` below is a
+    //     COUNTERSIGNATURE ON ONE ENVELOPE, so it expires with that envelope.
+    { table: 'users',               column: 'default_signature_base64',  reason: 'inspector (staff) signature asset — purpose: reusable account asset for countersigning; basis: contract performance with the tenant; window: life of the account (destroyed by the tenant purge / staff offboarding), NOT the agreement window — see docs/compliance/retention-policy.md' },
     { table: 'users',               column: 'is_signature_enabled',      reason: 'boolean flag, not personal data' },
     // An inspector's routing origin can be their home address, so it IS personal
     // data — it is simply not a CONSUMER data subject's. Same posture as
@@ -80,7 +91,7 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'tenant_invites',      column: 'email',                     reason: 'staff invite — not consumer-DSAR scope' },
     { table: 'audit_logs',          column: 'ip_address',                reason: 'staff-action security audit trail' },
     { table: 'report_signoff',      column: 'signature_ref',             reason: 'inspector (staff) signoff reference' },
-    { table: 'agreement_requests',  column: 'inspector_signature_base64', reason: 'inspector (staff) countersignature' },
+    { table: 'agreement_requests',  column: 'inspector_signature_base64', reason: 'inspector (staff) countersignature — purpose: evidence that the company executed THIS agreement; basis: Art. 17(3)(e) defence of legal claims, the same basis as the client signature it sits opposite; window: the tenant agreement retention window, destroyed by the same envelope-expiry pass (retention-sweep.ts) that nulls the client signature and its three R2 artefacts' },
     // Provenance ABOUT the signature evidence, not evidence itself: which rule
     // attributed a signature to a person, what that rule read, and when it ran.
     // Declared rather than left to the heuristic because they sit on the table

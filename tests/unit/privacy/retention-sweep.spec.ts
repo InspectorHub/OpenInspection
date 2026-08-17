@@ -7,6 +7,14 @@ import { eq } from 'drizzle-orm';
 import { runRetentionSweep } from '../../../server/lib/compliance/retention-sweep';
 
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+/**
+ * The sweep now destroys the three signed-agreement artefacts alongside the
+ * column, so every call needs a bucket. These specs are about the DB half, so
+ * the stub only has to accept the delete — `signature-retention-graph.spec.ts`
+ * is where the objects are actually asserted gone.
+ */
+const sweepBucket = () => ({ delete: async () => {} } as unknown as R2Bucket);
+
 const NOW = Date.UTC(2026, 5, 8); // 2026-06-08
 
 describe('runRetentionSweep', () => {
@@ -116,7 +124,7 @@ describe('runRetentionSweep', () => {
         // t1 (6y): signed 7 years ago -> past window -> purge.
         await seedSignedEnvelope({ id: 'e-old', tenantId: 't1', agreementId: 'agr-tpl', signedAtMs: NOW - 7 * YEAR_MS });
 
-        const summary = await runRetentionSweep(testDb as any, NOW);
+        const summary = await runRetentionSweep(testDb as any, NOW, { photos: sweepBucket() });
         expect(summary.purgedEnvelopes).toBe(1);
 
         const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-old')).get();
@@ -138,7 +146,7 @@ describe('runRetentionSweep', () => {
         // (retention-expiry as a self-contained data-minimization clock).
         await seedSignedEnvelope({ id: 'e-pii', tenantId: 't1', agreementId: 'agr-tpl', signedAtMs: NOW - 7 * YEAR_MS, pii: true });
 
-        const summary = await runRetentionSweep(testDb as any, NOW);
+        const summary = await runRetentionSweep(testDb as any, NOW, { photos: sweepBucket() });
         expect(summary.purgedEnvelopes).toBe(1);
 
         const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-pii')).get();
@@ -169,7 +177,7 @@ describe('runRetentionSweep', () => {
         // anonymize fields STAY '[erased]' (byte-identical, no error).
         await seedSignedEnvelope({ id: 'e-pre', tenantId: 't1', agreementId: 'agr-tpl', signedAtMs: NOW - 7 * YEAR_MS });
 
-        const summary = await runRetentionSweep(testDb as any, NOW);
+        const summary = await runRetentionSweep(testDb as any, NOW, { photos: sweepBucket() });
         expect(summary.purgedEnvelopes).toBe(1);
 
         const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-pre')).get();
@@ -187,7 +195,7 @@ describe('runRetentionSweep', () => {
         // t1 (6y): live-PII row signed 3 years ago -> within window -> nothing.
         await seedSignedEnvelope({ id: 'e-recent', tenantId: 't1', agreementId: 'agr-tpl', signedAtMs: NOW - 3 * YEAR_MS, pii: true });
 
-        const summary = await runRetentionSweep(testDb as any, NOW);
+        const summary = await runRetentionSweep(testDb as any, NOW, { photos: sweepBucket() });
         expect(summary.purgedEnvelopes).toBe(0);
 
         const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-recent')).get();
@@ -209,7 +217,7 @@ describe('runRetentionSweep', () => {
         // Same 3-year age, but t2 has a 2-year window -> purged.
         await seedSignedEnvelope({ id: 'e-t2', tenantId: 't2', agreementId: 'agr-tpl2', signedAtMs: NOW - 3 * YEAR_MS });
 
-        const summary = await runRetentionSweep(testDb as any, NOW);
+        const summary = await runRetentionSweep(testDb as any, NOW, { photos: sweepBucket() });
         expect(summary.purgedEnvelopes).toBe(1);
         const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-t2')).get();
         expect(env!.purgedAt).not.toBeNull();
@@ -232,7 +240,7 @@ describe('runRetentionSweep', () => {
         // Younger than 6y -> kept.
         await seedSignedEnvelope({ id: 'e-noconf-young', tenantId: 't3', agreementId: 'agr-tpl3', signedAtMs: NOW - 5 * YEAR_MS, inspectionId: 'insp-t3' });
 
-        const summary = await runRetentionSweep(testDb as any, NOW);
+        const summary = await runRetentionSweep(testDb as any, NOW, { photos: sweepBucket() });
         expect(summary.purgedEnvelopes).toBe(1);
 
         const old = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-noconf-old')).get();
@@ -254,7 +262,7 @@ describe('runRetentionSweep', () => {
             createdAt: new Date(NOW - 7 * YEAR_MS),
         } as any);
 
-        const summary = await runRetentionSweep(testDb as any, NOW);
+        const summary = await runRetentionSweep(testDb as any, NOW, { photos: sweepBucket() });
         expect(summary.purgedEnvelopes).toBe(0);
         const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-draft')).get();
         expect(env!.purgedAt).toBeNull();
@@ -263,9 +271,9 @@ describe('runRetentionSweep', () => {
     it('is idempotent — a second run skips already-purged rows', async () => {
         await seedSignedEnvelope({ id: 'e-old2', tenantId: 't1', agreementId: 'agr-tpl', signedAtMs: NOW - 8 * YEAR_MS });
 
-        const first = await runRetentionSweep(testDb as any, NOW);
+        const first = await runRetentionSweep(testDb as any, NOW, { photos: sweepBucket() });
         expect(first.purgedEnvelopes).toBe(1);
-        const second = await runRetentionSweep(testDb as any, NOW);
+        const second = await runRetentionSweep(testDb as any, NOW, { photos: sweepBucket() });
         expect(second.purgedEnvelopes).toBe(0);
     });
 });

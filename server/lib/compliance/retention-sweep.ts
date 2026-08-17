@@ -46,6 +46,7 @@ import {
     ANONYMIZE_SIGNER_PII,
     ANONYMIZE_REQUEST_PII,
 } from './anonymize-pii';
+import { r2Keys } from '../r2-keys';
 import { changeCount, toMs, subtractYearsMs } from './db-row-utils';
 
 // Accept either the D1 drizzle type (prod) or the better-sqlite3 test db.
@@ -53,11 +54,32 @@ type AnyDb = DrizzleD1Database<Record<string, unknown>> | { [k: string]: unknown
 
 const DEFAULT_RETENTION_YEARS = 6;
 
+/**
+ * The three documents that embed a picture of the signature the column holds.
+ *
+ * Named here rather than derived, because they are what the sign-completion
+ * workflow actually writes (`workflows/sign-completion-workflow.ts`) and a
+ * fourth artefact would have to be added deliberately in both places. A glob of
+ * the envelope prefix would have coupled destruction to whatever happened to be
+ * under it.
+ */
+const SIGNATURE_ARTEFACTS = ['signed.pdf', 'certificate.pdf', 'evidence.zip'] as const;
+
 export interface RetentionSweepSummary {
     /** Number of envelopes whose signatures were destroyed this run. */
     purgedEnvelopes: number;
     /** Number of signer rows whose signatures were destroyed this run. */
     purgedSigners: number;
+    /**
+     * R2 objects destroyed this run: the signed PDF, the certificate and the
+     * evidence pack, three per due envelope.
+     *
+     * Counted from the keys ATTEMPTED rather than from a bucket response,
+     * because R2 delete is idempotent and reports no per-key outcome. The number
+     * therefore means "this many artefacts are now absent", which is what a
+     * destruction record needs, not "this many existed".
+     */
+    purgedArtefacts: number;
 }
 
 /**
@@ -71,6 +93,7 @@ export interface RetentionSweepSummary {
 export async function runRetentionSweep(
     rawDb: AnyDb,
     now: number,
+    stores: { photos?: R2Bucket | undefined } = {},
 ): Promise<RetentionSweepSummary> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = rawDb as any;
@@ -82,6 +105,11 @@ export async function runRetentionSweep(
     const due = await db.select({
         id: agreementRequests.id,
         tenantId: agreementRequests.tenantId,
+        // Selected for the R2 keys. `agreementFile` needs
+        // (tenantId, inspectionId, envelopeId, name), and the envelope id IS
+        // `agreementRequests.id` — so the only missing coordinate was on the
+        // row all along.
+        inspectionId: agreementRequests.inspectionId,
         signedAt: agreementRequests.signedAt,
         years: tenantConfigs.agreementRetentionYears,
     })
@@ -96,15 +124,47 @@ export async function runRetentionSweep(
 
     // A row is past-window when signedAt < now - years (i.e. signedAt + years < now).
     const dueIds: string[] = [];
-    for (const r of due as Array<{ id: string; signedAt: unknown; years: number | null }>) {
+    const dueArtefactKeys: string[] = [];
+    for (const r of due as Array<{
+        id: string; tenantId: string; inspectionId: string | null; signedAt: unknown; years: number | null;
+    }>) {
         const signedAtMs = toMs(r.signedAt);
         if (signedAtMs == null) continue;
         const years = r.years ?? DEFAULT_RETENTION_YEARS;
         const cutoff = subtractYearsMs(now, years);
-        if (signedAtMs < cutoff) dueIds.push(r.id);
+        if (signedAtMs >= cutoff) continue;
+        dueIds.push(r.id);
+        // The three artefacts that hold a picture of the same signature the
+        // column below is about to lose. Keyed per envelope, so a prefix built
+        // from the wrong row would destroy a live agreement's evidence.
+        if (r.inspectionId) {
+            for (const name of SIGNATURE_ARTEFACTS) {
+                dueArtefactKeys.push(r2Keys.agreementFile(r.tenantId, r.inspectionId, r.id, name));
+            }
+        }
     }
 
-    if (dueIds.length === 0) return { purgedEnvelopes: 0, purgedSigners: 0 };
+    if (dueIds.length === 0) return { purgedEnvelopes: 0, purgedSigners: 0, purgedArtefacts: 0 };
+
+    // review review: nulling the column while `signed.pdf` still embeds the
+    // same image is DATABASE retention wearing the name of retention. The column
+    // and the artefacts are one evidence object, so a sweep that cannot reach
+    // the artefacts must not destroy half of it and report success.
+    //
+    // Demanded HERE, after the due set is known, so a run with nothing due never
+    // needs a binding it would not use.
+    const bucket = stores.photos;
+    if (!bucket) {
+        throw new Error(
+            'agreement retention needs the photos bucket — refusing to null a signature column '
+            + 'while signed.pdf still embeds the same image. Pass { photos } to runRetentionSweep.',
+        );
+    }
+    // Objects first, for the same reason as the report-PDF sweep: a failure
+    // after this point leaves rows whose objects are gone, which the next pass
+    // retries harmlessly. The reverse leaves objects nothing points at.
+    if (dueArtefactKeys.length > 0) await bucket.delete(dueArtefactKeys);
+    const purgedArtefacts = dueArtefactKeys.length;
 
     // Anonymize satellite PII + destroy signer signatures for the due envelopes
     // (keep the audit chain). The PII SET is the SHARED `ANONYMIZE_SIGNER_PII`
@@ -121,11 +181,18 @@ export async function runRetentionSweep(
     // the column moved there. The `purged_at IS NULL` guard in the WHERE keeps
     // the count truthful and the operation idempotent under a race. PII SET =
     // shared `ANONYMIZE_REQUEST_PII`; purged_at layered on here.
+    // `inspectorSignatureBase64` goes in the SAME pass, and that is a decision
+    // rather than tidiness: it is the company's countersignature ON THIS
+    // ENVELOPE, so its purpose ends when the envelope's does. The inspector's
+    // SAVED DEFAULT signature (`users.default_signature_base64`) is a different
+    // clock — an account asset that expires with the account — and both are now
+    // written down in erasure-out-of-scope.ts rather than left indefinite by
+    // omission (review review).
     const envRes = await db.update(agreementRequests)
-        .set({ ...ANONYMIZE_REQUEST_PII, purgedAt: new Date(now) })
+        .set({ ...ANONYMIZE_REQUEST_PII, inspectorSignatureBase64: null, purgedAt: new Date(now) })
         .where(and(inArray(agreementRequests.id, dueIds), isNull(agreementRequests.purgedAt)))
         .run();
     const purgedEnvelopes = changeCount(envRes);
 
-    return { purgedEnvelopes, purgedSigners };
+    return { purgedEnvelopes, purgedSigners, purgedArtefacts };
 }
