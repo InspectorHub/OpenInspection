@@ -94,8 +94,14 @@ const OUT_OF_SCOPE = flag(
 );
 const SCHEMA_DIR = flag("--schema-dir", join(ROOT, "server", "lib", "db", "schema"));
 
-const VALID_ACTIONS = new Set(["delete", "null", "hash", "retain", "anonymize"]);
-const REQUIRES_BASIS = new Set(["anonymize", "retain"]);
+// `erase_in_place` replaced `anonymize` on 2026-08-17 (counsel round 27, CA-08:
+// the old label invited a future reader to conclude we had produced legally
+// deidentified data). The old value is NOT accepted here — this gate reads the
+// manifest, which is source, and source has one vocabulary. The WIRE and the
+// persisted `decisions_json` still accept both, deliberately; see
+// server/lib/validations/admin/compliance.ts for why.
+const VALID_ACTIONS = new Set(["delete", "null", "hash", "retain", "erase_in_place"]);
+const REQUIRES_BASIS = new Set(["erase_in_place", "retain"]);
 const VALID_ENFORCEMENT = new Set(["enforced", "pending"]);
 
 /**

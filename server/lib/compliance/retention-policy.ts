@@ -82,11 +82,11 @@ export interface RetentionPolicyHeader {
 }
 
 export const RETENTION_POLICY: RetentionPolicyHeader = {
-    version: '2026-08-17.1',
+    version: '2026-08-17.2',
     status: 'interim',
     effectiveAt: '2026-08-08',
     approvedBy: null,
     approvedAt: null,
-    supersedes: '2026-08-15.1',
-    rulesDigest: '078f264e8dfbc10631f28359646d2e339fbee3b7ab85c97bdd8e532770a03cc8',
+    supersedes: '2026-08-17.1',
+    rulesDigest: '8e1b4cda8812770e388f2cfd3e52190e7c015dc54626ceec82d372c2e8c41090',
 };

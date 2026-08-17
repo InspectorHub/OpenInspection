@@ -120,7 +120,9 @@ const EXPLICIT_LEDGER_TABLES = [
     "sync_outbox",
 ];
 
-const VALID_ACTIONS = new Set(["delete", "anonymize"]);
+// See check-erasure-manifest.mjs — `erase_in_place` replaced `anonymize`
+// (CA-08). Source has one vocabulary; the wire keeps both.
+const VALID_ACTIONS = new Set(["delete", "erase_in_place"]);
 
 const errors = [];
 const src = readFileSync(MANIFEST, "utf8");

@@ -25,6 +25,40 @@ honest, and one that says nothing reads as approved.
 
 ---
 
+## 2026-08-17.2 — a rename, and nothing else
+
+**What changed.** One word. The retention action formerly written `anonymize` is
+now written `erase_in_place`, in this catalogue and in the erasure manifest that
+shares the verb.
+
+**What did not change.** No period. No table. No anchor column. No exclusion, no
+open question, no `decideBy` date. Every row still expires exactly when it did
+before this version, and the executor still performs exactly the same SQL. The
+digest moved because the action string is one of the operative fields it hashes —
+which is the gate working as designed: it cannot tell a rename from a
+re-decision, so it refuses both until a human says which one this is. This one is
+a rename.
+
+**Why the old name had to go.** External counsel, round 27, ruling CA-08. What
+the action does is overwrite identifier columns with a sentinel in a row that
+survives. That is not CCPA deidentification — which carries substantive
+conditions we do not meet — and it is not GDPR anonymisation either. Calling it
+`anonymize` invited a future reader, or a future legal document, to cite the
+label as evidence that we had produced legally deidentified data. It is the same
+failure mode round 16 named: an internal classification read downstream as an
+established fact. `erase_in_place` describes the operation and asserts nothing
+about its legal effect.
+
+**Also renamed in the same change**, for the same reason and recorded here
+because it is the other half of one decision: the erasure manifest's data
+category `user.biometric.signature` became `user.signature.rendered_image`, and
+the rule carries `biometricStatus: 'not_assessed_as_biometric'`. Not
+`biometric: false` — a boolean answer is itself a legal conclusion, which is the
+mistake being fixed. That category is not an operative field of this policy and
+does not affect the digest.
+
+---
+
 ## 2026-08-17.1 — report PDFs get a window
 
 **What changed.** `report_pdfs` gained a retention rule. It had none: the
