@@ -464,4 +464,23 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
      * Appended at END per the D1 add-column-at-end rule.
      */
     reportPdfRetentionYears: integer('report_pdf_retention_years').notNull().default(7),
+    /**
+     * Whether this workspace counts report opens. Default FALSE.
+     *
+     * review B4: the legitimate-interests assessment for report-view counting
+     * assigned the interest to the inspection company — a company that could
+     * not enable the processing, could not disable it, and could not see that
+     * it was happening. A legitimate interest may not be a mask for processing
+     * its supposed beneficiary cannot decline, so the assessment did not hold
+     * until this column existed.
+     *
+     * Default false rather than true, and that is the whole point: the
+     * defensible starting position is the one where nobody is counted until
+     * somebody chose it. Nothing is lost by it — no production row exists.
+     *
+     * Read by `shouldCountReportView`, which checks it FIRST.
+     * Appended at END per the D1 add-column-at-end rule.
+     */
+    reportViewCountingEnabled: integer('is_report_view_counting_enabled', { mode: 'boolean' })
+        .notNull().default(false),
 });

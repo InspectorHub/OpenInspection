@@ -132,6 +132,7 @@ const TenantConfigGetResponseSchema = z.object({
         allowInspectorChoice: z.boolean().describe('Whether the public booking page offers an inspector dropdown'),
         agreementRetentionYears: z.number().int().describe('Years signed agreements are retained before the GDPR retention sweep destroys them (Track I-a). Default 6.'),
         reportPdfRetentionYears: z.number().int().describe('Years a rendered report PDF is kept. 0 = indefinite. Default 7 is a platform default, not a statutory requirement.'),
+        reportViewCountingEnabled: z.boolean().describe('Whether this workspace counts report opens. Default false.'),
         reviewUrl: z.string().nullable().optional().describe('Track J (#122) — company review link, or null.'),
         smsMode: z.enum(['platform', 'own', 'managed_shared', 'managed_dedicated']).describe('Track L (D3) — SMS sender mode.'),
         companyPhone: z.string().nullable().optional().describe('Track L — call-back number rendered as {{company_phone}} in SMS copy.'),
@@ -442,6 +443,7 @@ const adminSettingsRoutes = createApiRouter()
                 allowInspectorChoice: config?.allowInspectorChoice ?? false,
                 agreementRetentionYears: config?.agreementRetentionYears ?? 6,
                 reportPdfRetentionYears: resolveReportPdfRetentionYears(config),
+                reportViewCountingEnabled: config?.reportViewCountingEnabled ?? false,
                 reviewUrl: config?.reviewUrl ?? null,
                 smsMode: (config?.smsMode as 'platform' | 'own' | 'managed_shared' | 'managed_dedicated') ?? 'platform',
                 companyPhone: (config?.companyPhone as string | null) ?? null,
@@ -488,6 +490,9 @@ const adminSettingsRoutes = createApiRouter()
         }
         if (body.allowInspectorChoice !== undefined) {
             update.allowInspectorChoice = body.allowInspectorChoice;
+        }
+        if (body.reportViewCountingEnabled !== undefined) {
+            update.reportViewCountingEnabled = body.reportViewCountingEnabled;
         }
         if (body.reportPdfRetentionYears !== undefined) {
             update.reportPdfRetentionYears = body.reportPdfRetentionYears;
