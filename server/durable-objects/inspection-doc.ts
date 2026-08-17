@@ -50,6 +50,7 @@ import type { ResultsProjection } from '../lib/collab/results-doc.types';
 import { findingKeysFromTemplateSnapshot } from '../lib/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
+import { purgePathMatches } from './purge-path';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -413,6 +414,22 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
             await this.restructure();
             return Response.json({ ok: true });
+        }
+
+        // Destruction. Called by TenantPurgeService for every report the tenant
+        // owned, because this object is addressed by `${tenantId}:${reportId}`
+        // and so is reachable by name only if the caller knows the report ids —
+        // which is why the purge collects them BEFORE the cascade deletes them.
+        //
+        // `deleteAll` empties both the Y.Doc updates and the snapshot ring. The
+        // in-memory `this.doc` is deliberately left alone: an object with live
+        // sockets is an editing session in progress on a workspace being
+        // destroyed, and there is nothing correct to show it. It writes nothing
+        // back — every persistence path in this class writes through storage
+        // that has just been emptied, and the object is evicted once idle.
+        if (purgePathMatches(url.pathname) && req.method === 'POST') {
+            await this.ctx.storage.deleteAll();
+            return Response.json({ purged: true });
         }
 
         return new Response('not found', { status: 404 });
