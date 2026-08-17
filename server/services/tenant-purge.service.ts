@@ -3,6 +3,7 @@ import { eq, and, isNull, getTableColumns, getTableName } from 'drizzle-orm';
 import { logger } from '../lib/logger';
 import { tenants, tenantDestructionRecords, users, reports } from '../lib/db/schema';
 import { collabDocName } from '../lib/collab/doc-name';
+import { agentViewTokenPrefix } from '../lib/agent-view-token';
 import { DESTRUCTION_STATUS } from '../lib/status/destruction-status';
 import { DESTRUCTION_RECORD_GENERATION, STORES_MEASURED } from '../lib/compliance/destruction-scope';
 // The tenant-scoped table set is DERIVED from the schema (every table with a
@@ -229,9 +230,31 @@ export class TenantPurgeService {
         }
 
         // 5. KV delete (best-effort)
+        //
+        //    Two shapes. The three NAMED keys above, and the share tokens, which
+        //    cannot be named — `agent_view_token:{token}` is keyed by the
+        //    credential itself. They are reachable because the token carries its
+        //    tenant in its leading 32 characters; see lib/agent-view-token.ts.
+        //    A token minted before that carries nothing that says whose it is,
+        //    so nothing sweeps it and nothing pretends to: it expires inside its
+        //    own thirty-day TTL.
         let kvCount = 0;
         for (const k of kvKeys) {
             try { await this.kv.delete(k); kvCount++; } catch { /* ignore */ }
+        }
+        try {
+            let cursor: string | undefined;
+            do {
+                const page = await this.kv.list({
+                    prefix: agentViewTokenPrefix(tenantId), ...(cursor ? { cursor } : {}),
+                });
+                for (const k of page.keys) {
+                    try { await this.kv.delete(k.name); kvCount++; } catch { /* ignore */ }
+                }
+                cursor = page.list_complete ? undefined : page.cursor;
+            } while (cursor);
+        } catch (err) {
+            logger.error('Share-token sweep failed', { tenantId }, err instanceof Error ? err : undefined);
         }
 
         // 6. Durable Objects. NOT best-effort like the R2 and KV sweeps above.

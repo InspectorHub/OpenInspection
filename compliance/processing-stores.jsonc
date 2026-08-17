@@ -99,11 +99,11 @@
       "subjects": ["staff"],
       "purpose": "Tenant configuration and decrypted-secret cache (`tenant:{slug}`, `secrets_enc`), plus the password-change stamps (`pwchanged:{userId}`) that invalidate JWTs issued before a credential change, and the agent view tokens.",
       "retention_rule": "none",
-      "deletion_mechanism": "partial",
+      "deletion_mechanism": "tenant-purge.service.ts — three named keys plus an `agent_view_token:{tenantIdHex}` prefix sweep",
       "export_mechanism": "not-applicable",
       "tenant_scope": "mixed",
       "evidence_level": "E2",
-      "note": "MIXED SCOPE is the gap. `tenant:{slug}` is tenant-prefixed and can be swept; `pwchanged:{userId}` and `agent_view_token:{token}` are keyed by an id that carries no tenant, so a tenant purge cannot enumerate them by prefix. `agent_view_token` is closed by B1b; `pwchanged` is a bounded non-personal stamp (a user id and a timestamp) whose only reader is the auth middleware."
+      "note": "Share tokens are now reachable: the token carries its tenant in its leading 32 hex characters, so `kv.list({prefix})` enumerates exactly one tenant's — see lib/agent-view-token.ts for why the token and not the key had to carry it. Two residues, both bounded and both asserted by tests rather than assumed: tokens minted before that change carry nothing saying whose they are and expire inside their own 30-day TTL, and `pwchanged:{userId}` is keyed by user id — swept by name from the user list, and in any case a non-personal stamp (a user id and a timestamp) whose only reader is the auth middleware."
     },
     {
       "store_type": "kv",
