@@ -9,6 +9,7 @@ import { Table, Pill, type PillTone } from "@core/shared-ui";
 import { LegalDocsPanel } from "~/components/settings/LegalDocsPanel";
 import { AiAssurancePanel, type AiAssuranceRow } from "~/components/settings/AiAssurancePanel";
 import { RetentionWindowSection } from "~/components/settings/RetentionWindowSection";
+import { ReportViewCountingSection } from "~/components/settings/ReportViewCountingSection";
 import { getBaseUrlFromRequest, rebaseHostedLegalUrl } from "~/lib/legal-base-url";
 import { m } from "~/paraglide/messages";
 
@@ -66,6 +67,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   let retentionYears = DEFAULT_RETENTION_YEARS;
   let pdfRetentionYears = DEFAULT_PDF_RETENTION_YEARS;
+  let viewCountingEnabled = false;
   let legal = {
     legalMode: "hosted" as "hosted" | "custom",
     customPrivacyUrl: "" as string,
@@ -84,6 +86,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     if (Number.isInteger(raw) && raw >= MIN_RETENTION_YEARS && raw <= MAX_RETENTION_YEARS) {
       retentionYears = raw;
     }
+    // Absence reads as OFF, matching the column default. A workspace that has
+    // never opened this page has not opted in.
+    viewCountingEnabled = d.reportViewCountingEnabled === true;
     // Its own floor: 0 is a real choice here (indefinite), not an empty field.
     const rawPdf = Number(d.reportPdfRetentionYears);
     if (Number.isInteger(rawPdf) && rawPdf >= MIN_PDF_RETENTION_YEARS && rawPdf <= MAX_RETENTION_YEARS) {
@@ -142,7 +147,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     };
   }
 
-  return { retentionYears, pdfRetentionYears, erasureLog, legal, aiAssurance };
+  return { retentionYears, pdfRetentionYears, viewCountingEnabled, erasureLog, legal, aiAssurance };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -194,6 +199,20 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
     const res = await api.admin["tenant-config"].$patch({
       json: { reportPdfRetentionYears: years },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as
+        | string
+        | undefined;
+      return { ok: false, intent, message };
+    }
+    return { ok: true, intent };
+  }
+
+  if (intent === "view-counting-save") {
+    const res = await api.admin["tenant-config"].$patch({
+      json: { reportViewCountingEnabled: String(form.get("enabled")) === "1" },
     });
     if (!res.ok) {
       const err = await res.json().catch(() => null);
@@ -271,6 +290,7 @@ export default function SettingsCompliancePage() {
         intent="pdf-retention-save"
         field="pdfRetentionYears"
       />
+      <ReportViewCountingSection initialEnabled={data.viewCountingEnabled} />
       <LegalDocsPanel initial={data.legal} />
       <ErasureLogView rows={data.erasureLog} />
       <AiAssurancePanel initial={data.aiAssurance} />

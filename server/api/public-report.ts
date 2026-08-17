@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, and } from 'drizzle-orm';
 import type { HonoConfig } from '../types/hono';
-import { inspections, tenants } from '../lib/db/schema';
+import { inspections, tenants, tenantConfigs } from '../lib/db/schema';
 import { resolveRenderAccess } from '../lib/render-token';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
@@ -337,7 +337,19 @@ const publicReportRoutes = createApiRouter()
         // OI #271 — delivery confirmation, after the publish gate (a blocked
         // request is not an open). Grant/renderMode/ownerPreview are resolved
         // here; only `x-oi-client-method` is relayed. Never throws.
+        //
+        // `countingEnabled` is the tenant's own decision and defaults to false
+        // (counsel B4 — a legitimate interest may not be a mask for processing
+        // its supposed beneficiary cannot decline). A missing config row reads
+        // as OFF, which is the same direction as the column default: a tenant
+        // who has never opened the settings page has not opted in.
+        const viewCfg = await getDrizzle(c)
+            .select({ enabled: tenantConfigs.reportViewCountingEnabled })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
         await recordReportView(getDrizzle(c), { tenantId, inspectionId: id }, {
+            countingEnabled: viewCfg?.enabled ?? false,
             accessTokenId: clientGrant?.accessTokenId ?? null, renderMode, ownerPreview,
             method: c.req.header('x-oi-client-method') ?? c.req.method,
             purpose: c.req.header('purpose'), secPurpose: c.req.header('sec-purpose'),

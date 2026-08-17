@@ -267,7 +267,12 @@ describe('OI #271 — report view confirmation', () => {
     });
 
     it('shouldCountReportView refuses every non-human shape', () => {
+        // `countingEnabled: true` is required for these cases to mean anything.
+        // The tenant switch is checked FIRST, so with it false every assertion
+        // below would pass for the wrong reason — the suite would be green about
+        // prefetch and render-mode suppression it never actually exercised.
         const human = {
+            countingEnabled: true,
             accessTokenId: 'tok-1', renderMode: false, ownerPreview: false, method: 'GET',
         };
         expect(shouldCountReportView(human)).toBe(true);
@@ -277,6 +282,8 @@ describe('OI #271 — report view confirmation', () => {
         expect(shouldCountReportView({ ...human, ownerPreview: true })).toBe(false);
         expect(shouldCountReportView({ ...human, purpose: 'Prefetch' })).toBe(false);
         expect(shouldCountReportView({ ...human, secPurpose: 'prefetch;prerender' })).toBe(false);
+        // The tenant's own decision, in front of all of them.
+        expect(shouldCountReportView({ ...human, countingEnabled: false })).toBe(false);
     });
 
     /* ---------------- Art. 21 — suppression, not revocation ---------------- */

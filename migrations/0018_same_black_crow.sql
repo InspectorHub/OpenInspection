@@ -1,0 +1,19 @@
+-- Report-view counting becomes a decision the tenant can actually make.
+--
+-- The legitimate-interests assessment for this counter assigned the interest to
+-- the inspection company — a company that could not enable the processing,
+-- could not disable it, and could not see that it was happening. Counsel (round
+-- 20, B4) ruled that a tenant's legitimate interest may not be a mask for
+-- processing they cannot decline: the assessment does not hold until the
+-- decline exists. This column is the decline.
+--
+-- DEFAULT FALSE, which is a change of behaviour and the point of the task. The
+-- defensible starting position is the one where nobody is counted until
+-- somebody chose it. Nothing is lost by it: no report_views row exists in
+-- production, so the old default was counting nobody in practice anyway.
+--
+-- Read FIRST by shouldCountReportView, before the access-token test. A tenant
+-- who has not chosen this should not have the outcome depend on any other
+-- signal — the answer is no because they did not ask for it, not because a
+-- request header happened to look like a prefetch.
+ALTER TABLE `tenant_configs` ADD `is_report_view_counting_enabled` integer DEFAULT false NOT NULL;

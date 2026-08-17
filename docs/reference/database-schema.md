@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 94 |
-| Columns | 1116 |
+| Columns | 1117 |
 | Indexes (excluding primary keys) | 159 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 516 (46%) |
+| Columns carrying a source comment | 517 (46%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -2192,7 +2192,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `tenant_configs`
 
-<sub>server/lib/db/schema/tenant/core.ts · 87 columns · primary key `tenant_id`</sub>
+<sub>server/lib/db/schema/tenant/core.ts · 88 columns · primary key `tenant_id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2283,6 +2283,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `legal_name` | text |  |  |  | The registered legal entity, as it appears on the licence — distinct from `companyName`, which is the trading brand / DBA. **[more]** |
 | `invoice_seq` | integer | NN | `1000` |  | The last invoice number handed out for this tenant. Default 1000, so the first invoice is **1001** — Jobber's convention, and the category's; starting at 1 tells a homebuyer they are this company's first customer. **[more]** |
 | `report_pdf_retention_years` | integer | NN | `7` |  | Years a rendered report PDF is kept. `0` = indefinite, which is an explicit controller instruction the platform executes rather than an absence of a setting. **[more]** |
+| `is_report_view_counting_enabled` | integer | NN | `false` |  | Whether this workspace counts report opens. Default FALSE. **[more]** |
 
 ---
 

@@ -4,9 +4,58 @@
 recipient who presented a valid portal access token.
 
 **Status:** written **before** the code (OI #271, Task 1 of the delivery
-confirmation plan), and **caught up to it on 2026-08-07**. It reaches a **split
+confirmation plan), **caught up to it on 2026-08-07**, and **materially
+corrected on 2026-08-17** after external counsel found the balancing test
+resting on a premise the product did not support. It reaches a **split
 conclusion**: one shape of the feature passes the balancing test and one does
 not.
+
+---
+
+## What counsel corrected, and why it changed the code
+
+Counsel (round 20, ruling B4) read this assessment against the implementation
+and found that **the interest it balances was assigned to a party who could not
+act on it**.
+
+The interest is the inspection company's: knowing that the report they were paid
+to produce actually reached the client. That is a real interest and the purpose
+test still holds. But at the time this document was written, the company:
+
+- could not **enable** the counting,
+- could not **disable** it,
+- and could not **see** that it was happening.
+
+A legitimate interest is an interest of a controller who is exercising it. A
+controller who cannot decline the processing is not exercising an interest; the
+processing is simply being performed, and the interest is doing rhetorical work
+in an assessment rather than legal work in a decision. Counsel's words: a
+tenant's legitimate interest may not be a mask for processing they cannot
+decline.
+
+**What changed in the product.** `tenant_configs.is_report_view_counting_enabled`
+now exists, defaults to **false**, and is the FIRST condition
+`shouldCountReportView` checks — before the access-token test, so that a
+workspace which has not chosen this never has the outcome depend on any other
+signal. Settings → Compliance carries the switch and, beside it, a plain
+statement of what is recorded, what is not, that the number is a signal rather
+than proof of receipt, and that any recipient may object.
+
+**Nothing was lost by defaulting it off.** No `report_views` row existed in
+production, so the previous default was counting nobody in practice. The change
+moves the starting position to the one that can be defended.
+
+**What this does NOT change.** The recipient-side analysis in section 3 stands
+unaltered: the Art. 21 objection path, the accuracy limits in 3.4, and the
+prohibition on presenting "opened" as proof. A tenant enabling the counter does
+not enable anything a recipient cannot still object to, individually. Two
+different parties, two different rights, and the tenant's new switch answers
+only the first.
+
+**One sentence deleted rather than edited.** Any claim in the earlier text that
+the tenant *benefits from* this processing was removed rather than softened. A
+benefit received without the ability to decline it is not the thing the phrase
+means, and rewording it would have preserved the error in gentler language.
 
 What exists in the code: the counter (`report_views`), keyed per section 3.4
 **option 3**; the Art. 21 suppression marker
@@ -14,8 +63,8 @@ What exists in the code: the counter (`report_views`), keyed per section 3.4
 route that accepts either portal entry path; the Art. 13 disclosure, as a
 platform-rendered block in every message that carries a report link and on the
 report page itself; and the inspector-facing surface that pairs "opened" with
-delivery status in three states. **All nine conditions in section 4 are now
-met**, and the compile-time switch that had been holding the counter shut
+delivery status in three states. **All TEN conditions in section 4 are now
+met** (the tenth was added on 2026-08-17 — see the correction block below), and the compile-time switch that had been holding the counter shut
 (`server/lib/report-views.gate.ts`) was deleted in the change that closed
 conditions 4, 5 and 6 — the same change, deliberately, because section 3.2 makes
 the disclosure load-bearing *inside* the balancing test rather than alongside
@@ -399,6 +448,15 @@ the assessment has to be redone rather than cited.
    not only client/co_client: section 3.1 identifies the agents and one-off
    shares as having the weakest expectation, so they are the last population to
    lock out.
+
+10. **The tenant can decline it, and has not been asked to accept it.**
+    `tenant_configs.is_report_view_counting_enabled` defaults to false and is
+    the first condition `shouldCountReportView` checks. Counsel B4: an interest
+    assigned to a controller who cannot enable, disable or see the processing is
+    not an interest being exercised. Without this switch the assessment balances
+    a benefit against a right on behalf of a party who had no say in either.
+    The switch answers the TENANT's side only; the recipient's Art. 21 objection
+    in condition 9 is a separate right and is unaffected by it.
 
 **All nine conditions are now met (2026-08-07).** The counter exists, records
 only what it observed, can be stopped by the person it observes, tells that
