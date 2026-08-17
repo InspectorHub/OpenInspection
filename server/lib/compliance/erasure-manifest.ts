@@ -390,7 +390,7 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // not on its checked-in list, and FAILS outright once the deadline passes.
     // The tripwire in `tests/unit/privacy/erasure-manifest-coverage.spec.ts`
     // fails the day the sweep learns about `inspections`, so this notice cannot
-    // outlive its gap either.
+    // outlive its gap either. A DIFFERENT question about the two coordinate columns — whether they are statutory precise geolocation under §1798.140(w), which review answered NO because that definition reaches only data derived from a device (CA-10) — is recorded with its trip-wire in `STATUTORY_CLASSIFICATIONS`, in the out-of-scope companion file. It is kept out of `ErasureRule` on purpose: `category` above is our own label and may not be cited as a legal determination, while that entry is one.
     { table: 'inspections', column: 'property_address',  category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
     { table: 'inspections', column: 'address_place_id',  category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
     { table: 'inspections', column: 'address_street',    category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
