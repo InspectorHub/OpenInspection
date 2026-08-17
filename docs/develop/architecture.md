@@ -246,10 +246,59 @@ Enforced by `npm run lint:signature-dynamics`
 opposite duty on cryptographic verification: that it goes through
 `crypto.subtle.verify` or a constant-time compare.
 
-The related half — that a signature image is never used or stored for biometric
-**authentication** — belongs in the same gate rather than beside it, because the
-statutory test turns on "used to authenticate" and two separate gates could each
-pass while the boundary broke between them. It is not built yet.
+### The second half: a signature is never an authenticator
+
+The rule above is about the **input** — how the mark was made. The second half is
+about the **use**: a signature image is never used or stored for biometric
+**authentication**. A pad that captures nothing but a picture still crosses the
+line the moment that picture is matched against a stored one to decide who
+somebody is.
+
+It lives in the **same gate** rather than beside it. The statutory test turns on
+the words "used to authenticate", so the two halves are one boundary seen from
+two angles, and two separate gates could each pass while it broke between them.
+
+Three shapes are banned, and they are the three stages of every biometric
+pipeline:
+
+| stage | banned shape | example |
+|---|---|---|
+| feature extraction | turning the image into a key | `extractSignatureImageFeatures` |
+| enrolment | storing a template of the image | `signatureImageTemplate` |
+| comparison | matching two images to decide identity | `compareSignatureImages` |
+
+**Hashing the image is the approved alternative and is deliberately untouched.**
+`signatureImageHash` — a SHA-256 fingerprint recorded at signing — proves the
+stored record is unaltered and identifies nobody. Every pattern requires either
+the word `Image` or an unambiguous biometric noun, so a hash never reaches them,
+and neither do the cryptographic `verify*Signature` functions that
+`lint:sigcompare` requires.
+
+Two design notes that were bought with a mutation proof rather than reasoning:
+
+- The patterns carry **no leading word boundary**. A planted
+  `loadSignatureImageTemplate(...)` passed silently the first time, because a
+  word boundary cannot match between `load` and `Signature`; any verb prefix
+  walked straight through. The end of the identifier is what carries the
+  meaning, so only the trailing boundary is kept.
+- **No prefix is exempted**, `email` included. An email-signature template that
+  happened to hold an image would trip this and should be renamed, or argued
+  about in the open. That is a far cheaper failure than a biometric template
+  hidden behind a prefix somebody once added to an exemption list.
+
+### Related: the claims the product may not make about any of this
+
+`npm run lint:verification-copy` (`scripts/check-verification-copy.mjs`) is the
+copy-side companion, and after round 26-9 it is a **Global Core control —
+Verification Claim Integrity**, not a regional overlay: it is load-bearing under
+FTC Act §5, state UDAP statutes, contract expectation and evidentiary integrity
+at once. It scans every message catalogue, in every locale, for copy that
+converts an integrity result into a conclusion about human authorship, identity,
+intent, consent or legal validity — "Signature Verified", "Valid Signature",
+"Signer Verified", "Signed by [person]" and the rest. A **disclaimer does not
+rescue an over-broad claim; narrow the claim.** What is permitted is the claim
+narrowed to the check that ran: *"The stored signature image matches the
+signature image fingerprint recorded at signing."*
 
 ## Service layer
 

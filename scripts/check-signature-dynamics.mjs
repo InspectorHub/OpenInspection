@@ -34,13 +34,34 @@
  * `crypto.subtle.verify` or a constant-time compare. Same word, inverted duty.
  * The names must stay distinct or the two will be read as one rule.
  *
- * ── The other half of this invariant ────────────────────────────────────────
- * Round 27 (CA-17) adds "the signature image is never used or stored for
- * biometric AUTHENTICATION", and counsel asked for it in THIS gate rather than
- * beside it: §1798.81.5(d)(1)(A)(vi) turns on "used to authenticate", and split
- * across two gates someone could satisfy one while breaking the other. That
- * half — feature extraction from a signature image, a stored image template,
- * comparison of two signature images — extends this file. It is not built yet.
+ * ── The other half of this invariant (CA-17, round 27) ──────────────────────
+ * The first half above is about the INPUT: how the mark was made. This half is
+ * about the USE: a signature image is never used or stored for biometric
+ * AUTHENTICATION. Counsel asked for it in THIS gate rather than beside it,
+ * because §1798.81.5(d)(1)(A)(vi) turns on "used to authenticate" — and split
+ * across two gates someone could satisfy one while breaking the other. A pad
+ * that captures nothing but a picture still crosses the line the moment that
+ * picture is matched against a stored one to decide who somebody is.
+ *
+ * Three shapes, which are the three stages of every biometric pipeline:
+ *
+ *   6. FEATURE EXTRACTION from a signature image — the step that turns a
+ *      picture into a key.
+ *   7. A STORED signature-image TEMPLATE — the artefact the statute names.
+ *   8. COMPARISON of two signature images — the authentication decision itself.
+ *
+ * What is NOT banned, and why the patterns carry `Image` explicitly:
+ *
+ *   - `signatureImageHash` is real (`server/api/inspections/agreements.ts`) and
+ *     is the approved mechanism: a SHA-256 fingerprint of the stored image,
+ *     which proves the record is unaltered and identifies nobody. A hash is not
+ *     a feature vector, and this gate must never push anyone off it.
+ *   - An email-signature TEMPLATE is an ordinary, unrelated product feature, so
+ *     the template rule requires `Image` rather than banning the word.
+ *   - `verifyTelnyxSignature`, `validateTwilioSignature`, `verifyInboundSignature`
+ *     are cryptographic and are `lint:sigcompare`'s business — see below. Every
+ *     rule here needs `Image` or an unambiguous biometric noun, so none of them
+ *     can be reached from the word `Signature` alone.
  *
  * Usage: node scripts/check-signature-dynamics.mjs [--self-test]
  */
@@ -57,7 +78,8 @@ const EXT = /\.(ts|tsx)$/;
 const SKIP = /(\.test\.|\.spec\.|[\\/]tests?[\\/])/;
 
 /**
- * Five shapes, one boundary.
+ * Eight shapes, one boundary. 1-5 are the INPUT (how the mark was made); 6-8
+ * are the USE (what the picture is then made to decide).
  *
  *  1. The stroke SYMBOLS themselves (`Stroke`, `StrokePoint`, the pad module) —
  *     the type-level tell that stroke data crossed the line.
@@ -68,10 +90,18 @@ const SKIP = /(\.test\.|\.spec\.|[\\/]tests?[\\/])/;
  *  4. `velocity` / `acceleration` on a signature — the other two behavioural
  *     axes a template is built from.
  *  5. Timing arrays keyed to a signature (`strokeTimings`, `pointTimestamps`).
+ *  6. Feature extraction from a signature image (`extractSignatureImageFeatures`,
+ *     `signatureImageFeatures`, `signature_image_descriptor`).
+ *  7. A stored signature-image template (`signatureImageTemplate`,
+ *     `enrollSignatureImage`, `signature_image_template`).
+ *  8. Comparison of two signature images (`compareSignatureImages`,
+ *     `signatureImageSimilarity`, `signature_image_match`).
  *
  * `ctx.stroke()` and `ctx.strokeStyle` are the Canvas API, not our data, and
  * `strokeWidth(pen, pressure)` is the pad's own rendering — the word alone is
- * not the offence, so the patterns require the data shape.
+ * not the offence, so the patterns require the data shape. Rules 6-8 are the
+ * same discipline applied to the second half: `Signature` alone is not the
+ * offence either, so each of them requires `Image` or a biometric noun.
  */
 const BANNED = new RegExp([
     // 1 — the symbols and the module
@@ -88,6 +118,29 @@ const BANNED = new RegExp([
     '\\b(?:signature)?(?:[Vv]elocity|[Aa]cceleration)\\s*:\\s*(?:z\\.|number|integer\\(|real\\()',
     // 5 — timing arrays
     '\\b(?:strokeTimings?|pointTimestamps?)\\b',
+    // ── CA-17: the AUTHENTICATION half ──
+    // 6 — feature extraction from a signature image
+    // NOTE ON THE LEADING BOUNDARY: rules 6-8 carry NO `\b` in front. A mutation
+    // proof planted `loadSignatureImageTemplate(...)` and the gate stayed
+    // silent, because `\b` cannot match between `load` and `Signature` — any
+    // verb prefix walked straight through. The trailing `\b` is kept: the END of
+    // the identifier is what carries the meaning. No prefix is exempted, not
+    // even `email`: an email-signature template that happens to hold an image
+    // would trip this and should be renamed or argued about in the open, which
+    // is a far cheaper failure than a biometric template hidden behind a prefix
+    // somebody added to an exemption list.
+    '(?:extract|derive|compute|encode)[A-Za-z]*[Ss]ignature[A-Za-z]*(?:Features?|Descriptors?|Embeddings?|Vectors?)\\b',
+    '[Ss]ignature(?:Image)?(?:Features?|Descriptors?|Embeddings?|FeatureVectors?)\\b',
+    // 7 — a stored signature-image template, and enrolment into one
+    '[Ss]ignature[A-Za-z]*Image[A-Za-z]*Template\\b',
+    '[Ss]ignature[A-Za-z]*BiometricTemplate\\b',
+    '(?:enrol|enroll|register)[A-Za-z]*[Ss]ignatureImages?\\b',
+    // 8 — comparison of two signature images
+    '(?:compare|match|score)[A-Za-z]*[Ss]ignatureImages?\\b',
+    '[Ss]ignatureImages?(?:Match|Matches|Similarity|Distance|Score)\\b',
+    // 6-8, snake_case: the inspector signature rides in `inspection_results.data`
+    // as JSON, so the column-shaped spelling has to be here too.
+    '\\bsignature_image_(?:features?|descriptors?|embeddings?|vectors?|template|match|similarity|distance|score)\\b',
 ].join('|'));
 
 function walk(dir, out = []) {
@@ -102,6 +155,20 @@ function walk(dir, out = []) {
     return out;
 }
 
+/**
+ * The must-flag cases for rules 6-8 are the real lines of this codebase with
+ * the violation inserted, not invented snippets: the enclosing statement, the
+ * column name and the field name are all things that exist today
+ * (`server/lib/inspection/auto-sign.ts`, `server/lib/db/schema/inspection/agreements.ts`,
+ * `server/api/inspections/agreements.ts`). That is deliberate — a positive
+ * control assembled out of nothing only proves the pattern matches itself,
+ * whereas these prove it matches the shape the violation would actually take
+ * when someone adds it to the code that is already there.
+ *
+ * The must-NOT-flag cases for rules 6-8 are real lines, copied verbatim. Three
+ * of them are cryptographic verification, which `lint:sigcompare` REQUIRES —
+ * without them here the two gates eventually collide on one line of code.
+ */
 function selfTest() {
     const mustFlag = [
         "import type { Stroke } from '../components/media-studio/signaturePad.logic';",
@@ -109,6 +176,21 @@ function selfTest() {
         'strokePoints: z.array(z.object({ x: z.number(), y: z.number(), p: z.number() })),',
         "signatureStrokes: text('signature_strokes'),",
         'pressure: z.number(),',
+        // 6 — feature extraction
+        'const features = extractSignatureImageFeatures(inspector.defaultSignatureBase64);',
+        "signatureImageFeatures: text('signature_image_features'),",
+        // 7 — a stored template
+        "signatureImageTemplate: text('signature_image_template'),",
+        'await enrollSignatureImage(inspector.id, inspector.defaultSignatureBase64);',
+        // 8 — comparison of two images
+        'if (compareSignatureImages(stored.signatureBase64, presented.signatureBase64) > 0.92) {',
+        'const signatureImageSimilarity = score(stored, presented);',
+        "data._inspector_signature = { signature_image_match: true };",
+        // The verb-prefixed forms. These are here because the first mutation
+        // proof planted exactly this line and the gate said nothing.
+        'const stored = await loadSignatureImageTemplate(inspector.id);',
+        'const s = getSignatureImageSimilarity(a, b);',
+        'const v = buildSignatureFeatureVector(signatureBase64);',
     ];
     const mustNotFlag = [
         'const signatureBase64 = pad.toDataURL();',
@@ -116,6 +198,14 @@ function selfTest() {
         'const stroke = ctx.strokeStyle;',
         'await ctx.stroke();',
         'strokeWidth(pen, pressure)',
+        // Real lines. The first is the APPROVED mechanism CA-17 leaves intact:
+        // a fingerprint of the image, which proves nothing about a person.
+        'signatureImageHash: sigHash ? `sha256:${sigHash}` : null,',
+        "return await crypto.subtle.verify('HMAC', key, sigBytes, encoder.encode(rawBody));",
+        'return constantTimeEquals(expected, presented);',
+        'export async function verifyInboundSignature(',
+        'if (!inspector?.defaultSignatureBase64) return;',
+        "signatureBase64:    text('signature_base64'),",
     ];
     let bad = 0;
     for (const s of mustFlag) if (!BANNED.test(s)) { console.error(`  MISSED: ${s}`); bad++; }
@@ -155,13 +245,20 @@ if (files.length === 0) {
 }
 
 if (hits.length > 0) {
-    console.error('\n✘ Behavioural signature data outside the signature pad:\n');
+    console.error('\n✘ A signature crossed the line between a picture and a biometric:\n');
     for (const h of hits) console.error(`    ${h.file}:${h.line}\n      ${h.text}`);
-    console.error('\n  A rendered signature IMAGE is evidence and may be persisted. Stroke');
-    console.error('  geometry, pen pressure and timing are a reusable biometric template and');
-    console.error('  may not leave app/components/media-studio/ — not in a schema, not in a');
-    console.error('  column, and not inside inspection_results.data, which is JSON and would');
-    console.error('  carry one with no schema change at all.\n');
+    console.error('\n  A rendered signature IMAGE is evidence and may be persisted. Two things');
+    console.error('  it may never become:\n');
+    console.error('  1. A BEHAVIOURAL TEMPLATE. Stroke geometry, pen pressure and timing may');
+    console.error('     not leave app/components/media-studio/ — not in a schema, not in a');
+    console.error('     column, and not inside inspection_results.data, which is JSON and');
+    console.error('     would carry one with no schema change at all.');
+    console.error('  2. AN AUTHENTICATOR (CA-17). Extracting features from the image, storing');
+    console.error('     a template of it, or comparing two of them to decide who someone is');
+    console.error('     makes it biometric data under a statute that turns on the words "used');
+    console.error('     to authenticate". Hashing the image is the approved alternative and is');
+    console.error('     untouched: a fingerprint proves the record is unaltered and identifies');
+    console.error('     nobody.\n');
     process.exit(1);
 }
 
