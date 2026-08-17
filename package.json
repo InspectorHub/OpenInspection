@@ -102,6 +102,7 @@
     "db:lag:local": "node scripts/check-migration-lag.mjs --local --label local-d1",
     "db:lag:saas": "cross-env WRANGLER_CONFIG=wrangler.saas.jsonc node scripts/check-migration-lag.mjs --label saas",
     "db:generate": "drizzle-kit generate",
+    "agent-terms:publish": "node scripts/publish-agent-terms.mjs",
     "wipe:d1:local": "node scripts/wipe-d1.mjs --local",
     "wipe:d1:remote": "node scripts/wipe-d1.mjs --remote",
     "wipe:d1:saas:remote": "cross-env WRANGLER_CONFIG=wrangler.saas.jsonc node scripts/wipe-d1.mjs --remote",

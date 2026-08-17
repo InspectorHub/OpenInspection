@@ -30,6 +30,7 @@ const SignupBodySchema = z
         // handler. This field was previously documented as 'unused', which is how
         // an account could be created with no acceptance at all.
         termsAccepted: z.boolean().describe('Whether the agent accepted the agent terms shown to them. The version and content hash are recorded server-side from the text in force.'),
+        shownContentHash: z.string().regex(/^[0-9a-f]{64}$/).optional().describe('SHA-256 of the agent-terms body this page actually rendered. Used ONLY to reject a stale page whose text is no longer in force — never as the recorded evidence, which always comes from the server.'),
     })
     .openapi('AgentSignupBody');
 
@@ -42,6 +43,44 @@ const SignupResponseSchema = z
         }).describe('TODO describe data field for the OpenInspection MCP integration'),
     })
     .openapi('AgentSignupResponse');
+
+const AgentTermsResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({
+        version: z.string().describe('The version in force, YYYY-MM-DD.'),
+        contentHash: z.string().describe('SHA-256 hex of the body below. Echo it back on submit so a stale page is refused.'),
+        body: z.string().describe('The agent-terms text to display. The signer must be shown this, not a link to it.'),
+    }),
+}).openapi('AgentTermsResponse');
+
+/**
+ * The agent terms as currently in force — body included.
+ *
+ * Public and GET, because the signup page has to SHOW the text. The checkbox said
+ * "I have read and accept the Agent Terms" while the page displayed nothing and
+ * linked nowhere, so the acceptance recorded a presentation that had not happened
+ * — the same defect counsel round 26 §26d-2 closed for e-signature, where intent
+ * must come from a recorded act rather than be inferred from an artefact existing.
+ *
+ * `contentHash` travels with the body so the form can send back what it rendered
+ * and a stale page can be refused. That value is a staleness check only; the
+ * evidence recorded on the account is always the hash the server read.
+ */
+const agentTermsRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/terms',
+    tags: ["agents"],
+    summary: "The agent terms in force",
+    description: "Returns the deployment's current agent-terms version, its content hash, and the body to display at signup. 404 when the deployment has published none — in which case agent signup is closed.",
+    responses: {
+        200: {
+            content: { 'application/json': { schema: AgentTermsResponseSchema } },
+            description: 'The agent terms in force',
+        },
+        404: { description: 'No agent terms published — agent signup is closed' },
+    },
+    operationId: "getAgentTerms"
+}, { scopes: ['read'], tier: 'extended' }));
 
 const signupRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -64,6 +103,25 @@ const signupRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 
 const agentSignupRoutes = createApiRouter()
+    .openapi(agentTermsRoute, async (c) => {
+        const { DeploymentLegalService } = await import('../services/deployment-legal.service');
+        const legal = new DeploymentLegalService(getDrizzle(c) as never);
+        const inForce = await legal.latest('agent_terms');
+        if (!inForce) {
+            // 404 rather than an empty 200. "No agent terms exist" and "here are
+            // the empty agent terms" are different facts, and the signup page has
+            // to be able to tell them apart to close itself honestly.
+            throw Errors.NotFound('This deployment has not published agent terms');
+        }
+        return c.json({
+            success: true as const,
+            data: {
+                version: inForce.version,
+                contentHash: inForce.contentHash,
+                body: inForce.bodySnapshot,
+            },
+        }, 200);
+    })
     .openapi(signupRoute, async (c) => {
         const body = c.req.valid('json');
 
@@ -102,24 +160,42 @@ const agentSignupRoutes = createApiRouter()
         // that has not published a document written for agents cannot take an
         // agent's agreement to one. The message says so plainly, because an
         // operator hitting this needs to know it is their action that is missing.
-        // WHOSE terms. An agent has no tenant, so the counterparty is the
-        // OPERATOR — read as a capability (`profile.fixedTenantId`) rather than
-        // by branching on APP_MODE. Where there is no fixed tenant the operator
-        // is not a tenant of this deployment at all, and the document belongs in
-        // the platform's own ledger: a different plan's half, and refusing here
-        // is the honest answer rather than picking an arbitrary tenant's text.
-        const operatorTenantId = c.var.profile.fixedTenantId;
-        const { LegalVersionService } = await import('../services/legal-version.service');
-        const legal = new LegalVersionService(getDrizzle(c) as never);
-        const inForce = operatorTenantId
-            ? await legal.latest(operatorTenantId, 'agent_terms')
-            : null;
+        //
+        // WHOSE terms. An agent has no tenant, so the counterparty is whoever
+        // OPERATES this deployment — and that is why the document lives in
+        // `deployment_legal_versions` rather than under a tenant. This used to read
+        // `profile.fixedTenantId`, which is the single tenant in standalone and
+        // NULL in SaaS, so every SaaS signup was refused for a reason that had
+        // nothing to do with the caller. One document with no tenant answers both
+        // modes with the same query, and the branch is gone rather than widened.
+        const { DeploymentLegalService } = await import('../services/deployment-legal.service');
+        const legal = new DeploymentLegalService(getDrizzle(c) as never);
+        const inForce = await legal.latest('agent_terms');
         if (!inForce) {
+            logger.error('[agent-signup] refused: no agent terms published on this deployment');
             throw Errors.BadRequest(
-                'Agent signup is unavailable until this workspace publishes its agent terms.',
+                'Agent signup is unavailable until this deployment publishes its agent terms.',
+            );
+        }
+        // Staleness, not evidence. The recorded hash is always the one the server
+        // read above — a client-supplied hash would be the client asserting what it
+        // read, which is what this record exists to replace. But a page that
+        // rendered an older version is a real thing to catch: the tick was given
+        // against text that is no longer in force, so the acceptance would name a
+        // version the signer was never shown. Refuse and let them re-read.
+        if (body.shownContentHash && body.shownContentHash !== inForce.contentHash) {
+            logger.info('[agent-signup] refused: stale page — shown hash is not the version in force');
+            throw Errors.BadRequest(
+                'The agent terms were updated while this page was open. Reload and review the current version.',
             );
         }
         if (body.termsAccepted !== true) {
+            // Logged, because the status code alone cannot say which of this
+            // endpoint's four refusals fired — bot challenge, no published terms,
+            // a stale page, or an unticked box all answer 400, and an operator
+            // reading "400" learns nothing. Two round trips of an e2e diagnosis
+            // were spent on exactly that.
+            logger.info('[agent-signup] refused: terms not accepted');
             throw Errors.BadRequest('The agent terms must be accepted to create an account');
         }
 

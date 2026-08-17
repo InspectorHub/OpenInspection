@@ -247,6 +247,13 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
       email: REGISTERED_AGENT.email,
       password: REGISTERED_AGENT.password,
       name: REGISTERED_AGENT.name,
+      // Required since round 20 A3: an agent is a third party and the account is
+      // not created without a recorded acceptance. The tick is all a client
+      // sends — the version and content hash come from the text in force,
+      // server-side, so a caller cannot assert what it read. globalSetup
+      // publishes that text, because a deployment with none refuses every
+      // signup by design (round 24c) rather than by accident.
+      termsAccepted: true,
     });
     expect(signupRes.status(), 'registered agent global account must be created').toBe(200);
 
@@ -385,6 +392,15 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
 
       await freshPage.getByLabel('Full name').fill(UNREGISTERED_AGENT.name);
       await freshPage.getByLabel('Password').fill(UNREGISTERED_AGENT.password);
+
+      // The terms are SHOWN on this page, and the tick is required — an agent is a
+      // third party and the account is not created without a recorded acceptance
+      // (round 20 A3). Asserting the body is visible first is the point: the tick
+      // used to sit under a label naming a document the page never displayed, so an
+      // acceptance recorded a presentation that had not happened.
+      await expect(freshPage.locator('#agent-terms-body')).toBeVisible();
+      await freshPage.getByRole('checkbox', { name: /accept the Agent Terms/i }).check();
+
       await freshPage.getByRole('button', { name: 'Create account' }).click();
 
       // Task 4c — a converting agent lands on /agent-dashboard?welcome=<id>,

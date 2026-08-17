@@ -42,7 +42,13 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
     // Spec 3 Task 5 — core /agent-login dual-mode front door (password +
     // magic-link request); both are unauthenticated by design (the caller
     // holds neither a session nor a report token yet).
-    const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup' || path === '/agent/magic-login' || path === '/api/agent/magic-login/request' || path === '/api/agent/report-context' || path === '/api/agent/login' || path === '/api/agent/login-link';
+    //
+    // `/api/agent-signup/terms` is listed SEPARATELY because these are exact
+    // matches, not prefixes: `path === '/api/agent-signup'` does not cover a
+    // child path. The signup page must display the agent terms before anyone
+    // has an account, so a document nobody can read without a session would
+    // leave the tick asserting a presentation that never happened.
+    const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup' || path === '/api/agent-signup/terms' || path === '/agent/magic-login' || path === '/api/agent/magic-login/request' || path === '/api/agent/report-context' || path === '/api/agent/login' || path === '/api/agent/login-link';
     // Agent Accounts A3 — concierge magic-link entry points (client-facing,
     // no JWT). The token in the URL is the secret.
     const isConciergePublic =

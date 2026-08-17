@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /**
  * Track I-a GDPR (spec §4) — append-only DSAR (data-subject erasure) decision
@@ -228,3 +228,54 @@ export const messagingCompliance = sqliteTable('messaging_compliance', {
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
+
+/**
+ * Legal documents belonging to the DEPLOYMENT rather than to a tenant.
+ *
+ * `agent_terms` is the first, and it is here rather than in
+ * `tenant_legal_versions` because it has no tenant. An agent account is global
+ * (`users.tenant_id IS NULL`) and spans every company on the deployment that
+ * names the agent as a contact, so the counterparty is whoever OPERATES this
+ * software — one document, not one per company.
+ *
+ * That is not a stylistic preference. Keying it on a tenant forced a mode
+ * branch: standalone could borrow `profile.fixedTenantId` (the single tenant IS
+ * the operator) while SaaS had no such row, so `POST /api/agent-signup` refused
+ * every SaaS request and the comment there called it another plan's problem. A
+ * table with no tenant column answers both modes with the same query and deletes
+ * the branch instead of parameterising it. `sms_disclosure_versions` above is the
+ * same shape for the same reason.
+ *
+ * Neither is it a hole in the tenant-isolation rule: there is no tenant data
+ * here. Stamping a tenant id on the operator's own contract would be a guess
+ * that later reads as a fact, which is the failure that rule exists to prevent.
+ */
+export const deploymentLegalVersions = sqliteTable('deployment_legal_versions', {
+    id: text('id').primaryKey(),
+    doc: text('doc', { enum: ['agent_terms'] }).notNull(),
+    /** `YYYY-MM-DD`, the date a reader is shown. Calendar-semantic, so TEXT. */
+    version: text('version').notNull(),
+    /**
+     * The body exactly as published, NOT NULL.
+     *
+     * `tenant_legal_versions.body_snapshot` is nullable because a tenant may
+     * revert to a built-in template, and "they went back to the default" is a
+     * publish worth recording. There is no default to revert to here — the
+     * deployment's own document is the only text there is — so a row with no body
+     * would be a version nobody can ever show a signer again.
+     */
+    bodySnapshot: text('body_snapshot').notNull(),
+    /**
+     * SHA-256 hex of `body_snapshot`. An acceptance copies it, so it proves WHAT
+     * was shown rather than which version string was current.
+     *
+     * The unique index on (doc, hash) is what makes publishing idempotent: the
+     * same words published twice return the existing row instead of minting a
+     * second version a reader would have to diff to understand.
+     */
+    contentHash: text('content_hash').notNull(),
+    publishedAt: integer('published_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    uniqueIndex('uq_deployment_legal_versions_doc_hash').on(t.doc, t.contentHash),
+    index('idx_deployment_legal_versions_latest').on(t.doc, t.publishedAt),
+]);

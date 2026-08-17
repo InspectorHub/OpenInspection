@@ -1,37 +1,46 @@
 /**
- * An agent is a third party, and now signs something that says so.
+ * An agent is a third party, and now signs something that says so — once, for the
+ * whole deployment.
  *
- * Round 20 A3. An agent is a `users` row with `tenant_id IS NULL` — a global
- * identity with a direct relationship to the operator and no company behind it.
- * So neither a tenant's Privacy URL nor a company's contract governs them, and
- * until now the signup path accepted `termsAccepted: undefined` and wrote NULL.
+ * Round 20 A3 opened this: an agent is a `users` row with `tenant_id IS NULL`, a
+ * global identity with no company behind it, so neither a tenant's Privacy URL nor
+ * a company's contract governs them, and the signup path used to accept
+ * `termsAccepted: undefined` and write NULL.
+ *
+ * ── What round 29 changed, and why this file was rewritten ───────────────────
+ * The first implementation put the document in `tenant_legal_versions`, reasoning
+ * that in standalone the operator IS the single tenant. That reasoning worked in
+ * standalone and broke SaaS outright: the lookup went through
+ * `profile.fixedTenantId`, which is null there, so every SaaS agent signup was
+ * refused for a reason having nothing to do with the caller.
+ *
+ * Counsel round 29 settled the underlying question — ONE acceptance covers the
+ * whole deployment, so the ledger is `agent × terms version` and never
+ * `agent × company × terms version`. That makes the document tenant-less, which
+ * removes the mode branch rather than parameterising it. `deployment_legal_versions`
+ * is the store; `agent_terms` has been REMOVED from the tenant enum so nobody
+ * re-wires the old way and is right to think it was intended.
  *
  * ── What the acceptance has to carry, and why a URL is not it ────────────────
  * The old shape held `termsUrl` and `privacyUrl`. A URL records where the text
  * WAS, not what it SAID — the page behind it can be edited, and then the
- * acceptance points at something the signer never read. Version plus content
- * hash is the only pair that survives the text changing, and it is the same
- * standard every other legal artefact in this repository already meets.
- *
- * ── Scope: the standalone half ───────────────────────────────────────────────
- * Here the counterparty is the OPERATOR, so `tenant_legal_versions` gains
- * `'agent_terms'`. The SaaS half — where the counterparty is the platform and a
- * SaaS agent has no portal identity to hang a consent row on — is a separate
- * plan's, and the plan that owns it changed after this one was written. This
- * spec deliberately asserts nothing about SaaS.
+ * acceptance points at something the signer never read. Version plus content hash
+ * is the only pair that survives the text changing.
  *
  * ── What ships versus what goes live ────────────────────────────────────────
- * The document type, the acceptance shape and the fail-closed signup ship here.
- * GOING LIVE gates on counsel-approved text (round 24c), which is why nothing
- * below asserts any particular wording.
+ * The store, the acceptance shape, the fail-closed signup and the publish path
+ * ship. GOING LIVE gates on counsel-approved text (round 24c, and round 29 says
+ * the current draft is not it), which is why nothing below asserts any particular
+ * wording — and why `agent-terms:publish` refuses a body that still carries
+ * placeholders.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
-import { users, tenants, tenantLegalVersions } from '../../../server/lib/db/schema';
-import { LegalVersionService } from '../../../server/services/legal-version.service';
+import { users, deploymentLegalVersions } from '../../../server/lib/db/schema';
+import { DeploymentLegalService } from '../../../server/services/deployment-legal.service';
 import { signup } from '../../../server/services/agent/signup';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -39,10 +48,9 @@ vi.mock('../../../server/services/agent/auto-link', () => ({
     autoLinkSameEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
-const OPERATOR = '00000000-0000-0000-0000-0000000000d1';
 const HASH64 = /^[0-9a-f]{64}$/;
 
-describe('agent_terms as a document type', () => {
+describe('agent terms belong to the deployment, not to a tenant', () => {
     let db: BetterSQLite3Database<typeof schema>;
 
     beforeEach(async () => {
@@ -51,32 +59,64 @@ describe('agent_terms as a document type', () => {
         await setupSchema(fix.sqlite);
         const { drizzle } = await import('drizzle-orm/d1');
         (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
-        await db.insert(tenants).values({
-            id: OPERATOR, slug: 'operator', status: 'active',
-            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
-        });
     });
 
-    it('the version registry accepts agent_terms and versions it independently', async () => {
-        const svc = new LegalVersionService(db as never);
-        const version = await svc.recordPublish({ tenantId: OPERATOR, doc: 'agent_terms', body: 'agent text' });
-        expect(version).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-        const stored = await svc.latest(OPERATOR, 'agent_terms');
-        expect(stored?.contentHash).toMatch(HASH64);
+    it('publishes a version and reads it back with a hash of the body', async () => {
+        const svc = new DeploymentLegalService(db as never);
+        const out = await svc.recordPublish({ doc: 'agent_terms', version: '2026-08-01', body: 'agent text' });
+        expect(out.created).toBe(true);
+        expect(out.contentHash).toMatch(HASH64);
 
-        // Independently: publishing agent terms must not mint a Terms row, or the
-        // "latest in force" lookup for one document answers with the other's.
-        const rows = await db.select().from(tenantLegalVersions).all();
-        expect(rows.map((r) => r.doc)).toEqual(['agent_terms']);
+        const stored = await svc.latest('agent_terms');
+        expect(stored?.version).toBe('2026-08-01');
+        expect(stored?.bodySnapshot).toBe('agent text');
+        // The row retains the BODY, not just a pointer. A version nobody can show
+        // a signer again is not evidence of anything.
+        expect(stored?.contentHash).toBe(out.contentHash);
     });
 
-    it('agent terms and tenant terms do not share a version sequence', async () => {
-        const svc = new LegalVersionService(db as never);
-        await svc.recordPublish({ tenantId: OPERATOR, doc: 'terms', body: 'tenant text' });
-        await svc.recordPublish({ tenantId: OPERATOR, doc: 'agent_terms', body: 'agent text' });
-        const rows = await db.select().from(tenantLegalVersions).all();
-        expect(rows).toHaveLength(2);
-        expect(new Set(rows.map((r) => r.doc))).toEqual(new Set(['terms', 'agent_terms']));
+    it('no tenant is involved — which is the whole point, and what SaaS needed', async () => {
+        const svc = new DeploymentLegalService(db as never);
+        await svc.recordPublish({ doc: 'agent_terms', version: '2026-08-01', body: 'agent text' });
+        const rows = await db.select().from(deploymentLegalVersions).all();
+        expect(rows).toHaveLength(1);
+        // No tenant column to be null OR wrong. The previous model keyed this on
+        // `profile.fixedTenantId`, which is null in SaaS, so the lookup returned
+        // nothing and signup refused every SaaS caller.
+        expect(Object.keys(rows[0]!)).not.toContain('tenantId');
+    });
+
+    it('republishing the same words returns the existing version instead of a second row', async () => {
+        const svc = new DeploymentLegalService(db as never);
+        const first = await svc.recordPublish({ doc: 'agent_terms', version: '2026-08-01', body: 'same words' });
+        const again = await svc.recordPublish({ doc: 'agent_terms', version: '2026-08-09', body: 'same words' });
+        expect(again.created).toBe(false);
+        expect(again.version).toBe(first.version);
+        expect(await db.select().from(deploymentLegalVersions).all()).toHaveLength(1);
+    });
+
+    it('a published version cannot come to mean different words', async () => {
+        const svc = new DeploymentLegalService(db as never);
+        await svc.recordPublish({ doc: 'agent_terms', version: '2026-08-01', body: 'original' });
+        await expect(svc.recordPublish({
+            doc: 'agent_terms', version: '2026-08-01', body: 'quietly edited',
+        })).rejects.toThrow(/already published with different text/i);
+        expect(await db.select().from(deploymentLegalVersions).all()).toHaveLength(1);
+    });
+
+    it('latest is the most recently published, not the highest version string', async () => {
+        const svc = new DeploymentLegalService(db as never);
+        await svc.recordPublish({ doc: 'agent_terms', version: '2026-09-01', body: 'first published' });
+        await new Promise((r) => setTimeout(r, 2));
+        await svc.recordPublish({ doc: 'agent_terms', version: '2026-08-01', body: 'published second' });
+        // A correction published after a forward-dated version is the one in force.
+        // Sorting by the version STRING would silently serve the withdrawn text.
+        expect((await svc.latest('agent_terms'))?.bodySnapshot).toBe('published second');
+    });
+
+    it('returns null when the deployment has published nothing', async () => {
+        const svc = new DeploymentLegalService(db as never);
+        expect(await svc.latest('agent_terms')).toBeNull();
     });
 });
 
