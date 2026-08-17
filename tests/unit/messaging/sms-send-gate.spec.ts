@@ -59,9 +59,15 @@ async function seedStaffRevocation(id: string, userId: string) {
         disclosureVersion: 1, capturedVia: 'optin_link', createdAt: new Date(),
     } as never);
 }
+// `bodyTemplate` is REQUIRED on `SmsGateArgs` — the marketing block only fires
+// on what the caller hands over, so an omitting call site has to be a build
+// error rather than a silent skip. These cases are about consent, revocation
+// and preference, so they send an empty body: nothing for the content check to
+// find, and the checks under test are unaffected. Marketing content has its own
+// spec (tests/unit/sms/marketing-block.spec.ts).
 const gate = (over: Partial<Parameters<typeof smsSendGate>[0]> = {}) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    smsSendGate({ db: db as any, tenantId: TENANT, to: PHONE, purpose: 'notification', ...over });
+    smsSendGate({ db: db as any, tenantId: TENANT, to: PHONE, purpose: 'notification', bodyTemplate: '', ...over });
 
 describe('smsSendGate — express consent (consumers only)', () => {
     it('a consumer with no consent record is refused', async () => {

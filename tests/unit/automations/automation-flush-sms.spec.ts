@@ -177,15 +177,36 @@ describe('flush() — SMS branch (Track L)', () => {
         expect(call.body).toContain('Acme');   // company_name (tenant name)
     });
 
-    it('SP2: deliverSms preserves the review_url fail-closed skip on the resolved body', async () => {
-        // Arrange: seed an sms rule whose body includes {{review_url}}.
-        // The backfill in seedSmsLog creates an sms template with that body.
-        // tenant_configs.review_url is NOT set, so delivery must skip fail-closed.
+    it('SP2: a body referencing review_url is refused as marketing, not sent', async () => {
+        // This used to assert `review_url not configured` — the fail-closed skip
+        // in the send core, which only fired when the tenant had no review URL.
+        // The SMS gate now refuses the body outright: a review link is
+        // promotional, and the consent we hold was captured under a disclosure
+        // describing appointment and report updates. The skip is therefore
+        // earlier and unconditional, and the send-core check below it has become
+        // the second line rather than the first.
         const { logId } = await seedSmsLog({ contactId: 'c1', smsBody: 'Visit {{review_url}}' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
         await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
         expect((await statusOf(logId))?.status).toBe('skipped');
-        expect((await statusOf(logId))?.error).toBe('review_url not configured');
+        expect((await statusOf(logId))?.error).toBe('marketing content on sms: review_url');
+        expect(fakeSendMessage).not.toHaveBeenCalled();
+    });
+
+    it('SP2: and configuring a review URL does not unlock it — the control', async () => {
+        // Without this case the one above is satisfied by ANY refusal of a
+        // tenant with no review URL, which is the old behaviour wearing a new
+        // reason string. Configuring the URL is the input that used to make the
+        // send succeed; it must now change nothing.
+        await db.insert(schema.tenantConfigs).values({
+            tenantId: TENANT, smsMode: 'platform',
+            reviewUrl: 'https://g.example/review', updatedAt: new Date(),
+        } as never);
+        const { logId } = await seedSmsLog({ contactId: 'c1', smsBody: 'Visit {{review_url}}' });
+        await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+        expect((await statusOf(logId))?.status).toBe('skipped');
+        expect((await statusOf(logId))?.error).toBe('marketing content on sms: review_url');
         expect(fakeSendMessage).not.toHaveBeenCalled();
     });
 

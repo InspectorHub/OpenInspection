@@ -58,12 +58,36 @@ export const COOLING_WINDOW_MS = COOLING_WINDOW_HOURS * 60 * 60 * 1000;
  * stays gated, and a new company cannot receive a password reset. Nothing
  * fails loudly. `tests/unit/email/outbound-cooling-window.spec.ts` checks
  * every entry against the class registry for exactly that reason.
+ *
+ * ── The second kind of entry, and why it is not the first ───────────────────
+ * `subject-export-ready` and `subject-erasure-confirmed` are exempt for a
+ * DIFFERENT reason, and the distinction is worth keeping visible because the
+ * two look alike from inside this file.
+ *
+ * The four above are account mechanics: they hand someone the keys to a
+ * product, and holding them turns a rate limit into a lockout. That is a
+ * product argument, and a future reviewer could reasonably reweigh it.
+ *
+ * These two are not a product argument. They carry a statutory right — the
+ * answer to an access or erasure request, whose deadline runs against the
+ * controller from the moment the request arrives. An abuse control may delay
+ * our own outbound; it may not spend a day of someone else's legal clock. The
+ * hold survives review as an abuse control ON THAT CONDITION, so this is not a
+ * concession made to the exemption list, it is the term the hold exists under.
+ *
+ * The case is real rather than hypothetical: a subject request against a
+ * brand-new company lands inside the first 24 hours by construction, which is
+ * precisely the interval this window covers.
  */
 export const ACCOUNT_EMAIL_CLASSES: ReadonlySet<string> = new Set([
+    // Account mechanics — blocking these locks a paying customer out.
     'password-reset',
     'workspace-invitation',
     'usage-quota-warning',
     'usage-quota-reached',
+    // Statutory rights — blocking these delays a deadline that is not ours.
+    'subject-export-ready',
+    'subject-erasure-confirmed',
 ]);
 
 /**
