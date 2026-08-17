@@ -323,15 +323,35 @@ export async function scheduled(
         if (at.getUTCHours() === 4 && at.getUTCMinutes() < 5) {
             try {
                 const { runLogRetentionSweep } = await import('./lib/compliance/retention-logs');
+                 
+                // PHOTOS is passed because one rule now reaches outside D1:
+                // `report_pdfs` deletes an R2 object and its row together, and
+                // it REFUSES to run without a bucket rather than deleting rows
+                // that point at objects nothing else could ever reach. On a
+                // deployment with no PHOTOS binding the whole sweep throws into
+                // the catch below and logs — which is correct and loud, rather
+                // than a sweep that quietly expires everything except the one
+                // store this task exists to expire.
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const logSummary = await runLogRetentionSweep(drizzle(env.DB) as any, Date.now());
+                const sweepDb = drizzle(env.DB) as any;
+                const logSummary = await runLogRetentionSweep(
+                    sweepDb, Date.now(), { photos: env.PHOTOS },
+                );
                 // Counts only — the summary carries table names and integers,
                 // never a row. Silent on a no-op run, which is the steady state.
                 if (logSummary.total > 0) {
                     logger.info('[cron] log retention sweep', logSummary);
                 }
             } catch (e) {
-                logger.error('[cron] log retention sweep failed', {}, e instanceof Error ? e : undefined);
+                // A RetentionSweepError carries the PARTIAL summary: every rule
+                // that did run, and the ones that did not. Logging only the
+                // message would erase the record of what expired successfully,
+                // which is a worse report than the one it replaces.
+                const { RetentionSweepError } = await import('./lib/compliance/retention-logs');
+                const partial = e instanceof RetentionSweepError
+                    ? { failures: e.failures, ...e.summary }
+                    : {};
+                logger.error('[cron] log retention sweep failed', partial, e instanceof Error ? e : undefined);
             }
         }
     }

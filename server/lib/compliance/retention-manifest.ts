@@ -46,6 +46,7 @@ import {
     TENANT_LEGAL_VERSION_RETENTION_MONTHS,
     MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS,
     SLUG_HISTORY_RETENTION_MONTHS,
+    REPORT_PDF_DEFAULT_RETENTION_MONTHS,
 } from './retention-windows';
 
 
@@ -78,6 +79,17 @@ export interface RetentionRule {
     action: 'delete' | 'anonymize';
     /** Why THIS period for THIS table. Enforced non-empty by the gate. */
     purpose: string;
+    /**
+     * The `tenant_configs` column holding a per-tenant override, in YEARS,
+     * where 0 means indefinite.
+     *
+     * Present on exactly one rule, and named here rather than hidden in the
+     * executor so the manifest stays TRUE: without it this file would state a
+     * seven-year window for a table where a tenant may have chosen three, and a
+     * register generated from the manifest would publish a number no tenant
+     * necessarily has.
+     */
+    tenantWindowColumnYears?: string;
 }
 
 export const RETENTION_MANIFEST: RetentionRule[] = [
@@ -177,6 +189,19 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'months', value: MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS },
         action: 'delete',
         purpose: 'Display-only record of which catalogue version a workspace imported and when. The marker the update and replace paths actually read is tenant_library_imports, a different table, so expiring a history row shortens a list and cannot change what the next import does.',
+    },
+    {
+        // The first rule that reaches outside D1: the row points at an R2
+        // object, so the executor deletes both or neither. Deleting the row
+        // alone is worse than doing nothing — the row is the only thing that
+        // knows the object's key, so the object becomes unreachable by anything
+        // that could ever remove it.
+        table: 'report_pdfs',
+        timestampColumn: 'rendered_at',
+        window: { unit: 'months', value: REPORT_PDF_DEFAULT_RETENTION_MONTHS },
+        action: 'delete',
+        tenantWindowColumnYears: 'report_pdf_retention_years',
+        purpose: 'A rendered PDF of a property: the address, the photographs and the defects found there. Nothing expired one while the tenant lived, so a report was kept for as long as the company existed with no decision behind it. Seven years is a PLATFORM-SELECTED DEFAULT for the tenant-silent case — not a statutory retention period, and not a representation that seven years is the maximum legally required period (review review, decision, which struck the earlier five-plus-two derivation). It is informed primarily by legal-claim defence and secondarily by regulatory record retention. Each tenant may set their own period, and 0 means indefinite: an explicit controller instruction the platform executes. See lib/compliance/report-pdf-retention.ts for the disclosure wording and the jurisdiction facts with their as-of dates.',
     },
     {
         table: 'tenant_slug_history',

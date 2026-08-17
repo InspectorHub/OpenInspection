@@ -196,3 +196,20 @@ export const MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS = 36;
  * the window can never expire a row still holding a slug out of circulation.
  */
 export const SLUG_HISTORY_RETENTION_MONTHS = 36;
+
+/**
+ * Default deletion window for `report_pdfs`, in months.
+ *
+ * The PLATFORM default for the tenant-silent case, and each tenant may set
+ * their own (`tenant_configs.report_pdf_retention_years`, where 0 means
+ * indefinite). Expressed in months because the executor does calendar
+ * arithmetic for months and multiplying years by 365 drifts against both the
+ * calendar and the number published in the disclosure.
+ *
+ * Seven years is NOT a statutory period and must never be described as one —
+ * review struck the "five plus two" derivation this number used to carry
+ * (review, decision). The wording a customer sees, and the machine-readable
+ * taxonomy that keeps the distinction from resting on prose, live in
+ * `report-pdf-retention.ts`.
+ */
+export const REPORT_PDF_DEFAULT_RETENTION_MONTHS = 84;

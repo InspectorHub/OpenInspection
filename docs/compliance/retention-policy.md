@@ -1,0 +1,91 @@
+# Retention policy — versions, and why each number is the number
+
+The retention catalogue lives in code: `server/lib/compliance/retention-manifest.ts`
+holds WHICH tables and WHAT action, `retention-windows.ts` holds HOW LONG and
+why, and `retention-policy.ts` carries the version header and a digest of the
+operative fields. `npm run lint:retention-policy` refuses a build where the
+rules moved and the header did not — a window edited on its own, shipped, and
+noticed by nobody is the case that gate exists to remove.
+
+This file is the other half: every period has to be answerable with one page
+saying why this number and not another, and a digest cannot say that.
+
+> **Where this file lives.** The gate's failure message points at `[redacted]`,
+> which is the private review archive in the parent repository. This is the
+> open-source engine, so the record lives here beside
+> [`destruction-evidence.md`](destruction-evidence.md). Nothing in this file is
+> privileged; it states which periods apply and the public basis for each.
+
+## Status
+
+`interim`. No period here has been approved by review as final. `approvedBy`
+and `approvedAt` in the header are null, and that is a fact about the policy
+rather than a gap in the paperwork: an unapproved policy that says so is
+honest, and one that says nothing reads as approved.
+
+---
+
+## 2026-08-17.1 — report PDFs get a window
+
+**What changed.** `report_pdfs` gained a retention rule. It had none: the
+tenant purge destroys these objects when a workspace is destroyed, but nothing
+expired one while the tenant lived, so a rendered PDF of a property — the
+address, the photographs, the defects found there — was kept for as long as the
+company existed with no decision behind it.
+
+**The period.** Seven years by default, and each tenant may set their own in
+Settings → Compliance. Zero means indefinite.
+
+**Why seven, and what seven is NOT.** This is a **platform-selected default for
+the tenant-silent case**. It is not a statutory retention period, and not a
+representation that seven years is the maximum legally required period.
+
+That distinction is the whole reason this entry exists. An earlier derivation in
+this repository read seven as "five plus two" — five years from Illinois for
+home-inspection contracts, reports and supporting data, plus two years past
+final disposition of a qualifying judicial proceeding. External review rejected
+it (review, decision): the Illinois period is five years **or** two years
+past final disposition, **whichever is longer**, so the second figure is an
+event-dependent tail rather than a fixed cap. A proceeding ending in year six
+extends the statutory period past seven. Seven years therefore cannot be
+presented as "the longest statutory period", and a register row reading
+`P7Y — legal basis = Illinois law` would invite the next reader to conclude that
+a California tenant is legally required to keep seven years.
+
+The default is informed **primarily by defence of legal claims** and
+**secondarily by regulatory record retention**. The jurisdiction facts behind it,
+each with the date it was checked, are in
+`server/lib/compliance/report-pdf-retention.ts` — including that Washington
+completed a home-inspector rules revision in July 2026, which is why every fact
+carries an as-of date rather than a bare citation.
+
+**Tenant override is not absolute.** The effective period is
+`jurisdictional minimum + tenant instruction + platform constraints`, never
+`tenant choice > law`. Indefinite retention is a tenant OPTION, not a tenant
+entitlement, and seven years is a default rather than a ceiling. The resolver in
+code answers only the middle term — what the tenant asked for, or the default
+when they have not asked. A jurisdictional floor, once one can be determined per
+tenant, is applied above it and deliberately not folded in: one function
+silently responsible for a legal determination it has no facts for is how a
+wrong answer gets an authoritative shape.
+
+**Why the disclosure sits next to the control.** The dominant competitor stores
+reports indefinitely, including after cancellation. A customer who never opens a
+disclosure would reasonably assume our number is required of them, so review
+wording renders plainly beside the field rather than behind a disclosure control
+or on a policy page.
+
+**Mechanically.** This is the first rule that reaches outside D1. The row points
+at an R2 object, so the executor deletes the object first and the row second,
+and **refuses to run at all without a bucket** rather than deleting rows that
+point at objects nothing else could ever reach — the row is the only thing that
+knows the key.
+
+---
+
+## 2026-08-15.1 — the catalogue's first versioned state
+
+The state the versioning began from: fourteen rules, seven declared
+out-of-scope with reasons, and two parked as open questions with dates by which
+they must be answered. See `retention-manifest.ts` for each, and
+`retention-windows.ts` for the reasoning behind every period.
