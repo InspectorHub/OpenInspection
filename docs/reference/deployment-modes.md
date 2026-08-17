@@ -17,6 +17,15 @@ pure function that resolves one from the environment. Nothing else in the worker
 reads `APP_MODE`; a gate in `tests/unit/sync/portal-isolation.spec.ts` keeps it
 that way.
 
+> **Branding is not one of these differences, in either mode.** An earlier
+> version of this table carried a `brandingSource` row saying standalone took
+> its company name and colour from `APP_NAME` / `PRIMARY_COLOR`. That was never
+> true. Both modes read `tenant_configs` and let it win; `APP_NAME` and
+> `PRIMARY_COLOR` are the values used until something is set. **Change your
+> company name and primary colour in Settings → Workspace** — no redeploy, in
+> either mode. The row is gone because the distinction it described did not
+> exist.
+
 > The table below is **generated** from those two constants by
 > `npm run docs:modes`. Do not edit it by hand — edit the constants, then
 > regenerate. `tests/unit/platform/deployment-modes-doc.spec.ts` fails if the
@@ -36,12 +45,13 @@ that way.
 | `hasSetupWizard` | yes | no | `/setup` exists, gated on the `SETUP_CODE` secret, to create the first account. |
 | `aiDevMockFallback` | yes | no | AI calls may fall back to a local mock when no credential resolves. |
 | `hasManagedAi` | no | yes | A platform-provided AI credential can ever be resolved. Standalone has no platform, so the managed path is absent rather than disabled — use your own key in Settings → Advanced → AI. |
-| `brandingSource` | `env` | `tenant-config` | Where the company name and colour come from: `env` (`APP_NAME` / `PRIMARY_COLOR`) or per-tenant config edited in Settings. |
 | `mcpApiRoute` | `/mcp` | `/company/` | Where the MCP OAuth surface mounts. |
 | `videoBackendManaged` | no | yes | Whether the platform picks the video backend. Standalone operators set `videoMode` themselves, which is why the self-host settings form exists and the saas one refuses to save. |
 | `hasManagedCompliance` | no | yes | A platform-operated compliance path (managed SMS 10DLC brand/campaign filing) exists. Absent in standalone — nobody can file on your behalf. |
 | `hasContentMarketplace` | no | yes | The content marketplace surface exists. Standalone 404s the browse route rather than rendering an empty shelf: the catalogue is curated first-party and nothing can reach it. |
 | `qboAppManaged` | no | yes | The platform supplies the Intuit app tenants connect through, so nobody is asked for a Client ID. Standalone brings its own: Intuit matches a redirect URI byte for byte and a self-hosted deploy answers on its own domain, so the platform app cannot work there — which is why the credential form, including `QBO_ENV`, renders only in standalone. |
+| `tenantRecordOwnedByPortal` | no | yes | Whether a platform stores the authoritative tenant record and this worker reads a projection of it. Decides which admin provider is constructed; in standalone this deployment owns the row outright. |
+| `hasPortalIntegrationApi` | no | yes | Whether the portal machine-to-machine surface (`/api/integration/*`) is mounted. Standalone 404s the whole prefix rather than answering on an API nobody can authenticate to. |
 | `botProtectionMandatory` | no | yes | Whether the public booking form and agent signup MUST carry a bot challenge. Saas always challenges — with no `TURNSTILE_SECRET_KEY` it uses Cloudflare's published test key rather than skipping, so the mechanism is permissive but never off. Standalone leaves it to the operator: no key, no challenge. |
 
 <!-- END GENERATED: capability table -->

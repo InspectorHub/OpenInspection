@@ -11,6 +11,11 @@ describe('DeploymentProfile capability surface', () => {
         expect(STANDALONE_PROFILE.hasManagedCompliance).toBe(false);
         expect(STANDALONE_PROFILE.mcpApiRoute).toBe('/mcp');
         expect(STANDALONE_PROFILE.hasContentMarketplace).toBe(false);
+        // Owns its tenant row outright — there is no platform storing another
+        // copy — and mounts no machine-to-machine surface, because there is
+        // nobody on the other end to authenticate.
+        expect(STANDALONE_PROFILE.tenantRecordOwnedByPortal).toBe(false);
+        expect(STANDALONE_PROFILE.hasPortalIntegrationApi).toBe(false);
     });
 
     it('saas plan-manages the video backend and mounts MCP under the company prefix', () => {
@@ -18,6 +23,11 @@ describe('DeploymentProfile capability surface', () => {
         expect(SAAS_PROFILE.hasManagedCompliance).toBe(true);
         expect(SAAS_PROFILE.mcpApiRoute).toBe('/company/');
         expect(SAAS_PROFILE.hasContentMarketplace).toBe(true);
+        // Portal is the system of record for the tenant row and the M2M surface
+        // exists for it to talk through. These two replaced the last two
+        // `env.APP_MODE` comparisons outside the seam.
+        expect(SAAS_PROFILE.tenantRecordOwnedByPortal).toBe(true);
+        expect(SAAS_PROFILE.hasPortalIntegrationApi).toBe(true);
     });
 });
 

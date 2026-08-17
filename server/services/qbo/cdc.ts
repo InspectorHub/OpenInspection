@@ -11,8 +11,12 @@ import {
 } from './api-base';
 import { describeQboError } from './api-base';
 import { withInvoiceSync } from './invoice-sync';
+import type { CustomerSyncSurface } from './customer-sync';
 
-export function withCdc<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
+// Same inherited bound as `withWebhook` — see the note there.
+export function withCdc<
+    TBase extends Constructor<QBOServiceBase & CustomerSyncSurface>,
+>(Base: TBase) {
     return class extends withInvoiceSync(Base) {
         public toIso8601(when: Date): string {
             return when.toISOString();

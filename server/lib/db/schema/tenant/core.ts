@@ -438,4 +438,16 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
      * (tenant_configs is FK-referenced).
      */
     legalName: text('legal_name'),
+    /**
+     * The last invoice number handed out for this tenant. Default 1000, so the
+     * first invoice is **1001** — Jobber's convention, and the category's;
+     * starting at 1 tells a homebuyer they are this company's first customer.
+     *
+     * A COUNTER, not a `MAX(invoice_number) + 1` scan. D1 has no interactive
+     * transaction, so read-then-write races two concurrent creates onto one
+     * number and `uq_invoices_tenant_number` then refuses the second invoice at
+     * the point of sale. Allocation is one atomic `UPDATE … RETURNING`.
+     * Appended at END per the D1 add-column-at-end rule.
+     */
+    invoiceSeq: integer('invoice_seq').notNull().default(1000),
 });

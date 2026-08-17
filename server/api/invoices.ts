@@ -142,6 +142,9 @@ const invoiceRoutes = createApiRouter()
             c.executionCtx.waitUntil(
                 c.var.services.qbo.upsertInvoice(tenantId, {
                     id:        invoice.id,
+                    // The document number the customer sees in QuickBooks.
+                    // Omitted until now, which is why it fell back to a UUID.
+                    invoiceNumber: invoice.invoiceNumber,
                     // Required by QuickBooks, and omitted here for as long as
                     // this call existed. The push it produced was refused every
                     // time with `CustomerRef is required`.
@@ -167,6 +170,7 @@ const invoiceRoutes = createApiRouter()
                 c.executionCtx.waitUntil(
                     c.var.services.qbo.upsertInvoice(tenantId, {
                         id:        inv.id,
+                        invoiceNumber: inv.invoiceNumber,
                         contactId: inv.contactId ?? null,
                         dueDate:     inv.dueDate,
                         lineItems:   inv.lineItems,

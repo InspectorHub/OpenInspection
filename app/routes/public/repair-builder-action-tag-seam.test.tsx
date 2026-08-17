@@ -100,10 +100,19 @@ type RouteAction = (args: any) => Promise<unknown>;
 let builderAction: RouteAction;
 let agentAction: RouteAction;
 
+// Explicit timeout, not the 10s default. This hook transforms and imports two
+// route modules and everything they pull in; under a loaded machine that
+// exceeds 10s and the file fails to COLLECT — which reports as one failed FILE
+// with zero failed tests, a shape easy to read as infrastructure noise.
+//
+// This repo has recorded nine specs dismissed as flake for exactly that
+// reason, each of which turned out to be a missing explicit timeout rather than
+// a flaky test. Passing alone and failing in the full run is the signature, not
+// the acquittal.
 beforeAll(async () => {
   builderAction = (await import("./repair-builder.$tenant.$id")).action;
   agentAction = (await import("../agent/repair-items")).action;
-});
+}, 60_000);
 
 beforeEach(() => {
   post.mockReset().mockResolvedValue({ ok: true, json: async () => ({ data: { id: "item-1" } }) });

@@ -646,9 +646,12 @@ export const smsAdminRoutes = createApiRouter()
         }, 200);
     })
     .openapi(complianceProvisionRoute, async (c) => {
-        // SaaS gate: managed provisioning is only available in SaaS mode.
+        // The capability, not the mode: it asks exactly this — whether a
+        // platform-operated 10DLC filing path exists to provision INTO. The
+        // settings page read it while the endpoints ENFORCING it compared the
+        // mode, which is the worse half to get wrong.
         const profile = c.var.profile;
-        if (profile?.mode !== 'saas') {
+        if (!profile?.hasManagedCompliance) {
             return c.json({ success: false as const, error: 'managed_provision_unavailable' }, 403);
         }
 
@@ -741,9 +744,12 @@ export const smsAdminRoutes = createApiRouter()
         }, 200);
     })
     .openapi(complianceResubmitRoute, async (c) => {
-        // SaaS gate: managed provisioning is only available in SaaS mode.
+        // The capability, not the mode: it asks exactly this — whether a
+        // platform-operated 10DLC filing path exists to provision INTO. The
+        // settings page read it while the endpoints ENFORCING it compared the
+        // mode, which is the worse half to get wrong.
         const profile = c.var.profile;
-        if (profile?.mode !== 'saas') {
+        if (!profile?.hasManagedCompliance) {
             return c.json({ success: false as const, error: 'managed_provision_unavailable' }, 403);
         }
 

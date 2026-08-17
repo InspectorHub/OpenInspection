@@ -29,9 +29,10 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { InvoiceService } from '../../../server/services/invoice.service';
 import { QBOServiceBase } from '../../../server/services/qbo/api-base';
 import { withInvoiceSync } from '../../../server/services/qbo/invoice-sync';
+import { withCustomerSync } from '../../../server/services/qbo/customer-sync';
 import type { InvoiceSummary } from '../../../server/services/qbo/api-base';
 
-class TestQBOService extends withInvoiceSync(QBOServiceBase) {}
+class TestQBOService extends withInvoiceSync(withCustomerSync(QBOServiceBase)) {}
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INV_ID = 'inv-aaaaaaaa-0000-0000-0000-000000000001';

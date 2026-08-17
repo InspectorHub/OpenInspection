@@ -16,6 +16,36 @@ import { logger } from '../lib/logger';
 import { mcpEnabled } from '../lib/mcp/flag';
 import { coerceOverrides, getCapabilities, type CapabilitySet } from '../lib/auth/capabilities';
 import { isRole } from '../lib/auth/roles';
+import type { DeploymentProfile } from '../lib/deployment-profile';
+
+/**
+ * Which deployment capabilities the browser is sent.
+ *
+ * An explicit allowlist, not a spread of the whole profile: it also carries
+ * `fixedTenantId` and the portal URLs, which are the server's business.
+ *
+ * It is a NAMED function so a spec can assert on what ships. The list used to
+ * be four fields written inline, and a capability that is not on it is not
+ * merely undocumented in the client — it is UNREADABLE there. That is not a
+ * hypothetical: `library-hub.tsx` and `CommandPalette.tsx` both gate the
+ * marketplace on `branding.isSaas` while `marketplace.tsx` gates it on
+ * `hasContentMarketplace`, and the reason is simply that the capability had
+ * never been put on the wire. The wrong answer was the only reachable one.
+ */
+export function deploymentPayload(
+    profile: DeploymentProfile,
+    env: { MCP_ENABLED?: string },
+) {
+    return {
+        mode: profile.mode || 'standalone',
+        hasBilling: profile.hasBilling || false,
+        hasSeatQuota: profile.hasSeatQuota || false,
+        mcpEnabled: mcpEnabled(env),
+        hasContentMarketplace: profile.hasContentMarketplace || false,
+        videoBackendManaged: profile.videoBackendManaged || false,
+        hasManagedCompliance: profile.hasManagedCompliance || false,
+    };
+}
 import { getDrizzle } from '../lib/route-helpers';
 import { getBaseUrl } from '../lib/url';
 import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
@@ -305,12 +335,7 @@ const sessionContextRoutes = createApiRouter()
                     dateFormat: userDateFormat,
                     timeFormat: userTimeFormat,
                 },
-                deployment: {
-                    mode: profile.mode || 'standalone',
-                    hasBilling: profile.hasBilling || false,
-                    hasSeatQuota: profile.hasSeatQuota || false,
-                    mcpEnabled: mcpEnabled(c.env as { MCP_ENABLED?: string }),
-                },
+                deployment: deploymentPayload(profile, c.env as { MCP_ENABLED?: string }),
                 seatUsage,
                 videoProvider,
                 outboundCoolingWindow,

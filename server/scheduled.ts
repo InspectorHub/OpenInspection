@@ -1,5 +1,4 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
 import { AutomationService } from './services/automation.service';
 import { maybeMetering } from './services/metering.service';
 import { AgreementService } from './services/agreement.service';
@@ -9,9 +8,7 @@ import { PlanQuotaGuard, readTenantTier } from './features/plan-quota/guard';
 import { tenantAiCapsLoader } from './features/plan-quota/ai-caps';
 import { getDeploymentProfile } from './lib/deployment-profile';
 import type { BrowserRun } from './types/hono';
-import { QBOService } from './services/qbo.service';
-import { InvoiceService } from './services/invoice.service';
-import { qboConnections } from './lib/db/schema/qbo';
+import { runQBOCDC } from './services/qbo/cron-cdc';
 import { logger } from './lib/logger';
 import type { SyncEnvelope } from './lib/sync-events/envelope';
 // Spec 2 Task 2b — cron-path deps for report.published PDF-email delivery
@@ -64,40 +61,6 @@ export interface ScheduledEnv {
     // back to the generic template path (see reportDelivery construction below).
     BROWSER?: BrowserRun;
     KEY_ENCRYPTION_SECRET?: string;
-}
-
-async function runQBOCDC(env: ScheduledEnv): Promise<void> {
-    if (!env.JWT_SECRET || !env.QBO_CLIENT_ID) {
-        logger.info('[cron:qbo] QBO not configured — skipping CDC');
-        return;
-    }
-    const svc = new QBOService(
-        env.DB,
-        env.QBO_CLIENT_ID,
-        env.QBO_CLIENT_SECRET ?? '',
-        env.QBO_WEBHOOK_SECRET ?? '',
-        env.JWT_SECRET,
-        env.QBO_ENV,
-    );
-    const invoiceSvc = new InvoiceService(env.DB);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = drizzle(env.DB as any);
-    const connections = await db.select().from(qboConnections).where(eq(qboConnections.syncEnabled, true)).all();
-
-    for (const conn of connections) {
-        try {
-            const { processed } = await svc.runCDCSync(
-                conn.tenantId,
-                // Inbound: the row appended is dropped on purpose — QuickBooks
-                // is where this figure came from, so it must not be pushed back.
-                async (invoiceId, tid) => { await invoiceSvc.markPaid(invoiceId, tid, 'qbo'); },
-                async (invoiceId, amountPaidCents, tid) => { await invoiceSvc.markPartial(invoiceId, tid, 'qbo', amountPaidCents); },
-            );
-            if (processed > 0) logger.info('[cron:qbo] CDC processed invoices', { tenantId: conn.tenantId, processed });
-        } catch (e) {
-            logger.error('[cron:qbo] tenant CDC failed', { tenantId: conn.tenantId }, e instanceof Error ? e : undefined);
-        }
-    }
 }
 
 async function cleanupPendingAttachments(photos: R2Bucket): Promise<void> {

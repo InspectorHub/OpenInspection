@@ -32,7 +32,7 @@ const CONNECTED: QBOConnectionStatus = {
   companyName: "Sandbox Company US baeb",
   lastSyncAt: NOW_SECONDS - HOUR,
   syncEnabled: true,
-  openErrors: 0,
+  openErrors: [],
   paymentDiscrepancies: [],
   heldDepositCount: 0,
   refreshTokenExpiresAt: NOW_SECONDS + 100 * 24 * HOUR,

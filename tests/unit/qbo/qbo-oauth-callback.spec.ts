@@ -3,6 +3,8 @@ import { Hono } from 'hono';
 import type { HonoConfig } from '../../../server/types/hono';
 import type { UserRole } from '../../../server/types/auth';
 import { AppError } from '../../../server/lib/errors';
+import { drizzle } from 'drizzle-orm/d1';
+import { standaloneQboEnv, TENANT } from '../helpers/qbo-deployment-envs';
 
 /**
  * The Intuit redirect lands here as a CROSS-SITE top-level navigation, so the
@@ -193,10 +195,17 @@ describe('QBO OAuth callback authorization', () => {
         // Storing a token against an API host the worker will refuse to call
         // would leave the page saying "connected" while nothing ever syncs.
         //
-        // Its own code, not the credential one: QBO_ENV is env-only in every
-        // deployment mode, so `not_configured` — whose copy tells the reader
-        // to fix the Client ID on the settings form — would send them to a
-        // field that is already correct.
+        // Its own code, not the credential one: `not_configured`'s copy tells
+        // the reader to fix the Client ID on the settings form, and here that
+        // field is already correct.
+        //
+        // This rationale used to read "QBO_ENV is env-only in every deployment
+        // mode". That is false, and it put the wrong model inside the reason a
+        // test exists: `QBO_ENV` is a member of `INTEGRATION_SECRET_KEYS`
+        // (`server/lib/secrets-catalog.ts`), it is on the credential form
+        // (`QboCredentialsForm.tsx`), and `applyIntegrationSecrets` merges it.
+        // This case is "neither place supplied it", not "this deployment cannot
+        // supply it" — see the spec below, which pins the other half.
         kv.store.set('qbo_oauth_state:st-4', TENANT_ID);
         const env = { ...(ENV(kv) as object), QBO_ENV: undefined } as never;
 
@@ -205,6 +214,76 @@ describe('QBO OAuth callback authorization', () => {
 
         expect(res.headers.get('location')).toBe('/settings/integrations/qbo?error=missing_qbo_env');
         expect(qboService.saveConnection).not.toHaveBeenCalled();
+    });
+
+    it('completes on a SELF-HOSTED deploy, where every credential is in the tenant row', async () => {
+        // The deployment shape no spec in this file had ever built.
+        //
+        // `ENV` above hardcodes the platform-supplied credentials, so
+        // `!QBO_CLIENT_ID || !QBO_CLIENT_SECRET` was false on every run and the
+        // tenant-credential fallback below it was dead in the whole suite. This
+        // is the shape `qboAppManaged: false` produces: Intuit matches a
+        // redirect URI byte for byte, so the platform's app cannot serve
+        // someone else's domain, and Settings → Integrations is the ONLY place
+        // the operator can put anything.
+        //
+        // `QBO_ENV` arriving from the tenant row is the specific half that was
+        // impossible under the old guard: it names two of the four keys, so an
+        // operator with the id and secret on the Worker env and the environment
+        // on the form skipped the merge and got `?error=missing_qbo_env` for a
+        // field they had filled in correctly.
+        const fx = await standaloneQboEnv({
+            tenantSecrets: {
+                QBO_CLIENT_ID:     'tenant-client-id',
+                QBO_CLIENT_SECRET: 'tenant-client-secret',
+                QBO_ENV:           'sandbox',
+            },
+        });
+        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
+        kv.store.set('qbo_oauth_state:st-self', TENANT);
+
+        const env = {
+            ...(fx.env as object),
+            APP_BASE_URL,
+            TENANT_CACHE: kv,
+        } as never;
+
+        const res = await buildApp(kv).request(
+            `${QBO_OAUTH_MOUNT}/callback?code=c1&state=st-self&realmId=${REALM_ID}`,
+            {}, env, CTX,
+        );
+
+        expect(res.headers.get('location')).toBe('/settings/integrations/qbo?connected=1');
+        expect(qboService.saveConnection).toHaveBeenCalledTimes(1);
+    });
+
+    it('completes when only QBO_ENV comes from the tenant row and the rest is on env', async () => {
+        // THE case the deleted guard broke, and the reason the spec above is
+        // not enough on its own: with `if (!QBO_CLIENT_ID || !QBO_CLIENT_SECRET)`
+        // in place, a fully-self-hosted deploy still merged (env has neither),
+        // so every all-or-nothing test passed either way. Only mixed provenance
+        // separates them — the guard named two of the four keys, so an operator
+        // with the id and secret on the Worker env and the environment on the
+        // settings form skipped the merge entirely and was told
+        // `missing_qbo_env` about a field they had filled in.
+        const fx = await standaloneQboEnv({ tenantSecrets: { QBO_ENV: 'sandbox' } });
+        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
+        kv.store.set('qbo_oauth_state:st-mixed', TENANT);
+
+        const env = {
+            ...(fx.env as object),
+            QBO_CLIENT_ID:     'platform-client-id',
+            QBO_CLIENT_SECRET: 'platform-client-secret',
+            APP_BASE_URL,
+            TENANT_CACHE: kv,
+        } as never;
+
+        const res = await buildApp(kv).request(
+            `${QBO_OAUTH_MOUNT}/callback?code=c1&state=st-mixed&realmId=${REALM_ID}`,
+            {}, env, CTX,
+        );
+
+        expect(res.headers.get('location')).toBe('/settings/integrations/qbo?connected=1');
     });
 
     it('refuses an unknown state', async () => {

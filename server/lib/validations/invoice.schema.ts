@@ -166,6 +166,12 @@ export const InvoiceResponseSchema = z.object({
  */
 export const PublicInvoiceBodySchema = z.object({
     id: z.string(),
+    // The number the customer sees. DECLARED because the route parses the row
+    // through this schema and zod strips what is not declared — the same trap
+    // that hid `amountPaidCents` below and left the pay page unable to show a
+    // balance the column already held. Nullable for rows that predate the
+    // column; the client falls back to a short id rather than an empty cell.
+    invoiceNumber: z.number().nullable().optional(),
     amountCents: z.number(),
     // The payer's own record of what has already been received. Undeclared until
     // now, and because the route PARSES the row through this schema (IA-86), zod

@@ -494,8 +494,16 @@ const adminSettingsRoutes = createApiRouter()
         }
         if (body.smsMode !== undefined) {
             const profile = c.var.profile;
-            if (profile.mode === 'standalone') {
-                // Standalone is BYO-only; ignore any submitted mode and force own.
+            // The real question is whether the `managed_*` SMS modes EXIST on
+            // this deployment — i.e. whether anyone can file a 10DLC brand and
+            // campaign on the tenant's behalf. That is `hasManagedCompliance`,
+            // and it is what the settings page reads to decide whether to offer
+            // the choice. `mode === 'standalone'` was a proxy that happens to
+            // agree today; reading the capability is what keeps the two agreeing
+            // when a deployment stops matching the proxy.
+            if (!profile.hasManagedCompliance) {
+                // No managed path exists here: ignore any submitted mode and
+                // force BYO, which is the only one that can work.
                 update.smsMode = 'own';
             } else {
                 // SaaS: the schema already excludes 'platform' via z.enum(['own','managed_shared','managed_dedicated']).

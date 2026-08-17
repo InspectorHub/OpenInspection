@@ -68,8 +68,6 @@ export interface DeploymentProfile {
      *  Read this instead of branching on APP_MODE — see the file header. */
     hasManagedAi: boolean;
 
-    brandingSource: 'env' | 'tenant-config';
-
     /** Where the MCP OAuth surface mounts. SaaS serves per-workspace endpoints
      *  under /company/{slug}/mcp, so the provider takes the broad '/company/'
      *  prefix; standalone has one fixed '/mcp'. The company-slug guard applies
@@ -126,6 +124,27 @@ export interface DeploymentProfile {
      *  legitimate reason not to challenge anyone, and we are not in a position
      *  to overrule it. */
     botProtectionMandatory: boolean;
+
+    /** Whether the tenant RECORD is owned by a platform that stores it
+     *  elsewhere. True in saas: portal is the system of record for tenant
+     *  status and tier, and this worker reads a projection of it, so the admin
+     *  service takes `PortalProvider`. False in standalone: this deployment
+     *  owns the row outright and `StandaloneProvider` writes it directly.
+     *
+     *  `di.ts` used to answer this by comparing `APP_MODE`, under an allowlist
+     *  entry granted for what it may IMPORT rather than how it may test the
+     *  mode. Naming the question is what makes the answer checkable. */
+    tenantRecordOwnedByPortal: boolean;
+
+    /** Whether the portal M2M surface (`/api/integration/*`) exists at all.
+     *  False in standalone: there is no platform on the other end, so the entry
+     *  404s the prefix rather than mounting a machine-to-machine API nobody can
+     *  authenticate to. A surface that answers is a surface somebody probes.
+     *
+     *  Read at the worker entry, before any middleware — which is possible
+     *  because `getDeploymentProfile` takes `ProfileEnv`, not `AppEnv`. That
+     *  widening exists for exactly this class of caller; see the note on it. */
+    hasPortalIntegrationApi: boolean;
 }
 
 const FIXED_TENANT_FALLBACK = '00000000-0000-0000-0000-000000000000';
@@ -138,13 +157,14 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
     hasSetupWizard: true,
     aiDevMockFallback: true,
     hasManagedAi: false,
-    brandingSource: 'env',
     mcpApiRoute: '/mcp',
     videoBackendManaged: false,
     hasManagedCompliance: false,
     hasContentMarketplace: false,
     qboAppManaged: false,
     botProtectionMandatory: false,
+    tenantRecordOwnedByPortal: false,
+    hasPortalIntegrationApi: false,
 };
 
 export const SAAS_PROFILE: DeploymentProfile = {
@@ -155,13 +175,14 @@ export const SAAS_PROFILE: DeploymentProfile = {
     hasSetupWizard: false,
     aiDevMockFallback: false,
     hasManagedAi: true,
-    brandingSource: 'tenant-config',
     mcpApiRoute: '/company/',
     videoBackendManaged: true,
     hasManagedCompliance: true,
     hasContentMarketplace: true,
     qboAppManaged: true,
     botProtectionMandatory: true,
+    tenantRecordOwnedByPortal: true,
+    hasPortalIntegrationApi: true,
 };
 
 /**
