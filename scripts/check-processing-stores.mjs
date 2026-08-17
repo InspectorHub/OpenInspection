@@ -175,12 +175,47 @@ const findMissing = (declared, entries, key = 'binding') =>
         e[key] === d || (Array.isArray(e[key]) && e[key].includes(d))
     )));
 
-const findStale = (declared, entries, key = 'binding') => {
+/**
+ * Names an entry claims that no readable config declares.
+ *
+ * `unverifiable` is the third answer, and it exists because the second answer
+ * was wrong on CI. `wrangler.saas.jsonc` is GITIGNORED, so a fresh checkout
+ * declares only the standalone surface — and every SaaS-only queue then looked
+ * deleted. The gate was reporting absence of evidence as evidence of absence,
+ * which is the one mistake a registry gate must not make about resources it
+ * cannot see.
+ *
+ * The split is declarative, not a guess from the name: an entry whose `modes`
+ * include a mode whose config was not read is unverifiable for the names it owns
+ * in that mode, never stale. When the SaaS config IS present (a maintainer's
+ * machine, or any CI that provisions it) `unverifiable` is empty and the check is
+ * exactly as strict as before.
+ */
+const findStale = (declared, entries, key = 'binding', unreadModes = new Set()) => {
     const set = declared instanceof Set ? declared : new Set(declared);
-    return entries.flatMap((e) => {
+    const stale = [];
+    const unverifiable = [];
+    for (const e of entries) {
         const named = Array.isArray(e[key]) ? e[key] : (e[key] ? [e[key]] : []);
-        return named.filter((n) => !set.has(n));
-    });
+        const missing = named.filter((x) => !set.has(x));
+        if (missing.length === 0) continue;
+        // An entry names ONE physical resource per mode — the word-export queue
+        // is `…-word-export` in standalone and `…-word-export-saas` in SaaS — so
+        // an unread mode can excuse at most one missing name. Arithmetic, not a
+        // guess from the suffix.
+        const excusable = (e.modes ?? []).filter((m) => unreadModes.has(m)).length;
+        if (missing.length <= excusable) {
+            unverifiable.push(...missing);
+        } else {
+            // More names gone than blindness can account for: at least one is a
+            // real deletion, and since the entry does not say which name belongs
+            // to which mode, none of them gets excused. Blaming the blind spot
+            // for a genuine deletion is the failure this arithmetic prevents.
+            stale.push(...missing);
+        }
+    }
+    stale.unverifiable = unverifiable;
+    return stale;
 };
 
 /** Zero declared surfaces means the parse failed, not that the worker has none. */
@@ -269,6 +304,29 @@ function selfTest() {
         ['q-a'], [{ binding: 'B', queues: ['q-a'] }], 'queues',
     ).length === 0]);
 
+    // Staleness vs unverifiability, both directions. The positive control is the
+    // one that matters: without it, a fix that demoted EVERYTHING to
+    // unverifiable would pass a gate that no longer checks anything.
+    const saasOnly = [{ binding: 'B', queues: ['q-saas'], modes: ['saas'] }];
+    const blind = findStale([], saasOnly, 'queues', new Set(['saas']));
+    checks.push(['a saas-only name is unverifiable when the saas config was not read',
+        blind.length === 0 && blind.unverifiable.length === 1]);
+    const sighted = findStale([], saasOnly, 'queues', new Set());
+    checks.push(['the same name IS stale once that config is readable',
+        sighted.length === 1 && sighted.unverifiable.length === 0]);
+    // An entry spanning both modes: the standalone name is judged for real even
+    // while its saas sibling cannot be.
+    const spanning = [{ binding: 'B', queues: ['q-std', 'q-saas'], modes: ['standalone', 'saas'] }];
+    const half = findStale(['q-std'], spanning, 'queues', new Set(['saas']));
+    checks.push(['a readable name in a partly-blind entry is still checked',
+        half.length === 0 && half.unverifiable.length === 1]);
+    // Both names gone, one blind mode: blindness accounts for at most one, so
+    // the entry is NOT excused. Without this the fix would have let a genuinely
+    // deleted standalone queue hide behind its saas sibling.
+    const halfGone = findStale([], spanning, 'queues', new Set(['saas']));
+    checks.push(['blindness excuses one missing name per unread mode, not all of them',
+        halfGone.length === 2 && halfGone.unverifiable.length === 0]);
+
     // An asserted role with no basis is refused; unclassified with none is fine.
     const bad = fieldProblems(baseEntry({ role: coord('processor', null) }), new Set());
     checks.push(['an asserted role with no basis is refused',
@@ -311,12 +369,26 @@ if (!selfTest()) {
     process.exit(1);
 }
 
+/** Which deploy mode each config describes, so an absent one names what it cost. */
+const CONFIG_MODES = { 'wrangler.jsonc': 'standalone', 'wrangler.saas.jsonc': 'saas' };
+
 const bindings = new Set();
 const queues = new Set();
 let configsRead = 0;
+const configsMissing = [];
+const unreadModes = new Set();
 for (const name of CONFIGS) {
     let raw;
-    try { raw = readFileSync(join(ROOT, name), 'utf8'); } catch { continue; }
+    try {
+        raw = readFileSync(join(ROOT, name), 'utf8');
+    } catch {
+        // NOT a silent continue. `wrangler.saas.jsonc` is gitignored, so this is
+        // the normal state on CI and on a fresh clone — and the gate used to
+        // treat everything it declares as deleted.
+        configsMissing.push(name);
+        unreadModes.add(CONFIG_MODES[name]);
+        continue;
+    }
     const cfg = JSON.parse(stripJsonc(raw));
     bindingsFromConfig(cfg, bindings);
     consumedQueues(cfg, queues);
@@ -333,9 +405,9 @@ const manifestExports = new Set(
 );
 
 const missingBindings = findMissing(bindings, entries);
-const staleBindings = findStale(bindings, entries);
+const staleBindings = findStale(bindings, entries, 'binding', unreadModes);
 const missingQueues = findMissing(queues, entries, 'queues');
-const staleQueues = findStale(queues, entries, 'queues');
+const staleQueues = findStale(queues, entries, 'queues', unreadModes);
 const missingAdapters = findMissing(adapters, entries, 'external_processor');
 const staleAdapters = findStale(adapters, entries, 'external_processor');
 const unattributed = findUnattributedVars(TRACKED_VARS, entries);
@@ -353,7 +425,13 @@ const gaps = entries.filter((e) => DELETION_GAPS.includes(e.deletion_mechanism))
 
 // Every pair side by side. A single total would let a complete binding sweep
 // read as a complete registry while every sub-processor stayed invisible.
-console.log(`\nprocessing stores — ${configsRead} config(s) read`);
+console.log(`\nprocessing stores — ${configsRead} of ${CONFIGS.length} config(s) read`);
+// Printed EVERY run, not only when something is skipped. A gate that mentions
+// its blind spot only while it happens to be blind is a gate nobody can audit
+// on the day it goes green.
+console.log(`  configs unreadable  : ${configsMissing.length}${configsMissing.length ? ` — ${configsMissing.join(', ')} (gitignored; the modes they declare cannot be checked for deletion)` : ''}`);
+const unverifiable = [...(staleBindings.unverifiable ?? []), ...(staleQueues.unverifiable ?? [])];
+console.log(`  names unverifiable  : ${unverifiable.length}${unverifiable.length ? ` — ${unverifiable.join(', ')}` : ''}`);
 console.log(`  bindings            : ${bindings.size} declared / ${bindings.size - missingBindings.length} registered`);
 console.log(`  consumed queues     : ${queues.size} declared / ${queues.size - missingQueues.length} registered`);
 console.log(`  external processors : ${adapters.length} declared / ${adapters.length - missingAdapters.length} registered`);
