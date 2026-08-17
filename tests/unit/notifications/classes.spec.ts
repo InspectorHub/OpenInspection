@@ -43,6 +43,11 @@ const NEVER_OFF = [
     // worth honouring, and the recipient's workspace is gone by the time it
     // sends, so there is nothing left to hold a preference anyway.
     'destruction-incomplete',
+    // A statutory act reported to the person it was performed on. Muting either
+    // would mean we erased someone's data, or assembled a copy of it, and then
+    // honoured a preference that hid the fact from the only person entitled to
+    // know. There is no version of that preference worth storing.
+    'subject-export-ready', 'subject-erasure-confirmed',
     // A one-off share to a typed-in address: no account, no relationship, so no
     // preference can exist. See the third `required: true` case in classes.ts.
     'repair-request-share',
