@@ -450,4 +450,18 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
      * Appended at END per the D1 add-column-at-end rule.
      */
     invoiceSeq: integer('invoice_seq').notNull().default(1000),
+    /**
+     * Years a rendered report PDF is kept. `0` = indefinite, which is an
+     * explicit controller instruction the platform executes rather than an
+     * absence of a setting.
+     *
+     * The default of 7 is a disclosed PLATFORM default and is never presented
+     * as a statutory requirement — counsel struck the "longest statutory
+     * period" framing this number used to carry. The wording a customer sees,
+     * and the machine-readable taxonomy that keeps the distinction from resting
+     * on prose, live in `lib/compliance/report-pdf-retention.ts`.
+     *
+     * Appended at END per the D1 add-column-at-end rule.
+     */
+    reportPdfRetentionYears: integer('report_pdf_retention_years').notNull().default(7),
 });

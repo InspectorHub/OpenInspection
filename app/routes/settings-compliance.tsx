@@ -1,7 +1,5 @@
-import { useState } from "react";
 import { useLoaderData } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
-import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import type { Route } from "./+types/settings-compliance";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -10,11 +8,17 @@ import { AccessDenied } from "~/components/AccessDenied";
 import { Table, Pill, type PillTone } from "@core/shared-ui";
 import { LegalDocsPanel } from "~/components/settings/LegalDocsPanel";
 import { AiAssurancePanel, type AiAssuranceRow } from "~/components/settings/AiAssurancePanel";
+import { RetentionWindowSection } from "~/components/settings/RetentionWindowSection";
 import { getBaseUrlFromRequest, rebaseHostedLegalUrl } from "~/lib/legal-base-url";
 import { m } from "~/paraglide/messages";
 
 const DEFAULT_RETENTION_YEARS = 6;
 const MIN_RETENTION_YEARS = 1;
+// Zero is meaningful for report PDFs and meaningless for agreements, so the two
+// windows do not share a floor: 0 here is the tenant instructing indefinite
+// retention, which the platform executes.
+const MIN_PDF_RETENTION_YEARS = 0;
+const DEFAULT_PDF_RETENTION_YEARS = 7;
 const MAX_RETENTION_YEARS = 99;
 
 interface ErasureDecision {
@@ -61,6 +65,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   ]);
 
   let retentionYears = DEFAULT_RETENTION_YEARS;
+  let pdfRetentionYears = DEFAULT_PDF_RETENTION_YEARS;
   let legal = {
     legalMode: "hosted" as "hosted" | "custom",
     customPrivacyUrl: "" as string,
@@ -78,6 +83,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const raw = Number(d.agreementRetentionYears);
     if (Number.isInteger(raw) && raw >= MIN_RETENTION_YEARS && raw <= MAX_RETENTION_YEARS) {
       retentionYears = raw;
+    }
+    // Its own floor: 0 is a real choice here (indefinite), not an empty field.
+    const rawPdf = Number(d.reportPdfRetentionYears);
+    if (Number.isInteger(rawPdf) && rawPdf >= MIN_PDF_RETENTION_YEARS && rawPdf <= MAX_RETENTION_YEARS) {
+      pdfRetentionYears = rawPdf;
     }
     const origin = getBaseUrlFromRequest(request);
     const legalMode = d.legalMode === "custom" ? "custom" : "hosted";
@@ -132,7 +142,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     };
   }
 
-  return { retentionYears, erasureLog, legal, aiAssurance };
+  return { retentionYears, pdfRetentionYears, erasureLog, legal, aiAssurance };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -160,6 +170,30 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
     const res = await api.admin["tenant-config"].$patch({
       json: { agreementRetentionYears: years },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as
+        | string
+        | undefined;
+      return { ok: false, intent, message };
+    }
+    return { ok: true, intent };
+  }
+
+  if (intent === "pdf-retention-save") {
+    const raw = String(form.get("pdfRetentionYears") ?? "");
+    const years = Number(raw);
+    if (
+      raw.trim() === "" ||
+      !Number.isInteger(years) ||
+      years < MIN_PDF_RETENTION_YEARS ||
+      years > MAX_RETENTION_YEARS
+    ) {
+      return { ok: false, intent, message: m.settings_compliance_pdf_range_error() };
+    }
+    const res = await api.admin["tenant-config"].$patch({
+      json: { reportPdfRetentionYears: years },
     });
     if (!res.ok) {
       const err = await res.json().catch(() => null);
@@ -217,7 +251,26 @@ export default function SettingsCompliancePage() {
         {m.settings_compliance_intro()}
       </p>
 
-      <RetentionWindow initialYears={data.retentionYears} />
+      <RetentionWindowSection
+        heading={m.settings_compliance_retention_heading()}
+        description={m.settings_compliance_retention_desc()}
+        note={m.settings_compliance_retention_note()}
+        initialYears={data.retentionYears}
+        min={MIN_RETENTION_YEARS}
+        max={MAX_RETENTION_YEARS}
+        intent="retention-save"
+        field="retentionYears"
+      />
+      <RetentionWindowSection
+        heading={m.settings_compliance_pdf_heading()}
+        description={m.settings_compliance_pdf_desc()}
+        note={m.settings_compliance_pdf_note()}
+        initialYears={data.pdfRetentionYears}
+        min={MIN_PDF_RETENTION_YEARS}
+        max={MAX_RETENTION_YEARS}
+        intent="pdf-retention-save"
+        field="pdfRetentionYears"
+      />
       <LegalDocsPanel initial={data.legal} />
       <ErasureLogView rows={data.erasureLog} />
       <AiAssurancePanel initial={data.aiAssurance} />
@@ -225,83 +278,6 @@ export default function SettingsCompliancePage() {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Retention window                                                  */
-/* ------------------------------------------------------------------ */
-
-function RetentionWindow({ initialYears }: { initialYears: number }) {
-  const { fetcher, submit, busy } = useGuardedSubmit<typeof action>();
-  const [years, setYears] = useState(String(initialYears));
-  const [dirty, setDirty] = useState(false);
-
-  const saving = busy;
-  const saved =
-    fetcher.state === "idle" &&
-    fetcher.data?.intent === "retention-save" &&
-    fetcher.data.ok === true &&
-    !dirty;
-  const failed =
-    fetcher.state === "idle" &&
-    fetcher.data?.intent === "retention-save" &&
-    fetcher.data.ok === false &&
-    !dirty;
-
-  function handleSave() {
-    setDirty(false);
-    submit(
-      { intent: "retention-save", retentionYears: years },
-      { method: "post" },
-    );
-  }
-
-  return (
-    <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-      <div>
-        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
-          {m.settings_compliance_retention_heading()}
-        </h3>
-        <p className="text-[12px] text-ih-fg-3 mt-1">
-          {m.settings_compliance_retention_desc()}
-        </p>
-      </div>
-
-      <div className="flex items-end gap-3 flex-wrap">
-        <label className="block">
-          <span className="block text-[12px] font-bold text-ih-fg-2 mb-1">{m.settings_compliance_years_label()}</span>
-          <input
-            type="number"
-            min={MIN_RETENTION_YEARS}
-            max={MAX_RETENTION_YEARS}
-            step={1}
-            value={years}
-            onChange={(e) => {
-              setYears(e.target.value);
-              setDirty(true);
-            }}
-            className="w-28 px-3 py-1.5 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-          />
-        </label>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
-        >
-          {saving ? m.settings_compliance_saving() : m.common_save()}
-        </button>
-        {saved && <span className="text-[13px] text-ih-ok-fg font-bold">{m.settings_flash_saved_short()}</span>}
-        {failed && (
-          <span className="text-[13px] text-ih-bad-fg font-bold">
-            {fetcher.data?.message ?? m.settings_compliance_save_failed()}
-          </span>
-        )}
-      </div>
-
-      <p className="text-[12px] text-ih-fg-3 leading-relaxed">
-        {m.settings_compliance_retention_note()}
-      </p>
-    </section>
-  );
-}
 /* ------------------------------------------------------------------ */
 /*  Erasure log (read-only accountability record)                     */
 /* ------------------------------------------------------------------ */
