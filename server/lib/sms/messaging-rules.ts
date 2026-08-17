@@ -82,6 +82,14 @@ export interface MessagingRule {
  * is Canada, which is exactly the collision the two-field `Jurisdiction` and
  * this explicit `-` exist to keep visible.
  */
+/**
+ * @gateConsumed `scripts/check-messaging-rules.mjs` reads this table out of the
+ * SOURCE TEXT rather than importing it — the gate is a plain .mjs script and
+ * this is TypeScript. That consumption is invisible to a module-graph analyzer,
+ * so knip reports the symbol as dead. The tag says "a tool consumes this",
+ * which is true; a dead-code baseline entry would have said "this is dead and we
+ * tolerate it", which is not.
+ */
 export const MESSAGING_RULES: Record<string, Partial<Record<NotificationCategory, MessagingRule>>> = {
     'US/CA': {
         transactional: {
@@ -134,6 +142,12 @@ export const MESSAGING_RULES: Record<string, Partial<Record<NotificationCategory
  * hide behind a full-looking table. `identification` and `unsubscribe` are
  * deliberately absent: this function inspects neither the composed body nor the
  * inbound path, and claiming them would be the same lie in the other direction.
+ */
+/**
+ * @gateConsumed read as source text by `scripts/check-messaging-rules.mjs`, the
+ * same as MESSAGING_RULES above — it is how the gate tells which requirements
+ * this module CLAIMS to enforce, so a register entry claiming
+ * `enforced_by: 'send-gate'` for something absent here is refused.
  */
 export const GATE_ENFORCED_REQUIREMENTS: readonly string[] = ['consent_standard', 'quiet_hours'];
 

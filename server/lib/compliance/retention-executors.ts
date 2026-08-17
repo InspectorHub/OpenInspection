@@ -103,7 +103,7 @@ export interface RetentionSweepStores {
  * `report_pdfs` has a per-tenant window, so a single precomputed date cannot
  * express what it needs.
  */
-export interface ExecutorContext {
+interface ExecutorContext {
     now: number;
     stores: RetentionSweepStores;
 }

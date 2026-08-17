@@ -78,7 +78,7 @@ export interface DestructionNotifier {
  * incident, and wording it as one would misinform the reader about both what
  * happened and what they have to do about it (review).
  */
-export function destructionIncompleteBody(destroyedAt: Date, stores: string[]): string {
+function destructionIncompleteBody(destroyedAt: Date, stores: string[]): string {
     const date = destroyedAt.toISOString().slice(0, 10);
     return `Tenant destruction initiated on ${date} did not complete for the following `
         + `stores: ${stores.join(', ')}. The database and cache portions completed. `

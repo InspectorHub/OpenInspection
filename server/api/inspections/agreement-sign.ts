@@ -78,6 +78,11 @@ agreementSignRoutes.post('/:id/sign', async (c) => {
             throw e;
         }
 
+        // By id alone, and provably safe: `env.requestId` is the primary key
+        // `findOrCreate(tenantId, id)` just returned, so the tenant filter was
+        // applied by the call that produced it. The tenant-scoping gate lists
+        // this exact case ("pk from prior scoped fetch") and the baseline entry
+        // moved with the file rather than being granted afresh.
         const envelope = await db.select().from(agreementRequests)
             .where(eq(agreementRequests.id, env.requestId)).get();
         if (!envelope) throw Errors.NotFound('Agreement request not found');

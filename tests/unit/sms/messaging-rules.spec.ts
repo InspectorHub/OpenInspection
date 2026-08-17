@@ -23,10 +23,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
+import { smsSendGate } from '../../../server/lib/sms/send-gate';
+// The rules table has its own module. Importing it from `send-gate` worked only
+// through re-exports that nothing else used, and re-exports are how one symbol
+// gets two homes — the gate that reads this table reads it from where it lives.
 import {
-    smsSendGate, rulesFor, jurisdictionKey,
-    GATE_ENFORCED_REQUIREMENTS, type Jurisdiction,
-} from '../../../server/lib/sms/send-gate';
+    rulesFor, jurisdictionKey, GATE_ENFORCED_REQUIREMENTS, type Jurisdiction,
+} from '../../../server/lib/sms/messaging-rules';
 
 const CALIFORNIA: Jurisdiction = { country: 'US', region: 'CA' };
 const CANADA: Jurisdiction = { country: 'CA', region: null };
