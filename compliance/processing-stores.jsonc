@@ -73,14 +73,15 @@
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
       },
       "lifecycle_owner": "engine",
-      "data_categories": ["inspection_content", "contact", "staff_account", "agreement_evidence"],
+      "data_categories": ["inspection_content", "contact", "staff_account", "agreement_evidence", "message_thread", "media_metadata"],
       "subjects": ["end_client", "agent", "staff", "platform_staff"],
       "purpose": "The system of record for inspections, contacts, agreements and accounts.",
       "retention_rule": "engine:RETENTION_MANIFEST",
       "deletion_mechanism": "tenant-purge.service.ts cascade over tenantScopedTables()",
       "export_mechanism": "subject-data.assembler.ts + data-export.service.ts",
       "tenant_scope": "per-tenant",
-      "evidence_level": "E2"
+      "evidence_level": "E2",
+      "note": "`message_thread` and `media_metadata` were added when counsel rounds CA-10/CA-11 landed, and they name two families this registry could previously not see even though they sit inside a store it had always listed: `inspection_messages` (the counterparty thread, with its attachment metadata) and `inspection_media_pool.exif_data` (photo capture metadata). Neither is a store of its own, so neither gets an entry of its own — the honest unit here is the binding, and inventing rows for tables would inflate every count on this page. What they got instead is a column-level classification with its statutory basis and trip-wire, in STATUTORY_CLASSIFICATIONS in the engine's erasure out-of-scope module, asserted by tests/unit/privacy/classification-basis.spec.ts. Two limits belong on the record here rather than there: neither is reached by consumer erasure (no manifest rule, and the PII heuristic matches neither column name), and the subject export does not assemble messages at all, so `export_mechanism` above is complete for this store only in the sense that the assembler runs — not that it covers every table in it."
     },
 
     // ── Key-value ───────────────────────────────────────────────────────────
@@ -139,7 +140,7 @@
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
       },
       "lifecycle_owner": "engine",
-      "data_categories": ["inspection_media", "agreement_pdf", "report_pdf", "evidence_pack"],
+      "data_categories": ["inspection_media", "agreement_pdf", "report_pdf", "evidence_pack", "message_attachment"],
       "subjects": ["end_client", "staff"],
       "purpose": "Photographs, video, rendered report PDFs, signed agreements and evidence packs.",
       "retention_rule": "engine:RETENTION_MANIFEST",
@@ -147,7 +148,7 @@
       "export_mechanism": "data-export.service.ts",
       "tenant_scope": "per-tenant",
       "evidence_level": "E2",
-      "note": "Both halves are now covered. Destruction: the four-prefix sweep. Retention: report PDFs expire on a per-tenant window (report_pdfs rule; 0 = indefinite is a controller instruction), and the three signed-agreement artefacts — signed.pdf, certificate.pdf, evidence.zip — are destroyed by the agreement sweep in the same pass that nulls the signature column, because nulling the column while the PDF still embeds the image is database retention wearing the name of retention (counsel round 26). What is still UNGOVERNED here is inspection media: photographs and video have no expiry rule of their own and live until the tenant does."
+      "note": "Both halves are now covered. Destruction: the four-prefix sweep. Retention: report PDFs expire on a per-tenant window (report_pdfs rule; 0 = indefinite is a controller instruction), and the three signed-agreement artefacts — signed.pdf, certificate.pdf, evidence.zip — are destroyed by the agreement sweep in the same pass that nulls the signature column, because nulling the column while the PDF still embeds the image is database retention wearing the name of retention (counsel round 26). What is still UNGOVERNED here is inspection media: photographs and video have no expiry rule of their own and live until the tenant does. `message_attachment` was added with the CA-11 classification: attachments referenced by an `inspection_messages` row are objects under `{tenantId}/messages/`, which the bare-tenant-prefix sweep does reach, so the destruction answer here is the same as for photos even though the message table itself has no erasure rule. One asymmetry to keep in view rather than in someone's memory: the strip-on-ingest re-encode that removes camera metadata FAILS OPEN when the images binding is absent (a standalone deploy may have none), so an object here can retain EXIF the `exif_data` column never stored — see the `exif_data` classification, which is recorded as architecture-dependent for exactly this reason."
     },
     {
       "store_type": "r2",
