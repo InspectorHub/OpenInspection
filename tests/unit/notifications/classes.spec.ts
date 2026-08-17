@@ -38,6 +38,11 @@ const NEVER_OFF = [
     // Not §2.0/§2.1 but the same harm: muting it means the workspace hits the
     // free-tier wall with no warning.
     'usage-quota-warning', 'usage-quota-reached',
+    // Muting this would let a workspace opt out of being told that data it
+    // asked us to erase still exists. There is no version of that preference
+    // worth honouring, and the recipient's workspace is gone by the time it
+    // sends, so there is nothing left to hold a preference anyway.
+    'destruction-incomplete',
     // A one-off share to a typed-in address: no account, no relationship, so no
     // preference can exist. See the third `required: true` case in classes.ts.
     'repair-request-share',

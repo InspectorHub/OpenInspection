@@ -141,6 +141,17 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     { id: 'usage-quota-warning',  label: 'Free inspections running out', category: 'operational', required: true, channels: ['email'], audience: ['staff'] },
     { id: 'usage-quota-reached',  label: 'Free inspections used up',     category: 'operational', required: true, channels: ['email'], audience: ['staff'] },
 
+    // A destruction that did not finish, told to the controller.
+    //
+    // `required: true` is not a formality here. This is a message about the
+    // failure to complete an erasure the recipient asked for, sent under round
+    // 22 without undue delay after the failure is known; a preference that
+    // could switch it off would let a workspace opt out of being told its own
+    // data still exists. It is also the one class whose recipient's workspace
+    // no longer exists by the time it sends — which is why the address is
+    // resolved before the cascade rather than at the boundary.
+    { id: 'destruction-incomplete', label: 'Workspace deletion did not finish', category: 'operational', required: true, channels: ['email'], audience: ['staff'] },
+
     // ─── not a notification to anyone but the sender
     // An admin sending their own message template to their own address to see
     // what it looks like. Classified so the boundary is never handed a send it

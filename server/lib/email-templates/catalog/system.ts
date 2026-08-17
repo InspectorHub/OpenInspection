@@ -92,4 +92,35 @@ export const SYSTEM_TEMPLATES: EmailTemplateDescriptor[] = [
     ],
     cta: { labelBlockKey: 'ctaLabel', urlVar: 'billingPortalUrl' },
   },
+
+  // A workspace deletion that did not finish.
+  //
+  // `editable: false` for a stronger reason than the quota notices: this is a
+  // compliance statement made under round 22, and a tenant able to rewrite it
+  // could soften or contradict the fact being reported. `brand: 'platform'`
+  // because by the time it sends the workspace's own branding has been
+  // destroyed along with everything else.
+  //
+  // No CTA. There is nothing for the recipient to click — the remediation is
+  // ours — and a button would imply an action they can take.
+  //
+  // The wording is mechanical. A deletion that did not finish is not a security
+  // incident, and a template that read like one would misinform the recipient
+  // about what happened and what it asks of them.
+  {
+    trigger: 'destruction-incomplete',
+    name: 'Workspace deletion did not finish',
+    category: 'system',
+    editable: false,
+    required: true,
+    brand: 'platform',
+    defaultSubject: 'Workspace deletion did not complete',
+    blocks: [
+      { key: 'heading', label: 'Heading', default: 'Workspace deletion did not complete', multiline: false },
+      { key: 'body',    label: 'Body',    default: '{{noticeBody}}',                      multiline: true  },
+    ],
+    variables: [
+      { name: 'noticeBody', desc: 'The statement of which stores did not complete, built by the purge' },
+    ],
+  },
 ];
