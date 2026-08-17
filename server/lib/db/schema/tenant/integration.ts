@@ -89,6 +89,26 @@ export const tenantDestructionRecords = sqliteTable('tenant_destruction_records'
     // Null while 'started'. The gap between this and `destroyed_at` is how long
     // the purge took; its absence is how you find one that never finished.
     completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+    // ── Measurement universe (appended at table end for D1 rebuild safety) ──
+    //
+    // `status` answers "did the purge finish?". Nothing here answered "finish
+    // WHAT?" — and a certification that cites a record without knowing its
+    // scope claims more than the record supports. A row written before
+    // non-database stores were reachable is generation 1, is never rewritten,
+    // and legitimately fails today's scope check: it did not fail, it measured
+    // less. See `lib/compliance/destruction-scope.ts`.
+    recordVersion: integer('record_version').notNull().default(1),
+    /** JSON array of the stores this destruction attempted. Null on generation 1. */
+    storesMeasured: text('stores_measured', { mode: 'json' }).$type<string[]>(),
+    /**
+     * JSON object of per-store outcome — `{"durable_objects":"incomplete"}`.
+     *
+     * This is where a store that refused to purge is recorded, rather than in
+     * `status`. That axis has two values on purpose (see the comment above it),
+     * and a run that finished with one unverified measurement is not the same
+     * fact as a run that never finished.
+     */
+    storeResults: text('store_results', { mode: 'json' }).$type<Record<string, string>>(),
 }, (t) => [
     index('idx_destruction_tenant').on(t.tenantId),
     index('idx_destruction_destroyed_at').on(t.destroyedAt),

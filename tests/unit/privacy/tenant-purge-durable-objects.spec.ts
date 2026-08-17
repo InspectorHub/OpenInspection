@@ -25,6 +25,9 @@ import { TenantPurgeService } from '../../../server/services/tenant-purge.servic
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import {
+    DESTRUCTION_RECORD_GENERATION, STORES_MEASURED, isCertifiableAtCurrentScope,
+} from '../../../server/lib/compliance/destruction-scope';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
@@ -159,12 +162,47 @@ describe('TenantPurgeService — Durable Objects', () => {
         expect(out.durableObjects).toBe(0);
     });
 
-    // NOTE — the gap this task leaves open, on purpose and for one commit.
-    // `incompleteStores` currently exists only in the return value, which one
-    // caller reads and then drops. What an SCC Clause 8.5 certification is read
-    // off years later is the `tenant_destruction_records` row, and that row has
-    // nowhere to put this yet. The column, and the assertion that the row
-    // carries it, land in the next task.
+    it('records the outcome on the ROW, not only in the return value', async () => {
+        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+            INSPECTION_DOC: stubNamespace(() => {}, false),
+            TENANT_PRESENCE: stubNamespace(() => {}),
+        });
+        await svc.purge(TENANT);
+
+        const rec = await testDb.select().from(schema.tenantDestructionRecords).get();
+        // A return value is read by one caller and then gone. The row is what an
+        // SCC Clause 8.5 certification is read off years later.
+        expect(rec?.recordVersion).toBe(DESTRUCTION_RECORD_GENERATION);
+        expect(rec?.storesMeasured).toEqual([...STORES_MEASURED]);
+        expect(rec?.storeResults?.['durable_objects']).toBe('incomplete');
+        expect(rec?.storeResults?.['database']).toBe('complete');
+        // The run DID finish, so the status axis still says so. The unverified
+        // measurement lives in store_results, and certifiability is the question
+        // that reads both.
+        expect(rec?.status).toBe('completed');
+        expect(isCertifiableAtCurrentScope({
+            recordVersion: rec!.recordVersion,
+            status: rec!.status,
+            storesMeasured: rec!.storesMeasured,
+            storeResults: rec!.storeResults,
+        })).toBe(false);
+    });
+
+    it('a fully successful purge writes a certifiable record', async () => {
+        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+            INSPECTION_DOC: stubNamespace(() => {}),
+            TENANT_PRESENCE: stubNamespace(() => {}),
+        });
+        await svc.purge(TENANT);
+
+        const rec = await testDb.select().from(schema.tenantDestructionRecords).get();
+        expect(isCertifiableAtCurrentScope({
+            recordVersion: rec!.recordVersion,
+            status: rec!.status,
+            storesMeasured: rec!.storesMeasured,
+            storeResults: rec!.storeResults,
+        })).toBe(true);
+    });
 
     it('an unbound namespace is skipped without inventing a failure', async () => {
         // A deployment that never enabled collaborative editing has no

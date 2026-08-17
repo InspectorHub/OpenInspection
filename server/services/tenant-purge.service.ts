@@ -4,6 +4,7 @@ import { logger } from '../lib/logger';
 import { tenants, tenantDestructionRecords, users, reports } from '../lib/db/schema';
 import { collabDocName } from '../lib/collab/doc-name';
 import { DESTRUCTION_STATUS } from '../lib/status/destruction-status';
+import { DESTRUCTION_RECORD_GENERATION, STORES_MEASURED } from '../lib/compliance/destruction-scope';
 // The tenant-scoped table set is DERIVED from the schema (every table with a
 // `tenant_id` column, minus the destruction-record ledger) so the purge can
 // never silently drift as tables are added. The former hand-maintained list
@@ -116,6 +117,13 @@ export class TenantPurgeService {
             tenantSlug,
             destroyedAt: new Date(),
             status:      DESTRUCTION_STATUS.STARTED,
+            //    The measurement universe is declared UP FRONT, with the same
+            //    reasoning as the row itself: a purge that dies partway leaves
+            //    behind what it set out to measure, so the gap between the
+            //    declared scope and the results is readable. Declared at the
+            //    end it would only ever describe runs that finished.
+            recordVersion:  DESTRUCTION_RECORD_GENERATION,
+            storesMeasured: [...STORES_MEASURED],
         });
 
         // 3. Delete tenant rows in dependency-safe order. Every table is scoped by
@@ -231,12 +239,22 @@ export class TenantPurgeService {
         //    purge understates what happened, which is the safe direction — it
         //    asks a human to look, rather than certifying something false.
         try {
+            //    Per-store outcome. `status` stays a two-value axis about
+            //    whether the run finished — a store that refused to purge is a
+            //    finished run with one unverified measurement, which is a
+            //    different fact and belongs in its own column. The three stores
+            //    with no failure path of their own report complete because
+            //    their sweeps ran; `durable_objects` reports what it observed.
+            const storeResults: Record<string, string> = Object.fromEntries(
+                STORES_MEASURED.map(s => [s, incompleteStores.includes(s) ? 'incomplete' : 'complete']),
+            );
             await d.update(tenantDestructionRecords)
                 .set({
                     rowsDeleted: rows,
                     r2Objects:   r2Count,
                     r2Bytes,
                     kvKeys:      kvCount,
+                    storeResults,
                     status:      DESTRUCTION_STATUS.COMPLETED,
                     completedAt: new Date(),
                 })
