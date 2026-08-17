@@ -29,6 +29,7 @@
  * failing.
  */
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
@@ -137,6 +138,15 @@ describe('OI #271 — report view confirmation', () => {
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
+        // Counting is OFF by default now (counsel B4 — a legitimate interest may
+        // not be a mask for processing its supposed beneficiary cannot decline),
+        // so every case below has to enable it or it would be asserting that the
+        // counter works while the switch was refusing every request. That is not
+        // fixture noise: it is the tenant decision the whole feature now rests on,
+        // and a suite that omitted it would be green about a counter it never ran.
+        await testDb.insert(schema.tenantConfigs).values({
+            tenantId: TENANT, reportViewCountingEnabled: true, updatedAt: new Date(),
+        });
         await seedRoleProfiles(asD1Db(testDb), TENANT);
         await testDb.insert(schema.inspections).values({
             id: INSP, tenantId: TENANT, propertyAddress: '1 Main St', date: '2026-06-01',
@@ -180,6 +190,37 @@ describe('OI #271 — report view confirmation', () => {
         const row = await counters();
         expect(row.viewCount).toBe(1);
         expect(row.firstViewedAt).not.toBeNull();
+    });
+
+    it('records NOTHING for a tenant that has not enabled counting, through the real route', async () => {
+        // The pure-function test covers the predicate. This one covers the WIRE:
+        // that the route actually reads the tenant's decision and hands it to
+        // `shouldCountReportView`. A switch nothing passes to the check is a
+        // switch that does not exist, and this repository has six recorded cases
+        // of exactly that.
+        await testDb.update(schema.tenantConfigs)
+            .set({ reportViewCountingEnabled: false })
+            .where(eq(schema.tenantConfigs.tenantId, TENANT));
+
+        const token = await issue();
+        const res = await buildApp().request(reportUrl(token));
+
+        // The report is still READABLE. Not counting is not gating.
+        expect(res.status).toBe(200);
+        expect((await counters()).viewCount).toBe(0);
+    });
+
+    it('records nothing when the tenant has no config row at all', async () => {
+        // Absence must read as OFF, matching the column default. A workspace that
+        // has never opened the settings page has not opted in — and reading a
+        // missing row as enabled would make the default the opposite of the one
+        // the assessment is written around.
+        await testDb.delete(schema.tenantConfigs)
+            .where(eq(schema.tenantConfigs.tenantId, TENANT));
+
+        const token = await issue();
+        expect((await buildApp().request(reportUrl(token))).status).toBe(200);
+        expect((await counters()).viewCount).toBe(0);
     });
 
     it('keeps first_viewed_at at the FIRST view and increments the count', async () => {
