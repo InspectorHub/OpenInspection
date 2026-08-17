@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { purgePathMatches } from './purge-path';
 
 /**
  * Design System 0520 subsystem B phase 2 task 2.4 — TenantPresenceDO.
@@ -84,6 +85,17 @@ export class TenantPresenceDO extends DurableObject {
             await this.ctx.storage.put('state', state);
             await this.broadcastRoster();
             return new Response('ok');
+        }
+
+        // Destruction. Called by TenantPurgeService once the tenant's rows are
+        // gone: this object is addressed by idFromName(tenantId), so a purge can
+        // reach it by name without enumerating anything. `deleteAll` empties the
+        // object's storage; any live socket then reads a missing `state` and
+        // rebuilds an empty one, which is the correct end state for a workspace
+        // that no longer exists.
+        if (purgePathMatches(url.pathname) && req.method === 'POST') {
+            await this.ctx.storage.deleteAll();
+            return Response.json({ purged: true });
         }
 
         return new Response('not found', { status: 404 });

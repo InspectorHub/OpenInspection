@@ -13,6 +13,7 @@
 // runInDurableObject() only works with DOs defined in the `main` worker.
 export { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
 export { InspectionPresenceDO } from '../../server/durable-objects/inspection-presence';
+export { TenantPresenceDO } from '../../server/durable-objects/tenant-presence';
 
 interface TestEnv {
     DB: D1Database;

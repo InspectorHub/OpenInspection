@@ -59,6 +59,10 @@ export default defineConfig({
                     INSPECTION_DOC: 'InspectionDocDO',
                     // Presence DO (WebSocket roster broadcast) — presence-do.spec.ts.
                     INSPECTION_PRESENCE: 'InspectionPresenceDO',
+                    // Per-tenant presence — the second of the two objects that
+                    // hold storage, and so the second the tenant purge must be
+                    // able to empty (do-purge.spec.ts).
+                    TENANT_PRESENCE: 'TenantPresenceDO',
                 },
             },
         }),
