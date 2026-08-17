@@ -1,8 +1,8 @@
 # Agent Terms
 
 <!--
-COUNSEL-READY v1 — reviewed once (round 29, 2026-08-17). NOT APPROVED FOR
-PUBLICATION.
+COUNSEL-READY v2 — round 29 landed, nine decision points resolved. NOT APPROVED
+FOR PUBLICATION.
 
 Round 29 verdict: keep the skeleton, do not publish. Draft quality 7/10, contract
 architecture 8.5/10, blocking §1 · §7 · §11 · §14 (numbered against the previous
@@ -11,11 +11,20 @@ text and restructures to the 18 sections counsel set out. The archived ruling is
 `docs/legal/2026-08-17-counsel-round-29-response.md` in the superproject and it,
 not this file, is the binding text.
 
-Still not publishable, for one reason that is not a drafting problem: §17 needs
-the operating entity's jurisdiction, and counsel explicitly declined to pick one
-in the abstract. Every remaining `{{PLACEHOLDER}}` is a decision, not a gap in the
-text — and `npm run agent-terms:publish` refuses any body still containing one, so
-this cannot reach production by accident.
+v2 resolves nine of the ten decision points v1 left open, each against researched
+practice rather than preference — see the review request for round 30.
+
+Still not publishable, and now for ONE reason rather than ten: §17 needs the
+operating entity's jurisdiction, and there is no entity. The operator is an
+individual with no company, so no US state's law can be named honestly, and a
+governing-law clause that cannot hold is worse than none — it fails exactly when
+it is needed and shows we wrote it knowing. That is not a drafting problem and no
+amount of drafting fixes it.
+
+Agent signup stays closed until it resolves, which costs nothing: the refusal is
+already the shipped behaviour and it is what round 24c asked for. Every remaining
+`{{PLACEHOLDER}}` is that same decision wearing a different name, and
+`npm run agent-terms:publish` refuses any body still carrying one.
 
 Written to be reviewed against BEHAVIOUR. Factual clauses carry the code they were
 read off, so a reviewer can check the claim rather than take it. Where a clause and
@@ -26,11 +35,12 @@ This is the OPERATOR's document. OpenInspection is deployed by whoever runs it, 
 the operator's name, contact and law are per-deployment and must never be hardcoded
 to one company.
 
-The counsel decision points are at the end. They are decisions, not questions:
-each one names what has to be chosen and what changes depending on the answer.
+The decision points at the end are now DOWN TO ONE, plus two the operator must
+confirm rather than decide. What was resolved, and on what basis, is in the round
+30 review request rather than repeated here.
 -->
 
-**Status:** counsel-ready draft — not published
+**Status:** counsel-ready draft (v2) — not published
 **Applies to:** anyone who creates or uses an Agent account on
 {{OPERATOR_NAME}}'s OpenInspection deployment
 
@@ -151,6 +161,10 @@ transaction for which you were granted access, and only to persons who are
 authorized participants in that transaction or are otherwise entitled to receive
 it.**
 
+By way of example and not limitation, those people ordinarily include your own
+client in that transaction, their lender, their attorney, a contractor quoting
+the repairs identified in the Report, and your own transaction file.
+
 You may not:
 
 - post a Report, or any part of it, publicly;
@@ -164,7 +178,11 @@ You may not:
 **You may not use Report contents, or personal information obtained through the
 Service, to train, fine-tune, evaluate, benchmark, or operate any machine-learning
 or artificial-intelligence system, except with the express written authorization of
-the party entitled to authorize that use.**
+BOTH the Inspection Company that produced the Report and the client it was
+produced for.**
+
+Both, because neither alone can give it: the Report is the company's work product,
+and it is about the client's property and their transaction.
 
 ## 8. Messages and email
 
@@ -241,6 +259,17 @@ agent-mode OIDC path.)*
 Keep your email account secure: whoever controls your email address can obtain a
 sign-in code. Tell us promptly if you believe someone else has used your account.
 
+## 11a. Electronic communications
+
+You agree to receive communications from us electronically — including these
+Terms, changes to them, and notices about your account — and you agree that
+electronic records and signatures satisfy any requirement that such
+communications be in writing.
+
+You accepted these Terms electronically, and that acceptance is recorded with the
+version and content hash of the text you were shown (§16), which is what allows it
+to be produced later.
+
 ## 12. Availability
 
 The Service is provided as-is and as-available. We do not promise uptime, and we
@@ -267,7 +296,7 @@ or lost data, arising from your use of an Agent account or from anything in a
 Report.
 
 **Our total aggregate liability arising out of or relating to these Terms will not
-exceed the greater of (a) {{LIABILITY_FLOOR}} or (b) the amounts you paid us in the
+exceed the greater of (a) US$50 or (b) the amounts you paid us in the
 twelve months before the event giving rise to the claim.**
 
 These limits do **not** apply to liability for fraud, for willful misconduct, or to
@@ -328,69 +357,36 @@ deleted.
 {{OPERATOR_CONTACT_EMAIL}}
 
 <!--
-## Counsel decision points
+## Counsel decision points — what is left
 
-Ten decisions. Each says what must be chosen and what changes with the answer.
-Everything counsel already ruled on in round 29 is in the text above and is NOT
-repeated here.
+v1 listed ten. Nine are resolved in the text above; the reasoning and the
+competitor data behind each is in the round 30 review request. What remains:
 
-1. **§17 — the operating entity, then the dispute shape.** (Blocks publication.)
-   Governing law, and then venue-vs-arbitration. If arbitration: seat, rules, fee
-   allocation, carve-outs, and whether a class-action waiver is used. Counsel
-   declined to pick a state in the abstract, so this is upstream of drafting —
-   nothing else in the document is blocked by it, and nothing else can substitute
-   for it.
+**BLOCKING — 1. §17, the operating entity.** There is no entity: the operator is
+an individual, and the billing path under consideration is a merchant-of-record
+(Paddle), which makes a third party the seller of record to the customer while
+these Terms still govern the service relationship. Counsel declined to pick a
+state in the abstract; we now know one cannot be picked at all. The question for
+counsel is therefore no longer "which law" but: **can an Agent Terms be published
+at all by an operator with no entity, or must agent signup stay closed until one
+exists?** — and if it can, what §17 should say. Nothing else in this document is
+blocked by it.
 
-2. **§14 — the cap floor.** Counsel proposed *"greater of $100 or amounts paid in
-   the preceding 12 months"*, on the reasoning that an Agent pays nothing so a
-   paid-amount-only cap is $0. Confirm $100 (`{{LIABILITY_FLOOR}}`), or set another
-   figure. A per-deployment placeholder is deliberate — a self-host operator's
-   exposure is not ours — but confirm a floor is appropriate at all rather than a
-   fixed sum.
+**CONFIRM — 2. §14, the US$50 floor.** Chosen, not inherited. Counsel proposed
+$100; the closest competitor (Spectora) caps at $10 flat, Dropbox uses a $20
+floor and Google $200. An Agent pays nothing, so the floor IS the entire exposure
+— the fee limb is always zero. $50 sits above the level a court might treat as
+illusory and below counsel's more conservative figure. Confirm or move it.
 
-3. **§14 — is the narrow indemnity the right trigger?** Drafted as intentional or
-   unlawful misuse only, listing the three concrete cases. Confirm the trigger is
-   *intent/unlawfulness* and not *breach*, and whether it should also cover a claim
-   that the Agent lacked the authority represented in §1.
-
-4. **§8 — does the allocation actually hold?** We control the sending domain,
-   generate part of the message, and process unsubscribes. Counsel warned that a
-   contract cannot decide who the sender is in law. Confirm the split as drafted is
-   the final position, **or** tell us this requires a product change —
-   recipient-side consent capture before an Agent can email a third party — in
-   which case §8 is provisional and the feature needs work before publication.
-
-5. **§7 — who is "the party entitled to authorize" an AI use?** The Inspection
-   Company, its client, or both together? A prohibition whose exception nobody can
-   identify is unenforceable in practice, and the answer decides whether we need a
-   product surface to record such an authorization.
-
-6. **§7 — is the authorized-participant test workable without a list?** It replaces
-   an over-restrictive absolute, but it puts the judgement on the Agent. Confirm
-   whether an illustrative (non-exhaustive) list — own client, lender, attorney,
-   contractor quoting the repairs, transaction file — should appear in the text.
-
-7. **§10 — does the jurisdiction-neutral wording survive contact with the role
-   map?** Drafted to say who *determines* what and to point at the Privacy Notice,
-   per round 27. Confirm it does not re-create a global controller/processor
-   conclusion, and identify which Privacy Notice is authoritative for a self-host
-   operator who has published their own.
-
-8. **§2 — how far does `Agent` reach?** Defined as a real-estate professional or
-   other authorized transaction participant. If the product later admits buyers,
-   sellers, lenders, attorneys, contractors or insurance agents to the same account
-   type, does this document cover them, or does that trigger a new document?
-   Counsel warned against letting the catch-all grow silently.
-
-9. **Capacity, and electronic acceptance.** Two P2s that still need a yes/no
-   because they touch the signup form: (a) is a capacity/age representation
-   required at signup, and (b) does electronic acceptance need an explicit
-   consent-to-electronic-communications clause in this document, given the
-   acceptance itself is electronic and the US ESIGN/UETA posture is reviewed
-   elsewhere in the corpus?
-
-10. **Publication mechanics.** Confirm that a **non-material** first publication is
-    correct — nobody has accepted a prior version, so there is nothing to force a
-    re-acceptance of — and that the version string should be the date of counsel
-    approval rather than the date of deployment.
+**CONFIRM — 3. §8, whether the allocation survives the facts.** The message has
+THREE content sources, and only one is ours: our operational shell (subject
+`Repair request — <address>`, one sentence and a link, no promotional content and
+no unsubscribe), a free-text message the Agent supplies, and a template the
+Inspection Company may override wholesale. Given 15 U.S.C. §7702(2) and (16), the
+stronger argument is that this is not a commercial electronic mail message at all,
+rather than that it falls within the §7702(17) transactional exemption — whose
+first limb requires a transaction the recipient "previously agreed to enter into
+with the sender", which a cold contractor has not. Those are different arguments
+and only the first holds. Confirm the section as drafted, or tell us this needs a
+product change (recipient-side consent capture) rather than wording.
 -->
