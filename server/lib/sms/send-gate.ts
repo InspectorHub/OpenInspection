@@ -53,8 +53,6 @@ import { isPreferenceMuted } from '../notifications/preference-port';
 import { categoryOf } from '../notifications/classes';
 import { marketingVarsIn } from './marketing-content';
 import { rulesFor, jurisdictionKey, type Jurisdiction, type MessagingRule } from './messaging-rules';
-export { rulesFor, jurisdictionKey, MESSAGING_RULES, GATE_ENFORCED_REQUIREMENTS } from './messaging-rules';
-export type { Jurisdiction, MessagingRule } from './messaging-rules';
 
 export interface SmsGateArgs {
     // Callers pass tenant-scoped drizzle handles with different schema maps;

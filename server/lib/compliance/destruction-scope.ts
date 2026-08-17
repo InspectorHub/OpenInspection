@@ -21,6 +21,8 @@
  * two things again, which is the exact conflation this module exists to end.
  */
 
+import { DESTRUCTION_STATUS } from '../status/destruction-status';
+
 /**
  * Bumped whenever the set of stores a purge REACHES changes.
  *
@@ -58,7 +60,7 @@ export function isCertifiableAtCurrentScope(r: DestructionScopeView): boolean {
     // judge it — and silently accepting it would let an older certification
     // vouch for a scope it has never heard of.
     if (r.recordVersion !== DESTRUCTION_RECORD_GENERATION) return false;
-    if (r.status !== 'completed') return false;
+    if (r.status !== DESTRUCTION_STATUS.COMPLETED) return false;
 
     const measured = r.storesMeasured ?? [];
     if (!STORES_MEASURED.every((s) => measured.includes(s))) return false;
