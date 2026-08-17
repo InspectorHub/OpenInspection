@@ -1,0 +1,571 @@
+// Processing-store registry — every store this worker can reach.
+//
+// It exists because both repositories' compliance gates read exactly one
+// filesystem input, the Drizzle table directory, so everything they could see
+// was a database column by construction. A store missing from here is
+// invisible to compliance, which is how report PDFs came to have no expiry
+// rule and Durable Objects no deletion path.
+//
+// FOUR RULES.
+//
+// 1. `retention_rule` is a POINTER, never a copy. Windows live in
+//    `server/lib/compliance/retention-manifest.ts`; an entry names the rule
+//    and the gate resolves it. A restated window is a second source of truth
+//    for one fact, and the two will disagree.
+// 2. `role` is a jurisdiction MAP whose coordinates are OBJECTS carrying their
+//    basis, never bare strings — a bare string asserts a legal classification
+//    our own contract is not entitled to make. An undetermined coordinate is
+//    `legal_role: "unclassified"` with a null basis: never omitted, never
+//    guessed. The gate counts unclassified coordinates beside the total so a
+//    registry full of unknowns can never read as classified.
+// 3. The two California "business" determinations are ENTITY facts, not store
+//    facts, so they live once at the top of this file rather than repeated on
+//    every entry. §1798.140(d) (threshold: $26,625,000 / 100k consumers /
+//    50% of revenue) decides whether the service-provider framework engages;
+//    §1798.80(a) ("whether or not organized for profit", no threshold) is what
+//    §1798.81.5's security duty and §1798.82(b)'s maintainer duty attach to.
+//    One flag would answer both with one bit, and they disagree. The per-store
+//    `role.US_CA` coordinate is a different question again — what WE are with
+//    respect to that store's data — and takes the vocabulary in the framework
+//    document's §3.
+// 4. `evidence_level` describes the evidence for THIS ENTRY'S CLAIMS about
+//    deletion and export, not confidence in the description. Every entry ships
+//    at E2 (source-verified) because that is what reading the code buys. E3
+//    (production-verified) requires a recorded production observation, and no
+//    store has one — the absence is written down rather than rounded up.
+//    Ladder: E0 proposal · E1 implemented · E2 source-verified ·
+//    E3 production-verified · E4 observed user state.
+//
+// Verified against both wrangler configs and the source on 2026-08-17.
+{
+  // ── Entity-level facts (rule 3) ───────────────────────────────────────────
+  // Both undetermined. Neither can be answered from this repository: the first
+  // needs revenue and consumer-volume figures, the second needs the operating
+  // entity's legal form. They are written as open questions because the
+  // alternative — omitting them — reads as "not applicable".
+  "california_business_determinations": {
+    "CCPA_business_1798_140": {
+      "determination": "undetermined",
+      "basis": null,
+      "determined_at": null,
+      "source": null,
+      "question": "Does the operating entity exceed $26,625,000 annual revenue (CPI-adjusted, effective 2025-01-01), buy/sell/share the personal information of 100,000+ California consumers or households, or derive 50% or more of annual revenue from selling or sharing personal information? Any one suffices."
+    },
+    "customer_records_business_1798_80": {
+      "determination": "undetermined",
+      "basis": null,
+      "determined_at": null,
+      "source": null,
+      "question": "Is the operating entity a sole proprietorship, partnership, corporation, association or other group, whether or not organized for profit? There is no threshold, so this is expected to resolve to yes once the entity's form is stated — and it is what §1798.81.5's reasonable-security duty and §1798.82(b)'s maintainer duty attach to, independently of the answer above."
+    }
+  },
+
+  "stores": [
+    // ── Databases ───────────────────────────────────────────────────────────
+    {
+      "store_type": "d1",
+      "binding": "DB",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — the tenant determines purposes and means for end-client data", "determined_at": "2026-08-15", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "engine",
+      "data_categories": ["inspection_content", "contact", "staff_account", "agreement_evidence"],
+      "subjects": ["end_client", "agent", "staff", "platform_staff"],
+      "purpose": "The system of record for inspections, contacts, agreements and accounts.",
+      "retention_rule": "engine:RETENTION_MANIFEST",
+      "deletion_mechanism": "tenant-purge.service.ts cascade over tenantScopedTables()",
+      "export_mechanism": "subject-data.assembler.ts + data-export.service.ts",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2"
+    },
+
+    // ── Key-value ───────────────────────────────────────────────────────────
+    {
+      "store_type": "kv",
+      "binding": "TENANT_CACHE",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — a cache of the tenant's own configuration, held on their instruction", "determined_at": "2026-08-15", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "engine",
+      "data_categories": ["tenant_config", "integration_secrets", "session_invalidation"],
+      "subjects": ["staff"],
+      "purpose": "Tenant configuration and decrypted-secret cache (`tenant:{slug}`, `secrets_enc`), plus the password-change stamps (`pwchanged:{userId}`) that invalidate JWTs issued before a credential change, and the agent view tokens.",
+      "retention_rule": "none",
+      "deletion_mechanism": "partial",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "mixed",
+      "evidence_level": "E2",
+      "note": "MIXED SCOPE is the gap. `tenant:{slug}` is tenant-prefixed and can be swept; `pwchanged:{userId}` and `agent_view_token:{token}` are keyed by an id that carries no tenant, so a tenant purge cannot enumerate them by prefix. `agent_view_token` is closed by B1b; `pwchanged` is a bounded non-personal stamp (a user id and a timestamp) whose only reader is the auth middleware."
+    },
+    {
+      "store_type": "kv",
+      "binding": "OAUTH_KV",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — OAuth state for integrations the tenant chose to connect", "determined_at": "2026-08-15", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "engine",
+      "data_categories": ["oauth_state", "mcp_grant"],
+      "subjects": ["staff"],
+      "purpose": "Two unrelated tenants share this namespace because the binding name is fixed by @cloudflare/workers-oauth-provider: the calendar connect flow's `cal-oauth:{state}` handshake rows, and the remote-MCP OAuth provider's own grant and token records.",
+      "retention_rule": "provider-managed",
+      "deletion_mechanism": "ttl",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "mixed",
+      "evidence_level": "E2",
+      "note": "Both writers set a TTL, so nothing here outlives its handshake or grant; what neither has is a tenant-prefixed key, so neither is reachable by a tenant purge. Accepted for the calendar state (a random nonce with a short TTL); the MCP grant records are the library's own shape and are not ours to re-key."
+    },
+
+    // ── Object storage ──────────────────────────────────────────────────────
+    {
+      "store_type": "r2",
+      "binding": "PHOTOS",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — the tenant determines purposes and means for inspection media and deliverables", "determined_at": "2026-08-15", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "engine",
+      "data_categories": ["inspection_media", "agreement_pdf", "report_pdf", "evidence_pack"],
+      "subjects": ["end_client", "staff"],
+      "purpose": "Photographs, video, rendered report PDFs, signed agreements and evidence packs.",
+      "retention_rule": "none",
+      "deletion_mechanism": "tenant-purge.service.ts four-prefix sweep",
+      "export_mechanism": "data-export.service.ts",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2",
+      "note": "Destruction is covered; RETENTION is not — no object expires while the tenant lives. Closed by B1a and R26-4."
+    },
+    {
+      "store_type": "r2",
+      "binding": "EXPORTS_BUCKET",
+      "modes": ["saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — an export assembled on the tenant's or their data subject's instruction", "determined_at": "2026-08-15", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "engine",
+      "data_categories": ["subject_data_export", "tenant_offboarding_archive"],
+      "subjects": ["end_client", "agent", "staff"],
+      "purpose": "Where a completed data export or offboarding archive is written for portal to hand to the requester. A single object here can hold everything the other stores hold about one person.",
+      "retention_rule": "none",
+      "deletion_mechanism": "none",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2",
+      "note": "The highest-concentration store in the registry and the one with no clock: an export bundles a subject's whole record into one object and nothing expires it. Absent from standalone entirely — the offboarding command path is SaaS-only."
+    },
+
+    // ── Durable Objects ─────────────────────────────────────────────────────
+    {
+      "store_type": "durable_object",
+      "binding": "INSPECTION_DOC",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — the tenant determines purposes and means for the report content edited here", "determined_at": "2026-08-15", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "engine",
+      "data_categories": ["inspection_content", "inspector_prose", "photo_keys"],
+      "subjects": ["end_client", "staff"],
+      "purpose": "Collaborative editing host: one Yjs document per report, plus up to 25 projection snapshots.",
+      "retention_rule": "none",
+      "deletion_mechanism": "none",
+      "export_mechanism": "none",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2",
+      "note": "Addressed by `${tenantId}:${reportId}` — see collabDocName — so it is the one presence/collab store a tenant purge could enumerate if it had a verb to call. Closed by B1c."
+    },
+    {
+      "store_type": "durable_object",
+      "binding": "TENANT_PRESENCE",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — presence is generated on the tenant's instruction while their staff work", "determined_at": "2026-08-15", "source": "contract + review" },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "engine",
+      "data_categories": ["presence_only", "staff_identity"],
+      "subjects": ["staff"],
+      "purpose": "Which of a workspace's staff are online and what each is looking at, aggregated per tenant.",
+      "retention_rule": "none",
+      "deletion_mechanism": "none",
+      "export_mechanism": "none",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2",
+      "note": "Persists a `state` key on every mutation (seven ctx.storage.put sites), so unlike its per-inspection sibling this one has an explicit object at rest. Addressed by idFromName(tenantId), so it IS enumerable by a tenant purge. Closed by B1c."
+    },
+    {
+      "store_type": "durable_object",
+      "binding": "INSPECTION_PRESENCE",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — presence is generated on the tenant's instruction while their staff work", "determined_at": "2026-08-15", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "engine",
+      "data_categories": ["presence_only", "staff_identity"],
+      "subjects": ["staff"],
+      "purpose": "Who is currently viewing one inspection, and which item each has focused.",
+      "retention_rule": "connection-bounded",
+      "deletion_mechanism": "none",
+      "export_mechanism": "none",
+      "tenant_scope": "not-tenant-scoped",
+      "evidence_level": "E2",
+      "note": "CORRECTED against the source. This class makes no ctx.storage call, but that does not make it stateless: it is a new_sqlite_classes Durable Object and its roster lives in WebSocket hibernation ATTACHMENTS (serializeAttachment), which the runtime persists so the object can sleep — the class comment says so itself. Each attachment carries userId, name and photoUrl. Two mitigations and one residual: the 90-second heartbeat sweep drops dead connections and an attachment cannot outlive its socket, so nothing accumulates; the residual is that it is addressed by idFromName(inspectionId) with NO tenant component, so a tenant purge has no way to enumerate these objects even once B1c gives them a purge verb."
+    },
+    {
+      "store_type": "durable_object",
+      "binding": "INSPECTOR_MCP",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — an MCP session acts on the tenant's own data at their instruction", "determined_at": "2026-08-15", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "vendor-library",
+      "data_categories": ["mcp_session", "staff_identity"],
+      "subjects": ["staff"],
+      "purpose": "Remote MCP server session host — one object per authenticated MCP connection, carrying the caller's props (tenant and user identity).",
+      "retention_rule": "unknown",
+      "deletion_mechanism": "none",
+      "export_mechanism": "none",
+      "tenant_scope": "unknown",
+      "evidence_level": "E2",
+      "note": "The only entry whose lifecycle_owner is not us. Our subclass makes no ctx.storage call, but it extends McpAgent from the `agents` library and is declared new_sqlite_classes, so whatever that base class persists is at rest under our account and we did not write it. What it stores and how it is addressed are both UNKNOWN rather than none — reading the vendor's storage shape is the work that would let this entry make a claim."
+    },
+
+    // ── Queues ──────────────────────────────────────────────────────────────
+    {
+      "store_type": "queue",
+      "binding": "WORD_EXPORT_QUEUE",
+      "queues": ["openinspection-word-export", "openinspection-word-export-saas"],
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — an export job the tenant's staff started", "determined_at": "2026-08-15", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "platform",
+      "data_categories": ["job_reference"],
+      "subjects": ["staff"],
+      "purpose": "Asynchronous .docx report export jobs.",
+      "retention_rule": "queue-managed",
+      "deletion_mechanism": "not-applicable",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2",
+      "note": "The message body is identifiers only — exportId, tenantId, inspectionId, format — so the content it names lives in D1 and R2 and is governed there. Queue messages are consumed and dropped by the platform; there is no store to sweep."
+    },
+    {
+      "store_type": "queue",
+      "binding": "SYNC_QUEUE",
+      "queues": ["inspectorhub-sync-dlq-saas"],
+      "modes": ["saas"],
+      "role": {
+        "EU":    { "legal_role": "controller",   "basis": "The account record synchronised here is our own customer relationship, not the tenant's end-client data — framework §3 'roles by product area', account/billing row", "determined_at": "2026-08-17", "source": "framework §3 + review §12" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "platform",
+      "data_categories": ["staff_account", "credential_material"],
+      "subjects": ["staff"],
+      "purpose": "The engine-to-portal user-sync seam: CloudEvents envelopes carrying account changes, and the dead-letter queue this worker consumes to mark failed rows.",
+      "retention_rule": "queue-managed",
+      "deletion_mechanism": "not-applicable",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2",
+      "note": "Unlike the export queue this one carries CONTENT, not references — staff email and name, and for user.password_changed the password hash. The durable copy is `sync_outbox` in D1, which has a retention rule; the queue itself is transient platform state."
+    },
+    {
+      "store_type": "queue",
+      "binding": null,
+      "queues": ["inspectorhub-cmd-saas"],
+      "modes": ["saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — commands apply changes to the tenant's own workspace on portal's instruction", "determined_at": "2026-08-17", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "platform",
+      "data_categories": ["tenant_config", "credential_material", "staff_account"],
+      "subjects": ["staff"],
+      "purpose": "Inbound portal-to-core commands. Consumed only — this worker holds no producer binding for it, which is why it appears here by queue name and not by binding.",
+      "retention_rule": "queue-managed",
+      "deletion_mechanism": "not-applicable",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2",
+      "note": "A command this worker cannot interpret is PARKED in `parked_cmd_events` (D1), which has a dead-letter retention rule; the dedup ledger is `processed_cmd_events`, which has its own. The queue is transient, but both of its durable residues are governed."
+    },
+
+    // ── Compute surfaces that can hold state ────────────────────────────────
+    {
+      "store_type": "workflow",
+      "binding": "SIGN_COMPLETION_WORKFLOW",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — post-signature effects run on the tenant's instruction", "determined_at": "2026-08-17", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "platform",
+      "data_categories": ["job_reference"],
+      "subjects": ["end_client", "staff"],
+      "purpose": "Durable execution of the effects that follow a completed signature (see sign-effects.ts).",
+      "retention_rule": "workflow-managed",
+      "deletion_mechanism": "not-applicable",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2",
+      "note": "A Workflow instance persists its own step state and params for the platform's own retention period, which we do not set. The params are identifiers; the documents they name are in R2 and D1."
+    },
+    {
+      "store_type": "browser_rendering",
+      "binding": "BROWSER",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — rendering the tenant's own report to PDF", "determined_at": "2026-08-17", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "platform",
+      "data_categories": ["report_content"],
+      "subjects": ["end_client", "staff"],
+      "purpose": "Headless-browser PDF rendering of report and verification pages.",
+      "retention_rule": "none-at-rest",
+      "deletion_mechanism": "not-applicable",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "not-tenant-scoped",
+      "evidence_level": "E2",
+      "note": "Report content passes THROUGH this surface — it is a processing surface with no store of ours behind it. Registered because the registry's question is 'what can the worker reach', and a transient surface that sees report content is worth a line saying it keeps none."
+    },
+    {
+      "store_type": "images",
+      "binding": "IMAGES",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — transforming the tenant's own inspection media", "determined_at": "2026-08-17", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "platform",
+      "data_categories": ["inspection_media"],
+      "subjects": ["end_client", "staff"],
+      "purpose": "Image transformation for inspection photographs.",
+      "retention_rule": "none-at-rest",
+      "deletion_mechanism": "not-applicable",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "not-tenant-scoped",
+      "evidence_level": "E2",
+      "note": "Transform-in-flight over bytes read from PHOTOS; the originals and any stored derivative live in R2 under that entry."
+    },
+    {
+      "store_type": "stream",
+      "binding": "STREAM",
+      "modes": ["standalone", "saas"],
+      "env_vars": ["STREAM_CUSTOMER_SUBDOMAIN"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — inspection video the tenant's staff recorded", "determined_at": "2026-08-17", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "platform",
+      "data_categories": ["inspection_media"],
+      "subjects": ["end_client", "staff"],
+      "purpose": "Video backend when a deployment selects Stream over R2 — stores the uploaded video and serves playback from the customer subdomain.",
+      "retention_rule": "none",
+      "deletion_mechanism": "unknown",
+      "export_mechanism": "unknown",
+      "tenant_scope": "not-tenant-scoped",
+      "evidence_level": "E2",
+      "note": "Account-scoped, not tenant-scoped: the binding is name-only and a Stream video id carries no tenant. Whether the tenant purge reaches Stream-hosted video is UNKNOWN and written as unknown — the R2 sweep is a prefix walk and Stream is not R2."
+    },
+    {
+      "store_type": "rate_limiter",
+      "binding": "RATE_LIMITER",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "controller",   "basis": "Abuse prevention on our own public endpoints is our purpose, not the tenant's instruction — framework §3, platform-operational row", "determined_at": "2026-08-17", "source": "framework §3" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "platform",
+      "data_categories": ["ip_address"],
+      "subjects": ["end_client", "staff", "anonymous_visitor"],
+      "purpose": "Per-IP request counting on public endpoints.",
+      "retention_rule": "window-bounded",
+      "deletion_mechanism": "not-applicable",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "not-tenant-scoped",
+      "evidence_level": "E2",
+      "note": "The key is `{prefix}:{ip}` and the window is 60 seconds, so an IP is held for at most a minute and no counter survives it. The one entry here whose subject includes a visitor who never became a customer."
+    },
+    {
+      "store_type": "static_assets",
+      "binding": "ASSETS",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "controller",   "basis": "Our own built client bundle — no personal data and no tenant instruction involved", "determined_at": "2026-08-17", "source": "framework §3" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "platform",
+      "data_categories": [],
+      "subjects": [],
+      "purpose": "The built client bundle and public static files.",
+      "retention_rule": "not-applicable",
+      "deletion_mechanism": "not-applicable",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "not-tenant-scoped",
+      "evidence_level": "E2",
+      "note": "Registered with empty data_categories and subjects on purpose. A binding absent from the registry is indistinguishable from one nobody looked at; a binding present with nothing in it is a reviewed answer."
+    },
+
+    // ── External processors (not bindings) ──────────────────────────────────
+    // These are sub-processors reached over the network. They are the half of
+    // the registry a binding count cannot see, which is why the gate counts
+    // them separately and refuses to merge the two numbers.
+    {
+      "store_type": "external_processor",
+      "binding": null,
+      "external_processor": "server/lib/email/providers/resend.ts",
+      "modes": ["standalone", "saas"],
+      "env_vars": ["SENDER_EMAIL"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — mail sent on the tenant's instruction to their own contacts; the tenant may supply their own Resend key and sender", "determined_at": "2026-08-17", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "vendor",
+      "data_categories": ["contact", "message_content"],
+      "subjects": ["end_client", "agent", "staff"],
+      "purpose": "Transactional email delivery — the platform default provider, and the one a tenant most often re-points at their own account.",
+      "retention_rule": "vendor-managed",
+      "deletion_mechanism": "vendor-contract",
+      "export_mechanism": "none",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2",
+      "note": "A recipient address and the message body leave our estate here. What the vendor keeps and for how long is theirs; the record that we sent it is `automation_logs`, retained indefinitely by design."
+    },
+    {
+      "store_type": "external_processor",
+      "binding": null,
+      "external_processor": "server/lib/email/providers/sendgrid.ts",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — mail sent on the tenant's instruction to their own contacts", "determined_at": "2026-08-17", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "vendor",
+      "data_categories": ["contact", "message_content"],
+      "subjects": ["end_client", "agent", "staff"],
+      "purpose": "Transactional email delivery — selectable alternative provider.",
+      "retention_rule": "vendor-managed",
+      "deletion_mechanism": "vendor-contract",
+      "export_mechanism": "none",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2"
+    },
+    {
+      "store_type": "external_processor",
+      "binding": null,
+      "external_processor": "server/lib/email/providers/mailgun.ts",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — mail sent on the tenant's instruction to their own contacts", "determined_at": "2026-08-17", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "vendor",
+      "data_categories": ["contact", "message_content"],
+      "subjects": ["end_client", "agent", "staff"],
+      "purpose": "Transactional email delivery — selectable alternative provider.",
+      "retention_rule": "vendor-managed",
+      "deletion_mechanism": "vendor-contract",
+      "export_mechanism": "none",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2"
+    },
+    {
+      "store_type": "external_processor",
+      "binding": null,
+      "external_processor": "server/lib/email/providers/postmark.ts",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — mail sent on the tenant's instruction to their own contacts", "determined_at": "2026-08-17", "source": "contract + review" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "vendor",
+      "data_categories": ["contact", "message_content"],
+      "subjects": ["end_client", "agent", "staff"],
+      "purpose": "Transactional email delivery — selectable alternative provider.",
+      "retention_rule": "vendor-managed",
+      "deletion_mechanism": "vendor-contract",
+      "export_mechanism": "none",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2"
+    },
+    {
+      "store_type": "external_processor",
+      "binding": null,
+      "external_processor": "server/lib/ai/providers/gemini.ts",
+      "modes": ["standalone", "saas"],
+      "env_vars": ["AI_MODEL"],
+      "role": {
+        "EU":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "vendor",
+      "data_categories": ["inspection_content", "inspector_prose"],
+      "subjects": ["end_client", "staff"],
+      "purpose": "AI translation and drafting. Two credential paths: a tenant's own key, or the deployment's managed key for entitled tenants.",
+      "retention_rule": "vendor-managed",
+      "deletion_mechanism": "vendor-contract",
+      "export_mechanism": "none",
+      "tenant_scope": "per-tenant",
+      "evidence_level": "E2",
+      "note": "The one external processor whose EU coordinate is left UNCLASSIFIED rather than asserted as processor, and deliberately: the framework's own roles-by-product-area table calls BYO-key AI 'complicated' — the tenant chooses the account while we choose the provider, model, prompts, ledger and posture — and managed AI puts Art. 28(10) live. Writing 'processor' here would be exactly the self-labelling §3 forbids. What leaves the process on either key is enumerated in docs/compliance/ai-data-flow.md."
+    }
+  ]
+}
