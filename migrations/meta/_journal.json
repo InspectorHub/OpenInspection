@@ -134,6 +134,13 @@
       "when": 1786953003872,
       "tag": "0018_same_black_crow",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1786955832673,
+      "tag": "0019_slippery_magdalene",
+      "breakpoints": true
     }
   ]
 }

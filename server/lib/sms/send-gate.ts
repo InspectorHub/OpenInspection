@@ -50,7 +50,7 @@ import { marketingVarsIn } from './marketing-content';
 type SmsPurpose = 'notification' | 'test';
 
 export type SmsGateOutcome =
-    | { allowed: true; smsMode: string; companyPhone: string | null; reviewUrl: string | null }
+    | { allowed: true; smsMode: string; companyPhone: string | null; reviewUrl: string | null; companyName: string | null }
     | { allowed: false; reason: string };
 
 export interface SmsGateArgs {
@@ -157,12 +157,17 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
     // A tenant with no config row is 'platform' — the same default all three
     // chains already used. Wrapped rather than `.catch()`-chained because some
     // drizzle handles return a thenable-only builder from `.get()`.
-    let cfg: { smsMode: string; companyPhone: string | null; reviewUrl: string | null } | null | undefined;
+    let cfg: { smsMode: string; companyPhone: string | null; reviewUrl: string | null; companyName: string | null } | null | undefined;
     try {
         cfg = await db.select({
             smsMode:      tenantConfigs.smsMode,
             companyPhone: tenantConfigs.companyPhone,
             reviewUrl:    tenantConfigs.reviewUrl,
+            // Read here rather than by a second query in the caller: this is
+            // the one place that already holds the tenant's config row, and the
+            // sender-identity record the send path writes needs the brand a
+            // recipient actually sees (review 26-5).
+            companyName:  tenantConfigs.companyName,
         }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
     } catch { cfg = null; }
     const smsMode = cfg?.smsMode ?? 'platform';
@@ -279,5 +284,6 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
         smsMode,
         companyPhone: cfg?.companyPhone ?? null,
         reviewUrl: cfg?.reviewUrl ?? null,
+        companyName: cfg?.companyName ?? null,
     };
 }

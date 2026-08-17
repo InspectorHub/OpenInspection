@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 94 |
-| Columns | 1117 |
+| Columns | 1118 |
 | Indexes (excluding primary keys) | 159 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 517 (46%) |
+| Columns carrying a source comment | 518 (46%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -217,7 +217,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `automation_logs`
 
-<sub>server/lib/db/schema/inspection/automation.ts · 16 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/inspection/automation.ts · 17 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -237,6 +237,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `notice_id` | text |  |  |  | Communication C1 (design §3.13) — the NOTICE HEADER this channel-attempt belongs to (notifications.id). **[more]** |
 | `attempts` | integer | NN | `0` |  | How many times flush() has PICKED THIS ROW UP. Stamped when the batch is claimed — before anything is dispatched — and that ordering is the entire point. **[more]** |
 | `last_attempt_at` | integer |  |  |  | When the last claim happened — `attempts` says how many, this says how stale. A row stuck at attempts=6 tells you nothing without it. |
+| `sender_identity` | text |  |  |  | WHO SENT IT, and ON WHOSE BEHALF — recorded, not inferred. review review: the owner of the number is not automatically the legal sender. **[more]** |
 
 **Indexes**
 
