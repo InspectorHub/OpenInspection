@@ -94,7 +94,15 @@ while read -r _l_ref l_sha _r_ref r_sha; do
     [ -z "$l_sha" ] && continue
     [ "$l_sha" = "$ZERO" ] && continue
     if [ "$r_sha" = "$ZERO" ] || [ -z "$r_sha" ]; then
-        QBASE=$(git merge-base "$l_sha" origin/main 2>/dev/null) || QBASE=""
+        # A brand-new branch has no remote counterpart, so the range has to be
+        # computed from a main ref. UPSTREAM FIRST, and that order matters on a
+        # fork: `origin/main` here is the fork's copy and it lags the canonical
+        # branch by however many PRs have merged since it was last synced. A
+        # range measured from the stale one re-attributes already-merged,
+        # already-verified work to the new branch — which is exactly what fired
+        # this gate on a branch that touches no QuickBooks file at all, and a
+        # gate that fires on every first push is one people learn to skip.
+        QBASE=$(git merge-base "$l_sha" upstream/main 2>/dev/null)             || QBASE=$(git merge-base "$l_sha" origin/main 2>/dev/null)             || QBASE=""
         [ -z "$QBASE" ] && { QBO_CHANGED="unknown"; break; }
         QRANGE="$QBASE..$l_sha"
     else
