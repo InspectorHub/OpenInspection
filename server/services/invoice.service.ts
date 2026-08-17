@@ -17,6 +17,7 @@ import * as ledger from './invoice-payments.service';
 import type { OfflinePaymentInput, PaymentCorrectionInput } from './invoice-payments.service';
 import * as refunds from './invoice/refund';
 import { applyHeldDepositsToInvoice } from './invoice/deposit-application';
+import { allocateInvoiceNumber } from './invoice-number';
 import type { PartialRefundInput } from './invoice/refund';
 
 function getStatus(inv: { sentAt: Date | null; paidAt: Date | null; partialPaidAt?: Date | null; voidedAt?: Date | null }): 'draft' | 'sent' | 'paid' | 'partial' | 'void' {
@@ -181,6 +182,10 @@ export class InvoiceService {
             dueDate: data.dueDate ?? null,
             notes: data.notes ?? null,
             currency: cfg?.currency ?? 'USD',
+            // Allocated, not derived. `MAX(invoice_number) + 1` would race two
+            // concurrent creates onto one number and the unique index would then
+            // refuse the second invoice in front of whoever was raising it.
+            invoiceNumber: await allocateInvoiceNumber(db, tenantId),
         };
         await db.insert(invoices).values(row);
         // A deposit taken at booking has been sitting against the ORDER with no

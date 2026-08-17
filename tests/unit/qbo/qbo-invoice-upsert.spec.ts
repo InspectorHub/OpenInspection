@@ -51,7 +51,7 @@ class TestQbo extends withInvoiceSync(withCustomerSync(QBOServiceBase)) {}
 /** The invoice the push is handed — the shape `InvoiceService` passes it. */
 const INVOICE_INPUT = {
     id:            INV,
-    invoiceNumber: 'INV-001',
+    invoiceNumber: 1001,
     contactId:     CONTACT,
     dueDate:       '2026-09-30',
     lineItems:     [{ description: 'Full home inspection', amountCents: 45000 }],
@@ -196,7 +196,9 @@ describe('creating the QuickBooks invoice', () => {
         await qbo.upsertInvoice(TENANT, INVOICE_INPUT);
 
         expect(sent[0].body).toMatchObject({
-            DocNumber:   'INV-001',
+            // The bare integer: QuickBooks renders its own document-number
+            // styling, and the '#' is ours. This used to be a UUID fragment.
+            DocNumber:   '1001',
             DueDate:     '2026-09-30',
             EmailStatus: 'EmailSent',
             CustomerRef: { value: 'QBO-CUST-9' },

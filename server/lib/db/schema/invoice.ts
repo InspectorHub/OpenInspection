@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { tenants } from './tenant';
 import { inspections } from './inspection';
 import { contacts } from './contact';
@@ -58,7 +58,33 @@ export const invoices = sqliteTable('invoices', {
     // total, which drifts from ours the first time either side edits the
     // invoice. Appended at table end. See #273.
     amountPaidCents: integer('amount_paid_cents'),
+    /**
+     * The number a human uses for this invoice — per tenant, sequential.
+     *
+     * There was no such column. `invoice-sync.ts` read `invoice.invoiceNumber`,
+     * which was always `undefined`, and fell back to `invoice.id` sliced to 21
+     * characters — so the customer's QuickBooks showed a UUID fragment like
+     * `9ce7a7ba-c5e0-4678-86` as the document number. A UUID happens to satisfy
+     * uniqueness, so nothing ever failed; it was silently unprofessional.
+     *
+     * An INTEGER, not a formatted string: the `#` and any future per-tenant
+     * prefix belong to rendering. Storing the presentation would make a prefix
+     * change rewrite history, and would make "which invoice came first" a string
+     * comparison.
+     *
+     * Allocated from `tenantConfigs.invoiceSeq` by an atomic
+     * `UPDATE … RETURNING`, because D1 has no interactive transaction and
+     * `MAX(number)+1` races two concurrent creates onto the same number.
+     *
+     * NULLABLE only for rows that predate the column; every new invoice gets
+     * one. Appended at END per the D1 add-column-at-end rule.
+     */
+    invoiceNumber: integer('invoice_number'),
 }, (t) => [
     index('idx_invoices_inspection').on(t.inspectionId),
     index('idx_invoices_contact').on(t.tenantId, t.contactId),
+    // One number per tenant. A duplicate is a real accounting problem — two
+    // documents a customer cannot tell apart — so it is refused by the
+    // database rather than by whoever remembers.
+    uniqueIndex('uq_invoices_tenant_number').on(t.tenantId, t.invoiceNumber),
 ]);

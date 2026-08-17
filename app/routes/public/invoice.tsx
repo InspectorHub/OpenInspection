@@ -48,7 +48,15 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 
     const invoice: InvoiceData | null = d
       ? {
-          number: `INV-${d.id.slice(0, 8).toUpperCase()}`,
+          // The tenant's own sequential number. It used to be `INV-` plus
+          // eight hex characters of the row's UUID — a fabricated identifier
+          // that looked like an invoice number to the customer and matched
+          // nothing the inspector could search for. Rows that predate the
+          // column still fall back to the short id, which is what they have
+          // always effectively been.
+          number: d.invoiceNumber == null
+            ? `INV-${d.id.slice(0, 8).toUpperCase()}`
+            : `#${d.invoiceNumber}`,
           // Issued/Due are calendar dates (YYYY-MM-DD) — format for display via
           // the shared formatter (locale only; date-only anchors to UTC). Keep
           // empty/null so the "—" / "Due on receipt" fallbacks still apply.

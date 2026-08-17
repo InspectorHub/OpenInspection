@@ -33,8 +33,23 @@ export function withInvoiceSync<
     // `withPaymentSync` carries `txnDateFor`, `getQBOCustomerIdForInvoice` and
     // `findQboCustomerId` — the lookups both halves share.
     return class extends withPaymentSync(Base) {
-        public buildDocNumber(invoiceNumber: string): string {
-            return invoiceNumber.slice(0, 21);
+        /**
+         * What QuickBooks shows as the document number.
+         *
+         * The bare integer, no `#`: QuickBooks renders its own document-number
+         * styling and a prefix would be doubled. The `#` is ours, for our
+         * surfaces — see `formatInvoiceNumber`.
+         *
+         * The 21-character cap is Intuit's `DocNumber` limit. It cannot bite an
+         * integer, and it is kept because the fallback below still can: a row
+         * that predates `invoices.invoice_number` has no number, and the UUID it
+         * falls back to is 36 characters. That fallback is exactly the defect
+         * this column fixed — it put `9ce7a7ba-c5e0-4678-86` in front of a
+         * paying customer — so it stays only for rows written before the
+         * column existed, and the backfill leaves none.
+         */
+        public buildDocNumber(invoiceNumber: number | null | undefined, invoiceId: string): string {
+            return invoiceNumber == null ? invoiceId.slice(0, 21) : String(invoiceNumber);
         }
 
         public async applyInvoiceStatusFromQBO(
@@ -54,7 +69,7 @@ export function withInvoiceSync<
             tenantId: string,
             invoice: {
                 id: string;
-                invoiceNumber?: string | null;
+                invoiceNumber?: number | null;
                 contactId?: string | null;
                 dueDate?: string | null;
                 lineItems: Array<{ description: string; amountCents: number; quantity?: number }>;
@@ -146,7 +161,7 @@ export function withInvoiceSync<
             }
 
             const payload = buildInvoicePayload({
-                docNumber: this.buildDocNumber(invoice.invoiceNumber ?? invoice.id),
+                docNumber: this.buildDocNumber(invoice.invoiceNumber, invoice.id),
                 txnDate, dueDate, lines, qboCustomerId,
                 status: invoice.status,
             });
