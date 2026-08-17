@@ -19,7 +19,12 @@
 import { loadTenantSecrets } from '../../lib/secrets-cache';
 import { applyIntegrationSecrets } from '../../lib/middleware/integration-secrets';
 
-export interface QboCredentials {
+/**
+ * Not exported: only `QboCredentialResolution` below names it, and that IS
+ * exported, so a consumer reading `.credentials` still gets the shape. An
+ * export nobody imports is a public surface kept true for no reader.
+ */
+interface QboCredentials {
     clientId: string;
     clientSecret: string;
     webhookSecret: string;
