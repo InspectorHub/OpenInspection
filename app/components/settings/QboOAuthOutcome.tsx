@@ -35,6 +35,11 @@ function qboOAuthErrorMessage(code: string): string {
       return m.settings_qbo_oauth_error_failed();
     case "access_denied":
       return m.settings_qbo_oauth_error_access_denied();
+    case "realm_already_connected":
+      // Not a failure of the OAuth round trip — Intuit said yes. One
+      // QuickBooks company may only be bound to one workspace, because the
+      // webhook resolves its tenant by realm id and nothing else.
+      return m.settings_qbo_oauth_error_realm_already_connected();
     default:
       return m.settings_qbo_oauth_error_unknown({ code });
   }

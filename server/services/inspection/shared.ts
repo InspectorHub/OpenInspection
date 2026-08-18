@@ -202,6 +202,12 @@ export function sanitizeDefectStates(data: Record<string, unknown>): void {
             for (const c of customDefects as Array<Record<string, unknown>>) {
                 if (!c || typeof c !== 'object') continue;
                 deleteRepairPriceKeys(c);
+                // Same field, same vocabulary, same PATCH as the canned rows
+                // below — so, the same rule. This is the only check between the
+                // client and the JSON blob.
+                if ('trade' in c) {
+                    c.trade = isDefectTrade(c.trade) ? c.trade : null;
+                }
             }
         }
         const defects = entry.tabs?.defects;

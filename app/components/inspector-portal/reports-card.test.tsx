@@ -21,17 +21,17 @@ import { ReportsCard, type ReportRow } from "~/components/inspector-portal/Repor
 
 const PRIMARY: ReportRow = {
     id: "rep-primary", kind: "primary", title: "Inspection Report", status: "in_progress",
-    publishedAt: null, versionCount: 0, hasContent: false,
+    publishedAt: null, versionCount: 0, hasContent: false, hasNarrative: false,
     canDelete: false, deleteBlockedReason: "primary",
 };
 const SEWER: ReportRow = {
     id: "rep-sewer", kind: "ancillary", title: "Sewer Scope", status: "in_progress",
-    publishedAt: null, versionCount: 0, hasContent: true,
+    publishedAt: null, versionCount: 0, hasContent: true, hasNarrative: true,
     canDelete: true, deleteBlockedReason: null,
 };
 const RADON: ReportRow = {
     id: "rep-radon", kind: "ancillary", title: "Radon Testing", status: "published",
-    publishedAt: "2026-08-03T12:00:00.000Z", versionCount: 1, hasContent: false,
+    publishedAt: "2026-08-03T12:00:00.000Z", versionCount: 1, hasContent: false, hasNarrative: false,
     canDelete: false, deleteBlockedReason: "published",
 };
 

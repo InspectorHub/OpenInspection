@@ -11,7 +11,7 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 |---|---|
 | Tables | 98 |
 | Columns | 1149 |
-| Indexes (excluding primary keys) | 165 |
+| Indexes (excluding primary keys) | 166 |
 | Database foreign keys (all legacy, frozen) | 51 |
 | Columns carrying a source comment | 540 (47%) |
 
@@ -1747,10 +1747,12 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/qbo.ts · 11 columns · primary key `tenant_id`</sub>
 
+> One QuickBooks company, one workspace — and the webhook depends on it. `POST /api/integrations/qbo/webhook` is unauthenticated and platform-wide: in SaaS the Intuit app belongs to the platform, so there is ONE webhook URL and ONE verifier token for every realm, and nothing in the URL names a tenant.
+
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `tenant_id` | text | PK NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `realm_id` | text | NN |  |  | *App-layer reference to another row — no database foreign key.* |
+| `realm_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
 | `company_name` | text |  |  |  | *A name.* |
 | `access_token_enc` | text | NN |  |  | *Encrypted at rest (AES-GCM envelope).* |
 | `refresh_token_enc` | text | NN |  |  | *Encrypted at rest (AES-GCM envelope).* |
@@ -1760,6 +1762,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `is_sync_enabled` | integer | NN | `true` |  | *Boolean flag, stored as integer 0/1.* |
 | `default_item_id` | text | NN | `'1'` |  | *App-layer reference to another row — no database foreign key.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
+
+**Indexes**
+
+- **UNIQUE** `uq_qbo_connections_realm` (realm_id)
 
 ---
 

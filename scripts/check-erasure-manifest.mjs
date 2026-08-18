@@ -46,6 +46,17 @@
  *   - a PII-heuristic column found in ANY schema table that is neither covered
  *     by a manifest rule nor declared in ERASURE_OUT_OF_SCOPE
  *
+ * WARNINGS (exit 0, console.warn):
+ *   - a pending rule whose enforcementDeadline falls within LEAD_TIME_DAYS.
+ *     The hard failure above only ever arrives the day AFTER the date, on
+ *     whoever happens to be committing; this is the notice that lets somebody
+ *     schedule the work instead of being interrupted by it. It must never
+ *     become a failure — see LEAD_TIME_DAYS.
+ *
+ * EVERY run, green or red, prints how many rules are pending enforcement and
+ * when the nearest one is due. A verdict with no numbers behind it cannot be
+ * checked on the day it is green, and green is every day but one.
+ *
  * The heuristic deliberately includes `recipient` (automation_logs.recipient
  * holds emails and E.164 numbers — renamed from recipient_email, which is how
  * it escaped the original pattern) and bare `ip`.
@@ -141,7 +152,51 @@ const PENDING_ENFORCEMENT = new Set([
 const PII_HEURISTIC = /(email|phone|ip_address|user_agent|signature|client_name|full_name|recipient|address)/;
 const isPiiColumn = (col) => PII_HEURISTIC.test(col) || col === "ip";
 
+/**
+ * How far ahead of an enforcement deadline this gate starts saying so.
+ *
+ * The past-due failure below is correct and, on its own, useless as notice: it
+ * fires the morning AFTER the date, on whoever happens to be committing, and
+ * every run before that one is indistinguishable from a run with no deadline at
+ * all. What the date was chosen to buy is review time, and review time that
+ * begins when the build breaks is not review time — it is an interruption, and
+ * the cheapest way out of an interruption is to move the date.
+ *
+ * 90 days is ONE QUARTER, chosen against the manifest's own justification for
+ * the deadline it carries: "two quarters covers that work with review". Half of
+ * the budgeted work still remaining is the last honest moment to start —
+ * earlier and the warning is background noise on a rule nobody can act on yet,
+ * later and there is no longer room for the schema change, the migration and
+ * the review the deadline was sized for. It is deliberately NOT derived from
+ * how long the work takes; that is not knowable here, which is exactly why the
+ * deadline itself came from review discipline rather than from a computation.
+ *
+ * This is a WARNING and must stay one. A lead time that fails the build is just
+ * an earlier deadline wearing a softer word.
+ */
+const LEAD_TIME_DAYS = 90;
+
+/**
+ * One clock reading for the whole run. Past-due, days-remaining and the report
+ * line are three statements about the same instant, and a run that straddled
+ * midnight while making them could report the same deadline as both passed and
+ * due tomorrow.
+ */
+const NOW = Date.now();
+const MS_PER_DAY = 86_400_000;
+
 const errors = [];
+/**
+ * Findings that must be SEEN without failing the run. They live in their own
+ * array on purpose: pushing to `errors` is one character away, and would turn
+ * every lead time into the deadline it exists to precede.
+ */
+const warnings = [];
+/**
+ * Every well-formed pending rule, so the report can print how many are
+ * outstanding and which one is due first — on every run, not only red ones.
+ */
+const pendingDeadlines = [];
 
 const src = `${readFileSync(MANIFEST, "utf8")}\n${readFileSync(OUT_OF_SCOPE, "utf8")}`;
 
@@ -304,11 +359,27 @@ rules.forEach((rule, i) => {
   const due = Date.parse(`${rule.enforcementDeadline}T23:59:59Z`);
   if (Number.isNaN(due)) {
     errors.push(`${label}: enforcementDeadline '${rule.enforcementDeadline}' is not a real date.`);
-  } else if (Date.now() > due) {
+    return;
+  }
+  // Whole days still on the clock. The deadline is the END of its day, so
+  // `floor` answers "how many full days are left to work in": on the deadline
+  // itself that is 0, and the day after it goes negative — the same boundary
+  // the failure below uses, rather than a second one drawn near it.
+  const daysLeft = Math.floor((due - NOW) / MS_PER_DAY);
+  pendingDeadlines.push({ key, deadline: rule.enforcementDeadline, daysLeft });
+
+  if (daysLeft < 0) {
     errors.push(
       `${label}: enforcement deadline ${rule.enforcementDeadline} has PASSED and the retention ` +
         `is still not enforced. Build it, or move the date deliberately and say why — an ` +
         `expired "pending" is the unbounded retain this check exists to prevent.`,
+    );
+  } else if (daysLeft <= LEAD_TIME_DAYS) {
+    warnings.push(
+      `${key}: enforcement deadline ${rule.enforcementDeadline} is ${daysLeft} day(s) away and ` +
+        `nothing expires this column yet. Build the enforcement now, or move the date ` +
+        `deliberately and say why — on ${rule.enforcementDeadline} this stops being a warning ` +
+        `and starts failing the build.`,
     );
   }
 });
@@ -393,13 +464,47 @@ for (const file of schemaFiles(SCHEMA_DIR)) {
 }
 
 // ── Report ───────────────────────────────────────────────────────────────────
+//
+// The pending count and the nearest deadline print on EVERY run, pass or fail.
+// They are the numbers this gate is actually guarding, and a gate that prints
+// only a verdict cannot be checked on the day it is green — which is every day
+// until the one it breaks. `scripts/check-retention-policy.mjs` states the rule
+// in general; the case that made it necessary here is specific: ten rules sat
+// pending against a single date while every run of this gate said "OK" and
+// named neither the ten nor the date.
+const nearest = pendingDeadlines.reduce(
+  (best, d) => (best === null || d.daysLeft < best.daysLeft ? d : best),
+  null,
+);
+const pendingLine = nearest === null
+  ? "  0 pending enforcement (no rule in this manifest is waiting on a dated remediation)."
+  : `  ${pendingDeadlines.length} pending enforcement (nearest deadline ${nearest.deadline}, ` +
+    `${nearest.daysLeft} days).`;
+
 if (errors.length > 0) {
   console.error("\nErasure manifest lint FAILED:\n");
   for (const e of errors) console.error("  " + e);
   console.error(`\n${errors.length} error(s).`);
+}
+
+// After the error block, so a red run reads top-down as "what is broken, then
+// what is about to be". Each approaching deadline is NAMED rather than counted:
+// "3 deadlines approaching" tells a reader to go and find them, and the reason
+// this branch exists at all is that nobody was looking.
+if (warnings.length > 0) {
+  console.warn(
+    `\nErasure manifest lint — enforcement deadlines APPROACHING (within ${LEAD_TIME_DAYS} days):\n`,
+  );
+  for (const w of warnings) console.warn("  " + w);
+  console.warn("");
+}
+
+if (errors.length > 0) {
+  console.error(pendingLine);
   process.exit(1);
 }
 
 console.log(
   `erasure-manifest lint: OK (${rules.length} rules, ${outOfScope.size} out-of-scope declarations).`,
 );
+console.log(pendingLine);

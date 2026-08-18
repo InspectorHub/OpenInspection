@@ -25,6 +25,32 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
             refreshTokenExpiresIn: number;
         }): Promise<void> {
             const db = this.getDrizzle();
+
+            // One QuickBooks company belongs to one workspace, and the webhook
+            // depends on it: `qbo_connections.realm_id` is not unique (tenant_id
+            // is the primary key), and the unauthenticated webhook resolves its
+            // tenant SOLELY by realm id out of the verified body. A second
+            // tenant holding the same realm makes that lookup ambiguous, and an
+            // ambiguous lookup writes one company's payments into whichever
+            // tenant the row order happened to return.
+            //
+            // Enforced here rather than as a DDL constraint, per the Schema
+            // Rules: D1 cannot cheaply rebuild a table, so integrity that has to
+            // hold lives in the application. The read side refuses independently
+            // (see `handleWebhook`) because a duplicate predating this guard
+            // would otherwise keep silently resolving.
+            const claimant = await db.select({ tenantId: qboConnections.tenantId })
+                .from(qboConnections)
+                .where(eq(qboConnections.realmId, input.realmId))
+                .all();
+            const otherClaimant = claimant.find((r) => r.tenantId !== input.tenantId);
+            if (otherClaimant) {
+                throw Errors.Conflict(
+                    'This QuickBooks company is already connected to another workspace. '
+                    + 'Disconnect it there first, then connect it here.',
+                );
+            }
+
             const nowMs = Date.now();
             const [encAccess, encRefresh] = await Promise.all([
                 encryptToken(input.accessToken, this.jwtSecret),

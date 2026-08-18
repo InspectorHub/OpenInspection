@@ -105,6 +105,38 @@ const InspectionPeopleSchema = z.object({
   listingAgents: z.array(PeopleAgentSchema).describe('TODO describe listingAgents field for the OpenInspection MCP integration'),
 }).openapi('InspectionPeople');
 
+/**
+ * The hub's invoice block AS THE SERVICE PRODUCES IT: the ROUTE adds `payUrl` (the
+ * tokenized link needs portal-access, which this aggregate deliberately does not
+ * depend on) and runs `redactMoney`, which DROPS every `*Cents` key for a caller
+ * without the financial capability — which is why money below is `.optional()`
+ * even though the service always computes it. Neither difference is drift, and
+ * splitting the schema is what makes the compiler say so.
+ */
+export const HubInvoiceCoreSchema = z.object({
+  id:         z.string().describe('Invoice id'),
+  status:     z.string().describe('draft | sent | partial | paid'),
+  amountCents: z.number().optional().describe('Invoice total in cents. ABSENT without the financial capability.'),
+  // Cumulative amount RECEIVED, not a remaining balance — the remainder is
+  // derived against our own authoritative total (`amountCents`), never against
+  // an external system's. Null when the invoice is partial but no figure was
+  // recorded, which the UI must render as "unknown" rather than as zero.
+  amountPaidCents: z.number().nullable().optional().describe('Cumulative amount received in cents; null when unrecorded. ABSENT without the financial capability.'),
+  currency:   z.string().optional().describe("ISO 4217 currency snapshot the invoice was created in — what its figures must be formatted in, not the viewer's default."),
+  sentAt:     z.string().nullable().describe('ISO sent timestamp'),
+  paidAt:     z.string().nullable().describe('ISO paid timestamp'),
+});
+export type HubInvoiceCore = z.infer<typeof HubInvoiceCoreSchema>;
+
+/** As it reaches the browser: the core plus the pay link the route issues. */
+const HubInvoiceSchema = HubInvoiceCoreSchema.extend({
+  // IA-34 — the public pay page is token-gated, so a bare `/invoice/:id` is
+  // refused. The inspector's "copy pay link" must hand out the SAME tokenized
+  // URL the emailed link carries; null when no primary client email exists to
+  // bind a token to (the UI hides the action rather than copy a dead link).
+  payUrl:     z.string().nullable().describe('Tokenized public pay link, or null when unavailable'),
+});
+
 // Issue #111 — single aggregate payload for the `/inspections/:id` hub page.
 // One round trip drives six blocks (People / Schedule / Services / Agreement /
 // Invoice / Report status). Every field is explicit (no z.any()).
@@ -173,26 +205,7 @@ export const InspectionHubSchema = z.object({
     signersTotal:  z.number().describe('How many signers the envelope has'),
     signersSigned: z.number().describe('How many of them have signed'),
   })).describe('Agreement requests for this inspection, newest first'),
-  invoice: z.object({
-    id:         z.string().describe('Invoice id'),
-    status:     z.string().describe('draft | sent | partial | paid'),
-    amountCents: z.number().optional().describe('Invoice total in cents. ABSENT without the financial capability.'),
-    // Cumulative amount RECEIVED, not a remaining balance — the remainder is
-    // derived against our own authoritative total (`amountCents`), never against
-    // an external system's. Null when the invoice is partial but no figure was
-    // recorded, which the UI must render as "unknown" rather than as zero.
-    // ABSENT (not null) without the financial capability — `redactMoney` drops
-    // every `*Cents` key.
-    amountPaidCents: z.number().nullable().optional().describe('Cumulative amount received in cents; null when unrecorded. ABSENT without the financial capability.'),
-    currency:   z.string().optional().describe("ISO 4217 currency snapshot the invoice was created in — what its figures must be formatted in, not the viewer's default."),
-    sentAt:     z.string().nullable().describe('ISO sent timestamp'),
-    paidAt:     z.string().nullable().describe('ISO paid timestamp'),
-    // IA-34 — the public pay page is token-gated, so a bare `/invoice/:id` is
-    // refused. The inspector's "copy pay link" must hand out the SAME tokenized
-    // URL the emailed link carries; null when no primary client email exists to
-    // bind a token to (the UI hides the action rather than copy a dead link).
-    payUrl:     z.string().nullable().describe('Tokenized public pay link, or null when unavailable'),
-  }).nullable().describe('Most recent invoice for the inspection, or null'),
+  invoice: HubInvoiceSchema.nullable().describe('Most recent invoice for the inspection, or null'),
   publishReadiness: z.object({
     ready:         z.boolean().describe('True when every required defect field is filled'),
     blockingCount: z.number().describe('Count of defects blocking publish'),

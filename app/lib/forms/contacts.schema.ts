@@ -1,5 +1,12 @@
 import { z } from "zod";
 import { requiredText } from "~/lib/forms/required-text";
+// The contact-party axis, DERIVED not re-typed: the select, the DB column and
+// the API schema all answer to ROLE_KIND, so a fourth hand-written literal list
+// here can only ever drift behind them — and did, rejecting the "other" option
+// the modal already rendered. A real value import (not type-only) is safe:
+// role-kinds.ts has no imports of its own, so nothing server-only is pulled
+// into the browser bundle. Same reasoning as `app/lib/access.ts`.
+import { ROLE_KIND } from "../../../server/lib/people/role-kinds";
 // i18n — locale-aware validation messages. `m.*()` resolves to the active locale
 // via paraglide's ALS (server) / cookie (client), so schemas carrying user-facing
 // messages are built by a FACTORY called per validation (never a module-level
@@ -14,7 +21,7 @@ import { m } from "~/paraglide/messages";
  * one validation source, progressive-enhancement safe.
  *
  * Field set (from the ContactModal form):
- *   - type    — "client" | "agent", select, defaults to "client"
+ *   - type    — one of ROLE_KIND (client | agent | other), select, defaults to "client"
  *   - name    — required free-text
  *   - email   — optional; empty string coerced to undefined so the API receives null
  *   - phone   — optional free-text (tel input)
@@ -24,7 +31,7 @@ import { m } from "~/paraglide/messages";
  */
 export function makeAddContactSchema() {
   return z.object({
-    type: z.enum(["client", "agent"]).default("client"),
+    type: z.enum(ROLE_KIND).default(ROLE_KIND.CLIENT),
     name: requiredText(m.validation_contact_name_required()).min(1, m.validation_contact_name_required()),
     email: z
       .string()
