@@ -98,3 +98,12 @@ export type { AiCallProvenance, NewAiCallProvenance } from './ai';
 // rather than copied (see the file for why that is a rule, not a shortcut).
 export { aiContentReviews } from './ai';
 export type { AiContentReview, NewAiContentReview } from './ai';
+
+// Migration intake — staged rows for a vendor import, so a run is resumable
+// row by row and undoable per row rather than all-or-nothing.
+export { migrationBatches, migrationRows } from './migration-intake';
+export {
+    MIGRATION_INTENTS,
+    MIGRATION_CONFLICT_POLICIES,
+    MIGRATION_ROW_RESOLUTIONS,
+} from './migration-intake';
