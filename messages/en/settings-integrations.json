@@ -158,6 +158,7 @@
   "settings_qbo_oauth_error_invalid_state": "That connection attempt expired. Start again from this page.",
   "settings_qbo_oauth_error_failed": "QuickBooks refused the connection. Check that the credentials above belong to the same Intuit app and environment, then try again.",
   "settings_qbo_oauth_error_access_denied": "You declined the connection at QuickBooks. Nothing was changed.",
+  "settings_qbo_oauth_error_realm_already_connected": "That QuickBooks company is already connected to another workspace. Disconnect it there first, then connect it here.",
   "settings_qbo_oauth_error_unknown": "QuickBooks returned an error: {code}",
   "settings_qbo_env_provided": "Provided by this deployment",
   "settings_qbo_env_provided_badge": "Env",

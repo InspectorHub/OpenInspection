@@ -302,6 +302,10 @@ describe('payloads the handler must survive', () => {
             unparsed:     1,
             ignoredEntity: 1,
             unknownRealm: 1,
+            // A realm two workspaces claim is a fourth, distinct reason — see
+            // tests/unit/qbo/qbo-realm-tenant-binding.spec.ts. Zero here is the
+            // assertion that this batch hit none of it, not padding.
+            ambiguousRealm: 0,
         });
     });
 
