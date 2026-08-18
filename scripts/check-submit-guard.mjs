@@ -32,11 +32,31 @@
  * call sites, is a FAILURE — "found nothing" and "looked at nothing" produce the
  * same empty result, and this repo has shipped that mistake before.
  *
+ * RULE C — the AWAITING ratchet (see evaluateAwaitingRatchet). The baseline's
+ * two populations are not equal: an EXEMPT entry is a decision, an AWAITING one
+ * is a debt. The key ratchet above stops a raw submit arriving SILENTLY, and
+ * nothing else — "new" means "not in the baseline", and the baseline is written
+ * by a flag, so the honest way to add debt was always `--update` plus an
+ * AWAITING reason — and the awaiting count went UP over the gate's first months
+ * while every run reported `0 new`. Rule C freezes the awaiting TOTAL in
+ * `submit-guard-awaiting-ceiling.json` and fails when it moves in either
+ * direction: upward is new debt, downward is a ceiling that has gone slack and
+ * is holding free slots open for it. `--update` may only ever LOWER the
+ * ceiling, so a new AWAITING entry cannot be laundered by re-running the flag —
+ * raising it takes a hand edit of a committed file, which is a diff that says
+ * "I am adding debt" out loud.
+ *
+ * The ceiling is stored PER FILE, and the per-file numbers are diagnosis, not
+ * enforcement: the verdict is on the total (so moving a component between files
+ * is not a false alarm), while the message NAMES the files that went over or
+ * under (so a failure points somewhere rather than reporting an integer).
+ *
  * Usage:
  *   node scripts/check-submit-guard.mjs            # verify (exit 1 on a new hit)
- *   node scripts/check-submit-guard.mjs --update   # rewrite the baseline, then
- *                                                  # exit 1 until every new entry
- *                                                  # carries a written reason
+ *   node scripts/check-submit-guard.mjs --update   # rewrite the baseline and
+ *                                                  # TIGHTEN the awaiting ceiling,
+ *                                                  # then exit 1 until every new
+ *                                                  # entry carries a written reason
  */
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, relative, sep, dirname } from 'node:path';
@@ -46,6 +66,13 @@ import { enclosingSymbol, normalizeSignature, makeKey, diffBaseline } from './li
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const BASELINE_PATH = join(__dirname, 'submit-guard-baseline.json');
+/**
+ * The frozen awaiting count, per file. Committed, and seeded BY HAND — there is
+ * deliberately no `--seed` flag, because every automatic path that can create
+ * this file is also a path that can reset it, and a ratchet you can reset by
+ * running a command is not a ratchet.
+ */
+const AWAITING_CEILING_PATH = join(__dirname, 'submit-guard-awaiting-ceiling.json');
 
 /** Client surfaces only. The posture is about what the BROWSER does. */
 const SCAN_ROOTS = ['app'];
@@ -307,6 +334,122 @@ function walk(dir, acc) {
     return acc;
 }
 
+// ---------------------------------------------------------------------------
+// RULE C — the AWAITING ratchet.
+// ---------------------------------------------------------------------------
+
+/**
+ * The declared conversion debt, counted per source file.
+ *
+ * Read from the BASELINE, not from the hits: converting a call site leaves its
+ * baseline entry behind as a stale key until someone runs `--update`, and the
+ * debt is what the file DECLARES. Counting hits instead would make every
+ * conversion red until the flag was run, which is the friction that teaches
+ * people to run `--update` without reading it.
+ *
+ * @param {Record<string,string>} baseline
+ * @returns {Map<string, number>} relpath -> awaiting entries in that file
+ */
+export function awaitingByFile(baseline) {
+    const out = new Map();
+    for (const [key, reason] of Object.entries(baseline)) {
+        if (!CONVERSION_DEBT.test(String(reason ?? ''))) continue;
+        const file = key.split('::')[0];
+        out.set(file, (out.get(file) ?? 0) + 1);
+    }
+    return out;
+}
+
+function sum(values) {
+    let t = 0;
+    for (const v of values) t += v;
+    return t;
+}
+
+/**
+ * The ratchet's verdict, as a pure function.
+ *
+ * @param {{ awaiting: Map<string,number>, ceiling: Record<string,number> | null }} input
+ *   `ceiling` is null when the file is missing or unparseable — which is a
+ *   FAILURE, never "nothing to check". A gate that cannot read its own frozen
+ *   copy knows nothing, and knowing nothing must not read as green.
+ * @returns {{ ok: boolean, awaitingTotal: number, ceilingTotal: number,
+ *             over: string[], under: string[], failures: string[] }}
+ */
+export function evaluateAwaitingRatchet({ awaiting, ceiling }) {
+    const failures = [];
+    const awaitingTotal = sum(awaiting.values());
+    if (ceiling === null || typeof ceiling !== 'object' || Array.isArray(ceiling)) {
+        return {
+            ok: false,
+            awaitingTotal,
+            ceilingTotal: 0,
+            over: [],
+            under: [],
+            failures: [
+                `the awaiting ceiling at ${AWAITING_CEILING_PATH} is missing or is not a JSON object. ` +
+                'It is committed and seeded by hand; restore it from git rather than regenerating it, ' +
+                'because a regenerated ceiling freezes whatever debt happens to be there today. ' +
+                'Refusing to report success on a ratchet whose frozen copy could not be read.',
+            ],
+        };
+    }
+
+    const bad = Object.entries(ceiling).filter(
+        ([, n]) => !Number.isInteger(n) || n < 0,
+    );
+    if (bad.length > 0) {
+        failures.push(
+            'the awaiting ceiling holds values that are not non-negative integers: ' +
+            bad.map(([f, n]) => `${f} = ${JSON.stringify(n)}`).join(', ') +
+            '. An unreadable entry is a failure, not a zero.',
+        );
+    }
+
+    const ceilingTotal = sum(Object.values(ceiling).filter((n) => Number.isInteger(n) && n >= 0));
+    const files = [...new Set([...awaiting.keys(), ...Object.keys(ceiling)])].sort();
+    const over = files.filter((f) => (awaiting.get(f) ?? 0) > (ceiling[f] ?? 0));
+    const under = files.filter((f) => (awaiting.get(f) ?? 0) < (ceiling[f] ?? 0));
+
+    // The detector-broke check, and the reason it is not folded into the
+    // `under` branch: a marker that stops matching reads as a completed
+    // burn-down, and "the debt is gone" is the single most attractive wrong
+    // answer this gate can give.
+    if (awaitingTotal === 0 && ceilingTotal > 0) {
+        failures.push(
+            `the AWAITING marker matched ZERO baseline entries while the ceiling still holds ${ceilingTotal}. ` +
+            'Either every site was converted — in which case delete this ratchet by hand, deliberately — ' +
+            `or the marker text (${CONVERSION_DEBT.source}) no longer matches what the baseline says. ` +
+            'Refusing to read an empty result as a finished burn-down.',
+        );
+    } else if (awaitingTotal > ceilingTotal) {
+        failures.push(
+            `the conversion backlog GREW: ${awaitingTotal} awaiting against a ceiling of ${ceilingTotal}. ` +
+            'A new baseline entry may be exempt with a stated reason; it may not be AWAITING. ' +
+            `Over their frozen count: ${over.map((f) => `${f} (${awaiting.get(f) ?? 0} > ${ceiling[f] ?? 0})`).join(', ')}.`,
+        );
+    } else if (awaitingTotal < ceilingTotal) {
+        failures.push(
+            `the awaiting ceiling has gone slack: ${awaitingTotal} awaiting against a ceiling of ${ceilingTotal}, ` +
+            `so ${ceilingTotal - awaitingTotal} free slot(s) are being held open for new debt. ` +
+            'Run `npm run lint:submit-guard -- --update` to tighten it. Below their frozen count: ' +
+            `${under.map((f) => `${f} (${awaiting.get(f) ?? 0} < ${ceiling[f] ?? 0})`).join(', ')}.`,
+        );
+    }
+
+    return { ok: failures.length === 0, awaitingTotal, ceilingTotal, over, under, failures };
+}
+
+/** The frozen ceiling, or null when it cannot be read or parsed. */
+function readCeiling() {
+    try {
+        const parsed = JSON.parse(readFileSync(AWAITING_CEILING_PATH, 'utf8'));
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
 function main() {
     const update = process.argv.includes('--update');
     const files = [];
@@ -354,10 +497,14 @@ function main() {
     const scannedCount = files.length - excluded;
     const result = evaluate({ hits, baseline, scannedCount, busyConsumers, busyViolations, rawSites });
 
+    const awaitingFiles = awaitingByFile(baseline);
+    const ceiling = readCeiling();
+    const ratchet = evaluateAwaitingRatchet({ awaiting: awaitingFiles, ceiling });
+
     // Printed on EVERY run, pass or fail. A gate that only reports its verdict
     // cannot be checked on the day it is green.
     const baselineKeys = Object.keys(baseline);
-    const awaiting = baselineKeys.filter((k) => CONVERSION_DEBT.test(baseline[k] ?? '')).length;
+    const awaiting = ratchet.awaitingTotal;
     console.log(
         `[submit-guard] scanned ${scannedCount} files (${excluded} excluded), ` +
         `${rawSites} call sites (${hits.size} baseline keys), ${baselineKeys.length} baselined ` +
@@ -365,10 +512,17 @@ function main() {
         `${result.violations.length} new`
     );
     console.log(`[submit-guard] busy rule: ${busyConsumers} consumer files checked, ${busyViolations.length} violations`);
+    console.log(
+        `[submit-guard] awaiting ratchet: ${awaiting} awaiting across ${awaitingFiles.size} file(s), ` +
+        `ceiling ${ratchet.ceilingTotal} across ${ceiling === null ? 'UNREADABLE' : Object.keys(ceiling).length} file(s) ` +
+        `(${ratchet.over.length} over, ${ratchet.under.length} under)`
+    );
 
-    if (update) return runUpdate(hits, baseline);
+    if (update) return runUpdate(hits, baseline, ceiling);
 
-    for (const failure of result.failures) console.error(`[submit-guard] FAIL — ${failure}`);
+    for (const failure of [...result.failures, ...ratchet.failures]) {
+        console.error(`[submit-guard] FAIL — ${failure}`);
+    }
 
     if (busyViolations.length > 0) {
         console.error(`[submit-guard] FAIL — ${busyViolations.length} useGuardedSubmit consumer(s) drop \`busy\`:`);
@@ -405,15 +559,22 @@ function main() {
         console.error(`${BASELINE_PATH}.`);
     }
 
-    process.exit(result.ok ? 0 : 1);
+    process.exit(result.ok && ratchet.ok ? 0 : 1);
 }
 
 /**
  * Rewrite the baseline: keep every reason already written, drop keys no longer
  * hit, seed new keys with an EMPTY reason — and then exit 1, printing them, so
  * a bare entry can never be landed by running --update and committing.
+ *
+ * Then TIGHTEN the awaiting ceiling, and only tighten it. `--update` is the one
+ * automatic writer of that file, so if it could also raise the number, the
+ * whole ratchet would be one command away from being undone: add a raw submit,
+ * run `--update`, write `AWAITING #106 CONVERSION` into the fresh entry, run
+ * `--update` again, and the debt is frozen at its new, larger size with nothing
+ * in the diff that reads as a decision. It refuses instead, and names the files.
  */
-function runUpdate(hits, baseline) {
+function runUpdate(hits, baseline, ceiling) {
     const next = {};
     const fresh = [];
     for (const key of [...hits.keys()].sort()) {
@@ -426,6 +587,11 @@ function runUpdate(hits, baseline) {
     }
     writeFileSync(BASELINE_PATH, JSON.stringify(next, null, 4) + '\n', 'utf8');
     console.log(`[submit-guard] wrote ${Object.keys(next).length} entries to ${BASELINE_PATH}`);
+
+    const tightened = updateCeiling(next, ceiling);
+    if (!tightened) {
+        process.exit(1);
+    }
     if (fresh.length === 0) {
         console.log('[submit-guard] every entry carries a reason.');
         process.exit(0);
@@ -437,6 +603,49 @@ function runUpdate(hits, baseline) {
     console.error('not (keep it here), and write the reason AS YOU DECIDE. A reason written later');
     console.error('is a reconstruction.');
     process.exit(1);
+}
+
+/**
+ * Rewrite the awaiting ceiling from the freshly written baseline — downward
+ * only. Returns false (having printed why) when the write is refused.
+ *
+ * @param {Record<string,string>} nextBaseline the baseline just written
+ * @param {Record<string,number> | null} ceiling the frozen copy as read
+ */
+function updateCeiling(nextBaseline, ceiling) {
+    const awaiting = awaitingByFile(nextBaseline);
+    const verdict = evaluateAwaitingRatchet({ awaiting, ceiling });
+
+    if (ceiling === null) {
+        console.error(`[submit-guard] FAIL — ${verdict.failures[0]}`);
+        return false;
+    }
+    if (verdict.awaitingTotal > verdict.ceilingTotal) {
+        console.error(
+            `[submit-guard] FAIL — refusing to RAISE the awaiting ceiling from ${verdict.ceilingTotal} ` +
+            `to ${verdict.awaitingTotal}. This flag tightens the ratchet; it does not loosen it. ` +
+            `Over their frozen count: ${verdict.over.map((f) => `${f} (${awaiting.get(f) ?? 0} > ${ceiling[f] ?? 0})`).join(', ')}.`
+        );
+        console.error('  Convert the site instead, or mark it exempt with a reason that says why it is');
+        console.error(`  not a user mutation. If the debt genuinely must grow, edit ${AWAITING_CEILING_PATH}`);
+        console.error('  by hand — that diff is the decision, and it should be argued for in review.');
+        return false;
+    }
+    if (verdict.awaitingTotal === 0 && verdict.ceilingTotal > 0) {
+        console.error(`[submit-guard] FAIL — ${verdict.failures[0]}`);
+        console.error('  Not written: a ceiling of 0 written from a marker that may simply have stopped');
+        console.error('  matching would freeze "no debt" as the truth and retire the ratchet by accident.');
+        return false;
+    }
+
+    const nextCeiling = {};
+    for (const file of [...awaiting.keys()].sort()) nextCeiling[file] = awaiting.get(file);
+    writeFileSync(AWAITING_CEILING_PATH, JSON.stringify(nextCeiling, null, 4) + '\n', 'utf8');
+    console.log(
+        `[submit-guard] awaiting ceiling ${verdict.ceilingTotal} -> ${verdict.awaitingTotal} ` +
+        `across ${Object.keys(nextCeiling).length} file(s) in ${AWAITING_CEILING_PATH}`
+    );
+    return true;
 }
 
 /**

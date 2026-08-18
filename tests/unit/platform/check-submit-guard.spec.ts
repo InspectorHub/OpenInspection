@@ -27,6 +27,15 @@ type Evaluation = {
     failures: string[];
 };
 
+type Ratchet = {
+    ok: boolean;
+    awaitingTotal: number;
+    ceilingTotal: number;
+    over: string[];
+    under: string[];
+    failures: string[];
+};
+
 let findSubmitCallSites: (source: string) => Hit[];
 let findBusyViolations: (source: string) => BusyViolation[];
 let evaluate: (input: {
@@ -37,6 +46,11 @@ let evaluate: (input: {
     busyConsumers: number;
     busyViolations: string[];
 }) => Evaluation;
+let awaitingByFile: (baseline: Record<string, string>) => Map<string, number>;
+let evaluateAwaitingRatchet: (input: {
+    awaiting: Map<string, number>;
+    ceiling: Record<string, number> | null;
+}) => Ratchet;
 
 beforeAll(async () => {
     const scriptPath = path.resolve(
@@ -44,9 +58,8 @@ beforeAll(async () => {
         '../../../scripts/check-submit-guard.mjs',
     );
     // @vite-ignore — load the .mjs via native Node import.
-    ({ findSubmitCallSites, findBusyViolations, evaluate } = await import(
-        /* @vite-ignore */ pathToFileURL(scriptPath).href
-    ));
+    ({ findSubmitCallSites, findBusyViolations, evaluate, awaitingByFile, evaluateAwaitingRatchet } =
+        await import(/* @vite-ignore */ pathToFileURL(scriptPath).href));
 });
 
 describe('findSubmitCallSites — the call shape, not the name', () => {
@@ -277,5 +290,134 @@ describe('findBusyViolations — the non-destructured consumer shape', () => {
     it('honours the escape hatch on the namespace form too', () => {
         const src = `${IMPORT}\n// submit-guard-allow-no-busy: the trigger unmounts on click.\nconst install = useGuardedSubmit<Res>();\ninstall.submit(p, post);\n`;
         expect(findBusyViolations(src)).toEqual([]);
+    });
+});
+
+const AWAITING = 'AWAITING #106 CONVERSION — a user mutation, not converted yet.';
+const EXEMPT = 'Not a mutation — a poll.';
+
+describe('awaitingByFile — the debt the baseline DECLARES', () => {
+    it('counts only entries carrying the AWAITING marker, grouped by file', () => {
+        const per = awaitingByFile({
+            'a.tsx::x::fetcher.submit(1);': AWAITING,
+            'a.tsx::y::fetcher.submit(2);': AWAITING,
+            'a.tsx::z::fetcher.submit(3);': EXEMPT,
+            'b.tsx::x::fetcher.submit(4);': AWAITING,
+        });
+        expect([...per.entries()].sort()).toEqual([
+            ['a.tsx', 2],
+            ['b.tsx', 1],
+        ]);
+    });
+
+    it('reads the debt from the BASELINE, so a converted site stays counted until --update', () => {
+        // Converting a call site removes the raw submit, which makes its key
+        // stale — reported, not failed — and the entry survives until someone
+        // runs the flag. Counting HITS instead would turn every conversion red
+        // and teach people to run --update without reading it.
+        expect(awaitingByFile({ 'gone.tsx::x::fetcher.submit(1);': AWAITING }).get('gone.tsx')).toBe(1);
+    });
+
+    it('does not count an entry with no reason at all', () => {
+        expect(awaitingByFile({ 'a.tsx::x::fetcher.submit(1);': '' }).size).toBe(0);
+    });
+});
+
+describe('evaluateAwaitingRatchet — the backlog may only shrink', () => {
+    it('passes when the declared debt equals the ceiling', () => {
+        const r = evaluateAwaitingRatchet({ awaiting: new Map([['a.tsx', 2]]), ceiling: { 'a.tsx': 2 } });
+        expect(r.ok).toBe(true);
+        expect([r.awaitingTotal, r.ceilingTotal]).toEqual([2, 2]);
+    });
+
+    it('FAILS when the backlog grows, and NAMES the file', () => {
+        const r = evaluateAwaitingRatchet({ awaiting: new Map([['a.tsx', 3]]), ceiling: { 'a.tsx': 2 } });
+        expect(r.ok).toBe(false);
+        expect(r.over).toEqual(['a.tsx']);
+        expect(r.failures.join(' ')).toMatch(/GREW: 3 awaiting against a ceiling of 2.*a\.tsx \(3 > 2\)/);
+    });
+
+    it('POSITIVE CONTROL — a file the ceiling declares NOTHING about is visible, not skipped', () => {
+        // The shape a new offender actually arrives in: a path that appears in
+        // no ceiling entry at all. A gate that iterates the ceiling instead of
+        // the union would never look at it, and would report green.
+        const r = evaluateAwaitingRatchet({
+            awaiting: new Map([
+                ['known.tsx', 2],
+                ['brand-new.tsx', 1],
+            ]),
+            ceiling: { 'known.tsx': 2 },
+        });
+        expect(r.ok).toBe(false);
+        expect(r.over).toEqual(['brand-new.tsx']);
+        expect(r.failures.join(' ')).toContain('brand-new.tsx (1 > 0)');
+    });
+
+    it('FAILS on a slack ceiling too, and NAMES the file — free slots are how debt returns', () => {
+        const r = evaluateAwaitingRatchet({ awaiting: new Map([['a.tsx', 1]]), ceiling: { 'a.tsx': 2 } });
+        expect(r.ok).toBe(false);
+        expect(r.under).toEqual(['a.tsx']);
+        expect(r.failures.join(' ')).toMatch(/slack.*1 free slot\(s\).*a\.tsx \(1 < 2\)/);
+    });
+
+    it('lets a move between files pass — the verdict is on the total, not per file', () => {
+        // Per-file numbers are diagnosis. Enforcing them would make renaming a
+        // component a gate failure, which is the false-alarm direction that
+        // teaches people to bypass a gate.
+        const r = evaluateAwaitingRatchet({
+            awaiting: new Map([['moved.tsx', 2]]),
+            ceiling: { 'original.tsx': 2 },
+        });
+        expect(r.ok).toBe(true);
+        expect([r.over, r.under]).toEqual([['moved.tsx'], ['original.tsx']]);
+    });
+
+    it('FAILS when the marker matches nothing while the ceiling still holds debt', () => {
+        // An empty result reads as a finished burn-down, and that is the most
+        // attractive wrong answer this gate can give.
+        const r = evaluateAwaitingRatchet({ awaiting: new Map(), ceiling: { 'a.tsx': 2 } });
+        expect(r.ok).toBe(false);
+        expect(r.failures.join(' ')).toMatch(/matched ZERO baseline entries while the ceiling still holds 2/);
+    });
+
+    it('FAILS when the ceiling cannot be read — an unreadable input is never "nothing to report"', () => {
+        for (const ceiling of [null, [] as unknown as Record<string, number>]) {
+            const r = evaluateAwaitingRatchet({ awaiting: new Map([['a.tsx', 1]]), ceiling });
+            expect(r.ok).toBe(false);
+            expect(r.failures.join(' ')).toMatch(/missing or is not a JSON object/);
+        }
+    });
+
+    it('FAILS on a ceiling value that is not a non-negative integer', () => {
+        const r = evaluateAwaitingRatchet({
+            awaiting: new Map([['a.tsx', 1]]),
+            ceiling: { 'a.tsx': 1, 'b.tsx': -1, 'c.tsx': 'many' as unknown as number },
+        });
+        expect(r.ok).toBe(false);
+        expect(r.failures.join(' ')).toMatch(/b\.tsx = -1.*c\.tsx = "many"/);
+    });
+
+    it('passes an empty ceiling against an empty backlog — nothing frozen, nothing owed', () => {
+        expect(evaluateAwaitingRatchet({ awaiting: new Map(), ceiling: {} }).ok).toBe(true);
+    });
+});
+
+describe('the two committed files agree', () => {
+    it('the ceiling equals the baseline\'s declared debt, file by file', async () => {
+        // The seed is by hand and the ratchet only ever tightens, so the two can
+        // drift apart in exactly one way: somebody edits the baseline and not
+        // the ceiling. That is the drift the gate exists to catch, and this
+        // asserts the committed state is the state the gate reports green.
+        const { readFileSync } = await import('node:fs');
+        const dir = path.resolve(import.meta.dirname ?? process.cwd(), '../../../scripts');
+        const baseline = JSON.parse(readFileSync(path.join(dir, 'submit-guard-baseline.json'), 'utf8'));
+        const ceiling = JSON.parse(readFileSync(path.join(dir, 'submit-guard-awaiting-ceiling.json'), 'utf8'));
+        const r = evaluateAwaitingRatchet({ awaiting: awaitingByFile(baseline), ceiling });
+        expect({ over: r.over, under: r.under, failures: r.failures }).toEqual({
+            over: [],
+            under: [],
+            failures: [],
+        });
+        expect(r.awaitingTotal).toBeGreaterThan(0);
     });
 });
