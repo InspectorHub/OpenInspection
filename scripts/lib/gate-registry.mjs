@@ -63,7 +63,10 @@ export const SCRIPT_GATES = [
     // idempotency key and no pending affordance. That is cheapest to argue about
     // while the line is being typed, and by the time CI sees one it is written.
     // An fs walk of ~680 client files with two regexes; comparable to the
-    // tracking gate.
+    // tracking gate. It also holds the AWAITING ratchet, which is why it stays
+    // here rather than moving to PUSH: the moment debt is DECLARED is the same
+    // moment the line is typed, and `0 new` stayed true on every run while the
+    // backlog grew.
     { key: 'submitguard', label: 'Client submit-guard coverage', script: 'check-submit-guard.mjs', fix: 'npm run lint:submit-guard', rung: PRECOMMIT },
     // Pre-commit rather than CI, and for a reason the gates above do not share:
     // a seeder that nothing runs automatically has NO other rung. The CLI
