@@ -125,6 +125,17 @@ export const SCRIPT_GATES = [
     { key: 'signaturedynamics', label: 'lint:signature-dynamics', script: 'check-signature-dynamics.mjs', fix: 'npm run lint:signature-dynamics', rung: PUSH },
     { key: 'smsgateargs', label: 'lint:sms-gate-args', script: 'check-sms-gate-args.mjs', fix: 'npm run lint:sms-gate-args', rung: PUSH },
     { key: 'messagingrules', label: 'lint:messaging-rules', script: 'check-messaging-rules.mjs', fix: 'npm run lint:messaging-rules', rung: PUSH },
+    // PUSH, not PRECOMMIT, and the argument cuts the other way from the price /
+    // tracking / AI gates above. Those catch a CAPABILITY arriving, where the
+    // moment to argue is while the line is typed. This one catches a vocabulary
+    // WORD drifting from its call sites, and the drift is usually created by a
+    // commit elsewhere in the tree -- a route deleted, a metadata key renamed --
+    // so the commit that breaks it is often not the commit that touches the
+    // registry. It also reads every .ts/.tsx under server/ and app/ and matches
+    // three call forms with a brace walker, the most expensive scan in this
+    // list. PUSH sees the whole change; that is the rung where the answer is
+    // complete.
+    { key: 'auditregistry', label: 'lint:audit-registry', script: 'check-audit-registry.mjs', fix: 'npm run lint:audit-registry', rung: PUSH },
 ];
 
 export const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup', rung: PRECOMMIT };

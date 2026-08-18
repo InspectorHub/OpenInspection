@@ -5133,26 +5133,54 @@
             "enum": [
               "inspection.sync_conflict_resolved"
             ],
-            "description": "TODO describe action field for the OpenInspection MCP integration"
+            "description": "The audit action to record. Constrained to the actions an inspector-driven request may write."
           },
           "resourceType": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64,
-            "description": "TODO describe resourceType field for the OpenInspection MCP integration"
+            "enum": [
+              "agent",
+              "agreement_request",
+              "audit_log",
+              "bulk_export",
+              "client",
+              "comment",
+              "contact_role_profile",
+              "contractor_type",
+              "credential",
+              "defect_category",
+              "import",
+              "inspection",
+              "inspection_item",
+              "inspection_results",
+              "inspector_service_areas",
+              "library",
+              "mcp_grant",
+              "rating_system",
+              "recommendation",
+              "signing_key",
+              "starter_content",
+              "tag",
+              "template",
+              "tenant",
+              "tenant_config",
+              "user",
+              "user_service_origin",
+              "widget"
+            ],
+            "description": "The entity family the action touched."
           },
           "resourceId": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "description": "TODO describe resourceId field for the OpenInspection MCP integration"
+            "description": "Id of the entity the action touched."
           },
           "detail": {
             "type": "object",
             "additionalProperties": {
               "nullable": true
             },
-            "description": "TODO describe detail field for the OpenInspection MCP integration"
+            "description": "Free-form metadata. Redacted by value shape at write time."
           }
         },
         "required": [
@@ -5160,7 +5188,7 @@
           "resourceType",
           "resourceId"
         ],
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "An inspector-driven audit event."
       }
     },
     "summary": "Record an inspector-driven audit event",

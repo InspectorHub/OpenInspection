@@ -53,6 +53,7 @@
     "lint:processing-stores": "node scripts/check-processing-stores.mjs",
     "lint:platform-defaults": "node scripts/check-platform-defaults.mjs",
     "lint:non-translatable": "node scripts/check-non-translatable.mjs",
+    "lint:audit-registry": "node scripts/check-audit-registry.mjs",
     "lint:migrefs": "node scripts/check-migration-refs.mjs",
     "lint:migchain": "node scripts/check-migration-chain.mjs",
     "lint:zero-tracking": "node scripts/check-zero-tracking.mjs",

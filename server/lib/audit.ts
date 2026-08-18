@@ -4,12 +4,12 @@ import { eq } from 'drizzle-orm';
 import { auditLogs, users } from './db/schema/tenant';
 import { logger } from './logger';
 import type { HonoConfig } from '../types/hono';
+import type { AuditFamily } from './audit-families';
 
 export type AuditAction =
     | 'inspection.create'
     | 'inspection.delete'
     | 'inspection.status_change'
-    | 'inspection.status_changed'
     | 'inspection.complete'
     | 'inspection.send_pdf'
     // The order-wide report gate released for one inspection, and put back.
@@ -18,15 +18,12 @@ export type AuditAction =
     | 'inspection.report_unlocked'
     | 'inspection.report_relocked'
     | 'inspection.send_sms'
-    | 'inspection.send_text_fallback'
     | 'inspection.rescheduled'
     | 'inspection.bulk_assign'
     | 'inspection.bulk_status'
     | 'inspection.template_upgraded'
-    | 'inspection.results_merged'
     | 'inspection.results_batch_patched'
     | 'inspection.sync_conflict_resolved'
-    | 'inspection.conflicts_resolved'
     | 'inspection.share_agent'
     | 'inspection.property_facts.update'
     | 'inspection.pca_narrative.update'
@@ -37,9 +34,6 @@ export type AuditAction =
     | 'inspection.media.attach'
     | 'inspection.media.video.finalize'
     | 'inspection.media.video.delete'
-    | 'inspection.inspector_signed'
-    | 'persistence.granted'
-    | 'persistence.denied'
     | 'template.create'
     | 'template.update'
     | 'template.delete'
@@ -49,14 +43,11 @@ export type AuditAction =
     | 'user.join'
     | 'user.password_change'
     | 'agreement.create'
-    | 'agreement.update'
-    | 'agreement.delete'
     | 'agreement.send'
     | 'agreement.remind'
     | 'agreement.sent'
     | 'agreement.viewed'
     | 'agreement.declined'
-    | 'agreement.expired'
     | 'agreement.inspector_signed'
     // The tenant retired its e-signature key and minted a replacement. Nothing
     // already signed changes, but WHICH key covers which stretch of a company's
@@ -84,7 +75,6 @@ export type AuditAction =
     | 'data.import'
     | 'data.delete'
     | 'audit.view'
-    | 'repair_request.exported'
     | 'comment.created'
     | 'comment.updated'
     | 'comment.deleted'
@@ -121,6 +111,9 @@ export type AuditAction =
     | 'inspection.compliance.psq_status_changed'
     // Agent unified link (Spec 3, Task 2) — single-use magic-login code issue.
     | 'agent.magic_login.issued'
+    // Written by fulfill-booking.ts through the slug writer, which until now
+    // typed `action` as string — this entry and that type closed together.
+    | 'booking.routing.applied'
     // IA-36 ④ — report-delivery credential lifecycle. Rotation destroys the old
     // secret in place (the (inspection, recipient) unique index leaves no dead
     // row behind), so these events are the ONLY durable answer to "the customer
@@ -138,7 +131,7 @@ interface AuditParams {
     tenantId: string;
     userId?: string | undefined;
     action: AuditAction;
-    entityType: string;
+    entityType: AuditFamily;
     entityId?: string | undefined;
     metadata?: Record<string, unknown> | undefined;
     ipAddress?: string | undefined;
@@ -211,8 +204,14 @@ function redactAuditMetadata(metadata: Record<string, unknown> | undefined): Rec
 /**
  * Write an audit log entry. Uses waitUntil when executionCtx is provided
  * so it never blocks the response path.
+ *
+ * Exported for the two kinds of caller `auditFromContext` cannot serve: a route
+ * that runs BEFORE the tenant is on the context (the join handler — the JWT
+ * middleware skips `/join`, so `c.get('tenantId')` is undefined there and the
+ * insert would fail a NOT NULL constraint into the swallowed error path), and a
+ * React Router action, which has no Hono context at all.
  */
-function writeAuditLog(params: AuditParams): void {
+export function writeAuditLog(params: AuditParams): void {
     const { db, executionCtx, ...rest } = params;
     // Fire-and-forget by contract: recording that something happened must never
     // turn a request that DID happen into a 500. The async rejection path was
@@ -247,7 +246,7 @@ function writeAuditLog(params: AuditParams): void {
 export function auditFromContext(
     c: Context<HonoConfig>,
     action: AuditAction,
-    entityType: string,
+    entityType: AuditFamily,
     options?: { entityId?: string; metadata?: Record<string, unknown> }
 ): void {
     const user = c.get('user');
@@ -275,11 +274,19 @@ export function auditFromContext(
  * grouping in audit dashboards. Other events (logins, settings tweaks, library
  * edits) intentionally leave the column NULL so the index stays signal-rich.
  *
- * The list is forward-compatible: when emitters for these events appear, they
- * should call writeAuditLogWithSlug instead of writeAuditLog so the slug is
- * resolved automatically.
+ * ⚠️ The list was written to be forward-compatible — "when emitters for these
+ * events appear, call writeAuditLogWithSlug" — and closing `AuditAction` turned
+ * that into a contradiction. FIVE of the six names below are not members of the
+ * union (`user.slug.set`, `inspection.created`, `inspection.published`,
+ * `invoice.sent`, `invoice.paid`), so no caller can pass them any more, and the
+ * sixth (`agreement.sent`) is declared `in-esign-log` — its record is the
+ * hash-chained row, not an `audit_logs` one. The consequence is that
+ * `inspector_slug` cannot be populated by anything writable today. It is a
+ * `Set<string>` rather than `Set<AuditAction>` deliberately, so this file states
+ * the gap instead of hiding it behind a cast; pinned by
+ * `tests/unit/tenancy/audit-inspector-slug.spec.ts`.
  */
-const INSPECTOR_SLUG_AUDIT_ALLOWLIST = new Set<string>([
+export const INSPECTOR_SLUG_AUDIT_ALLOWLIST = new Set<string>([
     'user.slug.set',
     'inspection.created',
     'inspection.published',
@@ -291,8 +298,8 @@ const INSPECTOR_SLUG_AUDIT_ALLOWLIST = new Set<string>([
 export interface AuditWithSlugParams {
     tenantId: string;
     actorUserId?: string;
-    action: string;
-    entityType: string;
+    action: AuditAction;
+    entityType: AuditFamily;
     entityId?: string;
     metadata?: Record<string, unknown>;
     ipAddress?: string;
