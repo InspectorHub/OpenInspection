@@ -1,7 +1,7 @@
 # Agent Terms
 
 <!--
-review-READY v4 — rounds 29, 31 and 32 landed. NOT APPROVED FOR PUBLICATION.
+review-READY v5 — rounds 29, 30, 31 and 32 landed. NOT APPROVED FOR PUBLICATION.
 
 THIS FILE IS A DRAFT DERIVED FROM RULINGS. IT IS NOT A RULING SOURCE.
 review review asked for this explicitly. The binding text is the archived Round
@@ -15,11 +15,20 @@ Do not add reasoning here that exists nowhere else. Explanatory notes stay only
 where they say what a CLAUSE means or which code fact it rests on.
 
 WHY IT CANNOT BE PUBLISHED, and how that is enforced: run
-`npm run agent-terms:publish`. It prints review review publish-gate checklist
-and refuses while any line is red. Two of them are the blockers — the operating
-entity (§17) and the retention model, which is not about the entity at all — and
-the gate reads the retention signal out of the policy header rather than trusting
-anybody's recollection of it.
+`npm run agent-terms:publish`. It prints the review publish-gate checklist and
+refuses while any line is red.
+
+§17 IS GONE. review ruled that governing law may be omitted rather than named:
+"must not ship as a placeholder" never meant every contract must contain the
+clause. That removes a blocker; it does not remove the risk — with no governing
+law, no venue and no arbitration, a dispute still has to find a forum. review also
+declined an explicit "no choice of law is made" sentence, which would convert an
+absence into an affirmative statement for no gain.
+
+What still blocks: the operator's own identity (contracting party and contact —
+review keeps this P0) and the retention model (review approved no window). The
+gate reads the retention signal out of the policy header rather than trusting
+anybody's recollection.
 
 Factual clauses cite the code they were read off, so a reviewer can check the claim
 rather than take it. Where a clause and the code disagree, the code is what is true.
@@ -27,7 +36,7 @@ review found one that had drifted, which is the argument for keeping them.
 -->
 
 
-**Status:** review-ready draft (v4) — not published
+**Status:** review-ready draft (v5) — not published
 **Applies to:** anyone who creates or uses an Agent account on
 {{OPERATOR_NAME}}'s OpenInspection deployment
 
@@ -340,12 +349,11 @@ special, consequential, or punitive damages, nor for lost profits, lost business
 or lost data, arising from your use of an Agent account or from anything in a
 Report.
 
-**Our total aggregate liability arising out of or relating to these Terms will not
-exceed the greater of (a) US$200 or (b) the amounts you paid us in the
-twelve months before the event giving rise to the claim.**
+**Our total aggregate liability arising out of or relating to your Agent account
+or these Terms will not exceed US$200.**
 
-These limits do **not** apply to liability for fraud, for willful misconduct, or to
-any liability that cannot be limited or excluded under applicable law.
+**This limitation does not apply to liability that cannot lawfully be excluded or
+limited**, nor to liability for fraud or willful misconduct.
 
 **Narrow indemnity.** You will indemnify us against third-party claims arising from
 your **intentional or unlawful** misuse of the Service — specifically, unauthorized
@@ -384,27 +392,7 @@ Each version is recorded with its own content hash, so an earlier acceptance alw
 points at the exact text it was given for, and the version you accepted can be
 reconstructed later.
 
-## 17. Governing law and disputes
-
-These Terms are governed by the law of {{GOVERNING_LAW}}, without regard to its
-conflict-of-laws rules.
-
-{{DISPUTE_PROVISION}}
-
-<!--
-{{DISPUTE_PROVISION}} is one of two shapes, and which one is a decision, not
-drafting — see decision point 1. Either:
-  (a) exclusive venue — "The courts located in {{VENUE}} have exclusive
-      jurisdiction over any dispute arising out of or relating to these Terms, and
-      each party consents to that venue."
-  (b) arbitration — binding individual arbitration, seat, rules, fee allocation,
-      small-claims and injunctive carve-outs, and a class-action waiver.
-review will not choose in the abstract: it follows the operating entity. Governing
-law alone is NOT a complete dispute provision, so this placeholder cannot simply be
-deleted.
--->
-
-## 18. Contact
+## 17. Contact
 
 {{OPERATOR_CONTACT_EMAIL}}
 
