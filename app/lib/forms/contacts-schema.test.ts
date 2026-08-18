@@ -86,7 +86,21 @@ describe("addContactSchema", () => {
     }
   });
 
-  it("fails when type is not 'client' or 'agent'", () => {
+  // The form enum is DERIVED from ROLE_KIND, so it holds every contact-party
+  // kind the DB column and the API schema hold. The select offers "other";
+  // a form schema that rejects it turns a rendered option into a save failure.
+  it("accepts type 'other'", () => {
+    const result = makeAddContactSchema().safeParse({ name: "Casey", type: "other" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.type).toBe("other");
+    }
+  });
+
+  // Positive control for the case above: derivation must not degrade into
+  // accepting anything. "owner" is a staff seat on the users.role axis, which
+  // shares vocabulary with this one but is not a contact-party kind.
+  it("rejects a value from the staff-seat axis ('owner')", () => {
     const result = makeAddContactSchema().safeParse({ name: "Bob", type: "owner" });
     expect(result.success).toBe(false);
   });
