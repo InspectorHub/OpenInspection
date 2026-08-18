@@ -1,8 +1,7 @@
 # Agent Terms
 
 <!--
-COUNSEL-READY v2 — round 29 landed, nine decision points resolved. NOT APPROVED
-FOR PUBLICATION.
+COUNSEL-READY v3 — rounds 29 and 31 landed. NOT APPROVED FOR PUBLICATION.
 
 Round 29 verdict: keep the skeleton, do not publish. Draft quality 7/10, contract
 architecture 8.5/10, blocking §1 · §7 · §11 · §14 (numbered against the previous
@@ -11,11 +10,25 @@ text and restructures to the 18 sections counsel set out. The archived ruling is
 `docs/legal/2026-08-17-counsel-round-29-response.md` in the superproject and it,
 not this file, is the binding text.
 
-v2 resolves nine of the ten decision points v1 left open, each against researched
-practice rather than preference — see the review request for round 30.
+v2 resolved nine of v1's ten decision points against researched practice. v3 lands
+round 31, which reviewed v1 rather than v2 — and three of its five P0s were already
+closed by then (the transaction-purpose use test, the no-reliance restructure, and
+the deletion of "we are only the delivery path").
 
-Still not publishable, and now for ONE reason rather than ten: §17 needs the
-operating entity's jurisdiction, and there is no entity. The operator is an
+Round 31 caught one thing v2 had WRONG rather than missing: §10 asserted the
+acceptance record holds the IP address and country, while the code note in the same
+paragraph showed `ip?` and `country?` — optional. It now says "where collected".
+A clause contradicting the code reference printed beside it is the failure this
+document's whole method is supposed to prevent, and it survived two drafts.
+
+Still not publishable, and for TWO reasons now — §17 was never the only one:
+
+**(a) §12/§15 retention.** Round 13 approved no retention windows. A clause pointing
+at the Privacy Notice for what is kept must not imply the period is settled, and
+until the retention model is final this document cannot go live whatever else is
+resolved. Round 31 §15 is explicit: 这里必须等 retention model final.
+
+**(b) §17 needs the operating entity's jurisdiction, and there is no entity.** The operator is an
 individual with no company, so no US state's law can be named honestly, and a
 governing-law clause that cannot hold is worse than none — it fails exactly when
 it is needed and shows we wrote it knowing. That is not a drafting problem and no
@@ -40,7 +53,7 @@ confirm rather than decide. What was resolved, and on what basis, is in the roun
 30 review request rather than repeated here.
 -->
 
-**Status:** counsel-ready draft (v2) — not published
+**Status:** counsel-ready draft (v3) — not published
 **Applies to:** anyone who creates or uses an Agent account on
 {{OPERATOR_NAME}}'s OpenInspection deployment
 
@@ -104,7 +117,10 @@ on it. You do not request access and we do not grant it.
 you. It does not own or control your Agent account.**
 
 That company can remove your access at any time, and your access to that
-inspection ends when it does. We may separately suspend or close your account.
+inspection ends when it does. **Removal by one Inspection Company affects only your
+access to that company's inspections. It does not by itself terminate your account,
+or your access to inspections other companies have made available to you.** We may
+separately suspend or close the account itself.
 
 Neither of us owes you notice before access ends, and access ending is not a
 breach of these Terms by anyone.
@@ -131,9 +147,10 @@ offer; it is not a promise that any particular feature is or will remain availab
 to you.
 
 You may not attempt to reach inspections, companies, or accounts you were not
-named on, and you may not share your credentials or a sign-in link with anyone. A
-sign-in link sent to your email address authenticates **you**; forwarding one hands
-over your account.
+named on. **You may not allow another person to use your Agent account**, and you
+may not share your credentials or a sign-in link — sharing a credential is only the
+means; the account is the thing. A sign-in link sent to your email address
+authenticates **you**, so forwarding one hands over the account.
 
 *(Code: `GET /api/agent/referrals`, `GET /api/agent/my-repair-items`, the
 repair-builder share-by-email route, `server/api/agent/notification-preferences.ts`.)*
@@ -150,6 +167,17 @@ or current. We make no representation about the condition of any property.
 **You are solely responsible for determining whether and how you use a Report in
 connection with your professional, contractual, fiduciary, regulatory, or other
 obligations.** If you rely on a Report, that reliance is your responsibility.
+
+**Reports are third-party materials.** Reports and other inspection materials are
+provided by or on behalf of the Inspection Company. We grant you no ownership
+interest in them. Any right you have to use a Report arises from the transaction,
+from your relationship with the Inspection Company or its client, and from
+applicable law — not from any ownership of ours.
+
+**Nothing in these Terms prevents you from exercising your own professional
+judgment, or from complying with duties that apply to you.** These Terms allocate
+what WE are responsible for; they do not purport to remove an obligation you owe
+somebody else.
 
 A Report concerns another person's property and another person's transaction.
 Treat it as confidential to that transaction.
@@ -171,7 +199,11 @@ You may not:
 - use Report contents for marketing unrelated to that transaction;
 - sell, license, or otherwise resell Report contents;
 - assemble Report contents into a database or a competing product;
-- scrape, bulk-extract, or systematically copy Report contents;
+- use automated means to access, scrape, crawl, extract, index, copy, or
+  systematically collect Reports, inspection data, contact information, or anything
+  else reached through the account — except where the Service expressly provides a
+  feature that does it;
+- circumvent, or attempt to circumvent, any access control;
 - redistribute a Report to anyone not covered by the paragraph above;
 - attempt to reach inspections you were not granted access to.
 
@@ -188,8 +220,10 @@ and it is about the client's property and their transaction.
 
 When you send a repair-request link through the Service:
 
-**You are responsible for deciding whether and to whom a message is sent. We
-provide the technical service used to transmit the message.**
+**When you use the messaging functionality, you provide the recipient and the
+message information, and you instruct us to transmit the message on your behalf.**
+
+**You are responsible for deciding whether and to whom a message is sent.**
 
 **You represent that you have a lawful basis, and any authorization required, to
 send the message to that recipient.**
@@ -230,20 +264,29 @@ above governs what you may do with it.
 To operate your account we hold your name and email address, your sign-in
 credential (or the fact that you sign in without a password), your notification
 preferences, and the record of this acceptance — its date and time, the version and
-content hash of the text you were shown, and the IP address and country the
-acceptance came from.
+content hash of the text you were shown, and, **where collected**, the IP address
+and country it came from.
 
-*(Code: `users.terms_accepted` stores `{ at, version, contentHash, ip?, country? }`
+*(Code: `users.terms_accepted` stores `{ at, version, contentHash, ip?, country? }` —
+the last two are OPTIONAL, which is why this clause says "where collected". It said
+they were recorded, full stop, while the code reference two lines below showed the
+question marks. Counsel caught it (round 31 §11); a deployment behind a proxy that
+strips the header would otherwise have made the sentence false.
 — `server/lib/db/schema/tenant/user.ts`.)*
 
 The acceptance record stores the version **and a hash of the text** rather than a
 link to a page, so what you agreed to can be shown later even if the page changes.
 
-**We determine how your Agent account information is used to operate and secure
-the Service. The Inspection Company determines the purposes for which inspection
-information and Report content is processed in connection with its inspection
-business. Our applicable Privacy Notice describes the roles and the processing that
+**For personal information associated with your Agent account, we determine the
+purposes and means of processing, subject to applicable law. For Report content
+provided by an Inspection Company, that company determines the purposes for which
+it is used, and we process it in accordance with our agreement with that company
+and applicable law. Our Privacy Notice describes the roles and the processing that
 apply in each jurisdiction.**
+
+This section describes the relationship. It does not attempt to complete a
+privacy-law classification inside a contract — legal role is a per-jurisdiction map,
+not a single word, and the Privacy Notice is where that map lives.
 
 The Privacy Notice at {{PRIVACY_URL}} covers how we handle personal data, including
 how to reach us about access, correction, or deletion.
@@ -256,8 +299,10 @@ or — where this deployment enables it — with a federated identity provider.
 *(Code: `server/api/agent/login.ts`, `server/api/agent/magic-login.ts`, and the
 agent-mode OIDC path.)*
 
-Keep your email account secure: whoever controls your email address can obtain a
-sign-in code. Tell us promptly if you believe someone else has used your account.
+**You are responsible for maintaining control of the email address associated with
+your account.** Whoever controls it can obtain a sign-in code, which is what makes
+that responsibility load-bearing rather than advisory. Tell us promptly if you
+believe someone else has used your account.
 
 ## 11a. Electronic communications
 
@@ -274,6 +319,10 @@ to be produced later.
 
 The Service is provided as-is and as-available. We do not promise uptime, and we
 may change, suspend, or discontinue any part of it.
+
+**We may also limit or suspend access where reasonably necessary for security,
+abuse prevention, legal compliance, or protection of the Service.** §4 covers your
+account; this covers the Service itself.
 
 ## 13. Disclaimers
 
@@ -320,13 +369,20 @@ records), §13 (Disclaimers), §14 (Limitation of liability and indemnity), §17
 (Governing law and disputes), and any provision that by its nature should survive.
 
 Records we are required to keep — including the record of this acceptance —
-survive closure. {{PRIVACY_URL}} states for how long, and on what basis.
+survive closure. The Privacy Notice at {{PRIVACY_URL}} describes what is kept and on
+what basis.
 
 ## 16. Changes to these Terms
 
 We may publish a new version. Where a change is material you will be asked to
 accept the new version before continuing; where it is not, the new version applies
 going forward and the version you accepted stays on record.
+
+**A material change does not bind you through continued use. It binds when your
+acceptance of it has been RECORDED** — which is how the product behaves rather than
+a promise about it: the gate refuses access until the acceptance is written, so
+there is no state in which continued use could later be argued to have been
+agreement.
 
 Each version is recorded with its own content hash, so an earlier acceptance always
 points at the exact text it was given for, and the version you accepted can be
@@ -361,6 +417,24 @@ deleted.
 
 v1 listed ten. Nine are resolved in the text above; the reasoning and the
 competitor data behind each is in the round 30 review request. What remains:
+
+**BLOCKING — 0. Two conflicts between round 29 and round 31, which we did NOT
+resolve ourselves.** Picking one silently is how a corpus starts disagreeing with
+itself.
+
+  *§1 capacity.* Round 29 asked for "if you access the Service in connection with
+  your work for an organization, you represent that you are authorized to do so".
+  Round 31 asks for "You enter into these Terms in your individual capacity. You are
+  not entering into these Terms on behalf of an inspection company, its client, or
+  any other person or entity." One accommodates acting for an employer; the other
+  disclaims it. v3 still carries round 29's sentence — tell us which wins.
+
+  *Section structure.* Round 29 set out 18 sections in one order; round 31 proposes
+  16 in another. v3 keeps round 29's, since renumbering twice would invalidate every
+  cross-reference in this file and in the register for no gain until it is settled.
+
+**BLOCKING — 0b. §12/§15 retention.** See the header: no approved retention window
+exists, so nothing here may imply one. Independent of the entity.
 
 **BLOCKING — 1. §17, the operating entity.** There is no entity: the operator is
 an individual, and the billing path under consideration is a merchant-of-record
