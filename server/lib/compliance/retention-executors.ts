@@ -31,6 +31,7 @@ import {
     reportVersions,
     smsConsentLog,
     smsDisclosureVersions,
+    accountAcceptances,
     tenantLegalVersions,
     tenantMarketplaceImportHistory,
     tenantSlugHistory,
@@ -304,8 +305,30 @@ export const EXECUTORS: Record<string, Executor> = {
                 eq(sql`tlv_newer.doc`, tenantLegalVersions.doc),
                 sql`tlv_newer.version > ${tenantLegalVersions.version}`,
             ));
+        // AND not referenced by any surviving acceptance. This check did not exist
+        // and did not need to: nothing pointed at these rows until this session
+        // added `account_acceptances`, a ledger that is never swept and that
+        // stores the version and content hash of the text a person was shown.
+        // Without it, an acceptance outlives the text it names — which is the one
+        // property the acceptance architecture exists to provide.
+        //
+        // review review §8 stated the rule: retain while referenced. Note this
+        // is NOT "keep forever" — they were explicit that a version nothing cites
+        // may still retire. The sibling `sms_disclosure_versions` executor already
+        // did exactly this against `sms_consent_log`; this one had simply never
+        // been given a referencing table to check.
+        const accepted = db.select({ one: sql`1` }).from(accountAcceptances)
+            .where(and(
+                eq(accountAcceptances.tenantId, tenantLegalVersions.tenantId),
+                eq(accountAcceptances.doc, tenantLegalVersions.doc),
+                eq(accountAcceptances.version, tenantLegalVersions.version),
+            ));
         const res = await db.delete(tenantLegalVersions)
-            .where(and(lt(tenantLegalVersions.publishedAt, cutoff), exists(newer)))
+            .where(and(
+                lt(tenantLegalVersions.publishedAt, cutoff),
+                exists(newer),
+                notExists(accepted),
+            ))
             .run();
         return changeCount(res);
     },

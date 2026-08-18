@@ -25,6 +25,55 @@ honest, and one that says nothing reads as approved.
 
 ---
 
+## 2026-08-19.1 — review ruled, and it is APPROVED WITH CONDITIONS
+
+**What changed.** review reviewed all 15 rules: 8 approved as written, 4 windows
+changed, 2 tables removed from the fixed sweep entirely.
+
+| Rule | Was | Now | Why |
+|---|---|---|---|
+| `audit_logs` | 24m | **36m** | Two years creates an evidence discontinuity: the report survives, the acceptance survives, and the proof of who did what to them is gone |
+| `report_versions` | 36m | **84m** | Hash-chained snapshots are part of the report's evidence chain. Seven years of PDF backed by three years of provenance is not a coherent horizon |
+| `tenant_marketplace_import_history` | 36m | **12m** | Operational history. Three years needs a purpose this table does not have |
+| `tenant_slug_history` | 36m | **12m** | The purpose is stopping a retired slug being reissued; that risk does not run three years. Disputes are legal hold's job |
+| `sms_disclosure_versions` | 36m | **removed from sweep** | See below |
+| `tenant_legal_versions` | 36m | **removed from sweep** | See below |
+
+**The defect we reported, and the half of it that was not real.** We told review
+that a consent record could outlive the text it names, and asked for both tables to
+leave the sweep. review agreed and generalised it into a rule. Then implementing it
+meant reading the executors, and they did not say what the manifest said:
+
+- `sms_disclosure_versions` **was already reference-preserving**. Its executor
+  deletes only a version that is superseded AND cited by no `sms_consent_log` row,
+  and it keeps the current version. Our report was wrong about this table. We had
+  read the manifest — a table and a number — and not the executor, which is what
+  the number actually does.
+- `tenant_legal_versions` **was genuinely exposed**, and became so in this same
+  session: its executor checks only that a newer version exists, which was correct
+  until `account_acceptances` arrived — a ledger that is never swept and that
+  stores the version and content hash of the text a person was shown.
+
+So the rule stands and the framing was half wrong. Both tables stay IN the sweep
+with reference-preserving executors, rather than being removed from it — review
+was explicit that the ruling is retain-while-referenced, not keep-forever: *"这并不
+意味着所有 SMS disclosure versions 永久保存"*. Removing them would have let rows
+accumulate indefinitely, which is not what was asked for. The missing
+`notExists(account_acceptances)` check is now in the tenant executor, so both tables
+implement the same rule.
+
+**Why this version is `approved_with_conditions` and not `approved`.** review
+asked for that distinction in terms: *"我建议把 review 标成 APPROVED WITH
+CONDITIONS，而不是 APPROVED"*. Three of the five conditions are unmet — the
+dependency-aware sweep, the `legal_hold` override (**zero occurrences in the
+codebase**), and the customer ToS re-accept change summary. A reader who sees
+`approved` stops asking what is left.
+
+**And a scope limit that belongs here rather than in a plan.** This covers
+DATABASE retention only. Object storage, Durable Objects, KV and queues were never
+in the compliance register (review). A green retention gate does not mean the
+data lifecycle has been reviewed.
+
 ## 2026-08-18.1 — the acceptance ledger declared out of scope, and nothing deleted
 
 **What changed.** `account_acceptances` is declared `RETENTION_OUT_OF_SCOPE`. The

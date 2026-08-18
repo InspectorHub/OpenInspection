@@ -28,7 +28,13 @@
  * that, the part of an audit row still worth keeping is the structured event —
  * who-did-what-to-which-entity minus the who.
  */
-export const AUDIT_LOG_ANONYMIZE_MONTHS = 24;
+// 24 → 36, review review §2. Two years was justified as "a dispute cycle plus
+// the audit that follows it" and review found that reasoning does not reach it:
+// with reports and acceptances retained for 3–7 years, a 2-year audit log creates
+// an evidence discontinuity where the report still exists, the acceptance still
+// exists, and the proof of WHO DID WHAT to them has gone. Audit logs sit with
+// security/compliance evidence, not with operational cache.
+export const AUDIT_LOG_ANONYMIZE_MONTHS = 36;
 
 /**
  * Deletion window for the replay-protection ledgers
@@ -146,7 +152,11 @@ export const AI_ASSURANCE_RETENTION_MONTHS = 36;
  * drafts and amendments behind it. Three years covers the window in which an
  * amendment is still likely to be questioned.
  */
-export const REPORT_VERSION_RETENTION_MONTHS = 36;
+// 36 → 84, review review §6. These are hash-chained report snapshots — part of
+// the report's evidence chain, not telemetry about it — so keeping the PDF for
+// seven years while the version chain expires at three leaves seven years of PDF
+// backed by three years of provenance. The two now share one evidence horizon.
+export const REPORT_VERSION_RETENTION_MONTHS = 84;
 
 /**
  * Deletion window for `sms_disclosure_versions` — the TCPA disclosure text
@@ -184,7 +194,11 @@ export const TENANT_LEGAL_VERSION_RETENTION_MONTHS = 36;
  * is a different table (`tenant_library_imports`), so expiring a history row
  * shortens a list and cannot change what an import does next.
  */
-export const MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS = 36;
+// 36 → 12, review review §9. "Which tenant imported what" is operational
+// history. Three years would need a purpose this table does not have — financial
+// reconciliation, dispute investigation, contractual evidence or regulatory audit —
+// and it serves none of them.
+export const MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS = 12;
 
 /**
  * Deletion window for `tenant_slug_history`.
@@ -195,7 +209,10 @@ export const MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS = 36;
  * predates a rename, and three years is comfortably past the one-year block —
  * the window can never expire a row still holding a slug out of circulation.
  */
-export const SLUG_HISTORY_RETENTION_MONTHS = 36;
+// 36 → 12, review review §11. The purpose is stopping a retired slug being
+// reissued, and that risk does not run for three years. A slug caught up in an
+// ongoing dispute is handled by legal hold, not by making every slug wait.
+export const SLUG_HISTORY_RETENTION_MONTHS = 12;
 
 /**
  * Default deletion window for `report_pdfs`, in months.
