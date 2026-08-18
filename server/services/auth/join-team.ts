@@ -13,7 +13,7 @@ import { users, tenantInvites } from '../../lib/db/schema';
 import { buildInviteAcceptanceStatements } from '../legal/invite-acceptance';
 import { Errors } from '../../lib/errors';
 import { hashPassword } from '../../lib/password';
-import { assertSeatAvailableForJoin, type SeatQuotaContext } from '../../features/seat-quota/join-guard';
+import { assertSeatAvailableForJoin, type SeatQuotaContext } from '../../features/seat-quota';
 import type { UserSyncOutbox } from '../../lib/integration/user-sync';
 
 export interface JoinTeamOptions {

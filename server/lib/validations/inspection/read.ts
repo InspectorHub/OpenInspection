@@ -129,7 +129,7 @@ export const HubInvoiceCoreSchema = z.object({
 export type HubInvoiceCore = z.infer<typeof HubInvoiceCoreSchema>;
 
 /** As it reaches the browser: the core plus the pay link the route issues. */
-export const HubInvoiceSchema = HubInvoiceCoreSchema.extend({
+const HubInvoiceSchema = HubInvoiceCoreSchema.extend({
   // IA-34 — the public pay page is token-gated, so a bare `/invoice/:id` is
   // refused. The inspector's "copy pay link" must hand out the SAME tokenized
   // URL the emailed link carries; null when no primary client email exists to
