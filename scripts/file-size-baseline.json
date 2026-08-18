@@ -61,6 +61,7 @@
   "app/routes/public/portal-inspection.tsx": 430,
   "app/hooks/useStructureEdit.ts": 424,
   "server/data/automation-seeds.ts": 423,
+  "server/lib/compliance/retention-manifest.ts": 420,
   "server/lib/db/schema/inspection/core.ts": 415,
   "app/components/editor/InspectionSettingsSheet.tsx": 413,
   "server/services/agreement/signer-state.ts": 413,

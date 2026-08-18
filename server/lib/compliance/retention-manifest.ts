@@ -88,6 +88,29 @@ export interface RetentionRule {
     /** Why THIS period for THIS table. Enforced non-empty by the gate. */
     purpose: string;
     /**
+     * How this rule obeys the global invariant that a legal hold outranks every
+     * scheduled deletion (review review). Required on every rule, because the
+     * failure this field exists to prevent is a table nobody classified — which
+     * looks identical to a table that does not need classifying.
+     *
+     * `tenant_scoped`   — the table carries `tenant_id`, and the executor
+     *                     excludes rows belonging to a held tenant. This is the
+     *                     real enforcement, and it is what the behavioural drift
+     *                     guard in `legal-hold-sweep.spec.ts` proves per table.
+     * `suspend_all`     — the table has NO tenant dimension but carries
+     *                     substantive records, so a hold cannot be expressed as
+     *                     a filter. The rule is skipped entirely while ANY hold
+     *                     is in force. Over-preserving a small operational table
+     *                     is the cheap error; the other one is spoliation.
+     * `not_applicable`  — a hold cannot reach anything in this table, and
+     *                     `legalHoldNote` has to say why. Not a way to opt out:
+     *                     the gate rejects the value without the note, and the
+     *                     note is the thing a reviewer disagrees with.
+     */
+        legalHold: 'tenant_scoped' | 'suspend_all' | 'not_applicable';
+    /** REQUIRED when `legalHold` is `not_applicable`. Enforced by the gate. */
+    legalHoldNote?: string;
+    /**
      * The `tenant_configs` column holding a per-tenant override, in YEARS,
      * where 0 means indefinite.
      *
@@ -107,6 +130,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'months', value: AUDIT_LOG_ANONYMIZE_MONTHS },
         action: 'erase_in_place',
         purpose: 'PII-bearing audit trail. Two years covers a dispute cycle plus the audit that follows it; past that the structured event (action, entity_type, entity_id) is the only part worth keeping, so the actor and the free-text metadata go and the row stays.',
+        legalHold: 'tenant_scoped',
     },
     {
         table: 'processed_webhook_events',
@@ -114,6 +138,8 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'days', value: DEDUP_LOG_RETENTION_DAYS },
         action: 'delete',
         purpose: 'Replay-protection ledger for inbound provider webhooks. It only has to outlive a provider retry window, measured in hours; nothing reads a row older than the window.',
+        legalHold: 'not_applicable',
+        legalHoldNote: 'The row is an event id and the instant it arrived — there is no payload, no identifier and no tenant dimension. Preserving it could not answer any question a preservation order asks, and suspending it while a hold runs would grow a pure replay ledger without preserving anything.',
     },
     {
         // NOT `received_at` — the column on this table is `processed_at`. The
@@ -123,6 +149,8 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'days', value: DEDUP_LOG_RETENTION_DAYS },
         action: 'delete',
         purpose: 'Replay-protection ledger for the portal to core command seam. Same purpose and same retry horizon as the webhook ledger, so deliberately the same number.',
+        legalHold: 'not_applicable',
+        legalHoldNote: 'An event id, a command type and the instant it was processed. Same reasoning as the webhook ledger: nothing here is evidence of anything except that a duplicate was rejected, and the command it deduplicated is preserved by the tables that actually applied it.',
     },
     {
         table: 'parked_cmd_events',
@@ -130,6 +158,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'days', value: DEAD_LETTER_RETENTION_DAYS },
         action: 'delete',
         purpose: 'Dead-letter queue, not a log. Its whole job is telling a human that portal and core disagree about a command shape, which is a days-to-weeks activity.',
+        legalHold: 'suspend_all',
     },
     {
         // TERMINAL ROWS ONLY. The executor excludes `pending`, and that
@@ -141,6 +170,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'days', value: SYNC_OUTBOX_RETENTION_DAYS },
         action: 'delete',
         purpose: 'Published/failed user-sync events whose payload carries staff email, name and — for user.password_changed — the password hash. Once published the row is a receipt; the only remaining reader is a human re-driving a portal/core divergence, which surfaces on a monthly reconciliation, so two cycles. PENDING rows are excluded: they are unpublished work the sweeper is still retrying, and expiring one would destroy an account change that never reached portal rather than retire a record of one.',
+        legalHold: 'suspend_all',
     },
     {
         table: 'idempotency_keys',
@@ -148,6 +178,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'days', value: IDEMPOTENCY_REPLAY_RETENTION_DAYS },
         action: 'delete',
         purpose: 'response_body is the verbatim success payload of a mutating API call, so it holds whatever PII that endpoint returned. Measured from created_at, NOT expires_at: that column decides whether a later caller may steal a dead claim and is never read once the row is done, so a completed row outlives it indefinitely. Seven days is seven times the store own declared 24h TTL — margin for a client re-driving a queued intent after a weekend, well inside the horizon past which the store itself says a retry is a different problem.',
+        legalHold: 'tenant_scoped',
     },
     {
         table: 'tenant_destruction_records',
@@ -155,6 +186,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'months', value: DESTRUCTION_RECORD_RETENTION_MONTHS },
         action: 'delete',
         purpose: 'The certification that a workspace was destroyed. Non-personal (tenant id snapshot, slug, counts), so the period is set by how long someone can still ask for it rather than by storage limitation: three years covers the ordinary contractual limitation window for an SCC Clause 8.5 request and spans two annual SOC 2 audit periods. Only COMPLETED records expire — a row still reading started is an unfinished destruction, and deleting one closes an open anomaly instead of retiring a settled record. Measured from destroyed_at, the initiation time, which is the only timestamp an unfinished row has.',
+        legalHold: 'tenant_scoped',
     },
     {
         table: 'ai_call_provenance',
@@ -162,6 +194,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'months', value: AI_ASSURANCE_RETENTION_MONTHS },
         action: 'delete',
         purpose: 'Which prompt version and model produced a piece of assisted text. Non-personal by construction — the schema forbids prompt text — and it grows per AI call, so it needs a window rather than an exemption. Three years is the same clock as the reviews that cite it, and it MUST stay the same clock: they are one governance record split across two tables. A row a surviving review still cites does not expire, because a review is written after its call and would otherwise outlive it and read as an orphan citation.',
+        legalHold: 'tenant_scoped',
     },
     {
         table: 'ai_content_reviews',
@@ -169,6 +202,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'months', value: AI_ASSURANCE_RETENTION_MONTHS },
         action: 'delete',
         purpose: 'That a named person reviewed the output of one AI call before it was published. Shares its clock with ai_call_provenance for the reason stated there. Three years covers the window in which a disputing customer or an auditor can still ask whether anyone checked a piece of assisted text.',
+        legalHold: 'tenant_scoped',
     },
     {
         table: 'report_versions',
@@ -176,6 +210,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'months', value: REPORT_VERSION_RETENTION_MONTHS },
         action: 'delete',
         purpose: 'The amendment trail behind a published report. SUPERSEDED versions only: the highest version_number for a report is what the report currently IS, carries its signature and content hash, and never expires here. What ages out is the earlier drafts and amendments behind it, three years past the point anyone is likely to question a revision.',
+        legalHold: 'tenant_scoped',
     },
     {
         // REFERENCE-PRESERVING, and the executor has always been. It deletes only
@@ -189,6 +224,8 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'months', value: SMS_DISCLOSURE_RETENTION_MONTHS },
         action: 'delete',
         purpose: 'Superseded TCPA disclosure text. Retained while any consent row cites it — the consent record stores this version and its content hash and is never swept, so deleting a cited version would leave evidence naming a text nobody can produce. The current version is kept too: it is what the next opt-in shows.',
+        legalHold: 'not_applicable',
+        legalHoldNote: 'Protected transitively and unconditionally, which is stronger than a hold filter would be. The executor deletes a version only when NO sms_consent_log row cites it, and sms_consent_log is out of scope for retention entirely — never swept, hold or no hold. So a version cited by a held tenant’s consent record cannot be deleted, and neither can one cited by anybody else’s.',
     },
     {
         // REFERENCE-PRESERVING as of review. The executor checked only that a
@@ -201,6 +238,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'months', value: TENANT_LEGAL_VERSION_RETENTION_MONTHS },
         action: 'delete',
         purpose: 'Superseded tenant Privacy/Terms bodies. Retained while any account acceptance cites the version, and the live version per (tenant, doc) is never expired because the hosted legal pages render it. review review §8 was explicit that this is retain-while-referenced, NOT keep-forever.',
+        legalHold: 'tenant_scoped',
     },
     {
         // review review §3. The inbox, not the record that a communication
@@ -213,6 +251,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'months', value: NOTIFICATION_RETENTION_MONTHS },
         action: 'delete',
         purpose: 'In-app notice header: a per-recipient title and body composed about an inspection. Anchored on creation rather than on read_at/archived_at — review declined that alternative because an unread notice would become immortal, turning a UI-state field into a retention control.',
+        legalHold: 'tenant_scoped',
     },
     {
         // review review §4. Anchored on RESOLUTION, which is why `resolved_at`
@@ -225,6 +264,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'days', value: QBO_SYNC_ERROR_RESOLVED_RETENTION_DAYS },
         action: 'delete',
         purpose: 'Resolved QuickBooks sync failures. Ninety days covers the whole row including the copied Intuit error text, which may quote a customer name — review refused a longer window for that text on data-minimisation grounds: a billing dispute is explained from the accounting records, not from an ephemeral rejection message.',
+        legalHold: 'tenant_scoped',
     },
     {
         table: 'tenant_marketplace_import_history',
@@ -232,6 +272,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'months', value: MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS },
         action: 'delete',
         purpose: 'Display-only record of which catalogue version a workspace imported and when. The marker the update and replace paths actually read is tenant_library_imports, a different table, so expiring a history row shortens a list and cannot change what the next import does.',
+        legalHold: 'tenant_scoped',
     },
     {
         // The first rule that reaches outside D1: the row points at an R2
@@ -245,6 +286,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         action: 'delete',
         tenantWindowColumnYears: 'report_pdf_retention_years',
         purpose: 'A rendered PDF of a property: the address, the photographs and the defects found there. Nothing expired one while the tenant lived, so a report was kept for as long as the company existed with no decision behind it. Seven years is a PLATFORM-SELECTED DEFAULT for the tenant-silent case — not a statutory retention period, and not a representation that seven years is the maximum legally required period (review review, decision, which struck the earlier five-plus-two derivation). It is informed primarily by legal-claim defence and secondarily by regulatory record retention. Each tenant may set their own period, and 0 means indefinite: an explicit controller instruction the platform executes. See lib/compliance/report-pdf-retention.ts for the disclosure wording and the jurisdiction facts with their as-of dates.',
+        legalHold: 'tenant_scoped',
     },
     {
         table: 'tenant_slug_history',
@@ -252,6 +294,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'months', value: SLUG_HISTORY_RETENTION_MONTHS },
         action: 'delete',
         purpose: 'Who a released slug used to belong to, and a one-year block on reusing it. Three years is comfortably past that block (SLUG_RETIREMENT_MS), so the sweep can never release a slug early; what it retires is the lookup that answers a stale link long after anyone follows one. A row whose retired_until has not passed is kept regardless of age.',
+        legalHold: 'tenant_scoped',
     },
 ];
 
@@ -280,6 +323,10 @@ export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
     {
         table: 'account_acceptances',
         reason: 'The evidence that an account was VALIDLY CREATED, written in the same db.batch() as the users row it belongs to (review A2, review decision). Expiring a row here does not shrink a record — it destroys one, and it destroys it in a specific direction: the account survives while the proof that its holder accepted anything does not, which is the state account = EXISTS, acceptance_ledger = ABSENT that the table exists to make unreachable. A retention sweep would reach that state deliberately, on a timer, for every account old enough. The natural clock for this row is the ACCOUNT, not the calendar: it should die when the users row it belongs to does, which is the tenant purge and the staff offboarding lifecycle, and both already destroy it. Growth is bounded by accounts times published document versions, not by usage. Declared here although the gate never asked: the LEDGER_NAME pattern matches no part of account_acceptances, so this table could have shipped with lint:retention green — the same silence that let tenant_destruction_records go a year without a decision.',
+    },
+    {
+        table: 'legal_holds',
+        reason: 'The preservation record itself. A hold that expired on its own schedule would be a preservation instrument that failed to preserve itself, and a RELEASED hold is not spent either: the question asked afterwards is over which period this tenant’s data was preserved and who decided it no longer had to be, which only the released row can answer. Growth is bounded by legal matters, not by usage. Declared here although the gate never asked — the LEDGER_NAME pattern matches no part of `legal_holds`, so this table could have shipped with lint:retention green, the same silence that let tenant_destruction_records go a year without a decision.',
     },
     {
         table: 'sms_consent_log',

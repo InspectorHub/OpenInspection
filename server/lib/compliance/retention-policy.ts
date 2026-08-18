@@ -72,8 +72,9 @@ export interface RetentionPolicyHeader {
     supersedes: string | null;
     /**
      * SHA-256 over the OPERATIVE fields of all three retention arrays — table,
-     * anchor, action, the RESOLVED window value and its unit, the set of
-     * out-of-scope tables, and each open entry's table and decide-by date.
+     * anchor, action, `legalHold`, the RESOLVED window value and its unit, the
+     * set of out-of-scope tables, and each open entry's table and decide-by
+     * date.
      * Recomputed by `scripts/check-retention-policy.mjs`; a mismatch fails the
      * build.
      *
@@ -99,10 +100,14 @@ export interface RetentionPolicyHeader {
  *         it left behind is narrower and stronger than "legal documents are
  *         exempt": they are protected only while a surviving record needs the
  *         version to remain reproducible
- *   3. ❌ `legal_hold` overrides every scheduled deletion. ZERO occurrences in the
- *         codebase. Without it, the first litigation-preservation request
- *         punches straight through every window below — however defensible the
- *         36- and 84-month numbers look on their own
+ *   3. ✅ `legal_hold` overrides every scheduled deletion. Every rule now carries
+ *         a `legalHold` classification, twelve of them enforced by a tenant
+ *         filter the executors apply and two by the driver standing the rule
+ *         down entirely; `legal-hold-sweep.spec.ts` drives a held and an unheld
+ *         tenant through the real sweep for each of the twelve. What is NOT
+ *         covered: a hold is placed by writing the row, with no endpoint and no
+ *         screen behind it — deliberate for a rare, legally-directed event, and
+ *         stated here rather than left to be discovered
  *   4. ❌ the customer ToS re-accept flow names the liability cap in its change
  *         summary (portal — built, pending the ToS publish)
  *   5. ❌ approval/version registration completed before the new ToS publishes
@@ -112,6 +117,13 @@ export interface RetentionPolicyHeader {
  * EXECUTOR is authoritative evidence of what the sweep actually does. We reported
  * a defect in `sms_disclosure_versions` that its executor had always prevented.
  *
+ * ⚠️ AND ONE QUESTION THIS DELIBERATELY DID NOT ANSWER: a hold suspends
+ * SCHEDULED deletion, which is what review invariant covers. It does not
+ * touch the DSAR erasure path, where a preservation obligation and an erasure
+ * request point in opposite directions and the resolution is a legal judgement
+ * (GDPR Art. 17(3)(e)) with notification duties attached, not a filter. Wiring
+ * it silently either way would have decided that question in a WHERE clause.
+ *
  * ⚠️ AND A SCOPE LIMIT review asked to be written here rather than filed: this
  * covers DATABASE retention only. Object storage, Durable Objects, KV and queues
  * were never in the compliance register (review). A green retention gate does
@@ -120,11 +132,11 @@ export interface RetentionPolicyHeader {
  * every production store is covered.
  */
 export const RETENTION_POLICY: RetentionPolicyHeader = {
-    version: '2026-08-19.2',
+    version: '2026-08-19.3',
     status: 'approved_with_conditions',
     effectiveAt: '2026-08-08',
     approvedBy: '[redacted]',
     approvedAt: '2026-08-19',
-    supersedes: '2026-08-17.3',
-    rulesDigest: 'ea925189ba1f9dcb19bbf868a3d08f562dbb90126a92e854763eb6a21a9dffa7',
+    supersedes: '2026-08-19.2',
+    rulesDigest: '872f2ae78321aa0825ed05c9629f2623e564bb784a5e8d4cc4d925451bb8be76',
 };

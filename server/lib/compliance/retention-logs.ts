@@ -36,6 +36,7 @@
  * a row, never a value.
  */
 import { EXECUTORS, type AnyDb, type RetentionSweepStores, cutoffOf } from './retention-executors';
+import { loadActiveHolds } from './legal-hold';
 import { RETENTION_MANIFEST } from './retention-manifest';
 
 export type { RetentionSweepStores };
@@ -69,6 +70,18 @@ export interface LogRetentionSummary {
     perTable: Record<string, number>;
     /** Sum across tables; the one number the cron decides to log on. */
     total: number;
+    /**
+     * Hold rows in force during this tick, and the tables skipped because of
+     * them.
+     *
+     * Reported rather than silent, because the two ways a sweep returns zero —
+     * nothing was due, and everything due was preserved — are the same number
+     * with opposite meanings, and only one of them is somebody's cue to ask
+     * whether a hold is still needed. `suspendedTables` growing month after
+     * month is what an abandoned hold looks like from the outside.
+     */
+    activeHolds: number;
+    suspendedTables: string[];
 }
 
 /**
@@ -88,6 +101,15 @@ export async function runLogRetentionSweep(
     const perTable: Record<string, number> = {};
     let total = 0;
 
+    // ONE read for the whole tick, and deliberately NOT wrapped in the try/catch
+    // below. review review made legal hold a global invariant over every
+    // scheduled deletion, and the failure that invariant exists to prevent is a
+    // sweep that could not see the holds and deleted under them anyway — which
+    // is indistinguishable, from in here, from a tick where nothing was held. A
+    // sweep that skips a night is recoverable.
+    const holds = await loadActiveHolds(db);
+    const suspendedTables: string[] = [];
+
     // Per-rule failures are COLLECTED and rethrown at the end rather than
     // thrown where they happen. A missing bucket must not be able to stop the
     // other fourteen tables from expiring — that would trade one silent gap for
@@ -98,8 +120,21 @@ export async function runLogRetentionSweep(
     for (const rule of RETENTION_MANIFEST) {
         const exec = EXECUTORS[rule.table];
         if (!exec) continue;
+        // `suspend_all` is for the tables with no tenant column: the hold cannot
+        // be expressed as a filter, so the whole rule stands down while any hold
+        // is in force. The alternative was to run them anyway and hope the held
+        // tenant's rows had already aged out, which is a guess wearing the shape
+        // of a decision. Recorded in the summary, not skipped quietly.
+        if (rule.legalHold === 'suspend_all' && holds.activeHoldCount > 0) {
+            suspendedTables.push(rule.table);
+            continue;
+        }
         try {
-            const affected = await exec(db, cutoffOf(now, rule.window), { now, stores });
+            const affected = await exec(db, cutoffOf(now, rule.window), {
+                now,
+                stores,
+                heldTenantIds: holds.heldTenantIds,
+            });
             perTable[rule.table] = affected;
             total += affected;
         } catch (err) {
@@ -107,9 +142,15 @@ export async function runLogRetentionSweep(
         }
     }
 
+    const summary: LogRetentionSummary = {
+        perTable,
+        total,
+        activeHolds: holds.activeHoldCount,
+        suspendedTables,
+    };
     if (failures.length > 0) {
-        throw new RetentionSweepError({ perTable, total }, failures);
+        throw new RetentionSweepError(summary, failures);
     }
 
-    return { perTable, total };
+    return summary;
 }

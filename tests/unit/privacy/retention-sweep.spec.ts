@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
-import { tenants, tenantConfigs, agreements, agreementRequests, agreementSigners, esignAuditLogs } from '../../../server/lib/db/schema';
+import { tenants, tenantConfigs, agreements, agreementRequests, agreementSigners, esignAuditLogs, legalHolds } from '../../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { runRetentionSweep } from '../../../server/lib/compliance/retention-sweep';
 
@@ -119,6 +119,44 @@ describe('runRetentionSweep', () => {
             createdAt: new Date(opts.signedAtMs),
         } as any);
     }
+
+    /**
+     * A legal hold outranks this clock too.
+     *
+     * The fixed-window sweep next door is not the only scheduled deletion, and
+     * this one destroys more than any of those rules: a signature and three R2
+     * artefacts, none of which can be reconstructed from anything that survives.
+     * A hold that stopped the log sweep and left this one running would preserve
+     * the audit trail of a signing while destroying the signature it attests to.
+     */
+    it("preserves a held tenant's envelope while expiring an unheld one", async () => {
+        await seedSignedEnvelope({ id: 'e-held', tenantId: 't1', agreementId: 'agr-tpl', signedAtMs: NOW - 7 * YEAR_MS });
+        // t2's window is 2 years, so 7 years is comfortably past it too — the
+        // positive control that makes the surviving row mean "preserved" rather
+        // than "the sweep did nothing this run".
+        await seedSignedEnvelope({ id: 'e-free', tenantId: 't2', agreementId: 'agr-tpl2', signedAtMs: NOW - 7 * YEAR_MS });
+        await testDb.insert(legalHolds).values({
+            id: 'hold-1',
+            tenantId: 't1',
+            matter: 'CV-2026-00417',
+            reason: 'Preservation demand served on the company.',
+            placedBy: 'u-legal',
+            placedAt: new Date(NOW),
+        } as any);
+
+        const summary = await runRetentionSweep(testDb as any, NOW, { photos: sweepBucket() });
+        expect(summary.purgedEnvelopes).toBe(1);
+
+        const held = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-held')).get();
+        expect(held!.purgedAt, 'the held envelope was purged').toBeNull();
+        const heldSigner = await testDb.select().from(agreementSigners).where(eq(agreementSigners.requestId, 'e-held')).get();
+        expect(heldSigner!.signatureBase64, 'the held signature was destroyed').toBe('data:image/png;base64,SIGNERSIG');
+
+        const free = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-free')).get();
+        expect(free!.purgedAt, 'the unheld envelope was NOT purged').not.toBeNull();
+        const freeSigner = await testDb.select().from(agreementSigners).where(eq(agreementSigners.requestId, 'e-free')).get();
+        expect(freeSigner!.signatureBase64).toBeNull();
+    });
 
     it('destroys signatures + sets purgedAt on past-window signed rows; keeps audit chain', async () => {
         // t1 (6y): signed 7 years ago -> past window -> purge.

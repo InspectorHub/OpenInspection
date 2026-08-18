@@ -18,10 +18,55 @@ saying why this number and not another, and a digest cannot say that.
 
 ## Status
 
-`interim`. No period here has been approved by review as final. `approvedBy`
-and `approvedAt` in the header are null, and that is a fact about the policy
-rather than a gap in the paperwork: an unapproved policy that says so is
-honest, and one that says nothing reads as approved.
+`approved_with_conditions`. The windows have been reviewed and the conditions
+attached to that review are named in `retention-policy.ts` — two of five remain
+unmet, both on the customer Terms publish rather than on any period here. The
+status is deliberately not `approved`: a reader who sees that word stops asking
+what is left.
+
+---
+
+## 2026-08-19.3 — a legal hold now outranks every scheduled deletion
+
+**What changed.** Every rule in the manifest gained a required `legalHold`
+classification, and the sweeps learned to obey it. Twelve rules are
+`tenant_scoped` — their executors exclude rows belonging to a tenant with an
+unreleased row in the new `legal_holds` table. Two are `suspend_all`
+(`sync_outbox`, `parked_cmd_events`): those tables carry a command or account
+payload with the tenant identity inside a JSON blob, so there is nothing to
+filter on and the whole rule stands down while any hold is in force. Three are
+`not_applicable`, each with a written reason. The agreement sweep — a separate
+clock that destroys a signature and three R2 artefacts — honours holds too.
+
+**Why a hold covers a tenant rather than a list of rows.** A narrow hold has to
+enumerate what it covers before anyone knows what the matter will need, and
+every record it failed to name is then deleted on schedule while a hold is
+nominally in force. That is the worst available outcome, because the hold's
+existence is what makes the deletion look considered. Over-preservation under a
+recorded hold is defensible; under-preservation is spoliation.
+
+**Why a failed read stops the sweep.** `loadActiveHolds` throws rather than
+returning nothing, and neither sweep catches it. An unreadable holds table looks
+exactly like a table with no holds in it, and the difference between those two
+readings is whether the night's deletions happened during a preservation order.
+A sweep that skips a night is recoverable.
+
+**Why the classification is checked against the schema.** `lint:retention`
+rejects a rule claiming `tenant_scoped` on a table with no `tenant_id` column,
+and one claiming anything else on a table that has one. The first would delete
+under a hold; the second over-preserves for no reason, which is invisible
+because over-preservation looks like nothing happening. The gate also fails when
+zero rules are `tenant_scoped` — every table could be classified and the
+invariant still enforced nowhere, which is what this file described one version
+ago and it printed OK then too.
+
+**What this deliberately does not do.** A hold suspends *scheduled* deletion. It
+does not touch the DSAR erasure path, where a preservation obligation and an
+erasure request point in opposite directions; that conflict is a legal judgement
+with notification duties attached, not a filter, and wiring it silently either
+way would have decided it in a WHERE clause. Placing a hold is also a database
+write with no endpoint and no screen behind it — deliberate for a rare,
+legally-directed event, and stated here rather than left to be discovered.
 
 ---
 
@@ -91,18 +136,20 @@ meant reading the executors, and they did not say what the manifest said:
   stores the version and content hash of the text a person was shown.
 
 So the rule stands and the framing was half wrong. Both tables stay IN the sweep
-with reference-preserving executors, rather than being removed from it — review
-was explicit that the ruling is retain-while-referenced, not keep-forever: *"这并不
-意味着所有 SMS disclosure versions 永久保存"*. Removing them would have let rows
-accumulate indefinitely, which is not what was asked for. The missing
+with reference-preserving executors, rather than being removed from it — the
+ruling is retain-while-referenced, not keep-forever, and it does not mean every
+SMS disclosure version is stored permanently. Removing them from the sweep would
+have let superseded rows accumulate indefinitely, which is not what was asked
+for. The missing
 `notExists(account_acceptances)` check is now in the tenant executor, so both tables
 implement the same rule.
 
-**Why this version is `approved_with_conditions` and not `approved`.** review
-asked for that distinction in terms: *"我建议把 review 标成 APPROVED WITH
-CONDITIONS，而不是 APPROVED"*. Three of the five conditions are unmet — the
-dependency-aware sweep, the `legal_hold` override (**zero occurrences in the
-codebase**), and the customer ToS re-accept change summary. A reader who sees
+**Why this version is `approved_with_conditions` and not `approved`.** A ruling
+handed straight to an engineering team has to carry its own unmet conditions, so
+the status names them rather than implying there are none. Three of the five
+were unmet at this version — the dependency-aware sweep, the `legal_hold`
+override (which had **zero occurrences in the codebase** when this version
+shipped; see 2026-08-19.3 above), and the customer ToS re-accept change summary. A reader who sees
 `approved` stops asking what is left.
 
 **And a scope limit that belongs here rather than in a plan.** This covers

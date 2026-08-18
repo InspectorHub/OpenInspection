@@ -47,6 +47,7 @@ import {
     ANONYMIZE_REQUEST_PII,
 } from './anonymize-pii';
 import { r2Keys } from '../r2-keys';
+import { loadActiveHolds } from './legal-hold';
 import { changeCount, toMs, subtractYearsMs } from './db-row-utils';
 
 // Accept either the D1 drizzle type (prod) or the better-sqlite3 test db.
@@ -98,6 +99,14 @@ export async function runRetentionSweep(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = rawDb as any;
 
+    // Legal hold outranks this clock too (review review). It is a SCHEDULED
+    // deletion — the invariant is over all of them, not only the fixed-window
+    // sweep next door — and it destroys more than most: a signature and three R2
+    // artefacts, none of which can be reconstructed. Read before anything is
+    // selected, and NOT caught: an unreadable holds table must stop this sweep
+    // rather than let it run as though nothing were preserved.
+    const holds = await loadActiveHolds(db);
+
     // One grouped SELECT: signed, not-yet-purged envelopes joined to their
     // tenant's retention-years config. The per-tenant window is applied in JS
     // from the joined `years` value (avoids a correlated per-tenant query — the
@@ -128,6 +137,7 @@ export async function runRetentionSweep(
     for (const r of due as Array<{
         id: string; tenantId: string; inspectionId: string | null; signedAt: unknown; years: number | null;
     }>) {
+        if (holds.heldTenantIds.has(r.tenantId)) continue;
         const signedAtMs = toMs(r.signedAt);
         if (signedAtMs == null) continue;
         const years = r.years ?? DEFAULT_RETENTION_YEARS;

@@ -33,3 +33,16 @@ export const probeReferenceTable = sqliteTable('probe_reference_table', {
     id: text('id').primaryKey(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
+
+/**
+ * The tenant-scoped arm. Its presence is what lets the clean fixture exercise
+ * the legal-hold classification check in BOTH directions — a rule claiming
+ * `tenant_scoped` on a table with no `tenant_id`, and a rule claiming anything
+ * else on a table that has one. Without a tenant-bearing table in the probe
+ * schema, half of that check could only ever be proved by hand.
+ */
+export const probeTenantLog = sqliteTable('probe_tenant_log', {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull(),
+    receivedAt: integer('received_at', { mode: 'timestamp_ms' }).notNull(),
+});
