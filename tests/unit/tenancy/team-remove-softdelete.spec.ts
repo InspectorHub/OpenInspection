@@ -21,6 +21,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { TeamService } from '../../../server/services/team.service';
 import { AuthService } from '../../../server/services/auth.service';
+import { SEAT_QUOTA_UNENFORCED } from '../../../server/features/seat-quota';
 import { getSeatUsage } from '../../../server/features/seat-quota/usage';
 import { MockKV } from '../mocks';
 import { createTestDb, setupSchema } from '../db';
@@ -173,7 +174,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
             role: 'manager',
         });
 
-        await auth.joinTeam(invite.token, 'new-password-123');
+        await auth.joinTeam(invite.token, 'new-password-123', { seatQuota: SEAT_QUOTA_UNENFORCED });
 
         const row = await testDb.select().from(schema.users).where(eq(schema.users.email, MEMBER_EMAIL)).get();
         expect(row).toBeDefined();
@@ -208,7 +209,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
             email: MEMBER_EMAIL,
             role: 'inspector',
         });
-        await auth.joinTeam(invite.token, 'new-password-123');
+        await auth.joinTeam(invite.token, 'new-password-123', { seatQuota: SEAT_QUOTA_UNENFORCED });
 
         const row = await testDb.select().from(schema.users).where(eq(schema.users.id, MEMBER)).get();
         expect(row).toBeDefined();

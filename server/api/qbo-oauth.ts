@@ -3,6 +3,7 @@ import type { HonoConfig } from '../types/hono';
 import { requireRole } from '../lib/middleware/rbac';
 import { QBOTokenResponseSchema, QBOCompanyInfoResponseSchema } from '../lib/validations/qbo.schema';
 import { logger } from '../lib/logger';
+import { AppError, ErrorCode } from '../lib/errors';
 import { qboRedirectUri } from '../lib/qbo-oauth-paths';
 import { resolveQboApiBase } from '../services/qbo/api-base';
 import { loadTenantSecrets } from '../lib/secrets-cache';
@@ -199,6 +200,14 @@ api.get('/callback', async (c) => {
 
         return c.redirect('/settings/integrations/qbo?connected=1');
     } catch (e) {
+        // A realm already bound to another workspace is not a broken round
+        // trip — Intuit said yes and we refused, and the tenant can act on
+        // that. Reporting it as `oauth_failed` would send them to re-check
+        // credentials that are fine.
+        if (e instanceof AppError && e.code === ErrorCode.CONFLICT) {
+            logger.warn('QBO OAuth callback refused — realm already connected elsewhere', { realmId });
+            return c.redirect('/settings/integrations/qbo?error=realm_already_connected');
+        }
         logger.error('QBO OAuth callback failed', { realmId }, e instanceof Error ? e : undefined);
         return c.redirect('/settings/integrations/qbo?error=oauth_failed');
     }

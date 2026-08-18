@@ -7,7 +7,9 @@
  * defers to `computeSeatsUsed`) with the profile gate.
  */
 
-export interface SeatUser {
+/** Local to this file since `summariseSeats` stopped taking rows — the only
+ *  caller of `computeSeatsUsed` is now `getSeatUsage`, which owns the query. */
+interface SeatUser {
     id: string;
 }
 

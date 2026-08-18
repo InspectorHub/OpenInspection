@@ -1520,6 +1520,8 @@ export default function InspectionEditPage() {
  photoUploading={uploadFetcher.state !== "idle"}
  onAddCustomDefect={(input) => {
  if (state.activeItemId && state.currentSection) {
+ // Forwarded and spread WHOLE — never destructured. A field named in
+ // one place and not the other is how `trade` came to be missing here.
  const d = makeCustomDefect(input);
  if (d) {
  findings.addCustomDefect(state.currentSection.id, state.activeItemId, {

@@ -120,14 +120,39 @@ export function withWebhook<
             const db = this.getDrizzle();
             let ignoredEntity = 0;
             let unknownRealm = 0;
+            let ambiguousRealm = 0;
             for (const event of events) {
                 const parsed = this.parseCloudEventType(event.type);
                 const entity = parsed?.entityType;
                 if (entity !== 'invoice' && entity !== 'payment') { ignoredEntity++; continue; }
 
-                const conn = await db.select().from(qboConnections)
-                    .where(eq(qboConnections.realmId, event.intuitaccountid)).get();
-                if (!conn) { unknownRealm++; continue; }
+                // `.all()`, not `.get()`. This lookup IS the tenant decision for
+                // an unauthenticated endpoint, and `realm_id` carries no unique
+                // constraint — `tenant_id` is the primary key, so the table
+                // permits two tenants to hold the same QuickBooks company. With
+                // `.get()` a duplicate resolved to whichever row came back
+                // first, which applied one company's payments, voids and
+                // balance changes to an arbitrary tenant's books.
+                //
+                // Ambiguity is refused, not guessed. `saveConnection` now
+                // refuses to create a second claim, but a database can already
+                // hold one, and the wrong tenant is worse than no tenant: the
+                // event is skipped, counted and named below so somebody can
+                // untangle the two connections.
+                const claimants = await db.select().from(qboConnections)
+                    .where(eq(qboConnections.realmId, event.intuitaccountid)).all();
+                if (claimants.length === 0) { unknownRealm++; continue; }
+                if (claimants.length > 1) {
+                    ambiguousRealm++;
+                    logger.warn('QBO webhook realm is ambiguous — refusing to guess a tenant', {
+                        realmId:  event.intuitaccountid,
+                        claimants: claimants.length,
+                        tenantIds: claimants.map((r) => r.tenantId),
+                        entityId:  event.intuitentityid,
+                    });
+                    continue;
+                }
+                const conn = claimants[0]!;
 
                 try {
                     // A payment names the invoices it settled; an invoice event
@@ -157,13 +182,14 @@ export function withWebhook<
             // from "one of one". `unparsed > 0` in particular means Intuit's
             // payload shape no longer matches our schema, which used to surface
             // as a perfectly healthy-looking {valid:true} that processed nothing.
-            if (unparsed > 0 || ignoredEntity > 0 || unknownRealm > 0) {
+            if (unparsed > 0 || ignoredEntity > 0 || unknownRealm > 0 || ambiguousRealm > 0) {
                 logger.warn('QBO webhook dropped events', {
                     received: candidates.length,
-                    handled:  events.length - ignoredEntity - unknownRealm,
+                    handled:  events.length - ignoredEntity - unknownRealm - ambiguousRealm,
                     unparsed,
                     ignoredEntity,
                     unknownRealm,
+                    ambiguousRealm,
                 });
             }
 

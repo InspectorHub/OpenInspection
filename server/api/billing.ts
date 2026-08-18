@@ -12,8 +12,9 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { eq } from 'drizzle-orm';
-import { tenants, users as usersTbl } from '../lib/db/schema';
+import { tenants } from '../lib/db/schema';
 import { summariseSeats } from '../lib/billing-summary';
+import { getSeatUsage } from '../features/seat-quota/usage';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { getDrizzle } from '../lib/route-helpers';
@@ -43,11 +44,13 @@ const billingRoutes = createApiRouter()
         }).from(tenants).where(eq(tenants.id, tenantId)).get();
         if (!tenant) throw Errors.NotFound('Tenant not found');
 
-        const rows = await db.select({
-            id: usersTbl.id,
-        }).from(usersTbl).where(eq(usersTbl.tenantId, tenantId)).all();
-
-        const summary = summariseSeats(rows, tenant);
+        // Seats come from `getSeatUsage`, not from a query written here. This
+        // route used to count the tenant's users itself and forgot
+        // `deleted_at IS NULL`, so a removed member — soft-deleted so their
+        // inspection attribution survives — stayed on the bill after the
+        // invite guard had already handed their seat back.
+        const usage = await getSeatUsage(tenantId, c.env.DB);
+        const summary = summariseSeats(usage.used, tenant);
 
         // Portal Customer Portal redirect URL — surfaced for the "Manage
         // billing" CTA on the page. Omitted when the portal isn't wired

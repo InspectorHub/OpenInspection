@@ -7,6 +7,8 @@
   "editor_defect_location_placeholder": "e.g. master bathroom, NE corner of basement",
   "editor_defect_trade_label": "Trade",
   "editor_defect_trade_select_placeholder": "— select —",
+  "editor_customdefect_trade_placeholder": "Trade — select",
+  "editor_customdefect_trade_summary": "Trade: {trade}",
   "editor_defect_deadline_label": "Deadline",
   "editor_defect_timeframe_label": "Timeframe",
   "editor_header_property_fallback": "Inspection",

@@ -6,8 +6,14 @@
  * one seat; the `permanent` / `guests` fields are retained for response
  * shape stability (guests are always 0 since the guest subsystem was
  * removed — `expires_at` is DEAD).
+ *
+ * ⚠️ IT TAKES A COUNT, NOT A ROW LIST, AND THAT IS THE POINT. It used to take
+ * the rows and count them, which meant the CALLER owned the definition of
+ * "a member" — and the route's own query had no `deleted_at IS NULL`, so the
+ * billing page charged for people `getSeatUsage` had already released. The
+ * count now has exactly one producer (`getSeatUsage`), so the seat guard, the
+ * session context, the portal quota sync and this page cannot disagree.
  */
-import { computeSeatsUsed, type SeatUser } from './middleware/seat-guard';
 
 export interface TenantBillingFields {
     maxUsers?: number | null;
@@ -26,11 +32,9 @@ const DEFAULT_TIER = 'free';
 const DEFAULT_MAX_USERS = 1;
 
 export function summariseSeats(
-    users: SeatUser[],
+    seatsUsed: number,
     tenant: TenantBillingFields,
 ): BillingSummary {
-    const seatsUsed = computeSeatsUsed(users);
-
     return {
         tier:      tenant.tier      ?? DEFAULT_TIER,
         maxUsers:  tenant.maxUsers  ?? DEFAULT_MAX_USERS,

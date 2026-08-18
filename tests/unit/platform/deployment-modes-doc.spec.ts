@@ -25,8 +25,24 @@ import { STANDALONE_PROFILE } from '../../../server/lib/deployment-profile';
  * deleted, because nothing ever compared it to the code.
  */
 describe('deployment-modes.md is generated from the profile constants', () => {
+    /**
+     * Carriage returns are stripped from BOTH sides before comparing.
+     *
+     * The generator writes unix line endings; git checks the file out with
+     * windows ones wherever `core.autocrlf` is on, which is every default
+     * Windows clone. The comparison then failed on bytes git itself considers
+     * identical, so a stale doc and a Windows checkout produced the same red
+     * and only one of them meant anything — `npm run docs:modes` "fixed" the
+     * second by rewriting the file to bytes git saw no change in.
+     *
+     * Stripping keeps the check about the table's CONTENT, which is the only
+     * thing that command can actually fix.
+     */
+    const CR = String.fromCharCode(13);
+    const lf = (text: string): string => text.split(CR).join('');
+
     function tableInDoc(): string {
-        const doc = readFileSync(DOC_PATH, 'utf8');
+        const doc = lf(readFileSync(DOC_PATH, 'utf8'));
         const start = doc.indexOf(START);
         const end = doc.indexOf(END);
         expect(start, `${START} marker missing from the doc`).toBeGreaterThanOrEqual(0);
@@ -60,6 +76,6 @@ describe('deployment-modes.md is generated from the profile constants', () => {
         expect(
             tableInDoc(),
             'docs/reference/deployment-modes.md is stale — run `npm run docs:modes`',
-        ).toBe(renderModesTable());
+        ).toBe(lf(renderModesTable()));
     });
 });

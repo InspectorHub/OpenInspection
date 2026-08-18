@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { AuthService } from '../../../server/services/auth.service';
+import { SEAT_QUOTA_UNENFORCED } from '../../../server/features/seat-quota';
 import { verifyPassword } from '../../../server/lib/password';
 import { MockKV } from '../mocks';
 import { createTestDb, setupSchema } from '../db';
@@ -177,7 +178,7 @@ describe('AuthService', () => {
             invitedBy: 'u1'
         } as any);
 
-        const result = await authService.joinTeam(token, 'password');
+        const result = await authService.joinTeam(token, 'password', { seatQuota: SEAT_QUOTA_UNENFORCED });
         expect(result.email).toBe(email);
         expect(result.role).toBe('inspector');
 
@@ -192,7 +193,7 @@ describe('AuthService', () => {
             status: 'pending', expiresAt: new Date(Date.now() + 1000000), invitedBy: 'u1',
         } as any);
 
-        await authService.joinTeam(token, 'password', 'Jamie Rivera');
+        await authService.joinTeam(token, 'password', { name: 'Jamie Rivera', seatQuota: SEAT_QUOTA_UNENFORCED });
 
         const dbUser = await testDb.select().from(users).where(eq(users.email as any, 'named@example.com')).get();
         expect(dbUser?.name).toBe('Jamie Rivera');
@@ -208,7 +209,7 @@ describe('AuthService', () => {
             permissionOverrides: { publish: false, scheduleOthers: true },
         } as any);
 
-        await authService.joinTeam(token, 'password');
+        await authService.joinTeam(token, 'password', { seatQuota: SEAT_QUOTA_UNENFORCED });
 
         const dbUser = await testDb.select().from(users).where(eq(users.email as any, 'override@example.com')).get();
         expect(dbUser?.permissionOverrides).toEqual({ publish: false, scheduleOthers: true });
@@ -221,7 +222,7 @@ describe('AuthService', () => {
             status: 'pending', expiresAt: new Date(Date.now() + 1000000), invitedBy: 'u1',
         } as any);
 
-        await authService.joinTeam(token, 'password');
+        await authService.joinTeam(token, 'password', { seatQuota: SEAT_QUOTA_UNENFORCED });
 
         const dbUser = await testDb.select().from(users).where(eq(users.email as any, 'plain@example.com')).get();
         expect(dbUser?.permissionOverrides ?? null).toBeNull();

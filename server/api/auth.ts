@@ -345,7 +345,15 @@ const coreAuthRoutes = createApiRouter()
     })
     .openapi(joinTeamRoute, async (c) => {
         const body = c.req.valid('json');
-        const user = await c.var.services.auth.joinTeam(body.token, body.password, body.name);
+        // The seat decision belongs to the deployment, not to the service:
+        // standalone has a `max_users` default and no billing behind it.
+        const user = await c.var.services.auth.joinTeam(body.token, body.password, {
+            name: body.name,
+            seatQuota: {
+                enforce: c.var.profile.hasSeatQuota,
+                billingPortalUrl: c.var.profile.billingPortalUrl,
+            },
+        });
 
         const keyring = await c.var.keyringPromise!;
         const now = Math.floor(Date.now() / 1000);

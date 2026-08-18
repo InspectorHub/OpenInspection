@@ -3,6 +3,7 @@
  * Supports both dynamic rating levels and legacy 3-level format.
  */
 import { findingKey, DEFAULT_UNIT } from './finding-key';
+import { DEFECT_TRADE_LABELS, isDefectTrade } from '../types/defect-fields';
 
 export interface RatingLevel {
   id: string;
@@ -42,6 +43,7 @@ interface CustomDefectInput {
   included?: boolean;
   category?: string;
   location?: string | null;
+  trade?: string | null;
   photos?: Array<{ key: string; croppedKey?: string; annotatedKey?: string; pendingUpload?: boolean }>;
 }
 
@@ -53,6 +55,11 @@ export interface ResolvedCustomDefect {
   effectiveComment: string;
   effectiveCategory: string;
   effectiveLocation: string | null;
+  /** The trade LABEL ("licensed roofer"), not the stored slug — the same value
+   *  the canned path publishes via `resolveDefectMustacheVars`. Custom and
+   *  canned defects render in one list, so a reader must not be able to tell
+   *  which branch produced a row. Null when unset or outside the vocabulary. */
+  effectiveTrade: string | null;
   defectPhotos: Array<{ key: string; originalKey: string; url: string }>;
 }
 
@@ -75,6 +82,7 @@ export function mapCustomDefectsForReport(
     effectiveComment: d.comment ?? '',
     effectiveCategory: d.category ?? 'recommendation',
     effectiveLocation: typeof d.location === 'string' && d.location.length > 0 ? d.location : null,
+    effectiveTrade: isDefectTrade(d.trade) ? DEFECT_TRADE_LABELS[d.trade] : null,
     // #181 PR-G: pending uploads have no R2 object yet — skip them.
     defectPhotos: (d.photos ?? []).filter((p) => !p.pendingUpload).map((p) => {
       const displayKey = p.annotatedKey || p.croppedKey || p.key;

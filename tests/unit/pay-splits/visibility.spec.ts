@@ -148,8 +148,38 @@ describe('GET /api/inspections/:id/pay-splits — who sees whose pay', () => {
     it("an inspector never receives a colleague's amount, not even to hide it", async () => {
         // A wage is not information to withhold visually — it must not be in
         // the payload at all. This is the assertion the whole design serves.
+        //
+        // Checked over VALUES, not over the serialized blob. The blob form
+        // (`JSON.stringify(body)).not.toContain('u2')`) read as a strict
+        // superset and was in fact a coin flip: split ids are `nanoid()`, 21
+        // random characters from a 64-symbol alphabet, so any given id carries
+        // the pair `u2` about one run in two hundred — and it duly failed on an
+        // id of `yFTngT9NULM83RTbHDDu2` while `userId` was correctly `u1`. A
+        // test that fails on the shape of a random id is not testing tenancy.
         const res = await getSplitsAs('u1', 'inspector');
-        expect(JSON.stringify(await res.json())).not.toContain('u2');
+        const body = await res.json() as { data: { splits: Record<string, unknown>[] } };
+
+        const foreign = body.data.splits.flatMap((split, i) =>
+            Object.entries(split)
+                .filter(([, v]) => v === 'u2')
+                .map(([k]) => `splits[${i}].${k}`));
+        expect(foreign).toEqual([]);
+        // Not vacuous: there IS a split, and it is the requester's own.
+        expect(body.data.splits.map(s => s.userId)).toEqual(['u1']);
+    });
+
+    it("positive control — the same check DOES see a colleague when one is returned", async () => {
+        // Without this, the assertion above would pass just as happily against
+        // an endpoint that returned nothing at all, or against a payload whose
+        // user field had been renamed out from under it.
+        const res = await getSplitsAs('mgr', 'manager');
+        const body = await res.json() as { data: { splits: Record<string, unknown>[] } };
+
+        const foreign = body.data.splits.flatMap((split, i) =>
+            Object.entries(split)
+                .filter(([, v]) => v === 'u2')
+                .map(([k]) => `splits[${i}].${k}`));
+        expect(foreign.length).toBeGreaterThan(0);
     });
 
     it('a manager sees every split on the inspection, editable', async () => {

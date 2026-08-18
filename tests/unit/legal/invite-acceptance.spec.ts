@@ -33,6 +33,7 @@ import { INVITE_REQUIRED_DOCS } from '../../../server/services/legal/invite-acce
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { AuthService } from '../../../server/services/auth.service';
+import { SEAT_QUOTA_UNENFORCED } from '../../../server/features/seat-quota';
 
 const TENANT = 't-invite';
 
@@ -85,7 +86,7 @@ describe('joinTeam records the acceptance in the same write as the member row', 
         await publishBoth();
         await invite('tok-ok', 'member@example.com');
 
-        const joined = await auth.joinTeam('tok-ok', 'password123');
+        const joined = await auth.joinTeam('tok-ok', 'password123', { seatQuota: SEAT_QUOTA_UNENFORCED });
 
         const rows = await db.select().from(accountAcceptances).all();
         expect(rows.map((r) => r.doc).sort()).toEqual(['privacy', 'terms']);
@@ -111,7 +112,7 @@ describe('joinTeam records the acceptance in the same write as the member row', 
         });
         await invite('tok-half', 'half@example.com');
 
-        await auth.joinTeam('tok-half', 'password123');
+        await auth.joinTeam('tok-half', 'password123', { seatQuota: SEAT_QUOTA_UNENFORCED });
         const rows = await db.select().from(accountAcceptances).all();
         // Exactly one row, and it names which document. Nothing was invented to
         // fill the gap, which is what "cannot read as complete" now means.
@@ -132,7 +133,7 @@ describe('joinTeam records the acceptance in the same write as the member row', 
         // publishing built-in documents at tenant creation, not by a stricter check.
         await invite('tok-none', 'none@example.com');
 
-        await auth.joinTeam('tok-none', 'password123');
+        await auth.joinTeam('tok-none', 'password123', { seatQuota: SEAT_QUOTA_UNENFORCED });
         expect(await db.select().from(users).all()).toHaveLength(1);
         // No acceptance rows, and that is the honest outcome rather than a row
         // pointing at a document that does not exist.
@@ -147,7 +148,7 @@ describe('joinTeam records the acceptance in the same write as the member row', 
         });
         await invite('tok-back', 'back@example.com');
 
-        const joined = await auth.joinTeam('tok-back', 'password123');
+        const joined = await auth.joinTeam('tok-back', 'password123', { seatQuota: SEAT_QUOTA_UNENFORCED });
 
         // The row is reattached, not re-minted — inspection history follows the
         // id — so the acceptance has to land on that id too.
@@ -165,7 +166,7 @@ describe('joinTeam records the acceptance in the same write as the member row', 
             append: async (e) => { appended.push(e); return 'row-1'; },
         });
 
-        await withOutbox.joinTeam('tok-sync', 'password123');
+        await withOutbox.joinTeam('tok-sync', 'password123', { seatQuota: SEAT_QUOTA_UNENFORCED });
 
         const invited = appended.find((e) => e.type === 'user.invited');
         // The event that creates the portal-side identity is the event that
@@ -183,7 +184,7 @@ describe('joinTeam records the acceptance in the same write as the member row', 
     it('a reactivated member reports the ORIGINAL acceptance time, not this attempt', async () => {
         await publishBoth();
         await invite('tok-a', 'again@example.com');
-        const first = await auth.joinTeam('tok-a', 'password123');
+        const first = await auth.joinTeam('tok-a', 'password123', { seatQuota: SEAT_QUOTA_UNENFORCED });
         const original = (await db.select().from(accountAcceptances).all())
             .map((r) => r.acceptedAt!.getTime()).sort();
 
@@ -193,7 +194,7 @@ describe('joinTeam records the acceptance in the same write as the member row', 
         const withOutbox = new AuthService({} as D1Database, undefined, {
             append: async (e) => { appended.push(e); return 'row-2'; },
         });
-        await withOutbox.joinTeam('tok-b', 'password123');
+        await withOutbox.joinTeam('tok-b', 'password123', { seatQuota: SEAT_QUOTA_UNENFORCED });
 
         const acceptance = appended.find((e) => e.type === 'user.invited')!
             .payload['acceptance'] as { documents: Array<{ acceptedAt: number }> };
@@ -206,12 +207,12 @@ describe('joinTeam records the acceptance in the same write as the member row', 
     it('re-accepting the SAME versions does not mint a second row, and does not fail the join', async () => {
         await publishBoth();
         await invite('tok-1', 'twice@example.com');
-        const first = await auth.joinTeam('tok-1', 'password123');
+        const first = await auth.joinTeam('tok-1', 'password123', { seatQuota: SEAT_QUOTA_UNENFORCED });
 
         // Removed, then re-invited while the tenant's documents are unchanged.
         await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, first.id));
         await invite('tok-2', 'twice@example.com');
-        await auth.joinTeam('tok-2', 'password123');
+        await auth.joinTeam('tok-2', 'password123', { seatQuota: SEAT_QUOTA_UNENFORCED });
 
         // The unique index is (user, doc, version): a second row at the same
         // version would read as the person having accepted twice. The already
