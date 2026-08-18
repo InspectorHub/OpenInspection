@@ -97,8 +97,17 @@ try {
 
 const gate = [
     ['contracting party + contact resolved', !placeholders.includes('OPERATOR_NAME') && !placeholders.includes('OPERATOR_CONTACT_EMAIL')],
-    ['governing law resolved', !placeholders.includes('GOVERNING_LAW')],
-    ['dispute mechanism resolved', !placeholders.includes('DISPUTE_PROVISION')],
+    // Governing law and the dispute mechanism are NO LONGER gate lines. Counsel
+    // round 30 §4: "governing law 'must not ship as a placeholder'" never meant
+    // every contract must contain the clause, and a document with no choice-of-law
+    // clause is not thereby invalid — so §17 was deleted rather than filled. What
+    // it does NOT mean is that the risk is gone: with no governing law, no venue
+    // and no arbitration, a dispute still has to find a forum. It means the
+    // Agent Portal is no longer blocked ON THIS.
+    //
+    // Counsel also declined an explicit "no choice of law is made" sentence: it
+    // converts a mere absence into an affirmative contractual statement, for no
+    // commercial gain.
     ['privacy notice URL resolved', !placeholders.includes('PRIVACY_URL')],
     ['retention model approved', retentionApproved],
     ['no-agency clause present', noAgency],
