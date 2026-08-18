@@ -44,9 +44,9 @@
  * code IS the contract: a gate that prints complaints and exits 0 is the
  * failure mode this whole family of checks was written after.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -245,5 +245,133 @@ describe('the three catalogue parsers are one shape', () => {
         // this says the wrong one is gone. A parser carrying both — a fixed
         // `arrayBody` beside a forgotten second copy — satisfies only the first.
         expect(readGate(rel)).not.toContain(PREFIX_SEARCH);
+    });
+});
+
+/**
+ * Erasure-only: the enforcement deadlines the manifest carries, and whether
+ * anybody finds out about them before the build stops.
+ *
+ * `check-erasure-manifest.mjs` already FAILS once a pending rule's
+ * `enforcementDeadline` has passed. That is the right end state and the wrong
+ * only signal: the ten address-family rules carry 2027-02-01, and until that
+ * morning every run of this gate said "OK" in exactly the tone it will use on
+ * the day before. A deadline whose entire notice period is the moment it breaks
+ * CI is a deadline nobody can plan around — it lands as an interruption on
+ * whoever happens to be committing, which is the opposite of the review the
+ * date was chosen to buy.
+ *
+ * So two things are asserted here, and they are the same thing twice:
+ *
+ *  1. A pending rule inside the lead-time window WARNS, by name, and the run
+ *     still exits 0. A warning that fails the build is just an earlier
+ *     deadline, and would be moved rather than acted on.
+ *  2. Every run — green included — prints how many rules are pending and when
+ *     the nearest one is due. `scripts/check-retention-policy.mjs` states the
+ *     house rule this comes from: a gate prints the numbers it is guarding on
+ *     every run, never a verdict alone, because the day it is green is the day
+ *     somebody needs to be able to check it.
+ *
+ * Lives beside the parsing battery rather than in a file of its own for the
+ * same reason the retention legal-hold block does: same gate, same probe
+ * directory, same child-process runner. Splitting it would separate the checks
+ * from the fixtures they depend on.
+ */
+describe('erasure-manifest gate — enforcement deadlines before they bite', () => {
+    const SCRATCH_REL = '.gate-cache';
+    const RENDERED_REL = `${SCRATCH_REL}/erasure-deadline-probe.ts`;
+    const RENDERED = path.join(ROOT, RENDERED_REL);
+    const TEMPLATE = path.join(ROOT, ERASURE_PROBE, 'probe-manifest-deadlines.template.ts');
+
+    /** A YYYY-MM-DD date `days` from now, computed rather than written down. */
+    const isoInDays = (days: number) =>
+        new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+
+    /**
+     * Render the template against the CURRENT clock and run the gate on it.
+     *
+     * The rendered file goes to `.gate-cache/` (gitignored scratch) rather than
+     * into the probe directory: a generated file sitting next to tracked
+     * fixtures is one interrupted run away from being committed, and a
+     * committed copy would carry dates that were only correct on the day it was
+     * written. The gate resolves `--manifest` against the repo root, so the
+     * path has to stay inside the tree — an OS temp dir on another drive does
+     * not survive that join on Windows.
+     */
+    function runWithDeadlines(nearDays: number, farDays: number) {
+        // Global, not first-match: the template's own doc comment names both
+        // tokens, so a plain string replace substitutes the PROSE and leaves
+        // the rules holding a literal token — which the gate then rejects as
+        // "not YYYY-MM-DD", a red test that looks like it proved something.
+        const rendered = readFileSync(TEMPLATE, 'utf8')
+            .replace(/__DEADLINE_NEAR__/g, isoInDays(nearDays))
+            .replace(/__DEADLINE_FAR__/g, isoInDays(farDays));
+        mkdirSync(path.join(ROOT, SCRATCH_REL), { recursive: true });
+        writeFileSync(RENDERED, rendered, 'utf8');
+        return run(ERASURE_GATE, [
+            '--manifest', RENDERED_REL,
+            '--out-of-scope', `${ERASURE_PROBE}/probe-out-of-scope.ts`,
+            '--schema-dir', ERASURE_PROBE,
+        ]);
+    }
+
+    afterAll(() => rmSync(RENDERED, { force: true }));
+
+    it('WARNS by name when a pending deadline is inside the lead-time window', () => {
+        const { status, output } = runWithDeadlines(45, 400);
+        expect(output).toContain('inspections.property_address');
+        expect(output).toMatch(/approach/i);
+        // A warning is a warning. If this ever exits 1, the lead time has become
+        // a second deadline and the only way back to green is to move the date.
+        expect(status).toBe(0);
+    });
+
+    it('stays silent about a pending rule that is nowhere near its deadline', () => {
+        // The positive control, and the only thing separating "warns about the
+        // right rule" from "warns about every pending rule" — which would fire
+        // on all ten address rules today and be tuned out by next week.
+        const { status, output } = runWithDeadlines(45, 400);
+        expect(status).toBe(0);
+        expect(output).not.toContain('inspections.address_city');
+    });
+
+    it('says nothing at all when every pending deadline is far away', () => {
+        // The other half of that control: with no rule inside the window there
+        // must be no warning header either. A gate that prints the heading
+        // unconditionally reads as a live warning to anyone scanning output.
+        const { status, output } = runWithDeadlines(300, 400);
+        expect(status).toBe(0);
+        expect(output).not.toMatch(/approach/i);
+        expect(output).toContain('erasure-manifest lint: OK');
+    });
+
+    it('prints the pending count and the nearest deadline on a GREEN real-tree run', () => {
+        // The number this gate is guarding, on the run where nobody is looking.
+        // Ten rules currently sit pending against 2027-02-01; a run that prints
+        // only "OK (N rules, M out-of-scope)" cannot tell anyone that.
+        const { status, output } = run(ERASURE_GATE, []);
+        expect(status).toBe(0);
+        expect(output).toMatch(
+            /[1-9]\d* pending enforcement \(nearest deadline \d{4}-\d{2}-\d{2}, -?\d+ days?\)/,
+        );
+    });
+
+    it('prints the same line on a FAILING run', () => {
+        // Both numbers on every run, pass or fail. A summary that only survives
+        // the happy path is missing from precisely the runs someone is reading
+        // closely — a red gate is when people actually read the output.
+        //
+        // The REAL manifest against the PROBE out-of-scope register: every rule
+        // is genuine, so the pending set is the real one, and the coverage arm
+        // fails because the tiny probe register excuses none of the schema's
+        // uncovered columns. The failure is real and has nothing to do with
+        // deadlines, which is the point.
+        const { status, output } = run(ERASURE_GATE, [
+            '--out-of-scope', `${ERASURE_PROBE}/probe-out-of-scope.ts`,
+        ]);
+        expect(status).toBe(1);
+        expect(output).toMatch(
+            /[1-9]\d* pending enforcement \(nearest deadline \d{4}-\d{2}-\d{2}, -?\d+ days?\)/,
+        );
     });
 });
