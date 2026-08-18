@@ -183,6 +183,13 @@
       "when": 1787044268084,
       "tag": "0025_right_nebula",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1787059273155,
+      "tag": "0026_abnormal_lucky_pierre",
+      "breakpoints": true
     }
   ]
 }
