@@ -84,13 +84,31 @@ function cell(value: unknown): string {
     return `\`${String(value)}\``;
 }
 
+/**
+ * Rows whose VALUE trips `lint:no-portal-routes`, with the reason.
+ *
+ * It lives here rather than in the generated markdown because that file is
+ * regenerated from this script: an exemption hand-written into the table
+ * survives exactly until the next `npm run docs:modes`, and nothing gates the
+ * generated file for drift, so it would revert silently.
+ *
+ * Line-scoped rather than file-scoped on purpose — a file-scoped allow on a
+ * generated document would also exempt every hosted path a FUTURE row happens
+ * to introduce, which is the leak the gate exists to catch.
+ */
+const ROUTE_ALLOW: Partial<Record<keyof DeploymentProfile, string>> = {
+    mcpApiRoute:
+        "this cell is the VALUE of this engine's own mcpApiRoute setting, not a link to a hosted screen",
+};
+
 export function renderModesTable(): string {
     const keys = Object.keys(DESCRIPTIONS) as (keyof DeploymentProfile)[];
     const rows = keys.map((k) => {
         const d = DERIVED[k];
         const standalone = d?.standalone ?? cell(STANDALONE_PROFILE[k]);
         const saas = d?.saas ?? cell(SAAS_PROFILE[k]);
-        return `| \`${k}\` | ${standalone} | ${saas} | ${DESCRIPTIONS[k]} |`;
+        const allow = ROUTE_ALLOW[k] ? ` <!-- no-portal-routes-allow: ${ROUTE_ALLOW[k]} -->` : '';
+        return `| \`${k}\` | ${standalone} | ${saas} | ${DESCRIPTIONS[k]} |${allow}`;
     });
     return [
         '| Capability | standalone | saas | What it decides |',

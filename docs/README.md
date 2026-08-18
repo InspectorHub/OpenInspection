@@ -5,7 +5,7 @@ Start here. Pick the section that matches what you are trying to do.
 | I want to… | Go to |
 |---|---|
 | Run OpenInspection for my own inspection business | [`operate/`](#operating-a-deployment) |
-| Use the product day to day | [`user-guide/`](#using-the-product) |
+| Use the product day to day | [inspectorhub.io/docs](#using-the-product) |
 | Change the code or send a pull request | [`develop/`](#developing) |
 | Connect it to QuickBooks, Stripe, a calendar, email or SMS | [`integrations/`](#integrations) |
 | Look up an endpoint, a table, a role | [`reference/`](#reference) |
@@ -27,13 +27,19 @@ Running the engine on your own Cloudflare account.
 
 ## Using the product
 
-| Doc | Topic |
-|---|---|
-| [`user-guide/README.md`](user-guide/README.md) | The inspection workflow end to end — create, inspect, publish, deliver, get paid |
+**Not here.** The user guide lives at <https://inspectorhub.io/docs> — the
+inspection workflow end to end: create, inspect, publish, deliver, get paid.
 
-> Illustrated, step-by-step versions of these walkthroughs (with screenshots)
-> live at <https://inspectorhub.io/docs>. The text here is complete on its own;
-> the hosted copy adds the pictures.
+It is not in this repository because it is not about this repository. A page
+explaining how to record a finding or send a report describes the product, and
+the product is the same product whether you run it yourself or somebody runs it
+for you — so one copy serves both, illustrated with screenshots taken from the
+software in this repository (`tests/docs-shots/`). Splitting it would give
+self-hosters the worse of two guides.
+
+Where a screen genuinely differs by deployment mode, the hosted page says so
+inline. Capability by capability, the difference is
+[`reference/deployment-modes.md`](reference/deployment-modes.md).
 
 ## Integrations
 

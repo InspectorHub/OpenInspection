@@ -1,3 +1,5 @@
+<!-- no-portal-routes-allow-file: generated from commit messages by release-please. The entries are a record of what shipped; editing them to satisfy a prose gate would falsify the history rather than fix a document. -->
+
 # Changelog
 
 All notable changes to this project will be documented in this file.

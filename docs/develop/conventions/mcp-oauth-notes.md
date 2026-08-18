@@ -1,3 +1,5 @@
+<!-- no-portal-routes-allow-file: every `/company/` here is THIS engine's own MCP mount prefix in SaaS mode (`apiRoute: '/company/'`, served by the OAuth provider rather than app/routes.ts), not a portal screen. The gate's prefix list was checked against app/routes.ts, which is why it cannot see this one. -->
+
 # MCP Remote + OAuth Integration — Discovery Notes
 
 > Produced by Task A0 spike (2026-06-29). Later tasks depend on the exact symbol names

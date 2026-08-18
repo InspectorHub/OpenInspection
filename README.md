@@ -97,7 +97,7 @@ Deep dive: [`docs/operate/deploy.md`](docs/operate/deploy.md). Architecture over
 
 - [Deploy](docs/operate/deploy.md) — first-time setup on Cloudflare
 - [Upgrading](docs/operate/upgrade.md) — upgrade an existing deployment to a newer release
-- [User guide](docs/user-guide/README.md) — the inspection workflow end to end
+- [User guide](https://inspectorhub.io/docs) — the inspection workflow end to end, for hosted and self-hosted alike
 - [Architecture](docs/develop/architecture.md) — module map, request flow, cost model
 - [Design System](docs/develop/design-system.md) — tokens, shared-ui components, dark mode, `lint:ds`
 - [Contributing](CONTRIBUTING.md) — code conventions and PR process, including the [Versioning & Deprecation Policy](CONTRIBUTING.md#versioning--deprecation-policy)
