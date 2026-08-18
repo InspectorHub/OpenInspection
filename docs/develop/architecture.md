@@ -329,9 +329,18 @@ The DI proxy in `server/lib/middleware/di.ts` lazy-instantiates each service on 
 
 ### Future app path
 
-1. **PWA** (current) — installable, offline-capable via Service Worker
-2. **Capacitor** (short-term) — native shell for camera, push notifications, App Store
-3. **React Native** (long-term) — reuse React hooks/state logic, rewrite UI components
+1. **PWA** (current) — installable, offline-capable via Service Worker plus the
+   `useOfflineQueue` hook, which carries the photo-upload queue and field sync.
+2. **A native client** (direction, unspecified) — designed for the field rather
+   than inherited from the browser: capture, local storage, sync and conflict
+   resolution are the requirement, not follow-ups to a shell.
+
+**Capacitor was on this list and is not any more** (2026-08-18). It was a
+WebView wrapper with native camera and offline capture deferred to later work,
+and those deferred items are the actual requirement — an inspector works
+basements and crawlspaces with no usable connection. That is a judgement about
+what this product needs, not about the tool. Until a native client exists,
+responsive web is the field surface.
 
 ## Storage
 
