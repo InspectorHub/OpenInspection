@@ -4,7 +4,7 @@ The open-source inspection engine. A single Cloudflare Worker (the
 cloudflare/react-router-hono-fullstack-template shape): a Hono entry that mounts the full
 API in-process and delegates page routes to React Router v8 SSR.
 
-**Docs**: `docs/README.md` is the map — `docs/operate/` (deploy, upgrade, configure) · `docs/develop/` (architecture, testing, design system) · `docs/reference/` (API, database, roles, deployment modes) · `docs/concepts/` (how the engine works) · `docs/user-guide/` (using the product)
+**Docs**: `docs/README.md` is the map — `docs/operate/` (deploy, upgrade, configure) · `docs/develop/` (architecture, testing, design system) · `docs/reference/` (API, database, roles, deployment modes) · `docs/concepts/` (how the engine works) · `docs/integrations/` (external services) · `docs/compliance/` (data handling). Docs here cover the **engine**: deploying it, operating it, changing it, integrating it. Using the product day to day is documented at <https://inspectorhub.io/docs>, which serves self-hosted and hosted deployments alike.
 
 ## Commands
 
@@ -110,12 +110,18 @@ Choosing a home for a new spec:
 
 `tests/docs-shots/` is the odd one out and deliberately so: those files are a
 **documentation build step**, not tests. They walk the real product and
-photograph it, so every screenshot in `docs/user-guide/` was produced by
-software that actually clicked the button — a UI change that breaks a documented
-step breaks the docs build instead of leaving a lie on the website. They are
-`*.shots.ts` so no other config can collect them, they carry **no copy** (every
-word lives in the markdown, joined by `<!-- shot: id | alt -->` markers), and
-`npm run lint:docs-markers` / `npm run docs:check` enforce that the two agree.
+photograph it, so every screenshot in the user guide was produced by software
+that actually clicked the button — a UI change that breaks a documented step
+breaks the docs build instead of leaving a lie on the website. They are
+`*.shots.ts` so no other config can collect them, and they carry **no copy**:
+every word lives in the markdown, joined by `<!-- shot: id | alt -->` markers.
+
+**Only this half lives here.** `npm run docs:shots` writes
+`.docs-shots/<slug>/<id>.png` (gitignored) and stops. The prose those markers
+belong to, the code that joins the two, and the gate that fails when they
+disagree are all in the hosted product's repository, which is where the guides
+are published from. This repository has no marker gate, because it has no
+markers — a capture with nowhere to go is caught over there, against the prose.
 
 Rules: `tests/unit/<domain>/` dirs are named after the `server/api/` module (or
 service family) the specs exercise — never flat specs at the root. Frontend

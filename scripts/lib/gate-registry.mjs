@@ -120,7 +120,16 @@ export const SCRIPT_GATES = [
     { key: 'naming', label: 'lint:naming', script: 'check-naming.mjs', fix: 'npm run lint:naming', rung: PUSH },
     { key: 'agentroutes', label: 'lint:agent-routes', script: 'check-agent-routes.mjs', fix: 'npm run lint:agent-routes', rung: PUSH },
     { key: 'doclinks', label: 'lint:doclinks', script: 'check-doc-links.mjs', fix: 'npm run lint:doclinks', rung: PUSH },
-    { key: 'docsmarkers', label: 'lint:docs-markers', script: 'check-docs-shots.mjs', fix: 'npm run lint:docs-markers', rung: PUSH },
+    // NOTE: there is no `docsmarkers` row any more. The user-guide prose is
+    // published from the hosted docs site and its marker gate went with it.
+    // `tests/docs-shots/` here still PRODUCES the captures, but no markdown in
+    // this repository carries a shot marker, so a gate registered here would
+    // scan a directory that no longer exists and go green on it.
+    // The docs gate that replaced `docsmarkers`. PUSH rather than PRECOMMIT for
+    // the same reason as the doc-link gate beside it: it reads every markdown
+    // file in the repo, and a bare hosted path is introduced by prose that is
+    // usually written across several commits before anyone pushes it.
+    { key: 'noportalroutes', label: 'lint:no-portal-routes', script: 'check-no-portal-routes.mjs', fix: 'npm run lint:no-portal-routes', rung: PUSH },
     { key: 'schemadoc', label: 'lint:schema-doc', script: 'gen-schema-doc.mjs', fix: 'npm run lint:schema-doc', rung: PUSH, args: ['--check'] },
     { key: 'verificationcopy', label: 'lint:verification-copy', script: 'check-verification-copy.mjs', fix: 'npm run lint:verification-copy', rung: PUSH },
     // PUSH rather than PRECOMMIT, unlike the tracking gate above it, and for a

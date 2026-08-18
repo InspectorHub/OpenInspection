@@ -88,8 +88,10 @@ describe('gate registry', () => {
         // Before consolidation `npm run lint` chained these by hand. The chain is
         // the historical source of truth for what the full run covered, so it is
         // what the registry is checked against — not a list retyped from memory.
-        // Verified 2026-08-18 against package.json: this is exactly `lint` and
-        // exactly `lint:gates-full`, same members, same order.
+        // Verified 2026-08-19 against package.json: this is exactly `lint` and
+        // exactly `lint:gates-full`, same members, same order. `lint:docs-markers`
+        // left the list when the user-guide prose left this repository — the
+        // marker gate went with the files it reads.
         const CHAINED_NODE_GATES = [
             'lint:ds', 'lint:contrast', 'lint:svg', 'lint:erasure', 'lint:retention',
             'lint:retention-policy', 'lint:processing-stores', 'lint:platform-defaults',
@@ -101,7 +103,7 @@ describe('gate registry', () => {
             'lint:tests-tsconfig', 'lint:test-imports', 'lint:deadcode', 'lint:timestamps',
             'lint:tz', 'lint:idempotency', 'lint:ext-collisions', 'lint:i18n',
             'lint:i18n-catalog', 'lint:i18n-glossary', 'lint:naming', 'lint:agent-routes',
-            'lint:submit-guard', 'lint:doclinks', 'lint:docs-markers', 'lint:seed-sql',
+            'lint:submit-guard', 'lint:doclinks', 'lint:seed-sql',
             'lint:schema-doc', 'lint:verification-copy', 'lint:fabricated-names',
             'lint:sigcompare', 'lint:signature-dynamics', 'lint:sms-gate-args',
             'lint:messaging-rules',
@@ -112,7 +114,7 @@ describe('gate registry', () => {
             missing,
             `${missing.length} of ${CHAINED_NODE_GATES.length} chained gates are unregistered: ${missing.join(', ')}`,
         ).toEqual([]);
-        expect(CHAINED_NODE_GATES.length).toBe(48);
+        expect(CHAINED_NODE_GATES.length).toBe(47);
     });
 
     it('passes --check to the schema-doc gate, which is a generator by default', () => {

@@ -137,9 +137,8 @@
     "docs:schema": "node scripts/gen-schema-doc.mjs",
     "docs:modes": "tsx scripts/gen-deployment-modes-doc.ts",
     "lint:doclinks": "node scripts/check-doc-links.mjs",
-    "docs:shots": "playwright test -c playwright.docs-shots.config.ts",
-    "docs:check": "node scripts/check-docs-shots.mjs --captures",
-    "lint:docs-markers": "node scripts/check-docs-shots.mjs"
+    "lint:no-portal-routes": "node scripts/check-no-portal-routes.mjs",
+    "docs:shots": "playwright test -c playwright.docs-shots.config.ts"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^0.8.1",
