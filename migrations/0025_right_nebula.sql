@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `uq_qbo_connections_realm` ON `qbo_connections` (`realm_id`);

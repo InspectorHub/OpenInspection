@@ -65,6 +65,12 @@ If it is unset, the connect flow stops and the settings page says so explicitly 
 
 Every outcome of the handshake is reported on that page, including the failures — a missing credential, an unset `QBO_ENV`, an expired attempt, or a declined authorization.
 
+### One QuickBooks company, one workspace
+
+A QuickBooks company (its *realm*) can be connected to exactly one workspace. Connecting one that another workspace already holds is refused, and the page says so: disconnect it there first.
+
+The reason is the webhook. It is a single unauthenticated endpoint shared by every connection — the path carries no workspace — so after verifying the Intuit signature the only thing that says whose books an event belongs to is the realm id inside the verified payload. Two workspaces claiming the same realm would make that answer ambiguous, and an ambiguous answer would post one company's payments into whichever workspace happened to be found first. Rather than guess, such an event is skipped and logged with both claimants named.
+
 ---
 
 ## What happens when a connection ends

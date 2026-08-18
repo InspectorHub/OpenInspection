@@ -1,5 +1,26 @@
 import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+/**
+ * One QuickBooks company, one workspace — and the webhook depends on it.
+ *
+ * `POST /api/integrations/qbo/webhook` is unauthenticated and platform-wide: in
+ * SaaS the Intuit app belongs to the platform, so there is ONE webhook URL and
+ * ONE verifier token for every realm, and nothing in the URL names a tenant.
+ * The handler verifies the HMAC and then resolves the tenant SOLELY by the
+ * realm id inside the verified body. That lookup is the entire tenant decision,
+ * so `realm_id` has to identify exactly one row.
+ *
+ * `tenant_id` is the primary key, which bounds this table at one row per
+ * tenant but says nothing about realms — two tenants could hold the same one,
+ * and the lookup would then apply one company's payments, voids and balance
+ * changes to whichever row came back first.
+ *
+ * Guarded in three places, deliberately: the unique index below, a refusal in
+ * `saveConnection` so the product cannot create a second claim, and a refusal
+ * in `handleWebhook` so a duplicate that somehow exists is skipped rather than
+ * resolved. The last one is not redundant — it is what a database predating
+ * this index falls back to.
+ */
 export const qboConnections = sqliteTable('qbo_connections', {
     tenantId:             text('tenant_id').primaryKey(),
     realmId:              text('realm_id').notNull(),
@@ -12,7 +33,9 @@ export const qboConnections = sqliteTable('qbo_connections', {
     syncEnabled:          integer('is_sync_enabled', { mode: 'boolean' }).notNull().default(true),
     defaultItemId:        text('default_item_id').notNull().default('1'),
     createdAt:            integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-});
+}, (t) => [
+    uniqueIndex('uq_qbo_connections_realm').on(t.realmId),
+]);
 
 export const qboEntityMap = sqliteTable('qbo_entity_map', {
     id:           text('id').primaryKey(),
