@@ -162,6 +162,13 @@
       "when": 1787012688216,
       "tag": "0022_smooth_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1787028862676,
+      "tag": "0023_warm_thaddeus_ross",
+      "breakpoints": true
     }
   ]
 }

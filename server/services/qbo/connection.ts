@@ -65,7 +65,7 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
             // `updatedAt` is what dates the response; `createdAt` only dates the
             // failure. Without the stamp — which clearPaymentDiscrepancy already
             // writes on the same table — "when was this dealt with" has no answer.
-            await db.update(qboSyncErrors).set({ resolved: true, updatedAt: new Date() })
+            await db.update(qboSyncErrors).set({ resolved: true, updatedAt: new Date(), resolvedAt: new Date() })
                 .where(and(eq(qboSyncErrors.id, errorId), eq(qboSyncErrors.tenantId, tenantId)));
         }
 

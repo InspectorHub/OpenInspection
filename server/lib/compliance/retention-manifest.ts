@@ -49,6 +49,8 @@ import {
     AI_ASSURANCE_RETENTION_MONTHS,
     REPORT_VERSION_RETENTION_MONTHS,
     SMS_DISCLOSURE_RETENTION_MONTHS,
+    NOTIFICATION_RETENTION_MONTHS,
+    QBO_SYNC_ERROR_RESOLVED_RETENTION_DAYS,
     TENANT_LEGAL_VERSION_RETENTION_MONTHS,
     MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS,
     SLUG_HISTORY_RETENTION_MONTHS,
@@ -201,6 +203,30 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         purpose: 'Superseded tenant Privacy/Terms bodies. Retained while any account acceptance cites the version, and the live version per (tenant, doc) is never expired because the hosted legal pages render it. Counsel round 33 §8 was explicit that this is retain-while-referenced, NOT keep-forever.',
     },
     {
+        // Counsel round 34 §3. The inbox, not the record that a communication
+        // happened — `automation_logs` answers that and is retained by design, and
+        // the same event writes a row in both. `inspection_id` is a soft reference
+        // with no cascade, so a notice legitimately outlives its inspection, which
+        // is the reason it needs a window of its own at all.
+        table: 'notifications',
+        timestampColumn: 'created_at',
+        window: { unit: 'months', value: NOTIFICATION_RETENTION_MONTHS },
+        action: 'delete',
+        purpose: 'In-app notice header: a per-recipient title and body composed about an inspection. Anchored on creation rather than on read_at/archived_at — counsel declined that alternative because an unread notice would become immortal, turning a UI-state field into a retention control.',
+    },
+    {
+        // Counsel round 34 §4. Anchored on RESOLUTION, which is why `resolved_at`
+        // exists: `updated_at` also moves on re-detection, so it says when the row
+        // was last touched rather than when it stopped being outstanding.
+        // Unresolved rows have a NULL anchor and are therefore never swept —
+        // outstanding work, not a record of work.
+        table: 'qbo_sync_errors',
+        timestampColumn: 'resolved_at',
+        window: { unit: 'days', value: QBO_SYNC_ERROR_RESOLVED_RETENTION_DAYS },
+        action: 'delete',
+        purpose: 'Resolved QuickBooks sync failures. Ninety days covers the whole row including the copied Intuit error text, which may quote a customer name — counsel refused a longer window for that text on data-minimisation grounds: a billing dispute is explained from the accounting records, not from an ephemeral rejection message.',
+    },
+    {
         table: 'tenant_marketplace_import_history',
         timestampColumn: 'created_at',
         window: { unit: 'months', value: MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS },
@@ -343,14 +369,4 @@ export const RETENTION_OPEN: RetentionOpenEntry[] = [
     //     terminal happy-path status is `published` (`SYNC_OUTBOX_STATUSES`);
     //     `sent` is not a value this column can hold. A predicate written from
     //     that sentence would have matched nothing and read as a working rule.
-    {
-        table: 'notifications',
-        reason: 'The notice header: per-recipient title and body composed about an inspection, addressed to a contact or a staff user. inspection_id is a soft reference with no cascade, so Track A (a row dies with its inspection) does not actually reach it, and read_at / archived_at retire a row from the inbox without removing it. Deciding this needs the notice lifetime answered, not a number picked here.',
-        decideBy: '2027-02-06',
-    },
-    {
-        table: 'qbo_sync_errors',
-        reason: 'error_msg is the QuickBooks rejection text for one of the tenant own records and may quote a customer name. Rows are deduped per (entity, error code) and resolved in place, so the table is bounded by distinct failures rather than by event volume — but a resolved row is never removed. Whether a resolved sync error is operational scrap or accounting evidence is the open question.',
-        decideBy: '2027-02-06',
-    },
 ];

@@ -90,19 +90,26 @@ export interface RetentionPolicyHeader {
 }
 
 /**
- * ⚠️ APPROVED WITH CONDITIONS — round 33. Five things must be true before this
- * becomes `approved`, and three of them are not:
+ * ⚠️ APPROVED WITH CONDITIONS — rounds 33 and 34. Conditions still unmet:
  *
- *   1. ✅ the manifest matches the ruling (4 windows changed, 2 tables removed)
- *   2. ⚠️ #11/#12 are DECLARED reference-preserving; the dependency-aware sweep
- *         that would retire an unreferenced version does not exist. Out-of-scope
- *         is the safe half — nothing is deleted — but it is not the whole ruling
+ *   1. ✅ the manifest matches the rulings (4 windows changed, 2 pending closed)
+ *   2. ✅ reference-preserving retention — round 34 WITHDREW the round 33
+ *         instruction to remove the legal-version tables from the sweep, and
+ *         confirmed the reference-aware executors we had built instead. The rule
+ *         it left behind is narrower and stronger than "legal documents are
+ *         exempt": they are protected only while a surviving record needs the
+ *         version to remain reproducible
  *   3. ❌ `legal_hold` overrides every scheduled deletion. ZERO occurrences in the
  *         codebase. Counsel: without it "再漂亮的 36/84 个月数字都会被 litigation
  *         preservation 要求击穿"
  *   4. ❌ the customer ToS re-accept flow names the liability cap in its change
- *         summary (portal)
+ *         summary (portal — built, pending the ToS publish)
  *   5. ❌ approval/version registration completed before the new ToS publishes
+ *
+ * ⚠️ AND A METHOD RULE from round 34, which cost a wasted ruling to learn:
+ * do not classify retention behaviour from the manifest or the table name. The
+ * EXECUTOR is authoritative evidence of what the sweep actually does. We reported
+ * a defect in `sms_disclosure_versions` that its executor had always prevented.
  *
  * ⚠️ AND A SCOPE LIMIT counsel asked to be written here rather than filed: this
  * covers DATABASE retention only. Object storage, Durable Objects, KV and queues
@@ -111,11 +118,11 @@ export interface RetentionPolicyHeader {
  * retention gate = green 就误以为所有 production stores 都已经被覆盖".
  */
 export const RETENTION_POLICY: RetentionPolicyHeader = {
-    version: '2026-08-19.1',
+    version: '2026-08-19.2',
     status: 'approved_with_conditions',
     effectiveAt: '2026-08-08',
-    approvedBy: 'docs/legal/2026-08-19-counsel-round-33-response.md',
+    approvedBy: 'docs/legal/2026-08-19-counsel-round-34-response.md',
     approvedAt: '2026-08-19',
     supersedes: '2026-08-17.3',
-    rulesDigest: '78ba3976c4d516808a7bccf8626f7bb816fa3628d9eeb5aa0eca508bcc7a5d17',
+    rulesDigest: 'ea925189ba1f9dcb19bbf868a3d08f562dbb90126a92e854763eb6a21a9dffa7',
 };
