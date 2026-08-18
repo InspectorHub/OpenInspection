@@ -228,6 +228,49 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
       reason: 'payment-processor reference on the retained financial row, not personal data' },
     { table: 'tenant_legal_versions', column: 'body_snapshot',            reason: 'company-authored policy text, not personal data of any data subject' },
     { table: 'tenant_legal_versions', column: 'published_by_user_id',     reason: 'staff author reference — not consumer-DSAR scope' },
+
+    // ── account_acceptances ───────────────────────────────────────────────────
+    // What a STAFF member accepted, recorded in the same write as the `users`
+    // row it belongs to (review A2 / review decision). The subject is an
+    // owner, admin or invited member of the workspace — an employee lifecycle,
+    // the same posture as every `users.*` entry above — so a consumer erasure
+    // request never reaches this table at all.
+    //
+    // ⚠️ NOTHING WENT RED TO PRODUCE THIS BLOCK, and that is the reason it is
+    // written out column by column. `PII_HEURISTIC` in
+    // `scripts/check-erasure-manifest.mjs` matches NO column here: not
+    // `actor_identity_ref`, not `content_hash`, not `authority_basis`. The whole
+    // table could have shipped with `lint:erasure` green, which is precisely the
+    // failure `docs/compliance/erasure-heuristic-limits.md` describes — silence
+    // reading as coverage. Two of these keys are pinned in the coverage spec's
+    // HEURISTIC_BLIND_SPOTS so the declaration is enforced rather than merely
+    // present.
+    //
+    // The second reason this is not a deletion, beyond the staff/consumer line:
+    // the row is the evidence that the account was VALIDLY CREATED. Erasing it
+    // does not shrink a record of a person, it destroys the proof that the
+    // person consented — leaving an account standing with no acceptance behind
+    // it, which is the exact state the table exists to make unreachable.
+    { table: 'account_acceptances', column: 'user_id',
+      reason: 'the staff `users` row this acceptance was committed alongside — staff lifecycle, not consumer-DSAR scope; deleting it would leave an account standing with no acceptance, the state the table exists to prevent' },
+    { table: 'account_acceptances', column: 'actor_identity_ref',
+      reason: 'the portal `identities.id` the acceptance was captured against, when it was captured there — an opaque staff-account reference, not consumer data; NULL for an acceptance captured on this side' },
+    { table: 'account_acceptances', column: 'doc',
+      reason: 'which document was accepted (a document name, e.g. `terms`) — not personal data' },
+    { table: 'account_acceptances', column: 'version',
+      reason: 'the version string of the document the person was shown — not personal data' },
+    { table: 'account_acceptances', column: 'content_hash',
+      reason: 'SHA-256 of the body shown, which is what makes the acceptance checkable; a hash of company-authored policy text, not of anything about the person' },
+    { table: 'account_acceptances', column: 'authority_basis',
+      reason: 'whether this person can bind the company (owner / individual_acknowledgement / …) — a fact about signing authority, and the one column that stops an invited member reading as an owner' },
+    { table: 'account_acceptances', column: 'accepted_at',
+      reason: 'when the HUMAN accepted — the legal fact the row exists to record; a staff-lifecycle timestamp, not consumer-DSAR scope' },
+    { table: 'account_acceptances', column: 'created_at',
+      reason: 'when the row was written, deliberately distinct from accepted_at — a processing timestamp, not personal data' },
+    { table: 'account_acceptances', column: 'tenant_id',
+      reason: 'tenant scope key, not personal data' },
+    { table: 'account_acceptances', column: 'id',
+      reason: 'opaque primary key' },
     // Pay splits (#278). A split is a payroll record about a STAFF member, held
     // under accounting and employment obligations. A client's erasure request
     // never reaches it — the client is not the data subject here. Declared

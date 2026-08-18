@@ -39,5 +39,22 @@ export const TENANT_CONFIGS_TEST_DDL =
 export const USERS_TEST_DDL =
     'CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, tenant_id TEXT, email TEXT NOT NULL, password_hash TEXT NOT NULL, name TEXT, phone TEXT, photo_url TEXT, default_signature_base64 TEXT, is_signature_enabled INTEGER NOT NULL DEFAULT true, bio TEXT, service_areas TEXT, slug TEXT, role TEXT NOT NULL DEFAULT \'admin\', google_refresh_token TEXT, google_calendar_id TEXT, google_access_token TEXT, google_token_expiry INTEGER, locale TEXT, onboarding_state TEXT, created_at INTEGER NOT NULL, totp_secret TEXT, is_totp_enabled INTEGER NOT NULL DEFAULT false, totp_recovery_codes TEXT, totp_verified_at INTEGER, is_referral_notification_enabled INTEGER NOT NULL DEFAULT true, is_report_notification_enabled INTEGER NOT NULL DEFAULT true, is_paid_notification_enabled INTEGER NOT NULL DEFAULT false, last_active_at INTEGER, signup_role TEXT, deleted_at INTEGER, terms_accepted TEXT, permission_overrides TEXT, timezone TEXT, date_format TEXT, time_format TEXT, service_origin_address TEXT, service_origin_lat REAL, service_origin_lng REAL);';
 
+/**
+ * `account_acceptances` is here because `applyAdminCredential` now writes it in
+ * the SAME `db.batch()` as the `users` row (review A2 / review decision).
+ * A missing table here does not park quietly — it fails the whole batch, which
+ * is the correct behaviour and an incomprehensible test failure.
+ *
+ * THE UNIQUE INDEX IS PART OF THE DDL, not decoration. It is what makes a
+ * redelivered command unable to mint a second acceptance row, so a workers spec
+ * created without it would exercise a table that agrees to something production
+ * refuses — and the at-least-once seam is exactly what these specs drive.
+ */
+export const ACCOUNT_ACCEPTANCES_TEST_DDL =
+    'CREATE TABLE IF NOT EXISTS account_acceptances (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, user_id TEXT NOT NULL, actor_identity_ref TEXT, doc TEXT NOT NULL, version TEXT NOT NULL, content_hash TEXT NOT NULL, authority_basis TEXT NOT NULL, accepted_at INTEGER NOT NULL, created_at INTEGER NOT NULL);';
+
+export const ACCOUNT_ACCEPTANCES_TEST_INDEX_DDL =
+    'CREATE UNIQUE INDEX IF NOT EXISTS uq_account_acceptances_user_doc_version ON account_acceptances (user_id, doc, version);';
+
 export const INSPECTION_RESULTS_TEST_DDL =
     'CREATE TABLE IF NOT EXISTS inspection_results (id TEXT PRIMARY KEY NOT NULL, tenant_id TEXT NOT NULL, inspection_id TEXT NOT NULL, data TEXT NOT NULL, ydoc_state BLOB, last_synced_at INTEGER NOT NULL, rating_system_id TEXT, rating_system_snapshot TEXT, report_id TEXT);';

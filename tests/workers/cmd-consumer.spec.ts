@@ -5,7 +5,10 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { applyCmdEnvelope } from '../../server/portal/cmd-consumer';
 import { handleCmdBatch } from '../../server/portal/cmd-batch';
-import { TENANT_CONFIGS_TEST_DDL, USERS_TEST_DDL } from '../helpers/inline-ddl';
+import {
+    TENANT_CONFIGS_TEST_DDL, USERS_TEST_DDL,
+    ACCOUNT_ACCEPTANCES_TEST_DDL, ACCOUNT_ACCEPTANCES_TEST_INDEX_DDL,
+} from '../helpers/inline-ddl';
 
 // Batch 2: the seed command delegates to the starter-content service, whose
 // real implementation touches 8 content tables — out of scope for the consumer
@@ -24,6 +27,30 @@ vi.mock('../../server/services/starter-content.service', () => ({
 }));
 
 const b = env as unknown as { DB: D1Database };
+
+/**
+ * The acceptance the portal captured, on every credential-bearing command here.
+ *
+ * `applyAdminCredential` REFUSES to create an account without one (review A2 /
+ * review decision), so a credential command that would mint `boss@x.com`
+ * must carry it. These specs are about the sequence guards, so this is fixture
+ * rather than subject — the refusal and the batch atomicity behind it are
+ * specified in `account-acceptance-atomicity.spec.ts`.
+ *
+ * It is attached to the STALE commands too, not only the fresh ones. A stale
+ * command can still be the one that creates the account (the salvage path
+ * exists because the newer command carried no credential), so a fixture that
+ * only fed the fresh path would leave the salvage branch untested against the
+ * shape production sends it.
+ */
+const ACCEPTANCE = {
+    actorIdentityRef: 'identity-boss',
+    authorityBasis: 'owner',
+    documents: [
+        { doc: 'terms', version: '2026-06-01', contentHash: 'a'.repeat(64), acceptedAt: 1_749_081_600_000 },
+        { doc: 'privacy', version: '2026-06-01', contentHash: 'b'.repeat(64), acceptedAt: 1_749_081_600_000 },
+    ],
+};
 
 function envelope(over: Partial<{ id: string; type: string; dataschema: string; tenantseq: number; credseq: number; replyto: string; data: Record<string, unknown> }> = {}) {
     return {
@@ -49,6 +76,14 @@ async function seedSchema(): Promise<void> {
         "CREATE TABLE IF NOT EXISTS sync_outbox (id TEXT PRIMARY KEY, event_type TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, last_tried_at INTEGER, last_error TEXT);",
     );
     await b.DB.exec(USERS_TEST_DDL);
+    // The acceptance rows ride the SAME batch as the users insert
+    // (review A2 / review decision), so this table is not optional
+    // scenery: without it the credential apply rolls the account back too.
+    // The unique index comes with it — it is what makes a redelivered
+    // command unable to mint a second acceptance, and this seam is
+    // at-least-once.
+    await b.DB.exec(ACCOUNT_ACCEPTANCES_TEST_DDL);
+    await b.DB.exec(ACCOUNT_ACCEPTANCES_TEST_INDEX_DDL);
     await b.DB.exec(
         'CREATE TABLE IF NOT EXISTS processed_cmd_events (event_id TEXT PRIMARY KEY, cmd_type TEXT NOT NULL, processed_at INTEGER NOT NULL);',
     );
@@ -67,7 +102,10 @@ async function seedSchema(): Promise<void> {
 }
 
 async function clearTables(): Promise<void> {
-    for (const t of ['processed_cmd_events', 'parked_cmd_events', 'users', 'tenant_configs', 'sync_outbox', 'tenants']) {
+    // `account_acceptances` is cleared BEFORE `users`: the two are written in one
+    // batch, so leaving acceptance rows behind would strand them at ids no user
+    // row has any more — an orphan state production never reaches.
+    for (const t of ['processed_cmd_events', 'parked_cmd_events', 'account_acceptances', 'users', 'tenant_configs', 'sync_outbox', 'tenants']) {
         await b.DB.exec(`DELETE FROM ${t};`);
     }
 }
@@ -136,7 +174,7 @@ describe('core cmd consumer — real D1 (A-21)', () => {
         }))).toBe('applied');
         expect(await applyCmdEnvelope(b.DB, undefined, envelope({
             tenantseq: 1,
-            data: { tenantId: 'ct1', slug: 'ws-1', status: 'active', adminEmail: 'boss@x.com', adminPasswordHash: 'newhash' },
+            data: { tenantId: 'ct1', slug: 'ws-1', status: 'active', adminEmail: 'boss@x.com', adminPasswordHash: 'newhash', acceptance: ACCEPTANCE },
         }))).toBe('stale-credential-applied');
         const t = await b.DB.prepare('SELECT status, applied_cmd_seq FROM tenants WHERE id = ?').bind('ct1')
             .first<{ status: string; applied_cmd_seq: number }>();
@@ -261,7 +299,7 @@ describe('core cmd consumer — batch 2: credseq guard, seed, replies (A-21)', (
     it('fresh credential-bearing update applies the credential and advances applied_cred_seq', async () => {
         expect(await applyCmdEnvelope(b.DB, undefined, envelope({
             tenantseq: 1, credseq: 1,
-            data: { tenantId: 'ct1', slug: 'ws-1', status: 'active', adminEmail: 'boss@x.com', adminPasswordHash: 'h1' },
+            data: { tenantId: 'ct1', slug: 'ws-1', status: 'active', adminEmail: 'boss@x.com', adminPasswordHash: 'h1', acceptance: ACCEPTANCE },
         }))).toBe('applied');
         const u = await b.DB.prepare('SELECT password_hash FROM users WHERE email = ?').bind('boss@x.com').first<{ password_hash: string }>();
         expect(u?.password_hash).toBe('h1');
@@ -272,12 +310,12 @@ describe('core cmd consumer — batch 2: credseq guard, seed, replies (A-21)', (
     it('stale credential (lower credseq) can no longer overwrite a newer one — the batch-1 residual is closed', async () => {
         expect(await applyCmdEnvelope(b.DB, undefined, envelope({
             tenantseq: 2, credseq: 2,
-            data: { tenantId: 'ct1', slug: 'ws-1', status: 'active', adminEmail: 'boss@x.com', adminPasswordHash: 'h2' },
+            data: { tenantId: 'ct1', slug: 'ws-1', status: 'active', adminEmail: 'boss@x.com', adminPasswordHash: 'h2', acceptance: ACCEPTANCE },
         }))).toBe('applied');
         // Reordered older credential: stale on BOTH streams → plain stale, no salvage.
         expect(await applyCmdEnvelope(b.DB, undefined, envelope({
             tenantseq: 1, credseq: 1,
-            data: { tenantId: 'ct1', slug: 'ws-1', status: 'suspended', adminEmail: 'boss@x.com', adminPasswordHash: 'h1' },
+            data: { tenantId: 'ct1', slug: 'ws-1', status: 'suspended', adminEmail: 'boss@x.com', adminPasswordHash: 'h1', acceptance: ACCEPTANCE },
         }))).toBe('stale');
         const u = await b.DB.prepare('SELECT password_hash FROM users WHERE email = ?').bind('boss@x.com').first<{ password_hash: string }>();
         expect(u?.password_hash).toBe('h2');         // newer hash survives
@@ -292,7 +330,7 @@ describe('core cmd consumer — batch 2: credseq guard, seed, replies (A-21)', (
         }))).toBe('applied');
         expect(await applyCmdEnvelope(b.DB, undefined, envelope({
             tenantseq: 1, credseq: 1,
-            data: { tenantId: 'ct1', slug: 'ws-1', status: 'active', adminEmail: 'boss@x.com', adminPasswordHash: 'h1' },
+            data: { tenantId: 'ct1', slug: 'ws-1', status: 'active', adminEmail: 'boss@x.com', adminPasswordHash: 'h1', acceptance: ACCEPTANCE },
         }))).toBe('stale-credential-applied');
         const t = await b.DB.prepare('SELECT status, applied_cmd_seq, applied_cred_seq FROM tenants WHERE id = ?').bind('ct1')
             .first<{ status: string; applied_cmd_seq: number; applied_cred_seq: number }>();
@@ -306,7 +344,7 @@ describe('core cmd consumer — batch 2: credseq guard, seed, replies (A-21)', (
     it('legacy command without credseq applies the credential unguarded and does NOT advance applied_cred_seq', async () => {
         expect(await applyCmdEnvelope(b.DB, undefined, envelope({
             tenantseq: 1,
-            data: { tenantId: 'ct1', slug: 'ws-1', status: 'active', adminEmail: 'boss@x.com', adminPasswordHash: 'legacy-h' },
+            data: { tenantId: 'ct1', slug: 'ws-1', status: 'active', adminEmail: 'boss@x.com', adminPasswordHash: 'legacy-h', acceptance: ACCEPTANCE },
         }))).toBe('applied');
         const u = await b.DB.prepare('SELECT password_hash FROM users WHERE email = ?').bind('boss@x.com').first<{ password_hash: string }>();
         expect(u?.password_hash).toBe('legacy-h');

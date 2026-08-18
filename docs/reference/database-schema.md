@@ -9,11 +9,11 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 96 |
-| Columns | 1129 |
-| Indexes (excluding primary keys) | 162 |
+| Tables | 97 |
+| Columns | 1139 |
+| Indexes (excluding primary keys) | 164 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 524 (46%) |
+| Columns carrying a source comment | 533 (47%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
 
-That is 10 of 96. If a table you just added appears here,
+That is 10 of 97. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 178 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 180 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -41,6 +41,32 @@ descriptions are read off this repository's naming conventions and were **not**
 written by anyone — treat them as a hint, not documentation. A column with
 neither is left blank. `[more]` marks a column whose source comment runs past
 400 characters: read it before changing that column.
+
+---
+
+## `account_acceptances`
+
+<sub>server/lib/db/schema/tenant/account-acceptances.ts · 10 columns · primary key `id`</sub>
+
+> What the person accepted, recorded where the account was born. review A2's invariant is that an account and its acceptance are ONE write.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN IX |  |  | Multi-tenant isolation, per the Schema Rules. |
+| `user_id` | text | NN UQ |  |  | The `users` row this acceptance was committed alongside. |
+| `actor_identity_ref` | text |  |  | `the` | The portal `identities.id` the acceptance was captured against, when it was captured over there. |
+| `doc` | text | NN UQ |  |  | Which document. Free text rather than an enum: the set of documents a deployment publishes is the deployment's business, and refusing an unknown one at the seam is the boundary's job, not the column's. |
+| `version` | text | NN UQ |  |  | `YYYY-MM-DD`, the version the person was shown. |
+| `content_hash` | text | NN |  |  | SHA-256 hex of the body shown. What was SHOWN, not where it lived. |
+| `authority_basis` | text | NN |  | `AUTHORITY_BASES` | On what basis this binds anyone — see `lib/auth/authority-basis.ts`. Deliberately separate from any role column: role is an operational fact and says nothing about signing authority. |
+| `accepted_at` | integer | NN IX |  |  | When the HUMAN accepted, epoch ms — not when this row was written. On the portal-originated path those differ by however long the onboarding workflow took, and collapsing them would forge the legal fact to match the plumbing. |
+| `created_at` | integer | NN |  |  | When this row was written. Distinct from the above, on purpose. |
+
+**Indexes**
+
+- **UNIQUE** `uq_account_acceptances_user_doc_version` (user_id, doc, version)
+- `idx_account_acceptances_tenant` (tenant_id, accepted_at)
 
 ---
 

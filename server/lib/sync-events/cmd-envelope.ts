@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AUTHORITY_BASES } from '../auth/authority-basis';
 
 /**
  * Consumer-side contract for the portal -> core COMMAND seam (A-21 batch 1).
@@ -51,6 +52,42 @@ const cmdEnvelopeSchema = z.object({
 });
 export type CmdEnvelope = z.infer<typeof cmdEnvelopeSchema>;
 
+/**
+ * What the person accepted, captured PORTAL-side and travelling with the
+ * command that would create their account.
+ *
+ * ── Why the basis is an enum here and not a free string ─────────────────────
+ * `lib/auth/authority-basis.ts` says the two repositories duplicate this
+ * vocabulary because they cannot import from each other — the engine is open
+ * source and deployable by anyone, and a runtime dependency on a private SaaS
+ * package would make that false. The cost of duplication is drift, and this is
+ * the declared place drift surfaces: a projection naming a basis this side
+ * cannot hold is refused AT THE BOUNDARY rather than stored and discovered
+ * later by a reader who cannot interpret the row.
+ *
+ * Refusing the whole command is the intended consequence. A basis nobody on
+ * this side can hold is not a field to drop tolerantly; the command it rides on
+ * is the one that creates an account, and applying the rest of it would create
+ * that account with an acceptance we could not record.
+ *
+ * ── `acceptedAt` is the HUMAN's timestamp ───────────────────────────────────
+ * Not when the command was built and not when the row is written. On the
+ * portal-originated path those differ by however long the onboarding workflow
+ * took, and collapsing them would forge the legal fact to match the plumbing.
+ */
+const cmdAcceptanceSchema = z.object({
+    /** Portal `identities.id`. Optional: a deployment with no portal has none. */
+    actorIdentityRef: z.string().optional(),
+    authorityBasis: z.enum(AUTHORITY_BASES),
+    documents: z.array(z.object({
+        doc: z.string().min(1),
+        version: z.string().min(1),
+        contentHash: z.string().min(1),
+        /** Epoch ms. */
+        acceptedAt: z.number(),
+    })).min(1),
+});
+
 /** Per-type data validation (appliers call these — invalid data throws there,
  *  exhausts retries, and surfaces as a `failed` outbox row on portal). */
 export const cmdTenantUpdateDataSchema = z.object({
@@ -62,6 +99,21 @@ export const cmdTenantUpdateDataSchema = z.object({
     maxUsers: z.number().optional(),
     adminEmail: z.string().optional(),
     adminPasswordHash: z.string().optional(),
+    /**
+     * OPTIONAL AT THE SCHEMA LEVEL, REQUIRED WHERE IT MATTERS.
+     *
+     * `cmd.tenant.update` is one command carrying several unrelated intents: a
+     * status flip, a seat-count change and a tier move all ride it, and none of
+     * them creates anything, so none of them has an acceptance to carry. Making
+     * the field mandatory here would reject that ordinary traffic and teach the
+     * producer to synthesise a block to get past the schema — which is how a
+     * fabricated acceptance enters a ledger.
+     *
+     * The requirement lives in the APPLIER (`applyAdminCredential`), where the
+     * INSERT-versus-UPDATE branch is the thing that actually knows whether an
+     * account is about to exist. A schema cannot know that.
+     */
+    acceptance: cmdAcceptanceSchema.optional(),
 });
 export const cmdSyncQuotaDataSchema = z.object({
     tenantId: z.string(),

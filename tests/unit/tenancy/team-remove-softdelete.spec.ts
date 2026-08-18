@@ -31,6 +31,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 // in-memory SQLite test DB (the established pattern in this suite).
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { withBatch } from '../helpers/d1-binding';
+import { LegalVersionService } from '../../../server/services/legal-version.service';
 
 const TENANT = '00000000-0000-0000-0000-0000000000d1';
 const ADMIN = '11111111-1111-1111-1111-1111111111d1';
@@ -47,14 +49,24 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         testDb = fix.db;
         sqlite = fix.sqlite;
         await setupSchema(sqlite);
+        // `joinTeam` writes the member row and their acceptance in ONE
+        // `db.batch()` (review review decision), and the better-sqlite3
+        // handle this mock returns has no such method.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        (mockDrizzle as any).mockReturnValue(withBatch(testDb, sqlite));
         kv = new MockKV();
 
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme-d1', status: 'active',
             deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
         });
+        // A workspace with no published Privacy/Terms has nothing for an
+        // invited member to accept, and `joinTeam` refuses rather than create
+        // an account with an empty ledger. These specs are about removal and
+        // reactivation, so the documents are fixture, not subject.
+        const legal = new LegalVersionService(testDb as never);
+        await legal.recordPublish({ tenantId: TENANT, doc: 'terms', body: 'Terms.', timezone: 'UTC' });
+        await legal.recordPublish({ tenantId: TENANT, doc: 'privacy', body: 'Privacy.', timezone: 'UTC' });
         await testDb.insert(schema.users).values({
             id: ADMIN, tenantId: TENANT, email: 'admin@acme.test',
             passwordHash: 'x', role: 'owner', createdAt: new Date(),

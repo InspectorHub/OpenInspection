@@ -95,7 +95,17 @@ describe('cmd consumer — offboarding commands (A-21 batch 3)', () => {
                 rows: 42, r2: 3, r2Bytes: 1048576, kv: 2,
             },
         });
-    });
+        // EXPLICIT TIMEOUT, because the default 5s is not a budget this test can
+        // hold. The purge derives its work from `tenantScopedTables` — every
+        // table in the schema carrying a `tenant_id` — so it issues one DELETE
+        // per table, and that count grows with the schema rather than with
+        // anything this spec does. It has crossed 5s under a full
+        // `test:workers` run while passing in isolation, which is the exact
+        // shape this repository has already mistaken for a flake nine times: red
+        // concurrently, green alone, dismissed. The assertion above is about
+        // destruction COUNTS, never about speed, so the number below is a
+        // headroom figure and not a claim that the purge should take 20s.
+    }, 20_000);
 
     it('data_export without the R2 bindings throws (retryable → surfaces as a failed cmd row, never silent)', async () => {
         await expect(applyCmdEnvelope(b.DB, kvStub, exportCmd, undefined, undefined))

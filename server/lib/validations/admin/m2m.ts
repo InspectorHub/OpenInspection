@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { AUTHORITY_BASES } from '../../auth/authority-basis';
 
 /**
  * Body schema for PATCH /api/integration/tenants/:slug (M2M).
@@ -14,6 +15,27 @@ export const TenantStatusBodySchema = z.object({
     maxUsers: z.number().int().positive().optional().describe('TODO describe maxUsers field for the OpenInspection MCP integration'),
     adminEmail: z.string().email().optional().describe('TODO describe adminEmail field for the OpenInspection MCP integration'),
     adminPasswordHash: z.string().optional().describe('TODO describe adminPasswordHash field for the OpenInspection MCP integration'),
+    /**
+     * What the admin accepted, captured portal-side.
+     *
+     * This endpoint is the RPC FALLBACK for the same provisioning sync the
+     * command queue carries, so the field mirrors `cmdAcceptanceSchema` — a
+     * body shape the queue accepts and this endpoint rejects would mean the
+     * invariant survives only while the queue is healthy. Optional for the same
+     * reason it is optional there: a status/tier/seat sync creates nothing and
+     * carries no acceptance, and the requirement is enforced in
+     * `applyAdminCredential`, which knows whether an account is about to exist.
+     */
+    acceptance: z.object({
+        actorIdentityRef: z.string().optional(),
+        authorityBasis: z.enum(AUTHORITY_BASES),
+        documents: z.array(z.object({
+            doc: z.string().min(1),
+            version: z.string().min(1),
+            contentHash: z.string().min(1),
+            acceptedAt: z.number(),
+        })).min(1),
+    }).optional().describe('Acceptance block captured by the portal for an account this call would create.'),
 });
 
 // StripeConnectBodySchema removed with the dead M2M stripe-connect endpoint

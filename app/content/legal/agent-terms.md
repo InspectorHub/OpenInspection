@@ -1,58 +1,33 @@
 # Agent Terms
 
 <!--
-review-READY v3 — rounds 29 and 31 landed. NOT APPROVED FOR PUBLICATION.
+review-READY v4 — rounds 29, 31 and 32 landed. NOT APPROVED FOR PUBLICATION.
 
-review verdict: keep the skeleton, do not publish. Draft quality 7/10, contract
-architecture 8.5/10, blocking §1 · §7 · §11 · §14 (numbered against the previous
-15-section draft). This revision lands every P0 and P1 from that round as clause
-text and restructures to the 18 sections review set out. The archived ruling is
-`[redacted]` in the superproject and it,
-not this file, is the binding text.
+THIS FILE IS A DRAFT DERIVED FROM RULINGS. IT IS NOT A RULING SOURCE.
+review review asked for this explicitly. The binding text is the archived Round
+response; what we owe and its status is the register. Where this file and either of
+those disagree, this file is the one that is wrong:
 
-v2 resolved nine of v1's ten decision points against researched practice. v3 lands
-review, which reviewed v1 rather than v2 — and three of its five P0s were already
-closed by then (the transaction-purpose use test, the no-reliance restructure, and
-the deletion of "we are only the delivery path").
+  [redacted]          (superproject)
+  [redacted]
 
-review caught one thing v2 had WRONG rather than missing: §10 asserted the
-acceptance record holds the IP address and country, while the code note in the same
-paragraph showed `ip?` and `country?` — optional. It now says "where collected".
-A clause contradicting the code reference printed beside it is the failure this
-document's whole method is supposed to prevent, and it survived two drafts.
+Do not add reasoning here that exists nowhere else. Explanatory notes stay only
+where they say what a CLAUSE means or which code fact it rests on.
 
-Still not publishable, and for TWO reasons now — §17 was never the only one:
+WHY IT CANNOT BE PUBLISHED, and how that is enforced: run
+`npm run agent-terms:publish`. It prints review review publish-gate checklist
+and refuses while any line is red. Two of them are the blockers — the operating
+entity (§17) and the retention model, which is not about the entity at all — and
+the gate reads the retention signal out of the policy header rather than trusting
+anybody's recollection of it.
 
-**(a) §12/§15 retention.** review approved no retention windows. A clause pointing
-at the Privacy Notice for what is kept must not imply the period is settled, and
-until the retention model is final this document cannot go live whatever else is
-resolved. review §15 is explicit: 这里必须等 retention model final.
-
-**(b) §17 needs the operating entity's jurisdiction, and there is no entity.** The operator is an
-individual with no company, so no US state's law can be named honestly, and a
-governing-law clause that cannot hold is worse than none — it fails exactly when
-it is needed and shows we wrote it knowing. That is not a drafting problem and no
-amount of drafting fixes it.
-
-Agent signup stays closed until it resolves, which costs nothing: the refusal is
-already the shipped behaviour and it is what review asked for. Every remaining
-`{{PLACEHOLDER}}` is that same decision wearing a different name, and
-`npm run agent-terms:publish` refuses any body still carrying one.
-
-Written to be reviewed against BEHAVIOUR. Factual clauses carry the code they were
-read off, so a reviewer can check the claim rather than take it. Where a clause and
-the code disagree, the code is what is true: fix the clause, or fix the code and
-say which. review valued this and it stays.
-
-This is the OPERATOR's document. OpenInspection is deployed by whoever runs it, so
-the operator's name, contact and law are per-deployment and must never be hardcoded
-to one company.
-
-The decision points at the end are now DOWN TO ONE, plus two the operator must
-confirm rather than decide. What was resolved, and on what basis, is in the review review request rather than repeated here.
+Factual clauses cite the code they were read off, so a reviewer can check the claim
+rather than take it. Where a clause and the code disagree, the code is what is true.
+review found one that had drifted, which is the argument for keeping them.
 -->
 
-**Status:** review-ready draft (v3) — not published
+
+**Status:** review-ready draft (v4) — not published
 **Applies to:** anyone who creates or uses an Agent account on
 {{OPERATOR_NAME}}'s OpenInspection deployment
 
@@ -63,8 +38,9 @@ confirm rather than decide. What was resolved, and on what basis, is in the revi
 These Terms are between **you**, as the individual who creates or uses an Agent
 account, and **{{OPERATOR_NAME}}** ("we", "us"), which operates this deployment.
 
-If you access the Service in connection with your work for an organization, you
-represent that you are authorized to do so.
+**You enter into these Terms personally. If you access the Service in connection
+with your work for an organization, you represent that you are authorized to use
+the Service for that organization.**
 
 These Terms do **not** make the Inspection Company, your brokerage, your employer,
 or any other transaction participant a party to this agreement unless we
@@ -74,6 +50,16 @@ You are always the direct party. If you act for an organization, you remain
 responsible for your own actions and you warrant your authority to act — but your
 use of the Service does not put your brokerage, or any Inspection Company, into a
 contract with us.
+
+**No agency or employment.** Nothing in these Terms creates, or is intended to
+create, an agency, employment, partnership, joint venture, fiduciary, franchise, or
+other representative relationship between you and us. You have no authority to bind
+us or to make commitments on our behalf.
+
+*(review asked for an explicit no-agency statement and no draft had one. §1's
+"the Inspection Company is not a party" is a different sentence: it says who is NOT
+on the other side of this contract, and says nothing about what YOU are to US. The
+word "Agent" invites the question "agent of whom", and this answers it.)*
 
 ## 2. Definitions
 
@@ -179,7 +165,14 @@ what WE are responsible for; they do not purport to remove an obligation you owe
 somebody else.
 
 A Report concerns another person's property and another person's transaction.
-Treat it as confidential to that transaction.
+**Treat it as confidential, and use it only as permitted by these Terms and
+applicable law.**
+
+*(Deliberately a use restriction rather than a confidentiality regime. "Confidential"
+alone would raise who owes the duty to whom, what counts as confidential
+information, and whether the obligation ever ends — a whole NDA's worth of
+questions this document does not need, because §7 already carries the restriction
+that does the work.)*
 
 ## 7. Sharing Reports and transaction information
 
@@ -237,6 +230,10 @@ must not be contacted, the technical transmission itself, system-generated conte
 and abuse prevention.
 
 We may refuse or stop delivery, and we may suppress an address.
+
+**You are responsible for the content and the recipient information that you
+provide or select. We remain responsible for content that we generate ourselves,
+and for the operation of the messaging infrastructure, under applicable law.**
 
 Nothing in this section makes you responsible for our own obligations as the
 operator of the sending infrastructure.
@@ -344,7 +341,7 @@ or lost data, arising from your use of an Agent account or from anything in a
 Report.
 
 **Our total aggregate liability arising out of or relating to these Terms will not
-exceed the greater of (a) US$50 or (b) the amounts you paid us in the
+exceed the greater of (a) US$200 or (b) the amounts you paid us in the
 twelve months before the event giving rise to the claim.**
 
 These limits do **not** apply to liability for fraud, for willful misconduct, or to
@@ -412,54 +409,24 @@ deleted.
 {{OPERATOR_CONTACT_EMAIL}}
 
 <!--
-## review decision points — what is left
+## What is still open
 
-v1 listed ten. Nine are resolved in the text above; the reasoning and the
-competitor data behind each is in the review review request. What remains:
+Kept SHORT on purpose — the authoritative list is the register's review/31/32
+rows, and duplicating it here is how a draft turns into a second ruling source.
 
-**BLOCKING — 0. Two conflicts between review and review, which we did NOT
-resolve ourselves.** Picking one silently is how a corpus starts disagreeing with
-itself.
+BLOCKING (both must be green before this publishes; the gate enforces both):
+  · the operating entity — §17 governing law and dispute mechanism
+  · the retention model — review approved no window, so §15 may not imply one
 
-  *§1 capacity.* review asked for "if you access the Service in connection with
-  your work for an organization, you represent that you are authorized to do so".
-  review asks for "You enter into these Terms in your individual capacity. You are
-  not entering into these Terms on behalf of an inspection company, its client, or
-  any other person or entity." One accommodates acting for an employer; the other
-  disclaims it. v3 still carries review's sentence — tell us which wins.
+FOR THE OPERATOR TO DECIDE, not review:
+  · the §14 liability floor — DECIDED: US$200, the most conservative of the values
+    on the table. review leaned US$100 and was explicit that no figure is legally
+    "safe"; the operator went higher because the only real risk in this clause is a
+    court finding the floor low enough to raise enforceability on a wholly free
+    service, and US$200 has industry precedent (Google) at effectively no cost.
 
-  *Section structure.* review set out 18 sections in one order; review proposes
-  16 in another. v3 keeps review's, since renumbering twice would invalidate every
-  cross-reference in this file and in the register for no gain until it is settled.
-
-**BLOCKING — 0b. §12/§15 retention.** See the header: no approved retention window
-exists, so nothing here may imply one. Independent of the entity.
-
-**BLOCKING — 1. §17, the operating entity.** There is no entity: the operator is
-an individual, and the billing path under consideration is a merchant-of-record
-(Paddle), which makes a third party the seller of record to the customer while
-these Terms still govern the service relationship. review declined to pick a
-state in the abstract; we now know one cannot be picked at all. The question for
-review is therefore no longer "which law" but: **can an Agent Terms be published
-at all by an operator with no entity, or must agent signup stay closed until one
-exists?** — and if it can, what §17 should say. Nothing else in this document is
-blocked by it.
-
-**CONFIRM — 2. §14, the US$50 floor.** Chosen, not inherited. review proposed
-$100; the closest competitor (Spectora) caps at $10 flat, Dropbox uses a $20
-floor and Google $200. An Agent pays nothing, so the floor IS the entire exposure
-— the fee limb is always zero. $50 sits above the level a court might treat as
-illusory and below review more conservative figure. Confirm or move it.
-
-**CONFIRM — 3. §8, whether the allocation survives the facts.** The message has
-THREE content sources, and only one is ours: our operational shell (subject
-`Repair request — <address>`, one sentence and a link, no promotional content and
-no unsubscribe), a free-text message the Agent supplies, and a template the
-Inspection Company may override wholesale. Given 15 U.S.C. §7702(2) and (16), the
-stronger argument is that this is not a commercial electronic mail message at all,
-rather than that it falls within the §7702(17) transactional exemption — whose
-first limb requires a transaction the recipient "previously agreed to enter into
-with the sender", which a cold contractor has not. Those are different arguments
-and only the first holds. Confirm the section as drafted, or tell us this needs a
-product change (recipient-side consent capture) rather than wording.
+ENGINEERING, from review and not a drafting item:
+  · the repair-request message must stay transaction-specific. Whether it is a
+    commercial message is decided by the content actually generated, not by a
+    clause in here — so the constraint belongs in the template and in a gate.
 -->
