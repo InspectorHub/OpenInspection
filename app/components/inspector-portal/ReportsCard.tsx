@@ -20,6 +20,14 @@ export interface ReportRow {
     publishedAt: string | null;
     versionCount: number;
     hasContent: boolean;
+    /**
+     * Whether the inspector has written the report-level narrative — the FLAG,
+     * not the prose. The text is unbounded free text and arrives from the
+     * per-report narrative endpoint an editor opens; a list payload carries
+     * only the boolean, for the same reason `hasContent` is a boolean rather
+     * than the findings map.
+     */
+    hasNarrative: boolean;
     canDelete: boolean;
     deleteBlockedReason: "primary" | "published" | null;
 }

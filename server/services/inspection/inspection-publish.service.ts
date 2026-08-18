@@ -28,7 +28,8 @@ import {
     type RequireDefectFields,
     type PublishReadiness,
 } from './shared';
-import { communicationCounts } from '../../lib/communication-counts';
+import { communicationCounts, type CommunicationCounts } from '../../lib/communication-counts';
+import type { HubInvoiceCore } from '../../lib/validations/inspection/read';
 import { listReportsForHub, type ReportListItem } from '../../lib/inspection/reports';
 import { InspectionSubService } from './base';
 import { CredentialService } from '../credential.service';
@@ -315,14 +316,13 @@ export class InspectionPublishService extends InspectionSubService {
             signersTotal: number;
             signersSigned: number;
         }>;
-        invoice: {
-            id: string; status: string; amountCents: number;
-            /** Cumulative amount received; null when partial with no recorded figure. */
-            amountPaidCents: number | null;
-            currency: string; sentAt: string | null; paidAt: string | null;
-        } | null;
+        // DERIVED, and from the CORE half on purpose: `payUrl` belongs to the wire
+        // schema because the ROUTE issues it — returning one here would not compile.
+        invoice: HubInvoiceCore | null;
         publishReadiness: { ready: boolean; blockingCount: number };
-        communication: { delivered: number; needsAttention: number; unread: number };
+        // The WHOLE helper result: assigned straight from communicationCounts(), so
+        // a subset (as this was of `rulesActive`) hides a field without stopping it.
+        communication: CommunicationCounts;
         /** The order's deliverables. One order, several reports. */
         reports: ReportListItem[];
     } | null> {
