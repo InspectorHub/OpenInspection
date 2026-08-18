@@ -1,6 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
 import { tenants, users, templates, tenantConfigs } from '../db/schema';
+import { deriveAuthorityBasis } from '../auth/authority-basis';
+import { buildAcceptanceStatement } from '../../services/legal/account-acceptance';
 import type { IntegrationProvider, TenantUpdateParams } from '../integration';
 import { logger } from '../logger';
 import { SQL_UUID_V4 } from './standalone-uuid';
@@ -187,7 +190,7 @@ export class StandaloneProvider implements IntegrationProvider {
 
     async handleTenantUpdate(params: TenantUpdateParams): Promise<void> {
         const db = this.getDrizzle();
-        const { id, slug, status, tier, name, deploymentMode, maxUsers, adminEmail, adminPasswordHash, adminName } = params;
+        const { id, slug, status, tier, name, deploymentMode, maxUsers, adminEmail, adminPasswordHash, adminName, acceptance } = params;
 
         let tenantId = id || crypto.randomUUID();
         // Prefer the stable tenant id (slug can change — e.g. the 2026-06-03
@@ -249,17 +252,58 @@ export class StandaloneProvider implements IntegrationProvider {
             const existingUser = await db.select().from(users).where(eq(users.email, adminEmail)).get();
             if (!existingUser) {
                 const now = new Date();
-                await db.insert(users).values({
-                    id: crypto.randomUUID(),
-                    tenantId,
-                    email: adminEmail,
-                    passwordHash: adminPasswordHash,
-                    role: 'owner',
-                    // adminName is required by the setup form so this is never
-                    // empty for first-time admin users.
-                    ...(adminName ? { name: adminName } : {}),
-                    createdAt: now,
-                });
+                const userId = crypto.randomUUID();
+                // The basis comes from the DOOR, never from a lookup: this is
+                // the `/setup` wizard, where the person is bringing the
+                // workspace into existence, so `owner`. Any basis the caller
+                // declared is ignored rather than trusted — the standalone
+                // provider IS the setup door, and accepting a declared basis
+                // here would let a caller assert an authority nobody checked.
+                const acceptanceStatements = acceptance
+                    ? buildAcceptanceStatement(db, {
+                        tenantId,
+                        userId,
+                        ...(acceptance.actorIdentityRef ? { actorIdentityRef: acceptance.actorIdentityRef } : {}),
+                        authorityBasis: deriveAuthorityBasis({ path: 'setup' }),
+                        documents: acceptance.documents,
+                    })
+                    : [];
+                // ONE WRITE, even when the acceptance list is empty — the batch
+                // is the shape, not a branch, so the atomic path is the path in
+                // use rather than one only some callers reach.
+                //
+                // ⚠️ ABSENCE IS NOT A REFUSAL HERE, AND THAT IS A KNOWN GAP, not
+                // a decision that self-hosters owe nothing. Refusing would make
+                // `/setup` impossible on this build, because THERE IS NOTHING TO
+                // ACCEPT: `deployment_legal_versions` holds one document kind
+                // (`agent_terms`, the operator's contract with global agents),
+                // and the tenant's own `tenant_legal_versions` cannot exist yet
+                // — the tenant is being created in this same request, and the
+                // first version is written when an admin later saves their
+                // Privacy/Terms text in settings. A refusal with no document
+                // behind it would be a gate that can only ever say no.
+                //
+                // What closes it is a document, not a stricter check: the
+                // deployment publishing terms the first operator is shown at
+                // `/setup` (which needs `deployment_legal_versions.doc` widened
+                // and a field on `SetupSchema`). Until then this path creates an
+                // owner account with no acceptance, and saying so plainly beats
+                // a `?? []` that reads as coverage.
+                const statements = [
+                    db.insert(users).values({
+                        id: userId,
+                        tenantId,
+                        email: adminEmail,
+                        passwordHash: adminPasswordHash,
+                        role: 'owner',
+                        // adminName is required by the setup form so this is never
+                        // empty for first-time admin users.
+                        ...(adminName ? { name: adminName } : {}),
+                        createdAt: now,
+                    }),
+                    ...acceptanceStatements,
+                ];
+                await db.batch(statements as unknown as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 
                 // Default Template — empty starter. Renamed from "Standard
                 // Home Inspection" (R7-23) because it collided semantically

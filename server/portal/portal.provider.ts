@@ -19,7 +19,7 @@ export class PortalProvider implements IntegrationProvider {
 
     async handleTenantUpdate(params: TenantUpdateParams): Promise<void> {
         const db = this.getDrizzle();
-        const { id, slug, status, tier, name, maxUsers, adminEmail, adminPasswordHash } = params;
+        const { id, slug, status, tier, name, maxUsers, adminEmail, adminPasswordHash, acceptance } = params;
 
         // Upsert keyed on the STABLE tenant id (core's tenant id IS portal's
         // tenantId — every provisioning sync passes it as `id`), falling back to
@@ -135,10 +135,17 @@ export class PortalProvider implements IntegrationProvider {
                 logger.error('Cannot sync admin: No tenant ID resolved');
                 return;
             }
+            // The acceptance travels with the credential on this path too. The
+            // RPC entry point (`PATCH /api/integration/tenants/:slug`) is the
+            // fallback the onboarding workflow uses when the command queue is
+            // unavailable, so leaving it out here would mean the invariant held
+            // on the queue path and not on the path taken when the queue is
+            // broken — the worse of the two moments to lose it.
             await applyAdminCredential(this.db, {
                 tenantId: finalTenantId,
                 adminEmail,
                 adminPasswordHash,
+                ...(acceptance !== undefined && { acceptance }),
             });
         }
 

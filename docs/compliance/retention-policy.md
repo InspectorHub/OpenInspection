@@ -25,6 +25,41 @@ honest, and one that says nothing reads as approved.
 
 ---
 
+## 2026-08-18.1 — the acceptance ledger declared out of scope, and nothing deleted
+
+**What changed.** `account_acceptances` is declared `RETENTION_OUT_OF_SCOPE`. The
+table is new: one row per document a staff member accepted, written in the same
+`db.batch()` as the `users` row it belongs to.
+
+**Why out of scope rather than a window.** Expiring a row here does not shrink a
+record — it destroys one, and it destroys it in a specific direction. The account
+survives; the proof that its holder accepted anything does not. That is the state
+`account = EXISTS, acceptance_ledger = ABSENT` which counsel round 24 ruling 24D
+refused, and which this table was created to make unreachable. A retention sweep
+would reach it deliberately, on a timer, for every account old enough — the one
+mechanism guaranteed to produce it.
+
+**The clock this row already has.** Its natural lifetime is the ACCOUNT's, not the
+calendar's: it should die when the `users` row it belongs to does. That happens on
+the tenant purge and in the staff offboarding lifecycle, and both already destroy
+it. Adding a second, shorter clock would not bound anything that is not already
+bounded; it would only guarantee that some accounts outlive their own evidence.
+
+**Volume.** Growth is bounded by accounts × published document versions, not by
+usage — an account accepts each version once, and the unique index on
+`(user, doc, version)` is what makes that true rather than conventional.
+
+**Declared although nothing went red.** `LEDGER_NAME` in
+`scripts/check-retention-manifest.mjs` matches no part of `account_acceptances`,
+so this table could have shipped with `lint:retention` green. That is the same
+silence that let `tenant_destruction_records` go a year without a decision, and
+the reason the entry exists is that somebody read the table, not that a gate
+asked.
+
+**What did not change.** No period, no table in `RETENTION_MANIFEST`, no anchor
+column, no `decideBy` date, and nothing new is deleted or erased anywhere. The
+digest moved because the gate hashes the exclusion list too.
+
 ## 2026-08-17.3 — one table declared out of scope, and nothing deleted
 
 **What changed.** `deployment_legal_versions` is declared `RETENTION_OUT_OF_SCOPE`.

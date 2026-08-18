@@ -207,6 +207,16 @@ const HEURISTIC_BLIND_SPOTS = [
     // `repair_action_tag` did. Its rule is `erase_in_place`, and the next test pins
     // that it is a rule rather than an exclusion.
     'reports.inspector_narrative',
+    // The acceptance ledger. `PII_HEURISTIC` matches nothing on this table —
+    // not `actor_identity_ref`, not `content_hash` — so it could have shipped
+    // with `lint:erasure` green from the day it was written. Two of its ten
+    // columns are pinned: the one that names a person's account, and the one
+    // that says whether that person can bind the company. The other eight are a
+    // scope key, an opaque id, two timestamps, a document name, a version and a
+    // hash of company-authored text, where losing the declaration changes no
+    // answer.
+    'account_acceptances.user_id',
+    'account_acceptances.authority_basis',
 ];
 
 describe('columns the PII heuristic cannot see', () => {

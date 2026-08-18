@@ -241,6 +241,10 @@ export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
         reason: 'The only copy of the text an acceptance points at. `users.terms_accepted` stores a version and a content hash, not the body — so deleting a row here does not shrink a record, it makes an existing one unverifiable, and the signer can no longer be shown what they agreed to. Counsel round 29 endorsed the version+hash design specifically because the accepted version can be reconstructed later; a retention sweep over this table is the one thing that would make that false. Growth is bounded by publications, not by usage: a handful of rows over the life of a deployment.',
     },
     {
+        table: 'account_acceptances',
+        reason: 'The evidence that an account was VALIDLY CREATED, written in the same db.batch() as the users row it belongs to (counsel A2, round 24 ruling 24D). Expiring a row here does not shrink a record — it destroys one, and it destroys it in a specific direction: the account survives while the proof that its holder accepted anything does not, which is the state account = EXISTS, acceptance_ledger = ABSENT that the table exists to make unreachable. A retention sweep would reach that state deliberately, on a timer, for every account old enough. The natural clock for this row is the ACCOUNT, not the calendar: it should die when the users row it belongs to does, which is the tenant purge and the staff offboarding lifecycle, and both already destroy it. Growth is bounded by accounts times published document versions, not by usage. Declared here although the gate never asked: the LEDGER_NAME pattern matches no part of account_acceptances, so this table could have shipped with lint:retention green — the same silence that let tenant_destruction_records go a year without a decision.',
+    },
+    {
         table: 'sms_consent_log',
         reason: 'TCPA consent evidence. Pruning it destroys the tenant own defence against a consent challenge — the direct analogue of portal P4-D5 on suppression lists, where the record IS the protection.',
     },

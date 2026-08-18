@@ -15,6 +15,24 @@
     "name": "Fixture Two",
     "maxUsers": 5,
     "adminEmail": "fix2@example.com",
-    "adminPasswordHash": "pbkdf2$fixture"
+    "adminPasswordHash": "pbkdf2$fixture",
+    "acceptance": {
+      "actorIdentityRef": "fixture-identity-2",
+      "authorityBasis": "owner",
+      "documents": [
+        {
+          "doc": "terms",
+          "version": "2026-06-01",
+          "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "acceptedAt": 1749081600000
+        },
+        {
+          "doc": "privacy",
+          "version": "2026-06-01",
+          "contentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "acceptedAt": 1749081600000
+        }
+      ]
+    }
   }
 }

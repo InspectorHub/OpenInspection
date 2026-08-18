@@ -74,6 +74,50 @@ console.log(`  body length         : ${body.length} chars (${raw.length} before 
 console.log(`  placeholders left   : ${placeholders.length}${placeholders.length ? ` — ${placeholders.join(', ')}` : ''}`);
 console.log(`  status line         : ${statusLine}`);
 
+// ── The publish gate (counsel round 32) ─────────────────────────────────────
+// Counsel's closing recommendation was to stop line-editing and run a PUBLISH
+// GATE instead: a fixed checklist that must be entirely green before this
+// document may go live. Encoded here rather than kept as a list somebody
+// remembers, because a checklist nobody executes is how a blocker gets forgotten
+// on the day everything else turns green.
+const noAgency = /no agency or employment/i.test(body);
+
+// Retention is a SECOND blocker, independent of the operating entity: round 13
+// approved no retention window, so §15 must not go live implying one. The signal
+// is the policy header's own state, not a human's recollection of it.
+let retentionApproved = false;
+let retentionDetail = 'could not read retention-policy.ts — treated as NOT approved';
+try {
+    const rp = readFileSync(join(ROOT, 'server', 'lib', 'compliance', 'retention-policy.ts'), 'utf8');
+    const status = rp.match(/status:\s*'([a-z]+)'/)?.[1] ?? '(none)';
+    const approvedBy = rp.match(/approvedBy:\s*(null|'[^']*')/)?.[1] ?? 'null';
+    retentionApproved = status !== 'interim' && approvedBy !== 'null';
+    retentionDetail = `status=${status} approvedBy=${approvedBy}`;
+} catch { /* keep the fail-closed default */ }
+
+const gate = [
+    ['contracting party + contact resolved', !placeholders.includes('OPERATOR_NAME') && !placeholders.includes('OPERATOR_CONTACT_EMAIL')],
+    ['governing law resolved', !placeholders.includes('GOVERNING_LAW')],
+    ['dispute mechanism resolved', !placeholders.includes('DISPUTE_PROVISION')],
+    ['privacy notice URL resolved', !placeholders.includes('PRIVACY_URL')],
+    ['retention model approved', retentionApproved],
+    ['no-agency clause present', noAgency],
+    ['no placeholders remain', placeholders.length === 0],
+    ['status line is not a draft', !draftish],
+];
+const green = gate.filter(([, ok]) => ok).length;
+console.log(`  publish gate         : ${green} of ${gate.length} green`);
+for (const [label, ok] of gate) console.log(`      ${ok ? '✓' : '✘'} ${label}`);
+console.log(`      · retention signal : ${retentionDetail}`);
+
+if (green < gate.length) {
+    die(`publish gate: ${gate.length - green} of ${gate.length} check(s) not green — see the list above.\n`
+      + '  This document does not go live until every one of them is. Counsel round 32\n'
+      + '  endorsed exactly this: keeping the publisher fail-closed until every check\n'
+      + '  is green is the correct posture. The ruling itself is archived at\n'
+      + '  docs/legal/2026-08-18-counsel-round-32-response.md in the superproject.');
+}
+
 if (placeholders.length > 0) {
     die(`The body still contains ${placeholders.length} unresolved placeholder(s): ${placeholders.join(', ')}.\n`
       + '  Counsel round 29: governing law must not ship as a placeholder, and a liability\n'

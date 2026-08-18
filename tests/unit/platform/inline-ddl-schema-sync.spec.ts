@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
-import { tenantConfigs, inspectionResults, users } from '../../../server/lib/db/schema';
-import { TENANT_CONFIGS_TEST_DDL, INSPECTION_RESULTS_TEST_DDL, USERS_TEST_DDL } from '../../helpers/inline-ddl';
+import { tenantConfigs, inspectionResults, users, accountAcceptances } from '../../../server/lib/db/schema';
+import {
+    TENANT_CONFIGS_TEST_DDL, INSPECTION_RESULTS_TEST_DDL, USERS_TEST_DDL,
+    ACCOUNT_ACCEPTANCES_TEST_DDL,
+} from '../../helpers/inline-ddl';
 
 /**
  * Drift guard for the hand-maintained workers-runtime DDL.
@@ -63,6 +66,22 @@ describe('workers inline DDL stays in sync with the Drizzle schema', () => {
             missing,
             `tests/helpers/inline-ddl.ts is missing users column(s): ${missing.join(', ')}. ` +
                 'Add them to USERS_TEST_DDL so the workers cmd-apply path does not park.',
+        ).toEqual([]);
+    });
+
+    it('account_acceptances test DDL covers every Drizzle schema column', () => {
+        // The fourth table, and the one where drift fails LOUDEST rather than
+        // quietest: the acceptance rows ride the same `db.batch()` as the users
+        // insert, so a column missing here does not park one statement — it
+        // rolls back the account too, which is correct behaviour presenting as
+        // an incomprehensible failure.
+        const ddlColumns = ddlColumnNames(ACCOUNT_ACCEPTANCES_TEST_DDL);
+        const schemaColumns = getTableConfig(accountAcceptances).columns.map((c) => c.name);
+        const missing = schemaColumns.filter((name) => !ddlColumns.has(name));
+        expect(
+            missing,
+            `tests/helpers/inline-ddl.ts is missing account_acceptances column(s): ${missing.join(', ')}. ` +
+                'Add them to ACCOUNT_ACCEPTANCES_TEST_DDL so the workers credential-apply batch does not roll back.',
         ).toEqual([]);
     });
 

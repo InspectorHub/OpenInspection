@@ -29,13 +29,36 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { accountAcceptances } from '../../lib/db/schema';
 import { AUTHORITY_BASES, type AuthorityBasis } from '../../lib/auth/authority-basis';
 
-/** One document the person accepted. Mirrors the portal's block, field for field. */
+/**
+ * One document the person accepted. Mirrors the portal's block, field for field.
+ *
+ * @declarationEmit Exported so the emitted `.d.ts` can NAME it: it is the
+ * element type of `documents` on both `AcceptanceInput` and
+ * `CapturedAcceptance`, and nothing imports it directly.
+ */
 export interface AcceptedDocument {
     doc: string;
     version: string;
     contentHash: string;
     /** Epoch ms — when the HUMAN accepted, never when this row is built. */
     acceptedAt: number;
+}
+
+/**
+ * An acceptance CAPTURED SOMEWHERE ELSE, travelling with the account it belongs
+ * to — the portal's onboarding block on a `cmd.tenant.update`, or the
+ * equivalent handed to an integration provider over RPC.
+ *
+ * It is `AcceptanceInput` minus the two fields the receiving side supplies
+ * itself: the tenant it is landing in, and the id of the `users` row it is
+ * being committed alongside — which does not exist until the receiver mints it.
+ * Keeping them out is what makes it impossible for a caller to hand in an
+ * acceptance keyed to some OTHER user.
+ */
+export interface CapturedAcceptance {
+    actorIdentityRef?: string | undefined;
+    authorityBasis: AuthorityBasis;
+    documents: readonly AcceptedDocument[];
 }
 
 export interface AcceptanceInput {
@@ -56,8 +79,14 @@ const HASH64 = /^[0-9a-f]{64}$/;
  * with separate versions — see the schema note on why that is not one row with a
  * list. The caller spreads them into its own batch.
  */
-export function buildAcceptanceStatement(
-    db: DrizzleD1Database<Record<string, unknown>>,
+export function buildAcceptanceStatement<TSchema extends Record<string, unknown>>(
+    // Generic in the schema because Drizzle's schema parameter is INVARIANT: a
+    // caller that built its handle with a bare `drizzle(c.env.DB)` holds a
+    // `DrizzleD1Database<Record<string, never>>`, which a fixed
+    // `Record<string, unknown>` parameter rejects. Every real caller is that
+    // caller, so the alternative was a cast at each of them — and a cast at a
+    // call site is where a genuinely wrong handle would slip through unnoticed.
+    db: DrizzleD1Database<TSchema>,
     input: AcceptanceInput,
 ) {
     if (!input.tenantId) throw new Error('acceptance requires a tenant');
