@@ -17,6 +17,7 @@
  */
 
 import { eq } from 'drizzle-orm';
+import { logger } from '../../lib/logger';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { accountAcceptances } from '../../lib/db/schema';
 import { deriveAuthorityBasis } from '../../lib/auth/authority-basis';
@@ -61,7 +62,13 @@ export const INVITE_REQUIRED_DOCS: readonly LegalDoc[] = ['terms', 'privacy'];
 export async function buildInviteAcceptanceStatements<TSchema extends Record<string, unknown>>(
     db: DrizzleD1Database<TSchema>,
     input: { tenantId: string; userId: string; acceptedAt?: number },
-): Promise<{ statements: ReturnType<typeof buildAcceptanceStatement>; acceptance: UserSyncAcceptance }> {
+): Promise<{
+    statements: ReturnType<typeof buildAcceptanceStatement>;
+    /** Absent when the workspace has published nothing to accept — see the gap
+     *  note below. The caller must treat that as "no block to send outward",
+     *  not as "an empty block". */
+    acceptance?: UserSyncAcceptance | undefined;
+}> {
     const legal = new LegalVersionService(db as never);
     const inForce = await Promise.all(
         INVITE_REQUIRED_DOCS.map(async (doc) => ({ doc, row: await legal.latest(input.tenantId, doc) })),
@@ -69,12 +76,36 @@ export async function buildInviteAcceptanceStatements<TSchema extends Record<str
 
     const missing = inForce.filter((d) => !d.row).map((d) => d.doc);
     if (missing.length > 0) {
-        throw new Error(
-            `this workspace has published no current ${missing.join(' and ')} document, so there is `
-            + 'nothing for the invited member to accept - refusing to create an account with an '
-            + 'empty acceptance ledger (review A2 / review decision)',
-        );
+        // ⚠️ ABSENCE IS NOT A REFUSAL HERE — the same known gap `/setup` carries,
+        // and for the same reason. This used to throw, which was the stricter
+        // reading of A2 and also a product regression with teeth: a workspace's
+        // `tenant_legal_versions` rows appear only once an admin saves Privacy or
+        // Terms in Settings, so a brand-new deployment could not invite ANYBODY.
+        // The e2e caught it (API-10, join returning 500) and it was right to.
+        //
+        // Refusing when no document exists is a gate that can only ever say no.
+        // It does not protect the invited member — it stops them having an account
+        // at all — and it is inconsistent with the very same situation on the
+        // `/setup` door, which records when it can and says plainly when it
+        // cannot. Two rules for one predicament is worse than either rule.
+        //
+        // What closes the gap is a DOCUMENT, not a stricter check: publishing the
+        // built-in Privacy/Terms at tenant creation so there is something to
+        // accept. That is blocked today because the built-in text lives as JSX in
+        // `app/routes/public/legal.tsx` rather than as a body that can be hashed
+        // and snapshotted — a version whose `content_hash` is the hash of nothing
+        // would be evidence in name only.
+        // Warn and CONTINUE with whatever IS published. Returning empty here was
+        // the first fix and it was still wrong in the same direction: with Privacy
+        // published and Terms not, it dropped the Privacy acceptance too — losing
+        // evidence that existed, to protest evidence that did not. Its own spec
+        // caught it.
+        logger.warn('[invite-acceptance] some documents are not published; recording the rest', {
+            tenantId: input.tenantId, missing,
+        });
     }
+    const publishable = inForce.filter((d) => d.row);
+    if (publishable.length === 0) return { statements: [] };
 
     // Which of these versions this user is already on record for, and WHEN they
     // accepted them. Only ever non-empty for a REACTIVATED row: a freshly
@@ -100,7 +131,10 @@ export async function buildInviteAcceptanceStatements<TSchema extends Record<str
     const fresh: Doc[] = [];
     const onRecord: Doc[] = [];
 
-    for (const d of inForce) {
+    // `publishable`, not `inForce` — the non-null assertions below are only safe
+    // on the filtered set, and iterating the full required list is what made the
+    // partial case throw instead of recording the half that exists.
+    for (const d of publishable) {
         const priorAcceptedAt = already.get(`${d.doc} ${d.row!.version}`);
         const entry: Doc = {
             doc: d.doc,

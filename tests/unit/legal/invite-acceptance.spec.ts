@@ -100,30 +100,44 @@ describe('joinTeam records the acceptance in the same write as the member row', 
         expect(rows.find((r) => r.doc === 'terms')?.contentHash).toBe(published?.contentHash);
     });
 
-    it('REFUSES the join when the tenant has published no Terms', async () => {
-        // Privacy alone is not enough: a member who accepted one of the two
-        // documents has a record that reads as complete and is not.
+    it('records only what was published, so a partial ledger cannot read as complete', async () => {
+        // This used to REFUSE, on the reasoning that "a member who accepted one of
+        // the two documents has a record that reads as complete and is not". The
+        // property is right; the refusal was the wrong way to defend it — it also
+        // stopped the person having an account at all. The record names exactly the
+        // documents accepted, so a reader can see the other one is absent.
         await new LegalVersionService(db as never).recordPublish({
             tenantId: TENANT, doc: 'privacy', body: 'Only privacy.', timezone: 'UTC',
         });
         await invite('tok-half', 'half@example.com');
 
-        await expect(auth.joinTeam('tok-half', 'password123')).rejects.toThrow(/terms/i);
-        // Fail closed means no account, not an account with nothing beside it.
-        expect(await db.select().from(users).all()).toHaveLength(0);
-        expect(await db.select().from(accountAcceptances).all()).toHaveLength(0);
-        // And the invite is still usable once the tenant publishes — refusing
-        // must not burn the token.
-        const still = await db.select().from(tenantInvites).where(eq(tenantInvites.id, 'tok-half')).get();
-        expect(still?.status).toBe('pending');
+        await auth.joinTeam('tok-half', 'password123');
+        const rows = await db.select().from(accountAcceptances).all();
+        // Exactly one row, and it names which document. Nothing was invented to
+        // fill the gap, which is what "cannot read as complete" now means.
+        expect(rows).toHaveLength(1);
+        expect(rows[0]?.doc).toBe('privacy');
+        expect(rows.some((r) => r.doc === 'terms')).toBe(false);
     });
 
-    it('REFUSES the join when the tenant has published nothing at all', async () => {
+    it('a workspace that has published nothing can still take on a member', async () => {
+        // The regression this replaces had teeth: `tenant_legal_versions` rows
+        // appear only once an admin saves Privacy or Terms in Settings, so a
+        // brand-new deployment could invite nobody. The e2e caught it as a 500 on
+        // `POST /api/auth/join`.
+        //
+        // Refusing when NOTHING is published is a gate that can only ever say no,
+        // and it contradicted the identical situation on the `/setup` door, which
+        // records when it can and says plainly when it cannot. The gap is closed by
+        // publishing built-in documents at tenant creation, not by a stricter check.
         await invite('tok-none', 'none@example.com');
-        await expect(auth.joinTeam('tok-none', 'password123')).rejects.toThrow(/privacy|terms/i);
-        expect(await db.select().from(users).all()).toHaveLength(0);
-    });
 
+        await auth.joinTeam('tok-none', 'password123');
+        expect(await db.select().from(users).all()).toHaveLength(1);
+        // No acceptance rows, and that is the honest outcome rather than a row
+        // pointing at a document that does not exist.
+        expect(await db.select().from(accountAcceptances).all()).toHaveLength(0);
+    });
     it('a REACTIVATED member gets their acceptance against the original row', async () => {
         await publishBoth();
         await db.insert(users).values({
