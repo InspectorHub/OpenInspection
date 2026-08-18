@@ -257,7 +257,9 @@ describe('Track E1 — InspectionService.getRepairList', () => {
         expect(custom).toBeDefined();
         expect(custom!.itemLabel).toBe('Loose flashing');
         expect(custom!.category).toBe('safety');
-        // IA-57 — custom defects carry no structured trade field today.
+        // IA-85 — this row declares no trade, so the entry carries none. The
+        // "a custom defect can never carry a trade" case below is the one that
+        // moved.
         expect(custom!.trade).toBeNull();
         expect(result.totals.safety).toBe(1);
         expect(result.totals.maintenance).toBe(1);
@@ -287,6 +289,37 @@ describe('Track E1 — InspectionService.getRepairList', () => {
     it('leaves trade null when the inspector picked none', async () => {
         const result = await svc.getRepairList(INSPECTION_ID, TENANT);
         expect(result.defects[0]!.trade).toBeNull();
+    });
+
+    /**
+     * IA-85 — the repair list is the contractor-facing surface, so "who should
+     * fix this" matters most on the defects the inspector wrote by hand. A
+     * custom defect resolves its trade to the same label a canned one does; an
+     * unknown slug resolves to null rather than leaking a raw enum id.
+     */
+    it('carries the resolved trade label onto a CUSTOM repair-list entry', async () => {
+        await testDb.insert(schema.inspectionResults).values({
+            id: 'res-custom-trade',
+            inspectionId: INSPECTION_ID,
+            tenantId: TENANT,
+            data: {
+                'roof-shingles': {
+                    customComments: {
+                        defects: [
+                            { id: 'cust-1', title: 'Loose flashing', comment: 'x', included: true, category: 'safety', trade: 'licensed-roofer' },
+                            { id: 'cust-2', title: 'Bad slug',       comment: 'y', included: true, category: 'safety', trade: 'plumber-extraordinaire' },
+                        ],
+                    },
+                },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any,
+            lastSyncedAt: new Date(),
+        });
+        const result = await svc.getRepairList(INSPECTION_ID, TENANT);
+        const good = result.defects.find(d => d.defectTitle === 'Loose flashing');
+        const bad  = result.defects.find(d => d.defectTitle === 'Bad slug');
+        expect(good!.trade).toBe('licensed roofer');
+        expect(bad!.trade).toBeNull();
     });
 
     it('reports showEstimates=false, with or without a tenant config row', async () => {

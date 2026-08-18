@@ -1,11 +1,16 @@
 import { Button } from "@core/shared-ui";
 import { BUILT_IN_DEFECT_CATEGORIES, type CustomDefectCategory } from "../../lib/custom-defects";
+import { DEFECT_TRADE_OPTIONS, type DefectTrade } from "../../lib/defect-fields";
 import { m } from "~/paraglide/messages";
 
 export interface CustomDefectFormProps {
   title: string;
   comment: string;
   category: CustomDefectCategory;
+  /** IA-85 — the trade, from the same vocabulary the canned defect row offers
+   *  (`DefectFieldsRow`). `''` is "not picked": trade is optional here because
+   *  the publish gate does not read custom defects. */
+  trade: DefectTrade | "";
   saveToLibrary: boolean;
   /** When set, renders the "Save to my library" checkbox (Track H B-20 back-flow). */
   showSaveToLibrary: boolean;
@@ -15,6 +20,7 @@ export interface CustomDefectFormProps {
   onTitleChange: (value: string) => void;
   onCommentChange: (value: string) => void;
   onCategoryChange: (value: CustomDefectCategory) => void;
+  onTradeChange: (value: DefectTrade | "") => void;
   onSaveToLibraryChange: (value: boolean) => void;
   onCancel: () => void;
   onSubmit: () => void;
@@ -25,12 +31,14 @@ export function CustomDefectForm({
   title,
   comment,
   category,
+  trade,
   saveToLibrary,
   showSaveToLibrary,
   categories,
   onTitleChange,
   onCommentChange,
   onCategoryChange,
+  onTradeChange,
   onSaveToLibraryChange,
   onCancel,
   onSubmit,
@@ -52,7 +60,7 @@ export function CustomDefectForm({
         aria-label={m.editor_customdefect_narrative_aria()}
         className="w-full h-16 px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] resize-none focus:shadow-ih-focus focus:border-ih-primary outline-none"
       />
-      <div className="flex items-center gap-2">
+      <div className="flex items-center flex-wrap gap-2">
         <select
           value={category}
           onChange={(e) => onCategoryChange(e.target.value as CustomDefectCategory)}
@@ -69,6 +77,23 @@ export function CustomDefectForm({
             .map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
+        </select>
+        {/* IA-85 — same vocabulary and same control as the canned defect row
+            (DefectFieldsRow), so one list of defects reads as one list.
+            The PLACEHOLDER differs on purpose: the canned row prints a visible
+            `TRADE` label above its select and can say "— select —", while this
+            compact form has no label rail, so a bare "— select —" would sit
+            beside a self-describing category box saying nothing about itself. */}
+        <select
+          value={trade}
+          onChange={(e) => onTradeChange(e.target.value as DefectTrade | "")}
+          aria-label={m.editor_defect_trade_label()}
+          className="h-8 px-2 rounded-lg border border-ih-border bg-ih-bg-card text-[12px] outline-none"
+        >
+          <option value="">{m.editor_customdefect_trade_placeholder()}</option>
+          {DEFECT_TRADE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
         </select>
         {/* Track H (B-20 back-flow) — default OFF so one-off findings don't pollute the library */}
         {showSaveToLibrary && (

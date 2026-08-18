@@ -101,6 +101,14 @@ export interface CustomCommentEntry {
     included:  boolean;
     category?: string;
     location?: string;
+    /** One of `DEFECT_TRADES` (`server/types/defect-fields.ts`), or null.
+     *  Same field, same vocabulary and same sanitizer rule as `DefectState.trade`:
+     *  a hand-written defect states WHO should fix it exactly as a canned one
+     *  does, and the contractor-facing repair list reads both by this key. Typed
+     *  `string` rather than `DefectTrade` because this projection describes what
+     *  the JSON blob may hold, not what the write path accepts — the guard in
+     *  `sanitizeDefectStates` is what narrows it. */
+    trade?:    string | null;
     photos?:   PhotoEntry[];
 }
 

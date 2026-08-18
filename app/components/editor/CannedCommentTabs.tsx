@@ -11,6 +11,7 @@ import {
   DEFECT_TIMEFRAME_LABELS,
 } from "../../lib/defect-fields";
 import type { CustomDefect, CustomDefectCategory } from "../../lib/custom-defects";
+import type { DefectTrade } from "../../lib/defect-fields";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -92,7 +93,7 @@ export interface CannedCommentTabsProps {
   onToggleCustomDefect?: (customId: string, included: boolean) => void;
 
   /** B-20 — add a field-authored custom defect. When unset the form is hidden. */
-  onAddCustomDefect?: (input: { title: string; comment: string; category: CustomDefectCategory }) => void;
+  onAddCustomDefect?: (input: { title: string; comment: string; category: CustomDefectCategory; trade?: DefectTrade | null }) => void;
   customFormOpen: boolean;
   /** Opens the custom-defect form (seeds title from query when no matches). */
   onOpenCustomForm: () => void;
@@ -100,6 +101,8 @@ export interface CannedCommentTabsProps {
   customTitle: string;
   customComment: string;
   customCategory: CustomDefectCategory;
+  /** IA-85 — the picked trade; `''` when the inspector picked none. */
+  customTrade: DefectTrade | "";
   /** IA-59 — tenant defect categories offered in the custom-defect dropdown. */
   customCategories?: Array<{ id: string; name: string }>;
   saveToLibrary: boolean;
@@ -107,6 +110,7 @@ export interface CannedCommentTabsProps {
   onCustomTitleChange: (value: string) => void;
   onCustomCommentChange: (value: string) => void;
   onCustomCategoryChange: (value: CustomDefectCategory) => void;
+  onCustomTradeChange: (value: DefectTrade | "") => void;
   onSaveToLibraryChange: (value: boolean) => void;
   onCancelCustomForm: () => void;
   onSubmitCustomDefect: () => void;
@@ -146,12 +150,14 @@ export function CannedCommentTabs({
   customTitle,
   customComment,
   customCategory,
+  customTrade,
   customCategories,
   saveToLibrary,
   showSaveToLibrary,
   onCustomTitleChange,
   onCustomCommentChange,
   onCustomCategoryChange,
+  onCustomTradeChange,
   onSaveToLibraryChange,
   onCancelCustomForm,
   onSubmitCustomDefect,
@@ -305,8 +311,28 @@ export function CannedCommentTabs({
                   />
                 }
                 bodySlot={
-                  cd.comment ? (
-                    <p className="text-[12px] mt-0.5 leading-relaxed text-ih-fg-3">{cd.comment}</p>
+                  // IA-85 — the comment AND the trade. A canned defect shows its
+                  // trade in a labelled control on the row; a custom one showed
+                  // nothing, so an inspector who had just picked one could not
+                  // see what they picked, let alone notice a wrong one.
+                  // Read-only here: there is no edit surface for a saved custom
+                  // defect yet, and showing the value is the prerequisite for it.
+                  (cd.comment || cd.trade) ? (
+                    <>
+                      {cd.comment && (
+                        <p className="text-[12px] mt-0.5 leading-relaxed text-ih-fg-3">{cd.comment}</p>
+                      )}
+                      {/* fg-3, not fg-4: fg-4 measured 2.64:1 against the selected
+                          row's tinted background at 11px, under the 4.5:1 AA floor
+                          for small text, while the comment line above measures 4.9.
+                          `lint:contrast` cannot see this — it reads the stylesheet,
+                          not a background composited from a row tint at runtime. */}
+                      {cd.trade && DEFECT_TRADE_LABELS[cd.trade] && (
+                        <p className="text-[11px] mt-0.5 text-ih-fg-3">
+                          {m.editor_customdefect_trade_summary({ trade: DEFECT_TRADE_LABELS[cd.trade] })}
+                        </p>
+                      )}
+                    </>
                   ) : null
                 }
               >
@@ -322,12 +348,14 @@ export function CannedCommentTabs({
                   title={customTitle}
                   comment={customComment}
                   category={customCategory}
+                  trade={customTrade}
                   categories={customCategories}
                   saveToLibrary={saveToLibrary}
                   showSaveToLibrary={showSaveToLibrary}
                   onTitleChange={onCustomTitleChange}
                   onCommentChange={onCustomCommentChange}
                   onCategoryChange={onCustomCategoryChange}
+                  onTradeChange={onCustomTradeChange}
                   onSaveToLibraryChange={onSaveToLibraryChange}
                   onCancel={onCancelCustomForm}
                   onSubmit={onSubmitCustomDefect}

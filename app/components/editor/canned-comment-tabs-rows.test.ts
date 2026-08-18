@@ -12,7 +12,7 @@ const customDefect = {
   comment: "Gutter pulling away.", included: true, photos: [] as Array<{ key: string }>,
 };
 
-function html(includedIds: string[]) {
+function html(includedIds: string[], extra: Record<string, unknown> = {}) {
   return renderToStaticMarkup(
     createElement(CannedCommentTabs, {
       visibleTabs: [{ id: "defects", label: "Defects" }],
@@ -30,11 +30,13 @@ function html(includedIds: string[]) {
       libraryMatches: [], onSeedFromLibrary: () => {},
       customDefects: [customDefect], onToggleCustomDefect: () => {},
       onAddCustomDefect: undefined, customFormOpen: false, onOpenCustomForm: () => {},
-      customTitle: "", customComment: "", customCategory: "recommendation",
+      customTitle: "", customComment: "", customCategory: "recommendation", customTrade: "",
       saveToLibrary: false, showSaveToLibrary: false,
       onCustomTitleChange: () => {}, onCustomCommentChange: () => {},
-      onCustomCategoryChange: () => {}, onSaveToLibraryChange: () => {},
+      onCustomCategoryChange: () => {}, onCustomTradeChange: () => {},
+      onSaveToLibraryChange: () => {},
       onCancelCustomForm: () => {}, onSubmitCustomDefect: () => {},
+      ...extra,
     } as never),
   );
 }
@@ -81,5 +83,33 @@ describe("CannedCommentTabs rows (behavior-preserving swap)", () => {
 
   it("keeps the selected (primary-tint) shell for included rows", () => {
     expect(html(["d1"])).toContain("bg-ih-primary-tint");
+  });
+});
+
+/**
+ * IA-85 — a hand-written defect names its trade from the SAME vocabulary the
+ * canned row offers. The form previously had no such control at all, so the
+ * contractor-facing repair list showed a trade for library defects and nothing
+ * for the ones the inspector actually wrote.
+ */
+describe("CannedCommentTabs custom-defect form", () => {
+  const open = () => html([], { onAddCustomDefect: () => {}, customFormOpen: true });
+
+  it("offers the canned trade vocabulary, plus an explicit none", () => {
+    const out = open();
+    expect(out).toContain('value="licensed-roofer"');
+    expect(out).toContain("licensed roofer");
+    // The empty option is what makes "no trade" expressible after a pick. It
+    // is asserted by its label, not by `value=""` — every empty text input in
+    // the form renders that attribute, so that would pass with no select at
+    // all. The label is the canned row's own placeholder: same control, same
+    // words, so the two defect kinds read alike.
+    expect(out).toContain(">— select —<");
+  });
+
+  it("does not invent a vocabulary of its own", () => {
+    const out = open();
+    // A trade the canned row would never offer must not appear here either.
+    expect(out).not.toContain("plumber-extraordinaire");
   });
 });

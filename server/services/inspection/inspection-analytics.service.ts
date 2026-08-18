@@ -4,6 +4,7 @@ import { contacts } from '../../lib/db/schema/contact';
 import { parseFindingKey } from '../../lib/finding-key';
 import { getEffectivePriceCents } from '../../lib/effective-price';
 import { RECOMMENDATION_CATEGORIES } from '../../lib/recommendation-categories';
+import { DEFECT_TRADE_LABELS, isDefectTrade } from '../../types/defect-fields';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../../lib/status/report-status';
 import { InspectionSubService } from './base';
@@ -145,6 +146,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
             included?:  boolean;
             category?:  'safety' | 'recommendation' | 'maintenance';
             location?:  string | null;
+            trade?:     string | null;
             recommendationId?: string | null;
         }
         const resultsRow = await this.getDrizzle()
@@ -227,9 +229,11 @@ export class InspectionAnalyticsService extends InspectionSubService {
                             : null,
                         category:            cat,
                         severityBucket:      item.severityBucket,
-                        // Custom defects carry no structured trade field today
-                        // (CustomCommentEntry has none) — always null.
-                        trade:               null,
+                        // The LABEL, matching the canned branch above. This row
+                        // is read straight off the JSON blob, so the slug is
+                        // resolved here; an unknown one resolves to null rather
+                        // than reaching the repair page as a raw enum id.
+                        trade:               isDefectTrade(c.trade) ? DEFECT_TRADE_LABELS[c.trade] : null,
                         recommendationId:    slug,
                         recommendationLabel: slug ? (labelBySlug.get(slug) ?? slug) : null,
                         // Custom defect photos are not currently aggregated by

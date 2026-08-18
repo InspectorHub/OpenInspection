@@ -69,4 +69,32 @@ describe('mapCustomDefectsForReport', () => {
     expect(mapCustomDefectsForReport(undefined, mkUrl)).toEqual([]);
     expect(mapCustomDefectsForReport({}, mkUrl)).toEqual([]);
   });
+
+  /**
+   * IA-85 — a custom defect carries `trade` exactly like a canned one, and the
+   * report card's trade strip is gated on `effectiveTrade`. The key must be
+   * emitted as the resolved LABEL (what the canned path publishes through
+   * `resolveDefectMustacheVars`), never the stored slug: the two rows sit in
+   * one list and a reader must not be able to tell them apart.
+   */
+  it('emits the resolved trade label for a custom defect that has one', () => {
+    const out = mapCustomDefectsForReport(
+      { defects: [{ id: 'c1', title: 'Loose flashing', trade: 'licensed-roofer' }] },
+      mkUrl,
+    );
+    expect(out[0].effectiveTrade).toBe('licensed roofer');
+  });
+
+  it('emits effectiveTrade: null when no trade was picked, and for an unknown slug', () => {
+    expect(mapCustomDefectsForReport({ defects: [{ id: 'c1', title: 'X' }] }, mkUrl)[0].effectiveTrade)
+      .toBeNull();
+    // A slug the vocabulary does not know resolves to null rather than to
+    // itself — the card would otherwise print a raw enum id at the client.
+    expect(
+      mapCustomDefectsForReport(
+        { defects: [{ id: 'c2', title: 'Y', trade: 'plumber-extraordinaire' }] },
+        mkUrl,
+      )[0].effectiveTrade,
+    ).toBeNull();
+  });
 });

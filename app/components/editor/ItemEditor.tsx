@@ -25,6 +25,7 @@ import { shouldTriggerSlash } from "../../lib/slash-trigger";
 import { findRatingLevel, type EditorRatingLevel } from "../../lib/rating-levels";
 import { findRatingContradictions } from "../../lib/contradiction-lint";
 import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "../../lib/custom-defects";
+import type { DefectTrade } from "../../lib/defect-fields";
 import { ItemHeader } from "../editor-shared/ItemHeader";
 import { FormField, type ItemOptions, type TemplateItem } from "../form/FormField";
 import { m } from "~/paraglide/messages";
@@ -84,7 +85,7 @@ interface ItemEditorProps {
  onAddPhoto?: () => void;
  photoUploading?: boolean;
  /** B-20 — add a field-authored defect into result.customComments.defects. */
- onAddCustomDefect?: (input: { title: string; comment: string; category: CustomDefectCategory }) => void;
+ onAddCustomDefect?: (input: { title: string; comment: string; category: CustomDefectCategory; trade?: DefectTrade | null }) => void;
  /** Track H (B-20 back-flow) — save the custom defect into the tenant library
   *  (best-effort; failure must not block the defect itself). */
  onSaveDefectToLibrary?: (input: { title: string; comment: string; category: CustomDefectCategory }) => void;
@@ -204,6 +205,8 @@ export function ItemEditor({
  const [customTitle, setCustomTitle] = useState("");
  const [customComment, setCustomComment] = useState("");
  const [customCategory, setCustomCategory] = useState<CustomDefectCategory>("recommendation");
+ // IA-85 — "" means the inspector picked no trade; the defect is written without the key.
+ const [customTrade, setCustomTrade] = useState<DefectTrade | "">("");
  const [saveToLibrary, setSaveToLibrary] = useState(false);
 
  // Task 4 — inline comment typeahead on the notes textarea (Tier 1 item.tabs).
@@ -335,7 +338,7 @@ export function ItemEditor({
  const submitCustomDefect = () => {
  const title = customTitle.trim();
  if (!title || !onAddCustomDefect) return;
- onAddCustomDefect({ title, comment: customComment.trim(), category: customCategory });
+ onAddCustomDefect({ title, comment: customComment.trim(), category: customCategory, trade: customTrade || null });
  // Track H (B-20 back-flow) — optionally flow the field-authored defect back into
  // the tenant library so the next inspection finds it in search. Best-effort:
  // library save failure must never block the defect itself (parent toasts).
@@ -345,6 +348,7 @@ export function ItemEditor({
  setCustomTitle("");
  setCustomComment("");
  setCustomCategory("recommendation");
+ setCustomTrade("");
  setSaveToLibrary(false);
  setCustomFormOpen(false);
  };
@@ -557,6 +561,7 @@ export function ItemEditor({
   setCustomTitle(deriveDefectTitle(match.text));
   setCustomComment(match.text);
   setCustomCategory("recommendation");
+  setCustomTrade("");
   setCustomFormOpen(true);
  }}
  customDefects={customDefects}
@@ -572,12 +577,14 @@ export function ItemEditor({
  customTitle={customTitle}
  customComment={customComment}
  customCategory={customCategory}
+ customTrade={customTrade}
  customCategories={defectCategories}
  saveToLibrary={saveToLibrary}
  showSaveToLibrary={!!onSaveDefectToLibrary}
  onCustomTitleChange={setCustomTitle}
  onCustomCommentChange={setCustomComment}
  onCustomCategoryChange={setCustomCategory}
+ onCustomTradeChange={setCustomTrade}
  onSaveToLibraryChange={setSaveToLibrary}
  onCancelCustomForm={() => setCustomFormOpen(false)}
  onSubmitCustomDefect={submitCustomDefect}
