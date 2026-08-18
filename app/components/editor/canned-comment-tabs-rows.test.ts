@@ -102,9 +102,19 @@ describe("CannedCommentTabs custom-defect form", () => {
     // The empty option is what makes "no trade" expressible after a pick. It
     // is asserted by its label, not by `value=""` — every empty text input in
     // the form renders that attribute, so that would pass with no select at
-    // all. The label is the canned row's own placeholder: same control, same
-    // words, so the two defect kinds read alike.
-    expect(out).toContain(">— select —<");
+    // all.
+    //
+    // The label is NOT the canned row's "— select —", and the difference is
+    // deliberate. The canned row prints a visible TRADE rail above its select;
+    // this compact form has none, so the same words there said nothing about
+    // what the control was — and it sat beside a category select whose value
+    // doubles as its label ("Recommendation"), which made the asymmetry
+    // visible on screen. Found in the browser; no gate can see it.
+    expect(out).toContain(">Trade — select<");
+    // And it is still the same vocabulary underneath: the canned row's own
+    // placeholder must NOT appear here, or the two would have drifted apart
+    // into two controls rather than one control with two presentations.
+    expect(out).not.toContain(">— select —<");
   });
 
   it("does not invent a vocabulary of its own", () => {
