@@ -71,6 +71,12 @@ const raw = readFileSync(SOURCE, 'utf8');
 // the marker still there. The loop only closes the cases where a full removal
 // IS reachable. What actually closes the reported hole is the REFUSAL below.
 //
+// `--!>` is in the pattern because HTML accepts it as a comment terminator just
+// as it accepts `-->`, and CodeQL flagged the first version of this fix for
+// missing it. A stripper that knows only one of the two closers leaves the whole
+// remainder of the document inside a comment it thinks is still open — the exact
+// shape of "the gate read a body that is not the published one".
+//
 // An unbalanced marker means the file's comment structure is not what this gate
 // assumes, and a gate that mis-parsed its input must not go on to report the
 // body clean. Its whole job is to notice a placeholder or a draft banner that
@@ -79,9 +85,9 @@ let body = raw;
 let previous;
 do {
     previous = body;
-    body = body.replace(/<!--[\s\S]*?-->/g, '');
+    body = body.replace(/<!--[\s\S]*?--!?>/g, '');
 } while (body !== previous);
-if (/<!--|-->/.test(body)) {
+if (/<!--|--!?>/.test(body)) {
     die(
         'the source still contains an HTML comment marker after stripping comments — '
         + 'an unbalanced `<!--` or `-->`. Refusing to check a body this gate could not '
