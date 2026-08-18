@@ -105,6 +105,11 @@ export const CLIENT_TEMPLATES: EmailTemplateDescriptor[] = [
     ],
     cta: { labelBlockKey: 'ctaLabel', urlVar: 'reportUrl' },
     // OI #271 — see `agent-share-link` above (LIA conditions 4 and 5).
+    //
+    // view-invariant: no-email-pixel - the delivery email carries a link and a
+    // disclosure, never an image whose fetch reports that the message was
+    // opened. An open pixel is the one mechanism the assessment's lawful basis
+    // is foreclosed on; it would move this feature to consent.
     systemBlocks: ['viewDisclosure'],
   },
 

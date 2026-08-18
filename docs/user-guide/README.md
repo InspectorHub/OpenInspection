@@ -16,7 +16,7 @@ called out inline and listed in
 
 ## First run
 
-After deploying (see [`self-host/deploy.md`](../self-host/deploy.md)), open
+After deploying (see [`operate/deploy.md`](../operate/deploy.md)), open
 `/setup` and enter your `SETUP_CODE` to create the first account. That account
 gets the **Owner** role.
 
@@ -187,7 +187,7 @@ Not disabled — absent. There is no platform behind a self-hosted deploy.
 |---|---|
 | Billing, seat quota, usage quota | You run the deployment; there is nobody to bill you |
 | Managed AI credentials | Use your own key in Settings → Advanced → AI |
-| Managed SMS compliance (10DLC brand/campaign filing) | Nobody can file on your behalf — see [`self-host/sms-compliance.md`](../self-host/sms-compliance.md) |
+| Managed SMS compliance (10DLC brand/campaign filing) | Nobody can file on your behalf — see [`operate/sms-compliance.md`](../operate/sms-compliance.md) |
 | Content marketplace | The catalogue is curated first-party; the route 404s rather than showing an empty shelf |
 | Workspace switching | One fixed tenant holds all your data |
 

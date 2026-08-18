@@ -4,7 +4,7 @@ Start here. Pick the section that matches what you are trying to do.
 
 | I want to… | Go to |
 |---|---|
-| Run OpenInspection for my own inspection business | [`self-host/`](#self-hosting) |
+| Run OpenInspection for my own inspection business | [`operate/`](#operating-a-deployment) |
 | Use the product day to day | [`user-guide/`](#using-the-product) |
 | Change the code or send a pull request | [`develop/`](#developing) |
 | Connect it to QuickBooks, Stripe, a calendar, email or SMS | [`integrations/`](#integrations) |
@@ -14,16 +14,16 @@ Start here. Pick the section that matches what you are trying to do.
 
 ---
 
-## Self-hosting
+## Operating a deployment
 
 Running the engine on your own Cloudflare account.
 
 | Doc | Topic |
 |---|---|
-| [`self-host/deploy.md`](self-host/deploy.md) | First-time production deploy — one-click, CLI, and what gets provisioned |
-| [`self-host/upgrade.md`](self-host/upgrade.md) | Move an existing deployment to a newer release (forward-only) — including the one-time reconcile a rebuilt baseline needs |
-| [`self-host/sms-compliance.md`](self-host/sms-compliance.md) | Privacy/Terms pages, carrier registration, TCPA/CTIA wording |
-| [`self-host/rotate-secrets.md`](self-host/rotate-secrets.md) | Rotating the ES256 JWT keyring without invalidating live sessions, and the tenant e-signature key without invalidating signed evidence |
+| [`operate/deploy.md`](operate/deploy.md) | First-time production deploy — one-click, CLI, and what gets provisioned |
+| [`operate/upgrade.md`](operate/upgrade.md) | Move an existing deployment to a newer release (forward-only) — including the one-time reconcile a rebuilt baseline needs |
+| [`operate/sms-compliance.md`](operate/sms-compliance.md) | Privacy/Terms pages, carrier registration, TCPA/CTIA wording |
+| [`operate/rotate-jwt-keyring.md`](operate/rotate-jwt-keyring.md) | Rotating the ES256 JWT keyring without invalidating live sessions |
 
 ## Using the product
 

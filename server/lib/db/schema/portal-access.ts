@@ -118,6 +118,15 @@ export const inspectionAccessTokens = sqliteTable('inspection_access_tokens', {
  * `inspection_access_tokens` (the token id is the only locator). An all-zero
  * row would still record that this person was sent this report.
  */
+// view-invariant: report-id-is-a-report-id - no column here may be populated
+// with something other than what its name asserts. An inspection id in a
+// `report_id` column is a false record about an identified person, which is why
+// this table has no such column at all until the renderer has per-report
+// identity.
+// view-invariant: no-device-signals - the columns below are the whole record.
+// No IP address, user agent, referrer or other device signal may be added
+// beside them: the counters are defensible because they describe the server's
+// own handling, not the recipient's device.
 export const reportViews = sqliteTable('report_views', {
     id:            text('id').primaryKey(),
     tenantId:      text('tenant_id').notNull(),

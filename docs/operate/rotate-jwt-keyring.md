@@ -1,7 +1,8 @@
-# Rotating keys
+# Rotating the JWT keyring
 
-Two different keys here rotate, and confusing them is easy because both are
-"the signing key":
+Two different keys in this system rotate, and confusing them is easy because
+both are "the signing key". Only the first is an operator task, and only the
+first is documented here:
 
 1. **JWT signing keys** — ES256 keypairs in a multi-version keyring
    (`JWT_PRIVATE_KEY_V<N>` / `JWT_PUBLIC_KEY_V<N>` + `JWT_CURRENT_KID`). These
@@ -128,31 +129,13 @@ Re-mint and re-push the same kid under the same `V<N>` name to restore the keyri
 
 Run `wrangler logout && wrangler login` to refresh the OAuth token. Re-run the rotation script — it picks up where it left off (idempotent).
 
-## Tenant e-signature key rotation
-
-Not a runbook step — a tenant owner does this from the app, and self-hosters have
-nothing to configure.
-
-`POST /api/admin/agreements/signing-key/rotate` (role: `owner`) retires the
-tenant's active Ed25519 key and mints a replacement. Everything already signed
-keeps verifying: the retired row stays in `signing_keys`, and both verifiers
-resolve a key from the `key_fingerprint` recorded on the row being checked rather
-than from whatever key the tenant holds now. A chain that spans the rotation
-verifies too, and the audit-trail export ships every key that chain used.
-
-Nothing is re-signed. Rotating does not, and must not, rewrite historical
-evidence to match the new key — that would manufacture the signing record the
-chain exists to prove.
-
-Both fingerprints — retired and new — land in `audit_logs` as
-`signing_key.rotate`, which is what lets a later reader say which key covers
-which stretch of a company's evidence.
-
-When to do it: the same triggers as the JWT list above, plus a change of the
-tenant's own signing authority. There is no scheduled rotation.
-
 ## What's NOT in scope
 
+- **Tenant e-signature keys.** A different keyring with different rules — old
+  public keys are never deleted, because deleting one invalidates every
+  signature it verified. It is an owner-facing operation that exists in both
+  deployment modes, so it is documented with the product:
+  <https://inspectorhub.io/docs/rotate-signing-key>.
 - **JWT_SECRET** (the legacy env var) is no longer used for JWT signing. It's still active as KDF input for `config-crypto`, `qbo-crypto`, and audit signing-key encryption. Rotating it requires a separate procedure (data re-encryption) not covered here.
 - **CF account API token** (the OAuth credential `wrangler login` provisions) — rotate via `wrangler logout && wrangler login`. Operational hygiene, not in this runbook.
 - **Stripe / Resend / Google API keys** — vendor-side rotation; follow each vendor's docs.

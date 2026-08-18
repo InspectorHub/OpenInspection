@@ -4,7 +4,7 @@ The open-source inspection engine. A single Cloudflare Worker (the
 cloudflare/react-router-hono-fullstack-template shape): a Hono entry that mounts the full
 API in-process and delegates page routes to React Router v8 SSR.
 
-**Docs**: `docs/README.md` is the map — `docs/self-host/` (deploy, upgrade, configure) · `docs/develop/` (architecture, testing, design system) · `docs/reference/` (API, database, roles, deployment modes) · `docs/concepts/` (how the engine works) · `docs/user-guide/` (using the product)
+**Docs**: `docs/README.md` is the map — `docs/operate/` (deploy, upgrade, configure) · `docs/develop/` (architecture, testing, design system) · `docs/reference/` (API, database, roles, deployment modes) · `docs/concepts/` (how the engine works) · `docs/user-guide/` (using the product)
 
 ## Commands
 
