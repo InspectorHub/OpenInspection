@@ -15,7 +15,8 @@
  *    problems the user must fix.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { parseCsvPreview, importContacts } from '../../../server/services/contacts-import.service';
+import { importContacts } from '../../../server/services/contacts-import.service';
+import { parseCsvPreview } from '../../../server/lib/migration-intake/csv';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
