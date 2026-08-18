@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertSpectoraTemplate } from '../../../server/lib/spectora-import';
+import { convertSpectoraTemplate } from '../../../server/lib/migration-intake/adapters/spectora';
 
 describe('Spectora import — pausesAdvance derivation', () => {
     it('sets pausesAdvance=true when is_defect is true', () => {
