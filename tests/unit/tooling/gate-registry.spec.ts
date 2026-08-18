@@ -114,6 +114,38 @@ describe('gate registry', () => {
         expect(schemaDoc!.args).toEqual(['--check']);
     });
 
+    it('summarises a run with both numbers, not just the failures', async () => {
+        // A runner that prints only failures reads as "all clear" on the day it
+        // silently ran nothing. The summary has to state how many gates ran.
+        const { execFileSync } = await import('node:child_process');
+        const out = execFileSync(process.execPath, ['scripts/run-gates.mjs', '--only', 'ds'], {
+            cwd: ROOT, encoding: 'utf8',
+        });
+        expect(out).toMatch(/gates: 1 selected of \d+/);
+        expect(out).toMatch(/1 passed · 0 failed · \d+ not selected/);
+    });
+
+    it('REFUSES a selection that matches no gate, instead of reporting a clean run', async () => {
+        // Measured before this existed: `--only nonexistent-gate` exited 0 with
+        // NO output at all. A typo in the hook would have read as "gates
+        // passed" — the emptiest possible false green, and the one this repo
+        // has met most often. Zero selected is a failure, never a pass.
+        const { execFileSync } = await import('node:child_process');
+        let code = 0;
+        let out = '';
+        try {
+            out = execFileSync(process.execPath, ['scripts/run-gates.mjs', '--only', 'nonexistent-gate'], {
+                cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+            });
+        } catch (err) {
+            const e = err as { status?: number; stdout?: string; stderr?: string };
+            code = e.status ?? 0;
+            out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
+        }
+        expect(code, 'selecting zero gates must not exit 0').not.toBe(0);
+        expect(out).toMatch(/0 selected/);
+    });
+
     it('carries a reason for every npm script it deliberately does NOT register', () => {
         // An exclusion with no reason is indistinguishable from an oversight,
         // and this map is the only thing standing between "we chose not to run

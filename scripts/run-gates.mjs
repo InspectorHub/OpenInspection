@@ -113,6 +113,26 @@ function runDupGate() {
     return { ok: res.status === 0, output: `${res.stdout ?? ''}${res.stderr ?? ''}` };
 }
 
+const ALL_GATES = [...SCRIPT_GATES, DUP_GATE];
+const selected = ALL_GATES.filter(wanted);
+
+/**
+ * A selection that matches nothing is a FAILURE, not an empty success.
+ *
+ * Measured before this existed: `--only nonexistent-gate` exited 0 having
+ * printed nothing at all. A mistyped key in the hook would have read as "gates
+ * passed" — the emptiest possible false green, and the shape this repo keeps
+ * meeting. The count is printed either way so the number is checkable on the
+ * day it is right, not only on the day it is wrong.
+ */
+if (selected.length === 0) {
+    console.error(
+        `run-gates: 0 selected of ${ALL_GATES.length} — nothing to run, which is a failure and not a clean run.\n` +
+        `           ${only ? `--only ${[...only].join(',')}` : ''}${rung ? ` --rung ${rung}` : ''} matched no gate.`,
+    );
+    process.exit(2);
+}
+
 const results = [];
 for (const gate of SCRIPT_GATES) {
     if (!wanted(gate)) continue;
@@ -122,16 +142,31 @@ if (wanted(DUP_GATE)) {
     results.push([DUP_GATE, runDupGate()]);
 }
 
-let failed = false;
+let failedCount = 0;
 for (const [gate, result] of results) {
     if (result.ok) {
         process.stdout.write(`  ✓  ${gate.label} passed\n`);
     } else {
-        failed = true;
+        failedCount += 1;
         process.stdout.write(`  ✗  ${gate.label} failed  →  ${gate.fix}\n`);
         const detail = result.output.trim();
         if (detail) process.stdout.write(`${detail.replace(/^/gm, '     ')}\n`);
     }
 }
 
-process.exit(failed ? 1 : 0);
+/**
+ * Both numbers, on every run, pass or fail.
+ *
+ * "1 gate failed" and "1 failed, 47 passed, 0 not selected" are different
+ * claims and only the second is checkable: the first cannot distinguish a run
+ * that caught one violation from a run that only ever looked at one gate. The
+ * `not selected` term is what makes a rung filter visible — a hook that quietly
+ * narrowed to three gates says so here rather than looking like a full run.
+ */
+const passedCount = results.length - failedCount;
+process.stdout.write(
+    `\n  gates: ${results.length} selected of ${ALL_GATES.length}` +
+    `  ·  ${passedCount} passed · ${failedCount} failed · ${ALL_GATES.length - results.length} not selected\n`,
+);
+
+process.exit(failedCount > 0 ? 1 : 0);
