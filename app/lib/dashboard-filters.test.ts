@@ -9,7 +9,7 @@
  * they carry — the rename must not quietly change what each filter selects.
  */
 import { describe, it, expect } from "vitest";
-import { matchesFilter, activeListFilters, emptyListReason } from "./dashboard-filters";
+import { matchesFilter, activeListFilters, emptyListReason, statFocusIds, isStatFocus, tabMatches } from "./dashboard-filters";
 import { INSPECTION_FILTERS, type FilterId } from "./dashboard-schema";
 import type { Inspection } from "./dashboard-schema";
 
@@ -63,7 +63,7 @@ describe("dashboard filter vocabulary", () => {
  */
 describe("activeListFilters", () => {
     const none = {
-        tab: "all", timeFilter: "all", tagId: "", dateFrom: "", dateTo: "", agentId: "", search: "",
+        tab: "all", focus: "", timeFilter: "all", tagId: "", dateFrom: "", dateTo: "", agentId: "", search: "",
     };
 
     it("reports nothing active when the list is unfiltered", () => {
@@ -77,6 +77,9 @@ describe("activeListFilters", () => {
         expect(activeListFilters({ ...none, dateFrom: "2026-01-01" })).toEqual(["date"]);
         expect(activeListFilters({ ...none, dateTo: "2026-01-31" })).toEqual(["date"]);
         expect(activeListFilters({ ...none, agentId: "c-1" })).toEqual(["agent"]);
+        // A stat card driving the list is a filter like any other: it must count,
+        // or an empty focused list tells a full workspace it has nothing.
+        expect(activeListFilters({ ...none, focus: "needs_attention" })).toEqual(["focus"]);
         expect(activeListFilters({ ...none, search: "smith" })).toEqual(["search"]);
     });
 
@@ -97,7 +100,7 @@ describe("activeListFilters", () => {
 
 describe("emptyListReason", () => {
     const none = {
-        tab: "all", timeFilter: "all", tagId: "", dateFrom: "", dateTo: "", agentId: "", search: "",
+        tab: "all", focus: "", timeFilter: "all", tagId: "", dateFrom: "", dateTo: "", agentId: "", search: "",
     };
 
     it("is 'no-inspections' only for a workspace that genuinely has none", () => {
@@ -109,11 +112,69 @@ describe("emptyListReason", () => {
         // UI concluding the workspace was empty.
         expect(emptyListReason(200, { ...none, tab: "published" })).toBe("no-matches");
         expect(emptyListReason(200, { ...none, search: "nobody" })).toBe("no-matches");
+        expect(emptyListReason(200, { ...none, focus: "needs_attention" })).toBe("no-matches");
     });
 
     it("is 'no-matches' when a search returns nothing, even with no rows loaded", () => {
         // Search also queries the server, so a zero local count with a query in
         // the box says nothing about whether the workspace is empty.
         expect(emptyListReason(0, { ...none, search: "nobody" })).toBe("no-matches");
+    });
+});
+
+/**
+ * The stat cards are bucket MEMBERSHIP, not workflow tabs.
+ *
+ * Making the cards clickable by pointing them at `?workflow=` was the obvious
+ * move and it is wrong: each of the four counts a different population than the
+ * nearest tab selects, so the number on the card and the list behind it would
+ * have disagreed on arrival. These pin the four sets, and the `in_progress`
+ * case carries its own counter-example against the tab that looks equivalent.
+ */
+describe("statFocusIds", () => {
+    const item = (id: string, status: string, reportStatus: string | null = null) =>
+        ({ id, status, reportStatus });
+
+    const today = [item("a", "confirmed")];
+    const thisWeek = [item("b", "scheduled")];
+    const later = [item("c", "scheduled")];
+    const needsAttention = [item("a", "confirmed"), item("d", "completed", "submitted")];
+    const recentReports = [item("e", "completed", "published")];
+    const buckets = { today, thisWeek, later, needsAttention, recentReports, cancelled: [] };
+    const all = [...today, ...thisWeek, ...later, ...needsAttention, ...recentReports];
+
+    it("unions the three date buckets for Upcoming", () => {
+        expect([...statFocusIds(buckets, all).upcoming].sort()).toEqual(["a", "b", "c"]);
+    });
+
+    it("dedupes an inspection that sits in two date buckets", () => {
+        const dup = { ...buckets, thisWeek: [item("a", "confirmed")] };
+        expect(statFocusIds(dup, all).upcoming.size).toBe(2);
+    });
+
+    it("reads Needs Attention and Recent Reports straight off their buckets", () => {
+        const sets = statFocusIds(buckets, all);
+        expect([...sets.needs_attention].sort()).toEqual(["a", "d"]);
+        expect([...sets.recent]).toEqual(["e"]);
+    });
+
+    it("selects In Progress by 'completed, report not published' — NOT the to_review tab", () => {
+        const writing = item("f", "completed", "in_progress");
+        const sets = statFocusIds(buckets, [...all, writing]);
+        expect([...sets.in_progress].sort()).toEqual(["d", "f"]);
+        // The counter-example: the nearest tab is a strict subset and drops the
+        // report still being written, which is why this is not a tab link.
+        expect(tabMatches("to_review", { status: "completed", reportStatus: "in_progress" })).toBe(false);
+        expect(sets.in_progress.has("f")).toBe(true);
+    });
+
+    it("survives a bucket the payload did not send", () => {
+        expect(statFocusIds({}, []).upcoming.size).toBe(0);
+    });
+
+    it("rejects a focus value the URL made up", () => {
+        expect(isStatFocus("needs_attention")).toBe(true);
+        expect(isStatFocus("awaiting_payment")).toBe(false);
+        expect(isStatFocus(null)).toBe(false);
     });
 });
