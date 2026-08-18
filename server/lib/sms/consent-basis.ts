@@ -19,7 +19,7 @@
  * the consumer consent evidence, which is the pollution the layered program
  * exists to avoid. Do not unify agent/staff onto the client express UI solely
  * for carrier filings — describe the layers in TFV/campaign answers instead
- * (see docs/self-host/sms-compliance.md).
+ * (see docs/operate/sms-compliance.md).
  */
 import type { RoleKind } from '../people/role-kinds';
 

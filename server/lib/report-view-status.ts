@@ -89,6 +89,11 @@ export interface ReportLinkStatus {
 /**
  * Which of the three states a recipient is in.
  *
+ * view-invariant: no-secondary-use - these counters answer one question for the
+ * inspector who sent the report ("did it get opened?") and are read nowhere
+ * else. No marketing, lead scoring, segmentation, ranking or model training may
+ * consume them; a second purpose is a second lawful basis, not a new query.
+ *
  * Precedence is opened > delivered > queued, and it is not arbitrary: a
  * recipient with an old delivered notice AND a scheduled amendment has already
  * had the report, so "scheduled to send" would be the less true of the two.

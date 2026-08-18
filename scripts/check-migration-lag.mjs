@@ -367,7 +367,7 @@ function main() {
         '       files it folded into 0000_baseline.sql, nothing was applied out of band,\n' +
         '       and the database is right to still remember them.\n' +
         '  For (3), follow "Upgrading across a rebuilt baseline" in\n' +
-        '  docs/self-host/upgrade.md: it brings the schema current and then rewrites the\n' +
+        '  docs/operate/upgrade.md: it brings the schema current and then rewrites the\n' +
         '  ledger, which is what clears this message. Do NOT declare these names in the\n' +
         '  baseline file instead — that silences the report while the schema stays behind.\n',
     );

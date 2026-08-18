@@ -120,6 +120,13 @@ export const SCRIPT_GATES = [
     { key: 'docsmarkers', label: 'lint:docs-markers', script: 'check-docs-shots.mjs', fix: 'npm run lint:docs-markers', rung: PUSH },
     { key: 'schemadoc', label: 'lint:schema-doc', script: 'gen-schema-doc.mjs', fix: 'npm run lint:schema-doc', rung: PUSH, args: ['--check'] },
     { key: 'verificationcopy', label: 'lint:verification-copy', script: 'check-verification-copy.mjs', fix: 'npm run lint:verification-copy', rung: PUSH },
+    // PUSH rather than PRECOMMIT, unlike the tracking gate above it, and for a
+    // reason that is about WHERE the breakage comes from rather than how much
+    // it costs: this one fails when an anchor comment is deleted or a guarded
+    // site is refactored away, which is usually a commit somewhere else in the
+    // tree. The rung that sees the whole change is the rung where the answer is
+    // complete. It reads the same ~1.9k server/app sources with one regex.
+    { key: 'viewinvariants', label: 'lint:view-invariants', script: 'check-view-tracking-invariants.mjs', fix: 'npm run lint:view-invariants', rung: PUSH },
     { key: 'fabricatednames', label: 'lint:fabricated-names', script: 'check-fabricated-names.mjs', fix: 'npm run lint:fabricated-names', rung: PUSH },
     { key: 'sigcompare', label: 'lint:sigcompare', script: 'check-signature-compare.mjs', fix: 'npm run lint:sigcompare', rung: PUSH },
     { key: 'signaturedynamics', label: 'lint:signature-dynamics', script: 'check-signature-dynamics.mjs', fix: 'npm run lint:signature-dynamics', rung: PUSH },
