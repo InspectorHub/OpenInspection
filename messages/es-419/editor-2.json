@@ -7,6 +7,8 @@
   "editor_defect_location_placeholder": "p. ej. baño principal, esquina NE del sótano",
   "editor_defect_trade_label": "Oficio",
   "editor_defect_trade_select_placeholder": "— seleccione —",
+  "editor_customdefect_trade_placeholder": "Oficio — seleccione",
+  "editor_customdefect_trade_summary": "Oficio: {trade}",
   "editor_defect_deadline_label": "Fecha límite",
   "editor_defect_timeframe_label": "Plazo",
   "editor_header_property_fallback": "Inspección",

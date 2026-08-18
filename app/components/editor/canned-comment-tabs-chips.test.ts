@@ -39,10 +39,11 @@ function html(includedIds: string[]) {
       onAddCustomDefect: undefined,
       customFormOpen: false,
       onOpenCustomForm: () => {},
-      customTitle: "", customComment: "", customCategory: "recommendation",
+      customTitle: "", customComment: "", customCategory: "recommendation", customTrade: "",
       saveToLibrary: false, showSaveToLibrary: false,
       onCustomTitleChange: () => {}, onCustomCommentChange: () => {},
-      onCustomCategoryChange: () => {}, onSaveToLibraryChange: () => {},
+      onCustomCategoryChange: () => {}, onCustomTradeChange: () => {},
+      onSaveToLibraryChange: () => {},
       onCancelCustomForm: () => {}, onSubmitCustomDefect: () => {},
     } as never),
   );

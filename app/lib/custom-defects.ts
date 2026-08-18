@@ -8,6 +8,10 @@
  * needed — the client just has to write the same shape.
  */
 
+// The trade vocabulary is the server's, re-exported through defect-fields so
+// the editor can never offer a value the write path would silently drop.
+import type { DefectTrade } from './defect-fields';
+
 // IA-59 — a field-added defect's category is a defect_categories.id or one of
 // the three legacy seed names; the form now offers the tenant's configured
 // categories, not just the three built-ins. Widened from the old 3-value union.
@@ -23,6 +27,10 @@ export interface CustomDefect {
   included: boolean;
   category: CustomDefectCategory;
   location?: string;
+  /** IA-85 — mirrors `CustomCommentEntry.trade`: a hand-written defect names
+   *  the trade exactly as a canned one does, from the same `DEFECT_TRADES`
+   *  vocabulary. The server sanitizer nulls anything outside it. */
+  trade?: DefectTrade | null;
 }
 
 export interface CannedEntryLike {
@@ -57,6 +65,7 @@ export function makeCustomDefect(
     comment?: string;
     category?: CustomDefectCategory;
     location?: string;
+    trade?: DefectTrade | null;
   },
   genId: () => string = () => crypto.randomUUID(),
 ): CustomDefect | null {
@@ -70,6 +79,9 @@ export function makeCustomDefect(
     category: input.category ?? 'recommendation',
     included: true,
     ...(input.location ? { location: input.location } : {}),
+    // Absent stays absent: an explicit null here would merge over a value a
+    // collaborating peer set on the same defect.
+    ...(input.trade ? { trade: input.trade } : {}),
   };
 }
 

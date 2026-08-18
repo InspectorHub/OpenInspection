@@ -60,6 +60,19 @@ describe('makeCustomDefect', () => {
     expect(d.location).toBe('NE corner');
   });
 
+  /**
+   * IA-85 — trade is optional, and absence must stay ABSENT: writing an
+   * explicit `trade: null` on every hand-written defect would make the CRDT
+   * merge a null over a value a peer had just set. The key appears only when
+   * the inspector picked something.
+   */
+  it('carries a picked trade and omits the key when none was picked', () => {
+    const withTrade = makeCustomDefect({ title: 'Loose flashing', trade: 'licensed-roofer' }, () => 'cd_4');
+    expect(withTrade?.trade).toBe('licensed-roofer');
+    const without = makeCustomDefect({ title: 'Loose flashing' }, () => 'cd_5');
+    expect(without && 'trade' in without).toBe(false);
+  });
+
   it('returns null for a blank title', () => {
     expect(makeCustomDefect({ title: '   ' }, () => 'cd_3')).toBeNull();
   });

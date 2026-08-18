@@ -47,6 +47,46 @@ describe('sanitizeDefectStates — new structured fields', () => {
         expect(d.timeframe).toBeNull();
     });
 
+    /**
+     * IA-85 — a field-authored custom defect now carries `trade` too, and it
+     * arrives on the same PATCH from the same client. The sanitizer is the only
+     * thing standing between that JSON blob and an unknown enum value, so it
+     * must guard `customComments.defects` by the same rule as the canned rows.
+     * The positive case is not decoration: a sanitizer that nulled every trade
+     * would satisfy the negative case alone.
+     */
+    it('drops an unknown trade on a CUSTOM defect to null', () => {
+        const data = {
+            item1: { customComments: { defects: [{
+                id: 'cust-1', title: 'Loose flashing', included: true,
+                trade: 'plumber-extraordinaire',
+            }] } },
+        };
+        sanitizeDefectStates(data);
+        expect((data.item1 as any).customComments.defects[0].trade).toBeNull();
+    });
+
+    it('keeps a valid trade on a CUSTOM defect', () => {
+        const data = {
+            item1: { customComments: { defects: [{
+                id: 'cust-1', title: 'Loose flashing', included: true,
+                trade: 'licensed-roofer',
+            }] } },
+        };
+        sanitizeDefectStates(data);
+        expect((data.item1 as any).customComments.defects[0].trade).toBe('licensed-roofer');
+    });
+
+    it('leaves a CUSTOM defect that declares no trade untouched', () => {
+        const data = {
+            item1: { customComments: { defects: [{
+                id: 'cust-1', title: 'Loose flashing', included: true,
+            }] } },
+        };
+        sanitizeDefectStates(data);
+        expect('trade' in (data.item1 as any).customComments.defects[0]).toBe(false);
+    });
+
     it('leaves missing fields untouched (does not invent null entries)', () => {
         const data = {
             item1: { tabs: { defects: [{
