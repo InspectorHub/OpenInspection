@@ -70,6 +70,15 @@ describe('gate registry', () => {
             'ds', 'contrast', 'svg', 'migrefs', 'filesize', 'tz', 'idempotency',
             'extcollide', 'price', 'zerotrack', 'aiclass', 'teststsconfig',
             'submitguard', 'seedsql', 'dup',
+            // Added 2026-08-18 with the coverage gate, and this edit is the
+            // decision the lock exists to force. It earns pre-commit on the
+            // same argument as the price and tracking gates: what it catches is
+            // a `lint:*` script ARRIVING with no rung, which is cheapest to
+            // answer while the line is being typed and is invisible by
+            // construction afterwards. Cost is two file reads and a set
+            // difference — measured, the rung went 15 gates to 16 and stayed
+            // at 6s.
+            'gateregistry',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);
@@ -144,6 +153,25 @@ describe('gate registry', () => {
         }
         expect(code, 'selecting zero gates must not exit 0').not.toBe(0);
         expect(out).toMatch(/0 selected/);
+    });
+
+    it('accounts for every lint:* script in package.json', () => {
+        const lintScripts = Object.keys(scripts).filter((k) => k.startsWith('lint:'));
+        const registered = new Set([...SCRIPT_GATES, DUP_GATE].map((g) => g.fix.replace(/^npm run /, '')));
+        const excluded = [...UNREGISTERED.keys()].filter((k) => k.startsWith('lint:'));
+        const orphans = lintScripts.filter((k) => !registered.has(k) && !UNREGISTERED.has(k));
+        expect(
+            orphans,
+            `${orphans.length} of ${lintScripts.length} lint:* scripts run on no rung and have no exclusion reason: ${orphans.join(', ')}`,
+        ).toEqual([]);
+        // Both numbers, always — an assertion that only fires on drift is one
+        // nobody can check on the day it is green.
+        expect(registered.size + excluded.length).toBe(lintScripts.length);
+    });
+
+    it('does not carry exclusion reasons for scripts that no longer exist', () => {
+        const stale = [...UNREGISTERED.keys()].filter((k) => !(k in scripts));
+        expect(stale, `UNREGISTERED names ${stale.join(', ')}, absent from package.json`).toEqual([]);
     });
 
     it('carries a reason for every npm script it deliberately does NOT register', () => {

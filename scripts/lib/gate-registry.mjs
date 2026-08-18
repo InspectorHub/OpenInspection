@@ -77,6 +77,10 @@ export const SCRIPT_GATES = [
     // reads it here instead.
     // Reads 31 files with two regexes.
     { key: 'seedsql', label: 'Seed SQL vs schema', script: 'check-seed-sql.mjs', fix: 'npm run lint:seed-sql', rung: PRECOMMIT },
+    // The gate that guards this list. At PRECOMMIT because what it catches is a
+    // `lint:*` script ARRIVING with no rung — cheapest to answer while the line
+    // is being typed, and the check is two file reads and a set difference.
+    { key: 'gateregistry', label: 'Gate-registry coverage', script: 'check-gate-registry.mjs', fix: 'npm run lint:gate-registry', rung: PRECOMMIT },
 
     // ---- PUSH rung -------------------------------------------------------
     // The 33 gates `npm run lint` used to chain with `&&`. Generated from
@@ -136,7 +140,6 @@ export const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm
  * oversight, which is why the value is prose and not `true`.
  */
 export const UNREGISTERED = new Map([
-    ['lint', 'the aggregate itself — it is what runs the gates, not a gate'],
     ['lint:gates', 'the pre-commit rung entry point, not a gate'],
     ['lint:gates-full', 'the push rung entry point, not a gate'],
     ['lint:fix', 'eslint --fix; a mutation, not a check'],
