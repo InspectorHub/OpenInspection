@@ -25,6 +25,42 @@ honest, and one that says nothing reads as approved.
 
 ---
 
+## 2026-08-19.2 — the two pending tables close, and review is partly withdrawn
+
+**What changed.** `notifications` and `qbo_sync_errors` were the last two rules with
+no decision. Both now have one, and review withdrew part of review.
+
+| Rule | Now | Why |
+|---|---|---|
+| `notifications` | **24 months from `created_at`** | The inbox, not the record that a communication happened — `automation_logs` answers that and is kept by design. review explicitly declined anchoring on `read_at`/`archived_at`: an unread notice would become immortal, which turns a UI-state field into a retention control |
+| `qbo_sync_errors` | **90 days after RESOLUTION**; unresolved never age out | An unresolved failure is outstanding work, not a record of work. "A sync failure that remains unresolved for a year should not disappear merely because it is old" |
+
+**A column had to be added to implement it faithfully.** There was no
+`resolved_at` — only `is_resolved` and `updated_at` — and `updated_at` moves on
+re-detection too, so it says when the row was last touched rather than when it
+stopped being outstanding. Using it would have been an inference dressed as a
+timestamp. Rows resolved before the column existed have a NULL anchor and are never
+swept: an unknown resolution date fails closed.
+
+**No exception for the customer name.** `error_msg` is Intuit's own text and may
+quote one. review refused to give it a longer window for possibly explaining a
+billing dispute later — that is what the accounting records are for — and stated
+the principle: *"Do not retain potentially identifying diagnostic text longer merely
+because it might someday be useful."*
+
+**review's instruction on the legal-version tables is WITHDRAWN.** Both stay in
+the sweep with reference-preserving executors. review drew the distinction we had
+missed: *"Not subject to unconditional age-based deletion" ≠ "must not be processed
+by the sweep."* A reference-aware sweep is the mechanism that gives bounded
+retention while preserving evidentiary dependencies; an exemption would have made
+these tables accumulate forever.
+
+**And the method rule that cost a wasted ruling:** do not classify retention
+behaviour from the manifest or the table name — the executor is authoritative
+evidence of what the sweep actually does. We reported a defect in
+`sms_disclosure_versions` that its executor had always prevented, because we read a
+table and a number instead of the query.
+
 ## 2026-08-19.1 — review ruled, and it is APPROVED WITH CONDITIONS
 
 **What changed.** review reviewed all 15 rules: 8 approved as written, 4 windows

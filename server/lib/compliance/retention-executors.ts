@@ -32,6 +32,8 @@ import {
     smsConsentLog,
     smsDisclosureVersions,
     accountAcceptances,
+    notifications,
+    qboSyncErrors,
     tenantLegalVersions,
     tenantMarketplaceImportHistory,
     tenantSlugHistory,
@@ -328,6 +330,33 @@ export const EXECUTORS: Record<string, Executor> = {
                 lt(tenantLegalVersions.publishedAt, cutoff),
                 exists(newer),
                 notExists(accepted),
+            ))
+            .run();
+        return changeCount(res);
+    },
+
+    notifications: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const res = await db.delete(notifications)
+            .where(lt(notifications.createdAt, cutoff))
+            .run();
+        return changeCount(res);
+    },
+
+    // RESOLVED rows only, and only ones that recorded WHEN. An unresolved error is
+    // outstanding work rather than a record of work — the same distinction that
+    // keeps `pending` out of the sync_outbox sweep — and a resolved row from before
+    // `resolved_at` existed has a NULL anchor, which fails closed rather than being
+    // read as "resolved long ago".
+    qbo_sync_errors: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const res = await db.delete(qboSyncErrors)
+            .where(and(
+                eq(qboSyncErrors.resolved, true),
+                isNotNull(qboSyncErrors.resolvedAt),
+                lt(qboSyncErrors.resolvedAt, cutoff),
             ))
             .run();
         return changeCount(res);

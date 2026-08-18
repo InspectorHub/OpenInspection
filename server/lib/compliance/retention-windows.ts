@@ -230,3 +230,32 @@ export const SLUG_HISTORY_RETENTION_MONTHS = 12;
  * `report-pdf-retention.ts`.
  */
 export const REPORT_PDF_DEFAULT_RETENTION_MONTHS = 84;
+
+/**
+ * review review §3. The in-app inbox — a notice header addressed to a person,
+ * composed about an inspection. NOT the record that the communication happened;
+ * `automation_logs` answers that and is retained by design.
+ *
+ * Anchored on `created_at`, and review explicitly declined the alternative of
+ * anchoring on `read_at`/`archived_at`: an unread notice would then be immortal,
+ * which turns a UI-state field into a retention control. "Nor do I think an unread
+ * notification deserves indefinite retention merely because the user never opened
+ * it."
+ */
+export const NOTIFICATION_RETENTION_MONTHS = 24;
+
+/**
+ * review review §4. Days after a QuickBooks sync error is RESOLVED, not after
+ * it was created — "a sync failure that remains unresolved for a year should not
+ * disappear merely because it is old". An unresolved row is outstanding work and
+ * never ages out, the same distinction that keeps `pending` rows out of the
+ * `sync_outbox` sweep.
+ *
+ * The 90 days cover the whole row INCLUDING the copied Intuit error text, which
+ * may quote a customer name. review refused to grant that text a longer window
+ * for possibly being useful later: "Do not retain potentially identifying
+ * diagnostic text longer merely because it might someday be useful." A billing
+ * dispute is explained from the accounting records, not from an ephemeral
+ * rejection message.
+ */
+export const QBO_SYNC_ERROR_RESOLVED_RETENTION_DAYS = 90;
