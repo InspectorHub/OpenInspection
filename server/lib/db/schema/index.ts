@@ -107,3 +107,8 @@ export {
     MIGRATION_CONFLICT_POLICIES,
     MIGRATION_ROW_RESOLUTIONS,
 } from './migration-intake';
+export type {
+    MigrationIntent,
+    MigrationConflictPolicy,
+    MigrationRowResolution,
+} from './migration-intake';
