@@ -18,7 +18,10 @@
  * the v2 `source` field so re-imports can detect already-mapped rows.
  */
 
-import type { TemplateSchemaV2, TemplateSection, TemplateItem, RatingLevel, CannedInfoComment, CannedDefect } from '../types/template-schema';
+import type { TemplateSchemaV2, TemplateSection, TemplateItem, RatingLevel, CannedInfoComment, CannedDefect } from '../../../types/template-schema';
+import type { ConvertStats } from '../bundle';
+import type { BundleResult, MigrationAdapter } from './types';
+import { emptyEntityCounts } from './types';
 
 const SPECTORA_PLATFORM = 'spectora';
 
@@ -79,14 +82,7 @@ interface SpectoraComment {
 export interface ConvertResult {
     template: TemplateSchemaV2;
     /** Counts of source comments mapped into each v2 tab. Useful for surfacing import diffs. */
-    stats: {
-        sections: number;
-        items: number;
-        information: number;
-        limitations: number;
-        defects: number;
-        unknownCommentTypes: string[];
-    };
+    stats: ConvertStats;
 }
 
 function freshId(prefix: string, externalId: string | undefined): string {
@@ -236,3 +232,72 @@ export function convertSpectoraTemplate(input: SpectoraTemplate): ConvertResult 
     }
     return { template, stats };
 }
+
+/** What the caller must supply that the vendor file does not contain. */
+export interface SpectoraAdapterOptions {
+    /** The name the imported template gets. The export's own name is a suggestion, not an answer. */
+    name: string;
+}
+
+const SPECTORA_ADAPTER_VERSION = '1';
+
+/**
+ * The Spectora entry into the normalised format.
+ *
+ * A thin shell over `convertSpectoraTemplate` on purpose: the four-bucket to
+ * three-tab mapping is the part that is specific to this vendor, and it should
+ * not also have to know what a bundle is. What the shell adds is the
+ * accounting — one template read, one emitted, nothing dropped — which the
+ * format requires before it will validate.
+ */
+export const spectoraAdapter: MigrationAdapter<SpectoraAdapterOptions> = {
+    name: 'spectora',
+    version: SPECTORA_ADAPTER_VERSION,
+    vendor: 'spectora',
+    convert(input: unknown, options: SpectoraAdapterOptions): BundleResult {
+        if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+            return {
+                ok: false,
+                error: {
+                    code: 'NOT_AN_EXPORT',
+                    message: 'This file is not a Spectora template export. Export a single template as JSON and upload that file.',
+                },
+            };
+        }
+        const source = input as SpectoraTemplate;
+        if (!Array.isArray(source.sections)) {
+            return {
+                ok: false,
+                error: {
+                    code: 'NO_SECTIONS',
+                    message: 'This Spectora export contains no sections, so there is no template structure to import.',
+                },
+            };
+        }
+
+        const { template, stats } = convertSpectoraTemplate(source);
+
+        return {
+            ok: true,
+            bundle: {
+                formatVersion: 1,
+                manifest: {
+                    source: { vendor: 'spectora' },
+                    adapter: { name: 'spectora', version: SPECTORA_ADAPTER_VERSION },
+                    counts: {
+                        template: { readFromSource: 1, emitted: 1, dropped: [] },
+                        contact: emptyEntityCounts(),
+                        member: emptyEntityCounts(),
+                    },
+                    warnings: stats.unknownCommentTypes.map((kind) => ({
+                        code: 'UNKNOWN_COMMENT_TYPE',
+                        message: `Comments of type "${kind}" were kept under Information so nothing was lost; recategorise them in the editor.`,
+                    })),
+                },
+                templates: [{ name: options.name, schema: template, stats }],
+                contacts: [],
+                members: [],
+            },
+        };
+    },
+};
