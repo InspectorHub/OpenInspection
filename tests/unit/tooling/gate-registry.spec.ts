@@ -75,6 +75,45 @@ describe('gate registry', () => {
         expect(actual).toEqual(EXPECTED_PRECOMMIT);
     });
 
+    it('registers every node-script gate the lint chain used to invoke', () => {
+        // Before consolidation `npm run lint` chained these by hand. The chain is
+        // the historical source of truth for what the full run covered, so it is
+        // what the registry is checked against — not a list retyped from memory.
+        // Verified 2026-08-18 against package.json: this is exactly `lint` and
+        // exactly `lint:gates-full`, same members, same order.
+        const CHAINED_NODE_GATES = [
+            'lint:ds', 'lint:contrast', 'lint:svg', 'lint:erasure', 'lint:retention',
+            'lint:retention-policy', 'lint:processing-stores', 'lint:platform-defaults',
+            'lint:non-translatable', 'lint:migrefs', 'lint:migchain', 'lint:english',
+            'lint:filesize', 'lint:dup', 'lint:tenant-scope', 'lint:status-literals',
+            'lint:capability-decl', 'lint:capability-readers', 'lint:mode-disguises',
+            'lint:price-capability', 'lint:zero-tracking', 'lint:ai-classification',
+            'lint:provider-helpers', 'lint:notification-dispatch', 'lint:tests',
+            'lint:tests-tsconfig', 'lint:test-imports', 'lint:deadcode', 'lint:timestamps',
+            'lint:tz', 'lint:idempotency', 'lint:ext-collisions', 'lint:i18n',
+            'lint:i18n-catalog', 'lint:i18n-glossary', 'lint:naming', 'lint:agent-routes',
+            'lint:submit-guard', 'lint:doclinks', 'lint:docs-markers', 'lint:seed-sql',
+            'lint:schema-doc', 'lint:verification-copy', 'lint:fabricated-names',
+            'lint:sigcompare', 'lint:signature-dynamics', 'lint:sms-gate-args',
+            'lint:messaging-rules',
+        ];
+        const registered = new Set([...SCRIPT_GATES, DUP_GATE].map((g) => g.fix.replace(/^npm run /, '')));
+        const missing = CHAINED_NODE_GATES.filter((n) => !registered.has(n));
+        expect(
+            missing,
+            `${missing.length} of ${CHAINED_NODE_GATES.length} chained gates are unregistered: ${missing.join(', ')}`,
+        ).toEqual([]);
+        expect(CHAINED_NODE_GATES.length).toBe(48);
+    });
+
+    it('passes --check to the schema-doc gate, which is a generator by default', () => {
+        const schemaDoc = SCRIPT_GATES.find((g) => g.script === 'gen-schema-doc.mjs');
+        expect(schemaDoc, 'gen-schema-doc.mjs is not registered').toBeDefined();
+        // Without --check this script WRITES docs/reference/database-schema.md.
+        // A gate that rewrites the file it is checking always passes.
+        expect(schemaDoc!.args).toEqual(['--check']);
+    });
+
     it('carries a reason for every npm script it deliberately does NOT register', () => {
         // An exclusion with no reason is indistinguishable from an oversight,
         // and this map is the only thing standing between "we chose not to run
