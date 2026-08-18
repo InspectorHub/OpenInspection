@@ -63,7 +63,7 @@ export { contactRoleProfiles, inspectionPeople } from './inspection/role-profile
 // Track I-a GDPR (spec §4) — append-only DSAR erasure decision log.
 // Track L (D7) — SMS consent ledger + disclosure versions.
 // messaging_compliance: per-tenant TCR/provider registration state (#181 provider plan).
-export { erasureLog, smsDisclosureVersions, smsConsentLog, messagingCompliance } from './compliance';
+export { erasureLog, smsDisclosureVersions, smsConsentLog, messagingCompliance, deploymentLegalVersions } from './compliance';
 // WH-2 — tenant SMS delivery-status ledger + shared webhook idempotency ledger.
 // WH-3 — tenant email suppression list (append-only; hard bounce / complaint).
 export { smsDeliveryStatus, processedWebhookEvents, emailSuppressions } from './messaging';

@@ -127,7 +127,20 @@ function computeDigest(manifestSrc, constants) {
             );
         }
 
-        return { table: field(lit, 'table'), anchor: field(lit, 'timestampColumn'), unit, value, action: field(lit, 'action') };
+        // `legalHold` is OPERATIVE, not descriptive: it decides whether a rule
+        // runs at all while a preservation order is in force, and whether it
+        // filters the held tenant out when it does. Reclassifying a table from
+        // `tenant_scoped` to `not_applicable` changes what production deletes
+        // just as surely as shortening a window, and without this field in the
+        // digest it would be a one-word diff nobody had to justify.
+        return {
+            table: field(lit, 'table'),
+            anchor: field(lit, 'timestampColumn'),
+            unit,
+            value,
+            action: field(lit, 'action'),
+            legalHold: field(lit, 'legalHold'),
+        };
     });
 
     // A table moving in or out of scope IS a retention change, so the exclusion
@@ -148,7 +161,7 @@ function computeDigest(manifestSrc, constants) {
     // RETENTION_OPEN is legitimately allowed to be empty: it empties as questions get answered.
 
     for (const r of rules) {
-        if (!r.table || !r.anchor || !r.unit || !r.action) {
+        if (!r.table || !r.anchor || !r.unit || !r.action || !r.legalHold) {
             errors.push(`rule with a missing operative field cannot be hashed faithfully: ${JSON.stringify(r)}`);
         }
     }
@@ -170,7 +183,7 @@ function computeDigest(manifestSrc, constants) {
 function selfTest() {
     const SYNTH = `
 export const RETENTION_MANIFEST: RetentionRule[] = [
-    { table: 't_a', timestampColumn: 'created_at', window: { unit: 'months', value: SAMPLE_MONTHS }, action: 'delete', purpose: 'prose' },
+    { table: 't_a', timestampColumn: 'created_at', window: { unit: 'months', value: SAMPLE_MONTHS }, action: 'delete', purpose: 'prose', legalHold: 'tenant_scoped' },
 ];
 export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
     { table: 't_b', reason: 'prose' },
@@ -200,6 +213,12 @@ export const RETENTION_OPEN: RetentionOpenEntry[] = [
     // Operative fields DO move it, one positive control each.
     checks.push(['changing an action moves the digest',
         computeDigest(SYNTH.replace("action: 'delete'", "action: 'anonymize'"), { SAMPLE_MONTHS: 24 }).digest !== base.digest]);
+    // Reclassifying a table's legal-hold behaviour changes what production
+    // deletes during a preservation order, so it has to move the digest too.
+    checks.push(['changing legalHold moves the digest',
+        computeDigest(SYNTH.replace("legalHold: 'tenant_scoped'", "legalHold: 'not_applicable'"), { SAMPLE_MONTHS: 24 }).digest !== base.digest]);
+    checks.push(['a rule with no legalHold is an error, not a hashable rule',
+        computeDigest(SYNTH.replace(", legalHold: 'tenant_scoped'", ''), { SAMPLE_MONTHS: 24 }).errors.length > 0]);
     checks.push(['changing a decideBy date moves the digest',
         computeDigest(SYNTH.replace("'2027-02-06'", "'2028-02-06'"), { SAMPLE_MONTHS: 24 }).digest !== base.digest]);
     checks.push(['dropping an exclusion moves the digest',

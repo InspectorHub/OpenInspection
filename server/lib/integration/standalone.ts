@@ -1,10 +1,15 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
 import { tenants, users, templates, tenantConfigs } from '../db/schema';
+import { deriveAuthorityBasis } from '../auth/authority-basis';
+import { buildAcceptanceStatement } from '../../services/legal/account-acceptance';
 import type { IntegrationProvider, TenantUpdateParams } from '../integration';
 import { logger } from '../logger';
 import { SQL_UUID_V4 } from './standalone-uuid';
 import { seedDefaultAutomations } from './standalone-seed-automations';
+import { SmsConsentService } from '../../services/sms-consent.service';
+import { SMS_DISCLOSURE_V1 } from '../../services/automation/shared';
 
 // Default Comment Library entries seeded into every new tenant. The same set
 // is also backfilled into existing tenants by the default-comments seed
@@ -61,17 +66,32 @@ async function seedDefaultComments(db: D1Database, tenantId: string): Promise<vo
 // INSERT). See that file for the seed data and the SP2 template-cutover
 // rationale.
 
-// Track L (D7) — seed the default TCPA SMS disclosure (version 1) once. Idempotent:
-// inserts only when no version exists yet (max-version guard via NOT EXISTS).
+// Track L (D7) — seed the default TCPA SMS disclosure (version 1) once.
+//
+// THREE things used to be wrong here, and all three came from this path writing
+// the row itself instead of asking the service that owns the table:
+//
+//  1. The disclosure text was a STRING LITERAL duplicated from
+//     `SMS_DISCLOSURE_V1`. Two copies of the exact words a consumer consents to,
+//     drifting independently, is the shape of a consent record pointing at text
+//     that no longer says what it said.
+//  2. It wrote no `content_hash`, so every self-hosted install started life with
+//     an unhashed version — and a NULL hash never matches, so republishing the
+//     identical text would mint a second version rather than being a no-op.
+//  3. Its `NOT EXISTS` guard and the publish path's de-duplication answer
+//     DIFFERENT questions — "does any version exist" versus "is this the same
+//     text as the current one" — so having only the first one here meant the
+//     platform default could be appended on top of a workspace's own wording.
+//
+// It now delegates, keeping the existence guard (which the service does not
+// have) and inheriting the hashing and de-duplication (which this path did not).
 async function seedSmsDisclosureV1(db: D1Database): Promise<void> {
     try {
-        await db.prepare(`
-            INSERT INTO sms_disclosure_versions (version, text, published_at)
-            SELECT 1, ?, unixepoch('now') * 1000
-            WHERE NOT EXISTS (SELECT 1 FROM sms_disclosure_versions)
-        `).bind(
-            'By providing your phone number and opting in, you agree to receive appointment and report text messages from {{company_name}}. Message frequency varies by your inspection activity. Message and data rates may apply. Reply STOP to opt out, HELP for help.',
-        ).run();
+        const existing = await db.prepare(
+            'SELECT 1 FROM sms_disclosure_versions LIMIT 1',
+        ).first();
+        if (existing) return;
+        await new SmsConsentService(db).publishDisclosure(SMS_DISCLOSURE_V1);
     } catch (err) {
         // non-fatal: setup wizard must not fail because of seed data
         logger.warn('seedSmsDisclosureV1.failed', {
@@ -170,7 +190,7 @@ export class StandaloneProvider implements IntegrationProvider {
 
     async handleTenantUpdate(params: TenantUpdateParams): Promise<void> {
         const db = this.getDrizzle();
-        const { id, slug, status, tier, name, deploymentMode, maxUsers, adminEmail, adminPasswordHash, adminName } = params;
+        const { id, slug, status, tier, name, deploymentMode, maxUsers, adminEmail, adminPasswordHash, adminName, acceptance } = params;
 
         let tenantId = id || crypto.randomUUID();
         // Prefer the stable tenant id (slug can change — e.g. the 2026-06-03
@@ -232,17 +252,58 @@ export class StandaloneProvider implements IntegrationProvider {
             const existingUser = await db.select().from(users).where(eq(users.email, adminEmail)).get();
             if (!existingUser) {
                 const now = new Date();
-                await db.insert(users).values({
-                    id: crypto.randomUUID(),
-                    tenantId,
-                    email: adminEmail,
-                    passwordHash: adminPasswordHash,
-                    role: 'owner',
-                    // adminName is required by the setup form so this is never
-                    // empty for first-time admin users.
-                    ...(adminName ? { name: adminName } : {}),
-                    createdAt: now,
-                });
+                const userId = crypto.randomUUID();
+                // The basis comes from the DOOR, never from a lookup: this is
+                // the `/setup` wizard, where the person is bringing the
+                // workspace into existence, so `owner`. Any basis the caller
+                // declared is ignored rather than trusted — the standalone
+                // provider IS the setup door, and accepting a declared basis
+                // here would let a caller assert an authority nobody checked.
+                const acceptanceStatements = acceptance
+                    ? buildAcceptanceStatement(db, {
+                        tenantId,
+                        userId,
+                        ...(acceptance.actorIdentityRef ? { actorIdentityRef: acceptance.actorIdentityRef } : {}),
+                        authorityBasis: deriveAuthorityBasis({ path: 'setup' }),
+                        documents: acceptance.documents,
+                    })
+                    : [];
+                // ONE WRITE, even when the acceptance list is empty — the batch
+                // is the shape, not a branch, so the atomic path is the path in
+                // use rather than one only some callers reach.
+                //
+                // ⚠️ ABSENCE IS NOT A REFUSAL HERE, AND THAT IS A KNOWN GAP, not
+                // a decision that self-hosters owe nothing. Refusing would make
+                // `/setup` impossible on this build, because THERE IS NOTHING TO
+                // ACCEPT: `deployment_legal_versions` holds one document kind
+                // (`agent_terms`, the operator's contract with global agents),
+                // and the tenant's own `tenant_legal_versions` cannot exist yet
+                // — the tenant is being created in this same request, and the
+                // first version is written when an admin later saves their
+                // Privacy/Terms text in settings. A refusal with no document
+                // behind it would be a gate that can only ever say no.
+                //
+                // What closes it is a document, not a stricter check: the
+                // deployment publishing terms the first operator is shown at
+                // `/setup` (which needs `deployment_legal_versions.doc` widened
+                // and a field on `SetupSchema`). Until then this path creates an
+                // owner account with no acceptance, and saying so plainly beats
+                // a `?? []` that reads as coverage.
+                const statements = [
+                    db.insert(users).values({
+                        id: userId,
+                        tenantId,
+                        email: adminEmail,
+                        passwordHash: adminPasswordHash,
+                        role: 'owner',
+                        // adminName is required by the setup form so this is never
+                        // empty for first-time admin users.
+                        ...(adminName ? { name: adminName } : {}),
+                        createdAt: now,
+                    }),
+                    ...acceptanceStatements,
+                ];
+                await db.batch(statements as unknown as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 
                 // Default Template — empty starter. Renamed from "Standard
                 // Home Inspection" (R7-23) because it collided semantically

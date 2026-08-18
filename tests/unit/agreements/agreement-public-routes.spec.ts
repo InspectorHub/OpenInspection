@@ -63,7 +63,40 @@ interface Stubs {
 }
 
 function buildApp(db: BetterSQLite3Database<typeof schema>, stubs: Stubs = {}) {
-    const auditAppend = stubs.auditAppend ?? vi.fn().mockResolvedValue({ id: 'a', hash: 'h' });
+    // Every audit append WRITES A ROW, whatever spy the caller supplied.
+    //
+    // The stub used to be a pure recorder, which was fine while nothing read the
+    // table back. The sign path now refuses a signature with no recorded
+    // PRESENTATION (review review — intent comes from an act, never inferred
+    // from a signature image existing) and reads `esign_audit_logs` to check it.
+    // A recorder that never persisted made every signature in this file fail for
+    // a reason that looked like the new check and was really a test double one
+    // layer too shallow.
+    //
+    // The persistence WRAPS the caller's spy rather than replacing the default,
+    // so a test that passes its own `auditAppend` to inspect calls cannot
+    // accidentally opt out of the row the sign path needs. Two tests did exactly
+    // that and both went red until this wrapped them.
+    //
+    // Only the fields the read path needs. The hash chain and the Ed25519
+    // signature are the real service's job and are covered by its own specs;
+    // inventing them here would reimplement the thing under test elsewhere.
+    const spy = stubs.auditAppend ?? vi.fn().mockResolvedValue({ id: 'a', hash: 'h' });
+    const auditAppend = vi.fn(async (
+        tenantId: string, requestId: string, event: string, payload: Record<string, unknown>,
+    ) => {
+        await db.insert(schema.esignAuditLogs).values({
+            id: crypto.randomUUID(), tenantId, requestId, event: event as never,
+            payloadJson: JSON.stringify(payload), createdAt: new Date(),
+            hash: 'h', signature: 'sig', keyFingerprint: 'fp',
+        });
+        // The spy's own return is irrelevant — callers only read {id, hash} —
+        // but it must still be CALLED, because that is what the tests assert on.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        (spy as unknown as (...a: unknown[]) => unknown)(tenantId, requestId, event, payload);
+        return { id: 'a', hash: 'h' };
+    });
+
     const automationTrigger = stubs.automationTrigger ?? vi.fn().mockResolvedValue(undefined);
     const notificationCreate = stubs.notificationCreate ?? vi.fn().mockResolvedValue(undefined);
     const emailConfirm = stubs.emailConfirm ?? vi.fn().mockResolvedValue(undefined);
@@ -141,6 +174,28 @@ function signReq(body: Record<string, unknown>) {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
     } as RequestInit;
+}
+
+/**
+ * Load the agreement the way a signer does, before signing it.
+ *
+ * The sign route now refuses a signature with no recorded PRESENTATION (review
+ * review: intent comes from an act, never inferred from a signature image
+ * existing), and the presentation is appended by this GET. A spec that POSTs a
+ * signature without ever loading the document was asserting a flow no human
+ * performs — the signing page fetches this endpoint before it can render a
+ * single character to sign.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function present(app: any, token: string, env: unknown): Promise<void> {
+    const { ctx } = makeExecCtx();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+    const res = await app.request(`/agreements/${token}`, {}, env, ctx) as Response;
+    // Loud on failure: a silent 404 here would make every signature below fail
+    // for a reason that looks like the intent check and is really a bad fixture.
+    if (res.status !== 200) {
+        throw new Error(`present(${token}) expected 200, got ${res.status}`);
+    }
 }
 
 describe('public agreement routes — per-signer (Track I-a)', () => {
@@ -226,6 +281,7 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         const { app, workflowCreate, notificationCreate, emailConfirm } = buildApp(db);
 
         const ec1 = makeExecCtx();
+        await present(app, token1, FAKE_ENV);
         const r1 = await app.request(`/agreements/${token1}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec1.ctx);
         await ec1.settle();
         expect(r1.status).toBe(200);
@@ -243,6 +299,7 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         expect(emailConfirm.mock.calls[0][4]).toBe(`https://example.test/verify/${requestId}`);
 
         const ec2 = makeExecCtx();
+        await present(app, token2, FAKE_ENV);
         const r2 = await app.request(`/agreements/${token2}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec2.ctx);
         await ec2.settle();
         expect(r2.status).toBe(200);
@@ -284,6 +341,7 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         const { app, workflowCreate, notificationCreate } = buildApp(db);
 
         const ec1 = makeExecCtx();
+        await present(app, r.token, FAKE_ENV);
         const first = await app.request(`/agreements/${r.token}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec1.ctx);
         await ec1.settle();
         expect(first.status).toBe(200);
@@ -293,6 +351,7 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         expect(notificationCreate).not.toHaveBeenCalled();
 
         const ec2 = makeExecCtx();
+        await present(app, r.token, FAKE_ENV);
         const second = await app.request(`/agreements/${r.token}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec2.ctx);
         await ec2.settle();
         expect(second.status).toBe(200);
@@ -307,6 +366,7 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         const { token1, requestId } = await createTwoSignerEnvelope(db, 'all');
         const { app } = buildApp(db);
         const { ctx, settle } = makeExecCtx();
+        await present(app, token1, FAKE_ENV);
         const res = await app.request(`/agreements/${token1}/sign`,
             signReq({ signatureBase64: SIG, onBehalfOf: 'Acme LLC', onBehalfDisclaimer: 'Authorized agent' }), FAKE_ENV, ctx);
         await settle();
@@ -355,6 +415,7 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         const { app, automationTrigger } = buildApp(db);
 
         const ec1 = makeExecCtx();
+        await present(app, token1, FAKE_ENV);
         await app.request(`/agreements/${token1}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec1.ctx);
         await ec1.settle();
         // after signer 1: only signer-level automation, no envelope-level
@@ -363,6 +424,7 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         expect(eventsAfter1).not.toContain('agreement.signed');
 
         const ec2 = makeExecCtx();
+        await present(app, token2, FAKE_ENV);
         await app.request(`/agreements/${token2}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec2.ctx);
         await ec2.settle();
         const allEvents = automationTrigger.mock.calls.map(c => c[0].triggerEvent);
@@ -370,11 +432,50 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         expect(allEvents.filter(e => e === 'agreement.signed')).toHaveLength(1);
     });
 
+    it('a signature with NO recorded presentation is refused', async () => {
+        // The original shape: POST a signature having never been shown the
+        // document. review review — intent must come from a recorded act, not
+        // be inferred back from a signature image existing. Every other test in
+        // this file now calls present() first, which is what a signing page does
+        // before it can render a character; this is the one that must not.
+        const { token1 } = await createTwoSignerEnvelope(db, 'all');
+        const { app } = buildApp(db);
+
+        const ec = makeExecCtx();
+        const res = await app.request(`/agreements/${token1}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec.ctx);
+        await ec.settle();
+
+        expect(res.status).toBe(400);
+        // And nothing was written: a refusal that still signed would be worse
+        // than no refusal, because the chain would then carry both.
+        const signers = await db.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, (await db.select().from(schema.agreementRequests).get())!.id)).all();
+        expect(signers.every((s) => s.signatureBase64 === null)).toBe(true);
+    });
+
+    it('a presentation to one signer does not satisfy the other signer intent chain', async () => {
+        // Two signers on one envelope is the normal case. This is why the
+        // presentation is a `signer.`-prefixed event: `request.viewed` is
+        // envelope-level under the audit dedup index, so the second signer's row
+        // would have collided and returned the first signer's — and the chain
+        // would have shown a presentation to somebody else.
+        const { token1, token2 } = await createTwoSignerEnvelope(db, 'all');
+        const { app } = buildApp(db);
+
+        await present(app, token1, FAKE_ENV);
+
+        const ec = makeExecCtx();
+        const res = await app.request(`/agreements/${token2}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec.ctx);
+        await ec.settle();
+        expect(res.status).toBe(400);
+    });
+
     it('audit: signer.signed appended on each sign; agreement.signed appended on envelope completion', async () => {
         const { token1, token2 } = await createTwoSignerEnvelope(db, 'all');
         const { app, auditAppend } = buildApp(db);
 
         const ec1 = makeExecCtx();
+        await present(app, token1, FAKE_ENV);
         await app.request(`/agreements/${token1}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec1.ctx);
         await ec1.settle();
         let events = auditAppend.mock.calls.map(c => c[2]);
@@ -382,6 +483,7 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         expect(events).not.toContain('agreement.signed');
 
         const ec2 = makeExecCtx();
+        await present(app, token2, FAKE_ENV);
         await app.request(`/agreements/${token2}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec2.ctx);
         await ec2.settle();
         events = auditAppend.mock.calls.map(c => c[2]);

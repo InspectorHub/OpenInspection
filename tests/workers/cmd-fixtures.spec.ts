@@ -5,7 +5,10 @@ import update from '../fixtures/cmd-events/cmd-tenant-update-v1.json';
 import quota from '../fixtures/cmd-events/cmd-tenant-sync-quota-v1.json';
 import updateReplyto from '../fixtures/cmd-events/cmd-tenant-update-replyto-v1.json';
 import seed from '../fixtures/cmd-events/cmd-tenant-seed-starter-content-v1.json';
-import { TENANT_CONFIGS_TEST_DDL, USERS_TEST_DDL } from '../helpers/inline-ddl';
+import {
+    TENANT_CONFIGS_TEST_DDL, USERS_TEST_DDL,
+    ACCOUNT_ACCEPTANCES_TEST_DDL, ACCOUNT_ACCEPTANCES_TEST_INDEX_DDL,
+} from '../helpers/inline-ddl';
 
 // Batch 2: the seed fixture exercises the consumer pipeline, not the content
 // seeder (which touches 8 tables and has its own coverage) — stubbed here.
@@ -39,6 +42,14 @@ describe('cmd golden fixtures — consumer can apply every fixture (A-21)', () =
         // inline-ddl-schema-sync.spec.ts; it used to be a second copy here,
         // which is how three columns went missing without a local gate noticing.
         await b.DB.exec(USERS_TEST_DDL);
+        // The acceptance rows ride the SAME batch as the users insert
+        // (review A2 / review decision), so this table is not optional
+        // scenery: without it the credential apply rolls the account back too.
+        // The unique index comes with it — it is what makes a redelivered
+        // command unable to mint a second acceptance, and this seam is
+        // at-least-once.
+        await b.DB.exec(ACCOUNT_ACCEPTANCES_TEST_DDL);
+        await b.DB.exec(ACCOUNT_ACCEPTANCES_TEST_INDEX_DDL);
         await b.DB.exec('CREATE TABLE IF NOT EXISTS processed_cmd_events (event_id TEXT PRIMARY KEY, cmd_type TEXT NOT NULL, processed_at INTEGER NOT NULL);');
         await b.DB.exec('CREATE TABLE IF NOT EXISTS parked_cmd_events (id TEXT PRIMARY KEY, envelope TEXT NOT NULL, reason TEXT NOT NULL, received_at INTEGER NOT NULL);');
         // The update fixture carries `name` → PortalProvider initializes

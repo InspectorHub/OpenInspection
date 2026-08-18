@@ -109,7 +109,7 @@ export async function noteVoidedInQuickBooks(
 export async function clearPaymentDiscrepancy(
     db: DrizzleD1Database, tenantId: string, invoiceId: string,
 ): Promise<void> {
-    await db.update(qboSyncErrors).set({ resolved: true, updatedAt: new Date() })
+    await db.update(qboSyncErrors).set({ resolved: true, updatedAt: new Date(), resolvedAt: new Date() })
         .where(and(
             eq(qboSyncErrors.tenantId, tenantId),
             eq(qboSyncErrors.oiType, 'invoice'),

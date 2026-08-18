@@ -6,19 +6,26 @@ describe('email template registry', () => {
   // A hand-maintained count is the only tripwire for a template being DELETED
   // by accident — nothing else in the suite notices a shrinking registry (an
   // orphaned class is legal, since a class may exist before its template does).
-  it('has exactly 24 descriptors — bump deliberately when adding one', () => {
-    expect(REGISTRY.length).toBe(24);
+  it('has exactly 25 descriptors — bump deliberately when adding one', () => {
+    expect(REGISTRY.length).toBe(25);
   });
   it('every trigger is unique', () => {
     const t = REGISTRY.map(d => d.trigger);
     expect(new Set(t).size).toBe(REGISTRY.length);
   });
   it('marks exactly the platform-owned triggers non-editable', () => {
-    // Non-editable == "this is OUR message, on OUR footing": account recovery
-    // and our own billing. A tenant rewriting either would be rewriting
-    // something they are not the author of.
+    // Non-editable == "this is OUR message, on OUR footing": account recovery,
+    // our own billing, and one compliance statement. A tenant rewriting any of
+    // them would be rewriting something they are not the author of.
+    //
+    // `destruction-incomplete` is non-editable for a stronger reason than the
+    // billing pair: it reports, under a review ruling, that data the recipient
+    // asked us to erase still exists. A tenant able to edit it could soften or
+    // contradict the fact being reported about their own deletion.
     const platform = REGISTRY.filter(d => !d.editable).map(d => d.trigger);
-    expect(platform).toEqual(['password-reset', 'usage-quota-warning', 'usage-quota-reached']);
+    expect(platform).toEqual([
+        'password-reset', 'usage-quota-warning', 'usage-quota-reached', 'destruction-incomplete',
+    ]);
   });
   // Which triggers are `required` is no longer asserted here. A hardcoded pair
   // in this file was a snapshot of the answer, and the answer was wrong: only

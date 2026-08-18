@@ -139,6 +139,40 @@ describe('flush() — SMS branch (Track L)', () => {
         expect(fakeSendMessage).not.toHaveBeenCalled();
     });
 
+    it('a sent row records WHO sent it and ON WHOSE BEHALF', async () => {
+        // review 26-5. Written in the same statement as the outcome, so a row
+        // that says 'sent' can never lack it — and snapshotted, because
+        // sms_mode and company_name both change and this row is evidence about
+        // one transmission at one moment.
+        const { logId } = await seedSmsLog({ contactId: 'c1' });
+        await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+
+        const row = await db.select().from(schema.automationLogs)
+            .where(eq(schema.automationLogs.id, logId)).get();
+        expect(row?.status).toBe('sent');
+        const id = row?.senderIdentity as Record<string, unknown> | null;
+        expect(id, 'a sent SMS row with no sender identity').toBeTruthy();
+        // Two roles, not one. The platform operated the transmission; the tenant
+        // is who it was sent for. Collapsing them is the defect.
+        expect(id!.platformSender).toBe('InspectorHub');
+        expect(id!.tenantOnWhoseBehalf).toBe(TENANT);
+        expect(id!.smsMode).toBe('platform');
+        expect(id!.channel).toBe('sms');
+    });
+
+    it('a SKIPPED row records no sender identity, because nothing was sent', async () => {
+        // The negative control that makes the assertion above mean something: a
+        // column populated on every row regardless of outcome would prove
+        // nothing about the send path.
+        const { logId } = await seedSmsLog({ contactId: 'c1' });
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+        const row = await db.select().from(schema.automationLogs)
+            .where(eq(schema.automationLogs.id, logId)).get();
+        expect(row?.status).toBe('skipped');
+        expect(row?.senderIdentity ?? null).toBeNull();
+    });
+
     it('client SMS with granted consent → sent via provider', async () => {
         const { logId } = await seedSmsLog({ contactId: 'c1' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
@@ -177,15 +211,36 @@ describe('flush() — SMS branch (Track L)', () => {
         expect(call.body).toContain('Acme');   // company_name (tenant name)
     });
 
-    it('SP2: deliverSms preserves the review_url fail-closed skip on the resolved body', async () => {
-        // Arrange: seed an sms rule whose body includes {{review_url}}.
-        // The backfill in seedSmsLog creates an sms template with that body.
-        // tenant_configs.review_url is NOT set, so delivery must skip fail-closed.
+    it('SP2: a body referencing review_url is refused as marketing, not sent', async () => {
+        // This used to assert `review_url not configured` — the fail-closed skip
+        // in the send core, which only fired when the tenant had no review URL.
+        // The SMS gate now refuses the body outright: a review link is
+        // promotional, and the consent we hold was captured under a disclosure
+        // describing appointment and report updates. The skip is therefore
+        // earlier and unconditional, and the send-core check below it has become
+        // the second line rather than the first.
         const { logId } = await seedSmsLog({ contactId: 'c1', smsBody: 'Visit {{review_url}}' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
         await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
         expect((await statusOf(logId))?.status).toBe('skipped');
-        expect((await statusOf(logId))?.error).toBe('review_url not configured');
+        expect((await statusOf(logId))?.error).toBe('marketing content on sms: review_url');
+        expect(fakeSendMessage).not.toHaveBeenCalled();
+    });
+
+    it('SP2: and configuring a review URL does not unlock it — the control', async () => {
+        // Without this case the one above is satisfied by ANY refusal of a
+        // tenant with no review URL, which is the old behaviour wearing a new
+        // reason string. Configuring the URL is the input that used to make the
+        // send succeed; it must now change nothing.
+        await db.insert(schema.tenantConfigs).values({
+            tenantId: TENANT, smsMode: 'platform',
+            reviewUrl: 'https://g.example/review', updatedAt: new Date(),
+        } as never);
+        const { logId } = await seedSmsLog({ contactId: 'c1', smsBody: 'Visit {{review_url}}' });
+        await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+        expect((await statusOf(logId))?.status).toBe('skipped');
+        expect((await statusOf(logId))?.error).toBe('marketing content on sms: review_url');
         expect(fakeSendMessage).not.toHaveBeenCalled();
     });
 

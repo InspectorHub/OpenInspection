@@ -17,6 +17,16 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'days', value: 30 },
         action: 'delete',
         purpose: 'fixture: a well-formed rule the gate must still find with prose quoting its declaration above it',
+        legalHold: 'not_applicable',
+        legalHoldNote: 'fixture: no tenant dimension in the probe schema, so a hold cannot be expressed here — the note is required, and this is what a required note looks like',
+    },
+    {
+        table: 'probe_tenant_log',
+        timestampColumn: 'received_at',
+        window: { unit: 'days', value: 30 },
+        action: 'delete',
+        purpose: 'fixture: the tenant-scoped arm, so a green run proves the legal-hold classification is checked against the schema and not merely parsed',
+        legalHold: 'tenant_scoped',
     },
 ];
 

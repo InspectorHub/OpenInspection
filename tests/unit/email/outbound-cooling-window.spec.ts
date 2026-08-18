@@ -16,7 +16,7 @@ import {
     isAccountEmailClass,
     unlockAtMs,
 } from '../../../server/lib/email/outbound-cooling-window';
-import { notificationClass } from '../../../server/lib/notifications/classes';
+import { NOTIFICATION_CLASSES, notificationClass } from '../../../server/lib/notifications/classes';
 import { SAAS_PROFILE, STANDALONE_PROFILE } from '../../../server/lib/deployment-profile';
 
 describe('account-email exemption list', () => {
@@ -44,6 +44,50 @@ describe('account-email exemption list', () => {
 
     it('gates the admin test send, which takes an arbitrary typed-in address', () => {
         expect(isAccountEmailClass('admin-test-send')).toBe(false);
+    });
+});
+
+/**
+ * review B2. The 24-hour hold survives review as an ABUSE control, on the
+ * condition that it never impedes a statutory right. A person exercising access
+ * or erasure has a deadline that runs against the controller, and an outbound
+ * queue is not a lawful reason to spend a day of it — least of all in the first
+ * 24 hours of a company's life, which is exactly when a brand-new tenant's first
+ * subject request would land.
+ *
+ * These two are NOT on the list for the reason the other four are. The others
+ * are account mechanics — mail that hands someone the keys to a product they
+ * just paid for. These carry a right that exists whether or not the product
+ * does, and review drew that line explicitly.
+ */
+describe('statutory-rights messages are never held', () => {
+    const STATUTORY_RIGHTS = ['subject-export-ready', 'subject-erasure-confirmed'] as const;
+
+    it('the two ids are real notification classes, required, and transactional', () => {
+        // CROSS-TASK: these classes are minted by the messaging-consent plan's
+        // class task. Until it lands this is RED, and that is the intended
+        // wiring — the two tasks agree on the literal strings or they do not
+        // ship. A silently-gated statutory right is the failure being prevented,
+        // so the check is deliberately not tolerant of a missing class.
+        for (const id of STATUTORY_RIGHTS) {
+            const cls = NOTIFICATION_CLASSES.find((c) => c.id === id);
+            expect(cls, `${id} is not in NOTIFICATION_CLASSES`).toBeDefined();
+            expect(cls?.required, `${id} must not be suppressible`).toBe(true);
+            expect(cls?.category, `${id} is not marketing`).toBe('transactional');
+        }
+    });
+
+    it('neither is held by the cooling window', () => {
+        for (const id of STATUTORY_RIGHTS) {
+            expect(isAccountEmailClass(id), `${id} is being held`).toBe(true);
+        }
+    });
+
+    it('an external sign-in link is still held — the hold has not been widened', () => {
+        // The positive control. Exempting the two above must not have loosened
+        // the rule for the phishing-shaped payload the window exists to delay.
+        expect(isAccountEmailClass('client-portal-login')).toBe(false);
+        expect(isAccountEmailClass('agent-login-link')).toBe(false);
     });
 });
 

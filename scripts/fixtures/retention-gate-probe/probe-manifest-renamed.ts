@@ -21,6 +21,8 @@ export const RETENTION_MANIFEST_V2: RetentionRule[] = [
         window: { unit: 'days', value: 30 },
         action: 'delete',
         purpose: 'fixture: a well-formed rule, in an array the gate must refuse to find',
+        legalHold: 'not_applicable',
+        legalHoldNote: 'fixture: no tenant dimension in the probe schema, so a hold cannot be expressed here — the note is required, and this is what a required note looks like',
     },
 ];
 

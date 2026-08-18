@@ -4,3 +4,5 @@ export * from './slug-history';
 export * from './user';
 export * from './integration';
 export * from './legal-versions';
+export * from './account-acceptances';
+export * from './legal-holds';

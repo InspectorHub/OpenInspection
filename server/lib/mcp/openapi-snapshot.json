@@ -7026,6 +7026,22 @@
     "description": "Public, unauthenticated read-only probe for the portal report-landing BFF loader. Resolves the report token to a role kind and, for agent-kind tokens only, whether a global agent account exists for the recipient email. A bad/expired/mismatched token replies 200 with kind: null rather than 401 — this is a context probe, not an auth check."
   },
   {
+    "operationId": "getAgentTerms",
+    "method": "GET",
+    "pathTemplate": "/api/agent-signup/terms",
+    "scopes": [
+      "read"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "The agent terms in force",
+    "description": "Returns the deployment's current agent-terms version, its content hash, and the body to display at signup. 404 when the deployment has published none — in which case agent signup is closed."
+  },
+  {
     "operationId": "getBookingAvailability",
     "method": "GET",
     "pathTemplate": "/api/public/availability/{inspectorId}",

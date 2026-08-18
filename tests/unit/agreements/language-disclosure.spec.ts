@@ -150,7 +150,12 @@ describe('agreement language disclosure — what the record supports', () => {
 // ---------------------------------------------------------------------------
 describe('agreement language disclosure — who may claim a version', () => {
     const PLATFORM_RENDERED_SIGN_ROUTE = 'server/api/bookings/agreement.ts';
-    const CALLER_RENDERED_SIGN_ROUTE = 'server/api/inspections/agreements.ts';
+    // Moved 2026-08-17: the in-person sign route was split out of
+    // `agreements.ts` when that file crossed the 400-line ceiling. The
+    // distinction this test is about is unchanged, and is now stated in the new
+    // file's own header — the caller drew the screen, so this route cannot
+    // attest which disclosure text was on it.
+    const CALLER_RENDERED_SIGN_ROUTE = 'server/api/inspections/agreement-sign.ts';
 
     /** The `languageDisclosureVersion:` argument each sign call passes. */
     function versionArgIn(src: string): string | null {

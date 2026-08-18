@@ -159,7 +159,7 @@ describe('runErasure', () => {
         expect(logs[0].subjectEmail).toBe(SUBJECT_EMAIL);
         expect(logs[0].requestedBy).toBe('admin-sub');
         const decisions = JSON.parse(logs[0].decisionsJson) as Array<Record<string, unknown>>;
-        const signerDecision = decisions.find(d => d.table === 'agreement_signers' && d.action === 'anonymize');
+        const signerDecision = decisions.find(d => d.table === 'agreement_signers' && d.action === 'erase_in_place');
         expect(signerDecision).toBeTruthy();
         expect(signerDecision!.legalBasis).toBe('art_17_3_e');
         // retentionExpiry = signedAt + 6 years, ms integer.
@@ -268,7 +268,7 @@ describe('runErasure', () => {
         // Decision log: anonymize action with legalBasis art_17_3_e (NOT delete).
         const logs = await db.select().from(schema.erasureLog).all();
         const decisions = JSON.parse(logs[0].decisionsJson) as Array<Record<string, unknown>>;
-        const signerDecision = decisions.find(d => d.table === 'agreement_signers' && d.action === 'anonymize');
+        const signerDecision = decisions.find(d => d.table === 'agreement_signers' && d.action === 'erase_in_place');
         expect(signerDecision).toBeTruthy();
         expect(signerDecision!.legalBasis).toBe('art_17_3_e');
         // retentionExpiry anchors to the subject signer's signed_at (envelope signedAt is NULL).

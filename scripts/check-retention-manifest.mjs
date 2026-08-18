@@ -120,7 +120,20 @@ const EXPLICIT_LEDGER_TABLES = [
     "sync_outbox",
 ];
 
-const VALID_ACTIONS = new Set(["delete", "anonymize"]);
+// See check-erasure-manifest.mjs — `erase_in_place` replaced `anonymize`
+// (CA-08). Source has one vocabulary; the wire keeps both.
+const VALID_ACTIONS = new Set(["delete", "erase_in_place"]);
+
+/**
+ * How a rule obeys the legal-hold invariant (review review).
+ *
+ * `not_applicable` is the only value that needs an argument attached, and that
+ * asymmetry is deliberate: it is the only one that opts a table OUT of
+ * preservation, so it is the only one a reviewer has to be able to disagree
+ * with. The other two describe a mechanism that either exists in the executor
+ * or is enforced by the driver, and the behavioural spec proves both.
+ */
+const VALID_LEGAL_HOLD = new Set(["tenant_scoped", "suspend_all", "not_applicable"]);
 
 const errors = [];
 const src = readFileSync(MANIFEST, "utf8");
@@ -231,13 +244,31 @@ if (rules.length === 0) {
 // ── Structural validity ──────────────────────────────────────────────────────
 rules.forEach((rule, i) => {
     const label = `rule #${i + 1} (${rule.table ?? "?"})`;
-    for (const field of ["table", "timestampColumn", "action", "purpose"]) {
+    for (const field of ["table", "timestampColumn", "action", "purpose", "legalHold"]) {
         if (!rule[field] || rule[field].trim() === "") {
             errors.push(`${label}: missing/empty '${field}'.`);
         }
     }
     if (rule.action && !VALID_ACTIONS.has(rule.action)) {
         errors.push(`${label}: invalid action '${rule.action}' (allowed: ${[...VALID_ACTIONS].join(", ")}).`);
+    }
+    if (rule.legalHold && !VALID_LEGAL_HOLD.has(rule.legalHold)) {
+        errors.push(
+            `${label}: invalid legalHold '${rule.legalHold}' ` +
+            `(allowed: ${[...VALID_LEGAL_HOLD].join(", ")}).`,
+        );
+    }
+    if (rule.legalHold === "not_applicable" && (!rule.legalHoldNote || rule.legalHoldNote.trim() === "")) {
+        errors.push(
+            `${label}: legalHold 'not_applicable' needs a 'legalHoldNote' saying why a preservation ` +
+            `order cannot reach anything in this table. Without one it is an opt-out nobody reviewed.`,
+        );
+    }
+    if (rule.legalHold && rule.legalHold !== "not_applicable" && rule.legalHoldNote) {
+        errors.push(
+            `${label}: 'legalHoldNote' belongs only on a 'not_applicable' rule — on any other value ` +
+            `it reads as a caveat on enforcement that is not actually implemented.`,
+        );
     }
     if (!rule.__windowUnit) {
         errors.push(
@@ -314,11 +345,52 @@ if (!existsSync(SCHEMA_DIR)) {
 }
 
 const schemaTables = new Set();
+/**
+ * Tables that actually carry a `tenant_id` column.
+ *
+ * Read from the schema rather than trusted from the manifest, because the whole
+ * point of the `legalHold` field is to be checkable. A rule that CLAIMS
+ * `tenant_scoped` on a table with no tenant column would compile, pass every
+ * type check, and quietly delete under a hold; a rule that claims
+ * `suspend_all` on a table that HAS one is over-preserving for no reason and
+ * would never be noticed, because over-preservation looks like nothing.
+ *
+ * The table's body is taken as the text up to the next `sqliteTable(`, and the
+ * column is matched as the literal declaration `text('tenant_id')` rather than
+ * as the bare string — a comment or an index that merely mentions the name must
+ * not be able to answer this question.
+ */
+const tenantScopedSchemaTables = new Set();
 const tableRe = /sqliteTable\(\s*'([^']+)'/g;
 for (const file of schemaFiles(SCHEMA_DIR)) {
     const text = readFileSync(file, "utf8");
     let m;
-    while ((m = tableRe.exec(text)) !== null) schemaTables.add(m[1]);
+    const hits = [];
+    while ((m = tableRe.exec(text)) !== null) hits.push({ name: m[1], at: m.index });
+    hits.forEach((hit, i) => {
+        schemaTables.add(hit.name);
+        const body = text.slice(hit.at, i + 1 < hits.length ? hits[i + 1].at : text.length);
+        if (/text\('tenant_id'\)/.test(body)) tenantScopedSchemaTables.add(hit.name);
+    });
+}
+
+// ── legalHold classification vs the schema ───────────────────────────────────
+for (const rule of rules) {
+    if (!rule.table || !schemaTables.has(rule.table)) continue;
+    const hasTenant = tenantScopedSchemaTables.has(rule.table);
+    if (rule.legalHold === "tenant_scoped" && !hasTenant) {
+        errors.push(
+            `rule '${rule.table}': legalHold 'tenant_scoped', but the table declares no ` +
+            `text('tenant_id') column — the executor has nothing to filter a held tenant on.`,
+        );
+    }
+    if (rule.legalHold !== "tenant_scoped" && hasTenant) {
+        errors.push(
+            `rule '${rule.table}': legalHold '${rule.legalHold}', but the table DOES carry ` +
+            `text('tenant_id'). A hold can be expressed here, so it must be — suspending or ` +
+            `exempting a tenant-scoped table preserves either too much or nothing.`,
+        );
+    }
 }
 
 const explicit = new Set(EXPLICIT_LEDGER_TABLES);
@@ -361,7 +433,29 @@ if (errors.length > 0) {
     process.exit(1);
 }
 
+const byHold = { tenant_scoped: 0, suspend_all: 0, not_applicable: 0 };
+for (const rule of rules) {
+    if (rule.legalHold in byHold) byHold[rule.legalHold] += 1;
+}
+
+// A count of zero enforcing rules is not a pass. Every rule could be classified,
+// every note could be present, and the legal-hold invariant could still be
+// enforced nowhere — which is exactly what this file looked like before the
+// field existed, and it printed OK then too.
+if (byHold.tenant_scoped === 0) {
+    console.error(
+        "retention-manifest lint: ZERO rules declare legalHold 'tenant_scoped'. " +
+        "Nothing enforces the hold invariant, so a green run here would mean nothing.",
+    );
+    process.exit(1);
+}
+
 console.log(
     `retention-manifest lint: OK (${rules.length} rules, ${outOfScope.length} out-of-scope, ` +
     `${open.length} open; ${inScope.length} ledger tables in scope of ${schemaTables.size} total).`,
+);
+console.log(
+    `  legal hold: ${byHold.tenant_scoped} enforced by tenant filter · ` +
+    `${byHold.suspend_all} suspended while any hold is in force · ` +
+    `${byHold.not_applicable} declared unreachable (each with a stated reason).`,
 );

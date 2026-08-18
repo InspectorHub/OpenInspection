@@ -10,6 +10,9 @@ const EXAMPLES: Record<string, string> = {
   inviteLink: 'https://app.example.com/join/abc123', resetLink: 'https://app.example.com/reset/abc123',
   loginUrl: 'https://app.example.com/auth?link=abc123', shareUrl: 'https://app.example.com/repair-request/abc123',
   billingPortalUrl: 'https://app.example.com/billing',
+  // A real sentence, not a placeholder: this template's whole body is this one
+  // variable, so a preview showing `{noticeBody}` would show nothing at all.
+  noticeBody: 'Tenant destruction initiated on 2026-08-17 did not complete for the following stores: durable_objects. The database and cache portions completed. The remaining deletion is being remediated, and we will confirm when it is complete.',
   clientName: 'Jordan Smith', inspectorName: 'Alex Rivera', agentName: 'Pat Lee',
   tenantName: 'Acme Inspections', workspaceName: 'Acme Inspections', agreementName: 'Inspection Agreement',
   date: 'July 1, 2026', time: '3:00 PM', amount: '$350.00',

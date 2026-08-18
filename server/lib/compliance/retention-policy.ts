@@ -43,8 +43,16 @@
  * name it cannot resolve rather than hashing the name and reading green.
  */
 
-/** `interim` = running in production, not approved. `approved` = review signed off on THIS version. */
-export type RetentionPolicyStatus = 'interim' | 'approved';
+/**
+ * `interim` = running in production, not approved.
+ * `approved_with_conditions` = review ruled on the windows, and named conditions
+ *   that are NOT yet met. Deliberately its own value rather than `approved`,
+ *   because a ruling handed straight to an engineering team has to carry its
+ *   own unmet conditions, and a reader who sees `approved` stops asking what is
+ *   left.
+ * `approved` = review signed off on THIS version and every condition is met.
+ */
+export type RetentionPolicyStatus = 'interim' | 'approved_with_conditions' | 'approved';
 
 export interface RetentionPolicyHeader {
     /** `YYYY-MM-DD.N` — N distinguishes multiple revisions on one day. */
@@ -64,8 +72,9 @@ export interface RetentionPolicyHeader {
     supersedes: string | null;
     /**
      * SHA-256 over the OPERATIVE fields of all three retention arrays — table,
-     * anchor, action, the RESOLVED window value and its unit, the set of
-     * out-of-scope tables, and each open entry's table and decide-by date.
+     * anchor, action, `legalHold`, the RESOLVED window value and its unit, the
+     * set of out-of-scope tables, and each open entry's table and decide-by
+     * date.
      * Recomputed by `scripts/check-retention-policy.mjs`; a mismatch fails the
      * build.
      *
@@ -81,12 +90,53 @@ export interface RetentionPolicyHeader {
     rulesDigest: string;
 }
 
+/**
+ * ⚠️ APPROVED WITH CONDITIONS — rounds 33 and 34. Conditions still unmet:
+ *
+ *   1. ✅ the manifest matches the rulings (4 windows changed, 2 pending closed)
+ *   2. ✅ reference-preserving retention — review WITHDREW the review
+ *         instruction to remove the legal-version tables from the sweep, and
+ *         confirmed the reference-aware executors we had built instead. The rule
+ *         it left behind is narrower and stronger than "legal documents are
+ *         exempt": they are protected only while a surviving record needs the
+ *         version to remain reproducible
+ *   3. ✅ `legal_hold` overrides every scheduled deletion. Every rule now carries
+ *         a `legalHold` classification, twelve of them enforced by a tenant
+ *         filter the executors apply and two by the driver standing the rule
+ *         down entirely; `legal-hold-sweep.spec.ts` drives a held and an unheld
+ *         tenant through the real sweep for each of the twelve. What is NOT
+ *         covered: a hold is placed by writing the row, with no endpoint and no
+ *         screen behind it — deliberate for a rare, legally-directed event, and
+ *         stated here rather than left to be discovered
+ *   4. ❌ the customer ToS re-accept flow names the liability cap in its change
+ *         summary (portal — built, pending the ToS publish)
+ *   5. ❌ approval/version registration completed before the new ToS publishes
+ *
+ * ⚠️ AND A METHOD RULE from review, which cost a wasted ruling to learn:
+ * do not classify retention behaviour from the manifest or the table name. The
+ * EXECUTOR is authoritative evidence of what the sweep actually does. We reported
+ * a defect in `sms_disclosure_versions` that its executor had always prevented.
+ *
+ * ⚠️ AND ONE QUESTION THIS DELIBERATELY DID NOT ANSWER: a hold suspends
+ * SCHEDULED deletion, which is what review invariant covers. It does not
+ * touch the DSAR erasure path, where a preservation obligation and an erasure
+ * request point in opposite directions and the resolution is a legal judgement
+ * (GDPR Art. 17(3)(e)) with notification duties attached, not a filter. Wiring
+ * it silently either way would have decided that question in a WHERE clause.
+ *
+ * ⚠️ AND A SCOPE LIMIT review asked to be written here rather than filed: this
+ * covers DATABASE retention only. Object storage, Durable Objects, KV and queues
+ * were never in the compliance register (review). A green retention gate does
+ * NOT mean the data lifecycle has been reviewed — without that sentence here,
+ * it is very easy for the next reader to see the gate pass and conclude that
+ * every production store is covered.
+ */
 export const RETENTION_POLICY: RetentionPolicyHeader = {
-    version: '2026-08-15.1',
-    status: 'interim',
+    version: '2026-08-19.3',
+    status: 'approved_with_conditions',
     effectiveAt: '2026-08-08',
-    approvedBy: null,
-    approvedAt: null,
-    supersedes: null,
-    rulesDigest: '1635306e85c1f3d456f929a7db7adcd209006d4ddb01b0d5592b476f2cb63edd',
+    approvedBy: '[redacted]',
+    approvedAt: '2026-08-19',
+    supersedes: '2026-08-19.2',
+    rulesDigest: '872f2ae78321aa0825ed05c9629f2623e564bb784a5e8d4cc4d925451bb8be76',
 };

@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { tenants, users } from '../tenant';
 import { inspections } from './core';
 import { EVENT_STATUSES } from '../../../status/event-status';
+import type { SmsSenderIdentity } from '../../../sms/sender-identity';
 
 export const automations = sqliteTable('automations', {
     id: text('id').primaryKey(),
@@ -165,6 +166,25 @@ export const automationLogs = sqliteTable('automation_logs', {
      *  stale. A row stuck at attempts=6 tells you nothing without it.
      *  Appended at table end for D1 rebuild safety. */
     lastAttemptAt: integer('last_attempt_at', { mode: 'timestamp_ms' }),
+    /**
+     * WHO SENT IT, and ON WHOSE BEHALF — recorded, not inferred.
+     *
+     * review review: the owner of the number is not automatically the legal
+     * sender. In the default mode a message leaves the platform's shared number
+     * carrying the tenant's brand, so the two questions have different answers.
+     * Both were previously reconstructable only by reading `sms_mode` off the
+     * tenant config AS IT IS TODAY — which answers the question about a message
+     * sent last year with today's configuration.
+     *
+     * JSON, holding the `SmsSenderIdentity` shape (see lib/sms/sender-identity).
+     * A snapshot on purpose: `sms_mode` and the company name both change, and
+     * this row is evidence about one transmission at one moment.
+     *
+     * Nullable — every row predating this, and every email/in-app row, has none.
+     * Appended at table end for D1 rebuild safety.
+     */
+    senderIdentity: text('sender_identity', { mode: 'json' })
+        .$type<SmsSenderIdentity>(),
 }, (t) => [
     index('idx_automation_logs_pending').on(t.tenantId, t.status, t.sendAt),
     index('idx_automation_logs_insp').on(t.inspectionId),

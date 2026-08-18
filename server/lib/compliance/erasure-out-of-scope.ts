@@ -66,7 +66,18 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // accounts; staff offboarding is a separate lifecycle.
     { table: 'users',               column: 'email',                     reason: 'staff account — not consumer-DSAR scope' },
     { table: 'users',               column: 'phone',                     reason: 'staff account — not consumer-DSAR scope' },
-    { table: 'users',               column: 'default_signature_base64',  reason: 'inspector (staff) signature asset' },
+    // review review. 'staff signature asset' said WHOSE it is and stopped
+    // there, which left the column indefinite by omission rather than by
+    // decision — and review is explicit that a staff signature may not inherit
+    // 'indefinite' from the client column having a six-year rule. Two different
+    // clocks, and they must say so:
+    //   - This one is an ACCOUNT ASSET. It is the inspector's saved default
+    //     drawing, reused across every future countersignature, so its purpose
+    //     lasts exactly as long as the account. It expires with the account
+    //     (tenant purge, or staff offboarding), not on an envelope's window.
+    //   - `agreement_requests.inspector_signature_base64` below is a
+    //     COUNTERSIGNATURE ON ONE ENVELOPE, so it expires with that envelope.
+    { table: 'users',               column: 'default_signature_base64',  reason: 'inspector (staff) signature asset — purpose: reusable account asset for countersigning; basis: contract performance with the tenant; window: life of the account (destroyed by the tenant purge / staff offboarding), NOT the agreement window — see docs/compliance/retention-policy.md' },
     { table: 'users',               column: 'is_signature_enabled',      reason: 'boolean flag, not personal data' },
     // An inspector's routing origin can be their home address, so it IS personal
     // data — it is simply not a CONSUMER data subject's. Same posture as
@@ -80,7 +91,7 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'tenant_invites',      column: 'email',                     reason: 'staff invite — not consumer-DSAR scope' },
     { table: 'audit_logs',          column: 'ip_address',                reason: 'staff-action security audit trail' },
     { table: 'report_signoff',      column: 'signature_ref',             reason: 'inspector (staff) signoff reference' },
-    { table: 'agreement_requests',  column: 'inspector_signature_base64', reason: 'inspector (staff) countersignature' },
+    { table: 'agreement_requests',  column: 'inspector_signature_base64', reason: 'inspector (staff) countersignature — purpose: evidence that the company executed THIS agreement; basis: Art. 17(3)(e) defence of legal claims, the same basis as the client signature it sits opposite; window: the tenant agreement retention window, destroyed by the same envelope-expiry pass (retention-sweep.ts) that nulls the client signature and its three R2 artefacts' },
     // Provenance ABOUT the signature evidence, not evidence itself: which rule
     // attributed a signature to a person, what that rule read, and when it ran.
     // Declared rather than left to the heuristic because they sit on the table
@@ -181,8 +192,8 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // ── reports ───────────────────────────────────────────────────────────────
     // A report is findings about a named person's property. `title` is the only
     // non-id column, and it is system-written — a literal or a snapshot of a
-    // tenant catalogue service name — so it has its own `anonymize` rule rather
-    // than an entry here. The rest of the row is ids, enums and a timestamp,
+    // tenant catalogue service name — so it has its own `erase_in_place` rule
+    // rather than an entry here. The rest of the row is ids, enums and a stamp,
     // declared out of scope below.
     //
     // (Corrected 2026-08-07 — this said `title` is "free text a human writes"
@@ -205,7 +216,7 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // said at a date, which is the one thing it exists to answer. Listed rather
     // than left silent because the PII heuristic does not flag any column here,
     // and silence is not the same as a decision.
-    // The payment ledger. The `note` column has its own anonymize rule above;
+    // The payment ledger. The `note` column has its own in-place erase rule;
     // everything that carries a figure or an actor reference is declared here
     // rather than left silent, because the heuristic flags none of it and
     // silence is not the same as a decision.
@@ -217,6 +228,49 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
       reason: 'payment-processor reference on the retained financial row, not personal data' },
     { table: 'tenant_legal_versions', column: 'body_snapshot',            reason: 'company-authored policy text, not personal data of any data subject' },
     { table: 'tenant_legal_versions', column: 'published_by_user_id',     reason: 'staff author reference — not consumer-DSAR scope' },
+
+    // ── account_acceptances ───────────────────────────────────────────────────
+    // What a STAFF member accepted, recorded in the same write as the `users`
+    // row it belongs to (review A2 / review decision). The subject is an
+    // owner, admin or invited member of the workspace — an employee lifecycle,
+    // the same posture as every `users.*` entry above — so a consumer erasure
+    // request never reaches this table at all.
+    //
+    // ⚠️ NOTHING WENT RED TO PRODUCE THIS BLOCK, and that is the reason it is
+    // written out column by column. `PII_HEURISTIC` in
+    // `scripts/check-erasure-manifest.mjs` matches NO column here: not
+    // `actor_identity_ref`, not `content_hash`, not `authority_basis`. The whole
+    // table could have shipped with `lint:erasure` green, which is precisely the
+    // failure `docs/compliance/erasure-heuristic-limits.md` describes — silence
+    // reading as coverage. Two of these keys are pinned in the coverage spec's
+    // HEURISTIC_BLIND_SPOTS so the declaration is enforced rather than merely
+    // present.
+    //
+    // The second reason this is not a deletion, beyond the staff/consumer line:
+    // the row is the evidence that the account was VALIDLY CREATED. Erasing it
+    // does not shrink a record of a person, it destroys the proof that the
+    // person consented — leaving an account standing with no acceptance behind
+    // it, which is the exact state the table exists to make unreachable.
+    { table: 'account_acceptances', column: 'user_id',
+      reason: 'the staff `users` row this acceptance was committed alongside — staff lifecycle, not consumer-DSAR scope; deleting it would leave an account standing with no acceptance, the state the table exists to prevent' },
+    { table: 'account_acceptances', column: 'actor_identity_ref',
+      reason: 'the portal `identities.id` the acceptance was captured against, when it was captured there — an opaque staff-account reference, not consumer data; NULL for an acceptance captured on this side' },
+    { table: 'account_acceptances', column: 'doc',
+      reason: 'which document was accepted (a document name, e.g. `terms`) — not personal data' },
+    { table: 'account_acceptances', column: 'version',
+      reason: 'the version string of the document the person was shown — not personal data' },
+    { table: 'account_acceptances', column: 'content_hash',
+      reason: 'SHA-256 of the body shown, which is what makes the acceptance checkable; a hash of company-authored policy text, not of anything about the person' },
+    { table: 'account_acceptances', column: 'authority_basis',
+      reason: 'whether this person can bind the company (owner / individual_acknowledgement / …) — a fact about signing authority, and the one column that stops an invited member reading as an owner' },
+    { table: 'account_acceptances', column: 'accepted_at',
+      reason: 'when the HUMAN accepted — the legal fact the row exists to record; a staff-lifecycle timestamp, not consumer-DSAR scope' },
+    { table: 'account_acceptances', column: 'created_at',
+      reason: 'when the row was written, deliberately distinct from accepted_at — a processing timestamp, not personal data' },
+    { table: 'account_acceptances', column: 'tenant_id',
+      reason: 'tenant scope key, not personal data' },
+    { table: 'account_acceptances', column: 'id',
+      reason: 'opaque primary key' },
     // Pay splits (#278). A split is a payroll record about a STAFF member, held
     // under accounting and employment obligations. A client's erasure request
     // never reaches it — the client is not the data subject here. Declared
@@ -305,7 +359,7 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // `report` -> `reports.inspector_narrative`. The classification is unaffected;
     // what changes is that the reason now names the tables that exist.
     { table: 'ai_content_reviews', column: 'artifact_id',
-      reason: 'opaque primary key of the inspection_results or reports row that received the text; that row carries its own rules (reports.inspector_narrative has an anonymize rule in erasure-manifest.ts), the same answer as reports.inspection_id. Holds no part of the reviewed prose' },
+      reason: 'opaque primary key of the inspection_results or reports row that received the text; that row carries its own rules (reports.inspector_narrative is erased in place by its own rule in the erasure manifest), the same answer as reports.inspection_id. Holds no part of the reviewed prose' },
     { table: 'ai_content_reviews', column: 'artifact_type',
       reason: 'two-value enum (inspection_result | report) naming WHICH table artifact_id points into — a pointer discriminator, not personal data' },
     { table: 'ai_content_reviews', column: 'ai_call_id',

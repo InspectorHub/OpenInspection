@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import type { ReportLinkTtl } from '../../../report-link-ttl';
 import type { CancellationPolicy } from '../../../billing/cancellation-policy';
@@ -450,4 +450,96 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
      * Appended at END per the D1 add-column-at-end rule.
      */
     invoiceSeq: integer('invoice_seq').notNull().default(1000),
+    /**
+     * Years a rendered report PDF is kept. `0` = indefinite, which is an
+     * explicit controller instruction the platform executes rather than an
+     * absence of a setting.
+     *
+     * The default of 7 is a disclosed PLATFORM default and is never presented
+     * as a statutory requirement — review struck the "longest statutory
+     * period" framing this number used to carry. The wording a customer sees,
+     * and the machine-readable taxonomy that keeps the distinction from resting
+     * on prose, live in `lib/compliance/report-pdf-retention.ts`.
+     *
+     * Appended at END per the D1 add-column-at-end rule.
+     */
+    reportPdfRetentionYears: integer('report_pdf_retention_years').notNull().default(7),
+    /**
+     * Whether this workspace counts report opens. Default FALSE.
+     *
+     * review B4: the legitimate-interests assessment for report-view counting
+     * assigned the interest to the inspection company — a company that could
+     * not enable the processing, could not disable it, and could not see that
+     * it was happening. A legitimate interest may not be a mask for processing
+     * its supposed beneficiary cannot decline, so the assessment did not hold
+     * until this column existed.
+     *
+     * Default false rather than true, and that is the whole point: the
+     * defensible starting position is the one where nobody is counted until
+     * somebody chose it. Nothing is lost by it — no production row exists.
+     *
+     * Read by `shouldCountReportView`, which checks it FIRST.
+     * Appended at END per the D1 add-column-at-end rule.
+     */
+    reportViewCountingEnabled: integer('is_report_view_counting_enabled', { mode: 'boolean' })
+        .notNull().default(false),
 });
+
+/**
+ * People who told us not to look them up.
+ *
+ * `GET /api/integration/tenants/by-email` answers, for one address, WHICH
+ * inspection companies hold a live report grant for it. That is a cross-tenant
+ * statement about a person's relationships, assembled by the platform rather
+ * than by any single company, and this table is how a person stops it. The
+ * lookup consults it FIRST and, on a hit, answers exactly as it answers for an
+ * address it has never seen.
+ *
+ * ── Why there is no `tenant_id`, stated rather than bolted on ───────────────
+ * Every other table here carries one because it holds a company's data. This
+ * one holds an OBJECTION TO A PLATFORM ACT: the scan has no tenant in scope,
+ * and the person raising it does not know — and must not have to enumerate —
+ * which companies hold grants for them. A tenant-scoped objection would be
+ * unexercisable by the only party entitled to exercise it, and would have to be
+ * re-filed every time a new company acquired a grant. The scope column would be
+ * a lie about what the row means, so it is absent by decision.
+ *
+ * `tenant_slug_history` above records the sibling case where `tenant_id` IS the
+ * scope; this is the case where there is no scope at all.
+ *
+ * ── Why the address is hashed ──────────────────────────────────────────────
+ * Kept as SHA-256 of the normalised address (trimmed, lower-cased) because the
+ * only question ever asked of this table is "did THIS address object", and a
+ * legible column would additionally be a browsable directory of the people who
+ * objected — a list we have no purpose for. The hash is UNSALTED and therefore
+ * confirmable by anyone holding a candidate address; that is the point (the
+ * lookup must be able to check it) and it is not claimed as a security control.
+ *
+ * ── Erasure posture ────────────────────────────────────────────────────────
+ * Same shape as `email_suppressions`: the row IS the mechanism that keeps
+ * honouring the objection, so deleting it on an erasure request would silently
+ * resume the processing the person objected to.
+ */
+export const discoveryObjections = sqliteTable('discovery_objections', {
+    id: text('id').primaryKey(),
+    // SHA-256 hex of the normalised address. The lookup key, and the only
+    // identifier in the row.
+    emailHash: text('email_hash').notNull(),
+    // How control of the address was proven when the objection was filed. One
+    // member today, declared as an enum because the answer is evidence: a
+    // future authenticated surface (a portal account, a verified-email
+    // challenge) is a DIFFERENT proof standard and must be distinguishable in
+    // the record from this one rather than merged into it.
+    provedBy: text('proved_by', { enum: ['inspection_access_token'] }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // Set instead of deleting the row, so the period during which the objection
+    // was in force stays answerable. A withdrawn row is inert: the lookup
+    // requires this to be NULL. Re-filing clears it rather than inserting a
+    // second row.
+    withdrawnAt: integer('withdrawn_at', { mode: 'timestamp_ms' }),
+}, (t) => [
+    // One live answer per address — the state, not a log of requests.
+    uniqueIndex('uq_discovery_objections_email_hash').on(t.emailHash),
+]);
+
+export type DiscoveryObjection = typeof discoveryObjections.$inferSelect;

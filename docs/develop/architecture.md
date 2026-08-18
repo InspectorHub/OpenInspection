@@ -219,6 +219,87 @@ Browser Run requires `compatibility_date >= "2026-03-24"` in `wrangler.jsonc` an
 - **D1 — Inspector pre-sign**: inspector can sign the agreement before sending to the client via `POST /api/admin/agreement-requests/:id/inspector-sign`. The render handler conditionally adds an inspector signature block when present.
 - **D2 — Auto-sign on publish**: per-inspection `auto_sign_on_publish` flag (plus a tenant-level default). When an inspector has a saved `users.default_signature_base64` and the flag is set, `InspectionService.publishInspection` auto-injects the inspector's signature into `inspection_results.data` at publish time. The report viewer and print output render the signature block automatically.
 
+### Invariant: a signature is a picture, never a biometric template
+
+A rendered signature **image** may be persisted for execution and evidence
+purposes. A reusable biometric or behavioural signature template may not be
+persisted or derived — not stroke geometry, not pen pressure, not timing.
+
+This is not a hypothetical boundary. The pad already samples pointer pressure
+and coalesced events into `StrokePoint { x, y, p }` while you draw. Its handle
+exposes only `toDataURL`, `isEmpty` and `clear`, so **today the invariant holds
+because one accessor does not exist** — which is one refactor from being untrue.
+
+Two properties make it enforceable rather than aspirational:
+
+- The exemption is a **directory**, `app/components/media-studio/`. That is
+  where the data is legitimately handled and where it stops. An allowlist of
+  file names would grow one entry at a time until it described nothing.
+- The gate scans for the stroke **symbols and field shapes**, not for column
+  definitions. The inspector signature is written into `inspection_results.data`
+  as `_inspector_signature`, which is a JSON blob — a stroke payload could ride
+  there with no schema change at all, and a column grep would never see it.
+
+Enforced by `npm run lint:signature-dynamics`
+(`scripts/check-signature-dynamics.mjs`), in the `lint` chain and
+`lint:gates-full`. Not to be confused with `lint:sigcompare`, which enforces the
+opposite duty on cryptographic verification: that it goes through
+`crypto.subtle.verify` or a constant-time compare.
+
+### The second half: a signature is never an authenticator
+
+The rule above is about the **input** — how the mark was made. The second half is
+about the **use**: a signature image is never used or stored for biometric
+**authentication**. A pad that captures nothing but a picture still crosses the
+line the moment that picture is matched against a stored one to decide who
+somebody is.
+
+It lives in the **same gate** rather than beside it. The statutory test turns on
+the words "used to authenticate", so the two halves are one boundary seen from
+two angles, and two separate gates could each pass while it broke between them.
+
+Three shapes are banned, and they are the three stages of every biometric
+pipeline:
+
+| stage | banned shape | example |
+|---|---|---|
+| feature extraction | turning the image into a key | `extractSignatureImageFeatures` |
+| enrolment | storing a template of the image | `signatureImageTemplate` |
+| comparison | matching two images to decide identity | `compareSignatureImages` |
+
+**Hashing the image is the approved alternative and is deliberately untouched.**
+`signatureImageHash` — a SHA-256 fingerprint recorded at signing — proves the
+stored record is unaltered and identifies nobody. Every pattern requires either
+the word `Image` or an unambiguous biometric noun, so a hash never reaches them,
+and neither do the cryptographic `verify*Signature` functions that
+`lint:sigcompare` requires.
+
+Two design notes that were bought with a mutation proof rather than reasoning:
+
+- The patterns carry **no leading word boundary**. A planted
+  `loadSignatureImageTemplate(...)` passed silently the first time, because a
+  word boundary cannot match between `load` and `Signature`; any verb prefix
+  walked straight through. The end of the identifier is what carries the
+  meaning, so only the trailing boundary is kept.
+- **No prefix is exempted**, `email` included. An email-signature template that
+  happened to hold an image would trip this and should be renamed, or argued
+  about in the open. That is a far cheaper failure than a biometric template
+  hidden behind a prefix somebody once added to an exemption list.
+
+### Related: the claims the product may not make about any of this
+
+`npm run lint:verification-copy` (`scripts/check-verification-copy.mjs`) is the
+copy-side companion, and after review it is a **Global Core control —
+Verification Claim Integrity**, not a regional overlay: it is load-bearing under
+FTC Act §5, state UDAP statutes, contract expectation and evidentiary integrity
+at once. It scans every message catalogue, in every locale, for copy that
+converts an integrity result into a conclusion about human authorship, identity,
+intent, consent or legal validity — "Signature Verified", "Valid Signature",
+"Signer Verified", "Signed by [person]" and the rest. A **disclaimer does not
+rescue an over-broad claim; narrow the claim.** What is permitted is the claim
+narrowed to the check that ran: *"The stored signature image matches the
+signature image fingerprint recorded at signing."*
+
 ## Service layer
 
 Each domain has a service class with:

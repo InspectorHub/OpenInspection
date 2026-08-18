@@ -1,0 +1,19 @@
+-- The destruction record learns whether the controller was told.
+--
+-- review requires a controller to be notified without undue delay after an
+-- incomplete destruction is KNOWN — not after it is remediated. This column is
+-- the evidence that happened.
+--
+-- A TIMESTAMP, not the address, and that is the whole design. This row outlives
+-- the tenant by three years, and the retention manifest sets that window on the
+-- stated ground that the row is non-personal: tenant id, slug and counts.
+-- Storing the owner's email here would make the record certifying an erasure
+-- hold an identifier of the party erased, and would falsify the reason the
+-- window rests on. Who they were is answerable from the slug and the account
+-- record on the portal side, where the customer relationship lives.
+--
+-- Null has two meanings and both are correct: the destruction finished, or the
+-- notice could not be sent. The second is an alert, on the same principle as a
+-- row stuck at 'started' — a timestamp written regardless of the send would
+-- assert a notification nobody received.
+ALTER TABLE `tenant_destruction_records` ADD `incomplete_notified_at` integer;

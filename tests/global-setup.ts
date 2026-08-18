@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import { createHash } from 'crypto';
 import { readFileSync, writeFileSync, rmSync, existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -131,6 +132,58 @@ export default function globalSetup() {
             }
         } catch {
             // KV may not be initialized — that's fine
+        }
+
+        // Publish agent terms.
+        //
+        // NOT part of the opt-in fixture set below, because it is not a fixture:
+        // `POST /api/agent-signup` assembles the acceptance server-side from the
+        // text in force and refuses outright when no version is published — an
+        // agent's agreement to a document that does not exist is not a thing to
+        // record. So a workspace without agent terms genuinely cannot create an
+        // agent account, and any spec that needs one needs this first, whether or
+        // not SEED_E2E is set. (The job labelled "seeded D1" runs plain
+        // `playwright test` and never sets it, which is why putting this in
+        // seedFixtures fixed nothing.)
+        //
+        // The row has no tenant: an agent account is global, so the counterparty
+        // is whoever operates the deployment. `deployment_legal_versions` is that
+        // table, and review review is the authority for the shape — one
+        // acceptance covers the whole deployment, so the ledger is
+        // `agent × terms version` rather than `agent × company × terms version`.
+        //
+        // Deliberately NOT the real document. `app/content/legal/agent-terms.md`
+        // is a review-ready draft that `agent-terms:publish` refuses to publish
+        // while it still carries placeholders, and that refusal is a shipped
+        // safeguard the tests must not route around. A short fixture body keeps
+        // the e2e testing the MECHANISM (a published version opens signup) instead
+        // of smuggling an unapproved contract into a database.
+        //
+        // The hash is DERIVED from the body: the service hashes it with SHA-256 and
+        // a verifier re-derives it later, so a hand-written digest would seed a row
+        // that fails its own check.
+        try {
+            const body = 'E2E agent terms fixture. Not a real agreement.';
+            const hash = createHash('sha256').update(body, 'utf8').digest('hex');
+            const agentTermsSql = tmp('.gs-agent-terms.sql');
+            writeFileSync(agentTermsSql,
+                `INSERT OR REPLACE INTO deployment_legal_versions `
+                + `(id, doc, version, body_snapshot, content_hash, published_at) `
+                + `VALUES ('e2e-agent-terms', 'agent_terms', '2026-08-01', `
+                + `'${body}', '${hash}', ${Date.now()});\n`);
+            try {
+                execSync(d1File(agentTermsSql, '--yes'), { cwd: appDir, stdio: 'pipe' });
+            } finally {
+                rmSync(agentTermsSql, { force: true });
+            }
+        } catch (err) {
+            // Loud, not swallowed. A silently missing row does not look like a
+            // missing row — it looks like agent signup returning 400, which is
+            // indistinguishable from the product being broken.
+            throw new Error(
+                '[globalSetup] failed to publish agent terms — agent signup will refuse every request\n  '
+                + (err instanceof Error ? err.message : String(err)),
+            );
         }
 
         // Opt-in: the subsystem-C/D/E E2E specs use the multi-user seed.

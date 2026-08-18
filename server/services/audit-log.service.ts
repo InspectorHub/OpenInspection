@@ -9,6 +9,19 @@ export type AuditEvent =
     | 'request.created'
     | 'request.sent'
     | 'request.viewed'
+    /**
+     * THIS signer was presented the agreement, at this content hash.
+     *
+     * Deliberately `signer.`-prefixed, and that prefix is the whole reason this
+     * event exists rather than reusing `request.viewed`. The dedup index below
+     * excludes `signer.%` — so an envelope-level event can appear at most once,
+     * while a per-signer event appears once per signer. A presentation is a
+     * PER-SIGNER fact: on a two-signer envelope, `request.viewed` would insert
+     * for the first viewer and then hit the constraint for the second, returning
+     * the first signer's row. The chain would then show a presentation to
+     * somebody else and the second signer's intent would rest on it.
+     */
+    | 'signer.presented'
     | 'agreement.signed'
     | 'agreement.inspector_signed'
     | 'signer.signed'

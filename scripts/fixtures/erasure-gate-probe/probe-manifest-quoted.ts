@@ -21,7 +21,7 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
         table: 'probe_contacts',
         column: 'client_name',
         category: 'contact',
-        action: 'anonymize',
+        action: 'erase_in_place',
         legalBasis: 'art_17_3_e',
     },
 ];
