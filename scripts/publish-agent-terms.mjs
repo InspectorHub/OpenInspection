@@ -59,7 +59,37 @@ const raw = readFileSync(SOURCE, 'utf8');
 // The draft banner and the decision points live in comments precisely so they are
 // reviewable without being publishable, and a placeholder mentioned inside a
 // comment must not block a body that no longer contains one.
-const body = raw.replace(/<!--[\s\S]*?-->/g, '').replace(/\n{3,}/g, '\n\n').trim();
+//
+// ── Why this loops, and then REFUSES ────────────────────────────────────────
+// A single pass is not a sanitizer, and CodeQL flagged this exact line for it.
+// Removing one comment SPLICES its neighbours together, and two fragments that
+// were harmless apart can form a new opener: `<!` + `<!-- -->` + `-- >` leaves
+// `<!-- >` after one pass.
+//
+// The loop is not what fixes that — it was measured, and it does not: `<!-- >`
+// has no closer, so a second pass removes nothing and the loop terminates with
+// the marker still there. The loop only closes the cases where a full removal
+// IS reachable. What actually closes the reported hole is the REFUSAL below.
+//
+// An unbalanced marker means the file's comment structure is not what this gate
+// assumes, and a gate that mis-parsed its input must not go on to report the
+// body clean. Its whole job is to notice a placeholder or a draft banner that
+// survived into published text, and both hide inside exactly this ambiguity.
+let body = raw;
+let previous;
+do {
+    previous = body;
+    body = body.replace(/<!--[\s\S]*?-->/g, '');
+} while (body !== previous);
+if (/<!--|-->/.test(body)) {
+    die(
+        'the source still contains an HTML comment marker after stripping comments — '
+        + 'an unbalanced `<!--` or `-->`. Refusing to check a body this gate could not '
+        + 'parse: a placeholder or a draft banner hidden by a broken comment is exactly '
+        + 'what it exists to catch. Fix the comment in app/content/legal/agent-terms.md.',
+    );
+}
+body = body.replace(/\n{3,}/g, '\n\n').trim();
 
 const placeholders = [...new Set([...body.matchAll(/\{\{([A-Z_]+)\}\}/g)].map((m) => m[1]))];
 const statusLine = body.split('\n').find((l) => /^\*\*Status:\*\*/.test(l)) ?? '(no status line)';
