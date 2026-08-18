@@ -14,7 +14,6 @@ import { QuotaBanner } from "~/components/QuotaBanner";
 import { useSessionContext, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { computeOnboardingSteps } from "~/lib/onboarding-progress";
 import { getScheduleSet } from "~/lib/schedule-onboarding.server";
-import { INSPECTION_STATUS, isReportPublished } from "~/lib/status";
 import { PageHeader, TabStrip, Pill, Card, Button, Icon } from "@core/shared-ui";
 import {
   DEFAULT_COLUMNS,
@@ -31,7 +30,7 @@ import {
   type FilterId,
   type TabKey,
 } from "~/lib/dashboard-schema";
-import { matchesFilter, matchesWorkflow, tabMatches } from "~/lib/dashboard-filters";
+import { matchesFilter, matchesWorkflow, tabMatches, statFocusIds, isStatFocus, type StatFocus } from "~/lib/dashboard-filters";
 import { dedupeBucketMembership, emptyDashboard } from "~/lib/dashboard-buckets";
 import { DashboardInspectionRow } from "~/components/dashboard/DashboardInspectionRow";
 import { FiltersDrawer } from "~/components/dashboard/FiltersDrawer";
@@ -39,7 +38,8 @@ import { ColumnsPopover } from "~/components/dashboard/ColumnsPopover";
 import { InspectionsToolbar } from "~/components/dashboard/InspectionsToolbar";
 import { InspectionsFilterStrip } from "~/components/dashboard/InspectionsFilterStrip";
 import { InspectionsEmptyState } from "~/components/dashboard/InspectionsEmptyState";
-import { InspectionsStatCards } from "~/components/dashboard/InspectionsStatCards";
+import { InspectionsStatCards, STAT_TARGETS } from "~/components/dashboard/InspectionsStatCards";
+import { InspectionsFocusBar } from "~/components/dashboard/InspectionsFocusBar";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
@@ -285,6 +285,10 @@ export default function InspectionsPage() {
   const activeTab: TabKey = TABS.some((t) => t.key === rawWorkflow)
     ? (rawWorkflow as TabKey)
     : "all";
+  // #90 — a stat card drives the list through `?focus=`, not `?workflow=`:
+  // none of the four is a workflow tab. Unknown values mean no focus.
+  const rawFocus = searchParams.get("focus");
+  const activeFocus: StatFocus | null = isStatFocus(rawFocus) ? rawFocus : null;
   const [activeFilter, setActiveFilter] = useState<FilterId>("all");
   const [activeTagFilter, setActiveTagFilter] = useState("");
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set());
@@ -354,12 +358,19 @@ export default function InspectionsPage() {
     return out;
   }, [buckets]);
 
+  /* ---- Stat-card sets ---- */
+  // #90 — the card's number and the list its link opens are ONE set read twice.
+  // Declared above the compound filter, which reads it during the same render.
+  const focusSets = useMemo(() => statFocusIds(buckets, allInspections), [buckets, allInspections]);
+
   /* ---- Compound filter ---- */
   const filteredInspections = useMemo(() => {
     const now = new Date();
     return allInspections.filter((insp) => {
       // Workflow tab
       if (!matchesWorkflow(insp, activeTab)) return false;
+      // Stat card — membership in the set the card counted, nothing derived.
+      if (activeFocus && !focusSets[activeFocus].has(insp.id)) return false;
       // Time filter
       if (activeFilter !== "all" && !matchesFilter(insp, activeFilter, now)) return false;
       // Filters modal: date range
@@ -386,11 +397,13 @@ export default function InspectionsPage() {
       const db = b.date ? new Date(b.date).getTime() : 0;
       return da - db;
     });
-  }, [allInspections, activeTab, activeFilter, activeTagFilter, filterDateFrom, filterDateTo, filterAgentId, searchQuery]);
+  }, [allInspections, activeTab, activeFocus, focusSets, activeFilter, activeTagFilter, filterDateFrom, filterDateTo, filterAgentId, searchQuery]);
 
   /* ---- Bucket-mode filtered (for grouped view) ---- */
   const filteredBuckets = useMemo(() => {
-    const useFlat = activeFilter !== "all" || searchQuery || activeTagFilter || filterDateFrom || filterDateTo || filterAgentId;
+    // A focused list is FLAT: "Upcoming" spans three buckets, and regrouping the
+    // answer into the buckets the card just merged answers a different question.
+    const useFlat = activeFocus !== null || activeFilter !== "all" || searchQuery || activeTagFilter || filterDateFrom || filterDateTo || filterAgentId;
     if (useFlat) return null; // signals flat mode
     const result: Record<string, Inspection[]> = {};
     for (const [key, items] of Object.entries(buckets)) {
@@ -400,7 +413,7 @@ export default function InspectionsPage() {
     // The payload's buckets overlap on purpose — the stat cards read them as
     // separate lenses — but the list showed one inspection as two rows.
     return dedupeBucketMembership(result);
-  }, [buckets, activeTab, activeFilter, searchQuery, activeTagFilter, filterDateFrom, filterDateTo, filterAgentId]);
+  }, [buckets, activeTab, activeFocus, activeFilter, searchQuery, activeTagFilter, filterDateFrom, filterDateTo, filterAgentId]);
 
   /* ---- Paginated list for flat mode ---- */
   const paginatedList = useMemo(() => {
@@ -474,11 +487,11 @@ export default function InspectionsPage() {
 
   /* ---- Stats ---- */
   const counts = useMemo(() => ({
-    upcoming: new Set([...buckets.today, ...buckets.thisWeek, ...buckets.later].map((i) => i.id)).size,
-    inProgress: allInspections.filter((i) => i.status === INSPECTION_STATUS.COMPLETED && !isReportPublished(i.reportStatus)).length,
-    needsAttention: buckets.needsAttention.length,
-    recent: buckets.recentReports.length,
-  }), [buckets, allInspections]);
+    upcoming: focusSets.upcoming.size,
+    inProgress: focusSets.in_progress.size,
+    needsAttention: focusSets.needs_attention.size,
+    recent: focusSets.recent.size,
+  }), [focusSets]);
 
   /* ---- Filter counts for the time-filter strip ---- */
   const filterCounts = useMemo(() => {
@@ -584,6 +597,7 @@ export default function InspectionsPage() {
   // "nothing here" from "nothing matching", and cleared as a set below.
   const listFilterState = {
     tab: activeTab,
+    focus: activeFocus ?? "",
     timeFilter: activeFilter,
     tagId: activeTagFilter,
     dateFrom: filterDateFrom,
@@ -592,18 +606,20 @@ export default function InspectionsPage() {
     search: searchQuery,
   };
 
-  // The workflow tab lives in the URL, not in state — one writer for it, used by
-  // the tab strip and by "Clear filters".
-  //   replace:true so tab flips don't pollute browser history;
+  // The workflow tab and the stat-card focus live in the URL, not in state — ONE
+  // writer for both, because two setSearchParams calls in a tick each start from
+  // the same `prev` and the second puts the first one back.
+  //   replace:true so flips don't pollute browser history;
   //   preventScrollReset keeps the list scroll position on switch.
-  function setWorkflowTab(id: string) {
+  function setUrlFilters(patch: Record<string, string | null>) {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      if (id === "all") next.delete("workflow");
-      else next.set("workflow", id);
+      for (const [k, v] of Object.entries(patch)) { if (v) next.set(k, v); else next.delete(k); }
       return next;
     }, { replace: true, preventScrollReset: true });
   }
+
+  const setWorkflowTab = (id: string) => setUrlFilters({ workflow: id === "all" ? null : id });
 
   function clearAllFilters() {
     setActiveFilter("all");
@@ -612,7 +628,7 @@ export default function InspectionsPage() {
     setFilterDateFrom("");
     setFilterDateTo("");
     setFilterAgentId("");
-    setWorkflowTab("all");
+    setUrlFilters({ workflow: null, focus: null });
   }
 
   // #111: tenant slug for the public report deep-link (Published tab). Available
@@ -708,7 +724,7 @@ export default function InspectionsPage() {
       />
 
       {/* Stat cards — quick-jump to buckets */}
-      <InspectionsStatCards counts={counts} />
+      <InspectionsStatCards counts={counts} targets={STAT_TARGETS} />
 
       {/* IA-12 — Onboarding checklist (hidden when dismissed or allDone) */}
       <OnboardingChecklist
@@ -723,6 +739,8 @@ export default function InspectionsPage() {
         }}
         onOpenWizard={() => navigate("/inspections/new")}
       />
+
+      <InspectionsFocusBar focus={activeFocus} />
 
       {/* Workflow tabs */}
       <TabStrip
