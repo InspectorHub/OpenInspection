@@ -15,7 +15,7 @@ import { inArray } from 'drizzle-orm';
 import { reportPdfs, tenantConfigs } from '../db/schema';
 import { changeCount, subtractMonthsMs } from './db-row-utils';
 import { resolveReportPdfRetentionYears } from './report-pdf-retention';
-import type { Executor } from './retention-executors';
+import type { Executor } from './retention-executor-context';
 
 /**
  * The one executor that touches R2.
@@ -59,6 +59,11 @@ export const reportPdfsExecutor: Executor = async (rawDb, _cutoff, ctx) => {
         // every silent tenant to the opposite of the stated default.
         const years = byTenant.get(r.tenantId) ?? resolveReportPdfRetentionYears(null);
         if (years === 0) continue;  // indefinite — a controller instruction
+        // Legal hold outranks the window (counsel round 33). This rule filters in
+        // JS rather than SQL because its window is per-tenant, so the exclusion
+        // goes here rather than through `notHeld` — same invariant, and the only
+        // place in this file where a tenant is decided about.
+        if (ctx.heldTenantIds.has(r.tenantId)) continue;
         const cutoff = subtractMonthsMs(ctx.now, years * 12);
         const rendered = r.renderedAt instanceof Date ? r.renderedAt.getTime() : Number(r.renderedAt);
         if (rendered < cutoff) doomed.push({ id: r.id, r2Key: r.r2Key });

@@ -9,11 +9,11 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 97 |
-| Columns | 1139 |
-| Indexes (excluding primary keys) | 164 |
+| Tables | 98 |
+| Columns | 1149 |
+| Indexes (excluding primary keys) | 165 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 533 (47%) |
+| Columns carrying a source comment | 540 (47%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
 
-That is 10 of 97. If a table you just added appears here,
+That is 10 of 98. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 180 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 183 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -1456,6 +1456,30 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ---
 
+## `legal_holds`
+
+<sub>server/lib/db/schema/tenant/legal-holds.ts · 9 columns · primary key `id`</sub>
+
+> A preservation obligation that outranks every scheduled deletion. Counsel round 33 made this a global invariant rather than a per-table note: a record within the scope of a legal hold, dispute, regulatory investigation or DSAR/complaint preservation must not be removed by an ordinary retention sweep until the hold is released.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN IX |  |  | Multi-tenant isolation, per the Schema Rules. The unit of a hold. |
+| `matter` | text | NN |  |  | The matter this hold exists for — a case number, regulator reference, complaint ID or DSAR ID. |
+| `reason` | text | NN |  |  | Why preservation is required, in a sentence a later reader can evaluate. Separate from `matter`: the reference identifies the proceeding, this says what about it reaches this tenant's data. |
+| `placed_by` | text | NN |  |  | Who placed it. A user id where a human did, or a system actor name where an automated preservation trigger did. |
+| `placed_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `released_at` | integer | IX |  |  | NULL while the hold is in force. The sweep's entire definition of "active" is this column being NULL — deliberately one condition, because a hold whose activeness is computed from several fields is a hold that can be accidentally inactive. |
+| `released_by` | text |  |  |  |  |
+| `release_reason` | text |  |  |  | Why it was safe to release. Null while in force; expected once released. |
+
+**Indexes**
+
+- `idx_legal_holds_tenant_active` (tenant_id, released_at)
+
+---
+
 ## `marketplace_libraries`
 
 <sub>server/lib/db/schema/marketplace.ts · 14 columns · primary key `id`</sub>
@@ -1763,7 +1787,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `qbo_sync_errors`
 
-<sub>server/lib/db/schema/qbo.ts · 10 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/qbo.ts · 11 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -1777,6 +1801,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `is_resolved` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
+| `resolved_at` | integer |  |  |  | WHEN the operational obligation ended — the retention anchor, and the reason this column exists at all. **[more]** |
 
 ---
 

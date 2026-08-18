@@ -103,7 +103,7 @@ const GATES: GateUnderTest[] = [
         okPrefix: 'retention-manifest lint: OK',
         missing: 'could not locate RETENTION_MANIFEST array',
         zero: 'parsed ZERO rules',
-        probeOk: 'OK (1 rules, 1 out-of-scope, 0 open',
+        probeOk: 'OK (2 rules, 1 out-of-scope, 0 open',
         probeArgs: (variant) => [
             '--manifest', `${RETENTION_PROBE}/${variant}.ts`,
             '--schema-dir', RETENTION_PROBE,
@@ -183,6 +183,42 @@ describe.each(GATES)('$name gate — finding the catalogue it checks', (g) => {
             expect(output).toContain(g.zero);
             expect(output).not.toContain(g.okPrefix);
         });
+    });
+});
+
+/**
+ * Retention-only, because the erasure gate has no legal-hold field to disagree
+ * with. Kept beside the shared battery rather than in a file of its own: it runs
+ * the same gate over the same probe directory, and splitting it would separate
+ * the check from the fixtures it depends on.
+ */
+describe('retention-manifest gate — legal-hold classification vs the schema', () => {
+    const onProbe = (variant: string) => run(RETENTION_GATE, [
+        '--manifest', `${RETENTION_PROBE}/${variant}.ts`,
+        '--schema-dir', RETENTION_PROBE,
+    ]);
+
+    it('accepts a classification that matches the schema', () => {
+        // The positive control. Without it, the failure below is satisfied by a
+        // check that rejects every classification.
+        const { status, output } = onProbe('probe-manifest');
+        expect(status).toBe(0);
+        expect(output).toContain('1 enforced by tenant filter');
+    });
+
+    it('FAILS a rule that exempts a table which HAS a tenant column', () => {
+        // The quiet failure: everything parses, the note is present, and a table
+        // that could have honoured a preservation order is silently exempt.
+        const { status, output } = onProbe('probe-manifest-hold-mismatch');
+        expect(status).toBe(1);
+        expect(output).toContain("DOES carry text('tenant_id')");
+    });
+
+    it('prints the classification counts beside the verdict', () => {
+        // A gate that only prints a verdict cannot be checked on the day it is
+        // green, which is the day it matters.
+        const { output } = run(RETENTION_GATE, []);
+        expect(output).toMatch(/legal hold: [1-9]\d* enforced by tenant filter/);
     });
 });
 

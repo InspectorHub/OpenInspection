@@ -13,24 +13,25 @@
  * directions: a rule with no executor is a retention promise nothing keeps, and
  * an executor with no rule is a delete statement running on a period nobody
  * wrote down.
+ *
+ * ── Every table here has a tenant, and every executor uses it ───────────────
+ * This file holds the `tenant_scoped` half of the catalogue. Each statement
+ * ends with `notHeld(<table>.tenantId, ctx)`, which is how counsel round 33's
+ * invariant — a legal hold outranks every scheduled deletion — is actually
+ * enforced. The tenant-less rules live in `retention-executors-platform.ts`,
+ * where a hold cannot be expressed as a filter and is handled by the driver
+ * instead.
  */
-import { and, eq, exists, isNotNull, lt, ne, notExists, or, sql } from 'drizzle-orm';
+import { and, eq, exists, isNotNull, lt, notExists, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { SQL } from 'drizzle-orm';
 import {
     auditLogs,
     idempotencyKeys,
-    parkedCmdEvents,
-    processedCmdEvents,
-    processedWebhookEvents,
-    syncOutbox,
     tenantDestructionRecords,
     aiCallProvenance,
     aiContentReviews,
     reportVersions,
-    smsConsentLog,
-    smsDisclosureVersions,
     accountAcceptances,
     notifications,
     qboSyncErrors,
@@ -38,17 +39,20 @@ import {
     tenantMarketplaceImportHistory,
     tenantSlugHistory,
 } from '../db/schema';
-import { SYNC_OUTBOX_STATUS } from '../status/sync-outbox-status';
 import { DESTRUCTION_STATUS } from '../status/destruction-status';
 import { ANONYMIZE_AUDIT_PII } from './anonymize-pii';
-import { changeCount, subtractMonthsMs } from './db-row-utils';
-import type { RetentionWindow } from './retention-manifest';
+import { changeCount } from './db-row-utils';
+import { notHeld } from './retention-executor-context';
+import type { Executor } from './retention-executor-context';
+import { PLATFORM_EXECUTORS } from './retention-executors-platform';
 import { reportPdfsExecutor } from './retention-report-pdfs';
 
-// Accept either the D1 drizzle type (prod) or the better-sqlite3 test db.
-export type AnyDb = DrizzleD1Database<Record<string, unknown>> | { [k: string]: unknown };
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+// Re-exported so `retention-logs.ts` and the specs keep one import site for the
+// executor surface; `notHeld` and `ExecutorContext` are deliberately NOT
+// re-exported, because the only code that should reach for them is an executor,
+// and an executor lives in this file or its platform sibling.
+export { cutoffOf } from './retention-executor-context';
+export type { AnyDb, Executor, RetentionSweepStores } from './retention-executor-context';
 
 /**
  * The audit-row in-place-erasure SET for the RETENTION clock.
@@ -72,15 +76,6 @@ const ANONYMIZE_AUDIT_ACTOR = {
     ipAddress: null,
 } as const;
 
-/** Cutoff instant for a window: rows strictly OLDER than this are due. */
-export function cutoffOf(now: number, window: RetentionWindow): Date {
-    return new Date(
-        window.unit === 'months'
-            ? subtractMonthsMs(now, window.value)
-            : now - window.value * DAY_MS,
-    );
-}
-
 /**
  * One executor per manifest table.
  *
@@ -89,32 +84,10 @@ export function cutoffOf(now: number, window: RetentionWindow): Date {
  * nothing — the "rule that exists but never runs" failure. `retention-logs.spec.ts`
  * asserts the two sets match in both directions.
  */
-/**
- * What a sweep can reach besides D1.
- *
- * Optional, and its absence is a REFUSAL rather than a degraded mode for any
- * rule that needs it. Every other executor is a `db.delete(...)`; `report_pdfs`
- * points at an object, and deleting the row without the object is worse than
- * doing nothing — the row is the only thing that knows the key.
- */
-export interface RetentionSweepStores {
-    photos?: R2Bucket | undefined;
-}
-
-/**
- * `now` travels beside the cutoff because one rule computes its own cutoffs:
- * `report_pdfs` has a per-tenant window, so a single precomputed date cannot
- * express what it needs.
- */
-interface ExecutorContext {
-    now: number;
-    stores: RetentionSweepStores;
-}
-
-export type Executor = (db: AnyDb, cutoff: Date, ctx: ExecutorContext) => Promise<number>;
-
 export const EXECUTORS: Record<string, Executor> = {
-    audit_logs: async (rawDb, cutoff) => {
+    ...PLATFORM_EXECUTORS,
+
+    audit_logs: async (rawDb, cutoff, ctx) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = rawDb as any;
         // The `isNotNull` disjunction is the idempotency guard: once a row's
@@ -127,56 +100,10 @@ export const EXECUTORS: Record<string, Executor> = {
         );
         const res = await db.update(auditLogs)
             .set(ANONYMIZE_AUDIT_ACTOR)
-            .where(and(lt(auditLogs.createdAt, cutoff), stillIdentifying))
-            .run();
-        return changeCount(res);
-    },
-
-    processed_webhook_events: async (rawDb, cutoff) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const db = rawDb as any;
-        const res = await db.delete(processedWebhookEvents)
-            .where(lt(processedWebhookEvents.receivedAt, cutoff))
-            .run();
-        return changeCount(res);
-    },
-
-    // `processed_at`, NOT `received_at`. The two dedup ledgers were written
-    // months apart and never converged on a column name; a rule pointed at the
-    // wrong one matches nothing and reads exactly like a rule that works.
-    processed_cmd_events: async (rawDb, cutoff) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const db = rawDb as any;
-        const res = await db.delete(processedCmdEvents)
-            .where(lt(processedCmdEvents.processedAt, cutoff))
-            .run();
-        return changeCount(res);
-    },
-
-    parked_cmd_events: async (rawDb, cutoff) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const db = rawDb as any;
-        const res = await db.delete(parkedCmdEvents)
-            .where(lt(parkedCmdEvents.receivedAt, cutoff))
-            .run();
-        return changeCount(res);
-    },
-
-    // TERMINAL rows only. `ne(status, 'pending')` rather than an IN-list of the
-    // terminal values on purpose: it also catches the LEGACY `done` rows that
-    // `SYNC_OUTBOX_STATUSES` deliberately omits (nothing may write it, but rows
-    // holding it exist), which an allow-list would silently leave behind
-    // forever. Excluding `pending` is the rule, not an optimization — a pending
-    // row is unpublished work the cron sweeper is still retrying, so deleting
-    // one destroys an account change portal never saw instead of retiring a
-    // record of one.
-    sync_outbox: async (rawDb, cutoff) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const db = rawDb as any;
-        const res = await db.delete(syncOutbox)
             .where(and(
-                lt(syncOutbox.createdAt, cutoff),
-                ne(syncOutbox.status, SYNC_OUTBOX_STATUS.PENDING),
+                lt(auditLogs.createdAt, cutoff),
+                stillIdentifying,
+                notHeld(auditLogs.tenantId, ctx),
             ))
             .run();
         return changeCount(res);
@@ -189,18 +116,21 @@ export const EXECUTORS: Record<string, Executor> = {
     // rows and look exactly as correct. No state predicate: an aged `in_flight`
     // row is a claim whose holder died without unwinding, and removing it is
     // strictly better than leaving it to block the key.
-    idempotency_keys: async (rawDb, cutoff) => {
+    idempotency_keys: async (rawDb, cutoff, ctx) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = rawDb as any;
         const res = await db.delete(idempotencyKeys)
-            .where(lt(idempotencyKeys.createdAt, cutoff))
+            .where(and(
+                lt(idempotencyKeys.createdAt, cutoff),
+                notHeld(idempotencyKeys.tenantId, ctx),
+            ))
             .run();
         return changeCount(res);
     },
 
     // Only COMPLETED records expire, and that is the rule rather than an
-    // optimization — the same shape as excluding `pending` from `sync_outbox`
-    // above. A row still reading `started` is a purge that destroyed a workspace
+    // optimization — the same shape as excluding `pending` from `sync_outbox`.
+    // A row still reading `started` is a purge that destroyed a workspace
     // and never said it finished. It is an open anomaly, and the only artifact
     // that says so; sweeping it on age would close the question by destroying
     // the evidence of it, which is the exact failure the two-phase write exists
@@ -209,13 +139,14 @@ export const EXECUTORS: Record<string, Executor> = {
     // `destroyed_at` is the initiation timestamp, not `completed_at`: it is the
     // only one every row has, and a completed record's two timestamps are
     // seconds apart, so the choice moves nothing for the rows that DO expire.
-    tenant_destruction_records: async (rawDb, cutoff) => {
+    tenant_destruction_records: async (rawDb, cutoff, ctx) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = rawDb as any;
         const res = await db.delete(tenantDestructionRecords)
             .where(and(
                 lt(tenantDestructionRecords.destroyedAt, cutoff),
                 eq(tenantDestructionRecords.status, DESTRUCTION_STATUS.COMPLETED),
+                notHeld(tenantDestructionRecords.tenantId, ctx),
             ))
             .run();
         return changeCount(res);
@@ -228,7 +159,7 @@ export const EXECUTORS: Record<string, Executor> = {
     // `readAiAssurance` counts exactly that shape as `unresolvedReviewCount` —
     // a health signal for rows written before the ownership check existed. A
     // sweep that manufactured them would turn the alarm into noise.
-    ai_call_provenance: async (rawDb, cutoff) => {
+    ai_call_provenance: async (rawDb, cutoff, ctx) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = rawDb as any;
         const res = await db.delete(aiCallProvenance)
@@ -238,16 +169,20 @@ export const EXECUTORS: Record<string, Executor> = {
                     db.select({ one: sql`1` }).from(aiContentReviews)
                         .where(eq(aiContentReviews.aiCallId, aiCallProvenance.id)),
                 ),
+                notHeld(aiCallProvenance.tenantId, ctx),
             ))
             .run();
         return changeCount(res);
     },
 
-    ai_content_reviews: async (rawDb, cutoff) => {
+    ai_content_reviews: async (rawDb, cutoff, ctx) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = rawDb as any;
         const res = await db.delete(aiContentReviews)
-            .where(lt(aiContentReviews.reviewedAt, cutoff))
+            .where(and(
+                lt(aiContentReviews.reviewedAt, cutoff),
+                notHeld(aiContentReviews.tenantId, ctx),
+            ))
             .run();
         return changeCount(res);
     },
@@ -256,7 +191,7 @@ export const EXECUTORS: Record<string, Executor> = {
     // what the report currently IS — it carries the signature and content hash
     // the verifier reads — so expiring it would not retire history, it would
     // delete the deliverable.
-    report_versions: async (rawDb, cutoff) => {
+    report_versions: async (rawDb, cutoff, ctx) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = rawDb as any;
         const newer = db.select({ one: sql`1` }).from(alias(reportVersions, 'rv_newer'))
@@ -265,32 +200,10 @@ export const EXECUTORS: Record<string, Executor> = {
                 sql`rv_newer.version_number > ${reportVersions.versionNumber}`,
             ));
         const res = await db.delete(reportVersions)
-            .where(and(lt(reportVersions.createdAt, cutoff), exists(newer)))
-            .run();
-        return changeCount(res);
-    },
-
-    // Two guards, and both are load-bearing. `sms_consent_log` is kept
-    // INDEFINITELY by an explicit exemption — the record is the tenant's
-    // defence against a consent challenge — and every consent row stamps the
-    // disclosure version it was shown. Deleting a cited version would leave
-    // permanent evidence pointing at text that no longer exists, which guts the
-    // exemption from the other side. The current (highest) version is also kept:
-    // it is what the next opt-in will show.
-    sms_disclosure_versions: async (rawDb, cutoff) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const db = rawDb as any;
-        const res = await db.delete(smsDisclosureVersions)
             .where(and(
-                lt(smsDisclosureVersions.publishedAt, cutoff),
-                notExists(
-                    db.select({ one: sql`1` }).from(smsConsentLog)
-                        .where(eq(smsConsentLog.disclosureVersion, smsDisclosureVersions.version)),
-                ),
-                exists(
-                    db.select({ one: sql`1` }).from(alias(smsDisclosureVersions, 'sdv_newer'))
-                        .where(sql`sdv_newer.version > ${smsDisclosureVersions.version}`),
-                ),
+                lt(reportVersions.createdAt, cutoff),
+                exists(newer),
+                notHeld(reportVersions.tenantId, ctx),
             ))
             .run();
         return changeCount(res);
@@ -298,7 +211,7 @@ export const EXECUTORS: Record<string, Executor> = {
 
     // SUPERSEDED versions only, per (tenant, doc). The newest is the live policy
     // the hosted legal pages render; expiring it would blank them.
-    tenant_legal_versions: async (rawDb, cutoff) => {
+    tenant_legal_versions: async (rawDb, cutoff, ctx) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = rawDb as any;
         const newer = db.select({ one: sql`1` }).from(alias(tenantLegalVersions, 'tlv_newer'))
@@ -330,16 +243,20 @@ export const EXECUTORS: Record<string, Executor> = {
                 lt(tenantLegalVersions.publishedAt, cutoff),
                 exists(newer),
                 notExists(accepted),
+                notHeld(tenantLegalVersions.tenantId, ctx),
             ))
             .run();
         return changeCount(res);
     },
 
-    notifications: async (rawDb, cutoff) => {
+    notifications: async (rawDb, cutoff, ctx) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = rawDb as any;
         const res = await db.delete(notifications)
-            .where(lt(notifications.createdAt, cutoff))
+            .where(and(
+                lt(notifications.createdAt, cutoff),
+                notHeld(notifications.tenantId, ctx),
+            ))
             .run();
         return changeCount(res);
     },
@@ -349,7 +266,7 @@ export const EXECUTORS: Record<string, Executor> = {
     // keeps `pending` out of the sync_outbox sweep — and a resolved row from before
     // `resolved_at` existed has a NULL anchor, which fails closed rather than being
     // read as "resolved long ago".
-    qbo_sync_errors: async (rawDb, cutoff) => {
+    qbo_sync_errors: async (rawDb, cutoff, ctx) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = rawDb as any;
         const res = await db.delete(qboSyncErrors)
@@ -357,6 +274,7 @@ export const EXECUTORS: Record<string, Executor> = {
                 eq(qboSyncErrors.resolved, true),
                 isNotNull(qboSyncErrors.resolvedAt),
                 lt(qboSyncErrors.resolvedAt, cutoff),
+                notHeld(qboSyncErrors.tenantId, ctx),
             ))
             .run();
         return changeCount(res);
@@ -364,11 +282,14 @@ export const EXECUTORS: Record<string, Executor> = {
 
     report_pdfs: reportPdfsExecutor,
 
-    tenant_marketplace_import_history: async (rawDb, cutoff) => {
+    tenant_marketplace_import_history: async (rawDb, cutoff, ctx) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = rawDb as any;
         const res = await db.delete(tenantMarketplaceImportHistory)
-            .where(lt(tenantMarketplaceImportHistory.createdAt, cutoff))
+            .where(and(
+                lt(tenantMarketplaceImportHistory.createdAt, cutoff),
+                notHeld(tenantMarketplaceImportHistory.tenantId, ctx),
+            ))
             .run();
         return changeCount(res);
     },
@@ -378,13 +299,14 @@ export const EXECUTORS: Record<string, Executor> = {
     // could claim it and inherit every stale link pointing at the old owner.
     // Three years is well past the one-year block, so this predicate should
     // never bind; it is here because "should never" is not "cannot".
-    tenant_slug_history: async (rawDb, cutoff) => {
+    tenant_slug_history: async (rawDb, cutoff, ctx) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = rawDb as any;
         const res = await db.delete(tenantSlugHistory)
             .where(and(
                 lt(tenantSlugHistory.changedAt, cutoff),
                 lt(tenantSlugHistory.retiredUntil, cutoff),
+                notHeld(tenantSlugHistory.tenantId, ctx),
             ))
             .run();
         return changeCount(res);
