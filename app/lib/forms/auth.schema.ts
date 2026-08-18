@@ -125,6 +125,22 @@ export function makeAgentSignupSchema() {
     password: requiredText(m.auth_validation_password_min12())
       .min(12, m.auth_validation_password_min12())
       .max(120, m.auth_validation_password_too_long()),
+    // An agent is a third party with a direct relationship to the operator and no
+    // company behind it, so neither a tenant's Privacy text nor a company's
+    // contract governs them (counsel round 20 A3). The tick is REQUIRED and the
+    // account is not created without it: recording a consent somebody did not
+    // give is worse than lacking one.
+    //
+    // Only the tick lives here. The version and content hash of the text shown
+    // are recorded SERVER-SIDE from the document in force — a client-supplied
+    // version would be the client asserting what it read, which is exactly the
+    // evidence the record exists to replace.
+    // An unchecked box submits NOTHING, so the failure has to be expressible for
+    // an absent field as well as a wrong one — hence `requiredText` (the file's
+    // own helper, which carries the message through both) rather than a literal
+    // with a custom error map.
+    agentTerms: requiredText(m.auth_validation_agent_terms_required())
+      .refine((v) => v === "on", m.auth_validation_agent_terms_required()),
   });
 }
 

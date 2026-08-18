@@ -9,22 +9,22 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 94 |
-| Columns | 1109 |
-| Indexes (excluding primary keys) | 159 |
+| Tables | 98 |
+| Columns | 1149 |
+| Indexes (excluding primary keys) | 165 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 509 (46%) |
+| Columns carrying a source comment | 540 (47%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
 a tenant, which is the only reason to be missing it:
 
-`marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
+`deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
 
-That is 8 of 94. If a table you just added appears here,
+That is 10 of 98. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 174 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 183 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -41,6 +41,32 @@ descriptions are read off this repository's naming conventions and were **not**
 written by anyone — treat them as a hint, not documentation. A column with
 neither is left blank. `[more]` marks a column whose source comment runs past
 400 characters: read it before changing that column.
+
+---
+
+## `account_acceptances`
+
+<sub>server/lib/db/schema/tenant/account-acceptances.ts · 10 columns · primary key `id`</sub>
+
+> What the person accepted, recorded where the account was born. Counsel A2's invariant is that an account and its acceptance are ONE write.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN IX |  |  | Multi-tenant isolation, per the Schema Rules. |
+| `user_id` | text | NN UQ |  |  | The `users` row this acceptance was committed alongside. |
+| `actor_identity_ref` | text |  |  | `the` | The portal `identities.id` the acceptance was captured against, when it was captured over there. |
+| `doc` | text | NN UQ |  |  | Which document. Free text rather than an enum: the set of documents a deployment publishes is the deployment's business, and refusing an unknown one at the seam is the boundary's job, not the column's. |
+| `version` | text | NN UQ |  |  | `YYYY-MM-DD`, the version the person was shown. |
+| `content_hash` | text | NN |  |  | SHA-256 hex of the body shown. What was SHOWN, not where it lived. |
+| `authority_basis` | text | NN |  | `AUTHORITY_BASES` | On what basis this binds anyone — see `lib/auth/authority-basis.ts`. Deliberately separate from any role column: role is an operational fact and says nothing about signing authority. |
+| `accepted_at` | integer | NN IX |  |  | When the HUMAN accepted, epoch ms — not when this row was written. On the portal-originated path those differ by however long the onboarding workflow took, and collapsing them would forge the legal fact to match the plumbing. |
+| `created_at` | integer | NN |  |  | When this row was written. Distinct from the above, on purpose. |
+
+**Indexes**
+
+- **UNIQUE** `uq_account_acceptances_user_doc_version` (user_id, doc, version)
+- `idx_account_acceptances_tenant` (tenant_id, accepted_at)
 
 ---
 
@@ -217,7 +243,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `automation_logs`
 
-<sub>server/lib/db/schema/inspection/automation.ts · 16 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/inspection/automation.ts · 17 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -237,6 +263,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `notice_id` | text |  |  |  | Communication C1 (design §3.13) — the NOTICE HEADER this channel-attempt belongs to (notifications.id). **[more]** |
 | `attempts` | integer | NN | `0` |  | How many times flush() has PICKED THIS ROW UP. Stamped when the batch is claimed — before anything is dispatched — and that ordering is the entire point. **[more]** |
 | `last_attempt_at` | integer |  |  |  | When the last claim happened — `attempts` says how many, this says how stale. A row stuck at attempts=6 tells you nothing without it. |
+| `sender_identity` | text |  |  |  | WHO SENT IT, and ON WHOSE BEHALF — recorded, not inferred. Counsel round 26-5: the owner of the number is not automatically the legal sender. **[more]** |
 
 **Indexes**
 
@@ -670,6 +697,28 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ---
 
+## `deployment_legal_versions`
+
+<sub>server/lib/db/schema/compliance.ts · 6 columns · primary key `id`</sub>
+
+> Legal documents belonging to the DEPLOYMENT rather than to a tenant. `agent_terms` is the first, and it is here rather than in `tenant_legal_versions` because it has no tenant.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  | `agent_terms` | *Primary key — an application-generated string id.* |
+| `doc` | text | NN UQ IX |  | `agent_terms` |  |
+| `version` | text | NN |  |  | `YYYY-MM-DD`, the date a reader is shown. Calendar-semantic, so TEXT. |
+| `body_snapshot` | text | NN |  |  | The body exactly as published, NOT NULL. `tenant_legal_versions.body_snapshot` is nullable because a tenant may revert to a built-in template, and "they went back to the default" is a publish worth recording. |
+| `content_hash` | text | NN UQ |  |  | SHA-256 hex of `body_snapshot`. An acceptance copies it, so it proves WHAT was shown rather than which version string was current. |
+| `published_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+
+**Indexes**
+
+- **UNIQUE** `uq_deployment_legal_versions_doc_hash` (doc, content_hash)
+- `idx_deployment_legal_versions_latest` (doc, published_at)
+
+---
+
 ## `discount_codes`
 
 <sub>server/lib/db/schema/inspection/services.ts · 10 columns · primary key `id`</sub>
@@ -691,6 +740,26 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_discount_codes_tenant` (tenant_id)
 - **UNIQUE** `uq_discount_codes_code_tenant` (upper(code), tenant_id)
+
+---
+
+## `discovery_objections`
+
+<sub>server/lib/db/schema/tenant/core.ts · 5 columns · primary key `id`</sub>
+
+> People who told us not to look them up. `GET /api/integration/tenants/by-email` answers, for one address, WHICH inspection companies hold a live report grant for it.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `email_hash` | text | NN UQ |  |  | SHA-256 hex of the normalised address. The lookup key, and the only identifier in the row. |
+| `proved_by` | text | NN |  | `inspection_access_token` | How control of the address was proven when the objection was filed. One member today, declared as an enum because the answer is evidence: a future authenticated surface (a portal account, a verified-email challenge) is a DIFFERENT proof standard and must be distinguishable in the record from this … |
+| `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
+| `withdrawn_at` | integer |  |  |  | Set instead of deleting the row, so the period during which the objection was in force stays answerable. |
+
+**Indexes**
+
+- **UNIQUE** `uq_discovery_objections_email_hash` (email_hash)
 
 ---
 
@@ -798,7 +867,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `request_id` | text | NN UQ IX |  |  | *App-layer reference to another row — no database foreign key.* |
-| `event` | text | NN UQ |  | `request.created, request.sent, request.viewed, agreement.signed, agree…` | The dedup key (with tenant + request) for the partial index below, and the label the admin audit trail and the downloadable evidence JSON print. |
+| `event` | text | NN UQ |  | `request.created, request.sent, request.viewed, signer.presented, agree…` | The dedup key (with tenant + request) for the partial index below, and the label the admin audit trail and the downloadable evidence JSON print. |
 | `payload_json` | text | NN |  |  | *Serialized JSON snapshot.* |
 | `prev_hash` | text |  |  |  | *Hash used for lookup and comparison; not reversible.* |
 | `hash` | text | NN |  |  | The chain link: the next row's prev_hash is a copy of this. verifyChain recomputes it, so a rewritten payload_json fails as reason:'hash' and an unlinked or reordered row fails as reason:'chain', naming brokenAt. |
@@ -1387,6 +1456,30 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ---
 
+## `legal_holds`
+
+<sub>server/lib/db/schema/tenant/legal-holds.ts · 9 columns · primary key `id`</sub>
+
+> A preservation obligation that outranks every scheduled deletion. Counsel round 33 made this a global invariant rather than a per-table note: a record within the scope of a legal hold, dispute, regulatory investigation or DSAR/complaint preservation must not be removed by an ordinary retention sweep until the hold is released.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN IX |  |  | Multi-tenant isolation, per the Schema Rules. The unit of a hold. |
+| `matter` | text | NN |  |  | The matter this hold exists for — a case number, regulator reference, complaint ID or DSAR ID. |
+| `reason` | text | NN |  |  | Why preservation is required, in a sentence a later reader can evaluate. Separate from `matter`: the reference identifies the proceeding, this says what about it reaches this tenant's data. |
+| `placed_by` | text | NN |  |  | Who placed it. A user id where a human did, or a system actor name where an automated preservation trigger did. |
+| `placed_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `released_at` | integer | IX |  |  | NULL while the hold is in force. The sweep's entire definition of "active" is this column being NULL — deliberately one condition, because a hold whose activeness is computed from several fields is a hold that can be accidentally inactive. |
+| `released_by` | text |  |  |  |  |
+| `release_reason` | text |  |  |  | Why it was safe to release. Null while in force; expected once released. |
+
+**Indexes**
+
+- `idx_legal_holds_tenant_active` (tenant_id, released_at)
+
+---
+
 ## `marketplace_libraries`
 
 <sub>server/lib/db/schema/marketplace.ts · 14 columns · primary key `id`</sub>
@@ -1694,7 +1787,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `qbo_sync_errors`
 
-<sub>server/lib/db/schema/qbo.ts · 10 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/qbo.ts · 11 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -1708,6 +1801,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `is_resolved` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
+| `resolved_at` | integer |  |  |  | WHEN the operational obligation ended — the retention anchor, and the reason this column exists at all. **[more]** |
 
 ---
 
@@ -2057,7 +2151,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `sms_consent_log`
 
-<sub>server/lib/db/schema/compliance.ts · 12 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/compliance.ts · 13 columns · primary key `id`</sub>
 
 > Track L (D7) — append-only SMS consent ledger (mirrors erasure_log). Current consent state = latest event per (tenant_id, contact_id).
 
@@ -2075,6 +2169,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
 | `subject_kind` | text | NN IX | `'contact'` | `contact, user` | WHO the consent is about, generalised beyond `contacts`. Staff are `users` rows and have no contact, so a ledger keyed only on `contact_id` could not record their STOP at all. **[more]** |
 | `subject_id` | text | NN IX | `''` |  | *App-layer reference to another row — no database foreign key.* |
+| `disclosure_content_hash` | text |  |  |  | The disclosure's `content_hash`, copied at consent time. `disclosure_version` alone is a pointer, and a pointer proves nothing about the words if the pointed-at text can move; this column is what makes "the consumer consented to this text" survive as evidence independent of the other table. **[more]** |
 
 **Indexes**
 
@@ -2106,7 +2201,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `sms_disclosure_versions`
 
-<sub>server/lib/db/schema/compliance.ts · 3 columns · primary key `version`</sub>
+<sub>server/lib/db/schema/compliance.ts · 4 columns · primary key `version`</sub>
 
 > Track L (D7) — the TCPA disclosure shown at SMS opt-in. version is monotonic; the current (max) version is shown to clients and stamped on each consent event.
 
@@ -2115,6 +2210,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `version` | integer | PK NN |  |  | *An integer value.* |
 | `text` | text | NN |  |  |  |
 | `published_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `content_hash` | text |  |  |  | SHA-256 of `text` at publication, lowercase hex. The consent row copies it, so a consent proves WHAT was shown rather than which row number was current at the time. **[more]** |
 
 ---
 
@@ -2190,7 +2286,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `tenant_configs`
 
-<sub>server/lib/db/schema/tenant/core.ts · 86 columns · primary key `tenant_id`</sub>
+<sub>server/lib/db/schema/tenant/core.ts · 88 columns · primary key `tenant_id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2280,6 +2376,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `repair_quick_phrases` | text |  |  |  | #275 — quick-insert phrases for repair-request notes, maintained by the tenant. Same shape and storage idiom as `custom_referral_sources` above. **[more]** |
 | `legal_name` | text |  |  |  | The registered legal entity, as it appears on the licence — distinct from `companyName`, which is the trading brand / DBA. **[more]** |
 | `invoice_seq` | integer | NN | `1000` |  | The last invoice number handed out for this tenant. Default 1000, so the first invoice is **1001** — Jobber's convention, and the category's; starting at 1 tells a homebuyer they are this company's first customer. **[more]** |
+| `report_pdf_retention_years` | integer | NN | `7` |  | Years a rendered report PDF is kept. `0` = indefinite, which is an explicit controller instruction the platform executes rather than an absence of a setting. **[more]** |
+| `is_report_view_counting_enabled` | integer | NN | `false` |  | Whether this workspace counts report opens. Default FALSE. **[more]** |
 
 ---
 
@@ -2306,7 +2404,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `tenant_destruction_records`
 
-<sub>server/lib/db/schema/tenant/integration.ts · 10 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/tenant/integration.ts · 14 columns · primary key `id`</sub>
 
 > Privacy & Compliance P3 (§3.2) — durable, non-personal proof that a tenant's data was physically destroyed during offboarding purge.
 
@@ -2322,6 +2420,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `destroyed_at` | integer | NN IX |  |  | When destruction was INITIATED. The row is written before the cascade, not after — see `status`. |
 | `status` | text | NN | `'completed'` | `DESTRUCTION_STATUSES` | Written BEFORE the D1/R2/KV cascade as 'started', updated to 'completed' with the real counts once every step has run. **[more]** |
 | `completed_at` | integer |  |  |  | Null while 'started'. The gap between this and `destroyed_at` is how long the purge took; its absence is how you find one that never finished. |
+| `record_version` | integer | NN | `1` |  | ── Measurement universe (appended at table end for D1 rebuild safety) ── `status` answers "did the purge finish?". **[more]** |
+| `stores_measured` | text |  |  |  | JSON array of the stores this destruction attempted. Null on generation 1. |
+| `store_results` | text |  |  |  | JSON object of per-store outcome — `{"durable_objects":"incomplete"}`. This is where a store that refused to purge is recorded, rather than in `status`. |
+| `incomplete_notified_at` | integer |  |  |  | When the controller was told this destruction did not finish. Null when it finished, and null when the notice could not be sent. **[more]** |
 
 **Indexes**
 
@@ -2361,7 +2463,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `doc` | text | NN UQ IX |  | `privacy, terms` | Which document. It is the discriminator in the uniqueness key and in every "latest in force" lookup, so the two version independently — saving Terms never mints a Privacy row. |
+| `doc` | text | NN UQ IX |  | `privacy, terms` | Which document. It is the discriminator in the uniqueness key and in every "latest in force" lookup, so the two version independently — saving Terms never mints a Privacy row. **[more]** |
 | `version` | text | NN UQ |  |  | `YYYY-MM-DD` in the tenant's own timezone — the date a reader is shown. |
 | `body_snapshot` | text |  |  |  | The document body as published. NULL means the tenant cleared their override and reverted to the built-in template — which is a publish, and is recorded as one, because "they went back to the default" is exactly the kind of change a missing row would silently hide. |
 | `content_hash` | text | NN |  |  | SHA-256 hex of `bodySnapshot` (of the empty string when it is NULL). |
@@ -2513,7 +2615,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `totp_verified_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `last_active_at` | integer |  |  |  | Agent Accounts A2 — per-user notification preferences. Default ON for referral + report (high signal); default OFF for paid (high noise — the inspector forwards the receipt manually if the agent wants visibility). **[more]** |
 | `deleted_at` | integer | IX |  |  | `mentor_id`, `assigned_section_ids` and `expires_at` were here — the role-extension columns of the apprentice / specialist / guest subsystems, all three removed 2026-06-13. **[more]** |
-| `terms_accepted` | text |  |  |  | Legal-links feature — set when the account was created through a public form (agent signup / agent invite) while the operator had TERMS_URL/PRIVACY_URL configured. |
+| `terms_accepted` | text |  |  |  | The acceptance an agent gave, as evidence rather than as a link. `{at, version, contentHash, ip?, country?}`. **[more]** |
 | `permission_overrides` | text |  |  |  | Role permission-template overrides (2026-06-13). Nullable JSON map of the four toggleable capabilities; absent/null = pure role template. |
 | `timezone` | text |  |  |  | Per-user display-timezone override (IANA name). NULL = inherit the tenant's default_timezone. |
 | `locale` | text |  |  |  | Per-user display-locale override (BCP-47). NULL = inherit the tenant's default_locale. |

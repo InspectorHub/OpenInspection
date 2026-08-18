@@ -1,5 +1,6 @@
 import type { SignatureUser } from '../../lib/inspector-signature';
 import { escapeHtml, type Constructor } from './base';
+import { SUBJECT_RIGHTS_TEMPLATES } from '../../lib/email-templates/subject-rights';
 
 /**
  * Transactional / account email methods: password reset, workspace
@@ -43,6 +44,63 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             });
             if (!rendered.enabled) return;
             await this.sendRendered(rendered, [to]);
+        }
+
+        /**
+         * The two statutory-rights messages (round 20 B2).
+         *
+         * These do NOT go through `renderOr`, and that is the one deliberate
+         * departure from every other method on this surface. Every other
+         * outbound message is one the TENANT is making and may rewrite. These
+         * report an act performed under statute, and the wording is what makes
+         * the report true — an erasure confirmation that dropped the retained
+         * categories would still send successfully and would misinform the one
+         * person entitled to understand it. So the copy is fixed, in
+         * `lib/email-templates/subject-rights.ts`, with substitution points.
+         *
+         * There is no `enabled` check for the same reason the quota notices have
+         * none: both classes are `required`, so nothing can return a disabled
+         * result, and guarding anyway would imply a person can switch off being
+         * told that their own data was erased.
+         */
+        async sendSubjectExportReady(
+            to: string,
+            vars: { requestedAt: string; completedAt: string; downloadUrl: string; expiresAt: string },
+        ): Promise<void> {
+            await this.sendSubjectRights('subject-export-ready', to, vars);
+        }
+
+        async sendSubjectErasureConfirmed(
+            to: string,
+            vars: { requestedAt: string; completedAt: string; retainedSummary: string },
+        ): Promise<void> {
+            await this.sendSubjectRights('subject-erasure-confirmed', to, vars);
+        }
+
+        /** Shared body: substitute, escape, and send under the class id. */
+        async sendSubjectRights(
+            classId: 'subject-export-ready' | 'subject-erasure-confirmed',
+            to: string,
+            vars: Record<string, string>,
+        ): Promise<void> {
+            const tpl = SUBJECT_RIGHTS_TEMPLATES[classId];
+            if (!tpl) throw new Error(`no subject-rights template for ${classId}`);
+            // Every substitution is escaped. These bodies carry a URL and a
+            // retained-categories summary assembled from manifest text, and a
+            // template that is not tenant-editable is still not a reason to
+            // interpolate unescaped.
+            const filled = Object.entries(vars).reduce(
+                (body, [k, v]) => body.split(`{{${k}}}`).join(escapeHtml(v)),
+                tpl.body,
+            );
+            const html = filled
+                .split('\n\n')
+                .map((para) => `<p>${para.split('\n').join('<br/>')}</p>`)
+                .join('');
+            await this.sendRendered(
+                { trigger: classId, subject: tpl.subject, html, enabled: true },
+                [to],
+            );
         }
 
         /**
@@ -160,6 +218,41 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             await this.sendRendered(rendered, [owner.email]);
 
             if (deps.kv) await deps.kv.put(dedupeKey, '1');
+        }
+
+        /**
+         * A workspace destruction that did not finish, told to the controller.
+         *
+         * Round 22: without undue delay after the failure is KNOWN, not after
+         * it is remediated. The purge calls this the moment its incomplete list
+         * is final.
+         *
+         * The BODY is passed in rather than composed here, and that is
+         * deliberate: it is a compliance statement, built by the purge from
+         * what it actually observed, and re-composing it at the presentation
+         * layer would put a second author between the observation and the
+         * sentence. The template's only job is to wrap it.
+         *
+         * `required` in the class registry, so the renderer cannot hand back a
+         * disabled result — a workspace must not be able to switch off being
+         * told that its own data still exists.
+         *
+         * The recipient's workspace no longer exists when this sends, so the
+         * caller resolves the address before the cascade and passes it. This
+         * method makes no owner lookup of its own; there would be nothing left
+         * to look up.
+         */
+        async sendDestructionIncompleteNotice(
+            to: string,
+            details: { destroyedAt: Date; stores: string[]; body: string },
+        ): Promise<void> {
+            const rendered = this.renderOr('destruction-incomplete', {
+                noticeBody: details.body,
+            }, {
+                subject: 'Workspace deletion did not complete',
+                html: `<p>${escapeHtml(details.body)}</p>`,
+            });
+            await this.sendRendered(rendered, [to]);
         }
 
         /**

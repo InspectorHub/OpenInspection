@@ -14,6 +14,8 @@ vi.mock('drizzle-orm/d1', () => ({
 }));
 
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { withBatch } from '../helpers/d1-binding';
+import { LegalVersionService } from '../../../server/services/legal-version.service';
 
 describe('AuthService', () => {
     let authService: AuthService;
@@ -27,7 +29,10 @@ describe('AuthService', () => {
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
 
-        (mockDrizzle as any).mockReturnValue(testDb);
+        // `joinTeam` writes the member row and their acceptance in ONE
+        // `db.batch()` (counsel round 24 ruling 24D), and the better-sqlite3
+        // handle this mock returns has no such method.
+        (mockDrizzle as any).mockReturnValue(withBatch(testDb, sqlite));
         mockKV = new MockKV();
         
         // Seed a default tenant to satisfy foreign keys
@@ -45,7 +50,16 @@ describe('AuthService', () => {
             companyName: 'Test Tenant',
             updatedAt: new Date(),
         });
-        
+        // A workspace with no published Privacy/Terms has nothing for an
+        // invited member to accept, and `joinTeam` refuses rather than create
+        // an account with an empty acceptance ledger. The refusal itself is
+        // specified in tests/unit/legal/invite-acceptance.spec.ts; here the
+        // documents are fixture so the join specs can be about joining.
+        const legal = new LegalVersionService(testDb as never);
+        await legal.recordPublish({ tenantId: 't1', doc: 'terms', body: 'Terms.', timezone: 'UTC' });
+        await legal.recordPublish({ tenantId: 't1', doc: 'privacy', body: 'Privacy.', timezone: 'UTC' });
+
+
         authService = new AuthService({} as any, mockKV as any);
     });
 

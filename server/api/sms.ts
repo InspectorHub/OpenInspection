@@ -512,8 +512,10 @@ export const smsAdminRoutes = createApiRouter()
         const quotaGuard = c.var.profile.hasUsageQuota
             ? new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl, aiCaps: tenantAiCapsLoader(c.env.DB) })
             : undefined;
+        // Declared before the gate, not at the provider call, so this path hands over a real body: a "no template here" exemption is the shape a marketing send would later be copied from.
+        const diagnosticBody = 'This is a test message from your inspection company. SMS is configured correctly.';
         const gate = await smsSendGate({
-            db, tenantId, to: normalized, purpose: 'test', env: c.env,
+            db, tenantId, to: normalized, purpose: 'test', env: c.env, bodyTemplate: diagnosticBody,
             ...(quotaGuard
                 ? { quota: { guard: quotaGuard, tier: c.get('tenantTier') ?? await readTenantTier(c.env.DB, tenantId) } }
                 : {}),
@@ -535,10 +537,7 @@ export const smsAdminRoutes = createApiRouter()
             return c.json({ success: false, error: 'SMS is not configured. Set your credentials first.' }, 200);
         }
 
-        const sendArgs: { from?: string; to: string; body: string; messagingServiceSid?: string } = {
-            to: normalized,
-            body: 'This is a test message from your inspection company. SMS is configured correctly.',
-        };
+        const sendArgs: { from?: string; to: string; body: string; messagingServiceSid?: string } = { to: normalized, body: diagnosticBody };
         if (resolved.from) sendArgs.from = resolved.from;
         if (resolved.messagingServiceSid) sendArgs.messagingServiceSid = resolved.messagingServiceSid;
         const res = await resolved.provider.sendMessage(sendArgs);

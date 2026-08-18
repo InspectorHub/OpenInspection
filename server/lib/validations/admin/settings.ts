@@ -152,6 +152,10 @@ export const TenantConfigPatchSchema = z.object({
     blockUnsignedAgreement: z.boolean().optional().describe('Whether clients must sign the inspection agreement before a booking is confirmed.'),
     allowInspectorChoice: z.boolean().optional().describe('Toggle the public inspector-choice dropdown (IA-26)'),
     agreementRetentionYears: z.number().int().min(1).max(99).optional().describe('How many years signed agreements / signatures are retained before the GDPR retention sweep destroys them (Track I-a). Integer 1–99; default 6 ≈ UK simple-contract limitation period.'),
+    // min(0), not min(1): zero carries meaning here — it is the tenant
+    // instructing indefinite retention, not an empty field.
+    reportPdfRetentionYears: z.number().int().min(0).max(99).optional().describe('Years a rendered report PDF is kept before the retention sweep destroys the object and its row. 0 = indefinite (an explicit controller instruction). Default 7 is a disclosed PLATFORM default, not a statutory requirement — see lib/compliance/report-pdf-retention.ts.'),
+    reportViewCountingEnabled: z.boolean().optional().describe('Whether this workspace counts report opens. Default false — the legitimate-interests assessment assigns the interest to the company, so the company has to be able to decline it (counsel B4).'),
     reviewUrl: z.string().url().max(500).nullish().describe('Track J (#122) — company review link (Google/Yelp/Facebook). null/empty clears it.'),
     smsMode: z.enum(['own', 'managed_shared', 'managed_dedicated']).optional().describe('Track L (D3) — Tenant SMS sender mode. "platform" is reserved for first-party use and is rejected when submitted by a tenant.'),
     companyPhone: z.string().max(40).nullish().describe('Track L — call-back number shown in SMS copy ({{company_phone}}). null/empty clears it.'),

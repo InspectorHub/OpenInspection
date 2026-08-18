@@ -2,6 +2,7 @@ import { eq, and } from 'drizzle-orm';
 import { inspections } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { InspectionSubService } from './base';
+import { mintAgentViewToken } from '../../lib/agent-view-token';
 
 /**
  * Agent view token sharing — generates + resolves the 30-day KV-backed
@@ -21,7 +22,10 @@ export class InspectionSharingService extends InspectionSubService {
         if (!rows[0]) throw Errors.NotFound('Inspection not found');
         if (!this.kv) throw Errors.Internal('KV not available');
 
-        const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+        // The tenant rides in the leading 32 characters so a tenant purge can
+        // enumerate these by prefix — see lib/agent-view-token.ts for why it is
+        // the token and not the key that carries it.
+        const token = mintAgentViewToken(tenantId);
         await this.kv.put(`agent_view_token:${token}`, `${inspectionId}:${tenantId}`, {
             expirationTtl: 30 * 24 * 60 * 60,
         });

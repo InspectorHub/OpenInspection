@@ -11,8 +11,22 @@ import {
 import type { SyncEnvelope } from '../lib/sync-events/envelope';
 import { applySyncQuota, applyTenantUpdate, applySeedStarterContent, applyAiCaps, applyTenantRename } from './apply-commands';
 import { applyCredentialIfFresh } from './admin-credential';
+// Reply routing + emission live next door: the seam is two concerns sharing a
+// queue (apply the command, tell the producer what happened), and only the
+// first one needs dedup, the stale guard or an applier.
+import { replyTypeFor, emitReply } from './cmd-reply';
 import { parkedFingerprint } from './parked-fingerprint';
-import { OutboxService, type OutboxRow } from './outbox.service';
+
+/**
+ * Re-exported so the batch loop can name it without reaching past this module
+ * into a service. The purge's Durable Object namespaces travel as their own
+ * parameter and are deliberately NOT folded into `CmdConsumerBuckets`: they are
+ * not buckets, and a name that lies about what it holds is how the next reader
+ * learns the wrong thing.
+ */
+export type { PurgeDurableObjects } from '../services/tenant-purge.service';
+import type { PurgeDurableObjects } from '../services/tenant-purge.service';
+import type { EmailServiceEnv } from '../lib/email/build-email-service';
 
 /** A-21 batch 3 — R2 bindings the offboarding commands need. Optional: absent
  *  in standalone (no portal direction at all) and in tests that don't
@@ -52,6 +66,8 @@ export async function applyCmdEnvelope(
     raw: unknown,
     syncQueue?: Queue<SyncEnvelope>,
     buckets?: CmdConsumerBuckets,
+    dos?: PurgeDurableObjects,
+    emailEnv?: EmailServiceEnv,
 ): Promise<CmdApplyResult> {
     const db = drizzle(dbBinding);
     const env = parseCmdEnvelope(raw);
@@ -132,6 +148,13 @@ export async function applyCmdEnvelope(
                         tenantId: cred.data.tenantId,
                         adminEmail: cred.data.adminEmail,
                         adminPasswordHash: cred.data.adminPasswordHash,
+                        // The salvage carries the acceptance too. A stale
+                        // command can still be the one that CREATES the account
+                        // — that is the whole reason this branch exists — and an
+                        // applier handed the credential without the acceptance
+                        // would refuse it, turning a recoverable salvage into a
+                        // wedged tenant.
+                        ...(cred.data.acceptance !== undefined && { acceptance: cred.data.acceptance }),
                         ...(env.credseq !== undefined && { credseq: env.credseq }),
                     });
                     if (credResult === 'credential-applied') {
@@ -150,7 +173,7 @@ export async function applyCmdEnvelope(
     }
 
     try {
-        const replyExtra = await applyKnownCmd(dbBinding, kv, env, buckets);
+        const replyExtra = await applyKnownCmd(dbBinding, kv, env, buckets, dos, emailEnv);
         // Advance the high-water mark (guarded so a concurrent higher write wins).
         if (tenantId) {
             await db.update(tenants)
@@ -171,31 +194,11 @@ export async function applyCmdEnvelope(
     }
 }
 
-/** Map a command type to its reply event type (null = command never replies —
- *  quota/seed carry no replyto today and would just be ignored). */
-type CmdReplyType = 'reply.tenant.updated' | 'reply.tenant.export_completed' | 'reply.tenant.purged'
-    | 'reply.subject.exported' | 'reply.subject.erased';
 /** The DSAR pair — operations on behalf of a person, not tenant state. Used by
  *  the stale-guard exemption above; see the reasoning there. */
 function isSubjectCmd(cmdType: string): boolean {
     return cmdType === 'io.inspectorhub.cmd.subject.export'
         || cmdType === 'io.inspectorhub.cmd.subject.erase';
-}
-
-function replyTypeFor(cmdType: string): CmdReplyType | null {
-    switch (cmdType) {
-        case 'io.inspectorhub.cmd.tenant.update': return 'reply.tenant.updated';
-        case 'io.inspectorhub.cmd.tenant.data_export': return 'reply.tenant.export_completed';
-        case 'io.inspectorhub.cmd.tenant.purge': return 'reply.tenant.purged';
-        // Privacy P3 — the DSAR replies. Unlike the tenant replies these wake
-        // NOTHING: a DSAR is a durable portal row, not a parked Workflow, so
-        // there is no waitForEvent timeout behind them and no RPC fallback. The
-        // durability that stands in for it is the sync outbox (append first,
-        // publish inline, cron sweeper republishes stragglers).
-        case 'io.inspectorhub.cmd.subject.export': return 'reply.subject.exported';
-        case 'io.inspectorhub.cmd.subject.erase': return 'reply.subject.erased';
-        default: return null;
-    }
 }
 
 /** Apply a known command. Returns the reply-payload EXTRAS for commands whose
@@ -206,6 +209,8 @@ async function applyKnownCmd(
     kv: KVNamespace | undefined,
     env: CmdEnvelope,
     buckets?: CmdConsumerBuckets,
+    dos?: PurgeDurableObjects,
+    emailEnv?: EmailServiceEnv,
 ): Promise<Record<string, unknown> | undefined> {
     switch (env.type) {
         case 'io.inspectorhub.cmd.tenant.update': {
@@ -226,10 +231,15 @@ async function applyKnownCmd(
                 ...(data.maxUsers !== undefined && { maxUsers: data.maxUsers }),
             });
             if (data.adminEmail && data.adminPasswordHash) {
+                // The acceptance rides the SAME parameter object as the
+                // credential and is never applied on its own — an acceptance
+                // written without the account it belongs to would be the
+                // mirror-image of the state counsel refused.
                 await applyCredentialIfFresh(dbBinding, {
                     tenantId: data.tenantId,
                     adminEmail: data.adminEmail,
                     adminPasswordHash: data.adminPasswordHash,
+                    ...(data.acceptance !== undefined && { acceptance: data.acceptance }),
                     ...(env.credseq !== undefined && { credseq: env.credseq }),
                 });
             }
@@ -266,7 +276,13 @@ async function applyKnownCmd(
             if (!buckets?.photos) throw new Error('purge: PHOTOS not bound');
             if (!kv) throw new Error('purge: TENANT_CACHE not bound');
             const { TenantPurgeService } = await import('../services/tenant-purge.service');
-            const result = await new TenantPurgeService(dbBinding, buckets.photos, kv).purge(data.tenantId);
+            // Platform sender, deliberately: the tenant's own email config is
+            // one of the things being destroyed, and this is our message about
+            // our failure. Absent emailEnv the purge still runs and logs that
+            // nobody could be told — see the else-branch in the service.
+            const { buildTenantEmailService } = await import('../lib/email/build-email-service');
+            const notifier = emailEnv ? await buildTenantEmailService(emailEnv, undefined) : undefined;
+            const result = await new TenantPurgeService(dbBinding, buckets.photos, kv, dos ?? {}, notifier).purge(data.tenantId);
             return { ...result };
         }
         case 'io.inspectorhub.cmd.tenant.ai_caps': {
@@ -320,80 +336,5 @@ async function applyKnownCmd(
         }
         default:
             throw new Error(`Unhandled known cmd type ${env.type as string}`);
-    }
-}
-
-/**
- * A-21 batch 2/3 — emit the command's reply event when it asked for one
- * (`replyto` present). The reply type is derived from the command type
- * (update → reply.tenant.updated, data_export → reply.tenant.export_completed,
- * purge → reply.tenant.purged); `fields` carries the type-specific payload
- * beyond the {tenantId, correlationId, replyto} base. The reply rides the
- * EXISTING core→portal sync queue via the sync outbox (durable: append first,
- * inline publish best-effort, the cron sweeper republishes stragglers).
- * Emission failure must NEVER fail the command — the command already applied;
- * a missing reply self-heals via the producer's timeout path.
- */
-async function emitReply(
-    dbBinding: D1Database,
-    syncQueue: Queue<SyncEnvelope> | undefined,
-    env: CmdEnvelope,
-    fields: Record<string, unknown>,
-): Promise<void> {
-    if (!env.replyto) return;
-    const replyType = replyTypeFor(env.type);
-    if (!replyType) return;
-    try {
-        let insertedRow: OutboxRow | undefined;
-        const outbox = new OutboxService(dbBinding, (row) => { insertedRow = row; });
-        await outbox.append({
-            type: replyType,
-            payload: {
-                tenantId: (env.data['tenantId'] as string | undefined) ?? '',
-                correlationId: env.id,
-                replyto: env.replyto,
-                ...fields,
-            },
-        });
-        if (syncQueue && insertedRow) {
-            // Inline publish; a throw is caught below and the row stays
-            // `pending` for the sweeper.
-            await outbox.publishRow(syncQueue, insertedRow);
-        }
-        logger.info('[cmd] reply emitted', { correlationId: env.id, replyType, published: !!(syncQueue && insertedRow) });
-    } catch (err) {
-        logger.error('[cmd] reply emission failed — outbox sweeper will retry if appended',
-            { id: env.id, replyType }, err instanceof Error ? err : undefined);
-    }
-}
-
-/** Mirror of portal's queue-loop backoff. */
-function backoffSeconds(attempts: number): number {
-    return Math.min(30 * 2 ** attempts, 3600);
-}
-
-/** Batch handler for the cmd queue. STRICTLY per-message ack/retry.
- *  `syncQueue` (A-21 batch 2) carries replies back to portal; `buckets`
- *  (batch 3) carries the R2 bindings the offboarding commands need — both
- *  optional so the standalone build type-checks unchanged. */
-export async function handleCmdBatch(
-    dbBinding: D1Database,
-    kv: KVNamespace | undefined,
-    batch: MessageBatch<unknown>,
-    syncQueue?: Queue<SyncEnvelope>,
-    buckets?: CmdConsumerBuckets,
-): Promise<void> {
-    for (const msg of batch.messages) {
-        try {
-            const result = await applyCmdEnvelope(dbBinding, kv, msg.body, syncQueue, buckets);
-            logger.info('[cmd] queue message handled', { id: msg.id, attempts: msg.attempts, result });
-            msg.ack();
-        } catch (err) {
-            const delaySeconds = backoffSeconds(msg.attempts);
-            logger.error('[cmd] queue message failed — retrying',
-                { id: msg.id, attempts: msg.attempts, delaySeconds },
-                err instanceof Error ? err : undefined);
-            msg.retry({ delaySeconds });
-        }
     }
 }

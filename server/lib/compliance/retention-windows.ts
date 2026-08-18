@@ -28,7 +28,13 @@
  * that, the part of an audit row still worth keeping is the structured event —
  * who-did-what-to-which-entity minus the who.
  */
-export const AUDIT_LOG_ANONYMIZE_MONTHS = 24;
+// 24 → 36, counsel round 33 §2. Two years was justified as "a dispute cycle plus
+// the audit that follows it" and counsel found that reasoning does not reach it:
+// with reports and acceptances retained for 3–7 years, a 2-year audit log creates
+// an evidence discontinuity where the report still exists, the acceptance still
+// exists, and the proof of WHO DID WHAT to them has gone. Audit logs sit with
+// security/compliance evidence, not with operational cache.
+export const AUDIT_LOG_ANONYMIZE_MONTHS = 36;
 
 /**
  * Deletion window for the replay-protection ledgers
@@ -146,7 +152,11 @@ export const AI_ASSURANCE_RETENTION_MONTHS = 36;
  * drafts and amendments behind it. Three years covers the window in which an
  * amendment is still likely to be questioned.
  */
-export const REPORT_VERSION_RETENTION_MONTHS = 36;
+// 36 → 84, counsel round 33 §6. These are hash-chained report snapshots — part of
+// the report's evidence chain, not telemetry about it — so keeping the PDF for
+// seven years while the version chain expires at three leaves seven years of PDF
+// backed by three years of provenance. The two now share one evidence horizon.
+export const REPORT_VERSION_RETENTION_MONTHS = 84;
 
 /**
  * Deletion window for `sms_disclosure_versions` — the TCPA disclosure text
@@ -184,7 +194,11 @@ export const TENANT_LEGAL_VERSION_RETENTION_MONTHS = 36;
  * is a different table (`tenant_library_imports`), so expiring a history row
  * shortens a list and cannot change what an import does next.
  */
-export const MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS = 36;
+// 36 → 12, counsel round 33 §9. "Which tenant imported what" is operational
+// history. Three years would need a purpose this table does not have — financial
+// reconciliation, dispute investigation, contractual evidence or regulatory audit —
+// and it serves none of them.
+export const MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS = 12;
 
 /**
  * Deletion window for `tenant_slug_history`.
@@ -195,4 +209,53 @@ export const MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS = 36;
  * predates a rename, and three years is comfortably past the one-year block —
  * the window can never expire a row still holding a slug out of circulation.
  */
-export const SLUG_HISTORY_RETENTION_MONTHS = 36;
+// 36 → 12, counsel round 33 §11. The purpose is stopping a retired slug being
+// reissued, and that risk does not run for three years. A slug caught up in an
+// ongoing dispute is handled by legal hold, not by making every slug wait.
+export const SLUG_HISTORY_RETENTION_MONTHS = 12;
+
+/**
+ * Default deletion window for `report_pdfs`, in months.
+ *
+ * The PLATFORM default for the tenant-silent case, and each tenant may set
+ * their own (`tenant_configs.report_pdf_retention_years`, where 0 means
+ * indefinite). Expressed in months because the executor does calendar
+ * arithmetic for months and multiplying years by 365 drifts against both the
+ * calendar and the number published in the disclosure.
+ *
+ * Seven years is NOT a statutory period and must never be described as one —
+ * counsel struck the "five plus two" derivation this number used to carry
+ * (round 24, ruling 24A). The wording a customer sees, and the machine-readable
+ * taxonomy that keeps the distinction from resting on prose, live in
+ * `report-pdf-retention.ts`.
+ */
+export const REPORT_PDF_DEFAULT_RETENTION_MONTHS = 84;
+
+/**
+ * Counsel round 34 §3. The in-app inbox — a notice header addressed to a person,
+ * composed about an inspection. NOT the record that the communication happened;
+ * `automation_logs` answers that and is retained by design.
+ *
+ * Anchored on `created_at`, and counsel explicitly declined the alternative of
+ * anchoring on `read_at`/`archived_at`: an unread notice would then be immortal,
+ * which turns a UI-state field into a retention control. "Nor do I think an unread
+ * notification deserves indefinite retention merely because the user never opened
+ * it."
+ */
+export const NOTIFICATION_RETENTION_MONTHS = 24;
+
+/**
+ * Counsel round 34 §4. Days after a QuickBooks sync error is RESOLVED, not after
+ * it was created — "a sync failure that remains unresolved for a year should not
+ * disappear merely because it is old". An unresolved row is outstanding work and
+ * never ages out, the same distinction that keeps `pending` rows out of the
+ * `sync_outbox` sweep.
+ *
+ * The 90 days cover the whole row INCLUDING the copied Intuit error text, which
+ * may quote a customer name. Counsel refused to grant that text a longer window
+ * for possibly being useful later: "Do not retain potentially identifying
+ * diagnostic text longer merely because it might someday be useful." A billing
+ * dispute is explained from the accounting records, not from an ephemeral
+ * rejection message.
+ */
+export const QBO_SYNC_ERROR_RESOLVED_RETENTION_DAYS = 90;

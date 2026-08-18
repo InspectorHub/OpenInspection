@@ -18,11 +18,41 @@ export async function signup(
         email: string;
         password: string;
         name: string;
-        termsAccepted?: { at: string; ip?: string; country?: string; termsUrl?: string; privacyUrl?: string };
+        /**
+         * REQUIRED, and it carries a version and a content hash rather than URLs.
+         *
+         * A URL records where the text WAS, not what it SAID: the page behind it
+         * can be edited, and the acceptance then points at something the signer
+         * never read. Version plus hash is the only pair that survives the text
+         * changing, and it is the standard every other legal artefact here
+         * already meets.
+         */
+        termsAccepted?: {
+            at: string; version: string; contentHash: string;
+            ip?: string; country?: string;
+        } | undefined;
     },
 ): Promise<{ userId: string; email: string }> {
     const db = drizzle(rawDb);
     const email = normalizeEmail(input.email);
+
+    // FAIL CLOSED, and BEFORE the insert. An agent is a third party who has
+    // agreed to a document written for them (round 20 A3), and an account that
+    // exists without a recorded acceptance is the state this removes.
+    //
+    // Refusing before the insert rather than after is not tidiness: a caller who
+    // fixes their payload and retries must not collide with a 409 from their own
+    // rejected first attempt.
+    if (!input.termsAccepted) {
+        throw Errors.BadRequest('Agent terms must be accepted before an account is created');
+    }
+    if (!input.termsAccepted.version || !/^[0-9a-f]{64}$/.test(input.termsAccepted.contentHash ?? '')) {
+        // An acceptance without a hash points at nothing checkable. Storing one
+        // would be worse than storing none, because it reads as evidence.
+        throw Errors.BadRequest(
+            'Agent terms acceptance must carry the version and the content hash of the text shown',
+        );
+    }
 
     const existing = await db
         .select({ id: users.id, role: users.role })
@@ -43,7 +73,7 @@ export async function signup(
         name: input.name,
         role: 'agent',
         createdAt: new Date(),
-        termsAccepted: input.termsAccepted ?? null,
+        termsAccepted: input.termsAccepted,
     });
 
     await autoLinkSameEmail(rawDb, id, email);

@@ -1,0 +1,20 @@
+-- Report PDFs get a retention window.
+--
+-- They had none. `tenant-purge.service.ts` destroys them when a workspace is
+-- destroyed, but nothing expired one while the tenant lived, so a rendered PDF
+-- of somebody's house — address, photographs, defects — was kept for as long as
+-- the company existed, with no decision behind it.
+--
+-- Default 7 years, and the reason is NOT what this repository used to say. The
+-- "five plus two" derivation was put to counsel and rejected (round 24, ruling
+-- 24A): Illinois is five years OR two years past final disposition of a
+-- qualifying proceeding, WHICHEVER IS LONGER, so the second figure is an
+-- event-dependent tail rather than a cap and a proceeding ending in year six
+-- runs past seven. Seven years is a platform-selected default for the
+-- tenant-silent case, not a statutory period. The wording a customer sees, and
+-- the machine-readable taxonomy that keeps that distinction from resting on
+-- prose, live in lib/compliance/report-pdf-retention.ts.
+--
+-- 0 means indefinite: an explicit controller instruction the platform executes,
+-- which is why the validator's floor here is 0 and the agreement window's is 1.
+ALTER TABLE `tenant_configs` ADD `report_pdf_retention_years` integer DEFAULT 7 NOT NULL;

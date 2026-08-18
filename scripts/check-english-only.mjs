@@ -48,11 +48,30 @@ function firstCjkIndex(text) {
     return -1;
 }
 
-const EXTS = ['.ts', '.tsx', '.js', '.mjs', '.css', '.html'];
+/**
+ * `.md` is here because the gate's own reason applies to it identically: this
+ * repository's `docs/` are published, and a reader who cannot read Chinese hits
+ * the same dead end in a compliance note as in a comment. It was missing, and
+ * the omission was found the honest way — a counsel quotation pasted into
+ * `retention-policy.ts` failed CI while the SAME quotation in
+ * `docs/compliance/retention-policy.md` sat green beside it.
+ *
+ * This does NOT extend to the private superproject's docs, which are outside
+ * this tree and outside the rule.
+ */
+const EXTS = ['.ts', '.tsx', '.js', '.mjs', '.css', '.html', '.md'];
 
+/**
+ * `.types` and `.superpowers` are gitignored — one is the emitted .d.ts mirror of
+ * `server/`, the other is local working notes. Neither ships, and both were
+ * reporting as offenders: the mirror duplicated every real hit so a one-line fix
+ * looked like two, and the notes are a private scratchpad this rule was never
+ * about. A gate that reports files nobody can fix is a gate people learn to skim.
+ */
 const SKIP_DIRS = new Set([
-    'node_modules', '.git', 'build', 'dist', '.wrangler', '.worktrees',
-    '.react-router', 'paraglide', 'messages', 'public', 'local-fixtures', 'coverage',
+    'node_modules', '.git', 'build', 'dist', '.wrangler', '.worktrees', '.types',
+    '.superpowers', '.react-router', 'paraglide', 'messages', 'public',
+    'local-fixtures', 'coverage',
 ]);
 
 /**

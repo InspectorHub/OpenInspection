@@ -65,4 +65,22 @@ export const qboSyncErrors = sqliteTable('qbo_sync_errors', {
     resolved:  integer('is_resolved', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    /**
+     * WHEN the operational obligation ended — the retention anchor, and the reason
+     * this column exists at all.
+     *
+     * Counsel round 34 ruled a resolved row expires 90 days after RESOLUTION and
+     * that "the retention clock should not be based on created_at": a sync failure
+     * left unfixed for a year must not disappear merely because it is old.
+     *
+     * `updated_at` is not a substitute. It moves on re-detection too — the row is
+     * refreshed in place and `retries` bumped — so it answers "when did anything
+     * last touch this" rather than "when did this stop being outstanding". Using it
+     * would have been an inference dressed as a timestamp.
+     *
+     * NULL on rows resolved before this column existed, and on every unresolved
+     * row. The sweep requires it non-null, so a NULL is never swept — an unknown
+     * resolution date fails closed rather than being treated as long ago.
+     */
+    resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
 });

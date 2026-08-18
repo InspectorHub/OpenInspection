@@ -41,25 +41,58 @@ export interface ErasureRule {
      * WE choose to govern a column, and must never be cited downstream as a
      * determination that the law classifies it that way.
      *
-     * The live example is `user.biometric.signature` on the two signature
-     * columns. Whether a signature image is Art. 9 "biometric data" turns on
+     * The live example is `user.signature.rendered_image` on ONE column —
+     * `agreement_signers.signature_base64`, the drawn image a signer produced.
+     * (Its sibling `esign_audit_logs.signature` is NOT a second one: that is a
+     * detached cryptographic seal over the audit chain, and it carries
+     * `system.integrity`. An earlier version of this paragraph said "the two
+     * signature columns" and was wrong about which columns it was describing;
+     * `tests/unit/privacy/classification-labels.spec.ts` now counts the
+     * carriers so the sentence cannot drift again.)
+     *
+     * That category used to assert a biometric characterisation, and the rename
+     * is the point. Whether a signature image is Art. 9 "biometric data" turns on
      * whether it is processed by specific technical means FOR THE PURPOSE of
      * uniquely identifying a natural person — which an image of a handwritten
-     * signature does not satisfy merely by being a signature. We keep the
-     * conservative label because governing it tightly costs us nothing; that
-     * choice is not a conclusion that Art. 9 applies, and a later document
-     * asserting so on the strength of this string would be wrong.
+     * signature does not satisfy merely by being a signature, and which two US
+     * statutes define in terms that positively EXCLUDE what we store. Governing
+     * the column tightly still costs us nothing, so the tight handling stays;
+     * what goes is the label that asserted a characterisation we deliberately
+     * do not make and that `scripts/check-signature-dynamics.mjs` exists to
+     * keep us from ever making.
      *
      * Counsel named the failure mode from our own history: an internal
      * classification read by the next legal document as an established fact.
      */
     category: string;
-    /** Masking strategy for this column on erasure. */
-    action: 'delete' | 'null' | 'hash' | 'retain' | 'anonymize';
     /**
-     * Required when the action retains/anonymizes evidence rather than deleting
-     * it — the GDPR Art. 17(3) exemption invoked. art_17_3_b = legal obligation;
-     * art_17_3_e = establishment/exercise/defence of legal claims.
+     * Whether the biometric question has been ANSWERED for this column.
+     *
+     * The only value is `not_assessed_as_biometric`, and a plain boolean field
+     * is deliberately NOT offered: answering the question `false` is itself a
+     * legal conclusion, which is the exact mistake the rename above removes.
+     * This field records that we neither claim nor deny the characterisation —
+     * we handle the column conservatively and leave the determination to
+     * whoever is qualified to make one.
+     */
+    biometricStatus?: 'not_assessed_as_biometric';
+    /**
+     * Masking strategy for this column on erasure.
+     *
+     * `erase_in_place` was called `anonymize` until counsel (round 27, CA-08)
+     * ruled the name out: what it does is overwrite identifier columns with a
+     * sentinel in a row that survives, which is neither CCPA deidentification
+     * (that carries substantive conditions we do not meet) nor GDPR
+     * anonymisation. The old name invited a future reader to cite it as proof
+     * we had produced legally deidentified data. The new one describes the
+     * operation and claims nothing.
+     */
+    action: 'delete' | 'null' | 'hash' | 'retain' | 'erase_in_place';
+    /**
+     * Required when the action retains evidence, or erases it in place, rather
+     * than deleting it — the GDPR Art. 17(3) exemption invoked. art_17_3_b =
+     * legal obligation; art_17_3_e = establishment/exercise/defence of legal
+     * claims.
      */
     legalBasis?: 'art_17_3_b' | 'art_17_3_e';
     /**
@@ -101,27 +134,28 @@ export interface ErasureRule {
  * `draft_only` delete rule on a table as "delete the matching ROWS" rather than
  * clearing the named column — the `column` on those rules names the locator
  * column (the email we matched on) for documentation, not a column to null.
- * Column-level `anonymize`/`null` rules act in-place on the named column.
+ * Column-level `erase_in_place`/`null` rules act on the named column, leaving
+ * the row.
  *
- * Signed-agreement PII columns -> `anonymize` + `legalBasis: 'art_17_3_e'`
+ * Signed-agreement PII columns -> `erase_in_place` + `legalBasis: 'art_17_3_e'`
  * (establishment/exercise/defence of legal claims) + `condition: 'signed_only'`,
  * keeping signature_base64 / signed_at / the audit chain (spec §3 D5).
  */
 export const ERASURE_MANIFEST: ErasureRule[] = [
-    // ── agreement_signers (signed evidence: anonymize the satellite PII) ──────
-    { table: 'agreement_signers', column: 'name',                 category: 'user.name',                   action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
-    { table: 'agreement_signers', column: 'email',                category: 'user.contact.email',          action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
-    { table: 'agreement_signers', column: 'ip_address',           category: 'user.device.ip_address',      action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
-    { table: 'agreement_signers', column: 'user_agent',           category: 'user.device.user_agent',      action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
-    { table: 'agreement_signers', column: 'on_behalf_of',         category: 'user.name',                   action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
-    { table: 'agreement_signers', column: 'on_behalf_disclaimer', category: 'user.contact',                action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    // ── agreement_signers (signed evidence: erase the satellite PII in place) ─
+    { table: 'agreement_signers', column: 'name',                 category: 'user.name',                   action: 'erase_in_place', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    { table: 'agreement_signers', column: 'email',                category: 'user.contact.email',          action: 'erase_in_place', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    { table: 'agreement_signers', column: 'ip_address',           category: 'user.device.ip_address',      action: 'erase_in_place', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    { table: 'agreement_signers', column: 'user_agent',           category: 'user.device.user_agent',      action: 'erase_in_place', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    { table: 'agreement_signers', column: 'on_behalf_of',         category: 'user.name',                   action: 'erase_in_place', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    { table: 'agreement_signers', column: 'on_behalf_disclaimer', category: 'user.contact',                action: 'erase_in_place', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
     // Draft/unsigned signer rows ride with their envelope deletion (below).
     { table: 'agreement_signers', column: 'email',                category: 'user.contact.email',          action: 'delete',    condition: 'draft_only' },
 
     // ── agreement_requests (envelope) ─────────────────────────────────────────
-    // Signed envelope: anonymize the denormalized client identity, keep the seal.
-    { table: 'agreement_requests', column: 'client_name',  category: 'user.name',          action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
-    { table: 'agreement_requests', column: 'client_email', category: 'user.contact.email', action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    // Signed envelope: erase the denormalized client identity, keep the seal.
+    { table: 'agreement_requests', column: 'client_name',  category: 'user.name',          action: 'erase_in_place', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    { table: 'agreement_requests', column: 'client_email', category: 'user.contact.email', action: 'erase_in_place', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
     // Draft/unsigned envelope: delete the ROW (locator = client_email).
     { table: 'agreement_requests', column: 'client_email', category: 'user.contact.email', action: 'delete', condition: 'draft_only' },
 
@@ -163,7 +197,7 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // declared out of scope below. `note` is the one free-text column a human
     // writes on a row linked to an identified client ("check from J. Smith,
     // 123 Oak St"), so it is cleared in place rather than left standing.
-    { table: 'order_payments', column: 'note', category: 'user.freetext', action: 'anonymize', legalBasis: 'art_17_3_b' },
+    { table: 'order_payments', column: 'note', category: 'user.freetext', action: 'erase_in_place', legalBasis: 'art_17_3_b' },
 
     // ── concierge_confirm_tokens (#88) ────────────────────────────────────────
     // Single-use magic-link tokens addressed to the subject: delete the ROWS
@@ -204,7 +238,7 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // nullable email/phone -> NULL, NOT NULL name -> the '[erased]' sentinel.
     // Basis: the converted request is part of the engagement record the
     // inspection stands on (same posture as agreement_requests).
-    { table: 'inspection_requests', column: 'client_name',  category: 'user.name',           action: 'anonymize', legalBasis: 'art_17_3_e' },
+    { table: 'inspection_requests', column: 'client_name',  category: 'user.name',           action: 'erase_in_place', legalBasis: 'art_17_3_e' },
     { table: 'inspection_requests', column: 'client_email', category: 'user.contact.email',  action: 'null' },
     { table: 'inspection_requests', column: 'client_phone', category: 'user.contact.phone_number', action: 'null' },
 
@@ -213,6 +247,15 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // the mechanism that keeps honoring the subject's objection — deleting it
     // would resume sending if the address ever re-enters the system.
     { table: 'email_suppressions', column: 'email', category: 'user.contact.email', action: 'retain', legalBasis: 'art_17_3_b' },
+    // Same shape as the suppression row above, and for the same reason: the ROW
+    // IS THE MECHANISM that honours the objection. A person who asked not to be
+    // discoverable across tenants, and whose objection row was then deleted on
+    // erasure, would silently become discoverable again — the erasure would have
+    // undone the very refusal it was supposed to respect. Stored as an unsalted
+    // hash of the normalised address, which is minimisation rather than a
+    // security control: enough to answer "did this address object", not enough
+    // to browse a directory of objectors.
+    { table: 'discovery_objections', column: 'email_hash', category: 'user.contact.email', action: 'retain', legalBasis: 'art_17_3_b' },
 
     // ── evidence ledgers retained under Art. 17(3) ────────────────────────────
     // automation_logs.recipient holds emails and E.164 numbers; the ledger is
@@ -236,8 +279,8 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     { table: 'erasure_log', column: 'response_note',  category: 'user.freetext', action: 'retain', legalBasis: 'art_17_3_b' },
     // Signature evidence kept on a DSAR (the retention sweep destroys it past
     // the window); the esign audit chain is NEVER touched.
-    { table: 'agreement_signers',  column: 'signature_base64', category: 'user.biometric.signature', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'enforced' },
-    { table: 'esign_audit_logs',   column: 'signature',        category: 'system.integrity',         action: 'retain', legalBasis: 'art_17_3_e' },
+    { table: 'agreement_signers',  column: 'signature_base64', category: 'user.signature.rendered_image', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'enforced', biometricStatus: 'not_assessed_as_biometric' },
+    { table: 'esign_audit_logs',   column: 'signature',        category: 'system.integrity',              action: 'retain', legalBasis: 'art_17_3_e' },
 
     // ── reports ───────────────────────────────────────────────────────────────
     // A report is findings about a named person's property. `title` is written
@@ -248,11 +291,11 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // update). No route writes it — the only other writer is the erasure
     // executor performing this very rule.
     //
-    // Anonymised rather than deleted: the row is the spine of a signed,
+    // Erased in place rather than deleted: the row is the spine of a signed,
     // delivered document, and removing it would strand the version chain that
     // proves what was delivered. A catalogue service name is tenant-authored,
-    // so it cannot be assumed free of identifiers, and anonymising a title
-    // costs nothing.
+    // so it cannot be assumed free of identifiers, and clearing a title costs
+    // nothing.
     //
     // AMENDMENT HISTORY
     //   Previous rationale: "`title` is the one free-text column a human writes
@@ -263,12 +306,13 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     //     carry a per-property address. Evidence: the two writers named above,
     //     read 2026-08-07 (E2 — verified in source, not inferred from a plan).
     //   Impact:             NONE on the processing decision. The action stays
-    //     `anonymize`, the basis and the period are unchanged. What changes is
-    //     the reason recorded for it.
+    //     the same one (it was spelled `anonymize` at the time and is now
+    //     `erase_in_place`), and the basis and the period are unchanged. What
+    //     changes is the reason recorded for it.
     //   Kept rather than overwritten: an accountability record under Art. 5(2)
     //     that quietly deletes a mistake is worth less than one that shows the
     //     mistake was found and corrected.
-    { table: 'reports', column: 'title', category: 'user.address', action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'reports', column: 'title', category: 'user.address', action: 'erase_in_place', legalBasis: 'art_17_3_e', retention: 'P6Y' },
     // `inspector_narrative` IS what the title turned out not to be: prose a person
     // composes about this property for this client, so it can carry names and
     // occupancy detail, none of it machine-detectable — the population
@@ -280,7 +324,7 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // inspections row, results, units, inspectors, style profile — not `reports`).
     // Put it in the snapshot and this rule must be re-decided: an erasure would
     // then either leave the prose inside a signed blob or break its signature.
-    { table: 'reports', column: 'inspector_narrative', category: 'user.freetext', action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+    { table: 'reports', column: 'inspector_narrative', category: 'user.freetext', action: 'erase_in_place', legalBasis: 'art_17_3_e', retention: 'P6Y' },
 
     // ── audit_logs (#276) ─────────────────────────────────────────────────────
     // Free-form JSON a caller composes; it MAY embed names/emails/phones/
@@ -293,7 +337,7 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // it one is the structured event (action/entity), not the blob.
     // `ip_address` stays too — staff-action security trail, declared out of
     // scope below.
-    { table: 'audit_logs', column: 'metadata', category: 'user.freetext', action: 'anonymize', legalBasis: 'art_17_3_b' },
+    { table: 'audit_logs', column: 'metadata', category: 'user.freetext', action: 'erase_in_place', legalBasis: 'art_17_3_b' },
 
     // ── repair requests (#88) ─────────────────────────────────────────────────
     // The one surface where the CLIENT types prose rather than the tenant. None
@@ -355,7 +399,7 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // not on its checked-in list, and FAILS outright once the deadline passes.
     // The tripwire in `tests/unit/privacy/erasure-manifest-coverage.spec.ts`
     // fails the day the sweep learns about `inspections`, so this notice cannot
-    // outlive its gap either.
+    // outlive its gap either. A DIFFERENT question about the two coordinate columns — whether they are statutory precise geolocation under §1798.140(w), which counsel answered NO because that definition reaches only data derived from a device (CA-10) — is recorded with its trip-wire in `STATUTORY_CLASSIFICATIONS`, in the out-of-scope companion file. It is kept out of `ErasureRule` on purpose: `category` above is our own label and may not be cited as a legal determination, while that entry is one.
     { table: 'inspections', column: 'property_address',  category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
     { table: 'inspections', column: 'address_place_id',  category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
     { table: 'inspections', column: 'address_street',    category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },

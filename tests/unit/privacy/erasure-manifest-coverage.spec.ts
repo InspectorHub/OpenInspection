@@ -5,7 +5,7 @@
  *
  * The anonymize satellite-PII column set lives in the shared `anonymize-pii.ts`
  * module (consumed by BOTH the orchestrator and the retention sweep so they
- * cannot drift), so the anonymize-column scan binds the orchestrator source AND
+ * cannot drift), so the in-place-erasure column scan binds the orchestrator AND
  * that shared module.
  *
  * Cross-references:
@@ -67,18 +67,18 @@ function stripComments(src: string): string {
 }
 
 describe('erasure-manifest coverage', () => {
-    it('every anonymize rule column (camelCase) appears in the orchestrator source', () => {
-        const anonymizeRules = ERASURE_MANIFEST.filter((r) => r.action === 'anonymize');
+    it('every erase_in_place rule column (camelCase) appears in the orchestrator source', () => {
+        const inPlaceRules = ERASURE_MANIFEST.filter((r) => r.action === 'erase_in_place');
         const missing: string[] = [];
 
-        for (const rule of anonymizeRules) {
+        for (const rule of inPlaceRules) {
             const camel = toCamelCase(rule.column);
             if (!orchestratorSource.includes(camel)) {
                 missing.push(`${rule.table}.${rule.column} (camelCase: ${camel})`);
             }
         }
 
-        expect(missing, `Orchestrator missing anonymize columns: ${missing.join(', ')}`).toHaveLength(0);
+        expect(missing, `Orchestrator missing erase_in_place columns: ${missing.join(', ')}`).toHaveLength(0);
     });
 
     it('every delete/null rule table is referenced in the orchestrator source', () => {
@@ -204,9 +204,19 @@ const HEURISTIC_BLIND_SPOTS = [
     // a named person's property — the exact population
     // `docs/compliance/erasure-heuristic-limits.md` says the pattern cannot
     // reach — and it went in with nothing red, the same way
-    // `repair_action_tag` did. Its rule is `anonymize`, and the next test pins
+    // `repair_action_tag` did. Its rule is `erase_in_place`, and the next test pins
     // that it is a rule rather than an exclusion.
     'reports.inspector_narrative',
+    // The acceptance ledger. `PII_HEURISTIC` matches nothing on this table —
+    // not `actor_identity_ref`, not `content_hash` — so it could have shipped
+    // with `lint:erasure` green from the day it was written. Two of its ten
+    // columns are pinned: the one that names a person's account, and the one
+    // that says whether that person can bind the company. The other eight are a
+    // scope key, an opaque id, two timestamps, a document name, a version and a
+    // hash of company-authored text, where losing the declaration changes no
+    // answer.
+    'account_acceptances.user_id',
+    'account_acceptances.authority_basis',
 ];
 
 describe('columns the PII heuristic cannot see', () => {
@@ -242,7 +252,7 @@ describe('columns the PII heuristic cannot see', () => {
             (r) => r.table === 'reports' && r.column === 'inspector_narrative',
         );
         expect(rule, 'reports.inspector_narrative has no manifest rule').toBeTruthy();
-        expect(rule!.action).toBe('anonymize');
+        expect(rule!.action).toBe('erase_in_place');
         expect(rule!.legalBasis).toBe('art_17_3_e');
         expect(
             ERASURE_OUT_OF_SCOPE.some(

@@ -150,18 +150,31 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
             await backfillAutomationTemplates(this.db, tenantId);
         }
 
-        // Track L (D7) — seed the default TCPA disclosure (version 1) once. Guarded by
-        // a max-version check so re-running ensureSeeds never creates a duplicate.
+        /**
+         * Track L (D7) — seed the default TCPA disclosure (version 1) once.
+         *
+         * This used to insert the row itself, duplicating the publish path's
+         * max+1 logic. It now delegates, because the disclosure ledger acquired
+         * an invariant an insert cannot carry on its own: every version stores a
+         * hash of its own text, and a consent copies that hash as its evidence.
+         * A second writer that skipped the hash would leave the ONE row nearly
+         * every deployment actually consents against unhashed — the seeded one —
+         * while the publish path looked correct. One writer, one invariant.
+         *
+         * The max-version guard stays HERE rather than being left to the publish
+         * path's de-duplication, and the two are not the same question. Publishing
+         * de-duplicates identical text against the current version; this guard
+         * asks whether ANY version exists. A workspace that has since published
+         * its own wording must not have the platform default appended back on top
+         * of it at the next ensureSeeds.
+         */
         public async ensureSmsDisclosureV1(): Promise<void> {
             const db = this.getDrizzle();
             const cur = await db.select({ v: max(smsDisclosureVersions.version) })
                 .from(smsDisclosureVersions).get();
             if ((cur?.v ?? 0) >= 1) return;
-            await db.insert(smsDisclosureVersions).values({
-                version:     1,
-                text:        SMS_DISCLOSURE_V1,
-                publishedAt: new Date(),
-            });
+            const { SmsConsentService } = await import('../sms-consent.service');
+            await new SmsConsentService(this.db).publishDisclosure(SMS_DISCLOSURE_V1);
         }
 
         async list(tenantId: string) {

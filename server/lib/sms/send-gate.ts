@@ -1,4 +1,24 @@
 /**
+ * Why this message is being sent — and therefore which gates it is exempt from.
+ *
+ * - `notification` — a real message to a real recipient. Every gate applies.
+ * - `test` — an operator sending to a number they control, to check that SMS
+ *   works at all. Exempt from the EXPRESS-CONSENT requirement only, and only
+ *   because there is no contact to hold consent: nothing exists to consult, so
+ *   requiring it would mean no test send could ever succeed.
+ *
+ *   `test` is NOT exempt from revocation. Honoring STOP does not depend on the
+ *   basis the first message was sent under, and it does not care that this one
+ *   is a test — a tenant testing against a number that texted STOP should be
+ *   told so, not quietly sent to.
+ */
+type SmsPurpose = 'notification' | 'test';
+
+export type SmsGateOutcome =
+    | { allowed: true; smsMode: string; companyPhone: string | null; reviewUrl: string | null; companyName: string | null }
+    | { allowed: false; reason: string };
+
+/**
  * The one gate chain every outbound SMS passes through.
  *
  * There used to be three copies: the real send path (`sendOneSms`), the
@@ -30,26 +50,9 @@ import type { RoleKind } from '../people/role-kinds';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 import { logger } from '../logger';
 import { isPreferenceMuted } from '../notifications/preference-port';
-
-/**
- * Why this message is being sent — and therefore which gates it is exempt from.
- *
- * - `notification` — a real message to a real recipient. Every gate applies.
- * - `test` — an operator sending to a number they control, to check that SMS
- *   works at all. Exempt from the EXPRESS-CONSENT requirement only, and only
- *   because there is no contact to hold consent: nothing exists to consult, so
- *   requiring it would mean no test send could ever succeed.
- *
- *   `test` is NOT exempt from revocation. Honoring STOP does not depend on the
- *   basis the first message was sent under, and it does not care that this one
- *   is a test — a tenant testing against a number that texted STOP should be
- *   told so, not quietly sent to.
- */
-type SmsPurpose = 'notification' | 'test';
-
-export type SmsGateOutcome =
-    | { allowed: true; smsMode: string; companyPhone: string | null; reviewUrl: string | null }
-    | { allowed: false; reason: string };
+import { categoryOf } from '../notifications/classes';
+import { marketingVarsIn } from './marketing-content';
+import { rulesFor, jurisdictionKey, type Jurisdiction, type MessagingRule } from './messaging-rules';
 
 export interface SmsGateArgs {
     // Callers pass tenant-scoped drizzle handles with different schema maps;
@@ -83,8 +86,49 @@ export interface SmsGateArgs {
      * A preference can only ever NARROW what consent already allows (§3.3):
      * it is checked AFTER consent, never instead of it, so muting a class can
      * never turn an un-consented number into a sendable one.
+     *
+     * A class id the registry does not know is REFUSED, not defaulted. See the
+     * marketing block below for why an unknown class cannot be assumed
+     * transactional.
      */
     classId?: string | undefined;
+    /**
+     * The body about to be sent, BEFORE `{{var}}` interpolation.
+     *
+     * REQUIRED, and deliberately so. This gate's marketing check only fires on
+     * what it is given, so an optional argument would make every future call
+     * site a silent bypass — the caller that forgets it would be the caller
+     * that sends the marketing text. Required makes forgetting a build error.
+     *
+     * A caller with no template still passes what it will actually send: the
+     * settings test-connection sends a fixed diagnostic sentence and hands that
+     * sentence over. `''` is accepted and means "nothing to inspect", but it
+     * has to be written down at the call site rather than arrived at by
+     * omission.
+     */
+    bodyTemplate: string;
+    /**
+     * WHERE the recipient is, when the caller can state it as a fact.
+     *
+     * OPTIONAL, and unlike `bodyTemplate` that is not a compromise. A body is
+     * something every caller HAS — omitting it is forgetfulness, which is why it
+     * is required and why `lint:sms-gate-args` watches it. A jurisdiction is a
+     * fact about the recipient that nothing in this system currently holds:
+     * there is no explicit recipient timezone, no verified address, and counsel
+     * 26a-1 forbids deriving it from the area code, which is the only signal the
+     * destination number carries. `+1` cannot even separate the US from Canada.
+     *
+     * So absent means "not established", and the rules are not consulted. It
+     * does NOT mean "no rules apply": the checks that run without it (revocation,
+     * express consent, the marketing content and class blocks) are the ones that
+     * hold today, and every one of them refuses in the same direction the
+     * jurisdiction rules would. When a caller CAN state a jurisdiction, the rules
+     * become binding and an unstudied one is a refusal.
+     *
+     * Consulted only together with `classId`: a rule is keyed on what the
+     * message IS, and an unclassified send has no answer to that.
+     */
+    jurisdiction?: Jurisdiction | undefined;
     /** Absent ⇒ no quota enforcement (standalone, BYO, or a non-quota deployment). */
     quota?: { guard: PlanQuotaGuard; tier: string } | undefined;
 }
@@ -131,17 +175,22 @@ async function contactIdsForPhone(
 }
 
 export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
-    const { db, tenantId, to, purpose, contactId, roleKind, env, quota, classId } = args;
+    const { db, tenantId, to, purpose, contactId, roleKind, env, quota, classId, bodyTemplate, jurisdiction } = args;
 
     // A tenant with no config row is 'platform' — the same default all three
     // chains already used. Wrapped rather than `.catch()`-chained because some
     // drizzle handles return a thenable-only builder from `.get()`.
-    let cfg: { smsMode: string; companyPhone: string | null; reviewUrl: string | null } | null | undefined;
+    let cfg: { smsMode: string; companyPhone: string | null; reviewUrl: string | null; companyName: string | null } | null | undefined;
     try {
         cfg = await db.select({
             smsMode:      tenantConfigs.smsMode,
             companyPhone: tenantConfigs.companyPhone,
             reviewUrl:    tenantConfigs.reviewUrl,
+            // Read here rather than by a second query in the caller: this is
+            // the one place that already holds the tenant's config row, and the
+            // sender-identity record the send path writes needs the brand a
+            // recipient actually sees (counsel 26-5).
+            companyName:  tenantConfigs.companyName,
         }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
     } catch { cfg = null; }
     const smsMode = cfg?.smsMode ?? 'platform';
@@ -172,6 +221,114 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
         if (!contactId) return { allowed: false, reason: 'no sms consent' };
         if (await latestConsent(db, tenantId, contactId) !== 'granted') {
             return { allowed: false, reason: 'no sms consent' };
+        }
+    }
+
+    // ── Marketing may not ride a transactional consent.
+    //
+    // The consent we hold was captured under a disclosure describing
+    // appointment and report updates. A review request is promotional, which
+    // changes which consent the message needs, so counsel's ruling is to refuse
+    // marketing on this channel outright until a separate marketing-SMS consent
+    // exists. It is decided HERE and not in the template editor because a
+    // tenant can write any body they like: "do not leave the compliance
+    // decision to the content author."
+    //
+    // WHY BOTH CHECKS. The class check sees anything carrying a seeded class
+    // id. It cannot see a tenant-authored template, which has no class by
+    // construction — the content check is the half that can. Neither subsumes
+    // the other.
+    //
+    // WHY HERE — after revocation and consent, before the preference lookup.
+    // Placed after the preference check instead, a muted-but-consented
+    // recipient would decide the question consent should have decided: the
+    // refusal would come back as "recipient switched this off" and the fact
+    // that we may not send this content AT ALL would never be recorded. A
+    // message that may not be sent must not have its reason chosen by whether
+    // someone happened to mute the class.
+    //
+    // The type says this cannot be absent, and that is the primary defence —
+    // an omitting call site does not compile. The runtime check is here for the
+    // callers a type cannot reach (an `as any` handle, a spec, a JS consumer of
+    // the built worker): absence must be a REFUSAL, never a skipped check.
+    if (typeof bodyTemplate !== 'string') {
+        logger.error('[sms-gate] called with no message body; refusing', { tenantId, classId });
+        return { allowed: false, reason: 'sms gate called with no message body' };
+    }
+    const marketing = marketingVarsIn(bodyTemplate);
+    if (marketing.length > 0) {
+        return { allowed: false, reason: `marketing content on sms: ${marketing.join(', ')}` };
+    }
+    if (classId) {
+        const category = categoryOf(classId);
+        // Undefined is NOT 'transactional'. `categoryOf` returns it for an id
+        // outside the registry — a typo, or a class deleted while a caller
+        // still names it — and a caller that cannot say what it is sending must
+        // not be able to send it on a consent that was never given for it.
+        // There is deliberately no default here.
+        if (category === undefined) {
+            logger.warn('[sms-gate] refusing an unknown notification class', { tenantId, classId });
+            return { allowed: false, reason: `unknown notification class on sms: ${classId}` };
+        }
+        if (category === 'marketing') {
+            return { allowed: false, reason: 'marketing class on sms' };
+        }
+    }
+
+    // ── The jurisdiction's rules, where the caller can state the jurisdiction.
+    //
+    // WHY HERE — with consent, above the preference lookup, for the same reason
+    // the marketing block is here: these are questions about whether the message
+    // may be sent AT ALL, and a refusal that came back as "recipient switched
+    // this off" would record the wrong fact about the wrong actor.
+    //
+    // WHAT IT ENFORCES is only what this function can honestly decide, and the
+    // register says so per requirement (`enforced_by`) with
+    // `GATE_ENFORCED_REQUIREMENTS` above as the executable half:
+    //
+    //   consent_standard — a rule demanding a signed telemarketing authorization
+    //     is refused, because the consent this product captures is a disclosure
+    //     about appointment and report updates and is not that agreement.
+    //   quiet_hours — a rule that ATTACHES is refused, because we hold no rung of
+    //     counsel's evidence ladder (explicit recipient timezone → verified
+    //     address → other reliable signal → conservative fallback) and area-code
+    //     inference is forbidden as the local-time fact. We cannot show a send is
+    //     inside the window, so we do not send. `unknown` refuses for the
+    //     stronger reason: nobody has read the authority yet.
+    //
+    // `identification` and `unsubscribe` are NOT enforced here and are not
+    // pretended to be — this function never sees the composed body and does not
+    // own the inbound path. They are enforced elsewhere and the register names
+    // where.
+    if (jurisdiction && classId) {
+        let rule: MessagingRule;
+        try {
+            rule = rulesFor(classId, jurisdiction);
+        } catch (err) {
+            // An unstudied jurisdiction is a refusal, never a fallback to a rule
+            // proven somewhere else.
+            logger.warn('[sms-gate] no messaging rule for this jurisdiction; refusing', {
+                tenantId, classId, jurisdiction: jurisdictionKey(jurisdiction),
+                reason: err instanceof Error ? err.message : String(err),
+            });
+            return { allowed: false, reason: `no messaging rule for ${jurisdictionKey(jurisdiction)}` };
+        }
+        if (rule.consent_standard === 'express_written') {
+            return {
+                allowed: false,
+                reason: `express written consent required in ${jurisdictionKey(jurisdiction)}`,
+            };
+        }
+        if (rule.quiet_hours !== 'not_applicable') {
+            // Two different facts, two different reasons: one says the rule
+            // applies and we cannot place the recipient in time, the other says
+            // we have not established whether the rule applies at all.
+            return {
+                allowed: false,
+                reason: rule.quiet_hours === 'unknown'
+                    ? `quiet-hours rule not established for ${jurisdictionKey(jurisdiction)}`
+                    : 'quiet hours apply and recipient local time is not established',
+            };
         }
     }
 
@@ -207,5 +364,6 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
         smsMode,
         companyPhone: cfg?.companyPhone ?? null,
         reviewUrl: cfg?.reviewUrl ?? null,
+        companyName: cfg?.companyName ?? null,
     };
 }

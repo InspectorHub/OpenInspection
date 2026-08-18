@@ -6,9 +6,10 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { eq, and, desc } from 'drizzle-orm';
-import { agreements, tenantConfigs, invoices, inspections } from '../../lib/db/schema';
+import { agreements, tenantConfigs, invoices, inspections, esignAuditLogs } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
+import { signingIntentProblem } from '../../lib/esign/signing-intent';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { PublicAgreementBodySchema } from '../../lib/validations/agreement-public.schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
@@ -200,6 +201,37 @@ const agreementRoutes = createApiRouter()
         // Serve the pinned content SNAPSHOT — never the live template.
         const snapshot = await svc.getSnapshotForRequest(envelope);
 
+        // THE PRESENTATION, on the audit chain. Counsel round 26: intent must
+        // come from a recorded act, not be inferred from a signature image
+        // existing — and step one of that chain, "the signer was presented
+        // agreement X at hash Y", was recorded nowhere. `request.viewed` had been
+        // declared in the event enum for months with ZERO writers; the status
+        // flag `markViewedBySigner` sets is not a chained tamper-evident fact and
+        // carries no hash.
+        //
+        // Appended AFTER the snapshot resolves, because the hash is the point: on
+        // a first view of an unpinned envelope `getSnapshotForRequest` is what
+        // pins it, so reading the hash beforehand would record null for the one
+        // case that matters.
+        //
+        // Best-effort, like every other append on this path: a signer must not be
+        // unable to READ their agreement because an audit row failed. The
+        // consequence of a lost row is that the signature is later refused for a
+        // missing presentation, which is the safe direction.
+        try {
+            await c.var.services.auditLog.append(envelope.tenantId, envelope.id, 'signer.presented', {
+                envelopeId: envelope.id,
+                signerId: signer.id,
+                signerEmail: signer.email,
+                contentHash: snapshot.hash,
+                presentedAt: Date.now(),
+            });
+        } catch (err) {
+            logger.error('agreement presentation audit append failed',
+                { envelopeId: envelope.id, signerId: signer.id },
+                err instanceof Error ? err : undefined);
+        }
+
         // Agreement name comes from the template row (display only, not content).
         const agreementRow = await getDrizzle(c).select({ name: agreements.name })
             .from(agreements).where(eq(agreements.id, envelope.agreementId)).get();
@@ -371,6 +403,36 @@ const agreementRoutes = createApiRouter()
         const resolved = await svc.getSignerByPresentedToken(token);
         if (!resolved) throw Errors.NotFound('Agreement request not found');
         const { signer, envelope } = resolved;
+
+        // INTENT MUST COME FROM AN ACT. Counsel round 26: never inferred back
+        // from the fact that a signature image exists. So before recording one,
+        // the chain has to show this signer was presented THIS document.
+        //
+        // Two distinct refusals, and they are recorded as different facts: no
+        // presentation at all is a missing step, and a presentation of different
+        // content is a document that changed under a signer. A missing HASH is
+        // neither — an envelope predating content hashing has nothing to compare,
+        // and refusing there would block a signature for a reason about our own
+        // history rather than about the signer.
+        const intentLogs = await getDrizzle(c)
+            .select({ event: esignAuditLogs.event, payloadJson: esignAuditLogs.payloadJson })
+            .from(esignAuditLogs)
+            .where(and(
+                eq(esignAuditLogs.tenantId, envelope.tenantId),
+                eq(esignAuditLogs.requestId, envelope.id),
+            ))
+            .all();
+        const intentProblem = signingIntentProblem({
+            logs: intentLogs, signerId: signer.id, signedHash: envelope.contentHash ?? null,
+        });
+        if (intentProblem) {
+            logger.error('signing refused — intent chain incomplete',
+                { envelopeId: envelope.id, signerId: signer.id, reason: intentProblem });
+            throw Errors.BadRequest(
+                'This agreement has not been presented to you in a recorded step. '
+                + 'Please reopen the signing link and try again.',
+            );
+        }
 
         const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
         const ua = (c.req.header('user-agent') || '').slice(0, 200) || null;

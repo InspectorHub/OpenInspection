@@ -43,7 +43,7 @@ import type { AutomationChannel } from '../../services/automation/shared';
  * AUDIENCE, not a content type. Putting it here would have made the taxonomy
  * mean two things at once. It lives on `recipientFacing` instead.
  */
-type NotificationCategory = 'transactional' | 'operational' | 'marketing';
+export type NotificationCategory = 'transactional' | 'operational' | 'marketing';
 
 export interface NotificationClass {
     /** Stable id. For registry-backed email this IS the template trigger. */
@@ -119,7 +119,27 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     // invoice is: it is the only record we produce of money that changed hands,
     // and muting it hides money the recipient has paid.
     { id: 'payment-receipt',      label: 'Your payment receipt',    category: 'transactional', required: true,  channels: ['email'], audience: ['client'] },
-    { id: 'report-ready',         label: 'Your report is ready',    category: 'transactional', required: true,  channels: ['email'], audience: ['client'] },
+
+    // ─── statutory rights (round 20 B2)
+    // Two messages the engine did not have. The erasure orchestrator and the
+    // subject-export service are API-only: they do the work, write the
+    // accountability record, and tell nobody — so a data subject who asked to
+    // be forgotten learned the outcome from the absence of further contact,
+    // which is indistinguishable from having been ignored.
+    //
+    // `required` because a person cannot mute the confirmation that their own
+    // erasure happened. Honouring a preference that hid a statutory act from
+    // the only person it concerns would be the wrong way round.
+    { id: 'subject-export-ready',      label: 'Your copy of your data is ready', category: 'transactional', required: true, channels: ['email'], audience: ['client', 'agent', 'staff'] },
+    { id: 'subject-erasure-confirmed', label: 'Your erasure request is complete', category: 'transactional', required: true, channels: ['email'], audience: ['client', 'agent', 'staff'] },
+    // `sms` is here because the product TEXTS this, and five seeded automations
+    // carrying an smsBody mapped to classes that said email only. For the four
+    // non-required ones the screen was unaffected — screen-model.ts renders
+    // every channel for a class the reader can switch, deliberately. This one is
+    // REQUIRED, so it appears in `alwaysSent`, which reads `channels` verbatim:
+    // it was telling a client "we always send you this by email" while also
+    // texting them, with no switch to compensate.
+    { id: 'report-ready',         label: 'Your report is ready',    category: 'transactional', required: true,  channels: ['email', 'sms'], audience: ['client'] },
     { id: 'report-ready-pdf',     label: 'Your report (PDF)',       category: 'transactional', required: true,  channels: ['email'], audience: ['client'] },
     // A one-off share to a typed-in address — see the third `required: true`
     // case in the header. Not "important enough to force"; there is simply no
@@ -141,6 +161,17 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     { id: 'usage-quota-warning',  label: 'Free inspections running out', category: 'operational', required: true, channels: ['email'], audience: ['staff'] },
     { id: 'usage-quota-reached',  label: 'Free inspections used up',     category: 'operational', required: true, channels: ['email'], audience: ['staff'] },
 
+    // A destruction that did not finish, told to the controller.
+    //
+    // `required: true` is not a formality here. This is a message about the
+    // failure to complete an erasure the recipient asked for, sent under round
+    // 22 without undue delay after the failure is known; a preference that
+    // could switch it off would let a workspace opt out of being told its own
+    // data still exists. It is also the one class whose recipient's workspace
+    // no longer exists by the time it sends — which is why the address is
+    // resolved before the cascade rather than at the boundary.
+    { id: 'destruction-incomplete', label: 'Workspace deletion did not finish', category: 'operational', required: true, channels: ['email'], audience: ['staff'] },
+
     // ─── not a notification to anyone but the sender
     // An admin sending their own message template to their own address to see
     // what it looks like. Classified so the boundary is never handed a send it
@@ -158,7 +189,7 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     // carries `defaultEnabled: false` because that column defaulted to false —
     // the default moved with the data rather than being quietly dropped.
     { id: 'agent-new-referral',   label: 'A new referral is booked', category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
-    { id: 'agent-report-ready',   label: 'A report is ready to read', category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
+    { id: 'agent-report-ready',   label: 'A report is ready to read', category: 'transactional', required: false, channels: ['email', 'sms'], audience: ['agent'] },
     { id: 'agent-invoice-paid',   label: 'An invoice is paid',      category: 'transactional', required: false, channels: ['email'], audience: ['agent'], defaultEnabled: false },
 
     // ─── automation rules the tenant did not write (spec §2.2, §2.3, §2.5)
@@ -187,10 +218,10 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     // control that lies.
     { id: 'inspection-cancelled',         label: 'Your inspection was cancelled',   category: 'transactional', required: false, channels: ['email'], audience: ['client'] },
     { id: 'inspection-cancelled-buyers-agent', label: 'An inspection you referred was cancelled', category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
-    { id: 'report-amended',               label: 'Your report was updated',         category: 'transactional', required: false, channels: ['email'], audience: ['client'] },
-    { id: 'report-ready-listing-agent',   label: 'A report is ready (listing agent)', category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
+    { id: 'report-amended',               label: 'Your report was updated',         category: 'transactional', required: false, channels: ['email', 'sms'], audience: ['client'] },
+    { id: 'report-ready-listing-agent',   label: 'A report is ready (listing agent)', category: 'transactional', required: false, channels: ['email', 'sms'], audience: ['agent'] },
     { id: 'booking-confirmation-buyers-agent', label: 'An inspection you referred is booked', category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
-    { id: 'report-amended-buyers-agent',  label: 'A report you follow was updated',  category: 'transactional', required: false, channels: ['email'], audience: ['agent'] },
+    { id: 'report-amended-buyers-agent',  label: 'A report you follow was updated',  category: 'transactional', required: false, channels: ['email', 'sms'], audience: ['agent'] },
     { id: 'event-reminder',               label: 'Reminder before your appointment', category: 'transactional', required: false, channels: ['email'], audience: ['client'] },
     { id: 'event-followup',               label: 'Your results are ready',          category: 'transactional', required: false, channels: ['email'], audience: ['client'] },
     // Distinct from `event-followup`, which is timed off the pickup and says
@@ -231,6 +262,20 @@ const BY_ID = new Map(NOTIFICATION_CLASSES.map((c) => [c.id, c]));
 
 export function notificationClass(id: string): NotificationClass | undefined {
     return BY_ID.get(id);
+}
+
+/**
+ * What a notification IS — the compliance taxonomy, asked from outside.
+ *
+ * `undefined` is deliberately NOT `'transactional'`. A caller that cannot
+ * identify a class has to decide for itself what an unknown means, and on the
+ * SMS path it means BLOCK: a default here would make every unrecognised class
+ * id silently sendable on a consent that was never given for it. The one place
+ * a default IS correct is `isSuppressible` below, and it defaults the other
+ * way — to required — for the same fail-closed reason seen from the other side.
+ */
+export function categoryOf(id: string): NotificationCategory | undefined {
+    return notificationClass(id)?.category;
 }
 
 /**

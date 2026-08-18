@@ -1,0 +1,19 @@
+-- Who sent an SMS, and on whose behalf.
+--
+-- Counsel round 26-5: the owner of the number is not automatically the legal
+-- sender. In the default mode a message leaves the platform's shared number
+-- carrying the tenant's brand, so "who initiated this transmission" and "on
+-- whose behalf was it sent" are two questions with two answers.
+--
+-- Both used to be answerable only by reading `tenant_configs.sms_mode` and
+-- `company_name` AS THEY ARE TODAY — which answers a question about a message
+-- sent last year using this year's configuration. Both of those columns change.
+--
+-- So this is a SNAPSHOT, written in the same statement as the delivery outcome
+-- so a sent row can never lack it. JSON holding the SmsSenderIdentity shape
+-- (see server/lib/sms/sender-identity.ts).
+--
+-- Nullable: every row that predates this, and every email or in-app row, has
+-- none — and the null is honest rather than backfillable, because the
+-- configuration those messages were sent under is exactly what was not recorded.
+ALTER TABLE `automation_logs` ADD `sender_identity` text;

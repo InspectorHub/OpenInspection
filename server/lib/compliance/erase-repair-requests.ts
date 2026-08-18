@@ -46,7 +46,7 @@ import { changeCount } from './db-row-utils';
  */
 type StepRecorder = (
     table: string,
-    action: 'delete' | 'null' | 'anonymize',
+    action: 'delete' | 'null' | 'erase_in_place',
     extra: { legalBasis?: 'art_17_3_b' | 'art_17_3_e'; retentionExpiry?: number },
     fn: () => Promise<number>,
 ) => Promise<void>;

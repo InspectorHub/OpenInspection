@@ -8,6 +8,7 @@
   "server/api/evidence.ts::downloadAgreementPdf::.where(eq(schema.agreementRequests.id, envelopeId)).get();",
   "server/api/evidence.ts::downloadCertPdf::.where(eq(schema.agreementRequests.id, envelopeId)).get();",
   "server/api/evidence.ts::downloadEvidenceZip::.where(eq(schema.agreementRequests.id, envelopeId)).get();",
+  "server/api/inspections/agreement-sign.ts::<module>::.where(eq(agreementRequests.id, env.requestId)).get();",
   "server/api/inspections/agreements.ts::<module>::.where(eq(agreementRequests.id, env.requestId)).get();",
   "server/api/inspections/agreements.ts::<module>::.where(eq(agreements.id, envelope.agreementId)).get();",
   "server/api/public-report.ts::resolveClientTenant::.from(inspections).where(eq(inspections.id, id)).get();",

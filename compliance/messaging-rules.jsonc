@@ -1,0 +1,468 @@
+// Jurisdictional messaging rules — message class x jurisdiction, as data.
+//
+// Counsel round 26a. The rules are data because they are not one rule: what a
+// message owes depends on WHAT it is and WHERE the recipient is, and code that
+// answers that with an `if` grows a global rule out of whichever jurisdiction
+// its author happened to study.
+//
+// ── SIX RULES FOR THIS FILE ─────────────────────────────────────────────────
+//
+// 1. NO RULE WITHOUT A CITATION. Every requirement names at least one entry in
+//    `citations`, and every citation carries `authority`, `checked_on`,
+//    `verified_against` and — unless it is `unverified` — the `quote` that was
+//    actually read. This is not ceremony. Two claims in this repository were
+//    already wrong in exactly the way an uncited rule is wrong: a TCPA
+//    quiet-hours range asserted wider than the regulation's own scope, and
+//    Washington recorded as carrying a signature exemption it does not have.
+//    Both came from second-hand summaries that transplanted a neighbouring
+//    rule. A quote from the publisher's own text is the only thing that stops
+//    it.
+//
+//    And ONE of those citations is named as the `basis_citation` — the provision
+//    the value actually rests on. "At least one of my four citations is primary
+//    text" was the first version of that check and it was not enough: it passed
+//    a rule whose own exception provision had been downgraded to a summary,
+//    because a sibling citation was still primary. Proven by mutating this file.
+//
+// 2. `verified_against` SAYS WHERE THE WORDS CAME FROM, on this ladder:
+//      primary_text        — the publisher's own text (govinfo, laws-lois.justice.gc.ca)
+//      primary_text_mirror — a law library's verbatim reproduction, quoted here
+//      secondary_source    — a memo, guidance summary or article
+//      unverified          — NOBODY HAS READ IT. The authority is named so the
+//                            next person knows what to open; the claim is not
+//                            settled and must not be read as if it were.
+//    The gate COUNTS unverified citations and prints the count on every run. An
+//    unverified statutory claim that reads as verified is worse than an absent
+//    one, so it is never allowed to hide inside a green run.
+//
+// 3. "A STATUTE EXEMPTS US" AND "OUR ARCHITECTURE DOES NOT TRIGGER IT" ARE
+//    DIFFERENT FACTS. This repository has conflated them before. So the legal
+//    reason lives in `basis_kind` and the engineering reason lives in
+//    `architecture_note`, and they are separate fields:
+//      statute_requires    — the provision affirmatively imposes this
+//      statute_scope       — the provision's own definitions do not reach this
+//                            case (cite the DEFINITION, not the duty)
+//      statutory_exception — the provision reaches it and then excepts it
+//                            (cite the exception; primary text only)
+//      architecture        — the provision would reach it; our design never
+//                            performs the triggering act (requires
+//                            `architecture_note`)
+//      product_posture     — no statute demands this; we do it anyway
+//      unknown             — we have not established the answer
+//    An `architecture_note` may never be the support for a legal conclusion,
+//    and `statutory_exception` may never rest on a summary. The gate enforces
+//    both.
+//
+// 4. `unknown` IS A LEGAL VALUE AND FAILS CLOSED. Where we have not read the
+//    authority, the requirement says `unknown`, names the authority as an
+//    unverified citation, and states the open question. The send gate refuses
+//    rather than proceeding. Guessing `not_applicable` is how an unstudied
+//    jurisdiction becomes a silent green light.
+//
+// 5. NO JURISDICTION FALLBACK, IN THIS FILE OR IN THE ACCESSOR. A rule answers
+//    for the exact country/region pair it declares. `rulesFor` throws for
+//    anything else. A fallback is precisely how a rule proven in one
+//    jurisdiction becomes a global rule, which is the thing this framework
+//    exists to prevent — and the reason there is no `US`-with-no-region entry
+//    even though the federal provisions cited below apply nationally: adding a
+//    state means studying that state's overlay, not inheriting California's.
+//
+// 6. `CA` IS AMBIGUOUS AND THIS FILE NEVER LEANS ON IT. `{country: "US",
+//    region: "CA"}` is California; `{country: "CA", region: null}` is Canada.
+//    Both appear below. Every entry states country and region as separate
+//    fields, and the gate refuses a region of `"*"` or `"ALL"` so nobody can
+//    make one entry answer for a country it has not studied.
+//
+// ── WHAT IS DELIBERATELY NOT HERE ───────────────────────────────────────────
+// A blanket 8am-9pm rule for all SMS. Counsel round 26a-1 refused that premise:
+// the restriction sits in the telephone-solicitation rules and a transactional
+// robotext does not inherit it. And no area-code-derived timezone: a number
+// ports and its holder travels, so an area code is not the recipient's local
+// time. The evidence order counsel set is explicit recipient timezone ->
+// verified address -> other reliable signal -> conservative fallback, and we
+// hold none of the first three today, which is why a `required` quiet-hours
+// rule refuses instead of computing a window.
+{
+  "reviewed_on": "2026-08-17",
+  "authority": "docs/legal/2026-08-15-counsel-round-26-response.md (26a-1, 26a-2, 26a-5)",
+
+  "rules": [
+    // ── United States / California ──────────────────────────────────────────
+    {
+      "country": "US",
+      "region": "CA",
+      "label": "United States - California",
+      "channel": "sms",
+      "message_categories": ["transactional", "operational"],
+      "applicability": "A robotext to a wireless number. 47 CFR 64.1200 reaches it as a 'call'; the telephone-solicitation provisions do not, because this content does not encourage a purchase.",
+      "requirements": {
+        "consent_standard": {
+          "value": "express",
+          "basis_kind": "statute_requires",
+          "enforced_by": "send-gate",
+          "checked_on": "2026-08-17",
+          "citations": ["cfr-64.1200-a1"],
+          "basis_citation": "cfr-64.1200-a1",
+          "note": "(a)(1) conditions the prohibition on the call being made with an automatic telephone dialing system or an artificial or prerecorded voice. Whether this platform is an ATDS is a contested legal question we do not resolve here.",
+          "architecture_note": "The gate requires a granted consent row for consumer recipients whatever the answer to the ATDS question is (requiresExpressSmsConsent). That is a posture, not a reading of the regulation.",
+          "open_question": "Post-Facebook v. Duguid, is this platform's send path an ATDS? Not answered; the conservative posture above makes the answer non-load-bearing for whether we send."
+        },
+        "quiet_hours": {
+          "value": "not_applicable",
+          "basis_kind": "statute_scope",
+          "enforced_by": "send-gate",
+          "checked_on": "2026-08-17",
+          "citations": ["cfr-64.1200-c1", "cfr-64.1200-f15", "cfr-64.1200-e", "ca-state-quiet-hours"],
+          // The DEFINITION, not the duty: what makes the restriction inapplicable
+          // here is (f)(15)'s scope, so that is the text this value rests on.
+          "basis_citation": "cfr-64.1200-f15",
+          "note": "The 8 a.m.-9 p.m. restriction is imposed on a 'telephone solicitation', which (f)(15) defines as a call or message for the purpose of encouraging a purchase, rental or investment. A booking confirmation or a report-ready notice is not one, so the restriction never attaches. This is the provision's SCOPE, not an exemption granted to us and not a fact about our architecture.",
+          "open_question": "No California-specific calling-hours statute was located for SMS; Bus. & Prof. Code art. 8 (17590-17594) is a do-not-call scheme. See the `ca-state-quiet-hours` citation, which is unverified."
+        },
+        "identification": {
+          "value": "required",
+          "basis_kind": "product_posture",
+          "enforced_by": "sender-identity",
+          "checked_on": "2026-08-17",
+          "citations": ["ctia-messaging-principles"],
+          "basis_citation": "ctia-messaging-principles",
+          "note": "64.1200(b)'s identification duty is written for artificial or prerecorded voice messages, so no federal provision read here imposes sender identification on a transactional SMS. We record it as required anyway, and say plainly that the source is industry guidance nobody here has read rather than a statute.",
+          "architecture_note": "resolveSmsSenderIdentity records the platform sender and the tenant on whose behalf the message went out (counsel 26a-3). That is a RECORD of identification, which is not the same as identifying the sender inside the message body.",
+          "open_question": "Is there a US provision - federal or California - that requires sender identification inside a transactional SMS body, or is CTIA guidance the only source? Until that is read, this value is our own posture and must not be cited as law."
+        },
+        "unsubscribe": {
+          "value": "required",
+          "basis_kind": "statute_requires",
+          "enforced_by": "inbound-stop-webhook",
+          "checked_on": "2026-08-17",
+          "citations": ["cfr-64.1200-a10"],
+          "basis_citation": "cfr-64.1200-a10",
+          "note": "The FCC's revocation rules are the authority and they have NOT been read. The requirement is recorded as required because we already honour STOP unconditionally, so nothing about the product waits on the reading.",
+          "architecture_note": "Inbound STOP is recorded as a revocation in server/api/sms.ts and the send gate refuses on the latest revoked row for every purpose, including test sends.",
+          "open_question": "Read 47 CFR 64.1200(a)(10) and the 2024 revocation order, then replace the unverified citation."
+        }
+      }
+    },
+    {
+      "country": "US",
+      "region": "CA",
+      "label": "United States - California",
+      "channel": "sms",
+      "message_categories": ["marketing"],
+      "applicability": "A text message to a wireless number encouraging a purchase, rental or investment - a 'telephone solicitation' under (f)(15) and 'telemarketing' under (f)(13).",
+      "requirements": {
+        "consent_standard": {
+          "value": "express_written",
+          "basis_kind": "statute_requires",
+          "enforced_by": "send-gate",
+          "checked_on": "2026-08-17",
+          "citations": ["cfr-64.1200-a2", "cfr-64.1200-f9", "cfr-64.1200-f13"],
+          "basis_citation": "cfr-64.1200-a2",
+          "note": "(a)(2) demands prior express WRITTEN consent for a call that includes or introduces an advertisement or constitutes telemarketing, and (f)(9) defines that as an agreement in writing bearing the signature of the person called. The consent this product holds was captured under a disclosure describing appointment and report updates; it is not that agreement.",
+          "architecture_note": "Marketing is refused on this channel outright, by content variable and by class category, before any jurisdiction rule is consulted (counsel 26a-2, option (a)). The refusal is a product decision, not a reading that the statute forbids the message."
+        },
+        "quiet_hours": {
+          "value": "required",
+          "basis_kind": "statute_requires",
+          "enforced_by": "send-gate",
+          "checked_on": "2026-08-17",
+          "citations": ["cfr-64.1200-c1", "cfr-64.1200-e", "cfr-64.1200-f15", "ca-state-quiet-hours"],
+          "basis_citation": "cfr-64.1200-c1",
+          "note": "Permitted window is 08:00-21:00 LOCAL TIME AT THE CALLED PARTY'S LOCATION - the regulation forbids initiating 'before the hour of 8 a.m. or after 9 p.m.', and (e) extends (c) to text messages to wireless numbers. The window is quoted rather than restated because the last time it was restated it was written wider than the text.",
+          "architecture_note": "We hold no explicit recipient timezone and no verified address, and area-code inference is forbidden as the legal local-time fact (counsel 26a-1). With no rung of the evidence ladder available, the conservative fallback is refusal - the gate cannot show a send is inside the window, so it does not send.",
+          "open_question": "(f)(15)(ii) excludes a message to a person with whom the caller has an established business relationship, which a review request to a past client might fall under. NOT relied on: it is a fact-specific judgement about each recipient and we have no counsel ruling applying it."
+        },
+        "identification": {
+          "value": "required",
+          "basis_kind": "product_posture",
+          "enforced_by": "sender-identity",
+          "checked_on": "2026-08-17",
+          "citations": ["ctia-messaging-principles"],
+          "basis_citation": "ctia-messaging-principles",
+          "note": "Same posture as the transactional entry, and the same unread source.",
+          "open_question": "Same question as the transactional entry: no US provision imposing in-body sender identification has been read."
+        },
+        "unsubscribe": {
+          "value": "required",
+          "basis_kind": "statute_requires",
+          "enforced_by": "inbound-stop-webhook",
+          "checked_on": "2026-08-17",
+          "citations": ["cfr-64.1200-a10"],
+          "basis_citation": "cfr-64.1200-a10",
+          "note": "Same unread authority as the transactional entry.",
+          "open_question": "Same reading as the transactional entry: 47 CFR 64.1200(a)(10) and the 2024 revocation order are named but unopened.",
+          "architecture_note": "STOP is honoured for every purpose regardless of what basis the first message went out under."
+        }
+      }
+    },
+
+    // ── Canada ──────────────────────────────────────────────────────────────
+    // Encoded as classification -> applicability -> exception -> requirements,
+    // never `transactional = exempt`. Counsel 26a-5 corrected exactly that
+    // shorthand, and the statute's own wording is why: 6(6) excuses PARAGRAPH
+    // (1)(a) only, and only for a message that SOLELY does one of the listed
+    // things. The content duties in 6(2) survive the exception untouched.
+    {
+      "country": "CA",
+      "region": null,
+      "label": "Canada",
+      "channel": "sms",
+      "message_categories": ["transactional", "operational"],
+      "applicability": "A commercial electronic message under CASL: sent to an electronic address, and one it would be reasonable to conclude has as its purpose encouraging participation in a commercial activity. A booking confirmation for a paid inspection is a CEM that falls inside the 6(6)(b) exception, not a message outside CASL.",
+      "requirements": {
+        "consent_standard": {
+          "value": "exception_applies",
+          "basis_kind": "statutory_exception",
+          "enforced_by": "send-gate",
+          "checked_on": "2026-08-17",
+          "citations": ["casl-6-6", "casl-6-1"],
+          "basis_citation": "casl-6-6",
+          "note": "6(6) opens 'Paragraph (1)(a) does not apply to a commercial electronic message that SOLELY' - so the consent limb is excused, the 6(1)(b) content limb is not, and the exception is lost the moment the message does anything beyond the listed purpose. A confirmation carrying a review link is no longer solely (b).",
+          "architecture_note": "The gate is stricter than this: it still requires a granted consent row for consumer recipients. The exception being available is not the same as our using it."
+        },
+        "quiet_hours": {
+          "value": "unknown",
+          "basis_kind": "unknown",
+          "enforced_by": "send-gate",
+          "checked_on": "2026-08-17",
+          "citations": ["crtc-utr-calling-hours"],
+          "basis_citation": "crtc-utr-calling-hours",
+          "note": "CASL contains no quiet-hours provision. The CRTC's Unsolicited Telecommunications Rules do set telemarketing calling hours, and whether they reach SMS has NOT been read. Recorded as unknown, which the gate treats as a refusal.",
+          "open_question": "Do the CRTC Unsolicited Telecommunications Rules apply to a transactional SMS, or only to telemarketing telecommunications? Read the Rules, then split this into a scoped answer."
+        },
+        "identification": {
+          "value": "required",
+          "basis_kind": "statute_requires",
+          "enforced_by": "sender-identity",
+          "checked_on": "2026-08-17",
+          "citations": ["casl-6-2"],
+          "basis_citation": "casl-6-2",
+          "note": "6(2)(a) requires prescribed information identifying the sender AND the person on whose behalf the message is sent where different, and 6(2)(b) requires contact information the recipient can readily use. This is owed even where 6(6) excuses consent, which is the half of our earlier reading counsel called too wide. A phone number alone does not discharge it.",
+          "architecture_note": "The two-role record exists (resolveSmsSenderIdentity: platform sender plus tenant on whose behalf). What is NOT proven is that the message BODY carries the prescribed identification and contact information.",
+          "open_question": "Which prescribed information does the Electronic Commerce Protection Regulations require in the body, and does our SMS body carry it? Unanswered; the record is not the disclosure."
+        },
+        "unsubscribe": {
+          "value": "required",
+          "basis_kind": "statute_requires",
+          "enforced_by": "inbound-stop-webhook",
+          "checked_on": "2026-08-17",
+          "citations": ["casl-6-2", "casl-11-1", "casl-11-2", "casl-11-3", "crtc-stop-as-unsubscribe"],
+          "basis_citation": "casl-6-2",
+          "note": "6(2)(c) requires an unsubscribe mechanism conforming to 11(1); 11(2) requires the address or page in 11(1)(b) to stay valid for a minimum of 60 days after the message is sent; 11(3) requires effect to be given without delay and no later than 10 business days.",
+          "architecture_note": "Reply STOP is our mechanism and it is processed on receipt, which satisfies 11(3)'s outer limit by construction rather than by a job. That CRTC accepts STOP as a mechanism is counsel's citation and is recorded as a secondary source."
+        }
+      }
+    },
+    {
+      "country": "CA",
+      "region": null,
+      "label": "Canada",
+      "channel": "sms",
+      "message_categories": ["marketing"],
+      "applicability": "A CEM whose purpose is encouraging participation in a commercial activity, and which does NOT solely do one of the things 6(6) lists - so no exception is available.",
+      "requirements": {
+        "consent_standard": {
+          "value": "express_or_implied",
+          "basis_kind": "statute_requires",
+          "enforced_by": "send-gate",
+          "checked_on": "2026-08-17",
+          "citations": ["casl-6-1", "casl-10-9", "casl-6-6"],
+          "basis_citation": "casl-6-1",
+          "note": "6(1)(a) accepts consent 'whether the consent is express or implied', and 10(9)(a) supplies implied consent from an existing business relationship. That is a genuinely lower bar than the US telemarketing standard, which is why the two jurisdictions cannot share one rule. 6(6) is cited as the exception that does NOT apply here.",
+          "architecture_note": "Immaterial today: marketing is refused on the SMS channel before any jurisdiction rule is reached. The rule is recorded so that a future marketing-SMS consent is built against the right standard for each jurisdiction rather than the strictest one found."
+        },
+        "quiet_hours": {
+          "value": "unknown",
+          "basis_kind": "unknown",
+          "enforced_by": "send-gate",
+          "checked_on": "2026-08-17",
+          "citations": ["crtc-utr-calling-hours"],
+          "basis_citation": "crtc-utr-calling-hours",
+          "note": "Marketing is the case the CRTC calling-hours rules are most likely to reach, and they have not been read. Unknown, and therefore refused.",
+          "open_question": "Same reading as the transactional entry, and this is the category where the answer will actually bite."
+        },
+        "identification": {
+          "value": "required",
+          "basis_kind": "statute_requires",
+          "enforced_by": "sender-identity",
+          "checked_on": "2026-08-17",
+          "citations": ["casl-6-2"],
+          "basis_citation": "casl-6-2",
+          "note": "Owed on every CEM, with or without an exception."
+        },
+        "unsubscribe": {
+          "value": "required",
+          "basis_kind": "statute_requires",
+          "enforced_by": "inbound-stop-webhook",
+          "checked_on": "2026-08-17",
+          "citations": ["casl-6-2", "casl-11-1", "casl-11-2", "casl-11-3", "crtc-stop-as-unsubscribe"],
+          "basis_citation": "casl-6-2",
+          "note": "Same provisions as the transactional entry."
+        }
+      }
+    }
+  ],
+
+  // ── Citations ─────────────────────────────────────────────────────────────
+  // `quote` is the text that was actually read, excerpted with ellipses where
+  // it is an excerpt. It is null ONLY where `verified_against` is `unverified`,
+  // and in that case the entry exists to NAME what has to be opened.
+  "citations": [
+    {
+      "id": "cfr-64.1200-c1",
+      "authority": "47 CFR 64.1200(c)(1)",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://www.govinfo.gov/content/pkg/CFR-2024-title47-vol3/xml/CFR-2024-title47-vol3-sec64-1200.xml",
+      "quote": "(c) No person or entity shall initiate any telephone solicitation to: (1) Any residential telephone subscriber before the hour of 8 a.m. or after 9 p.m. (local time at the called party's location)"
+    },
+    {
+      "id": "cfr-64.1200-e",
+      "authority": "47 CFR 64.1200(e)",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://www.govinfo.gov/content/pkg/CFR-2024-title47-vol3/xml/CFR-2024-title47-vol3-sec64-1200.xml",
+      "quote": "The rules set forth in paragraph (c) and (d) of this section are applicable to any person or entity making telephone solicitations or telemarketing calls or text messages to wireless telephone numbers to the extent described in the Commission's Report and Order, CG Docket No. 02-278, FCC 03-153, 'Rules and Regulations Implementing the Telephone Consumer Protection Act of 1991.'"
+    },
+    {
+      "id": "cfr-64.1200-f15",
+      "authority": "47 CFR 64.1200(f)(15) - definition of 'telephone solicitation'",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://www.govinfo.gov/content/pkg/CFR-2024-title47-vol3/xml/CFR-2024-title47-vol3-sec64-1200.xml",
+      "quote": "The term telephone solicitation means the initiation of a telephone call or message for the purpose of encouraging the purchase or rental of, or investment in, property, goods, or services, which is transmitted to any person, but such term does not include a call or message: (i) To any person with that person's prior express invitation or permission; (ii) To any person with whom the caller has an established business relationship; or (iii) By or on behalf of a tax-exempt nonprofit organization."
+    },
+    {
+      "id": "cfr-64.1200-f13",
+      "authority": "47 CFR 64.1200(f)(13) - definition of 'telemarketing'",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://www.govinfo.gov/content/pkg/CFR-2024-title47-vol3/xml/CFR-2024-title47-vol3-sec64-1200.xml",
+      "quote": "the initiation of a telephone call or message for the purpose of encouraging the purchase or rental of, or investment in, property, goods, or services, which is transmitted to any person."
+    },
+    {
+      "id": "cfr-64.1200-a1",
+      "authority": "47 CFR 64.1200(a)(1)",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://www.govinfo.gov/content/pkg/CFR-2024-title47-vol3/xml/CFR-2024-title47-vol3-sec64-1200.xml",
+      "quote": "Except as provided in paragraph (a)(2) of this section, initiate any telephone call (other than a call made for emergency purposes or is made with the prior express consent of the called party) ... [excerpt: the paragraph conditions the prohibition on use of an automatic telephone dialing system or an artificial or prerecorded voice]"
+    },
+    {
+      "id": "cfr-64.1200-a2",
+      "authority": "47 CFR 64.1200(a)(2)",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://www.govinfo.gov/content/pkg/CFR-2024-title47-vol3/xml/CFR-2024-title47-vol3-sec64-1200.xml",
+      "quote": "Initiate, or cause to be initiated, any telephone call that includes or introduces an advertisement or constitutes telemarketing, using an automatic telephone dialing system or an artificial or prerecorded voice, to any of the lines or telephone numbers described in paragraphs (a)(1)(i) through (iii) of this section, other than a call made with the prior express written consent of the called party ..."
+    },
+    {
+      "id": "cfr-64.1200-f9",
+      "authority": "47 CFR 64.1200(f)(9) - definition of 'prior express written consent'",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://www.govinfo.gov/content/pkg/CFR-2024-title47-vol3/xml/CFR-2024-title47-vol3-sec64-1200.xml",
+      "quote": "an agreement, in writing, bearing the signature of the person called that clearly authorizes the seller to deliver or cause to be delivered to the person called advertisements or telemarketing messages using an automatic telephone dialing system or an artificial or prerecorded voice ..."
+    },
+    {
+      "id": "cfr-64.1200-a10",
+      "authority": "47 CFR 64.1200(a)(10) and the FCC's 2024 revocation-of-consent order (CG Docket 02-278)",
+      "verified_against": "unverified",
+      "checked_on": "2026-08-17",
+      "source": null,
+      "quote": null,
+      "why_unverified": "Named but not opened. The 'unsubscribe: required' values that cite it do not depend on it: we honour STOP unconditionally already, so the reading can only narrow what we do, never widen it."
+    },
+    {
+      "id": "ctia-messaging-principles",
+      "authority": "CTIA Messaging Principles and Best Practices - sender identification in the message body",
+      "verified_against": "unverified",
+      "checked_on": "2026-08-17",
+      "source": null,
+      "quote": null,
+      "why_unverified": "Industry guidance, not law, and not read. It is named because the 'identification: required' values in the US entries rest on product posture rather than on any federal provision read here - and saying so is the point. Do not upgrade these to statute_requires without reading a statute."
+    },
+    {
+      "id": "ca-state-quiet-hours",
+      "authority": "California-specific calling-hours restriction for text messages (searched: Bus. & Prof. Code art. 8, 17590-17594)",
+      "verified_against": "unverified",
+      "checked_on": "2026-08-17",
+      "source": null,
+      "quote": null,
+      "why_unverified": "A search of California's Unsolicited and Unwanted Telephone Solicitations article found a do-not-call scheme and no calling-hours provision, but absence was not confirmed against the full code text. Recorded as an open question rather than as 'California adds nothing', because 'we did not find it' and 'it is not there' are different claims."
+    },
+    {
+      "id": "casl-6-1",
+      "authority": "An Act to promote the efficiency and adaptability of the Canadian economy (CASL), S.C. 2010, c. 23, s. 6(1)",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://laws-lois.justice.gc.ca/eng/acts/E-1.6/section-6.html",
+      "quote": "It is prohibited to send or cause or permit to be sent to an electronic address a commercial electronic message unless (a) the person to whom the message is sent has consented to receiving it, whether the consent is express or implied; and (b) the message complies with subsection (2)."
+    },
+    {
+      "id": "casl-6-2",
+      "authority": "CASL s. 6(2)",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://laws-lois.justice.gc.ca/eng/acts/E-1.6/section-6.html",
+      "quote": "The message must be in a form that conforms to the prescribed requirements and must (a) set out prescribed information that identifies the person who sent the message and the person - if different - on whose behalf it is sent; (b) set out information enabling the person to whom the message is sent to readily contact one of the persons referred to in paragraph (a); and (c) set out an unsubscribe mechanism in accordance with subsection 11(1)."
+    },
+    {
+      "id": "casl-6-6",
+      "authority": "CASL s. 6(6)",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://laws-lois.justice.gc.ca/eng/acts/E-1.6/section-6.html",
+      "quote": "Paragraph (1)(a) does not apply to a commercial electronic message that solely [(a) provides a quote or estimate for the supply of a product or service, if the quote or estimate was requested; (b) facilitates, completes or confirms a commercial transaction that the person to whom the message is sent previously agreed to enter into; (c) provides warranty, product recall, or safety or security information; (d) provides factual information about a subscription, membership, account, loan or similar ongoing relationship; (e) provides information about an employment relationship or benefit plan; (f) delivers a product, goods or a service, including product updates or upgrades; or (g) communicates a purpose specified in the regulations]"
+    },
+    {
+      "id": "casl-10-9",
+      "authority": "CASL s. 10(9)",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://laws-lois.justice.gc.ca/eng/acts/E-1.6/section-10.html",
+      "quote": "consent is implied only if ... (a) the person who sends the message, the person who causes it to be sent or the person who permits it to be sent has an existing business relationship or an existing non-business relationship with the person to whom it is sent"
+    },
+    {
+      "id": "casl-11-1",
+      "authority": "CASL s. 11(1)",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://laws-lois.justice.gc.ca/eng/acts/E-1.6/section-11.html",
+      "quote": "(a) enable the person to whom the commercial electronic message is sent to indicate, at no cost to them, the wish to no longer receive any commercial electronic messages ... (b) specify an electronic address, or link to a page on the World Wide Web that can be accessed through a web browser, to which the indication may be sent"
+    },
+    {
+      "id": "casl-11-2",
+      "authority": "CASL s. 11(2)",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://laws-lois.justice.gc.ca/eng/acts/E-1.6/section-11.html",
+      "quote": "the electronic address or World Wide Web page referred to in paragraph (1)(b) is valid for a minimum of 60 days after the message has been sent."
+    },
+    {
+      "id": "casl-11-3",
+      "authority": "CASL s. 11(3)",
+      "verified_against": "primary_text",
+      "checked_on": "2026-08-17",
+      "source": "https://laws-lois.justice.gc.ca/eng/acts/E-1.6/section-11.html",
+      "quote": "effect is given to an indication sent in accordance with paragraph (1)(b) without delay, and in any event no later than 10 business days after the indication has been sent."
+    },
+    {
+      "id": "crtc-stop-as-unsubscribe",
+      "authority": "CRTC guidance that replying STOP can constitute an unsubscribe mechanism for SMS",
+      "verified_against": "secondary_source",
+      "checked_on": "2026-08-17",
+      "source": "docs/legal/2026-08-15-counsel-round-26-response.md (26a-5)",
+      "quote": "CRTC ... acknowledges that using STOP in an SMS can constitute an unsubscribe mechanism [counsel's summary of the CRTC guidance; the CRTC document itself was not opened]"
+    },
+    {
+      "id": "crtc-utr-calling-hours",
+      "authority": "CRTC Unsolicited Telecommunications Rules - telemarketing calling hours, and whether they reach SMS",
+      "verified_against": "unverified",
+      "checked_on": "2026-08-17",
+      "source": null,
+      "quote": null,
+      "why_unverified": "Not opened. This is the whole reason both Canadian quiet-hours values are `unknown` rather than `not_applicable`: CASL itself has no quiet hours, and concluding 'therefore Canada has none' would be exactly the transplant that produced the Washington error."
+    }
+  ]
+}

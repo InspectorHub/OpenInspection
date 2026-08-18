@@ -7,7 +7,7 @@
  *
  * Decision policy (spec §3 D2/D5):
  *  - EVIDENCE-BEARING agreement rows (envelope status 'signed' OR signedAt not
- *    null OR ANY signer row has signed) -> ANONYMIZE the satellite PII (D5 field
+ *    null OR ANY signer row has signed) -> ERASE the satellite PII IN PLACE (D5
  *    set). KEEP signature_base64, signed_at, viewed_at, role, channel,
  *    content_snapshot, content_hash, and the entire esign_audit_logs chain.
  *    legalBasis art_17_3_e; retentionExpiry = (envelope signedAt, else earliest
@@ -33,8 +33,8 @@
  * realizes those rules with tenant-scoped, row-state-aware SQL.
  *
  * Binding: `tests/unit/privacy/erasure-manifest-coverage.spec.ts` asserts every
- * manifest anonymize/delete/null rule is referenced in this file, preventing
- * silent manifest↔orchestrator drift.
+ * manifest erase_in_place/delete/null rule is referenced in this file,
+ * preventing silent manifest↔orchestrator drift.
  */
 import { and, eq, inArray, or } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
@@ -79,10 +79,10 @@ const ANONYMIZED_TITLE = 'Inspection Report (details removed)';
  */
 export interface ErasureDecision {
     table: string;
-    action: 'delete' | 'null' | 'anonymize';
+    action: 'delete' | 'null' | 'erase_in_place';
     count: number;
     legalBasis?: 'art_17_3_b' | 'art_17_3_e';
-    /** Unix-MS integer: signedAt + retentionYears. Present on anonymize steps. */
+    /** Unix-MS integer: signedAt + retentionYears. Present on in-place erasures. */
     retentionExpiry?: number;
     /** Set when this step threw (fail-closed accountability). */
     error?: string;
@@ -136,7 +136,7 @@ export async function runErasure(
         try {
             const count = await fn();
             if (count > 0) decisions.push({ table, action, count, ...extra });
-            if (action === 'anonymize') anonymizedCount += count;
+            if (action === 'erase_in_place') anonymizedCount += count;
             else if (action === 'delete') deletedCount += count;
         } catch (err) {
             failed = true;
@@ -171,7 +171,7 @@ export async function runErasure(
     // still incomplete (e.g. completionPolicy 'all', one signer signed, others
     // pending; envelope status 'viewed'/'sent', signed_at NULL). Such a partial
     // envelope already carries collected signature evidence (image + IP + UA +
-    // audit chain) that must be ANONYMIZED-and-retained, never hard-deleted.
+    // audit chain) that must be ERASED-IN-PLACE-and-retained, never hard-deleted.
     // Load, in ONE grouped query (tenant-scoped, no N+1), the request ids that
     // have at least one signed signer row, and the EARLIEST signer signed_at per
     // request (used to anchor retentionExpiry when the envelope's own signedAt is
@@ -201,7 +201,7 @@ export async function runErasure(
     const evidenceEnvelopes = envelopes.filter(hasSignedEvidence);
     const draftEnvelopes = envelopes.filter((e) => !hasSignedEvidence(e));
 
-    // ── 1) Evidence envelopes: anonymize the SUBJECT'S signer rows (D5) ───────
+    // ── 1) Evidence envelopes: erase the SUBJECT'S signer rows in place (D5) ─
     // Tenant + subject email scoped, restricted to evidence-bearing envelopes so
     // other signers and unrelated rows are never touched. Idempotent: a re-run
     // finds email already cleared -> matches 0 rows.
@@ -216,7 +216,7 @@ export async function runErasure(
         const anonExtra: Pick<ErasureDecision, 'legalBasis' | 'retentionExpiry'> = anchorMs != null
             ? { legalBasis: 'art_17_3_e', retentionExpiry: addYearsMs(anchorMs, retentionYears) }
             : { legalBasis: 'art_17_3_e' };
-        await step('agreement_signers', 'anonymize', anonExtra, async () => {
+        await step('agreement_signers', 'erase_in_place', anonExtra, async () => {
             // Shared satellite-PII SET (name/email sentinel, rest NULL). KEEP
             // signature_base64 — it is the retained evidence on a DSAR. The
             // retention sweep reuses ANONYMIZE_SIGNER_PII and adds signature
@@ -230,11 +230,11 @@ export async function runErasure(
                 ))
                 .run();
             const c = changeCount(res);
-            retainedCount += c; // anonymized rows are retained-under-exemption evidence
+            retainedCount += c; // cleared rows are retained-under-exemption evidence
             return c;
         });
         // Envelope denormalized client identity.
-        await step('agreement_requests', 'anonymize', anonExtra, async () => {
+        await step('agreement_requests', 'erase_in_place', anonExtra, async () => {
             // Shared satellite-PII SET (client_email sentinel, client_name NULL).
             // KEEP signature_base64 on a DSAR; the sweep reuses this same SET.
             const res = await db.update(agreementRequests)
@@ -246,7 +246,7 @@ export async function runErasure(
                 ))
                 .run();
             const c = changeCount(res);
-            retainedCount += c; // anonymized envelopes are also retained-under-exemption evidence
+            retainedCount += c; // cleared envelopes are also retained-under-exemption evidence
             return c;
         });
     }
@@ -349,7 +349,7 @@ export async function runErasure(
 
     // Booking requests: the ROW survives (`inspections.request_id` carries a
     // frozen legacy FK to it), identity cleared in place via the shared SET.
-    await step('inspection_requests', 'anonymize', { legalBasis: 'art_17_3_e' }, async () => {
+    await step('inspection_requests', 'erase_in_place', { legalBasis: 'art_17_3_e' }, async () => {
         const res = await db.update(inspectionRequests)
             .set(ANONYMIZE_BOOKING_REQUEST_PII)
             .where(and(eq(inspectionRequests.tenantId, tenantId), eq(inspectionRequests.clientEmail, subjectEmail)))
@@ -378,7 +378,7 @@ export async function runErasure(
     // TWO columns. `inspector_narrative` is the one the paragraph above was wrong
     // about `title`: genuinely free prose a person writes about this property for
     // this client. See the reports block in `erasure-manifest.ts`.
-    await step('reports', 'anonymize', { legalBasis: 'art_17_3_e' }, async () => {
+    await step('reports', 'erase_in_place', { legalBasis: 'art_17_3_e' }, async () => {
         const inspIds = await subjectInspectionIds();
         if (inspIds.length === 0) return 0;
         // NULL, not a placeholder: a title is a label every list renders and
@@ -405,7 +405,7 @@ export async function runErasure(
     // payment against a standalone invoice has no inspection_id. The invoice
     // locator matches on contact_id, which survives the invoices step above
     // (that one nulls client_name/client_email only).
-    await step('order_payments', 'anonymize', { legalBasis: 'art_17_3_b' }, async () => {
+    await step('order_payments', 'erase_in_place', { legalBasis: 'art_17_3_b' }, async () => {
         if (subjectContactIds.length === 0) return 0;
         const inspIds = await subjectInspectionIds();
         const invRows = await db.select({ id: invoices.id }).from(invoices)
@@ -430,7 +430,7 @@ export async function runErasure(
     // `metadata` is free-form JSON: audit.ts strips the machine-detectable
     // identifiers at write, prose it cannot see at all, and older rows predate
     // it — so the whole value goes. Located by entity id (inspections/contacts).
-    await step('audit_logs', 'anonymize', { legalBasis: 'art_17_3_b' }, async () => {
+    await step('audit_logs', 'erase_in_place', { legalBasis: 'art_17_3_b' }, async () => {
         const targets = [...(await subjectInspectionIds()), ...subjectContactIds];
         if (targets.length === 0) return 0;
         const c = changeCount(await db.update(auditLogs).set(ANONYMIZE_AUDIT_PII)

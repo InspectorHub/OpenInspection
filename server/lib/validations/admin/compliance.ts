@@ -176,12 +176,29 @@ export const EraseDataResponseSchema = createApiResponseSchema(z.object({
         .describe('Total rows retained as anonymized evidence (signer rows + envelope rows, post-anonymization).'),
     decisions: z.array(z.object({
         table: z.string().describe('DB table the decision applies to.'),
-        action: z.enum(['delete', 'null', 'anonymize']).describe('Action taken on this table.'),
+        // BOTH values, and the older one is not deprecation debt.
+        //
+        // `erase_in_place` replaced `anonymize` in the source vocabulary on
+        // 2026-08-17 (counsel round 27, CA-08 — the old label invited a reader
+        // to conclude we had produced legally deidentified data). This schema is
+        // not source: it describes a RESPONSE and it validates the same array
+        // that is persisted in `erasure_log.decisions_json` and shipped to
+        // portal as `reply.subject.erased.v1`.
+        //
+        // Narrowing it to the new value alone would do two things a rename must
+        // not: break a versioned cross-repo event whose consumer validates the
+        // enum, and make every row written before the rename unreadable against
+        // its own schema. An accountability record that cannot be parsed is
+        // worse than one with an unfashionable word in it.
+        //
+        // New writes emit `erase_in_place`. Old rows keep what they said.
+        action: z.enum(['delete', 'null', 'anonymize', 'erase_in_place'])
+            .describe('Action taken on this table. `erase_in_place` on new rows; `anonymize` on rows written before 2026-08-17 and on the versioned portal reply event.'),
         count: z.number().int().describe('Rows affected.'),
         legalBasis: z.enum(['art_17_3_b', 'art_17_3_e']).optional()
             .describe('GDPR Art. 17(3) exemption invoked, when retaining evidence.'),
         retentionExpiry: z.number().optional()
-            .describe('Unix-MS integer: signedAt + retentionYears. Present on anonymize steps.'),
+            .describe('Unix-MS integer: signedAt + retentionYears. Present on erase_in_place steps (`anonymize` on rows predating the rename).'),
         error: z.string().optional()
             .describe('Set when this step threw (fail-closed accountability).'),
     })).optional().describe('Per-table erasure decisions recorded in the log row.'),

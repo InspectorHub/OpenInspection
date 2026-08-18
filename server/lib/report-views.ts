@@ -30,6 +30,16 @@ import { logger } from './logger';
  * ever cause a request NOT to be counted.
  */
 export interface ReportViewSignals {
+    /**
+     * The tenant's own decision, from `tenant_configs`. Default OFF.
+     *
+     * Counsel B4: the legitimate-interests assessment assigned the interest to
+     * the inspection company — a company that could not enable this, could not
+     * disable it, and could not see it happening. A tenant's legitimate
+     * interest may not be a mask for processing they cannot decline, so the
+     * assessment does not hold until the decline exists. This field is it.
+     */
+    countingEnabled: boolean;
     /** A live per-recipient portal grant resolved for THIS inspection. */
     accessTokenId: string | null;
     /** Headless PDF pipeline (`?render=`) — the product's own non-human GET. */
@@ -70,6 +80,14 @@ export interface ReportViewSignals {
  * to consent.
  */
 export function shouldCountReportView(s: ReportViewSignals): boolean {
+    // FIRST, before the access-token test. A tenant who has not chosen this
+    // should not have the outcome depend on any other signal — the answer is no
+    // because they did not ask for it, not because a header looked like a
+    // prefetch. Every check below returns the same boolean, so no assertion can
+    // tell the order apart; what would differ is any future branch that records
+    // WHY, and a tenant who never opted in must never appear in such a record
+    // as "suppressed because the link had no token".
+    if (!s.countingEnabled) return false;
     if (!s.accessTokenId) return false;
     if (s.renderMode || s.ownerPreview) return false;
     if (s.method.toUpperCase() !== 'GET') return false;
