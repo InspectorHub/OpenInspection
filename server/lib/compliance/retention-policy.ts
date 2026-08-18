@@ -47,9 +47,9 @@
  * `interim` = running in production, not approved.
  * `approved_with_conditions` = review ruled on the windows, and named conditions
  *   that are NOT yet met. Deliberately its own value rather than `approved`,
- *   because review asked for exactly that distinction: "如果这是要直接交给工程团队
- *   执行的 ruling，我建议把 review 标成 APPROVED WITH CONDITIONS，而不是 APPROVED".
- *   A reader who sees `approved` stops asking what is left.
+ *   because a ruling handed straight to an engineering team has to carry its
+ *   own unmet conditions, and a reader who sees `approved` stops asking what is
+ *   left.
  * `approved` = review signed off on THIS version and every condition is met.
  */
 export type RetentionPolicyStatus = 'interim' | 'approved_with_conditions' | 'approved';
@@ -100,8 +100,9 @@ export interface RetentionPolicyHeader {
  *         exempt": they are protected only while a surviving record needs the
  *         version to remain reproducible
  *   3. ❌ `legal_hold` overrides every scheduled deletion. ZERO occurrences in the
- *         codebase. review: without it "再漂亮的 36/84 个月数字都会被 litigation
- *         preservation 要求击穿"
+ *         codebase. Without it, the first litigation-preservation request
+ *         punches straight through every window below — however defensible the
+ *         36- and 84-month numbers look on their own
  *   4. ❌ the customer ToS re-accept flow names the liability cap in its change
  *         summary (portal — built, pending the ToS publish)
  *   5. ❌ approval/version registration completed before the new ToS publishes
@@ -114,8 +115,9 @@ export interface RetentionPolicyHeader {
  * ⚠️ AND A SCOPE LIMIT review asked to be written here rather than filed: this
  * covers DATABASE retention only. Object storage, Durable Objects, KV and queues
  * were never in the compliance register (review). A green retention gate does
- * NOT mean the data lifecycle has been reviewed — "否则以后很容易有人看到
- * retention gate = green 就误以为所有 production stores 都已经被覆盖".
+ * NOT mean the data lifecycle has been reviewed — without that sentence here,
+ * it is very easy for the next reader to see the gate pass and conclude that
+ * every production store is covered.
  */
 export const RETENTION_POLICY: RetentionPolicyHeader = {
     version: '2026-08-19.2',
