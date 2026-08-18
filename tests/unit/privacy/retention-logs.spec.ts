@@ -73,7 +73,14 @@ const daysAgo = (n: number) => new Date(NOW - n * DAY_MS);
  * because if the manifest's months ever became days the pair below would stop
  * straddling the boundary and every test would still pass.
  */
-const AUDIT_WINDOW_DAYS = 730;
+// 36 months. Whole days rather than derived arithmetic on purpose: the guard
+// below asserts this matches the constant, so a drift is a loud failure
+// rather than a boundary test that quietly stops testing a boundary.
+// 36 months back from NOW (2026-06-08) is 2023-06-08, which is exactly 1096
+// days. Not 1095: at 1095 the `+1` fixture lands ON the cutoff and the
+// comparison is strictly less-than, so the row that is supposed to be OUTSIDE
+// the window is kept and the test fails for arithmetic rather than behaviour.
+const AUDIT_WINDOW_DAYS = 1096;
 
 describe('runLogRetentionSweep', () => {
     let db: BetterSQLite3Database<typeof schema>;
@@ -109,11 +116,14 @@ describe('runLogRetentionSweep', () => {
 
     it('the fixture pair really straddles the audit window', () => {
         // The assertion that keeps every boundary test below honest: if the
-        // window stopped being 24 months, 731/729 would stop meaning
+        // window stopped being 36 months, ±1 day would stop meaning
         // "outside/inside" and the rest of this file would go quietly useless.
-        expect(AUDIT_LOG_ANONYMIZE_MONTHS).toBe(24);
-        expect(AUDIT_WINDOW_DAYS - 1).toBeLessThan(731);
-        expect(AUDIT_WINDOW_DAYS + 1).toBeGreaterThan(729);
+        //
+        // It did its job. The window moved 24 → 36 (counsel round 33 §2) and this
+        // failed immediately, which is the whole reason it is here.
+        expect(AUDIT_LOG_ANONYMIZE_MONTHS).toBe(36);
+        expect(AUDIT_WINDOW_DAYS).toBeGreaterThan(AUDIT_LOG_ANONYMIZE_MONTHS * 30);
+        expect(AUDIT_WINDOW_DAYS).toBeLessThan(AUDIT_LOG_ANONYMIZE_MONTHS * 31);
     });
 
     it('scrubs an aged audit row — actor AND free text — but keeps the row', async () => {

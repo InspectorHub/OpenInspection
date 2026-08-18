@@ -89,9 +89,17 @@ let retentionApproved = false;
 let retentionDetail = 'could not read retention-policy.ts — treated as NOT approved';
 try {
     const rp = readFileSync(join(ROOT, 'server', 'lib', 'compliance', 'retention-policy.ts'), 'utf8');
-    const status = rp.match(/status:\s*'([a-z]+)'/)?.[1] ?? '(none)';
+    // `[a-z_]+`, and the underscore is not a detail. This read `[a-z]+`, which
+    // could not match `approved_with_conditions` — so it parsed as "(none)",
+    // "(none) !== 'interim'" was true, and the gate went GREEN on the one status
+    // counsel invented specifically so nobody would treat it as approved. A check
+    // that fails to parse and reports success is worse than no check.
+    const status = rp.match(/status:\s*'([a-z_]+)'/)?.[1] ?? '(unparsed)';
     const approvedBy = rp.match(/approvedBy:\s*(null|'[^']*')/)?.[1] ?? 'null';
-    retentionApproved = status !== 'interim' && approvedBy !== 'null';
+    // Allow-list, not deny-list. `!== 'interim'` treats every value it has never
+    // heard of as acceptable, including a typo and including the next status
+    // somebody adds. Only one value means approved.
+    retentionApproved = status === 'approved' && approvedBy !== 'null';
     retentionDetail = `status=${status} approvedBy=${approvedBy}`;
 } catch { /* keep the fail-closed default */ }
 

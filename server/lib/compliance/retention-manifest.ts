@@ -176,18 +176,29 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         purpose: 'The amendment trail behind a published report. SUPERSEDED versions only: the highest version_number for a report is what the report currently IS, carries its signature and content hash, and never expires here. What ages out is the earlier drafts and amendments behind it, three years past the point anyone is likely to question a revision.',
     },
     {
+        // REFERENCE-PRESERVING, and the executor has always been. It deletes only
+        // a version that is superseded AND cited by no `sms_consent_log` row.
+        // Counsel round 33 §7 asked for exactly this behaviour; we reported it as
+        // missing because we read the manifest (a table and a number) and not the
+        // executor (what the number does). The window is real, its scope is not
+        // what the number alone suggests.
         table: 'sms_disclosure_versions',
         timestampColumn: 'published_at',
         window: { unit: 'months', value: SMS_DISCLOSURE_RETENTION_MONTHS },
         action: 'delete',
-        purpose: 'The TCPA disclosure text shown at SMS opt-in. Expires only versions that NO surviving consent row cites, and never the current (highest) version. sms_consent_log is kept indefinitely by an explicit exemption because that record is the tenant defence against a consent challenge, and every consent row stamps the version it was shown — deleting a cited version would leave permanent evidence pointing at text that no longer exists. In practice this reaps only versions published and never used.',
+        purpose: 'Superseded TCPA disclosure text. Retained while any consent row cites it — the consent record stores this version and its content hash and is never swept, so deleting a cited version would leave evidence naming a text nobody can produce. The current version is kept too: it is what the next opt-in shows.',
     },
     {
+        // REFERENCE-PRESERVING as of round 33. The executor checked only that a
+        // newer version existed, which was correct until this session added
+        // `account_acceptances` — a ledger that is never swept and that names the
+        // version and content hash a person was shown. It now also requires that
+        // no surviving acceptance cites the row.
         table: 'tenant_legal_versions',
         timestampColumn: 'published_at',
         window: { unit: 'months', value: TENANT_LEGAL_VERSION_RETENTION_MONTHS },
         action: 'delete',
-        purpose: 'Published snapshots of a tenant own Privacy and Terms text. SUPERSEDED versions only, per tenant and doc: the newest is the live policy the hosted legal pages render, and expiring it would blank them. The body is company-authored prose rather than personal data, so three years is set by how long a superseded policy is worth producing on request.',
+        purpose: 'Superseded tenant Privacy/Terms bodies. Retained while any account acceptance cites the version, and the live version per (tenant, doc) is never expired because the hosted legal pages render it. Counsel round 33 §8 was explicit that this is retain-while-referenced, NOT keep-forever.',
     },
     {
         table: 'tenant_marketplace_import_history',
