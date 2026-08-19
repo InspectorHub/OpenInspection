@@ -83,6 +83,7 @@ describe('migration staging tables', () => {
         expect([...MIGRATION_BATCH_STATUSES]).toEqual([
             'staged', 'applying', 'applied', 'partially_applied',
             'reverted', 'partially_reverted', 'abandoned',
+            'needs_assistance', 'expired',
         ]);
         expect([...MIGRATION_ROW_STATUSES]).toEqual([
             'pending', 'applied', 'skipped', 'failed', 'reverted',

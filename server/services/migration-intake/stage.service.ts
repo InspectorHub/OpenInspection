@@ -51,19 +51,24 @@ export interface StageResult {
 }
 
 /**
- * The entity an entry point imports. One kind each, by construction: an entry
- * point states what the operator meant, and a bundle carrying anything else is
- * a surprise rather than a convenience.
+ * The entity an entry point imports, or null where the entry point deliberately
+ * does not say.
+ *
+ * One kind each for the named entry points, by construction: an entry point
+ * states what the operator meant, and a bundle carrying anything else is a
+ * surprise rather than a convenience. The null is the assisted entry, whose
+ * whole premise is that nobody could name the kind.
  *
  * Module-private: every caller reaches it through `stage()`, and an entry point
  * that needed to look the mapping up for itself would be deciding the intent a
  * second time.
  */
-const ENTITY_FOR_INTENT: Record<MigrationIntent, EntityKind> = {
+const ENTITY_FOR_INTENT: Record<MigrationIntent, EntityKind | null> = {
     'templates.create': 'template',
     'templates.overwrite': 'template',
     'contacts.import': 'contact',
     'members.invite': 'member',
+    'assisted.full': null,
 };
 
 /** One bundle entry, whichever kind of entry the run is carrying. */
@@ -142,6 +147,15 @@ export class MigrationStageService {
         }
         const bundle = parsed.bundle;
         const kind = ENTITY_FOR_INTENT[params.intent];
+        if (kind === null) {
+            // An intent that names no entity kind cannot be staged from a
+            // bundle here: this method decides one kind, checks that kind for
+            // conflicts, and writes rows of that kind. Refusing is not a gap
+            // being deferred — it is the boundary of what a single-kind stage
+            // can honestly answer, and the alternative is a run that silently
+            // imports whichever kind the file happened to lead with.
+            throw Errors.BadRequest('This import route needs a file whose kind is known.');
+        }
 
         this.assertOnlyTheRequestedKind(bundle, kind);
 

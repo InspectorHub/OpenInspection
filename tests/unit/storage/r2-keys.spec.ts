@@ -18,5 +18,6 @@ describe('r2Keys', () => {
     expect(r2Keys.inspectorPhoto(t, 'U', 'jpg')).toBe('TEN/inspector-photos/U.jpg');
     expect(r2Keys.inspectorPhotoServe(t, 'U.jpg')).toBe('TEN/inspector-photos/U.jpg');
     expect(r2Keys.messageAttachment(t, 'MSG', 'ATT', 'png')).toBe('TEN/messages/MSG/ATT.png');
+    expect(r2Keys.migrationSource(t, 'BAT', 'csv')).toBe('TEN/migrations/BAT/source.csv');
   });
 });

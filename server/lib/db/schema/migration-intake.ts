@@ -13,6 +13,11 @@ export const MIGRATION_INTENTS = [
     'templates.overwrite',
     'contacts.import',
     'members.invite',
+    // The entry point for "I have an export and do not know which of these it
+    // is". It is the one intent that does not name an entity family, because
+    // the operator could not name one either — which is also why it is the one
+    // intent that never runs an adapter.
+    'assisted.full',
 ] as const;
 export type MigrationIntent = typeof MIGRATION_INTENTS[number];
 
@@ -69,8 +74,48 @@ export const migrationBatches = sqliteTable('migration_batches', {
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     appliedAt: integer('applied_at', { mode: 'timestamp_ms' }),
     revertedAt: integer('reverted_at', { mode: 'timestamp_ms' }),
+    /**
+     * Where the uploaded file went in object storage, or NULL when nothing was
+     * stored. The ONLY record of that location — re-mapping re-reads the file,
+     * and the retention sweep deletes it, so both read this column.
+     */
+    sourceKey: text('source_key'),
+    /**
+     * When this batch's stored file and rows become due for deletion.
+     *
+     * A per-batch clock rather than one window for the table, because a run
+     * waiting on a human has a different reason to exist from one the operator
+     * staged and left. The catalogue rule states the OUTER bound; this column
+     * is what the sweep actually compares against.
+     */
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
+    /**
+     * Authorisation A — keeping the uploaded file, so a re-map is possible and
+     * the page can be closed and reopened. Asked on every upload.
+     *
+     * The VERSION is stored, not just a flag. What somebody agreed to is the
+     * wording that was on the screen, and that wording changes; a boolean
+     * cannot be read back years later as an answer to "to what".
+     */
+    uploadAuthorizedBy: text('upload_authorized_by'),
+    uploadAuthorizedAt: integer('upload_authorized_at', { mode: 'timestamp_ms' }),
+    uploadAuthorizationVersion: text('upload_authorization_version'),
+    /**
+     * Authorisation B — a person on our side opening the file to convert it.
+     * Asked ONLY when the operator chooses that route, and NULL everywhere
+     * else.
+     *
+     * Separate from A on purpose. Merged, it would either over-ask (everyone
+     * consenting to human access they never need) or under-ask (a file read by
+     * somebody nobody authorised). And what B covers is third-party personal
+     * data: the operator's own clients' names and contact details.
+     */
+    staffAccessAuthorizedBy: text('staff_access_authorized_by'),
+    staffAccessAuthorizedAt: integer('staff_access_authorized_at', { mode: 'timestamp_ms' }),
+    staffAccessAuthorizationVersion: text('staff_access_authorization_version'),
 }, (t) => [
     index('idx_migration_batches_tenant_created').on(t.tenantId, t.createdAt),
+    index('idx_migration_batches_expires').on(t.expiresAt),
 ]);
 
 /**
