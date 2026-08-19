@@ -510,36 +510,6 @@
     "description": "Records a granted SMS consent event (captured_via=admin) for the inspection client contact, auto-creating + linking a contact when the client was free-typed (D6b). The deliberate, accountable basis for phone/in-person bookings."
   },
   {
-    "operationId": "authoriseImportRunAssistance",
-    "method": "POST",
-    "pathTemplate": "/api/imports/{batchId}/assistance",
-    "scopes": [
-      "write"
-    ],
-    "tag": "imports",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [
-        {
-          "name": "batchId",
-          "in": "path",
-          "required": true,
-          "description": "Id of the import run being read or changed",
-          "schema": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Id of the import run being read or changed"
-          }
-        }
-      ],
-      "body": {
-        "$ref": "#/components/schemas/AssistanceRequest"
-      }
-    },
-    "summary": "Allow a person to convert this file",
-    "description": "Records agreement for somebody on the support side to open the uploaded file and convert it, together with the version of the wording that agreement was given under."
-  },
-  {
     "operationId": "autocompletePlace",
     "method": "GET",
     "pathTemplate": "/api/places/autocomplete",
@@ -5139,68 +5109,6 @@
     "description": "Auto-generated placeholder for createTagItemsTags (POST /{id}/items/{itemId}/tags, tags domain). TODO: replace with a real description sourced from the handler."
   },
   {
-    "operationId": "createTemplateMigrationMigrateTo",
-    "method": "POST",
-    "pathTemplate": "/api/templates/{oldId}/migrate-to/{newId}",
-    "scopes": [
-      "write"
-    ],
-    "tag": "templates",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [
-        {
-          "name": "oldId",
-          "in": "path",
-          "required": true,
-          "description": "TODO describe oldId field for the OpenInspection MCP integration",
-          "schema": {
-            "type": "string",
-            "minLength": 1,
-            "description": "TODO describe oldId field for the OpenInspection MCP integration"
-          }
-        },
-        {
-          "name": "newId",
-          "in": "path",
-          "required": true,
-          "description": "TODO describe newId field for the OpenInspection MCP integration",
-          "schema": {
-            "type": "string",
-            "minLength": 1,
-            "description": "TODO describe newId field for the OpenInspection MCP integration"
-          }
-        }
-      ],
-      "body": {
-        "type": "object",
-        "properties": {
-          "strategy": {
-            "type": "string",
-            "enum": [
-              "preserve_unknown",
-              "refuse_incompatible",
-              "force"
-            ],
-            "default": "preserve_unknown",
-            "description": "TODO describe strategy field for the OpenInspection MCP integration"
-          },
-          "dryRun": {
-            "type": "boolean",
-            "description": "TODO describe dryRun field for the OpenInspection MCP integration"
-          },
-          "deleteOldTemplate": {
-            "type": "boolean",
-            "description": "TODO describe deleteOldTemplate field for the OpenInspection MCP integration"
-          }
-        },
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
-      }
-    },
-    "summary": "Migrate inspections from old template to new template",
-    "description": "Auto-generated placeholder for createTemplateMigrationMigrateTo (POST /{oldId}/migrate-to/{newId}, templates domain). TODO: replace with a real description sourced from the handler."
-  },
-  {
     "operationId": "createTenantAgreements",
     "method": "POST",
     "pathTemplate": "/api/admin/agreements",
@@ -5259,6 +5167,8 @@
               "inspector_service_areas",
               "library",
               "mcp_grant",
+              "migration_batch",
+              "migration_row",
               "rating_system",
               "recommendation",
               "signing_key",
