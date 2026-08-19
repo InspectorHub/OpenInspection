@@ -1,87 +1,67 @@
-// Admin → Data import & migration sub-router (Phase 1.3 split of
-// server/api/admin.ts; carved out of admin-data.ts to keep each file under the
-// size ceiling).
+// Admin → data import & one-time migration sub-router.
 //
-// The two heavy batch routines: bulk tenant import (POST /import) and the
-// one-time legacy finding-key migration (POST /migrate-finding-keys). Route
-// definitions are co-located with their `.openapi()` handlers; bodies are
-// byte-identical to the original admin.ts. Mounted at `/` by the admin
-// aggregator, preserving the original paths.
+// Two routes: delivery of a converted import bundle into the run it belongs to
+// (POST /import), and the one-time legacy finding-key migration
+// (POST /migrate-finding-keys). Route definitions are co-located with their
+// `.openapi()` handlers. Mounted at `/` by the admin aggregator.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { eq, and } from 'drizzle-orm';
 import { auditFromContext } from '../../lib/audit';
 import { requireRole } from '../../lib/middleware/rbac';
 import { requireCapability } from '../../lib/middleware/require-capability';
-import { Errors } from '../../lib/errors';
-import { logger } from '../../lib/logger';
 import { ImportResponseSchema } from '../../lib/validations/admin.schema';
-import { templates, agreements as agreementTable, inspections, inspectionResults, contactRoleProfiles } from '../../lib/db/schema';
+import { inspections, inspectionResults } from '../../lib/db/schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { templateSnapshotSectionsOrNone } from '../../services/inspection/shared';
-import { syncInspectionAssignmentsBatch } from '../../lib/db/assignment-links';
-import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { getDrizzle } from '../../lib/route-helpers';
-
-/**
- * Task 7c (people-role-profiles fix) — resolves an active role profile's id
- * by key (e.g. 'client', 'buyer_agent', 'listing_agent') for the imported-
- * inspection people-mirroring below. Returns undefined when the tenant has
- * no active profile for that key (role seeding failed/incomplete) —
- * callers treat that as "skip this role" rather than throw.
- */
-async function resolveRoleId(db: DrizzleD1Database, tenantId: string, key: string): Promise<string | undefined> {
-    const row = await db.select({ id: contactRoleProfiles.id }).from(contactRoleProfiles)
-        .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.key, key), eq(contactRoleProfiles.active, true)))
-        .get();
-    return row?.id;
-}
-
+import { MigrationStageService } from '../../services/migration-intake/stage.service';
+import { MigrationAssistanceService } from '../../services/migration-intake/assistance.service';
+import { limitsFor } from '../../lib/migration-intake/limits';
 
 /**
  * POST /api/admin/import
+ *
+ * Delivers a converted file into the import run it was uploaded to.
+ *
+ * It takes a bundle in the one normalised format rather than our own row
+ * shapes, which is what makes the format's rules apply to it: no primary keys
+ * of ours (ids are minted on write), counts that must equal what is actually
+ * carried, and every entry the conversion could not use named rather than
+ * counted. Nothing here reaches a real table — the run lands staged and the
+ * workspace applies it themselves, seeing what will happen first.
  */
 const importDataRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/import',
-    tags: ["admin"],
-    summary: "Import tenant for current tenant",
-    // The bulk import INSERTS TEMPLATES (see the `insert(templates)` below), so
-    // it creates templates in bulk and wears templateCreate like the single
-    // create route does (#307). It is a staff action with an acting user, which
-    // is what separates it from the two provisioning paths that mint templates
-    // with no user at all: `TemplateSeedService.bulkSeed` behind the portal M2M
-    // backfill route, and first-run setup in server/lib/integration/standalone.ts.
-    // Both carry a comment saying so at the insert.
+    tags: ['admin'],
+    summary: 'Deliver a converted import bundle',
+    description: 'Delivers a converted file, in the normalised import format, into the waiting import run it belongs to. The run becomes a prepared import the workspace reviews and applies; this route writes nothing to a real table.',
     middleware: [requireRole('owner', 'manager'), requireCapability('templateCreate')],
     request: {
         body: {
             content: {
                 'application/json': {
                     schema: z.object({
-                        inspections: z.array(z.record(z.string(), z.unknown())).optional().describe('TODO describe inspections field for the OpenInspection MCP integration'),
-                        templates: z.array(z.record(z.string(), z.unknown())).optional().describe('TODO describe templates field for the OpenInspection MCP integration'),
-                        agreements: z.array(z.record(z.string(), z.unknown())).optional().describe('TODO describe agreements field for the OpenInspection MCP integration'),
-                        inspectionResults: z.array(z.record(z.string(), z.unknown())).optional().describe('TODO describe inspectionResults field for the OpenInspection MCP integration'),
-                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                        batchId: z.string().min(1).describe('Id of the waiting import run this bundle was converted for'),
+                        bundle: z.record(z.string(), z.unknown()).describe('The converted file in the normalised import format, validated on arrival'),
+                    }),
                 },
             },
         },
     },
     responses: {
         200: {
-            content: {
-                'application/json': {
-                    schema: ImportResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
-                },
-            },
-            description: 'Success',
+            content: { 'application/json': { schema: ImportResponseSchema.describe('Counts of what the run now carries') } },
+            description: 'Bundle delivered',
         },
+        400: { description: 'The bundle carries nothing to import, more entries than one run may carry, or a kind this run did not ask for' },
         403: { description: "Missing the 'templateCreate' capability" },
+        404: { description: 'No such import run in this workspace' },
+        409: { description: 'That run is not waiting for a converted file' },
+        422: { description: 'The bundle is not in the normalised import format' },
     },
-    operationId: "importTenant",
-    description: "Auto-generated placeholder for importTenant (POST /import, admin domain). TODO: replace with a real description sourced from the handler."
+    operationId: 'importTenant',
 }, { scopes: ['admin'], tier: 'extended', capability: 'templateCreate' }));
 
 
@@ -122,151 +102,36 @@ const migrateFindingKeysRoute = createRoute(withMcpMetadata({
 const adminDataImportRoutes = createApiRouter()
     .openapi(importDataRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
+        const { batchId, bundle } = c.req.valid('json');
 
-        const importedInspections = Array.isArray(body.inspections) ? body.inspections : [];
-        const importedTemplates = Array.isArray(body.templates) ? body.templates : [];
-        const importedAgreements = Array.isArray(body.agreements) ? body.agreements : [];
-        const importedResults = Array.isArray(body.inspectionResults) ? body.inspectionResults : [];
+        const stage = new MigrationStageService(c.env.DB);
+        const result = await stage.stageIntoBatch({
+            tenantId,
+            batchId,
+            bundle,
+            limits: limitsFor(c.var.profile),
+        });
 
-        const total = importedInspections.length + importedTemplates.length +
-                      importedAgreements.length + importedResults.length;
-        if (total === 0) throw Errors.BadRequest('No importable records found.');
-        if (total > 5000) throw Errors.BadRequest('Payload too large.');
+        const byEntity = { template: 0, contact: 0, member: 0 };
+        for (const row of result.rows) byEntity[row.entity]++;
 
-        const db = getDrizzle(c);
-        const counts = { templates: 0, agreements: 0, inspections: 0, results: 0 };
+        await new MigrationAssistanceService(c.env.DB).notifyDelivered(tenantId, batchId);
 
-        interface TemplateImport { id: string; name: string; version?: number; schema: unknown; createdAt?: string }
-        interface AgreementImport { id: string; name: string; content: string; version?: number; createdAt?: string }
-        interface InspectionImport {
-            id: string; propertyAddress: string; inspectorId?: string; clientName?: string;
-            clientEmail?: string; templateId?: string; date?: string;
-            status?: 'requested' | 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
-            paymentStatus?: 'unpaid' | 'partial' | 'paid'; price?: number; createdAt?: string;
-            // Task 7c (people-role-profiles fix) — optional legacy agent-referral
-            // ids, mirrored into inspection_people (buyer_agent / listing_agent)
-            // below when present. Both must already be contacts.id rows in this
-            // tenant (same contract as the legacy inspections columns they name).
-            referredByAgentId?: string; sellingAgentId?: string;
-        }
-        interface ResultImport { id: string; inspectionId: string; data: unknown; lastSyncedAt?: string }
+        // The action this deserves is `migration.delivered` on a
+        // `migration_batch`, and neither word exists yet: the intake module's
+        // nine actions and its family are added to the registry in one pass
+        // rather than one route at a time, so that the enum, the registry
+        // entries and the call sites land together. Until then this wears the
+        // vocabulary the route already had.
+        auditFromContext(c, 'data.import', 'import', {
+            entityId: batchId,
+            metadata: { counts: { ...byEntity, total: result.rows.length } },
+        });
 
-        for (const t of importedTemplates as unknown as TemplateImport[]) {
-            if (!t.id || !t.name) continue;
-            await db.insert(templates).values({
-                id: t.id, tenantId, name: t.name, version: t.version ?? 1,
-                schema: typeof t.schema === 'string' ? t.schema : JSON.stringify(t.schema),
-                createdAt: t.createdAt ? new Date(t.createdAt) : new Date(),
-            }).onConflictDoNothing().run();
-            counts.templates++;
-        }
-
-        for (const a of importedAgreements as unknown as AgreementImport[]) {
-            if (!a.id || !a.name) continue;
-            await db.insert(agreementTable).values({
-                id: a.id, tenantId, name: a.name, content: a.content || '', version: a.version ?? 1,
-                createdAt: a.createdAt ? new Date(a.createdAt) : new Date(),
-            }).onConflictDoNothing().run();
-            counts.agreements++;
-        }
-
-        const importAssignments: Array<{ inspectionId: string; inspectorId: string | null }> = [];
-        for (const ins of importedInspections as unknown as InspectionImport[]) {
-            if (!ins.id || !ins.propertyAddress) continue;
-            // Imported historical inspections deliberately do not consume plan quota.
-            await db.insert(inspections).values({
-                id: ins.id, tenantId, propertyAddress: ins.propertyAddress,
-                inspectorId: ins.inspectorId || null,
-                templateId: ins.templateId || null,
-                date: ins.date || new Date().toISOString(), status: ins.status || INSPECTION_STATUS.REQUESTED,
-                paymentStatus: ins.paymentStatus || 'unpaid', price: ins.price || 0,
-                createdAt: ins.createdAt ? new Date(ins.createdAt) : new Date(),
-            }).onConflictDoNothing().run();
-            // DB-8: mirror the import row's assignment into the link table. NOTE: on
-            // onConflictDoNothing conflicts the canonical inspection row is unchanged,
-            // so this intentionally re-asserts the link rows from the IMPORT payload —
-            // acceptable for the one-shot import tool, where re-importing the same file
-            // is the only conflict source and payloads are identical.
-            importAssignments.push({ inspectionId: ins.id, inspectorId: ins.inspectorId || null });
-            counts.inspections++;
-
-            // Task 7c (people-role-profiles fix) — getInspection/listInspections
-            // (Task 9c-reads) resolve the client ONLY via inspection_people; the
-            // legacy inline clientName/clientEmail/referredByAgentId/
-            // sellingAgentId columns were dropped from inspections (Task 13),
-            // so every imported inspection needs matching inspection_people
-            // rows. Client is upserted as a contact (same idempotent match
-            // booking.service/core.ts use); agent ids are assumed to already be
-            // contacts.id rows in this tenant (same contract as the legacy
-            // columns) and are linked directly. Per-row non-fatal: one bad row
-            // must not abort the rest of the import (the inspection row already
-            // committed above regardless).
-            if (ins.clientName || ins.clientEmail || ins.referredByAgentId || ins.sellingAgentId) {
-                try {
-                    if (ins.clientName || ins.clientEmail) {
-                        const { id: clientContactId } = await c.var.services.contact.upsertClientContact(tenantId, {
-                            name: ins.clientName || 'Imported Client',
-                            ...(ins.clientEmail ? { email: ins.clientEmail } : {}),
-                            type: 'client',
-                        });
-                        const clientRoleId = await resolveRoleId(db, tenantId, 'client');
-                        if (clientRoleId) {
-                            await c.var.services.people.addPerson(tenantId, ins.id, clientContactId, clientRoleId);
-                        }
-                    }
-                    if (ins.referredByAgentId) {
-                        const buyerAgentRoleId = await resolveRoleId(db, tenantId, 'buyer_agent');
-                        if (buyerAgentRoleId) {
-                            await c.var.services.people.addPerson(tenantId, ins.id, ins.referredByAgentId, buyerAgentRoleId);
-                        }
-                    }
-                    if (ins.sellingAgentId) {
-                        const listingAgentRoleId = await resolveRoleId(db, tenantId, 'listing_agent');
-                        if (listingAgentRoleId) {
-                            await c.var.services.people.addPerson(tenantId, ins.id, ins.sellingAgentId, listingAgentRoleId);
-                        }
-                    }
-                } catch (err) {
-                    logger.error('inspection-people write from admin data import failed', { inspectionId: ins.id }, err instanceof Error ? err : undefined);
-                }
-            }
-        }
-        // B-29: all link-table resyncs in one db.batch round trip (was 2N
-        // statements inside the loop).
-        await syncInspectionAssignmentsBatch(db, tenantId, importAssignments);
-
-        for (const r of importedResults as unknown as ResultImport[]) {
-            if (!r.id || !r.inspectionId) continue;
-
-            // Verify inspectionId belongs to current tenant
-            const inspection = await db.select().from(inspections)
-                .where(eq(inspections.id, r.inspectionId))
-                .get();
-
-            if (!inspection) {
-                logger.warn(`Skipping result ${r.id}: inspection ${r.inspectionId} not found`);
-                continue;
-            }
-
-            if (inspection.tenantId !== tenantId) {
-                logger.warn(`Skipping result ${r.id}: inspection ${r.inspectionId} belongs to different tenant`);
-                continue;
-            }
-
-            await db.insert(inspectionResults).values({
-                id: r.id,
-                tenantId,
-                inspectionId: r.inspectionId,
-                data: typeof r.data === 'string' ? r.data : JSON.stringify(r.data),
-                lastSyncedAt: r.lastSyncedAt ? new Date(r.lastSyncedAt) : new Date(),
-            }).onConflictDoNothing().run();
-            counts.results++;
-        }
-
-        auditFromContext(c, 'data.import', 'import', { metadata: { counts } });
-
-        return c.json({ success: true, data: { message: 'Import complete.', imported: counts } }, 200);
+        return c.json({
+            success: true as const,
+            data: { batchId, rows: result.rows.length, byEntity },
+        }, 200);
     })
     .openapi(migrateFindingKeysRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -351,7 +216,15 @@ const adminDataImportRoutes = createApiRouter()
                 if (changed) {
                     await db.update(inspectionResults)
                         .set({ data: newData as unknown as object, lastSyncedAt: new Date() })
-                        .where(eq(inspectionResults.id, resultsRow.id));
+                        // Scoped by tenant as well as by id. The row was read
+                        // under a tenant filter a few lines up, so this changes
+                        // nothing at runtime — but the write states its own
+                        // scope rather than inheriting it from a read, which is
+                        // what the tenant-scoping gate asks of every by-id write.
+                        .where(and(
+                            eq(inspectionResults.id, resultsRow.id),
+                            eq(inspectionResults.tenantId, tenantId),
+                        ));
                     migrated++;
                 } else {
                     skipped++;

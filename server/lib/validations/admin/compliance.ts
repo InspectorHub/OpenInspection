@@ -146,14 +146,22 @@ export const InviteResponseSchema = createApiResponseSchema(z.object({
     expiresAt: z.string().describe('TODO describe expiresAt field for the OpenInspection MCP integration'),
 })).openapi('InviteResponse');
 
+/**
+ * What a delivered conversion reports back.
+ *
+ * Per-family counts rather than one number, because a converted file that
+ * produced no members when it was supposed to is a delivery worth catching at
+ * the moment it is made. Nothing here counts rows in real tables — this route
+ * writes none.
+ */
 export const ImportResponseSchema = createApiResponseSchema(z.object({
-    message: z.string().describe('TODO describe message field for the OpenInspection MCP integration'),
-    imported: z.object({
-        templates: z.number().describe('TODO describe templates field for the OpenInspection MCP integration'),
-        agreements: z.number().describe('TODO describe agreements field for the OpenInspection MCP integration'),
-        inspections: z.number().describe('TODO describe inspections field for the OpenInspection MCP integration'),
-        results: z.number().describe('TODO describe results field for the OpenInspection MCP integration'),
-    }).describe('TODO describe imported field for the OpenInspection MCP integration'),
+    batchId: z.string().describe('Id of the import run this bundle was delivered into'),
+    rows: z.number().describe('How many entries the run now carries'),
+    byEntity: z.object({
+        template: z.number().describe('Templates prepared by this delivery'),
+        contact: z.number().describe('Contacts prepared by this delivery'),
+        member: z.number().describe('Team invitations prepared by this delivery'),
+    }).describe('Entries prepared, split by kind'),
 })).openapi('ImportResponse');
 
 export const EraseDataResponseSchema = createApiResponseSchema(z.object({
