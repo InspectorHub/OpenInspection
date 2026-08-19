@@ -29,10 +29,13 @@ import type { TemplateSchemaV2 } from '../../../server/types/template-schema';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
+import { limitsFor } from '../../../server/lib/migration-intake/limits';
+import { SAAS_PROFILE } from '../../../server/lib/deployment-profile';
 import { MigrationApplyService } from '../../../server/services/migration-intake/apply.service';
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const USER = '22222222-2222-2222-2222-2222222222b2';
+const LIMITS = limitsFor(SAAS_PROFILE);
 const TEMPLATE = '33333333-3333-3333-3333-3333333333c3';
 
 const SCHEMA_A: TemplateSchemaV2 = {
@@ -121,7 +124,7 @@ describe('MigrationApplyService — template rows', () => {
 
     it('creates one template per row and records the id it minted', async () => {
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.create',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.create',
             bundle: templateBundle([{ name: 'Imported', schema: SCHEMA_A }]),
         });
         const result = await apply.apply({
@@ -148,7 +151,7 @@ describe('MigrationApplyService — template rows', () => {
 
     it('marks the batch applied, stamps applied_at and records the policy that was used', async () => {
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.create',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.create',
             bundle: templateBundle([{ name: 'Imported', schema: SCHEMA_A }]),
         });
         await apply.apply({
@@ -164,7 +167,7 @@ describe('MigrationApplyService — template rows', () => {
     it('captures the replaced document before overwriting it', async () => {
         await seedTemplate(db, TEMPLATE, 'Live', SCHEMA_A);
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.overwrite', targetId: TEMPLATE,
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.overwrite', targetId: TEMPLATE,
             bundle: templateBundle([{ name: 'Replacement', schema: SCHEMA_B }]),
         });
         await apply.apply({
@@ -196,7 +199,7 @@ describe('MigrationApplyService — template rows', () => {
     it('leaves the target alone when the operator settles an overwrite as a skip', async () => {
         await seedTemplate(db, TEMPLATE, 'Live', SCHEMA_A);
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.overwrite', targetId: TEMPLATE,
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.overwrite', targetId: TEMPLATE,
             bundle: templateBundle([{ name: 'Replacement', schema: SCHEMA_B }]),
         });
         const result = await apply.apply({
@@ -226,7 +229,7 @@ describe('MigrationApplyService — template rows', () => {
     it('records a per-row settlement on the row, and a batch-wide one only on the batch', async () => {
         await seedTemplate(db, TEMPLATE, 'Live', SCHEMA_A);
         const perRow = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.overwrite', targetId: TEMPLATE,
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.overwrite', targetId: TEMPLATE,
             bundle: templateBundle([{ name: 'Replacement', schema: SCHEMA_B }]),
         });
         await apply.apply({
@@ -239,7 +242,7 @@ describe('MigrationApplyService — template rows', () => {
         expect(perRowRow?.status).toBe('applied');
 
         const batchWide = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.overwrite', targetId: TEMPLATE,
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.overwrite', targetId: TEMPLATE,
             bundle: templateBundle([{ name: 'Again', schema: SCHEMA_A }]),
         });
         await apply.apply({
@@ -254,7 +257,7 @@ describe('MigrationApplyService — template rows', () => {
     it('defaults an unanswered per-row clash to keeping what is already there', async () => {
         await seedTemplate(db, TEMPLATE, 'Live', SCHEMA_A);
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.overwrite', targetId: TEMPLATE,
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.overwrite', targetId: TEMPLATE,
             bundle: templateBundle([{ name: 'Replacement', schema: SCHEMA_B }]),
         });
         const result = await apply.apply({
@@ -268,7 +271,7 @@ describe('MigrationApplyService — template rows', () => {
 
     it('consumes only pending rows, so a second apply changes nothing', async () => {
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.create',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.create',
             bundle: templateBundle([{ name: 'Once', schema: SCHEMA_A }]),
         });
         const first = await apply.apply({
@@ -285,7 +288,7 @@ describe('MigrationApplyService — template rows', () => {
 
     it('resumes a half-applied batch and only touches what is left', async () => {
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.create',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.create',
             bundle: templateBundle([
                 { name: 'First', schema: SCHEMA_A },
                 { name: 'Second', schema: SCHEMA_B },
@@ -315,7 +318,7 @@ describe('MigrationApplyService — template rows', () => {
 
     it('lands on partially_applied when any row fails, and names the reason on that row', async () => {
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.create',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.create',
             bundle: templateBundle([
                 { name: 'Good', schema: SCHEMA_A },
                 { name: 'Bad', schema: SCHEMA_B },
@@ -368,7 +371,7 @@ describe('MigrationApplyService — template rows', () => {
 
     it('refuses to apply a batch belonging to another tenant, and writes nothing', async () => {
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.create',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.create',
             bundle: templateBundle([{ name: 'Imported', schema: SCHEMA_A }]),
         });
         await expect(apply.apply({

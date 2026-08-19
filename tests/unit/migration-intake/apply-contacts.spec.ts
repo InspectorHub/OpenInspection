@@ -24,10 +24,13 @@ import type {
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
+import { limitsFor } from '../../../server/lib/migration-intake/limits';
+import { SAAS_PROFILE } from '../../../server/lib/deployment-profile';
 import { MigrationApplyService } from '../../../server/services/migration-intake/apply.service';
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const USER = '22222222-2222-2222-2222-2222222222b2';
+const LIMITS = limitsFor(SAAS_PROFILE);
 
 const EMPTY: EntityCounts = { readFromSource: 0, emitted: 0, dropped: [] };
 
@@ -78,7 +81,7 @@ describe('MigrationApplyService — contact rows', () => {
 
     it('inserts a fresh contact and records the minted id', async () => {
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([
                 { name: 'Alice', email: 'alice@example.test', agency: 'Acme', type: 'agent' },
             ]),
@@ -110,7 +113,7 @@ describe('MigrationApplyService — contact rows', () => {
             email: 'alice@example.test', phone: '555-1', createdAt: new Date(),
         });
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([{ name: 'Alice New', email: 'alice@example.test', type: 'client' }]),
         });
         const result = await apply.apply({
@@ -137,7 +140,7 @@ describe('MigrationApplyService — contact rows', () => {
             email: 'alice@example.test', phone: '555-1', agency: 'Old Co', createdAt: new Date(),
         });
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([
                 { name: 'Alice New', email: 'alice@example.test', phone: '555-9', type: 'agent' },
             ]),
@@ -174,7 +177,7 @@ describe('MigrationApplyService — contact rows', () => {
             { id: 'e2', tenantId: TENANT, type: 'client', name: 'Two Old', email: 'two@example.test', createdAt: new Date() },
         ]);
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([
                 { name: 'One New', email: 'one@example.test', type: 'client' },
                 { name: 'Two New', email: 'two@example.test', type: 'client' },
@@ -205,7 +208,7 @@ describe('MigrationApplyService — contact rows', () => {
             id: 'existing-1', tenantId: TENANT, type: 'client', name: 'Alice', email: null, createdAt: new Date(),
         });
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([{ name: 'Alice', type: 'client' }]),
         });
         const result = await apply.apply({
@@ -221,7 +224,7 @@ describe('MigrationApplyService — contact rows', () => {
             email: 'alice@example.test', createdAt: new Date(),
         });
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([
                 { name: 'Alice New', email: 'alice@example.test', type: 'client' },
                 { name: 'Bob', email: 'bob@example.test', type: 'client' },
@@ -256,7 +259,7 @@ describe('MigrationApplyService — contact rows', () => {
             email: 'alice@example.test', createdAt: new Date(),
         });
         const staged = await stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([{ name: 'Alice New', email: 'alice@example.test', type: 'client' }]),
         });
         // Staging saw no clash across the tenant boundary, so this is a create.

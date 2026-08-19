@@ -37,12 +37,15 @@ import type { TemplateSchemaV2 } from '../../../server/types/template-schema';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
+import { limitsFor } from '../../../server/lib/migration-intake/limits';
+import { SAAS_PROFILE } from '../../../server/lib/deployment-profile';
 import { MigrationApplyService } from '../../../server/services/migration-intake/apply.service';
 import { MigrationRevertService } from '../../../server/services/migration-intake/revert.service';
 import { getSeatUsage } from '../../../server/features/seat-quota/usage';
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const USER = '22222222-2222-2222-2222-2222222222b2';
+const LIMITS = limitsFor(SAAS_PROFILE);
 const TEMPLATE = '33333333-3333-3333-3333-3333333333c3';
 
 const SCHEMA_A: TemplateSchemaV2 = {
@@ -175,19 +178,19 @@ describe('MigrationRevertService.revert', () => {
         targetId?: string,
     ) {
         return stage.stage({
-            tenantId: TENANT, createdBy: USER, intent, targetId, bundle: templateBundle(list),
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent, targetId, bundle: templateBundle(list),
         });
     }
 
     async function stageContacts(list: BundleContact[]) {
         return stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import', bundle: contactsBundle(list),
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import', bundle: contactsBundle(list),
         });
     }
 
     async function stageMembers(list: BundleMember[]) {
         return stage.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'members.invite', bundle: membersBundle(list),
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'members.invite', bundle: membersBundle(list),
         });
     }
 
