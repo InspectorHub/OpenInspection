@@ -2,10 +2,13 @@
  * The seat check that runs when the seat is actually TAKEN.
  *
  * `requireSeatAvailable` (middleware.ts) guards POST /api/team/invite, and it
- * counts ACTIVE members. A pending invite holds no seat, so at one free seat
- * that guard says yes to every invite an owner sends — the cap is checked N
- * times against a number that has not moved, and never at the moment it moves.
- * It moves in `AuthService.joinTeam`, which is what this guards.
+ * now reserves against outstanding invitations too — so it no longer says yes
+ * to twelve invites sent against one free seat. Issuing and redeeming are still
+ * separate moments, and this is the second one: an invitation written before
+ * that reservation existed, one whose seat was freed by an unrelated expiry,
+ * and two people accepting at the same instant all arrive here having passed an
+ * issue-time check that is no longer true. The seat moves in
+ * `AuthService.joinTeam`, which is what this guards.
  *
  * It lives here rather than in the service so both halves of the invitation
  * read "used" from the same helper (`getSeatUsage`, i.e. `deleted_at IS NULL`),
@@ -36,15 +39,22 @@ export const SEAT_QUOTA_UNENFORCED: SeatQuotaContext = { enforce: false, billing
  *
  * Call it before anything is written and before the invite token is burned: a
  * refusal must leave the invitation usable once a seat is freed.
+ *
+ * `inviteId` is REQUIRED, and it is the invite being redeemed. `getSeatUsage`
+ * counts outstanding invitations as held seats, so this one is already in the
+ * total that is about to be tested against the cap — leaving it in would make
+ * the last legitimate acceptance refuse itself, every time. A parameter the
+ * caller cannot forget is the only version of that exclusion that stays true.
  */
 export async function assertSeatAvailableForJoin(
     tenantId: string,
     db: D1Database,
     seatQuota: SeatQuotaContext,
+    inviteId: string,
 ): Promise<void> {
     if (!seatQuota.enforce) return;
 
-    const usage = await getSeatUsage(tenantId, db);
+    const usage = await getSeatUsage(tenantId, db, { excludeInviteId: inviteId });
     if (usage.remaining <= 0) {
         throw Errors.SeatLimitReached({
             used: usage.used,

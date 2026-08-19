@@ -49,8 +49,14 @@ const billingRoutes = createApiRouter()
         // `deleted_at IS NULL`, so a removed member — soft-deleted so their
         // inspection attribution survives — stayed on the bill after the
         // invite guard had already handed their seat back.
+        //
+        // `members`, not `used`: `used` includes the invitations that have been
+        // sent and not accepted, because the quota has to reserve the seats they
+        // can still claim. A bill is for the people who are actually here, and
+        // it has to agree with the seat quantity the subscription is reconciled
+        // against — which is the same `members` number.
         const usage = await getSeatUsage(tenantId, c.env.DB);
-        const summary = summariseSeats(usage.used, tenant);
+        const summary = summariseSeats(usage.members, tenant);
 
         // Portal Customer Portal redirect URL — surfaced for the "Manage
         // billing" CTA on the page. Omitted when the portal isn't wired

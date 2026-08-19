@@ -63,12 +63,15 @@ describe('getSeatUsage', () => {
         }
     }
 
-    it('returns {used, max, remaining} with positive remaining', async () => {
+    it('returns the whole snapshot, with no invites outstanding', async () => {
         await seedTenant('t1', 10);
         await seedUsers('t1', 3);
 
         const usage = await getSeatUsage('t1', {} as any);
-        expect(usage).toEqual({ used: 3, max: 10, remaining: 7 });
+        // `used` counts held seats — members plus unaccepted invitations — so a
+        // fixture with no invites is the case where it equals `members`. The
+        // invitation half is pinned in tests/unit/team/seat-usage-pending-invites.spec.ts.
+        expect(usage).toEqual({ used: 3, members: 3, max: 10, remaining: 7, pendingInvites: 0 });
     });
 
     it('returns remaining = 0 when at limit', async () => {
@@ -160,7 +163,7 @@ describe('requireSeatAvailable middleware', () => {
         // Section F rewrite. SAAS_PROFILE now has hasSeatQuota=true
         // uniformly (no shared/silo split); the middleware calls
         // getSeatUsage and lets the request through when remaining > 0.
-        vi.mocked(getSeatUsage).mockResolvedValueOnce({ used: 3, max: 10, remaining: 7 });
+        vi.mocked(getSeatUsage).mockResolvedValueOnce({ used: 3, members: 3, max: 10, remaining: 7, pendingInvites: 0 });
         const app = makeApp(SAAS_PROFILE, 'tenant-1');
         const res = await app.request('/invite', { method: 'POST' }, { DB: {} } as never);
         expect(res.status).toBe(200);
@@ -171,7 +174,7 @@ describe('requireSeatAvailable middleware', () => {
         // Section F rewrite. Confirms the failure path: remaining=0 throws
         // Errors.SeatLimitReached which the global error handler translates
         // to HTTP 402 with the seat-limit error code.
-        vi.mocked(getSeatUsage).mockResolvedValueOnce({ used: 10, max: 10, remaining: 0 });
+        vi.mocked(getSeatUsage).mockResolvedValueOnce({ used: 10, members: 10, max: 10, remaining: 0, pendingInvites: 0 });
         const app = makeApp(SAAS_PROFILE, 'tenant-1');
         const res = await app.request('/invite', { method: 'POST' }, { DB: {} } as never);
         expect(res.status).toBe(402);

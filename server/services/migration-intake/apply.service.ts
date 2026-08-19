@@ -11,6 +11,9 @@ import {
 import { MIGRATION_BATCH_STATUS, type MigrationBatchStatus } from '../../lib/status/migration-batch-status';
 import { MIGRATION_ROW_STATUS } from '../../lib/status/migration-row-status';
 import { TemplateService } from '../template.service';
+import { applyMemberRow, type InviteDispatch } from './member-rows';
+import { getSeatUsage } from '../../features/seat-quota/usage';
+import { assertBatchSeatsAvailable, computeSeatsNeeded } from '../../features/seat-quota/batch';
 import { Errors } from '../../lib/errors';
 import type { BundleContact, BundleTemplate } from '../../lib/migration-intake/bundle';
 
@@ -31,18 +34,6 @@ export interface ApplyParams {
     /** `profile.hasSeatQuota`. False short-circuits every seat check. */
     seatQuotaEnforced: boolean;
     billingPortalUrl?: string | null | undefined;
-}
-
-/**
- * An invite this run created. Delivery is the caller's job: a method that both
- * writes rows and sends mail has no consistent retry, and who was written to
- * has to be the same record as what the run reports.
- */
-export interface InviteDispatch {
-    rowId: string;
-    email: string;
-    token: string;
-    expiresAt: Date;
 }
 
 export interface ApplyResult {
@@ -106,6 +97,8 @@ export class MigrationApplyService {
             ))
             .orderBy(asc(migrationRows.position))
             .all();
+
+        await this.beforeRows(params, pending);
 
         // The status does not move off `staged` until the run is actually
         // going to be attempted. Anything that can refuse the whole batch has
@@ -181,6 +174,32 @@ export class MigrationApplyService {
     }
 
     /**
+     * Whole-batch checks, answered before any row is written and before the
+     * batch is marked as running.
+     *
+     * The seat rule lives here rather than per row because a shortfall has to
+     * refuse everything while nothing has been sent. Half a batch of invites is
+     * a state nobody can read off the screen: some people got an email, some
+     * silently did not, and no view afterwards distinguishes the two.
+     *
+     * The count is read from the live tenant rather than from the staged rows,
+     * because staging can sit for a while — people join and invitations go out
+     * in between, and headroom measured when the file was uploaded is not
+     * headroom now.
+     */
+    private async beforeRows(params: ApplyParams, rows: StagedRowRecord[]): Promise<void> {
+        const needed = computeSeatsNeeded(rows);
+        if (needed === 0) return;
+        const usage = await getSeatUsage(params.tenantId, this.db);
+        assertBatchSeatsAvailable({
+            needed,
+            usage,
+            enforced: params.seatQuotaEnforced,
+            billingPortalUrl: params.billingPortalUrl ?? null,
+        });
+    }
+
+    /**
      * How this row settles when it collides with something that already exists.
      *
      * An unanswered row under the per-row policy keeps what is already there.
@@ -207,11 +226,12 @@ export class MigrationApplyService {
         params: ApplyParams,
         batch: StagedBatchRecord,
         row: StagedRowRecord,
-        _invites: InviteDispatch[],
+        invites: InviteDispatch[],
     ): Promise<RowOutcome> {
         try {
             if (row.entity === 'template') return await this.applyTemplateRow(db, params, batch, row);
             if (row.entity === 'contact') return await this.applyContactRow(db, params, row);
+            if (row.entity === 'member') return await applyMemberRow(this.db, params, row, invites);
             return { kind: 'failed', reason: `No writer is wired for ${row.entity} rows.` };
         } catch (err) {
             return { kind: 'failed', reason: err instanceof Error ? err.message : String(err) };

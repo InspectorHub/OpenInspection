@@ -73,12 +73,13 @@ export interface JoinTeamDeps {
  * theoretical one.
  *
  * ⚠️ IT REFUSES AT THE CAP TOO. `requireSeatAvailable` on POST /team/invite
- * counts ACTIVE members, and a pending invite is not one — so at one free
- * seat that guard says yes to every invite an owner sends, and the seat is
- * only actually taken here. The cap is therefore checked again at the
- * moment it moves, before anything is written, for BOTH branches:
- * reactivation clears `deleted_at`, which is precisely what makes the row
- * countable again.
+ * reserves the seat when the invitation is written, but the seat is only
+ * actually taken here — and an invitation can outlive the reservation that
+ * let it be written. The cap is therefore checked again at the moment it
+ * moves, before anything is written, for BOTH branches: reactivation clears
+ * `deleted_at`, which is precisely what makes the row countable again. The
+ * invitation being redeemed is excluded from that count, since it is itself
+ * one of the reservations being tested against.
  */
 export async function joinTeam(
     deps: JoinTeamDeps,
@@ -104,7 +105,7 @@ export async function joinTeam(
     // Before the hash, before the acceptance statements, before the token
     // is burned — a refusal here must leave the invite reusable once a seat
     // is freed.
-    await assertSeatAvailableForJoin(invite.tenantId, deps.db, seatQuota);
+    await assertSeatAvailableForJoin(invite.tenantId, deps.db, seatQuota, token);
 
     const passwordHash = await hashPassword(password);
     const trimmedName = name?.trim();
