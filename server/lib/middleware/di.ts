@@ -42,7 +42,6 @@ import { ReportPdfService } from '../../services/report-pdf.service';
 import { ReportExportService } from '../../services/report-export.service';
 import { SigningKeyService } from '../../services/signing-key.service';
 import { AuditLogService } from '../../services/audit-log.service';
-import { TemplateMigrationService } from '../../services/template-migration.service';
 import { ImportHistoryService } from '../../services/import-history.service';
 import { InspectionRequestService } from '../../services/inspection-request.service';
 import { RatingSystemService } from '../../services/rating-system.service';
@@ -328,9 +327,6 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     // stream. Reuses the PHOTOS bucket binding (same object store as
                     // report PDFs; see server/lib/r2-keys.ts:reportWordExport).
                     target.reportExport = new ReportExportService(c.env.DB, c.env.PHOTOS);
-                    break;
-                case 'templateMigration':
-                    target.templateMigration = new TemplateMigrationService(c.env.DB, c.get('tenantId'));
                     break;
                 case 'importHistory':
                     target.importHistory = new ImportHistoryService(c.env.DB, c.get('tenantId'));
