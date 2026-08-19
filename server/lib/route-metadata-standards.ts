@@ -18,6 +18,11 @@ export const VALID_TAGS = [
     'public', 'calendar', 'tags', 'ratings',
     'profile', 'identity', 'automations', 'integrations', 'qbo',
     'sms',
+    // Import runs — an upload becoming staged rows, and then real records. Its
+    // own tag rather than one per entity family: a single run can carry
+    // templates, contacts or team members, so filing it under any one of them
+    // would hide it from readers of the other two.
+    'imports',
 ] as const;
 
 export const VALID_SECONDARY_TAGS = ['public', 'm2m', 'beta', 'webhook'] as const;

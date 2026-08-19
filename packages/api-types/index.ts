@@ -40,6 +40,7 @@ export type { InspectionTagApi }      from '../../server/api/tags';
 export type { IntegrationsApi }       from '../../server/api/integrations';
 export type { InvoicesApi }           from '../../server/api/invoices';
 export type { MarketplaceApi }        from '../../server/api/marketplace';
+export type { MigrationIntakeApi }    from '../../server/api/migration-intake';
 export type { MessageTemplatesApi }   from '../../server/api/message-templates';
 export type { MessagesApi }           from '../../server/api/messages';
 export type { InspectorMessagesApi }  from '../../server/api/messages';

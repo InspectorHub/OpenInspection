@@ -65,6 +65,7 @@ import scheduleWeekSummaryRoutes from './api/schedule-week-summary';
 import teamRoutes from './api/team';
 import contactRoutes from './api/contacts';
 import contactsImportRoutes from './api/contacts/import';
+import migrationIntakeRoutes from './api/migration-intake';
 import invoiceRoutes from './api/invoices';
 import { servicesRoutes } from './api/services';
 import automationsRoutes from './api/automations';
@@ -418,6 +419,7 @@ const routes = app
   .route('/api/contacts', contactRoutes)
   // Import sub-router — extracted to fix hono/client type-collapse (C-10)
   .route('/api/contacts', contactsImportRoutes)
+  .route('/api/imports', migrationIntakeRoutes)
   .route('/api/recommendations', recommendationsRoutes)
   .route('/api/contractor-types', contractorTypesRoutes)
   .route('/api/role-profiles', roleProfilesRoutes)
