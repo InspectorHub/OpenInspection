@@ -1,34 +1,35 @@
-import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
-import { requireRole } from '../lib/middleware/rbac';
 import { capabilitiesFor } from '../lib/middleware/require-capability';
-import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { getBaseUrl } from '../lib/repair-gates';
 import { getDrizzle } from '../lib/route-helpers';
 import { Errors } from '../lib/errors';
-import { migrationBatches, type MigrationIntent } from '../lib/db/schema';
-import { MIGRATION_BATCH_STATUS } from '../lib/status/migration-batch-status';
+import { migrationBatches, migrationRows, type MigrationIntent } from '../lib/db/schema';
+import { MIGRATION_BATCH_STATUS, type MigrationBatchStatus } from '../lib/status/migration-batch-status';
 import type { HonoConfig } from '../types/hono';
 import { assertSourceSizeWithin, limitsFor } from '../lib/migration-intake/limits';
 import { buildBundle, defaultMappingFor, matchAdapter } from '../lib/migration-intake/adapters/registry';
+import { STAFF_ACCESS_AUTHORIZATION_VERSION } from '../lib/migration-intake/authorizations';
+import { assertConversionByPersonAvailable } from '../lib/migration-intake/unreadable-file';
 import { MigrationStageService } from '../services/migration-intake/stage.service';
 import { MigrationReportService } from '../services/migration-intake/report.service';
+import { MigrationApplyService } from '../services/migration-intake/apply.service';
+import { MigrationRevertService } from '../services/migration-intake/revert.service';
+import { MigrationRepairService } from '../services/migration-intake/repair.service';
 import { MigrationSourceFileService, extForFileName } from '../services/migration-intake/source-file.service';
 import { expiryFor } from '../services/migration-intake/assistance.service';
 import {
-    IntakeBatchParamsSchema,
-    IntakeListQuerySchema,
-    IntakeReportQuerySchema,
-    IntakeUploadFormSchema,
-} from '../lib/validations/migration-intake.schema';
-
-/**
- * The vendors this deployment can read without a person, listed for the refusal
- * message. A refusal that does not say what WOULD work sends the operator back
- * to the same file.
- */
-const SUPPORTED_SOURCES = ['a Spectora template export (JSON)', 'a spreadsheet saved as CSV or Excel'];
+    abandonRoute,
+    applyRoute,
+    assistanceRoute,
+    createBatchRoute,
+    getBatchRoute,
+    listBatchesRoute,
+    remapRoute,
+    repairRowRoute,
+    revertRoute,
+} from './migration-intake/route-definitions';
 
 /**
  * Whether this actor may run THIS import.
@@ -75,107 +76,35 @@ async function assertIntentAllowed(c: Context<HonoConfig>, intent: MigrationInte
     }
 }
 
-const createBatchRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/',
-    tags: ['imports'],
-    summary: 'Start an import run from an uploaded file',
-    description: 'Accepts an uploaded export or spreadsheet, stores it, and stages an import run from it. When no adapter can read the file the run is opened in a waiting state instead — and where no support path exists, the upload is refused before anything is stored.',
-    middleware: [requireRole('owner', 'manager')] as const,
-    request: {
-        body: {
-            content: {
-                'multipart/form-data': { schema: IntakeUploadFormSchema },
-            },
-        },
-    },
-    responses: {
-        201: {
-            content: {
-                'application/json': {
-                    schema: z.object({
-                        success: z.literal(true),
-                        data: z.object({
-                            batchId: z.string().describe('Id of the run just created, used for every later step'),
-                            status: z.string().describe('Lifecycle state the run was opened in'),
-                            needsAssistance: z.boolean().describe('Whether this run is waiting for a person to convert its file'),
-                        }),
-                    }),
-                },
-            },
-            description: 'Import run created',
-        },
-        403: { description: 'Not allowed to run this kind of import' },
-        422: { description: 'Nothing here can read the file, and it was not stored' },
-    },
-    operationId: 'createImportRun',
-    // A file upload is not expressible as a tool call, so this one is not
-    // offered as one. Every other route in this module is.
-}, { scopes: ['write'], tier: 'excluded' }));
-
-const listBatchesRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/',
-    tags: ['imports'],
-    summary: 'List import runs for this workspace',
-    description: 'Returns this workspace\'s import runs, newest first, so somebody can see what was imported and reach the undo for any of it.',
-    middleware: [requireRole('owner', 'manager')] as const,
-    request: { query: IntakeListQuerySchema },
-    responses: {
-        200: {
-            content: {
-                'application/json': {
-                    schema: z.object({
-                        success: z.literal(true),
-                        data: z.object({
-                            items: z.array(z.object({
-                                id: z.string().describe('Id of the import run'),
-                                intent: z.string().describe('Which entry point started it'),
-                                vendor: z.string().describe('Where the file came from, for display only'),
-                                status: z.string().describe('Lifecycle state of the run'),
-                                createdAt: z.string().describe('When the run was started, as an ISO timestamp'),
-                                expiresAt: z.string().nullable().describe('When the run and its file stop being kept, as an ISO timestamp'),
-                            })).describe('Import runs, newest first'),
-                        }),
-                    }),
-                },
-            },
-            description: 'Import runs',
-        },
-    },
-    operationId: 'listImportRuns',
-}, { scopes: ['read'], tier: 'extended' }));
-
-const getBatchRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/{batchId}',
-    tags: ['imports'],
-    summary: 'Read what an import run will do',
-    description: 'Returns the run counts split into three exclusive buckets, the entries that still need a person, and the sentence explaining why the run cannot be applied yet when it cannot.',
-    middleware: [requireRole('owner', 'manager')] as const,
-    request: { params: IntakeBatchParamsSchema, query: IntakeReportQuerySchema },
-    responses: {
-        200: {
-            content: {
-                'application/json': {
-                    schema: z.object({
-                        success: z.literal(true),
-                        data: z.unknown().describe('The full import-run report, including counts, problem entries and the blocked reason'),
-                    }),
-                },
-            },
-            description: 'Import run report',
-        },
-        404: { description: 'No such import run in this workspace' },
-    },
-    operationId: 'getImportRun',
-}, { scopes: ['read'], tier: 'extended' }));
-
 /**
- * Mounted at `/api/imports` rather than under a per-entity prefix: one run can
- * carry templates, contacts or team members, so filing it under any one of them
- * would hide it from readers of the other two.
+ * Loads a run this workspace owns and re-applies its own intent's gate.
+ *
+ * EVERY route below does this, not only the one that created the run. The gate
+ * that mattered when the file was uploaded is the same gate that matters when
+ * the rows are written, and an actor's capabilities can change in between.
+ *
+ * The 404 comes first and is the same sentence for a run that does not exist
+ * and one belonging to somebody else: telling those two apart would confirm
+ * that an id is real to a workspace with no business knowing it.
  */
+async function loadGatedBatch(c: Context<HonoConfig>, batchId: string) {
+    const tenantId = c.get('tenantId');
+    const db = getDrizzle(c);
+    const batch = await db.select().from(migrationBatches)
+        .where(and(eq(migrationBatches.id, batchId), eq(migrationBatches.tenantId, tenantId)))
+        .get();
+    if (!batch) throw Errors.NotFound('Migration batch not found');
+    await assertIntentAllowed(c, batch.intent);
+    return { db, batch, tenantId };
+}
+
+/** The two states a run can still be thrown away from. Anything else has written something. */
+const ABANDONABLE: MigrationBatchStatus[] = [
+    MIGRATION_BATCH_STATUS.STAGED,
+    MIGRATION_BATCH_STATUS.NEEDS_ASSISTANCE,
+];
+
+/** The handlers. Their shapes — and why they share one prefix — live next door. */
 const migrationIntakeRoutes = createApiRouter()
     .openapi(createBatchRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -237,25 +166,9 @@ const migrationIntakeRoutes = createApiRouter()
             }
         };
 
-        /**
-         * Nothing here can read it. On a deployment with a support path the run
-         * waits; on one without, it is refused BEFORE the file is stored —
-         * keeping a third party's personal data we can do nothing with has no
-         * reason behind it.
-         */
+        /** Nothing here can read it: the run waits for a person, or it is refused unstored. */
         const openWaitingRun = async () => {
-            if (!profile.hasAssistedMigration) {
-                throw Errors.UnprocessableEntity(
-                    `Nothing here can read that file, so it has not been kept. This import accepts ${SUPPORTED_SOURCES.join(', or ')}.`,
-                );
-            }
-            if (!staffAccessAuthorized) {
-                throw Errors.UnprocessableEntity(
-                    'Nothing here can read that file. It can be converted by a person, which needs your '
-                    + 'agreement for somebody to open it — the file has not been kept in the meantime. '
-                    + `This import otherwise accepts ${SUPPORTED_SOURCES.join(', or ')}.`,
-                );
-            }
+            assertConversionByPersonAvailable(profile, staffAccessAuthorized);
             const created = await withStoredFile((sourceKey) => stage.createAssistanceBatch({
                 tenantId,
                 createdBy: userId,
@@ -352,6 +265,123 @@ const migrationIntakeRoutes = createApiRouter()
             seatQuotaEnforced: c.var.profile.hasSeatQuota,
         });
         return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(remapRoute, async (c) => {
+        const { batchId } = c.req.valid('param');
+        const { mapping } = c.req.valid('json');
+        const { tenantId } = await loadGatedBatch(c, batchId);
+        const repair = new MigrationRepairService(c.env.DB, c.env.PHOTOS);
+        const data = await repair.remap({ tenantId, batchId, mapping, limits: limitsFor(c.var.profile) });
+        return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(repairRowRoute, async (c) => {
+        const { batchId, rowId } = c.req.valid('param');
+        const { payload } = c.req.valid('json');
+        const { tenantId } = await loadGatedBatch(c, batchId);
+        const repair = new MigrationRepairService(c.env.DB, c.env.PHOTOS);
+        const data = await repair.repairRow({ tenantId, batchId, rowId, payload });
+        return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(applyRoute, async (c) => {
+        const { batchId } = c.req.valid('param');
+        const body = c.req.valid('json');
+        const { tenantId } = await loadGatedBatch(c, batchId);
+
+        const apply = new MigrationApplyService(c.env.DB);
+        const result = await apply.apply({
+            tenantId,
+            batchId,
+            conflictPolicy: body.conflictPolicy,
+            rowResolutions: body.rowResolutions,
+            seatQuotaEnforced: c.var.profile.hasSeatQuota,
+            billingPortalUrl: c.var.profile.billingPortalUrl,
+        });
+
+        // Delivery happens here because this is the only place holding both the
+        // provider and the run's own record of who was invited, and it goes
+        // through the SAME provider call the team page uses rather than a
+        // second send path. A failure is NOT rolled back: the invitation exists
+        // and its seat is taken, and pressing apply again would skip the row
+        // and send nothing. So both numbers are reported instead of a clean
+        // success, and resending stays the team page's action.
+        let invitesSent = 0;
+        let invitesFailed = 0;
+        for (const invite of result.invites) {
+            try {
+                await c.var.services.email.sendInvitation(
+                    invite.email, `${getBaseUrl(c)}/join?token=${invite.token}`,
+                );
+                invitesSent++;
+            } catch {
+                invitesFailed++;
+            }
+        }
+
+        return c.json({
+            success: true as const,
+            data: {
+                status: result.status,
+                applied: result.applied,
+                skipped: result.skipped,
+                failed: result.failed,
+                invitesSent,
+                invitesFailed,
+            },
+        }, 200);
+    })
+    .openapi(revertRoute, async (c) => {
+        const { batchId } = c.req.valid('param');
+        const { tenantId } = await loadGatedBatch(c, batchId);
+        const revert = new MigrationRevertService(c.env.DB);
+        const data = await revert.revert({ tenantId, batchId });
+        return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(assistanceRoute, async (c) => {
+        const { batchId } = c.req.valid('param');
+        // The floor on this route is manager, but the decision to put a file of
+        // somebody else's personal data in front of an outside person is an
+        // owner's. Who may import data and who may make that call are not the
+        // same question — and the manager refused here can still apply the run.
+        if (c.get('userRole') !== 'owner') {
+            throw Errors.Forbidden('Only an owner can allow a person to open this file.');
+        }
+        const { db, batch, tenantId } = await loadGatedBatch(c, batchId);
+        if (batch.status !== MIGRATION_BATCH_STATUS.NEEDS_ASSISTANCE) {
+            throw Errors.Conflict('This import does not need converting.');
+        }
+        await db.update(migrationBatches).set({
+            staffAccessAuthorizedBy: c.get('user').sub,
+            staffAccessAuthorizedAt: new Date(),
+            // The version is stored verbatim, never derived: what somebody
+            // agreed to is the wording that was on the screen at the time.
+            staffAccessAuthorizationVersion: STAFF_ACCESS_AUTHORIZATION_VERSION,
+        }).where(and(eq(migrationBatches.id, batchId), eq(migrationBatches.tenantId, tenantId)));
+        return c.json({ success: true as const, data: { status: batch.status } }, 200);
+    })
+    .openapi(abandonRoute, async (c) => {
+        const { batchId } = c.req.valid('param');
+        const { db, batch, tenantId } = await loadGatedBatch(c, batchId);
+        if (!ABANDONABLE.includes(batch.status)) {
+            throw Errors.Conflict(
+                'This import has been applied. Its entries are the only record of where the imported '
+                + 'rows came from, so undo it instead.',
+            );
+        }
+        // The file goes FIRST. A row deleted with its object left behind is a
+        // third party's personal data retained under an authorisation for a run
+        // that no longer exists, and nothing left would know the key to sweep.
+        if (batch.sourceKey) {
+            await new MigrationSourceFileService(c.env.PHOTOS).remove([batch.sourceKey]);
+        }
+        await db.delete(migrationRows).where(and(
+            eq(migrationRows.batchId, batchId),
+            eq(migrationRows.tenantId, tenantId),
+        ));
+        await db.delete(migrationBatches).where(and(
+            eq(migrationBatches.id, batchId),
+            eq(migrationBatches.tenantId, tenantId),
+        ));
+        return c.json({ success: true as const, data: { deleted: true as const } }, 200);
     });
 
 export type MigrationIntakeApi = typeof migrationIntakeRoutes;
