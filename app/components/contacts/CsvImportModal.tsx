@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect, type ReactNode } from "react";
-import { useFetcher } from "react-router";
 import { Modal, Button, FileDropzone } from "@core/shared-ui";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export function CsvImportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const fetcher = useFetcher();
+  // #106 - the import writes every parsed row. `csv-preview` above stays raw:
+  // it parses and returns, and nothing is written until this intent.
+  const { fetcher, submit, busy: importing } = useGuardedSubmit();
   const [step, setStep] = useState<"upload" | "preview" | "done">("upload");
   const [csvText, setCsvText] = useState("");
   const [fileName, setFileName] = useState("");
@@ -91,10 +93,13 @@ export function CsvImportModal({ open, onClose }: { open: boolean; onClose: () =
         <Button variant="secondary" onClick={() => setStep("upload")}>{m.common_back()}</Button>
         <button
           onClick={() => {
-            fetcher.submit({ intent: "csv-import", csvText }, { method: "post" });
-            setStep("done");
+            // Advance only for a call the guard accepted: showing "done" for a
+            // refused click would claim rows were imported that never were.
+            if (submit({ intent: "csv-import", csvText }, { method: "post" })) setStep("done");
           }}
-          className="px-5 py-2 rounded-lg bg-ih-ok text-white text-xs font-bold uppercase tracking-widest hover:bg-ih-ok/85"
+          disabled={importing}
+          aria-busy={importing || undefined}
+          className="px-5 py-2 rounded-lg bg-ih-ok text-white text-xs font-bold uppercase tracking-widest hover:bg-ih-ok/85 disabled:opacity-50"
         >
           {m.contacts_csv_confirm()}
         </button>

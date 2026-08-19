@@ -32,6 +32,7 @@ export function NoticeBell({
   onMarkAllRead,
   onDismiss,
   onRemedy,
+  busy = false,
 }: {
   notices: NoticeRowData[];
   unread: number;
@@ -58,6 +59,8 @@ export function NoticeBell({
   onMarkAllRead: () => void;
   onDismiss: (noticeId: string) => void;
   onRemedy: (remedy: NoticeRemedy) => void;
+  /** #106 - the write guard's in-flight flag; see NoticeList's `busy`. */
+  busy?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -104,7 +107,9 @@ export function NoticeBell({
               <button
                 type="button"
                 onClick={onMarkAllRead}
-                className="text-[11px] font-semibold text-ih-fg-3 hover:text-ih-fg-1 transition-colors"
+                disabled={busy}
+                aria-busy={busy || undefined}
+                className="text-[11px] font-semibold text-ih-fg-3 hover:text-ih-fg-1 disabled:opacity-40 transition-colors"
               >
                 {m.notice_panel_mark_all()}
               </button>
@@ -116,6 +121,7 @@ export function NoticeBell({
             showCompany={showCompany}
             emptyBody={emptyBody}
             onDismiss={onDismiss}
+            busy={busy}
             /* A remedy always takes the reader somewhere — the opt-in page, or
                the composer. Leaving the panel open would drop it on top of the
                place it just sent them. Dismiss deliberately does NOT close: a

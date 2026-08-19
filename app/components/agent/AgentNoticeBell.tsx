@@ -13,13 +13,16 @@
  *    plain "Not delivered" the reader gets instead.
  */
 import { useEffect } from "react";
-import { useFetcher, useRevalidator } from "react-router";
+import { useRevalidator } from "react-router";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { NoticeBell } from "~/components/notices/NoticeBell";
 import type { NoticeRowData, NoticeRemedy } from "~/lib/notice-view";
 
 export function AgentNoticeBell({ notices, unread }: { notices: NoticeRowData[]; unread: number }) {
-  const fetcher = useFetcher<{ ok?: boolean; intent?: string; url?: string }>();
+  // #106 - dismiss, mark-all-read and the opt-in link all write.
+  const { fetcher, submit: guardedSubmit, busy } =
+    useGuardedSubmit<{ ok?: boolean; intent?: string; url?: string }>();
   const revalidator = useRevalidator();
 
   useEffect(() => {
@@ -36,7 +39,7 @@ export function AgentNoticeBell({ notices, unread }: { notices: NoticeRowData[];
   }, [fetcher.data]);
 
   const submit = (intent: string, noticeId?: string) =>
-    fetcher.submit(
+    guardedSubmit(
       { intent, ...(noticeId ? { noticeId } : {}) },
       { method: "post", action: "/resources/agent-notices" },
     );
@@ -58,6 +61,7 @@ export function AgentNoticeBell({ notices, unread }: { notices: NoticeRowData[];
       onMarkAllRead={() => submit("notice-mark-all-read")}
       onDismiss={(id) => submit("notice-dismiss", id)}
       onRemedy={onRemedy}
+      busy={busy}
     />
   );
 }

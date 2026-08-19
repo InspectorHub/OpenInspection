@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import { Card, Button, Modal } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { GateToggle } from "./GateToggle";
 import { MoneyInput } from "~/components/MoneyInput";
 import { formatCents, type PillTone } from "~/lib/hub-blocks";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import type { action } from "~/routes/inspector-portal";
 
@@ -50,7 +50,9 @@ export function InvoiceCard({
 }) {
     const [priceOpen, setPriceOpen] = useState(false);
     const [cents, setCents] = useState<number | null>(basePriceCents ?? null);
-    const priceFetcher = useFetcher<typeof action>();
+    // #106 — this writes the order price, which is what the client is billed.
+    const { fetcher: priceFetcher, submit: submitPrice, busy: pricing } =
+        useGuardedSubmit<typeof action>();
 
     // The base price only reaches the client when nothing outranks it. Once an
     // invoice exists the amount is frozen by the invoice; once services are
@@ -127,16 +129,20 @@ export function InvoiceCard({
                         <Button
                             variant="primary"
                             size="sm"
-                            disabled={priceFetcher.state !== "idle"}
+                            disabled={pricing}
                             onClick={() => {
-                                priceFetcher.submit(
-                                    {
-                                        intent: "save-order",
-                                        payload: JSON.stringify({ price: cents ?? 0 }),
-                                    },
-                                    { method: "post" },
-                                );
-                                setPriceOpen(false);
+                                // Close only on a call the guard accepted.
+                                if (
+                                    submitPrice(
+                                        {
+                                            intent: "save-order",
+                                            payload: JSON.stringify({ price: cents ?? 0 }),
+                                        },
+                                        { method: "post" },
+                                    )
+                                ) {
+                                    setPriceOpen(false);
+                                }
                             }}
                         >
                             {m.common_save()}

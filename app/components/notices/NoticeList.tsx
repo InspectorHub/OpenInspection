@@ -45,6 +45,7 @@ export function NoticeList({
   emptyBody,
   onDismiss,
   onRemedy,
+  busy = false,
 }: {
   notices: NoticeRowData[];
   /** Whether this portal has a message composer behind the email remedy. */
@@ -54,6 +55,15 @@ export function NoticeList({
   emptyBody: string;
   onDismiss: (noticeId: string) => void;
   onRemedy: (remedy: NoticeRemedy) => void;
+  /**
+   * #106 - dismissals go through useGuardedSubmit, which REFUSES a second call
+   * while one is in flight. The panel deliberately stays open after a dismiss
+   * because "a reader tidying an inbox usually clears more than one row"
+   * (NoticeBell), so successive clicks are the EXPECTED gesture here — which is
+   * exactly the case where a guard silently drops the second one. Disabling for
+   * the length of the round trip makes the refusal visible instead of silent.
+   */
+  busy?: boolean;
 }) {
   const locale = useDisplayLocale();
 
@@ -88,9 +98,11 @@ export function NoticeList({
                 <button
                   type="button"
                   onClick={() => onDismiss(n.id)}
+                  disabled={busy}
+                  aria-busy={busy || undefined}
                   aria-label={m.notice_dismiss_aria()}
                   title={m.notice_dismiss()}
-                  className="shrink-0 -mt-0.5 w-6 h-6 grid place-items-center rounded-md text-ih-fg-4 hover:text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
+                  className="shrink-0 -mt-0.5 w-6 h-6 grid place-items-center rounded-md text-ih-fg-4 hover:text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-40 transition-colors"
                 >
                   <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                     <path d="M3 3l6 6M9 3l-6 6" />

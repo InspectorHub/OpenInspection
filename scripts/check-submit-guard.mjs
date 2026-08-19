@@ -17,9 +17,24 @@
  * tests/unit/platform/check-submit-guard.spec.ts asserts a COUNT so that a
  * literal-name implementation reads red rather than covering half the tree.
  *
+ * ⚠️ THAT PARAGRAPH WAS HALF TRUE, AND THE HALF THAT WAS NOT COST FIVE SITES.
+ * `\w*[Ff]etcher\.submit` covers 53 identifiers, and every one of them ENDS IN
+ * "fetcher" — so it is still a name rule, just a generous one. A fetcher called
+ * `write`, `send` or `resend` was invisible: not reported, not baselined, not
+ * counted in the awaiting ceiling, and therefore not even visible as debt.
+ * `findSubmitCallSites` now runs a SECOND pass over the names each file
+ * DECLARES with `useFetcher` (see FETCHER_DECL), which is what the source
+ * actually says a fetcher is. Five real call sites arrived that way the day it
+ * landed, across StaffNoticeBell, CommunicationSection and messages.tsx.
+ *
  * KNOWN, WRITTEN-DOWN HOLE: a call split across lines (`fetcher\n  .submit(`)
  * does not match. No site in the tree is written that way today, and widening
  * the regex across newlines makes it match unrelated member chains.
+ *
+ * SECOND KNOWN HOLE: a fetcher obtained without a `const x = useFetcher()`
+ * declaration — destructured, returned from a helper hook, or handed in as a
+ * prop under a name that does not say fetcher — is still invisible to both
+ * passes. No site in the tree is written that way today.
  *
  * RULE B — `busy` (see findBusyViolations). The guard contains the double
  * click, but a button with no pending affordance still LOOKS live. Both
@@ -73,6 +88,26 @@ const BASELINE_PATH = join(__dirname, 'submit-guard-baseline.json');
  * running a command is not a ratchet.
  */
 const AWAITING_CEILING_PATH = join(__dirname, 'submit-guard-awaiting-ceiling.json');
+
+/**
+ * ⚠️ THE CEILING IS NOW `{}` — ZERO, AND THAT WAS A HAND EDIT. The burn-down
+ * finished: all 94 AWAITING entries were converted, and the 51 that remain are
+ * exemptions with written reasons. `--update` REFUSED to write the zero (see
+ * updateCeiling: a zero written from a marker that may simply have stopped
+ * matching would retire the ratchet by accident), which is the correct refusal
+ * and the reason this is a hand edit rather than a flag.
+ *
+ * What that costs, said out loud: the `awaitingTotal === 0 && ceilingTotal > 0`
+ * detector-broke branch below can no longer fire, because both numbers are now
+ * zero. The marker's own liveness is instead pinned in
+ * tests/unit/platform/check-submit-guard.spec.ts, where `awaitingByFile` is
+ * handed a genuine `AWAITING #106 CONVERSION` reason and must count it — a
+ * positive control that does not depend on any debt still existing in the tree.
+ *
+ * What it buys: the ratchet is now at its strictest. Any new AWAITING entry is
+ * `1 > 0` and fails on the spot, so debt can only be added by hand-raising this
+ * file again — a diff that says "I am adding debt" out loud.
+ */
 
 /** Client surfaces only. The posture is about what the BROWSER does. */
 const SCAN_ROOTS = ['app'];
@@ -137,6 +172,27 @@ function countNewlines(s) {
 const CALL_SHAPE = /\w*[Ff]etcher\.submit\s*\(/g;
 
 /**
+ * `const write = useFetcher<T>()` — a fetcher whose NAME does not say fetcher.
+ *
+ * ⚠️ THE SHAPE RULE ABOVE IS STILL A NAME RULE, and this closes it. The docblock
+ * at the top of this file argues the regex is name-independent because it covers
+ * 53 distinct identifiers — but every one of those 53 ENDS IN "fetcher", so the
+ * rule is `*fetcher.submit(` and nothing else. A fetcher called `write`, `send`,
+ * `resend` or `payload` was invisible to it: not reported, not baselined, not
+ * counted in the awaiting ceiling. Measured the day this was added: FIVE such
+ * call sites across three files (`StaffNoticeBell`'s `write`,
+ * `CommunicationSection`'s `send` and `resend`, `messages.tsx`'s `send`), none
+ * of which the gate had ever seen.
+ *
+ * The fix is NOT a wider member expression. `\w+\.submit\s*\(` would match
+ * `form.submit()`, `element.submit()` and every unrelated `.submit` in the tree,
+ * which trades one blind spot for a flood of false hits. It is to read the
+ * file's own `useFetcher` DECLARATIONS and treat those names as fetchers —
+ * which is what the source itself says they are.
+ */
+const FETCHER_DECL = /(?:const|let|var)\s+(\w+)\s*=\s*useFetcher\b/g;
+
+/**
  * Every raw fetcher-submit call site in one source file.
  *
  * @param {string} source
@@ -148,17 +204,37 @@ const CALL_SHAPE = /\w*[Ff]etcher\.submit\s*\(/g;
 export function findSubmitCallSites(source) {
     const stripped = stripComments(source);
     const lines = source.split('\n');
-    const out = [];
-    for (const m of stripped.matchAll(CALL_SHAPE)) {
-        const line = countNewlines(stripped.slice(0, m.index)) + 1;
-        out.push({
+    /** char offset -> hit, so the two passes can never report one call twice. */
+    const byIndex = new Map();
+    const record = (index) => {
+        if (byIndex.has(index)) return;
+        const line = countNewlines(stripped.slice(0, index)) + 1;
+        const head = stripped.slice(index, stripped.indexOf('(', index) + 1);
+        byIndex.set(index, {
             line,
-            index: m.index,
-            ident: m[0].slice(0, m[0].indexOf('.')),
+            index,
+            ident: head.slice(0, head.indexOf('.')),
             context: (lines[line - 1] ?? '').trim(),
         });
+    };
+
+    for (const m of stripped.matchAll(CALL_SHAPE)) record(m.index);
+
+    // Second pass: the names this file DECLARES as fetchers. Only names the
+    // first pass cannot already see, so nothing is counted twice and the total
+    // does not move when a fetcher is renamed into or out of the `*Fetcher`
+    // convention.
+    const declared = new Set();
+    for (const m of stripped.matchAll(FETCHER_DECL)) {
+        if (!/[Ff]etcher/.test(m[1])) declared.add(m[1]);
     }
-    return out;
+    for (const name of declared) {
+        for (const m of stripped.matchAll(new RegExp(`\\b${name}\\.submit\\s*\\(`, 'g'))) {
+            record(m.index);
+        }
+    }
+
+    return [...byIndex.values()].sort((a, b) => a.index - b.index);
 }
 
 // ---------------------------------------------------------------------------

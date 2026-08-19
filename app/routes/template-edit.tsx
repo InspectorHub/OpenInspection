@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { CLIENT_PROFILE_LIST } from "~/lib/report-style/profiles-client";
-import { useLoaderData, useFetcher, Link, isRouteErrorResponse, useRouteError } from "react-router";
+import { useLoaderData, Link, isRouteErrorResponse, useRouteError } from "react-router";
 import type { Route } from "./+types/template-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -23,6 +23,7 @@ import type { PropertyType } from "~/components/template/types";
 import { CommentLibraryDrawer } from "~/components/editor/CommentLibraryDrawer";
 import { useCannedComments } from "~/hooks/useCannedComments";
 import { buildCannedFromText, TAB_SEVERITY, type CannedTab } from "~/lib/editor/canned-from-library";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -134,7 +135,8 @@ function serializeCanned(c: CannedComment): Record<string, unknown> {
 
 export default function TemplateEditPage() {
   const { id, name: initialName, version: initialVersion, schema: initial, defectCategories, defaultProfileId: initialDefaultProfileId } = useLoaderData<typeof loader>();
-  const fetcher = useFetcher();
+  // #106 - Save writes the whole template schema and bumps its version.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit();
 
   // Authoring unification Plan-4 module K — one tenant-wide category → color
   // lookup, built once from the loader's single fetch, keyed by BOTH name and
@@ -395,7 +397,7 @@ export default function TemplateEditPage() {
   }
 
   function handleSave() {
-    fetcher.submit(
+    submit(
       { name: templateName, schema: JSON.stringify(toV2Payload()), defaultProfileId: defaultProfileId ?? "" },
       { method: "post" },
     );
@@ -502,8 +504,8 @@ export default function TemplateEditPage() {
           <Button variant="secondary" size="sm" onClick={() => setRatingModalOpen(true)}>
             {m.templates_edit_rating_system()}
           </Button>
-          <Button variant="primary" size="sm" onClick={handleSave}>
-            {fetcher.state === "submitting" ? m.templates_edit_saving() : saveSuccess ? m.templates_edit_saved() : m.common_save()}
+          <Button variant="primary" size="sm" onClick={handleSave} disabled={saving} aria-busy={saving || undefined}>
+            {saving ? m.templates_edit_saving() : saveSuccess ? m.templates_edit_saved() : m.common_save()}
           </Button>
         </div>
       </header>

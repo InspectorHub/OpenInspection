@@ -11,6 +11,7 @@ import { ContactModal } from "~/components/contacts/ContactModal";
 import { CsvImportModal } from "~/components/contacts/CsvImportModal";
 import { ContactsTable } from "~/components/contacts/ContactsTable";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -153,7 +154,10 @@ export default function ContactsPage() {
   const [typeFilter, setTypeFilter] = useState(filterType || "");
   const [pendingArchive, setPendingArchive] = useState<Contact | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const archiveFetcher = useFetcher<{ ok?: boolean }>();
+  // #106 - archiving a contact can revoke every report they can still open,
+  // and restore puts it back. One guard: both fire from row controls that
+  // are disabled while it is busy.
+  const { submit: submitArchive, busy: archiveBusy } = useGuardedSubmit<{ ok?: boolean }>();
   // IA-100 — how many reports this person can still open, fetched only for the
   // contact actually being archived, plus whether this tenant treats archiving
   // as revoking.
@@ -161,14 +165,13 @@ export default function ContactsPage() {
 
   const openEdit = (c: Contact) => { setEditContact(c); setModalOpen(true); };
   const restore = (c: Contact) =>
-    archiveFetcher.submit({ intent: "restore", id: c.id }, { method: "post" });
+    submitArchive({ intent: "restore", id: c.id }, { method: "post" });
   const confirmArchive = () => {
     if (pendingArchive) {
-      archiveFetcher.submit(
-        { intent: "delete", id: pendingArchive.id },
-        { method: "post" },
-      );
-      setPendingArchive(null);
+      // Keep the confirmation open when the guard refuses.
+      if (submitArchive({ intent: "delete", id: pendingArchive.id }, { method: "post" })) {
+        setPendingArchive(null);
+      }
     }
   };
 
@@ -276,7 +279,7 @@ export default function ContactsPage() {
         }
         confirmLabel={m.contacts_action_archive()}
         tone="default"
-        busy={archiveFetcher.state !== "idle"}
+        busy={archiveBusy}
         onConfirm={confirmArchive}
         onCancel={() => setPendingArchive(null)}
       />

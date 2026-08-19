@@ -40,6 +40,7 @@ import { InspectionsFilterStrip } from "~/components/dashboard/InspectionsFilter
 import { InspectionsEmptyState } from "~/components/dashboard/InspectionsEmptyState";
 import { InspectionsStatCards, STAT_TARGETS } from "~/components/dashboard/InspectionsStatCards";
 import { InspectionsFocusBar } from "~/components/dashboard/InspectionsFocusBar";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
@@ -274,7 +275,13 @@ export default function InspectionsPage() {
   /* ---- IA-12 Onboarding checklist ---- */
   // Optimistic dismiss: hide immediately on click, persist via BFF.
   const [checklistDismissedOptimistic, setChecklistDismissedOptimistic] = useState(false);
-  const dismissFetcher = useFetcher();
+  // #106 - dismissing the checklist is a per-user write. The generic
+  // `fetcher` above stays raw: it is the batch-delete loop, which submits
+  // once per selected id and is exempt for that reason.
+  // The card hides itself optimistically on the same click, so there is no
+  // control left on screen to leave pending.
+  // submit-guard-allow-no-busy: the control this fires is unmounted by the click.
+  const { submit: submitDismiss } = useGuardedSubmit();
   const checklistDismissed = loaderDismissed || checklistDismissedOptimistic;
 
   /* ---- State ---- */
@@ -732,7 +739,7 @@ export default function InspectionsPage() {
         dismissed={checklistDismissed}
         onDismiss={() => {
           setChecklistDismissedOptimistic(true);
-          dismissFetcher.submit(
+          submitDismiss(
             { intent: "dismiss-checklist" },
             { method: "post" },
           );

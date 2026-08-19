@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import { Card, Pill } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import type { action } from "~/routes/inspector-portal";
 
@@ -64,10 +64,10 @@ export function ReportsCard({
      * "is this order published" — so the route decides and this card renders.
      */
 }) {
-    const deleteFetcher = useFetcher<typeof action>();
+    // #106 — deleting a report is irreversible; it goes through the guard.
+    const { fetcher: deleteFetcher, submit, busy } = useGuardedSubmit<typeof action>();
     const [deleting, setDeleting] = useState<ReportRow | null>(null);
 
-    const busy = deleteFetcher.state !== "idle";
     const done = deleteFetcher.state === "idle" ? deleteFetcher.data : undefined;
     const error = done && "ok" in done && !done.ok && done.intent === "report-delete"
         ? done.error
@@ -150,11 +150,11 @@ export function ReportsCard({
                 onCancel={() => setDeleting(null)}
                 onConfirm={() => {
                     if (!deleting) return;
-                    deleteFetcher.submit(
-                        { intent: "report-delete", reportId: deleting.id },
-                        { method: "post" },
-                    );
-                    setDeleting(null);
+                    // Keep the confirmation open when the guard refuses — closing
+                    // it would say the report had been deleted.
+                    if (submit({ intent: "report-delete", reportId: deleting.id }, { method: "post" })) {
+                        setDeleting(null);
+                    }
                 }}
             />
         </Card>

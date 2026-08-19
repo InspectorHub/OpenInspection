@@ -13,6 +13,8 @@ import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
+import { IDEMPOTENCY_FIELD } from "~/hooks/useGuardedSubmit";
+
 import { ReportGateUnlock } from "~/components/inspector-portal/ReportGateUnlock";
 
 const fmt = (iso: string) => `on ${iso.slice(0, 10)}`;
@@ -72,9 +74,17 @@ describe("ReportGateUnlock", () => {
         });
         fireEvent.click(within(dialog).getByRole("button", { name: /^unlock reports$/i }));
 
-        await waitFor(() => expect(calls).toEqual([
-            { intent: "unlock-report", reason: "Client at closing; radon addendum still out." },
-        ]));
+        await waitFor(() => expect(calls).toHaveLength(1));
+        // #106 — the write goes through useGuardedSubmit, so the request carries
+        // the idempotency key the server-side guard reads. Asserted as its own
+        // field rather than folded into the payload, because "the key is there"
+        // is the half a plain deep-equal would silently drop.
+        const { [IDEMPOTENCY_FIELD]: key, ...payload } = calls[0];
+        expect(payload).toEqual({
+            intent: "unlock-report",
+            reason: "Client at closing; radon addendum still out.",
+        });
+        expect(key).toMatch(/^[0-9a-f-]{36}$/);
     });
 
     it("trims a reason that is only whitespace", async () => {
@@ -119,6 +129,9 @@ describe("ReportGateUnlock", () => {
         });
 
         fireEvent.click(screen.getByRole("button", { name: /put the gate back/i }));
-        await waitFor(() => expect(calls).toEqual([{ intent: "relock-report" }]));
+        await waitFor(() => expect(calls).toHaveLength(1));
+        const { [IDEMPOTENCY_FIELD]: key, ...payload } = calls[0];
+        expect(payload).toEqual({ intent: "relock-report" });
+        expect(key).toMatch(/^[0-9a-f-]{36}$/);
     });
 });

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { useFetcher } from "react-router";
 import { Drawer, Modal, Button, Input, IconButton, SegmentedControl } from "@core/shared-ui";
 import type { UnitScopeRow } from "./BreadcrumbDropdown";
+import type { GuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 type UnitsFetcher = ReturnType<typeof useFetcher>;
@@ -19,6 +20,14 @@ export interface UnitsManagerProps {
    * mutation. Every write in this panel submits through it (BFF relay).
    */
   fetcher: UnitsFetcher;
+  /**
+   * #106 - every write in this panel is a real unit mutation, so none of them
+   * may go out as a raw `fetcher.submit`. The editor owns the guard (it also
+   * watches this fetcher to revalidate) and this panel only fires it.
+   */
+  guardedSubmit: GuardedSubmit;
+  /** The guard's in-flight flag - the panel's own `busy`. */
+  busy: boolean;
 }
 
 /**
@@ -34,9 +43,12 @@ export interface UnitsManagerProps {
  * All writes route through the editor route action (`fetcher.submit`), never a
  * bare client fetch — the action holds the authed tenant context.
  */
-export function UnitsManager({ open, onClose, inspectionId, units, mode, fetcher }: UnitsManagerProps) {
+export function UnitsManager({ open, onClose, inspectionId, units, mode, fetcher, guardedSubmit, busy }: UnitsManagerProps) {
   const [showLossy, setShowLossy] = useState(false);
-  const busy = fetcher.state !== "idle";
+  // The panel fires many intents through one guard; the method is the same for
+  // all of them, so it is supplied here rather than at eleven call sites.
+  const submit = (fields: Record<string, string>) => guardedSubmit(fields, { method: "POST" });
+
 
   // Close the lossy-confirm modal once the switch lands (the editor revalidates
   // and re-renders in tagged mode).
@@ -46,10 +58,6 @@ export function UnitsManager({ open, onClose, inspectionId, units, mode, fetcher
   }, [fetcher.data]);
 
   const unitRows = units.filter((u) => (u.kind ?? "unit") === "unit");
-
-  const submit = (fields: Record<string, string>) => {
-    fetcher.submit({ ...fields }, { method: "POST" });
-  };
 
   return (
     <>

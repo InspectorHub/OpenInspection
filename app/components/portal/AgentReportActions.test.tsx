@@ -8,6 +8,7 @@
 import { render, fireEvent, waitFor } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 import { AgentReportActions } from "./AgentReportActions";
+import { IDEMPOTENCY_FIELD } from "~/hooks/useGuardedSubmit";
 
 const BASE_PROPS = {
   tenant: "acme",
@@ -47,14 +48,17 @@ describe("AgentReportActions — registered agent (hasAccount: true)", () => {
 
     fireEvent.click(getByTestId("agent-report-workspace-cta"));
 
-    await waitFor(() => {
-      expect(submitted).toEqual({
-        intent: "agent-magic-login",
-        tenant: "acme",
-        inspectionId: "insp-1",
-        token: "report-token-abc",
-      });
+    await waitFor(() => expect(submitted).not.toBeNull());
+    // #106 - the CTA goes through useGuardedSubmit, so the request carries the
+    // idempotency key as its own field.
+    const { [IDEMPOTENCY_FIELD]: key, ...payload } = submitted!;
+    expect(payload).toEqual({
+      intent: "agent-magic-login",
+      tenant: "acme",
+      inspectionId: "insp-1",
+      token: "report-token-abc",
     });
+    expect(key).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it("shows a check-your-email confirmation on success (never navigates)", async () => {

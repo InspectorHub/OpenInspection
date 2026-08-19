@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useFetcher } from "react-router";
 import { EmptyState } from "@core/shared-ui";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { pushToast } from "~/hooks/useToast";
 import { UnassignedLane } from "./UnassignedLane";
@@ -40,7 +40,8 @@ import {
  * would leave a window where the board shows a job at a time nobody owns.
  */
 export function DispatchBoard({ board }: { board: DispatchPayload }) {
-  const fetcher = useFetcher<RescheduleResult>();
+  // #106 - a drop reschedules a real appointment.
+  const { fetcher, submit, busy } = useGuardedSubmit<RescheduleResult>();
   const hours = boardHours();
   const closures = closureItems(board.items);
   const axisPx = axisHeightPx();
@@ -98,7 +99,7 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
 
   function move(item: DispatchItem, startMs: number, leadInspectorId: string) {
     if (!item.inspectionId) return;
-    fetcher.submit(
+    submit(
       {
         intent: "reschedule",
         inspectionId: item.inspectionId,
@@ -137,7 +138,6 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
     move(dragged, startMs, "");
   }
 
-  const busy = fetcher.state !== "idle";
 
   return (
     <>

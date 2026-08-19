@@ -98,6 +98,51 @@ describe('findSubmitCallSites — the call shape, not the name', () => {
         expect(hits.map((h) => h.line)).toEqual([1, 2, 3, 4, 5]);
     });
 
+    it('flags a fetcher whose NAME does not contain "fetcher"', () => {
+        // Miscount #2, and the reason the `*Fetcher` rule above is not enough:
+        // it covers 53 identifiers and every one of them ends in "fetcher", so
+        // a fetcher called `write` was never seen at all — not reported, not
+        // baselined, not counted in the awaiting ceiling. Three real files were
+        // in that state (StaffNoticeBell, CommunicationSection, messages.tsx).
+        const src = [
+            `const write = useFetcher<{ ok?: boolean }>();`,
+            `write.submit({ intent }, { method: "post" });`,
+        ].join('\n');
+        const hits = findSubmitCallSites(src);
+        expect(hits).toHaveLength(1);
+        expect(hits[0].line).toBe(2);
+        expect(hits[0].ident).toBe('write');
+    });
+
+    it('counts a declared fetcher ONCE even when its name also matches the shape rule', () => {
+        // The two passes must not double-count: `deleteFetcher` is found by the
+        // shape rule AND declared via useFetcher. A duplicate here would inflate
+        // rawSites past hits.size and trip the key-collision failure instead.
+        const src = [
+            `const deleteFetcher = useFetcher();`,
+            `deleteFetcher.submit(a, post);`,
+        ].join('\n');
+        expect(findSubmitCallSites(src)).toHaveLength(1);
+    });
+
+    it('does NOT flag a `.submit()` on something the file never declared as a fetcher', () => {
+        // The blunt fix for miscount #2 — `\\w+\\.submit\\s*\\(` — matches this and
+        // every unrelated member chain in the tree. The rule reads DECLARATIONS
+        // instead, so a form is still a form.
+        expect(findSubmitCallSites(`formRef.current.submit();`)).toEqual([]);
+        expect(findSubmitCallSites(`const form = document.forms[0];\nform.submit();`)).toEqual([]);
+    });
+
+    it('finds hits in source order regardless of which pass saw them', () => {
+        const src = [
+            `const write = useFetcher();`,
+            `deleteFetcher.submit(a, post);`,
+            `write.submit(b, post);`,
+            `coverFetcher.submit(c, post);`,
+        ].join('\n');
+        expect(findSubmitCallSites(src).map((h) => h.line)).toEqual([2, 3, 4]);
+    });
+
     it('tolerates whitespace before the paren', () => {
         expect(findSubmitCallSites(`fetcher.submit (payload, post);`)).toHaveLength(1);
     });
@@ -418,6 +463,36 @@ describe('the two committed files agree', () => {
             under: [],
             failures: [],
         });
-        expect(r.awaitingTotal).toBeGreaterThan(0);
+
+        // The burn-down is DONE: zero awaiting, and a ceiling of exactly {}.
+        //
+        // ⚠️ This used to read `expect(r.awaitingTotal).toBeGreaterThan(0)` — a
+        // guard against a vacuously green ratchet, and the right assertion right
+        // up until the day the debt actually reached zero. Deleting it outright
+        // would leave "0 == 0" as the whole test, which passes just as happily
+        // when the marker has stopped matching as when the work is finished.
+        // So the emptiness is asserted POSITIVELY instead, against the two facts
+        // that distinguish the two states: the baseline is large and every entry
+        // in it carries a written reason, and the ceiling is the empty object
+        // rather than a stale set of open slots. The marker's own liveness is
+        // pinned separately by the awaitingByFile block above, which hands it a
+        // genuine AWAITING reason and requires a count of 1.
+        expect(r.awaitingTotal).toBe(0);
+        expect(ceiling).toEqual({});
+        const keys = Object.keys(baseline);
+        expect(keys.length).toBeGreaterThan(40);
+        expect(keys.filter((k) => !String(baseline[k] ?? '').trim())).toEqual([]);
+    });
+
+    it('a single AWAITING entry fails against the zeroed ceiling', () => {
+        // What the zero actually buys, asserted rather than assumed: with no
+        // slots left open, one new debt entry is `1 > 0` and fails on the spot.
+        const r = evaluateAwaitingRatchet({
+            awaiting: awaitingByFile({ 'new.tsx::onSave::fetcher.submit(x);': AWAITING }),
+            ceiling: {},
+        });
+        expect(r.ok).toBe(false);
+        expect(r.failures.join(' ')).toMatch(/backlog GREW: 1 awaiting against a ceiling of 0/);
+        expect(r.over).toEqual(['new.tsx']);
     });
 });

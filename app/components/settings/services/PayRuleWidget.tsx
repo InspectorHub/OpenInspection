@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import type { action } from "~/routes/settings-services";
 import { toHundredths, fromHundredths } from "~/lib/settings-services";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -64,7 +64,11 @@ function RuleRow({
     allowDefault: boolean;
     onDone?: () => void;
 }) {
-    const fetcher = useFetcher<typeof action>({ key: `pay-rule-${rule?.id ?? "new"}-${serviceId}` });
+    // #106 — a pay rule decides what an inspector is paid, so the save goes
+    // through the guard. The per-rule fetcher key is kept.
+    const { fetcher, submit, busy } = useGuardedSubmit<typeof action>({
+        key: `pay-rule-${rule?.id ?? "new"}-${serviceId}`,
+    });
     const [type, setType] = useState<PayRule["type"]>(rule?.type ?? "percent");
     const [rate, setRate] = useState(rule ? rateOf(rule) : "");
     const [deduction, setDeduction] = useState(fromHundredths(rule?.deductionCents));
@@ -72,7 +76,6 @@ function RuleRow({
     const [localError, setLocalError] = useState<string | null>(null);
 
     const isPercent = type !== "fixed";
-    const busy = fetcher.state !== "idle";
     const result = fetcher.state === "idle" ? fetcher.data : undefined;
     const serverError =
         result && "intent" in result && "ok" in result && String(result.intent).startsWith("pay-rule") && result.ok === false
@@ -87,7 +90,7 @@ function RuleRow({
             return setLocalError(m.settings_pay_rule_error_rate());
         }
         setLocalError(null);
-        fetcher.submit(
+        const sent = submit(
             {
                 intent: "pay-rule-save",
                 serviceId,
@@ -99,7 +102,8 @@ function RuleRow({
             },
             { method: "post" },
         );
-        onDone?.();
+        // A refused click sent nothing, so the editor stays open.
+        if (sent) onDone?.();
     }
 
     return (
