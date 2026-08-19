@@ -318,50 +318,23 @@ export async function scheduled(
         logger.error('[cron] retention sweep failed', {}, e instanceof Error ? e : undefined);
     }
 
-    // 6b. OI #276 — log-table retention (RETENTION_MANIFEST). Separate from
-    //     block 6 because that one is the per-tenant AGREEMENT clock keyed on a
-    //     purged_at marker; this one is fixed platform windows over log tables.
-    //     One block cannot hold two definitions of "due".
+    // 6b. OI #276 — log-table retention (RETENTION_MANIFEST), plus the intake
+    //     expiry reminder that rides the same tick. Separate from block 6
+    //     because that one is the per-tenant AGREEMENT clock keyed on a
+    //     purged_at marker; these are fixed platform windows. One block cannot
+    //     hold two definitions of "due".
     //     Once-daily at 04:00, not every tick: a clock in days and months gains
     //     nothing from 288 passes a day, and 04:00 keeps this full-table scan
     //     off the same 5-minute budget as the 03:00 one below (block 7's
     //     pattern). Always-on in both modes — storage limitation is not a
-    //     topology question. Idempotent and wrapped.
+    //     topology question. Idempotent, and each half wraps its own failure.
+    //     Only the SCHEDULE is here; the work is one module away, so it can be
+    //     run on demand without waiting for four in the morning.
     {
         const at = new Date();
         if (at.getUTCHours() === 4 && at.getUTCMinutes() < 5) {
-            try {
-                const { runLogRetentionSweep } = await import('./lib/compliance/retention-logs');
-                 
-                // PHOTOS is passed because one rule now reaches outside D1:
-                // `report_pdfs` deletes an R2 object and its row together, and
-                // it REFUSES to run without a bucket rather than deleting rows
-                // that point at objects nothing else could ever reach. On a
-                // deployment with no PHOTOS binding the whole sweep throws into
-                // the catch below and logs — which is correct and loud, rather
-                // than a sweep that quietly expires everything except the one
-                // store this task exists to expire.
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const sweepDb = drizzle(env.DB) as any;
-                const logSummary = await runLogRetentionSweep(
-                    sweepDb, Date.now(), { photos: env.PHOTOS },
-                );
-                // Counts only — the summary carries table names and integers,
-                // never a row. Silent on a no-op run, which is the steady state.
-                if (logSummary.total > 0) {
-                    logger.info('[cron] log retention sweep', logSummary);
-                }
-            } catch (e) {
-                // A RetentionSweepError carries the PARTIAL summary: every rule
-                // that did run, and the ones that did not. Logging only the
-                // message would erase the record of what expired successfully,
-                // which is a worse report than the one it replaces.
-                const { RetentionSweepError } = await import('./lib/compliance/retention-logs');
-                const partial = e instanceof RetentionSweepError
-                    ? { failures: e.failures, ...e.summary }
-                    : {};
-                logger.error('[cron] log retention sweep failed', partial, e instanceof Error ? e : undefined);
-            }
+            const { runDailyRetentionTasks } = await import('./lib/cron/daily-retention-tasks');
+            await runDailyRetentionTasks(env, at);
         }
     }
 

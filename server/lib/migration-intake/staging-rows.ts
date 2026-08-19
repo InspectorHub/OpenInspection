@@ -9,17 +9,62 @@
  * from an uploaded one.
  */
 import type { BatchItem } from 'drizzle-orm/batch';
-import { migrationRows } from '../db/schema';
+import { migrationRows, type MigrationIntent } from '../db/schema';
 import { MIGRATION_ROW_STATUS } from '../status/migration-row-status';
 import { resolveConflicts, type IntakeDb } from './conflicts';
 import {
     MIGRATION_ENTITY_KINDS,
     type BundleContact,
+    type BundleManifest,
     type BundleMember,
     type BundleTemplate,
     type EntityKind,
     type MigrationBundleV1,
 } from './bundle';
+
+/**
+ * The entity an entry point imports, or null where the entry point deliberately
+ * does not say.
+ *
+ * One kind each for the named entry points, by construction: an entry point
+ * states what the operator meant, and a bundle carrying anything else is a
+ * surprise rather than a convenience. The null is the assisted entry, whose
+ * whole premise is that nobody could name the kind — so it is the one run
+ * allowed to carry all three.
+ *
+ * It lives beside `plannedEntries`, which is the function that consumes it,
+ * because THREE moments now need the answer: staging an uploaded file,
+ * delivering a converted one, and re-running the adapter under a new mapping.
+ * A second copy for the third caller would be a second chance for a re-map to
+ * carry a family the entry point never asked for.
+ */
+export const ENTITY_FOR_INTENT: Record<MigrationIntent, EntityKind | null> = {
+    'templates.create': 'template',
+    'templates.overwrite': 'template',
+    'contacts.import': 'contact',
+    'members.invite': 'member',
+    'assisted.full': null,
+};
+
+/**
+ * The four columns that record where a batch came from.
+ *
+ * The manifest is stringified HERE and exactly once. A report reads those bytes
+ * back rather than a re-serialization of a re-parsed object, so what it shows
+ * is what the producing run wrote — down to key order.
+ *
+ * Every write that produces rows from a bundle goes through this, including a
+ * re-map: a batch whose rows came from one adapter run and whose manifest came
+ * from another is a batch whose report describes a file it is not carrying.
+ */
+export function provenanceOf(manifest: BundleManifest) {
+    return {
+        vendor: manifest.source.vendor,
+        adapterName: manifest.adapter.name,
+        adapterVersion: manifest.adapter.version,
+        manifest: JSON.stringify(manifest),
+    };
+}
 
 /** One bundle entry, whichever kind of entry the run is carrying. */
 type BundleEntry = BundleTemplate | BundleContact | BundleMember;
