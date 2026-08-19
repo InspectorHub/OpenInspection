@@ -13,7 +13,14 @@
  * `retention-windows.ts` holds every period and the reason for it, one constant
  * per clock, and this file re-exports them so no import site cares which of the
  * two it came from. That file is where you go to change HOW LONG; this one is
- * WHICH TABLES and WHAT ACTION.
+ * WHICH TABLES and WHAT ACTION. `retention-rule-types.ts` holds the SHAPES —
+ * what a rule, an exclusion and an open question may say — and is re-exported
+ * here for the same reason.
+ *
+ * ⚠️ The three ARRAYS stay in this file whatever else moves out of it. Both
+ * gates open this path and parse them out of the source text, so relocating one
+ * does not fail loudly: the manifest gate exits on "could not locate" and the
+ * policy gate hashes an empty parse.
  *
  * ── Erase-in-place means the actor does not survive ─────────────────────────
  * `erase_in_place` on this list is the same verb the erasure orchestrator uses,
@@ -39,6 +46,12 @@
  */
 
 export * from './retention-windows';
+export * from './retention-rule-types';
+import type {
+    RetentionRule,
+    RetentionOutOfScopeEntry,
+    RetentionOpenEntry,
+} from './retention-rule-types';
 import {
     AUDIT_LOG_ANONYMIZE_MONTHS,
     DEDUP_LOG_RETENTION_DAYS,
@@ -55,73 +68,8 @@ import {
     MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS,
     SLUG_HISTORY_RETENTION_MONTHS,
     REPORT_PDF_DEFAULT_RETENTION_MONTHS,
+    MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS,
 } from './retention-windows';
-
-
-/**
- * A retention period, carrying its unit.
- *
- * Months are not days. A 24-month window expressed as 730 days drifts against
- * the calendar and against the number published in the privacy policy, so the
- * unit travels with the value and the executor does calendar arithmetic for
- * months (`subtractMonthsMs`) rather than multiplying.
- */
-export type RetentionWindow =
-    | { unit: 'months'; value: number }
-    | { unit: 'days'; value: number };
-
-/**
- * One table, one clock.
- *
- * `purpose` is REQUIRED and is not decoration: a period with no stated purpose
- * is a number somebody picked, and the gate rejects it. It is also what makes a
- * later change reviewable — a diff that shortens a window and leaves the
- * purpose untouched is visibly one of the two things wrong.
- */
-export interface RetentionRule {
-    /** DB table name (snake_case), as it appears in the Drizzle schema. */
-    table: string;
-    /** The column the window is measured from (snake_case). */
-    timestampColumn: string;
-    window: RetentionWindow;
-    action: 'delete' | 'erase_in_place';
-    /** Why THIS period for THIS table. Enforced non-empty by the gate. */
-    purpose: string;
-    /**
-     * How this rule obeys the global invariant that a legal hold outranks every
-     * scheduled deletion (counsel round 33). Required on every rule, because the
-     * failure this field exists to prevent is a table nobody classified — which
-     * looks identical to a table that does not need classifying.
-     *
-     * `tenant_scoped`   — the table carries `tenant_id`, and the executor
-     *                     excludes rows belonging to a held tenant. This is the
-     *                     real enforcement, and it is what the behavioural drift
-     *                     guard in `legal-hold-sweep.spec.ts` proves per table.
-     * `suspend_all`     — the table has NO tenant dimension but carries
-     *                     substantive records, so a hold cannot be expressed as
-     *                     a filter. The rule is skipped entirely while ANY hold
-     *                     is in force. Over-preserving a small operational table
-     *                     is the cheap error; the other one is spoliation.
-     * `not_applicable`  — a hold cannot reach anything in this table, and
-     *                     `legalHoldNote` has to say why. Not a way to opt out:
-     *                     the gate rejects the value without the note, and the
-     *                     note is the thing a reviewer disagrees with.
-     */
-        legalHold: 'tenant_scoped' | 'suspend_all' | 'not_applicable';
-    /** REQUIRED when `legalHold` is `not_applicable`. Enforced by the gate. */
-    legalHoldNote?: string;
-    /**
-     * The `tenant_configs` column holding a per-tenant override, in YEARS,
-     * where 0 means indefinite.
-     *
-     * Present on exactly one rule, and named here rather than hidden in the
-     * executor so the manifest stays TRUE: without it this file would state a
-     * seven-year window for a table where a tenant may have chosen three, and a
-     * register generated from the manifest would publish a number no tenant
-     * necessarily has.
-     */
-    tenantWindowColumnYears?: string;
-}
 
 export const RETENTION_MANIFEST: RetentionRule[] = [
     {
@@ -296,22 +244,25 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         purpose: 'Who a released slug used to belong to, and a one-year block on reusing it. Three years is comfortably past that block (SLUG_RETIREMENT_MS), so the sweep can never release a slug early; what it retires is the lookup that answers a stale link long after anyone follows one. A row whose retired_until has not passed is kept regardless of age.',
         legalHold: 'tenant_scoped',
     },
+    {
+        // The second rule that reaches outside D1. A batch row is the only
+        // thing that knows its uploaded file's key, so the executor deletes the
+        // object first and the rows after — the reverse order leaves an object
+        // no code path can ever name again.
+        //
+        // NOT YET REVIEWED BY COUNSEL. Rounds 33 and 34 covered the fifteen
+        // rules above it; this one was added afterwards and has had no external
+        // review. Recorded in the policy header's condition list rather than
+        // left to be inferred from a date.
+        table: 'migration_batches',
+        timestampColumn: 'expires_at',
+        window: { unit: 'days', value: MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS },
+        action: 'delete',
+        rowWindowColumn: 'expires_at',
+        purpose: 'An import run holds a third party\'s name, email address and phone number twice over: once in the staging rows and once in the uploaded file itself. Two lifetimes share this rule because a table gets one: a run the operator staged and walked away from expires after thirty days, and a run waiting on a person to convert its file expires after ninety. The window declared here is the longer of the two, which is the bound that is true of every row carrying a due date; the per-row due date lives on the column named above and is what the sweep compares. A batch with no due date written is left alone rather than swept at the outer bound — see rowWindowColumn. The staging rows go with the batch: see the out-of-scope entry for them.',
+        legalHold: 'tenant_scoped',
+    },
 ];
-
-/**
- * A table the retention catalogue deliberately does NOT expire, with the reason.
- *
- * @gateConsumed `scripts/check-retention-manifest.mjs` reads this declaration
- * out of the SOURCE TEXT rather than importing it — the gate is a plain .mjs
- * script and this is TypeScript. That consumption is invisible to a
- * module-graph analyzer, so knip would report the symbol as dead. The tag says
- * "a tool consumes this", which is true; a dead-code baseline entry would have
- * said "this is dead and we tolerate it", which is not.
- */
-export interface RetentionOutOfScopeEntry {
-    table: string;
-    reason: string;
-}
 
 /** @gateConsumed read as source text by `scripts/check-retention-manifest.mjs`. */
 export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
@@ -374,32 +325,14 @@ export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
         reason: 'Bounded to KEEP_PER_TARGET rows per (tenant, target) by an unconditional prune on every write (recordIntegrationTest, server/lib/integration-test-results.ts), so volume cannot grow with usage. The residual is AGE not volume — a target probed once keeps that row indefinitely — and it is accepted because what a retained row holds is a staff user id, a target enum and a provider message clamped to 300 characters about the tenant own integration, not a record of a data subject. Note the clamp is a LENGTH limit: the non-sensitivity of detail is a caller convention, not something this module can enforce.',
     },
     {
+        table: 'migration_rows',
+        reason: 'Deleted by the migration_batches executor in the same pass, because a staging row has no lifetime of its own — it exists only as part of a run. A second rule here would give one lifetime two clocks, and the two would drift the first time either window moved. Recorded rather than omitted so a reader can tell "governed elsewhere" from "nobody looked".',
+    },
+    {
         table: 'sms_delivery_status',
         reason: 'A per-message state cell, not an append-only ledger: rows are upserted last-writer-wins by (tenant, provider_message_id). The columns are a provider message id, a normalized status enum and a provider error code — no recipient identifier and no free text. The person the delivery concerns lives on the contact row, under the erasure manifest.',
     },
 ];
-
-/**
- * A table with a KNOWN retention gap and no decision yet, bounded by a date.
- *
- * The shape is borrowed from `PENDING_ENFORCEMENT` in the erasure gate, and for
- * the same reason: the alternative to declaring an open question is writing a
- * reason that sounds like a decision, and out-of-scope is where that lands. An
- * entry here says "this table accumulates data nothing expires, we know, and
- * here is when we answer" — which is honest, visible in the diff, and cannot
- * quietly become permanent because the gate fails once `decideBy` passes.
- *
- * To remove an entry: decide, then move it to `RETENTION_MANIFEST` or
- * `RETENTION_OUT_OF_SCOPE`. Adding one is a reviewed diff, not a keyword.
- *
- * @gateConsumed read as source text by `scripts/check-retention-manifest.mjs`.
- */
-export interface RetentionOpenEntry {
-    table: string;
-    reason: string;
-    /** YYYY-MM-DD. The gate fails once this date is past. */
-    decideBy: string;
-}
 
 /** @gateConsumed read as source text by `scripts/check-retention-manifest.mjs`. */
 export const RETENTION_OPEN: RetentionOpenEntry[] = [

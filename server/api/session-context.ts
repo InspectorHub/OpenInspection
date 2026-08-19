@@ -44,6 +44,12 @@ export function deploymentPayload(
         hasContentMarketplace: profile.hasContentMarketplace || false,
         videoBackendManaged: profile.videoBackendManaged || false,
         hasManagedCompliance: profile.hasManagedCompliance || false,
+        // The BOOLEAN only, never the three import caps beside it on the
+        // profile. Those are the grounds on which the server refuses; shipping
+        // them would invite the browser to re-decide the same question, and two
+        // implementations of one limit eventually disagree. The client shows
+        // whatever sentence the server sent back with the refusal.
+        hasAssistedMigration: profile.hasAssistedMigration || false,
     };
 }
 import { getDrizzle } from '../lib/route-helpers';

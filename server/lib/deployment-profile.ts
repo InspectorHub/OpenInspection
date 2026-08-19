@@ -41,6 +41,17 @@ export interface ProfileEnv {
     APP_MODE?: string;
     PORTAL_API_URL?: string;
     SINGLE_TENANT_ID?: string;
+    /**
+     * Per-deployment overrides for the import caps below.
+     *
+     * They exist because the defaults are a guess about somebody else's
+     * hosting plan. An operator who knows their own per-request budget can say
+     * so here without editing source; an operator who does not gets the mode's
+     * default. Strings because environment variables are strings.
+     */
+    IMPORT_MAX_CSV_BYTES?: string;
+    IMPORT_MAX_VENDOR_EXPORT_BYTES?: string;
+    IMPORT_MAX_ROWS?: string;
 }
 
 type DeploymentMode = 'standalone' | 'saas';
@@ -145,6 +156,29 @@ export interface DeploymentProfile {
      *  because `getDeploymentProfile` takes `ProfileEnv`, not `AppEnv`. That
      *  widening exists for exactly this class of caller; see the note on it. */
     hasPortalIntegrationApi: boolean;
+
+    /** Whether there is anybody on the other end to hand an unreadable export to.
+     *  False in standalone: a self-hosted deployment has no support team and the
+     *  bucket is the operator's own, so the route is ABSENT rather than disabled.
+     *  When false the intake path refuses an unmatched file BEFORE storing it —
+     *  keeping a third party's personal data we could do nothing with has no
+     *  reason behind it. */
+    hasAssistedMigration: boolean;
+
+    /** Largest spreadsheet an import will accept, in bytes. A DEFAULT, not a
+     *  constant: the number that suits our hosting is the wrong number for a
+     *  deployment whose per-request CPU budget is a fraction of it, which is why
+     *  ProfileEnv can override every one of these three. */
+    importMaxCsvBytes: number;
+
+    /** Largest vendor export (JSON) an import will accept, in bytes. Larger than
+     *  the spreadsheet cap because a template export carries structure a
+     *  contact list does not — but still bounded by what one request can parse. */
+    importMaxVendorExportBytes: number;
+
+    /** Most entries one import may carry. Beyond it the run is refused with the
+     *  real count, and the assisted route is what that operator wants instead. */
+    importMaxRows: number;
 }
 
 const FIXED_TENANT_FALLBACK = '00000000-0000-0000-0000-000000000000';
@@ -165,6 +199,10 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
     botProtectionMandatory: false,
     tenantRecordOwnedByPortal: false,
     hasPortalIntegrationApi: false,
+    hasAssistedMigration: false,
+    importMaxCsvBytes: 1_000_000,
+    importMaxVendorExportBytes: 2_000_000,
+    importMaxRows: 1_000,
 };
 
 export const SAAS_PROFILE: DeploymentProfile = {
@@ -183,6 +221,10 @@ export const SAAS_PROFILE: DeploymentProfile = {
     botProtectionMandatory: true,
     tenantRecordOwnedByPortal: true,
     hasPortalIntegrationApi: true,
+    hasAssistedMigration: true,
+    importMaxCsvBytes: 5_000_000,
+    importMaxVendorExportBytes: 20_000_000,
+    importMaxRows: 10_000,
 };
 
 /**
@@ -193,10 +235,42 @@ export const SAAS_PROFILE: DeploymentProfile = {
  * Precedence: APP_MODE=saas wins; standalone is the default. The
  * old SAAS_TOPOLOGY env var is no longer read.
  */
+/**
+ * A positive-integer override, or the default.
+ *
+ * Anything unparseable falls back rather than being treated as "no limit". A
+ * typo in a deployment variable must not be the way a cap disappears — the
+ * failure mode of a silently absent limit is a request that never finishes,
+ * which is far harder to diagnose than a limit that stayed where it was.
+ */
+function positiveIntOr(raw: string | undefined, fallback: number): number {
+    if (raw === undefined || raw.trim() === '') return fallback;
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed <= 0) return fallback;
+    return parsed;
+}
+
+function withImportLimits(base: DeploymentProfile, env: ProfileEnv): DeploymentProfile {
+    return {
+        ...base,
+        importMaxCsvBytes: positiveIntOr(env.IMPORT_MAX_CSV_BYTES, base.importMaxCsvBytes),
+        importMaxVendorExportBytes: positiveIntOr(
+            env.IMPORT_MAX_VENDOR_EXPORT_BYTES, base.importMaxVendorExportBytes,
+        ),
+        importMaxRows: positiveIntOr(env.IMPORT_MAX_ROWS, base.importMaxRows),
+    };
+}
+
 export function getDeploymentProfile(env: ProfileEnv): DeploymentProfile {
     if (env.APP_MODE === 'saas') {
         const base = env.PORTAL_API_URL ? env.PORTAL_API_URL.replace(/\/$/, '') : null;
-        return { ...SAAS_PROFILE, billingPortalUrl: base, loginRedirectBase: base };
+        return withImportLimits(
+            { ...SAAS_PROFILE, billingPortalUrl: base, loginRedirectBase: base },
+            env,
+        );
     }
-    return { ...STANDALONE_PROFILE, fixedTenantId: env.SINGLE_TENANT_ID ?? FIXED_TENANT_FALLBACK };
+    return withImportLimits(
+        { ...STANDALONE_PROFILE, fixedTenantId: env.SINGLE_TENANT_ID ?? FIXED_TENANT_FALLBACK },
+        env,
+    );
 }
