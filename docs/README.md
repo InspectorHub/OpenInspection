@@ -4,6 +4,7 @@ Start here. Pick the section that matches what you are trying to do.
 
 | I want to… | Go to |
 |---|---|
+| Get something running for the first time, today | [`quickstart.md`](quickstart.md) |
 | Run OpenInspection for my own inspection business | [`operate/`](#operating-a-deployment) |
 | Use the product day to day | [inspectorhub.io/docs](#using-the-product) |
 | Change the code or send a pull request | [`develop/`](#developing) |
@@ -16,10 +17,13 @@ Start here. Pick the section that matches what you are trying to do.
 
 ## Operating a deployment
 
-Running the engine on your own Cloudflare account.
+Running the engine on your own Cloudflare account. Start at the quickstart if you
+have never deployed it; it is the same path with every deferrable decision
+deferred.
 
 | Doc | Topic |
 |---|---|
+| [`quickstart.md`](quickstart.md) | Empty Cloudflare account to a workspace you can log into, in about 20 minutes |
 | [`operate/deploy.md`](operate/deploy.md) | First-time production deploy — one-click, CLI, and what gets provisioned |
 | [`operate/upgrade.md`](operate/upgrade.md) | Move an existing deployment to a newer release (forward-only) — including the one-time reconcile a rebuilt baseline needs |
 | [`operate/sms-compliance.md`](operate/sms-compliance.md) | Privacy/Terms pages, carrier registration, TCPA/CTIA wording |

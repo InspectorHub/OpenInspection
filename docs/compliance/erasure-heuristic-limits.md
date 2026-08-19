@@ -18,8 +18,9 @@ the schema", and it does not mean that. It means no column *whose name the
 gate was told to look for* is unruled. Everything else is invisible to it, and
 invisible reads exactly like correct.
 
-That misreading is the reason portal #88 was filed. This page is here so it is
-not the reason for the next one.
+That misreading has already produced one filed gap: a column holding personal
+data under a name the heuristic does not match was read as covered, because the
+gate was green. This page is here so it is not the reason for the next one.
 
 ---
 
