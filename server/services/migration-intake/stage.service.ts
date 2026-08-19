@@ -10,16 +10,17 @@ import { MIGRATION_BATCH_STATUS } from '../../lib/status/migration-batch-status'
 import { parseMigrationBundle } from '../../lib/validations/migration-bundle.schema';
 import {
     MIGRATION_ENTITY_KINDS,
-    type BundleManifest,
     type BundleTemplate,
     type EntityKind,
     type MigrationBundleV1,
 } from '../../lib/migration-intake/bundle';
 import type { IntakeDb } from '../../lib/migration-intake/conflicts';
 import {
+    ENTITY_FOR_INTENT,
     buildRowValues,
     entriesFor,
     plannedEntries,
+    provenanceOf,
     rowInsertStatements,
     toStagedRow,
     type StagedRow,
@@ -74,28 +75,6 @@ export interface StageResult {
     rows: StagedRow[];
 }
 
-/**
- * The entity an entry point imports, or null where the entry point deliberately
- * does not say.
- *
- * One kind each for the named entry points, by construction: an entry point
- * states what the operator meant, and a bundle carrying anything else is a
- * surprise rather than a convenience. The null is the assisted entry, whose
- * whole premise is that nobody could name the kind — so it is the one run
- * allowed to carry all three.
- *
- * Module-private: every caller reaches it through one of the methods below, and
- * an entry point that needed to look the mapping up for itself would be
- * deciding the intent a second time.
- */
-const ENTITY_FOR_INTENT: Record<MigrationIntent, EntityKind | null> = {
-    'templates.create': 'template',
-    'templates.overwrite': 'template',
-    'contacts.import': 'contact',
-    'members.invite': 'member',
-    'assisted.full': null,
-};
-
 function plural(n: number, word: string): string {
     return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
@@ -104,22 +83,6 @@ function plural(n: number, word: string): string {
 function nameSome(names: string[], limit = 3): string {
     if (names.length <= limit) return names.join(', ');
     return `${names.slice(0, limit).join(', ')} and ${names.length - limit} more`;
-}
-
-/**
- * The four columns that record where a batch came from.
- *
- * The manifest is stringified HERE and exactly once. A report reads those bytes
- * back rather than a re-serialization of a re-parsed object, so what it shows
- * is what the producing run wrote — down to key order.
- */
-function provenanceOf(manifest: BundleManifest) {
-    return {
-        vendor: manifest.source.vendor,
-        adapterName: manifest.adapter.name,
-        adapterVersion: manifest.adapter.version,
-        manifest: JSON.stringify(manifest),
-    };
 }
 
 /**
@@ -270,7 +233,10 @@ export class MigrationStageService {
             db.update(migrationBatches).set({
                 status: MIGRATION_BATCH_STATUS.STAGED,
                 ...provenanceOf(bundle.manifest),
-            }).where(eq(migrationBatches.id, params.batchId)),
+            }).where(and(
+                eq(migrationBatches.id, params.batchId),
+                eq(migrationBatches.tenantId, params.tenantId),
+            )),
             ...rowInsertStatements(db, rowValues),
         ] as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 
