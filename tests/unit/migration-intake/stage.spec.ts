@@ -31,9 +31,12 @@ import type {
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
+import { limitsFor } from '../../../server/lib/migration-intake/limits';
+import { SAAS_PROFILE } from '../../../server/lib/deployment-profile';
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const USER = '22222222-2222-2222-2222-2222222222b2';
+const LIMITS = limitsFor(SAAS_PROFILE);
 const TEMPLATE = '33333333-3333-3333-3333-3333333333c3';
 
 const EMPTY: EntityCounts = { readFromSource: 0, emitted: 0, dropped: [] };
@@ -128,7 +131,7 @@ describe('MigrationStageService.stage', () => {
     it('writes one batch and one row per entry, all pending', async () => {
         const result = await svc.stage({
             tenantId: TENANT,
-            createdBy: USER,
+            createdBy: USER, limits: LIMITS,
             intent: 'contacts.import',
             bundle: contactsBundle([
                 { name: 'Alice', email: 'alice@example.test', type: 'client' },
@@ -157,7 +160,7 @@ describe('MigrationStageService.stage', () => {
 
     it('stores each entry as its own payload, so a report can name the entry', async () => {
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([
                 { name: 'Alice', email: 'alice@example.test', type: 'client' },
                 { name: 'Bob', type: 'agent' },
@@ -179,7 +182,7 @@ describe('MigrationStageService.stage', () => {
             contacts: [{ name: 'Alice', type: 'client' }],
         });
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import', bundle,
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import', bundle,
         });
         const batch = await db.select().from(schema.migrationBatches)
             .where(eq(schema.migrationBatches.id, result.batchId)).get();
@@ -188,7 +191,7 @@ describe('MigrationStageService.stage', () => {
 
     it('writes no row into any real table', async () => {
         await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([{ name: 'Alice', email: 'alice@example.test', type: 'client' }]),
         });
         expect(await db.select().from(schema.contacts).all()).toEqual([]);
@@ -201,7 +204,7 @@ describe('MigrationStageService.stage', () => {
             name: `Person ${i}`, email: `p${i}@example.test`, type: 'client' as const,
         }));
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import', bundle: contactsBundle(many),
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import', bundle: contactsBundle(many),
         });
         const rows = await db.select().from(schema.migrationRows)
             .where(eq(schema.migrationRows.batchId, result.batchId)).all();
@@ -215,7 +218,7 @@ describe('MigrationStageService.stage', () => {
             email: 'ALICE@example.test', createdAt: new Date(),
         });
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([
                 { name: 'Alice New', email: 'alice@example.test', type: 'client' },
                 { name: 'Bob', email: 'bob@example.test', type: 'client' },
@@ -234,7 +237,7 @@ describe('MigrationStageService.stage', () => {
             id: 'existing-1', tenantId: TENANT, type: 'client', name: 'Alice', email: null, createdAt: new Date(),
         });
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([{ name: 'Alice', type: 'client' }]),
         });
         expect(result.rows[0].conflictWith).toBeNull();
@@ -246,7 +249,7 @@ describe('MigrationStageService.stage', () => {
             email: 'alice@example.test', createdAt: new Date(), archivedAt: new Date(),
         });
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([{ name: 'Alice New', email: 'alice@example.test', type: 'client' }]),
         });
         expect(result.rows[0].conflictWith).toBeNull();
@@ -261,7 +264,7 @@ describe('MigrationStageService.stage', () => {
             email: 'alice@example.test', createdAt: new Date(),
         });
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([{ name: 'Alice', email: 'alice@example.test', type: 'client' }]),
         });
         expect(result.rows[0].conflictWith).toBeNull();
@@ -273,7 +276,7 @@ describe('MigrationStageService.stage', () => {
             role: 'inspector', createdAt: new Date(),
         });
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'members.invite',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'members.invite',
             bundle: membersBundle([
                 { email: 'live@example.test', role: 'inspector' },
                 { email: 'nobody@example.test', role: 'inspector' },
@@ -289,7 +292,7 @@ describe('MigrationStageService.stage', () => {
             role: 'inspector', createdAt: new Date(), deletedAt: new Date(),
         });
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'members.invite',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'members.invite',
             bundle: membersBundle([{ email: 'gone@example.test', role: 'inspector' }]),
         });
         expect(result.rows[0].conflictWith).toBeNull();
@@ -301,7 +304,7 @@ describe('MigrationStageService.stage', () => {
             role: 'inspector', status: 'pending', expiresAt: new Date(Date.now() + 1e9),
         });
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'members.invite',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'members.invite',
             bundle: membersBundle([{ email: 'new@example.test', role: 'inspector' }]),
         });
         expect(result.rows[0].conflictWith).toBe('invite-1');
@@ -320,7 +323,7 @@ describe('MigrationStageService.stage', () => {
             role: 'inspector', status: 'pending', expiresAt: new Date(Date.now() - 1000),
         });
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'members.invite',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'members.invite',
             bundle: membersBundle([{ email: 'stale@example.test', role: 'inspector' }]),
         });
         expect(result.rows[0].conflictWith).toBe('invite-old');
@@ -337,7 +340,7 @@ describe('MigrationStageService.stage', () => {
             role: 'inspector', status: 'accepted', expiresAt: new Date(Date.now() + 1e9),
         });
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'members.invite',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'members.invite',
             bundle: membersBundle([{ email: 'past@example.test', role: 'inspector' }]),
         });
         expect(result.rows[0].conflictWith).toBeNull();
@@ -349,7 +352,7 @@ describe('MigrationStageService.stage', () => {
             schema: { schemaVersion: 2, sections: [] }, createdAt: new Date(),
         });
         await expect(svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.overwrite', targetId: TEMPLATE,
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.overwrite', targetId: TEMPLATE,
             bundle: templatesBundle([template('T0'), template('T1'), template('T2')]),
         })).rejects.toThrow(/contains 3 templates/);
 
@@ -359,7 +362,7 @@ describe('MigrationStageService.stage', () => {
 
     it('refuses an overwrite that names no template to replace', async () => {
         await expect(svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.overwrite',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.overwrite',
             bundle: templatesBundle([template('One')]),
         })).rejects.toThrow(/needs the template it is replacing/i);
     });
@@ -370,7 +373,7 @@ describe('MigrationStageService.stage', () => {
             schema: { schemaVersion: 2, sections: [] }, createdAt: new Date(),
         });
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.overwrite', targetId: TEMPLATE,
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.overwrite', targetId: TEMPLATE,
             bundle: templatesBundle([template('One')]),
         });
         expect(result.rows[0].conflictWith).toBe(TEMPLATE);
@@ -386,7 +389,7 @@ describe('MigrationStageService.stage', () => {
             schema: { schemaVersion: 2, sections: [] }, createdAt: new Date(),
         });
         const result = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.create',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.create',
             bundle: templatesBundle([template('One'), template('Two')]),
         });
         expect(result.rows.map((r) => r.conflictWith)).toEqual([null, null]);
@@ -404,14 +407,14 @@ describe('MigrationStageService.stage', () => {
             schema: { schemaVersion: 2, sections: [] }, createdAt: new Date(),
         });
         await expect(svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'templates.overwrite', targetId: 'not-mine',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.overwrite', targetId: 'not-mine',
             bundle: templatesBundle([template('One')]),
         })).rejects.toThrow(/not found/i);
     });
 
     it('refuses a bundle carrying entries the entry point never asked for', async () => {
         await expect(svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: bundleFor({
                 manifest: manifestFor({ counts: { contact: emitted(1), member: emitted(1) } }),
                 contacts: [{ name: 'A', type: 'client' }],
@@ -422,24 +425,24 @@ describe('MigrationStageService.stage', () => {
 
     it('refuses a bundle that fails format validation, and reports the issues', async () => {
         await expect(svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: { formatVersion: 1 },
         })).rejects.toThrow(/not a valid migration bundle/i);
     });
 
     it('refuses a bundle with nothing of the kind the entry point imports', async () => {
         await expect(svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import', bundle: bundleFor(),
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import', bundle: bundleFor(),
         })).rejects.toThrow(/no contacts/i);
     });
 
     it('leaves an earlier batch untouched when staged again', async () => {
         const first = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([{ name: 'Alice', type: 'client' }]),
         });
         const second = await svc.stage({
-            tenantId: TENANT, createdBy: USER, intent: 'contacts.import',
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
             bundle: contactsBundle([{ name: 'Alice', type: 'client' }]),
         });
         expect(second.batchId).not.toBe(first.batchId);

@@ -1,26 +1,34 @@
 import { drizzle } from 'drizzle-orm/d1';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
-    contacts,
     migrationBatches,
-    migrationRows,
     templates,
-    tenantInvites,
-    users,
     type MigrationIntent,
 } from '../../lib/db/schema';
 import { MIGRATION_BATCH_STATUS } from '../../lib/status/migration-batch-status';
-import { MIGRATION_ROW_STATUS } from '../../lib/status/migration-row-status';
 import { parseMigrationBundle } from '../../lib/validations/migration-bundle.schema';
-import type {
-    BundleContact,
-    BundleManifest,
-    BundleMember,
-    BundleTemplate,
-    EntityKind,
-    MigrationBundleV1,
+import {
+    MIGRATION_ENTITY_KINDS,
+    type BundleManifest,
+    type BundleTemplate,
+    type EntityKind,
+    type MigrationBundleV1,
 } from '../../lib/migration-intake/bundle';
+import type { IntakeDb } from '../../lib/migration-intake/conflicts';
+import {
+    buildRowValues,
+    entriesFor,
+    plannedEntries,
+    rowInsertStatements,
+    toStagedRow,
+    type StagedRow,
+} from '../../lib/migration-intake/staging-rows';
+import {
+    STAFF_ACCESS_AUTHORIZATION_VERSION,
+    UPLOAD_AUTHORIZATION_VERSION,
+} from '../../lib/migration-intake/authorizations';
+import { assertRowCountWithin, type IntakeLimits } from '../../lib/migration-intake/limits';
 import { Errors } from '../../lib/errors';
 
 export interface StageParams {
@@ -31,18 +39,34 @@ export interface StageParams {
     /** Required for the overwrite intent, meaningless for every other one. */
     targetId?: string | undefined;
     bundle: unknown;
+    /** The caps in force for this deployment. Passed in, never read from a constant here. */
+    limits: IntakeLimits;
+    /** Where the source file was stored, when one was. */
+    sourceKey?: string | null | undefined;
+    /** This run's own due date. */
+    expiresAt?: Date | null | undefined;
+    /** users.id of whoever agreed to the file being kept. */
+    uploadAuthorizedBy?: string | null | undefined;
 }
 
-/**
- * Not exported: it is reachable as `StageResult['rows'][number]`, and an
- * exported name nothing imports is a name the dead-code gate cannot tell from
- * a genuine leftover.
- */
-interface StagedRow {
-    id: string;
-    entity: EntityKind;
-    position: number;
-    conflictWith: string | null;
+export interface AssistanceBatchParams {
+    tenantId: string;
+    createdBy: string;
+    intent: MigrationIntent;
+    targetId?: string | null | undefined;
+    /** Where the file was stored. Required — a waiting batch with no file has nothing to wait for. */
+    sourceKey: string;
+    expiresAt: Date;
+    uploadAuthorizedBy: string;
+    /** Required here and nowhere else: this route is the only one a person reads the file on. */
+    staffAccessAuthorizedBy: string;
+}
+
+export interface StageIntoBatchParams {
+    tenantId: string;
+    batchId: string;
+    bundle: unknown;
+    limits: IntakeLimits;
 }
 
 export interface StageResult {
@@ -57,11 +81,12 @@ export interface StageResult {
  * One kind each for the named entry points, by construction: an entry point
  * states what the operator meant, and a bundle carrying anything else is a
  * surprise rather than a convenience. The null is the assisted entry, whose
- * whole premise is that nobody could name the kind.
+ * whole premise is that nobody could name the kind — so it is the one run
+ * allowed to carry all three.
  *
- * Module-private: every caller reaches it through `stage()`, and an entry point
- * that needed to look the mapping up for itself would be deciding the intent a
- * second time.
+ * Module-private: every caller reaches it through one of the methods below, and
+ * an entry point that needed to look the mapping up for itself would be
+ * deciding the intent a second time.
  */
 const ENTITY_FOR_INTENT: Record<MigrationIntent, EntityKind | null> = {
     'templates.create': 'template',
@@ -70,19 +95,6 @@ const ENTITY_FOR_INTENT: Record<MigrationIntent, EntityKind | null> = {
     'members.invite': 'member',
     'assisted.full': null,
 };
-
-/** One bundle entry, whichever kind of entry the run is carrying. */
-type BundleEntry = BundleTemplate | BundleContact | BundleMember;
-
-type IntakeDb = ReturnType<typeof drizzle>;
-
-function entriesFor(bundle: MigrationBundleV1, kind: EntityKind): BundleEntry[] {
-    switch (kind) {
-        case 'template': return bundle.templates;
-        case 'contact': return bundle.contacts;
-        case 'member': return bundle.members;
-    }
-}
 
 function plural(n: number, word: string): string {
     return `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -111,18 +123,6 @@ function provenanceOf(manifest: BundleManifest) {
 }
 
 /**
- * Remember the first row seen for an address, matched case-insensitively.
- *
- * First wins on purpose: when several rows answer to one address the earliest
- * is the one a later apply would have collided with, and picking a different
- * one each run would make the same file stage differently twice.
- */
-function rememberByEmail(map: Map<string, string>, email: string | null, id: string): void {
-    const key = (email ?? '').trim().toLowerCase();
-    if (key && !map.has(key)) map.set(key, id);
-}
-
-/**
  * Validates a bundle, works out what already exists, and records the whole
  * plan in the staging tables. It writes to nothing else.
  *
@@ -138,56 +138,34 @@ export class MigrationStageService {
     }
 
     async stage(params: StageParams): Promise<StageResult> {
-        const parsed = parseMigrationBundle(params.bundle);
-        if (!parsed.ok) {
-            throw Errors.UnprocessableEntity(
-                'That file is not a valid migration bundle.',
-                { issues: parsed.issues },
-            );
-        }
-        const bundle = parsed.bundle;
+        const bundle = this.parseOrThrow(params.bundle);
         const kind = ENTITY_FOR_INTENT[params.intent];
         if (kind === null) {
-            // An intent that names no entity kind cannot be staged from a
-            // bundle here: this method decides one kind, checks that kind for
-            // conflicts, and writes rows of that kind. Refusing is not a gap
-            // being deferred — it is the boundary of what a single-kind stage
-            // can honestly answer, and the alternative is a run that silently
-            // imports whichever kind the file happened to lead with.
+            // An intent that names no entity kind cannot open a run here: this
+            // method starts one from a file an adapter read, and the assisted
+            // intent is by definition the case where none did. Its run is
+            // opened by `createAssistanceBatch` and filled by `stageIntoBatch`,
+            // which between them require the file's location and both
+            // authorisations — none of which this method asks for. Accepting it
+            // here would produce staged rows with no record of whose file they
+            // came from or who agreed to it being kept.
             throw Errors.BadRequest('This import route needs a file whose kind is known.');
         }
 
         this.assertOnlyTheRequestedKind(bundle, kind);
-
-        const entries = entriesFor(bundle, kind);
-        if (entries.length === 0) {
+        const planned = plannedEntries(bundle, kind);
+        if (planned.length === 0) {
             throw Errors.BadRequest(`This file contains no ${kind}s to import.`);
         }
+        assertRowCountWithin(params.limits, planned.length);
 
         const db = this.getDB();
         const targetId = await this.resolveTarget(db, params, bundle);
-        const conflicts = await this.findConflicts(db, kind, params.tenantId, bundle, targetId);
 
+        const now = new Date();
         const batchId = crypto.randomUUID();
-        const rowValues = entries.map((entry, position) => ({
-            id: crypto.randomUUID(),
-            batchId,
-            tenantId: params.tenantId,
-            entity: kind,
-            position,
-            payload: JSON.stringify(entry),
-            conflictWith: conflicts[position] ?? null,
-            status: MIGRATION_ROW_STATUS.PENDING,
-        }));
+        const rowValues = await buildRowValues(db, params.tenantId, batchId, planned, targetId);
 
-        // D1 caps bind parameters at 100 per prepared statement, so the VALUES
-        // lists are chunked; every chunk plus the batch row travels in ONE
-        // db.batch so a staged run is never half-recorded. Same idiom as the
-        // invite-acceptance write in auth.service.ts — no sequential fallback,
-        // because a fallback that looks correct reopens the window the batch
-        // was introduced to close.
-        const colsPerRow = Object.keys(rowValues[0]).length;
-        const maxRowsPerStmt = Math.max(1, Math.floor(100 / colsPerRow));
         const statements: BatchItem<'sqlite'>[] = [
             db.insert(migrationBatches).values({
                 id: batchId,
@@ -197,23 +175,117 @@ export class MigrationStageService {
                 targetId,
                 ...provenanceOf(bundle.manifest),
                 status: MIGRATION_BATCH_STATUS.STAGED,
-                createdAt: new Date(),
+                createdAt: now,
+                sourceKey: params.sourceKey ?? null,
+                expiresAt: params.expiresAt ?? null,
+                uploadAuthorizedBy: params.uploadAuthorizedBy ?? null,
+                // The timestamp and the version come off the same condition as
+                // the name, so a row can never say who agreed without saying
+                // when, or to which wording.
+                uploadAuthorizedAt: params.uploadAuthorizedBy ? now : null,
+                uploadAuthorizationVersion: params.uploadAuthorizedBy ? UPLOAD_AUTHORIZATION_VERSION : null,
             }),
+            ...rowInsertStatements(db, rowValues),
         ];
-        for (let i = 0; i < rowValues.length; i += maxRowsPerStmt) {
-            statements.push(db.insert(migrationRows).values(rowValues.slice(i, i + maxRowsPerStmt)));
-        }
         await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 
-        return {
-            batchId,
-            rows: rowValues.map((r) => ({
-                id: r.id,
-                entity: r.entity,
-                position: r.position,
-                conflictWith: r.conflictWith,
-            })),
-        };
+        return { batchId, rows: rowValues.map(toStagedRow) };
+    }
+
+    /**
+     * Opens a run for a file nothing here can read.
+     *
+     * No rows and no bundle: there is nothing to plan yet. What it does carry is
+     * everything needed to finish later — where the file is, when it stops being
+     * kept, and both authorisations, recorded with the version of the wording
+     * each was given under.
+     */
+    async createAssistanceBatch(params: AssistanceBatchParams): Promise<{ batchId: string }> {
+        const db = this.getDB();
+        const batchId = crypto.randomUUID();
+        const now = new Date();
+        await db.insert(migrationBatches).values({
+            id: batchId,
+            tenantId: params.tenantId,
+            createdBy: params.createdBy,
+            intent: params.intent,
+            targetId: params.targetId ?? null,
+            // Provenance is unknown until somebody reads the file; these are
+            // placeholders the delivered bundle replaces, not guesses.
+            vendor: 'csv_generic',
+            adapterName: 'none',
+            adapterVersion: '0',
+            manifest: JSON.stringify({ warnings: [] }),
+            status: MIGRATION_BATCH_STATUS.NEEDS_ASSISTANCE,
+            createdAt: now,
+            sourceKey: params.sourceKey,
+            expiresAt: params.expiresAt,
+            uploadAuthorizedBy: params.uploadAuthorizedBy,
+            uploadAuthorizedAt: now,
+            uploadAuthorizationVersion: UPLOAD_AUTHORIZATION_VERSION,
+            staffAccessAuthorizedBy: params.staffAccessAuthorizedBy,
+            staffAccessAuthorizedAt: now,
+            staffAccessAuthorizationVersion: STAFF_ACCESS_AUTHORIZATION_VERSION,
+        });
+        return { batchId };
+    }
+
+    /**
+     * Delivers a converted bundle into a batch that has been waiting for one.
+     *
+     * The SAME batch, deliberately. Everything the normal path earns — the
+     * per-row plan, the resumable apply, the undo, and the fact that the
+     * operator is the one who presses apply — comes from being the same
+     * records; a separate insert path would have none of it.
+     */
+    async stageIntoBatch(params: StageIntoBatchParams): Promise<StageResult> {
+        const db = this.getDB();
+        const batch = await db.select().from(migrationBatches)
+            .where(and(
+                eq(migrationBatches.id, params.batchId),
+                eq(migrationBatches.tenantId, params.tenantId),
+            ))
+            .get();
+        if (!batch) throw Errors.NotFound('Migration batch not found');
+        if (batch.status !== MIGRATION_BATCH_STATUS.NEEDS_ASSISTANCE) {
+            throw Errors.Conflict('This import is not waiting for a converted file.');
+        }
+
+        const bundle = this.parseOrThrow(params.bundle);
+        // The BATCH's intent, not one supplied with the delivery: what the
+        // operator asked for was settled when they opened the run, and a
+        // delivery allowed to restate it would be allowed to widen it.
+        const kind = ENTITY_FOR_INTENT[batch.intent];
+        if (kind !== null) this.assertOnlyTheRequestedKind(bundle, kind);
+        if (batch.intent === 'templates.overwrite') this.assertSingleTemplate(bundle.templates);
+
+        const planned = plannedEntries(bundle, kind);
+        if (planned.length === 0) throw Errors.BadRequest('This bundle contains nothing to import.');
+        assertRowCountWithin(params.limits, planned.length);
+
+        const rowValues = await buildRowValues(
+            db, params.tenantId, params.batchId, planned, batch.targetId,
+        );
+        await db.batch([
+            db.update(migrationBatches).set({
+                status: MIGRATION_BATCH_STATUS.STAGED,
+                ...provenanceOf(bundle.manifest),
+            }).where(eq(migrationBatches.id, params.batchId)),
+            ...rowInsertStatements(db, rowValues),
+        ] as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+
+        return { batchId: params.batchId, rows: rowValues.map(toStagedRow) };
+    }
+
+    private parseOrThrow(input: unknown): MigrationBundleV1 {
+        const parsed = parseMigrationBundle(input);
+        if (!parsed.ok) {
+            throw Errors.UnprocessableEntity(
+                'That file is not a valid migration bundle.',
+                { issues: parsed.issues },
+            );
+        }
+        return parsed.bundle;
     }
 
     /**
@@ -224,7 +296,7 @@ export class MigrationStageService {
      */
     private assertOnlyTheRequestedKind(bundle: MigrationBundleV1, kind: EntityKind): void {
         const extras: string[] = [];
-        for (const other of ['template', 'contact', 'member'] as const) {
+        for (const other of MIGRATION_ENTITY_KINDS) {
             if (other === kind) continue;
             const count = entriesFor(bundle, other).length;
             if (count > 0) extras.push(plural(count, other));
@@ -267,102 +339,5 @@ export class MigrationStageService {
             `(${nameSome(entries.map((t) => t.name))}); overwrite import accepts exactly 1. ` +
             'To bring them all in, start from the Templates list instead.',
         );
-    }
-
-    /**
-     * Which existing row each entry collides with, BY POSITION in the bundle.
-     *
-     * Matching is by email, never by a vendor identifier: an identifier from
-     * one product is not an identity in another, and two vendors' identifiers
-     * can collide. An entry with no email is never matched — merging two
-     * different people who share a name cannot be undone, while a duplicate
-     * can be merged later.
-     */
-    private async findConflicts(
-        db: IntakeDb,
-        kind: EntityKind,
-        tenantId: string,
-        bundle: MigrationBundleV1,
-        targetId: string | null,
-    ): Promise<(string | null)[]> {
-        switch (kind) {
-            case 'template':
-                // The only template a run can collide with is the one it was
-                // aimed at. Nothing else in the file has a named counterpart,
-                // and a same-name template is not the same template.
-                return bundle.templates.map(() => targetId);
-            case 'contact':
-                return this.contactConflicts(db, tenantId, bundle.contacts);
-            case 'member':
-                return this.memberConflicts(db, tenantId, bundle.members);
-        }
-    }
-
-    /**
-     * Mirrors the active-contact unique index: an ARCHIVED contact does not
-     * hold the address, so importing that person again is a fresh row rather
-     * than a clash. Comparison is case-insensitive, which is stricter than the
-     * index — a differently-cased duplicate slips past the constraint and is
-     * still a duplicate to the person reading the list.
-     */
-    private async contactConflicts(
-        db: IntakeDb,
-        tenantId: string,
-        entries: BundleContact[],
-    ): Promise<(string | null)[]> {
-        if (!entries.some((c) => c.email?.trim())) return entries.map(() => null);
-        const existing = await db.select({ id: contacts.id, email: contacts.email })
-            .from(contacts)
-            .where(and(
-                eq(contacts.tenantId, tenantId),
-                isNotNull(contacts.email),
-                isNull(contacts.archivedAt),
-            ))
-            .all();
-        const byEmail = new Map<string, string>();
-        for (const row of existing) rememberByEmail(byEmail, row.email, row.id);
-        return entries.map((c) => {
-            const key = c.email?.trim().toLowerCase();
-            if (!key) return null;
-            return byEmail.get(key) ?? null;
-        });
-    }
-
-    /**
-     * A member "already exists" if the address holds a live workspace row or an
-     * invite row that has not been accepted.
-     *
-     * The invite half is decided by the partial unique index on
-     * (tenant_id, email), whose predicate is the pending status ALONE: while
-     * such a row is there a second invite to that address cannot be written, so
-     * calling it "no clash" would hand apply a row whose only outcome is a
-     * constraint failure. Expiry does not enter into it — an expired invite is
-     * a dead link, not a released address. An ACCEPTED invite is outside the
-     * predicate and blocks nothing; the member row it produced is what the
-     * first lookup finds, and a REMOVED member frees the address again.
-     */
-    private async memberConflicts(
-        db: IntakeDb,
-        tenantId: string,
-        entries: BundleMember[],
-    ): Promise<(string | null)[]> {
-        const byEmail = new Map<string, string>();
-
-        // Both lists are seat-bounded, so they are read whole and matched in
-        // memory: neither column is stored case-folded, and an IN clause would
-        // therefore answer only for addresses that happen to match in case.
-        const activeUsers = await db.select({ id: users.id, email: users.email })
-            .from(users)
-            .where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt)))
-            .all();
-        for (const row of activeUsers) rememberByEmail(byEmail, row.email, row.id);
-
-        const outstanding = await db.select({ id: tenantInvites.id, email: tenantInvites.email })
-            .from(tenantInvites)
-            .where(and(eq(tenantInvites.tenantId, tenantId), eq(tenantInvites.status, 'pending')))
-            .all();
-        for (const row of outstanding) rememberByEmail(byEmail, row.email, row.id);
-
-        return entries.map((m) => byEmail.get(m.email.trim().toLowerCase()) ?? null);
     }
 }
