@@ -12,6 +12,7 @@ import { MIGRATION_BATCH_STATUS, type MigrationBatchStatus } from '../../lib/sta
 import { MIGRATION_ROW_STATUS } from '../../lib/status/migration-row-status';
 import { TemplateService } from '../template.service';
 import { applyMemberRow, type InviteDispatch } from './member-rows';
+import { captureContactPriorState } from './contact-snapshot';
 import { getSeatUsage } from '../../features/seat-quota/usage';
 import { assertBatchSeatsAvailable, computeSeatsNeeded } from '../../features/seat-quota/batch';
 import { Errors } from '../../lib/errors';
@@ -290,26 +291,6 @@ export class MigrationApplyService {
         return { kind: 'applied', createdId: created.id, priorState: null };
     }
 
-    /**
-     * The snapshot an undo restores, in a fixed shape written here and read by
-     * the revert path. Both sides read this one function rather than each
-     * writing down what they think the other stores — a field missing from the
-     * snapshot is a field the undo silently fails to bring back, and an undo
-     * that restores a partial row is worse than one that refuses.
-     *
-     * It carries exactly the columns the overwrite below touches, plus the
-     * address it matched on, so restoring it returns the row to what it held.
-     */
-    private static contactPriorState(row: typeof contacts.$inferSelect): string {
-        return JSON.stringify({
-            name: row.name,
-            email: row.email,
-            phone: row.phone,
-            agency: row.agency,
-            type: row.type,
-        });
-    }
-
     private async applyContactRow(
         db: IntakeDb,
         params: ApplyParams,
@@ -328,7 +309,11 @@ export class MigrationApplyService {
                 .where(and(eq(contacts.id, row.conflictWith), eq(contacts.tenantId, params.tenantId)))
                 .get();
             if (!live) return { kind: 'failed', reason: 'The contact being replaced no longer exists.' };
-            const priorState = MigrationApplyService.contactPriorState(live);
+            // The snapshot an undo restores. Captured through the shared pair
+            // rather than assembled here, so the shape this path writes and the
+            // shape the undo path reads cannot drift: a field missing from the
+            // snapshot is a field the undo silently fails to bring back.
+            const priorState = captureContactPriorState(live);
 
             // EMAIL IS NOT WRITTEN, and its absence here is the point rather
             // than an omission: the address is what identified this row as the
