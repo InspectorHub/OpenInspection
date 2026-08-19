@@ -269,7 +269,13 @@ describe('MigrationApplyService — template rows', () => {
         expect(readSchema(live?.schema)).toEqual(SCHEMA_A);
     });
 
-    it('consumes only pending rows, so a second apply changes nothing', async () => {
+    it('refuses a second apply rather than quietly doing nothing', async () => {
+        // This used to assert that a second apply returned `applied: 0`. The
+        // batch claim now refuses a finished run outright, which is the better
+        // answer to a double click — "nothing happened" and "that already ran"
+        // are different things to tell an operator. The property the old
+        // assertion protected still holds and is still asserted below: the
+        // template was written exactly once. See apply-claim.spec.ts.
         const staged = await stage.stage({
             tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'templates.create',
             bundle: templateBundle([{ name: 'Once', schema: SCHEMA_A }]),
@@ -277,12 +283,11 @@ describe('MigrationApplyService — template rows', () => {
         const first = await apply.apply({
             tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: false,
         });
-        const second = await apply.apply({
-            tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: false,
-        });
-
         expect(first.applied).toBe(1);
-        expect(second.applied).toBe(0);
+
+        await expect(apply.apply({
+            tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: false,
+        })).rejects.toThrow(/already/i);
         expect(await db.select().from(schema.templates).all()).toHaveLength(1);
     });
 

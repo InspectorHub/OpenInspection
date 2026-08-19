@@ -16,6 +16,8 @@ import { captureContactPriorState } from './contact-snapshot';
 import { getSeatUsage } from '../../features/seat-quota/usage';
 import { assertBatchSeatsAvailable, computeSeatsNeeded } from '../../features/seat-quota/batch';
 import { Errors } from '../../lib/errors';
+import { claimBatchForApply } from '../../lib/migration-intake/apply-claim';
+import { conflictDrift } from '../../lib/migration-intake/conflict-drift';
 import type { BundleContact, BundleTemplate } from '../../lib/migration-intake/bundle';
 
 export interface ApplyParams {
@@ -106,12 +108,16 @@ export class MigrationApplyService {
         // to answer first, because a batch parked at `applying` by a refusal
         // reads afterwards as a run that started and stopped — and a retry of
         // it would look like a resumption of something that never ran.
-        await db.update(migrationBatches)
-            .set({ status: MIGRATION_BATCH_STATUS.APPLYING, conflictPolicy: params.conflictPolicy })
-            .where(and(
-                eq(migrationBatches.id, params.batchId),
-                eq(migrationBatches.tenantId, params.tenantId),
-            ));
+        //
+        // The move is also the CLAIM: a conditional update whose zero-row
+        // result is the refusal. See lib/migration-intake/apply-claim.ts for
+        // what it does and does not protect.
+        const claimed = await claimBatchForApply(
+            db, params.tenantId, params.batchId, params.conflictPolicy,
+        );
+        if (!claimed) {
+            throw Errors.Conflict('This import is already being applied, or has already been applied.');
+        }
 
         const invites: InviteDispatch[] = [];
         let applied = 0;
@@ -230,6 +236,11 @@ export class MigrationApplyService {
         invites: InviteDispatch[],
     ): Promise<RowOutcome> {
         try {
+            // Re-asked here rather than trusted from staging: the world can
+            // move between the two, and a row whose answer moved is failed
+            // rather than settled on either version of it.
+            const drift = await conflictDrift(db, params.tenantId, batch.targetId, row);
+            if (drift) return { kind: 'failed', reason: drift };
             if (row.entity === 'template') return await this.applyTemplateRow(db, params, batch, row);
             if (row.entity === 'contact') return await this.applyContactRow(db, params, row);
             if (row.entity === 'member') return await applyMemberRow(this.db, params, row, invites);

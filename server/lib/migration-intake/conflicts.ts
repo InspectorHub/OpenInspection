@@ -15,7 +15,7 @@
  */
 import type { drizzle } from 'drizzle-orm/d1';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
-import { contacts, tenantInvites, users } from '../db/schema';
+import { contacts, templates, tenantInvites, users } from '../db/schema';
 import type { BundleContact, BundleMember, EntityKind } from './bundle';
 
 /** The drizzle handle the intake path builds over its D1 binding. */
@@ -117,11 +117,20 @@ export async function resolveConflicts(
     targetId: string | null,
 ): Promise<(string | null)[]> {
     switch (kind) {
-        case 'template':
+        case 'template': {
             // The only template a run can collide with is the one it was aimed
             // at. Nothing else in the file has a named counterpart, and a
             // same-name template is not the same template.
-            return entries.map(() => targetId);
+            if (targetId === null) return entries.map(() => null);
+            // Confirm the target is still there. Handing the id back unchecked
+            // would make a DELETED template read as an unchanged clash, and the
+            // caller re-checking just before it writes would see no change at
+            // all — which is precisely the case it exists to catch.
+            const alive = await db.select({ id: templates.id }).from(templates)
+                .where(and(eq(templates.id, targetId), eq(templates.tenantId, tenantId)))
+                .get();
+            return entries.map(() => (alive ? targetId : null));
+        }
         case 'contact':
             return contactConflicts(db, tenantId, entries as BundleContact[]);
         case 'member':
