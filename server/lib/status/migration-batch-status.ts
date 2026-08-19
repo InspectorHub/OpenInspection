@@ -21,6 +21,15 @@ export const MIGRATION_BATCH_STATUSES = [
   'reverted',
   'partially_reverted',
   'abandoned',
+  // A run whose file no adapter could read. It is a STATE, not a dead end: the
+  // file stays where it was put, and the run resumes as a normal staged batch
+  // once somebody has converted it. Modelling it as a status rather than as an
+  // error is what gives the operator something with an id they can come back to.
+  'needs_assistance',
+  // Reached its own expiry without ever being converted. Distinct from
+  // `abandoned`, which is what an untouched STAGED run becomes: abandoned means
+  // the operator stopped, expired means we did.
+  'expired',
 ] as const;
 
 export type MigrationBatchStatus = typeof MIGRATION_BATCH_STATUSES[number];
@@ -33,4 +42,6 @@ export const MIGRATION_BATCH_STATUS = {
   REVERTED: 'reverted',
   PARTIALLY_REVERTED: 'partially_reverted',
   ABANDONED: 'abandoned',
+  NEEDS_ASSISTANCE: 'needs_assistance',
+  EXPIRED: 'expired',
 } as const satisfies Record<string, MigrationBatchStatus>;
