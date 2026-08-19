@@ -127,6 +127,35 @@ describe('joinTeam seat guard', () => {
         expect(row?.deletedAt).not.toBeNull();
     });
 
+    it('refuses when ANOTHER outstanding invitation is holding the last seat', async () => {
+        await seedMember('u1');                             // max_users = 2
+        await seedInvite('tok-other', 'other@example.com');  // holds the second
+        await seedInvite('tok-mine', 'mine@example.com');
+
+        const err = await auth.joinTeam('tok-mine', 'password123', { seatQuota: ENFORCED })
+            .then(() => null, (e: unknown) => e);
+
+        // Two seats are held by ONE member row. A count of member rows would
+        // read 1 here and admit the join, taking the workspace to three people
+        // on a two-seat plan the moment the other invitation is accepted.
+        expect((err as AppError).code).toBe(ErrorCode.SEAT_LIMIT_REACHED);
+        expect((err as AppError).details).toMatchObject({ used: 2, max: 2 });
+        const created = await testDb.select().from(users).where(eq(users.email, 'mine@example.com')).get();
+        expect(created).toBeUndefined();
+    });
+
+    it('does not count the invitation being redeemed against its own acceptance', async () => {
+        await seedMember('u1');                             // max_users = 2
+        await seedInvite('tok-self', 'self@example.com');   // the second seat, held by THIS invite
+
+        // The invite is itself outstanding, so a check that failed to exclude it
+        // would see 2 held against a cap of 2 and refuse every last legitimate
+        // acceptance — the previous test is the positive control that says the
+        // exclusion is one invitation wide and not a disabled check.
+        await expect(auth.joinTeam('tok-self', 'password123', { seatQuota: ENFORCED }))
+            .resolves.toBeTruthy();
+    });
+
     it('admits the join when a seat is free', async () => {
         await seedMember('u1');
         await seedInvite('tok-room', 'second@example.com');

@@ -65,11 +65,18 @@ export const Errors = {
     UnprocessableEntity: (msg: string, details?: unknown) =>
         new AppError(422, ErrorCode.UNPROCESSABLE_ENTITY, msg, details),
     RateLimited: (msg: string = 'Too many attempts. Please try again later.') => new AppError(429, ErrorCode.RATE_LIMITED, msg),
-    SeatLimitReached: (details: { used: number; max: number; billingPortalUrl: string | null }) =>
+    // `needed` is optional so the single-seat message stays exactly what it
+    // was; a bulk caller supplies it and gets a sentence with both numbers,
+    // because "seat limit reached" gives an operator staging twelve invites
+    // nothing to act on.
+    SeatLimitReached: (details: { used: number; max: number; billingPortalUrl: string | null; needed?: number }) =>
         new AppError(
             402,
             ErrorCode.SEAT_LIMIT_REACHED,
-            'Your team has reached its seat limit. Upgrade your plan to invite more members.',
+            details.needed === undefined
+                ? 'Your team has reached its seat limit. Upgrade your plan to invite more members.'
+                : `This import needs ${details.needed} seats and ${Math.max(0, details.max - details.used)} are available. ` +
+                  'Upgrade your plan, or import fewer people.',
             details,
         ),
     Internal: (msg: string = 'Internal server error') => new AppError(500, ErrorCode.INTERNAL_ERROR, msg),

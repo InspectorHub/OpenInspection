@@ -70,6 +70,30 @@ describe('GET /api/integration/tenants/:slug/seat-usage', () => {
     expect(body).toEqual({ success: true, data: { used: 2, max: 5 } });
   });
 
+  it('does not count a pending invitation — a subscription quantity is for people who are here', async () => {
+    await testDb.insert(schema.users).values([
+      { id: 'u1', tenantId: 't-a', email: 'u1@example.com', passwordHash: 'x', role: 'inspector', createdAt: new Date() },
+    ] as never);
+    // Outstanding invitations hold a seat against the QUOTA (getSeatUsage.used),
+    // which is what stops an owner over-issuing them. They are not a seat on the
+    // bill: nobody has accepted, and this number is what a subscription quantity
+    // is reconciled against.
+    await testDb.insert(schema.tenantInvites).values([
+      {
+        id: 'inv-1', tenantId: 't-a', email: 'pending@example.com', role: 'inspector',
+        status: 'pending', expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    ] as never);
+
+    const res = await app().request(
+      '/api/integration/tenants/tenant-a/seat-usage',
+      { headers: { [M2M_HEADER]: await header() } },
+      ENV,
+    );
+    const body = await res.json() as { data: { used: number; max: number | null } };
+    expect(body.data).toEqual({ used: 1, max: 5 });
+  });
+
   it('max is null when maxUsers is the unlimited sentinel (0)', async () => {
     await testDb.insert(schema.tenants).values([
       { id: 't-b', slug: 'tenant-b', tier: 'pro', maxUsers: 0, createdAt: new Date() },

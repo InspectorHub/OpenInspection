@@ -118,6 +118,22 @@ describe('GET /api/billing/summary', () => {
         expect(body.data.seatsUsed).toBe(1);
     });
 
+    it('does not bill for a pending invitation', async () => {
+        await seedTenant('t1', 5);
+        await seedMember('t1', 'active-1');
+        // `getSeatUsage.used` counts this invitation, because the quota has to
+        // reserve the seat it can still claim. The bill is the other number:
+        // nobody has accepted, so nobody is being charged for.
+        await testDb.insert(schema.tenantInvites).values({
+            id: 'inv-1', tenantId: 't1', email: 'pending@example.com', role: 'inspector',
+            status: 'pending', expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const { body } = await fetchSummary(makeApp());
+        expect(body.data.seatsUsed).toBe(1);
+        expect(body.data.permanent).toBe(1);
+    });
+
     it('stays scoped to the requesting tenant', async () => {
         await seedTenant('t1', 5);
         await seedTenant('t2', 5);
