@@ -1,6 +1,4 @@
 [
-  "server/api/admin/admin-data-import.ts::resolveRoleId::.where(eq(inspectionResults.id, resultsRow.id));",
-  "server/api/admin/admin-data-import.ts::resolveRoleId::.where(eq(inspections.id, r.inspectionId))",
   "server/api/agreements-render.ts::agreementRenderHandler::.where(eq(schema.agreementRequests.id, requestId)).get();",
   "server/api/agreements-render.ts::agreementRenderHandler::.where(eq(schema.agreements.id, reqRow.agreementId)).get();",
   "server/api/agreements-render.ts::certRenderHandler::.where(eq(schema.agreementRequests.id, requestId)).get();",
