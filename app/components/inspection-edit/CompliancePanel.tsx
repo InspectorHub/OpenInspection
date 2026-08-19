@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { useFetcher, useRevalidator } from "react-router";
+import { useRevalidator } from "react-router";
 import { Button, Modal, SegmentedControl } from "@core/shared-ui";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { formatDateTime } from "~/lib/format";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -12,7 +13,7 @@ import { m } from "~/paraglide/messages";
  * gate in inspection-edit.tsx); light_commercial and residential inspections
  * never mount this panel.
  *
- * Every mutation type gets its OWN `useFetcher` instance (signoff per role,
+ * Every mutation type gets its OWN `useGuardedSubmit` instance (signoff per role,
  * remove-signoff per role, PSQ responses, PSQ status, doc-review per item) —
  * sharing a fetcher across an unrelated in-flight mutation would abort it
  * (see feedback_rr_shared_fetcher_abort / the B-17 notes-vs-rating bug this
@@ -145,16 +146,17 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
   const locale = useDisplayLocale();
   // Independent fetchers per role AND per mutation type — a remove on one
   // role must never abort an in-flight sign-off submit on the other.
-  const signFetcher = useFetcher();
-  const removeFetcher = useFetcher();
+  // #106 - a sign-off is an attestation and its removal retracts one. Both go
+  // through the guard, and every control on this card is already disabled while
+  // its own fetcher is in flight, so a refused click is not reachable.
+  const { fetcher: signFetcher, submit: submitSign, busy: saving } = useGuardedSubmit();
+  const { fetcher: removeFetcher, submit: submitRemoveSignoff, busy: removing } = useGuardedSubmit();
   const [personId, setPersonId] = useState(existing?.personId ?? "");
   const [name, setName] = useState(existing?.name ?? "");
   const [license, setLicense] = useState(existing?.license ?? "");
   const [dualRole, setDualRole] = useState(existing?.dualRole ?? false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const saving = signFetcher.state !== "idle";
-  const removing = removeFetcher.state !== "idle";
 
   // This card renders straight off `existing` (loader props) — no local
   // optimistic copy of "signed" state — so a successful sign-off or removal
@@ -183,7 +185,7 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
 
   const submitSignoff = () => {
     if (!personId.trim() || !name.trim()) return;
-    signFetcher.submit(
+    submitSign(
       {
         intent: "compliance-signoff",
         role,
@@ -197,8 +199,10 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
   };
 
   const confirmRemove = () => {
-    removeFetcher.submit({ intent: "compliance-remove-signoff", role }, { method: "POST" });
-    setConfirmOpen(false);
+    // Keep the confirmation open when the guard refuses.
+    if (submitRemoveSignoff({ intent: "compliance-remove-signoff", role }, { method: "POST" })) {
+      setConfirmOpen(false);
+    }
   };
 
   return (
@@ -292,18 +296,18 @@ function psqStatuses(): { value: "sent" | "received" | "declined"; label: string
 function PsqPanel({ psq }: { psq: PsqView | null }) {
   // Separate fetcher per mutation TYPE (responses vs status) — a status click
   // must not abort an in-flight responses save, and vice versa.
-  const responsesFetcher = useFetcher();
-  const statusFetcher = useFetcher();
+  // #106 - the responses save writes the questionnaire and the status write
+  // records that it was sent, received or declined.
+  const { submit: submitResponses, busy: savingResponses } = useGuardedSubmit();
+  const { submit: submitStatus, busy: settingStatus } = useGuardedSubmit();
   const [responses, setResponses] = useState<Record<string, string>>(() => normalizeResponses(psq?.responses));
   const [status, setStatus] = useState<PsqView["status"] | null>(psq?.status ?? null);
   const [declineOpen, setDeclineOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
 
-  const savingResponses = responsesFetcher.state !== "idle";
-  const settingStatus = statusFetcher.state !== "idle";
 
   const commitResponses = () => {
-    responsesFetcher.submit(
+    submitResponses(
       { intent: "compliance-psq", responses: JSON.stringify(responses) },
       { method: "POST" },
     );
@@ -311,18 +315,22 @@ function PsqPanel({ psq }: { psq: PsqView | null }) {
 
   const applyStatus = (next: "sent" | "received", reason?: string) => {
     setStatus(next);
-    statusFetcher.submit(
+    submitStatus(
       { intent: "compliance-psq-status", status: next, ...(reason ? { reason } : {}) },
       { method: "POST" },
     );
   };
 
   const confirmDecline = () => {
-    setStatus("declined");
-    statusFetcher.submit(
+    // Only move the local status and clear the dialog for a call the guard
+    // accepted - a refused click sent nothing, and showing "declined" for it
+    // would be a claim about the record that is not true.
+    const sent = submitStatus(
       { intent: "compliance-psq-status", status: "declined", reason: declineReason.trim() || "(no reason provided)" },
       { method: "POST" },
     );
+    if (!sent) return;
+    setStatus("declined");
     setDeclineOpen(false);
     setDeclineReason("");
   };
@@ -401,13 +409,15 @@ function PsqPanel({ psq }: { psq: PsqView | null }) {
 function DocReviewRow({ item }: { item: DocumentReviewItemView }) {
   // One fetcher PER ROW (own component instance) — toggling one document's
   // checkbox must never abort another row's in-flight notes save.
-  const fetcher = useFetcher();
+  // #106 - one guard per ROW, for the same reason there is one fetcher per row:
+  // toggling one document must not contend with another's in-flight save. Every
+  // control in the row is `disabled={busy}`.
+  const { submit, busy } = useGuardedSubmit();
   const [local, setLocal] = useState(item);
-  const busy = fetcher.state !== "idle";
 
   const submitPatch = (next: DocumentReviewItemView) => {
     setLocal(next);
-    fetcher.submit(
+    submit(
       {
         intent: "compliance-doc-review",
         documentKey: next.documentKey,
@@ -477,8 +487,9 @@ function DocReviewRow({ item }: { item: DocumentReviewItemView }) {
 
 function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
   // Seeding the standard checklist is its own mutation type/fetcher too.
-  const seedFetcher = useFetcher();
-  const seeding = seedFetcher.state !== "idle";
+  // #106 - seeding creates the whole standard checklist server-side; twice
+  // would create it twice.
+  const { fetcher: seedFetcher, submit: submitSeed, busy: seeding } = useGuardedSubmit();
 
   // Seeding creates rows server-side but this section renders `items`
   // straight from loader props — without a revalidation the checklist stays
@@ -503,7 +514,7 @@ function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
             variant="link"
             size="sm"
             disabled={seeding}
-            onClick={() => seedFetcher.submit({ intent: "compliance-doc-review-seed" }, { method: "POST" })}
+            onClick={() => submitSeed({ intent: "compliance-doc-review-seed" }, { method: "POST" })}
           >
             {seeding ? m.common_loading() : m.editor_compliance_load_checklist()}
           </Button>
@@ -537,7 +548,10 @@ function relianceFields(): { key: keyof RelianceTextView; label: string }[] {
 // project already hit): a single fetcher shared across the three would cancel
 // the first field's save the moment the second field blurs.
 function RelianceFieldRow({ fieldKey, label, initial }: { fieldKey: keyof RelianceTextView; label: string; initial: string }) {
-  const fetcher = useFetcher();
+  // #106 - one guard per FIELD (this is one component instance per field), which
+  // is what keeps the guard from refusing the next field's blur. The textarea is
+  // `disabled={busy}` for the round trip.
+  const { submit, busy } = useGuardedSubmit();
   const [value, setValue] = useState(initial);
   // Last value we actually persisted — lets us skip a no-op save when a field
   // is blurred without an edit (e.g. tabbing through just to read it), which
@@ -545,12 +559,13 @@ function RelianceFieldRow({ fieldKey, label, initial }: { fieldKey: keyof Relian
   // on every pass. POSTs skip revalidation, so the local copy is the optimistic
   // source of truth like PsqPanel / DocReviewRow.
   const savedRef = useRef(initial);
-  const busy = fetcher.state !== "idle";
 
   const commit = () => {
     if (value === savedRef.current) return;
+    // Record the value as saved only for a call the guard accepted, or a
+    // refused blur would be remembered as persisted and never retried.
+    if (!submit({ intent: "save-pca-narrative", key: fieldKey, value }, { method: "POST" })) return;
     savedRef.current = value;
-    fetcher.submit({ intent: "save-pca-narrative", key: fieldKey, value }, { method: "POST" });
   };
 
   return (

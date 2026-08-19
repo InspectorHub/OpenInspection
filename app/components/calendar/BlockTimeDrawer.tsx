@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useFetcher } from "react-router";
 import { Drawer, Modal } from "@core/shared-ui";
 import { blockFormSeed, type CalendarEvent } from "./calendar-helpers";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export interface CalendarMember {
@@ -44,7 +44,10 @@ export function BlockTimeDrawer({
   canManageTeam,
   onClose,
 }: BlockTimeDrawerProps) {
-  const fetcher = useFetcher<BlockActionData>();
+  // #106 - creating, updating or deleting a time block changes what the
+  // public booking page will offer. Both controls are already
+  // `disabled={submitting}`.
+  const { fetcher, submit, busy: submitting } = useGuardedSubmit<BlockActionData>();
   const titleRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -73,12 +76,11 @@ export function BlockTimeDrawer({
     if (fetcher.state === "idle" && fetcher.data?.ok) onClose();
   }, [fetcher.data, fetcher.state, onClose]);
 
-  const submitting = fetcher.state !== "idle";
   const error = fetcher.data?.ok === false ? fetcher.data.message : null;
 
   function submitBlock(event: React.FormEvent) {
     event.preventDefault();
-    fetcher.submit(
+    submit(
       {
         intent: block ? "block-update" : "block-create",
         ...(block ? { id: block.id } : {}),
@@ -96,7 +98,7 @@ export function BlockTimeDrawer({
 
   function deleteBlock() {
     if (!block) return;
-    fetcher.submit(
+    submit(
       { intent: "block-delete", id: block.id },
       { method: "post" },
     );

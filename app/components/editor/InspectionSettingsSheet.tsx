@@ -5,6 +5,7 @@ import { TemplateCombobox } from "~/components/TemplateCombobox";
 import { CoverCropper, coverCropFor, type StoredCoverCrop } from "~/components/media-studio/CoverCropper";
 import { fullResUrl } from "~/components/media-studio/cropImage";
 import { ORIGINAL_QUALITY_KEY } from "~/routes/inspection-edit";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { CLIENT_PROFILE_LIST } from "~/lib/report-style/profiles-client";
 
@@ -62,7 +63,12 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
   // every save silently 401/403'd. A dedicated fetcher (not shared) avoids the
   // B-17 shared-fetcher abort hazard. templateChanged is captured at submit so
   // the response effect knows whether to fire onTemplateApplied.
-  const saveFetcher = useFetcher<{ ok: boolean; intent?: string }>();
+  // #106 - the settings save rewrites the inspection record. `coverFetcher`
+  // below stays raw: it carries multipart cover uploads the hook cannot take.
+  // The sheet closes itself on the reply, and the save button already reads
+  // `saveFetcher.state` for its own label and disabled state.
+  // submit-guard-allow-no-busy: the save button reads saveFetcher.state directly.
+  const { fetcher: saveFetcher, submit: submitSave } = useGuardedSubmit<{ ok: boolean; intent?: string }>();
   const templateChangedAtSubmit = useRef(false);
 
   type CoverPhoto = { key: string; url: string; label: string };
@@ -218,7 +224,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
       requireDefectFieldsOverride: form.requireDefectFieldsOverride === "" ? null : form.requireDefectFieldsOverride,
       profileOverride: form.profileOverride === "" ? null : form.profileOverride,
     };
-    saveFetcher.submit(
+    submitSave(
       { intent: "save-settings", payload: JSON.stringify(payload) },
       { method: "post" },
     );

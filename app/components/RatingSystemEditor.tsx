@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useFetcher } from "react-router";
 import { Modal, Button, IconButton, Icon } from "@core/shared-ui";
 import type { Severity } from "~/lib/severity";
 import { SEVERITIES, SEVERITY_LABEL, SEVERITY_DOT } from "~/lib/severity";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -73,7 +73,9 @@ export function RatingSystemEditor({
    *  instead of POSTing to /library/rating-systems (the default library-table save). */
   onSaveLevels?: (levels: EditorLevel[]) => void;
 }) {
-  const fetcher = useFetcher<{ ok?: boolean; error?: string }>();
+  // #106 - user mutation: saves a rating system and its levels. The Save
+  // button is already `disabled={saving || ...}`.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<{ ok?: boolean; error?: string }>();
   const editing = !!system;
 
   const [name, setName] = useState("");
@@ -106,7 +108,6 @@ export function RatingSystemEditor({
   // Auto-derive the slug from the name until the user edits it directly.
   const effectiveSlug = slugTouched ? slug : slugify(name);
 
-  const saving = fetcher.state !== "idle";
   const submittedRef = useRef(false);
   useEffect(() => {
     if (submittedRef.current && fetcher.state === "idle" && fetcher.data?.ok) {
@@ -143,7 +144,7 @@ export function RatingSystemEditor({
       return;
     }
     submittedRef.current = true;
-    fetcher.submit(
+    submit(
       {
         intent: "save",
         ...(system ? { id: system.id } : {}),

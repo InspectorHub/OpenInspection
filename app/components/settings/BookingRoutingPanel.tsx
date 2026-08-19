@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useFetcher } from "react-router";
 import { Banner, Input, RadioCardGroup } from "@core/shared-ui";
 import type { action } from "~/routes/settings-booking";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export type RoutingStrategy = "first_available" | "least_loaded" | "closest";
@@ -40,14 +41,15 @@ export function BookingRoutingPanel({
   /** Inspectors that would have a service origin — company-inherited or their own. */
   anchoredInspectorCount: number;
 }) {
-  const fetcher = useFetcher<typeof action>();
+  // #106 - user mutation: saves the booking routing strategy.
+  // `geocodeFetcher` below stays a plain lookup.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
   const geocodeFetcher = useFetcher<typeof action>();
   const [strategy, setStrategy] = useState<RoutingStrategy>(initial.routingStrategy);
   const [leadHours, setLeadHours] = useState(String(initial.minLeadHours));
   const [cutoff, setCutoff] = useState(initial.sameDayCutoffTime ?? "");
   const [dirty, setDirty] = useState(false);
 
-  const saving = fetcher.state !== "idle";
   const done = fetcher.state === "idle" && fetcher.data?.intent === "routing-save" && !dirty;
   const saved = done && fetcher.data?.ok === true;
   const failed = done && fetcher.data?.ok === false;
@@ -71,7 +73,7 @@ export function BookingRoutingPanel({
 
   function handleSave() {
     setDirty(false);
-    fetcher.submit(
+    submit(
       {
         intent: "routing-save",
         routingStrategy: strategy,

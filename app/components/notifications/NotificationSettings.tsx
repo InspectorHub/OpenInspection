@@ -1,4 +1,3 @@
-import { useFetcher } from "react-router";
 import {
     NotificationPreferences,
     type AlwaysSentItem,
@@ -6,6 +5,7 @@ import {
 } from "~/components/notifications/NotificationPreferences";
 import { SmsConsentBlock, type SmsConsent } from "~/components/notifications/SmsConsentBlock";
 import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -44,7 +44,9 @@ export function NotificationSettings({
     alwaysSent, youChoose, smsConsent, loadError = null,
     locale = "en-US", manageHref, intents, extraFields = {},
 }: NotificationSettingsProps) {
-    const fetcher = useFetcher<{
+    // #106 - every row here writes a notification-channel preference, which
+    // decides whether a client is contacted at all.
+    const { fetcher, submit: guardedSubmit, busy } = useGuardedSubmit<{
         ok?: boolean; success?: boolean; error?: string; intent?: string;
     }>();
 
@@ -58,7 +60,6 @@ export function NotificationSettings({
     const saveError = failed ? (result.error ?? null) : null;
     useNotificationSaveToast({ data: result, failed, error: saveError });
 
-    const busy = fetcher.state !== "idle";
     const status = busy ? ("saving" as const) : ("idle" as const);
 
     // No consent means no text can arrive, whatever a row says — so the column
@@ -67,7 +68,7 @@ export function NotificationSettings({
         && (smsConsent.state === "revoked" || smsConsent.state === "none");
 
     const submit = (fields: Record<string, string>) =>
-        fetcher.submit({ ...fields, ...extraFields }, { method: "post" });
+        guardedSubmit({ ...fields, ...extraFields }, { method: "post" });
 
     return (
         <div className="space-y-5">

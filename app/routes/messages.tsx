@@ -15,13 +15,14 @@
  * no `@`-parser.
  */
 import { useState } from "react";
-import { Link, useFetcher, useLoaderData, useNavigate } from "react-router";
+import { Link, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/messages";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Avatar } from "@core/shared-ui";
 import { MessageThread, type ThreadMessage } from "~/components/messaging/MessageThread";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -115,7 +116,11 @@ function threadTime(ms: number, locale: string, timeZone: string): string {
 export default function MessagesPage() {
   const { threads, thread, selected } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
-  const send = useFetcher<{ ok: boolean }>();
+  // #106 - a send delivers a real message to a real person.
+  // MessageThread owns the pending affordance and will not fire `onSend` again
+  // until the previous one resolves.
+  // submit-guard-allow-no-busy: the composer disables its own Send button.
+  const { submit: submitSend } = useGuardedSubmit<{ ok: boolean }>();
   const locale = useDisplayLocale();
   const timeZone = useDisplayTimeZone();
   const [mentionId, setMentionId] = useState("");
@@ -144,7 +149,7 @@ export default function MessagesPage() {
 
   async function handleSend(body: string) {
     if (!selected) throw new Error("no thread");
-    send.submit(
+    submitSend(
       { contactId: selected, body, inspectionId: mentionId },
       { method: "post" },
     );

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useFetcher } from "react-router";
 import { Button, Checkbox, Banner } from "@core/shared-ui";
 import type { AiAssistResult } from "~/routes/resources/ai-assist";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export interface AiAssistPanelProps {
@@ -46,7 +46,9 @@ export interface AiAssistPanelProps {
  * that a reasonable refactor would "simplify" away.
  */
 export function AiAssistPanel({ notes, context, resultId, onAccept }: AiAssistPanelProps) {
-  const fetcher = useFetcher<AiAssistResult>();
+  // #106 — `assist` spends a metered AI call and `review` writes the record
+  // that permits the note to change, so both go out through the guard.
+  const { fetcher, submit, busy } = useGuardedSubmit<AiAssistResult>();
   const [draft, setDraft] = useState<{ text: string; aiCallId: string } | null>(null);
   const [reviewed, setReviewed] = useState(false);
   /** The exact response object already acted on, so one round trip is handled
@@ -54,7 +56,6 @@ export function AiAssistPanel({ notes, context, resultId, onAccept }: AiAssistPa
    *  a later re-render would replay the accept. */
   const handledRef = useRef<AiAssistResult | null>(null);
 
-  const busy = fetcher.state !== "idle";
   const data = fetcher.data;
   const error = data && !data.ok ? data.error : null;
 
@@ -84,17 +85,20 @@ export function AiAssistPanel({ notes, context, resultId, onAccept }: AiAssistPa
   if (!resultId) return null;
 
   function improve() {
-    fetcher.submit(
+    submit(
       { intent: "assist", text: notes, context: context ?? "" },
       { method: "post", action: "/resources/ai-assist" },
     );
   }
 
   function useReviewed() {
-    if (!draft || !reviewed) return;
+    // `resultId` is re-tested here, not only at the early return above: the
+    // guard takes a Record<string, string>, and the narrowing on a prop does
+    // not reach inside this closure.
+    if (!draft || !reviewed || !resultId) return;
     // The review write comes FIRST and the note is changed only in the branch
     // above, on its success. Reversing these two lines is the fail-open bug.
-    fetcher.submit(
+    submit(
       { intent: "review", artifactId: resultId, aiCallId: draft.aiCallId },
       { method: "post", action: "/resources/ai-assist" },
     );

@@ -1,8 +1,9 @@
-import { useFetcher, useRouteLoaderData } from "react-router";
+import { useRouteLoaderData } from "react-router";
 import { SegmentedControl, type SegmentedControlOption } from "@core/shared-ui";
 import { SUPPORTED_CONTACT_LOCALES, normalizeLocale } from "../../server/lib/i18n/contact-locale";
 import { localeShortLabel, storedLocaleTag } from "~/lib/locales";
 import { writeUiLocaleCookie } from "~/lib/ui-prefs";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -43,7 +44,11 @@ export function LocaleSwitcher({ className }: { className?: string }) {
   // clicked. Absent while the error boundary renders — fall back to English.
   const rootData = useRouteLoaderData("root") as { locale?: string } | undefined;
   const current = normalizeLocale(rootData?.locale) ?? "en";
-  const fetcher = useFetcher();
+  // #106 - user mutation: writes the account's stored locale. The cookie is
+  // written client-side on the same click and the whole app re-renders in the
+  // new language immediately, so the request has nothing left to wait for.
+  // submit-guard-allow-no-busy: the UI has already changed before the request goes out.
+  const { submit } = useGuardedSubmit();
 
   // Built at render time (not a module const) so `m.*()` resolves inside the
   // paraglide request scope — same reason ThemeSegmentControl builds its own.
@@ -66,7 +71,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
       onChange={(next) => {
         if (next === current) return;
         writeUiLocaleCookie(next);
-        fetcher.submit(
+        submit(
           { intent: "set-locale", locale: storedLocaleTag(next) },
           { method: "post", action: "/settings/profile" },
         );

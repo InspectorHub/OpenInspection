@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useFetcher } from "react-router";
+import { Link } from "react-router";
 import { Card, Pill, Button, Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
@@ -11,6 +11,7 @@ import { isSoleClient } from "../../../server/lib/people/primary-client";
 import type { ReportLinkTtl } from "../../../server/lib/report-link-ttl";
 import { formatDate } from "~/lib/format";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -120,11 +121,13 @@ export function PeopleEditor({
   // Independent, dedicated fetchers per mutation. Reusing one fetcher across
   // concurrent mutations cancels the in-flight one (RR shared-fetcher-abort),
   // and these are genuinely separate user actions on the same card.
-  const addFetcher = useFetcher<typeof action>();
-  const removeFetcher = useFetcher<typeof action>();
-  const resetFetcher = useFetcher<typeof action>();
-  const primaryFetcher = useFetcher<typeof action>();
-  const expiryFetcher = useFetcher<typeof action>();
+  // #106 - all five are real writes on someone's access to the report, and each
+  // keeps its own guard for the same reason it kept its own fetcher.
+  const { fetcher: addFetcher, submit: submitAdd, busy: addBusy } = useGuardedSubmit<typeof action>();
+  const { submit: submitRemove, busy: removeBusy } = useGuardedSubmit<typeof action>();
+  const { submit: submitReset, busy: resetBusy } = useGuardedSubmit<typeof action>();
+  const { submit: submitPrimary, busy: primaryBusy } = useGuardedSubmit<typeof action>();
+  const { submit: submitExpiry, busy: expiryBusy } = useGuardedSubmit<typeof action>();
 
   // IA-133 — `ok` alone is not "a seat was created". The add is idempotent, so
   // re-adding someone already on the inspection returns ok with nothing changed.
@@ -149,19 +152,19 @@ export function PeopleEditor({
   const [ttl, setTtl] = useState<ReportLinkTtl>("never");
 
   function handleRemove(personId: string) {
-    removeFetcher.submit({ intent: "person-remove", personId }, { method: "post" });
-    setRemoveTarget(null);
+    // Keep the confirmation open when the guard refuses.
+    if (submitRemove({ intent: "person-remove", personId }, { method: "post" })) {
+      setRemoveTarget(null);
+    }
   }
 
   function handleReset(personId: string) {
-    resetFetcher.submit({ intent: "person-reset-access", personId }, { method: "post" });
-    setResetTarget(null);
+    if (submitReset({ intent: "person-reset-access", personId }, { method: "post" })) {
+      setResetTarget(null);
+    }
   }
 
-  const busy =
-    removeFetcher.state !== "idle" ||
-    resetFetcher.state !== "idle" ||
-    primaryFetcher.state !== "idle";
+  const busy = removeBusy || resetBusy || primaryBusy;
 
   const groups = GROUP_ORDER.map((kind) => ({
     kind,
@@ -265,7 +268,7 @@ export function PeopleEditor({
                           <button
                             type="button"
                             onClick={() =>
-                              primaryFetcher.submit(
+                              submitPrimary(
                                 { intent: "person-make-primary", personId: person.id },
                                 { method: "post" },
                               )
@@ -344,9 +347,9 @@ export function PeopleEditor({
             variant="secondary"
             size="sm"
             className="mt-2"
-            disabled={expiryFetcher.state !== "idle" || expiryWouldChangeNothing}
+            disabled={expiryBusy || expiryWouldChangeNothing}
             onClick={() =>
-              expiryFetcher.submit(
+              submitExpiry(
                 { intent: "report-link-expiry", ttl: JSON.stringify(ttl) },
                 { method: "post" },
               )
@@ -366,6 +369,8 @@ export function PeopleEditor({
         roleProfiles={roleProfiles}
         isAdmin={isAdmin}
         fetcher={addFetcher}
+        submit={submitAdd}
+        submitting={addBusy}
         alreadyPresent={addAlreadyPresent}
       />
 
@@ -378,7 +383,7 @@ export function PeopleEditor({
             <Button variant="ghost" onClick={() => setRemoveTarget(null)}>{m.common_cancel()}</Button>
             <Button
               variant="danger"
-              disabled={removeFetcher.state !== "idle"}
+              disabled={removeBusy}
               onClick={() => removeTarget && handleRemove(removeTarget.id)}
             >{m.inspections_hub_people_remove_cta()}</Button>
           </>
@@ -398,7 +403,7 @@ export function PeopleEditor({
             <Button variant="ghost" onClick={() => setResetTarget(null)}>{m.common_cancel()}</Button>
             <Button
               variant="danger"
-              disabled={resetFetcher.state !== "idle"}
+              disabled={resetBusy}
               onClick={() => resetTarget && handleReset(resetTarget.id)}
             >{m.inspections_hub_people_reset_cta()}</Button>
           </>

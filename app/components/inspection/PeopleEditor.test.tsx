@@ -11,6 +11,8 @@ import { describe, it, expect, vi } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { createElement } from "react";
 
+import { IDEMPOTENCY_FIELD } from "~/hooks/useGuardedSubmit";
+
 const submitMock = vi.fn();
 
 vi.mock("react-router", async () => {
@@ -188,10 +190,15 @@ describe("PeopleEditor", () => {
       />,
     );
     fireEvent.click(getByText("Make primary"));
-    expect(submitMock).toHaveBeenCalledWith(
-      { intent: "person-make-primary", personId: "p3" },
-      { method: "post" },
-    );
+    // #106 - the write leaves through useGuardedSubmit, so the body carries the
+    // idempotency key. Asserted as its own field: folding it into the payload
+    // would let a later change drop it with nothing going red.
+    expect(submitMock).toHaveBeenCalledTimes(1);
+    const [primaryPayload, primaryOptions] = submitMock.mock.calls[0];
+    const { [IDEMPOTENCY_FIELD]: primaryKey, ...primaryRest } = primaryPayload;
+    expect(primaryRest).toEqual({ intent: "person-make-primary", personId: "p3" });
+    expect(primaryKey).toMatch(/^[0-9a-f-]{36}$/);
+    expect(primaryOptions).toEqual({ method: "post" });
   });
 
   // IA-36 ② — Reset goes through a confirm modal (never window.confirm), and the
@@ -214,10 +221,12 @@ describe("PeopleEditor", () => {
     expect(submitMock).not.toHaveBeenCalled();
 
     fireEvent.click(getByText("Reset link"));
-    expect(submitMock).toHaveBeenCalledWith(
-      { intent: "person-reset-access", personId: "p1" },
-      { method: "post" },
-    );
+    expect(submitMock).toHaveBeenCalledTimes(1);
+    const [resetPayload, resetOptions] = submitMock.mock.calls[0];
+    const { [IDEMPOTENCY_FIELD]: resetKey, ...resetRest } = resetPayload;
+    expect(resetRest).toEqual({ intent: "person-reset-access", personId: "p1" });
+    expect(resetKey).toMatch(/^[0-9a-f-]{36}$/);
+    expect(resetOptions).toEqual({ method: "post" });
   });
 
   it("describes Reset as a RESTORE when the link is already revoked (IA-134)", () => {

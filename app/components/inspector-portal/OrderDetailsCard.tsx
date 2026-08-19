@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { Card, Button, Modal } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import type { action } from "~/routes/inspector-portal";
 
@@ -35,8 +36,9 @@ export function OrderDetailsCard({
     referredByName: string | null;
 }) {
     const [open, setOpen] = useState(false);
-    const fetcher = useFetcher<typeof action>();
-    const saving = fetcher.state !== "idle";
+    // #106 - this writes the order's own fields. `searchFetcher` below stays a
+    // plain read (a debounced typeahead, nothing to double-submit).
+    const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
 
     // Task 8 — the referrer picker. A PERSON, not a channel and not only an
     // agent: a past client really does refer jobs, so the typeahead searches
@@ -77,7 +79,7 @@ export function OrderDetailsCard({
             const v = String(data.get(k) ?? "").trim();
             return v === "" ? null : v;
         };
-        fetcher.submit(
+        const sent = submit(
             {
                 intent: "save-order",
                 payload: JSON.stringify({
@@ -89,7 +91,8 @@ export function OrderDetailsCard({
             },
             { method: "post" },
         );
-        setOpen(false);
+        // Close only on a call the guard accepted.
+        if (sent) setOpen(false);
     };
 
     return (

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import { Button } from "@core/shared-ui";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import type { action as restoreAction } from "~/routes/resources/inspection-restore";
 
@@ -38,16 +38,19 @@ export function RestoreInspectionAction({
     /** Only for fitting the trigger to a host row's control height. */
     className?: string;
 }) {
-    const fetcher = useFetcher<typeof restoreAction>();
+    // #106 - user mutation: restores a soft-deleted inspection. The button is
+    // already `disabled={busy}`.
+    const { fetcher, submit: submitRestore, busy } = useGuardedSubmit<typeof restoreAction>();
     const [confirming, setConfirming] = useState(false);
 
-    const busy = fetcher.state !== "idle";
     const result = fetcher.state === "idle" ? fetcher.data : undefined;
     const error = result && !result.ok ? result.error : undefined;
 
     function submit() {
-        setConfirming(false);
-        fetcher.submit({ id: inspectionId }, { method: "post", action: RESTORE_ROUTE });
+        // Close the confirmation only for a call the guard accepted.
+        if (submitRestore({ id: inspectionId }, { method: "post", action: RESTORE_ROUTE })) {
+            setConfirming(false);
+        }
     }
 
     return (

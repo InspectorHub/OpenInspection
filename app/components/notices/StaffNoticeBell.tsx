@@ -12,6 +12,7 @@
  */
 import { useEffect } from "react";
 import { useFetcher } from "react-router";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { NoticeBell } from "./NoticeBell";
 import type { StaffNoticesPayload } from "~/routes/resources/staff-notices";
@@ -20,7 +21,10 @@ const EMPTY: StaffNoticesPayload = { notices: [], unread: 0 };
 
 export function StaffNoticeBell() {
   const load = useFetcher<StaffNoticesPayload>();
-  const write = useFetcher<{ ok?: boolean }>();
+  // #106 - dismiss and mark-all-read both write the notice record. This was
+  // invisible to the gate until the detector learned to read `useFetcher`
+  // declarations rather than trusting the `*Fetcher` naming convention.
+  const { fetcher: write, submit: guardedSubmit, busy } = useGuardedSubmit<{ ok?: boolean }>();
 
   useEffect(() => {
     if (load.state === "idle" && !load.data) load.load("/resources/staff-notices");
@@ -37,7 +41,7 @@ export function StaffNoticeBell() {
 
   const data = load.data ?? EMPTY;
   const submit = (intent: string, noticeId?: string) =>
-    write.submit(
+    guardedSubmit(
       { intent, ...(noticeId ? { noticeId } : {}) },
       { method: "post", action: "/resources/staff-notices" },
     );
@@ -58,6 +62,7 @@ export function StaffNoticeBell() {
       onMarkAllRead={() => submit("notice-mark-all-read")}
       onDismiss={(id) => submit("notice-dismiss", id)}
       onRemedy={() => {}}
+      busy={busy}
     />
   );
 }

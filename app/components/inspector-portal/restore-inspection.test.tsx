@@ -27,6 +27,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { createRoutesStub, useFetcher, useLoaderData } from "react-router";
 
+import { IDEMPOTENCY_FIELD } from "~/hooks/useGuardedSubmit";
+
 import { LifecycleCard } from "~/components/inspector-portal/LifecycleCard";
 import { INSPECTION_STATUS } from "~/lib/status";
 
@@ -132,7 +134,12 @@ describe("recovering a cancelled inspection from the hub", () => {
         fireEvent.click(await restoreButton());
         fireEvent.click(await confirmInDialog());
 
-        await waitFor(() => expect(harness.submitted).toEqual([{ id: "insp-1" }]));
+        await waitFor(() => expect(harness.submitted).toHaveLength(1));
+        // #106 - the restore goes through useGuardedSubmit, so the idempotency
+        // key rides in the body. Asserted separately from the payload.
+        const { [IDEMPOTENCY_FIELD]: key, ...payload } = harness.submitted[0];
+        expect(payload).toEqual({ id: "insp-1" });
+        expect(key).toMatch(/^[0-9a-f-]{36}$/);
     });
 
     it("shows the API's refusal beside the control rather than swallowing it", async () => {

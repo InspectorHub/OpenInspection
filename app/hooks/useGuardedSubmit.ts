@@ -35,6 +35,18 @@ function mintKey(): string {
 type SubmitOptions = Parameters<ReturnType<typeof useFetcher>["submit"]>[1];
 
 /**
+ * The guarded submit, as a standalone type.
+ *
+ * Exported because a presentational component can be handed the submit without
+ * owning the fetcher — `PaymentsModal` is rendered by `/invoices`, which owns
+ * the fetcher whose `data` drives the page's banner. Passing the guarded
+ * function down keeps the raw `fetcher.submit` out of the leaf while leaving
+ * one guard, one key, and one in-flight window for the whole surface. Returns
+ * `false` when the guard refused the call.
+ */
+export type GuardedSubmit = (payload: Record<string, string>, options: SubmitOptions) => boolean;
+
+/**
  * A settled result counts as a failure only when the action says so. A
  * successful create returns a redirect, which React Router follows without ever
  * populating `fetcher.data` — so "no data" is a success, not an unknown.
@@ -43,8 +55,19 @@ function failed(data: unknown): boolean {
     return typeof data === "object" && data !== null && (data as { ok?: unknown }).ok === false;
 }
 
-export function useGuardedSubmit<T = unknown>() {
-    const fetcher = useFetcher<T>();
+/**
+ * Forwarded verbatim to `useFetcher`.
+ *
+ * `key` is not a nicety: several settings surfaces render one widget per row
+ * and give each fetcher a stable key so its pending state survives a remount
+ * and does not collide with its siblings'. A conversion that dropped the key
+ * would silently merge those rows' fetchers, which is a behaviour change
+ * wearing the shape of a refactor.
+ */
+type GuardedSubmitOptions = Parameters<typeof useFetcher>[0];
+
+export function useGuardedSubmit<T = unknown>(options?: GuardedSubmitOptions) {
+    const fetcher = useFetcher<T>(options);
     const [idempotencyKey, setIdempotencyKey] = useState<string>(mintKey);
     /** Set synchronously inside the handler — the only guard a double click meets. */
     const inFlight = useRef(false);

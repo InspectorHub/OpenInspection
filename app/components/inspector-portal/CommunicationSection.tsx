@@ -32,6 +32,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFetcher } from "react-router";
 import { Card } from "@core/shared-ui";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { BlockHeading } from "./BlockHeading";
@@ -78,11 +79,17 @@ export function CommunicationSection({
     // A failure must never hide behind a disclosure.
     const [outboxOpen, setOutboxOpen] = useState(counts.needsAttention > 0);
     const payload = useFetcher<CommunicationPayload>();
-    const send = useFetcher<{ ok: boolean }>();
+    // #106 - a send delivers a real message to a real person.
+    // MessageThread owns the pending affordance here: it holds its own `sending`
+    // state, disables Send while `onSend` is awaited, and refuses a second press
+    // before that resolves.
+    // submit-guard-allow-no-busy: the composer disables its own Send button.
+    const { fetcher: send, submit: submitSend } = useGuardedSubmit<{ ok: boolean }>();
     // Resend posts to the PAGE action's send-report intent (BFF — the browser
     // never calls /api directly), so a failed manual row re-sends to exactly
     // that one recipient with the role it was originally addressed under.
-    const resend = useFetcher<{ ok: boolean }>();
+    const { fetcher: resend, submit: submitResend, busy: resending } =
+        useGuardedSubmit<{ ok: boolean }>();
     const [recipientId, setRecipientId] = useState<string>("");
     // Optimistic bubbles: rendered immediately, dropped once the reload lands.
     const [pendingSends, setPendingSends] = useState<ThreadMessage[]>([]);
@@ -138,7 +145,7 @@ export function CommunicationSection({
         if (!row.roleKey) return;
         if (row.channel === "sms") {
             if (!row.recipientContactId) return;
-            resend.submit(
+            submitResend(
                 {
                     intent: "send-sms",
                     recipients: JSON.stringify([{ contactId: row.recipientContactId, roleKey: row.roleKey }]),
@@ -151,7 +158,7 @@ export function CommunicationSection({
         const recipient = row.recipientContactId
             ? { contactId: row.recipientContactId, roleKey: row.roleKey }
             : { email: row.recipient, roleKey: row.roleKey };
-        resend.submit(
+        submitResend(
             { intent: "send-report", recipients: JSON.stringify([recipient]), channels: JSON.stringify([row.channel]) },
             { method: "post" },
         );
@@ -168,6 +175,11 @@ export function CommunicationSection({
 
     async function handleSend(body: string) {
         if (!effectiveRecipient) throw new Error("no recipient");
+        // The optimistic bubble goes up only for a call the guard accepted -
+        // otherwise the thread would show a message nothing had been sent for.
+        if (!submitSend({ inspectionId, body, contactId: effectiveRecipient }, { method: "post", action: RESOURCE })) {
+            return;
+        }
         setPendingSends((prev) => [...prev, {
             id: `pending-${Date.now()}`,
             direction: "out",
@@ -179,10 +191,6 @@ export function CommunicationSection({
             createdAt: Date.now(),
             pending: true,
         }]);
-        send.submit(
-            { inspectionId, body, contactId: effectiveRecipient },
-            { method: "post", action: RESOURCE },
-        );
     }
 
     const summary = m.comm_summary_line({
@@ -291,7 +299,7 @@ export function CommunicationSection({
                                 locale={locale}
                             />
                             {groups.length > 0 ? (
-                                <OutboxList groups={groups} onGetConsent={onGetConsent} onResend={handleResend} />
+                                <OutboxList groups={groups} onGetConsent={onGetConsent} onResend={handleResend} resending={resending} />
                             ) : (
                                 <p className="text-[12px] text-ih-fg-3 py-4 text-center">{outboxEmpty}</p>
                             )}

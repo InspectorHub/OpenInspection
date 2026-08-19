@@ -36,6 +36,7 @@ import type {
     AgreementTemplateSaveResult,
 } from "~/routes/resources/agreement-templates";
 import { AGREEMENT_TEMPLATES_ACTION } from "~/routes/resources/agreement-templates";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export function AgreementTemplateModal({
@@ -59,7 +60,9 @@ export function AgreementTemplateModal({
     onSaved: (result: AgreementTemplateSaveResult) => void;
 }) {
     const loadFetcher = useFetcher<AgreementTemplateLoadResult>();
-    const saveFetcher = useFetcher<AgreementTemplateSaveResult>();
+    // #106 - saving an agreement template rewrites the document clients sign.
+    const { fetcher: saveFetcher, submit: submitSave, busy: saving } =
+        useGuardedSubmit<AgreementTemplateSaveResult>();
     const nameRef = useRef<HTMLInputElement>(null);
     const hintId = useId();
 
@@ -67,7 +70,6 @@ export function AgreementTemplateModal({
     const [content, setContent] = useState("");
     const [localError, setLocalError] = useState<string | null>(null);
     const editing = templateId !== null;
-    const saving = saveFetcher.state !== "idle";
 
     // Opening is what triggers the read — not mounting, which happens once for
     // every row on the page.
@@ -115,7 +117,7 @@ export function AgreementTemplateModal({
             return;
         }
         setLocalError(null);
-        saveFetcher.submit(
+        submitSave(
             {
                 intent: editing ? "update" : "create",
                 ...(editing ? { id: templateId } : {}),
