@@ -55,6 +55,8 @@
   "server/services/marketplace.service.ts::updateTemplateImport::.where(eq(tenantLibraryImports.id, existing.id));",
   "server/services/marketplace/library-replace.ts::resolveLibraryUpdate::.where(eq(marketplaceLibraries.id, libraryId))",
   "server/services/message.service.ts::createMessage::const [row] = await this.db().select().from(inspectionMessages).where(eq(inspectionMessages.id, id)).limit(1);",
+  "server/services/migration-intake/apply.service.ts::apply::}).where(eq(migrationRows.id, row.id));",
+  "server/services/migration-intake/revert.service.ts::revert::.where(eq(migrationRows.id, row.id));",
   "server/services/notice-inbox.ts::archiveNotice::.where(and(",
   "server/services/notice-inbox.ts::getOwnedNotice::.where(and(eq(notifications.id, id), inArray(notifications.contactId, contactIds)))",
   "server/services/portal-access.service.ts::issueToken::.where(eq(inspectionAccessTokens.id, existing.id))",

@@ -64,7 +64,7 @@ export interface EntityCounts {
 }
 
 /** An adapter-level note about the conversion as a whole — never a per-row error. */
-export interface BundleWarning {
+interface BundleWarning {
     code: string;
     message: string;
 }

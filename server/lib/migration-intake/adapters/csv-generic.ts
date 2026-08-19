@@ -33,9 +33,9 @@ const BUNDLE_MEMBER_ROLES: readonly BundleMemberRole[] =
  * shape for "not answered" — a required field with no source is a mapping that
  * has not been completed, and the format will not carry the result.
  */
-export type CsvValueSource<T> = { column: string } | { fixed: T };
+type CsvValueSource<T> = { column: string } | { fixed: T };
 
-export interface CsvContactMapping {
+interface CsvContactMapping {
     name: string;
     email?: string | undefined;
     phone?: string | undefined;
@@ -43,7 +43,7 @@ export interface CsvContactMapping {
     type: CsvValueSource<BundleContactType>;
 }
 
-export interface CsvMemberMapping {
+interface CsvMemberMapping {
     email: string;
     name?: string | undefined;
     role: CsvValueSource<BundleMemberRole>;
