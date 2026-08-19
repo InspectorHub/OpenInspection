@@ -1,13 +1,17 @@
 import { z } from '@hono/zod-openapi';
-import { MIGRATION_INTENTS } from '../db/schema';
+import {
+    MIGRATION_CONFLICT_POLICIES,
+    MIGRATION_INTENTS,
+    MIGRATION_ROW_RESOLUTIONS,
+} from '../db/schema';
+import { BUNDLE_CONTACT_TYPES } from '../migration-intake/bundle';
 
 /**
  * Request shapes for the import-run routes.
  *
- * Only the three the read/create half actually mounts live here today. The
- * mapping, repair and apply bodies arrive with the routes that consume them —
- * an exported schema with no route behind it is a claim about a surface that
- * does not exist yet, and the dead-code gate is right to call it one.
+ * Every schema here has a route behind it — an exported schema with none is a
+ * claim about a surface that does not exist, and the dead-code gate is right to
+ * call it one.
  */
 
 /** Everything the upload form carries besides the file itself. */
@@ -44,3 +48,93 @@ export const IntakeReportQuerySchema = z.object({
     pageSize: z.coerce.number().int().min(1).max(100).optional()
         .describe('How many entries needing attention per page'),
 }).openapi('IntakeReportQuery');
+
+export const IntakeRowParamsSchema = z.object({
+    batchId: z.string().min(1).describe('Id of the import run the entry belongs to'),
+    rowId: z.string().min(1).describe('Id of the prepared entry being corrected'),
+}).openapi('IntakeRowParams');
+
+/**
+ * Where one field's value comes from: a column of the uploaded file, or one
+ * answer given for the whole file.
+ *
+ * A union of two one-key objects rather than a nullable pair, because there is
+ * no third shape. A required field with no source is an incomplete mapping, and
+ * the adapter will refuse it — which is a different sentence from "you chose a
+ * column that is not in this file".
+ */
+function valueSource<T extends z.ZodTypeAny>(fixed: T) {
+    return z.union([
+        z.object({ column: z.string().min(1).describe('Header of the column feeding this field') }).strict(),
+        z.object({ fixed: fixed.describe('One answer applied to every entry') }).strict(),
+    ]);
+}
+
+/**
+ * A new column mapping for a run whose file is still stored.
+ *
+ * `kind` is carried in the body and CHECKED against the run's own entity family
+ * in the repair service. It is not derived from the run, because a mapping that
+ * describes members would otherwise be silently read as a contact mapping and
+ * the operator would be told their columns are missing.
+ */
+export const RemapRequestSchema = z.object({
+    mapping: z.union([
+        z.object({
+            kind: z.literal('template'),
+            name: z.string().min(1).describe('Name the imported template is saved under'),
+        }).strict(),
+        z.object({
+            kind: z.literal('contacts'),
+            mapping: z.object({
+                name: z.string().min(1).describe('Column holding the contact name'),
+                email: z.string().min(1).optional().describe('Column holding the email address'),
+                phone: z.string().min(1).optional().describe('Column holding the phone number'),
+                agency: z.string().min(1).optional().describe('Column holding the agency or company'),
+                type: valueSource(z.enum(BUNDLE_CONTACT_TYPES))
+                    .describe('Where each contact\'s type comes from'),
+            }).strict(),
+        }).strict(),
+        z.object({
+            kind: z.literal('members'),
+            mapping: z.object({
+                email: z.string().min(1).describe('Column holding the email address to invite'),
+                name: z.string().min(1).optional().describe('Column holding the person\'s name'),
+                role: valueSource(z.enum(['owner', 'manager', 'inspector']))
+                    .describe('Where each invitation\'s role comes from'),
+            }).strict(),
+        }).strict(),
+    ]).describe('Which column, or which fixed answer, feeds each field'),
+}).openapi('RemapRequest');
+
+/**
+ * One corrected entry, whole.
+ *
+ * `unknown` rather than a per-entity shape: what a valid entry looks like is
+ * settled by the run's own entity family, which the route does not read off the
+ * request, and the repair service answers with what is STILL wrong rather than
+ * refusing. A zod rejection here would replace that answer with a 400 the
+ * operator cannot act on.
+ */
+export const RepairRowRequestSchema = z.object({
+    payload: z.unknown().describe('The whole entry as it should now read'),
+}).openapi('RepairRowRequest');
+
+export const ApplyRequestSchema = z.object({
+    conflictPolicy: z.enum(MIGRATION_CONFLICT_POLICIES)
+        .describe('How an entry that clashes with something existing is settled'),
+    rowResolutions: z.record(z.string(), z.enum(MIGRATION_ROW_RESOLUTIONS)).optional()
+        .describe('Per-entry settlements, read only under the per_row policy; an unanswered entry keeps what is already there'),
+}).openapi('ApplyRequest');
+
+/**
+ * Agreement for somebody on the support side to open the uploaded file.
+ *
+ * `z.literal(true)` — there is no "false" version of this request. Withholding
+ * the agreement is not sending it, and a body carrying `false` is a client bug
+ * rather than a decision to record.
+ */
+export const AssistanceRequestSchema = z.object({
+    staffAccessAuthorized: z.literal(true)
+        .describe('Confirms a person may open the uploaded file to convert it'),
+}).openapi('AssistanceRequest');
