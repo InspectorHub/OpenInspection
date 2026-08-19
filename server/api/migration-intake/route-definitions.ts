@@ -18,7 +18,6 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import {
     ApplyRequestSchema,
-    AssistanceRequestSchema,
     IntakeBatchParamsSchema,
     IntakeListQuerySchema,
     IntakeReportQuerySchema,
@@ -253,36 +252,6 @@ export const revertRoute = createRoute(withMcpMetadata({
         404: { description: 'No such import run in this workspace' },
     },
     operationId: 'revertImportRun',
-}, { scopes: ['write'], tier: 'extended' }));
-
-export const assistanceRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/{batchId}/assistance',
-    tags: ['imports'],
-    summary: 'Allow a person to convert this file',
-    description: 'Records agreement for somebody on the support side to open the uploaded file and convert it, together with the version of the wording that agreement was given under.',
-    middleware: [requireRole('owner', 'manager')] as const,
-    request: {
-        params: IntakeBatchParamsSchema,
-        body: { content: { 'application/json': { schema: AssistanceRequestSchema } } },
-    },
-    responses: {
-        200: {
-            content: {
-                'application/json': {
-                    schema: z.object({
-                        success: z.literal(true),
-                        data: z.object({ status: z.string().describe('Lifecycle state the run is now in') }),
-                    }),
-                },
-            },
-            description: 'Agreement recorded',
-        },
-        403: { description: 'Only an owner can give this agreement' },
-        404: { description: 'No such import run in this workspace' },
-        409: { description: 'This run is not waiting for anybody to convert it' },
-    },
-    operationId: 'authoriseImportRunAssistance',
 }, { scopes: ['write'], tier: 'extended' }));
 
 export const abandonRoute = createRoute(withMcpMetadata({

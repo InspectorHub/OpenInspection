@@ -82,7 +82,7 @@ describe('migration staging tables', () => {
         const { MIGRATION_ROW_STATUSES } = await import('../../../server/lib/status/migration-row-status');
         expect([...MIGRATION_BATCH_STATUSES]).toEqual([
             'staged', 'applying', 'applied', 'partially_applied',
-            'reverted', 'partially_reverted', 'abandoned',
+            'reverted', 'partially_reverted', 'abandoned', 'declined',
             'needs_assistance', 'expired',
         ]);
         expect([...MIGRATION_ROW_STATUSES]).toEqual([

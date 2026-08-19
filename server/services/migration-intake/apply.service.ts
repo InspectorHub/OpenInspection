@@ -13,6 +13,7 @@ import { MIGRATION_ROW_STATUS } from '../../lib/status/migration-row-status';
 import { TemplateService } from '../template.service';
 import { applyMemberRow, type InviteDispatch } from './member-rows';
 import { captureContactPriorState } from './contact-snapshot';
+import { expiryFor } from './assistance.service';
 import { getSeatUsage } from '../../features/seat-quota/usage';
 import { assertBatchSeatsAvailable, computeSeatsNeeded } from '../../features/seat-quota/batch';
 import { Errors } from '../../lib/errors';
@@ -170,8 +171,24 @@ export class MigrationApplyService {
         const status = failed > 0
             ? MIGRATION_BATCH_STATUS.PARTIALLY_APPLIED
             : MIGRATION_BATCH_STATUS.APPLIED;
+        const finishedAt = new Date();
         await db.update(migrationBatches)
-            .set({ status, appliedAt: new Date() })
+            .set({
+                status,
+                appliedAt: finishedAt,
+                // The undo window opens now, not when the file was uploaded.
+                // Staging set a thirty-day clock so an unfinished run does not
+                // sit forever; once the run has been applied that same clock is
+                // measuring something else — how long the entries that make the
+                // undo possible are kept. Leaving it where it was would give a
+                // run applied on day twenty-nine a one-day undo.
+                //
+                // ONE instant for both columns: `applied_at` and the new due
+                // date describe the same event, and two `new Date()` calls
+                // would leave them milliseconds apart, reading like two things
+                // that happened rather than one.
+                expiresAt: expiryFor(false, finishedAt),
+            })
             .where(and(
                 eq(migrationBatches.id, params.batchId),
                 eq(migrationBatches.tenantId, params.tenantId),

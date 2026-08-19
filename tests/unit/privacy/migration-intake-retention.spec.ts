@@ -9,8 +9,14 @@
  * outer bound because a table gets one rule; the per-batch column is what the
  * sweep compares, and the executor reads it.
  *
- * Object first, row second. The row is the only thing that knows the object's
- * key, so deleting the row first leaves an object nothing can ever reach.
+ * Object first, entries second, key last. The batch row is the only thing that
+ * knows the object's key, so clearing the key first leaves an object nothing
+ * can ever reach.
+ *
+ * The batch row itself SURVIVES — it carries no third-party data, only ids,
+ * timestamps, a vendor name and this workspace's own authorisations. Which
+ * status a cleared run lands on, and why the answer differs per run, lives in
+ * `tests/unit/migration-intake/batch-terminal-states.spec.ts`.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
@@ -102,7 +108,7 @@ describe('migration intake retention', () => {
     it('states the OUTER bound in the catalogue and names the per-row clock', () => {
         const rule = RETENTION_MANIFEST.find((r) => r.table === 'migration_batches');
         expect(rule).toBeDefined();
-        expect(rule?.action).toBe('delete');
+        expect(rule?.action).toBe('erase_in_place');
         expect(rule?.window).toEqual({ unit: 'days', value: MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS });
         expect(rule?.rowWindowColumn).toBe('expires_at');
         expect(rule?.purpose.length).toBeGreaterThan(40);
@@ -152,14 +158,16 @@ describe('migration_batches executor', () => {
 
     afterEach(() => sqlite.close());
 
-    it('deletes an expired batch, its rows and its object', async () => {
+    it('clears an expired batch down to its record, and takes its object with it', async () => {
         await seedBatch(db, 'b-old', new Date(NOW.getTime() - 1000), `${TENANT}/migrations/b-old/source.csv`);
         const bucket = fakeBucket();
         const affected = await EXECUTORS.migration_batches(asAnyDb(db), new Date(NOW), ctxWith(bucket));
         expect(affected).toBe(1);
         expect(bucket.deleted).toEqual([`${TENANT}/migrations/b-old/source.csv`]);
-        expect(await db.select().from(schema.migrationBatches).all()).toEqual([]);
         expect(await db.select().from(schema.migrationRows).all()).toEqual([]);
+        // The run is still listable, and still says what it was. Which status
+        // it lands on, and why, is `batch-terminal-states.spec.ts`.
+        expect(await db.select().from(schema.migrationBatches).all()).toHaveLength(1);
     });
 
     it('leaves a batch whose own clock has not run out', async () => {
@@ -187,19 +195,24 @@ describe('migration_batches executor', () => {
         // The positive/negative control in ONE pass. Two rows, one due: a
         // predicate that matched everything and one that matched nothing both
         // pass a single-row test, and neither passes this one.
+        //
+        // Both batch rows survive now, so "which one was swept" is read off the
+        // key and the clock rather than off the row's existence — the entries
+        // and the object are what actually went.
         await seedBatch(db, 'b-old', new Date(NOW.getTime() - 1000), `${TENANT}/migrations/b-old/source.csv`);
         await seedBatch(db, 'b-live', new Date(NOW.getTime() + 1000), `${TENANT}/migrations/b-live/source.csv`);
         const bucket = fakeBucket();
         const affected = await EXECUTORS.migration_batches(asAnyDb(db), new Date(NOW), ctxWith(bucket));
         expect(affected).toBe(1);
         expect(bucket.deleted).toEqual([`${TENANT}/migrations/b-old/source.csv`]);
-        const left = await db.select().from(schema.migrationBatches).all();
-        expect(left.map((b) => b.id)).toEqual(['b-live']);
+        const stillHoldingAFile = (await db.select().from(schema.migrationBatches).all())
+            .filter((b) => b.sourceKey !== null);
+        expect(stillHoldingAFile.map((b) => b.id)).toEqual(['b-live']);
         const rowsLeft = await db.select().from(schema.migrationRows).all();
         expect(rowsLeft.map((r) => r.batchId)).toEqual(['b-live']);
     });
 
-    it('deletes a batch with no stored object without asking for the bucket contents', async () => {
+    it('clears a batch with no stored object without asking for the bucket', async () => {
         await seedBatch(db, 'b-nofile', new Date(NOW.getTime() - 1000), null);
         const bucket = fakeBucket();
         const affected = await EXECUTORS.migration_batches(asAnyDb(db), new Date(NOW), ctxWith(bucket));
@@ -211,10 +224,13 @@ describe('migration_batches executor', () => {
         await seedBatch(db, 'b-old', new Date(NOW.getTime() - 1000), `${TENANT}/migrations/b-old/source.csv`);
         await expect(EXECUTORS.migration_batches(asAnyDb(db), new Date(NOW), ctxWith(null)))
             .rejects.toThrow(/bucket/i);
-        // Nothing went. A refusal that had already deleted the rows would have
-        // left an object nothing knows the key of.
-        expect(await db.select().from(schema.migrationBatches).all()).toHaveLength(1);
+        // Nothing moved. A refusal that had already cleared the key would have
+        // left an object nothing knows the name of — and asserting on the batch
+        // row alone no longer shows that, because it survives a successful pass
+        // too.
         expect(await db.select().from(schema.migrationRows).all()).toHaveLength(1);
+        const batch = await db.select().from(schema.migrationBatches).all();
+        expect(batch[0]?.sourceKey).toBe(`${TENANT}/migrations/b-old/source.csv`);
     });
 
     it('leaves every row intact when the object delete itself fails', async () => {
@@ -258,8 +274,11 @@ describe('migration_batches executor', () => {
 
         expect(affected).toBe(1);
         expect(bucket.deleted).toEqual([`${OTHER}/migrations/b-free/source.csv`]);
-        const left = await db.select().from(schema.migrationBatches).all();
-        expect(left.map((b) => b.id)).toEqual(['b-held']);
+        // Both rows survive a sweep now, so the held one is identified by what
+        // it still HOLDS: the key to its file and its own due date.
+        const stillHoldingAFile = (await db.select().from(schema.migrationBatches).all())
+            .filter((b) => b.sourceKey !== null);
+        expect(stillHoldingAFile.map((b) => b.id)).toEqual(['b-held']);
         const rowsLeft = await db.select().from(schema.migrationRows).all();
         expect(rowsLeft.map((r) => r.batchId)).toEqual(['b-held']);
     });

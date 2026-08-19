@@ -128,7 +128,12 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'credential.updated': { family: 'credential', label: 'audit_action_credential_updated', meta: {}, status: { kind: 'live' } },
     'data.delete': { family: 'client', label: 'audit_action_data_delete', meta: { clientEmail: 'person' }, status: { kind: 'live' } },
     'data.export': { family: 'bulk_export', label: 'audit_action_data_export', meta: {}, status: { kind: 'live' } },
-    'data.import': { family: 'starter_content', altFamilies: ['import'], label: 'audit_action_data_import', meta: { counts: 'count' }, status: { kind: 'live' } },
+    // One writer, one family, no metadata: installing starter content. The
+    // `import` alt family and the `counts` key were the intake delivery route's,
+    // and it now writes `migration.delivered` on its own family. Leaving them
+    // here would declare a vocabulary word and a metadata key that nothing
+    // produces — the exact claim this registry exists to keep true.
+    'data.import': { family: 'starter_content', label: 'audit_action_data_import', meta: {}, status: { kind: 'live' } },
     'defect_category.created': { family: 'defect_category', label: 'audit_action_defect_category_created', meta: { name: 'name' }, status: { kind: 'live' } },
     'defect_category.deleted': { family: 'defect_category', label: 'audit_action_defect_category_deleted', meta: {}, status: { kind: 'live' } },
     'defect_category.updated': { family: 'defect_category', label: 'audit_action_defect_category_updated', meta: {}, status: { kind: 'live' } },
@@ -168,7 +173,12 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
         family: 'inspection',
         altFamilies: ['template'],
         label: 'audit_action_inspection_template_upgraded',
-        meta: { from: 'from', migrated: 'count', oldTemplateDeleted: 'flag', oldTemplateId: 'id', strategy: 'name', to: 'to' },
+        // Four keys were retired with `template-migrations.ts` (Task 32): `migrated`,
+        // `strategy`, `oldTemplateDeleted` and `oldTemplateId` were passed only by that
+        // route's handler. The surviving writer — inspection-sync.ts — passes `from`
+        // and `to` alone, and has since this action was declared. A declared meta key
+        // nothing writes is the same defect as a rule nothing enforces.
+        meta: { from: 'from', to: 'to' },
         status: { kind: 'live' },
     },
     'library.marketplace.updated': {
@@ -179,6 +189,21 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     },
     'mcp.grant.created': { family: 'mcp_grant', label: 'audit_action_mcp_grant_created', meta: { clientId: 'id' }, status: { kind: 'live' } },
     'mcp.grant.revoked': { family: 'mcp_grant', label: 'audit_action_mcp_grant_revoked', meta: { admin: 'person', targetUserId: 'person' }, status: { kind: 'live' } },
+    // The import pipeline, one entry per decision. `migration.abandoned` and
+    // `migration.remapped` carry no metadata on purpose: what they record is
+    // that somebody chose, and the run's own row already says what was chosen
+    // on. `migration.row_repaired` is the same restraint for a stronger reason
+    // — the corrected VALUES are a third party's contact details, and putting
+    // them in a metadata blob would move personal data onto a table with a
+    // different clock from the one the entries expire on.
+    'migration.abandoned': { family: 'migration_batch', label: 'audit_action_migration_abandoned', meta: {}, status: { kind: 'live' } },
+    'migration.applied': { family: 'migration_batch', label: 'audit_action_migration_applied', meta: { applied: 'count', failed: 'count', intent: 'name', invitesFailed: 'count', invitesSent: 'count', skipped: 'count' }, status: { kind: 'live' } },
+    'migration.assistance_requested': { family: 'migration_batch', label: 'audit_action_migration_assistance_requested', meta: { intent: 'name' }, status: { kind: 'live' } },
+    'migration.delivered': { family: 'migration_batch', label: 'audit_action_migration_delivered', meta: { byEntity: 'count', rows: 'count' }, status: { kind: 'live' } },
+    'migration.remapped': { family: 'migration_batch', label: 'audit_action_migration_remapped', meta: {}, status: { kind: 'live' } },
+    'migration.reverted': { family: 'migration_batch', label: 'audit_action_migration_reverted', meta: { refused: 'count', reverted: 'count' }, status: { kind: 'live' } },
+    'migration.row_repaired': { family: 'migration_row', label: 'audit_action_migration_row_repaired', meta: {}, status: { kind: 'live' } },
+    'migration.staged': { family: 'migration_batch', label: 'audit_action_migration_staged', meta: { intent: 'name', rows: 'count', vendor: 'name' }, status: { kind: 'live' } },
     'portal_access.revoked': { family: 'inspection', label: 'audit_action_portal_access_revoked', meta: { previousTokenHash: 'id', reason: 'reason', recipientEmail: 'person' }, status: { kind: 'live' } },
     'portal_access.rotated': { family: 'inspection', label: 'audit_action_portal_access_rotated', meta: { previousTokenHash: 'id', recipientEmail: 'person' }, status: { kind: 'live' } },
     'rating_system.cloned': { family: 'rating_system', label: 'audit_action_rating_system_cloned', meta: { name: 'name', sourceId: 'id' }, status: { kind: 'live' } },
