@@ -93,7 +93,7 @@ const ARRAY_FOR_KIND: Record<EntityKind, 'templates' | 'contacts' | 'members'> =
     member: 'members',
 };
 
-export const MigrationBundleV1Schema = z.object({
+const MigrationBundleV1Schema = z.object({
     formatVersion: z.literal(1),
     manifest: manifestSchema,
     templates: z.array(bundleTemplateSchema),
