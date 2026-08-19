@@ -8,7 +8,7 @@ import {
     type BundleMemberRole,
     type EntityCounts,
 } from '../bundle';
-import type { BundleResult, MigrationAdapter } from './types';
+import type { AdapterInspection, BundleResult, MigrationAdapter } from './types';
 import { emptyEntityCounts } from './types';
 
 const CSV_GENERIC_ADAPTER_VERSION = '1';
@@ -35,7 +35,7 @@ const BUNDLE_MEMBER_ROLES: readonly BundleMemberRole[] =
  */
 type CsvValueSource<T> = { column: string } | { fixed: T };
 
-interface CsvContactMapping {
+export interface CsvContactMapping {
     name: string;
     email?: string | undefined;
     phone?: string | undefined;
@@ -43,7 +43,7 @@ interface CsvContactMapping {
     type: CsvValueSource<BundleContactType>;
 }
 
-interface CsvMemberMapping {
+export interface CsvMemberMapping {
     email: string;
     name?: string | undefined;
     role: CsvValueSource<BundleMemberRole>;
@@ -88,6 +88,20 @@ export const csvGenericAdapter: MigrationAdapter<CsvGenericOptions> = {
     name: 'csv-generic',
     version: CSV_GENERIC_ADAPTER_VERSION,
     vendor: 'csv_generic',
+    /**
+     * The header row and up to five data rows.
+     *
+     * Five is enough for a person to tell a "Name" column from an "Owner"
+     * column and short enough to sit above the mapping controls without the
+     * page scrolling. Reading the whole file here would parse it twice for no
+     * gain — `convert` re-reads it once the mapping is settled.
+     */
+    inspect(input: unknown): AdapterInspection | null {
+        if (typeof input !== 'string') return null;
+        const table = parseCsvTable(input);
+        if (table.columns.length === 0) return null;
+        return { columns: table.columns, sampleRows: table.rows.slice(0, 5) };
+    },
     convert(input: unknown, options: CsvGenericOptions): BundleResult {
         if (typeof input !== 'string') {
             return { ok: false, error: { code: 'NOT_TEXT', message: 'The uploaded file could not be read as text.' } };
