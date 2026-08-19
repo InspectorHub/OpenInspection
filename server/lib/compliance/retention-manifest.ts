@@ -245,10 +245,17 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         legalHold: 'tenant_scoped',
     },
     {
-        // The second rule that reaches outside D1. A batch row is the only
-        // thing that knows its uploaded file's key, so the executor deletes the
-        // object first and the rows after — the reverse order leaves an object
-        // no code path can ever name again.
+        // The second rule that reaches outside D1, and the only one whose
+        // action is decided by what the row holds rather than by the table: the
+        // staging entries and the uploaded object carry a third party's
+        // personal data, the batch row does not. So the run's contents go and
+        // the run's record survives, which is what `erase_in_place` means
+        // everywhere else on this list.
+        //
+        // A batch row is the only thing that knows its uploaded file's key, so
+        // the executor deletes the object first, the entries second and clears
+        // the key last — any other order leaves an object no code path can ever
+        // name again.
         //
         // NOT YET REVIEWED BY review. Rounds 33 and 34 covered the fifteen
         // rules above it; this one was added afterwards and has had no external
@@ -257,9 +264,9 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         table: 'migration_batches',
         timestampColumn: 'expires_at',
         window: { unit: 'days', value: MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS },
-        action: 'delete',
+        action: 'erase_in_place',
         rowWindowColumn: 'expires_at',
-        purpose: 'An import run holds a third party\'s name, email address and phone number twice over: once in the staging rows and once in the uploaded file itself. Two lifetimes share this rule because a table gets one: a run the operator staged and walked away from expires after thirty days, and a run waiting on a person to convert its file expires after ninety. The window declared here is the longer of the two, which is the bound that is true of every row carrying a due date; the per-row due date lives on the column named above and is what the sweep compares. A batch with no due date written is left alone rather than swept at the outer bound — see rowWindowColumn. The staging rows go with the batch: see the out-of-scope entry for them.',
+        purpose: 'An import run holds a third party\'s name, email address and phone number twice over: once in the staging entries and once in the uploaded file itself. Both go together on the run\'s own due date; what survives is the batch row, carrying ids, timestamps, a vendor name and the two authorisations this workspace\'s own people gave. Two lifetimes share this rule because a table gets one: a run the operator staged and walked away from expires after thirty days, and a run waiting on a person to convert its file expires after ninety. The window declared here is the longer of the two, which is the bound that is true of every row carrying a due date; the per-row due date lives on the column named above and is what the sweep compares. A batch with no due date written is left alone rather than swept at the outer bound — see rowWindowColumn. The staging entries go with the run: see the out-of-scope entry for them. Clearing a run also closes its undo window, because the entries the undo reads are the entries that go.',
         legalHold: 'tenant_scoped',
     },
 ];

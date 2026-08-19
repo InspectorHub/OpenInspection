@@ -127,14 +127,3 @@ export const ApplyRequestSchema = z.object({
         .describe('Per-entry settlements, read only under the per_row policy; an unanswered entry keeps what is already there'),
 }).openapi('ApplyRequest');
 
-/**
- * Agreement for somebody on the support side to open the uploaded file.
- *
- * `z.literal(true)` — there is no "false" version of this request. Withholding
- * the agreement is not sending it, and a body carrying `false` is a client bug
- * rather than a decision to record.
- */
-export const AssistanceRequestSchema = z.object({
-    staffAccessAuthorized: z.literal(true)
-        .describe('Confirms a person may open the uploaded file to convert it'),
-}).openapi('AssistanceRequest');

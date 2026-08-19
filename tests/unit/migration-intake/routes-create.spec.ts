@@ -268,6 +268,44 @@ describe('POST /api/imports', () => {
         expect(await db.select().from(schema.migrationBatches).all()).toEqual([]);
     });
 
+    it('never opens a waiting run without the authorisation already recorded', async () => {
+        // Why there is no route for granting staff access AFTER the fact: this
+        // route refuses, and stores nothing, when a person has not been
+        // authorised to open the file, and it records the name, the instant and
+        // the wording version in the same insert as the row. So there is no such
+        // thing as a waiting run missing that authorisation.
+        //
+        // Both doors that can open one are driven, not one: the unreadable-file
+        // fallback and the "I do not know what this is" entry point write the
+        // batch through different branches.
+        const fallback = await post(
+            { role: 'owner', store },
+            { intent: 'contacts.import', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { name: 'weird.json', text: UNREADABLE },
+        );
+        expect(fallback.status).toBe(201);
+        const direct = await post(
+            { role: 'owner', store },
+            { intent: 'assisted.full', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { name: 'x.csv', text: CONTACTS_CSV },
+        );
+        expect(direct.status).toBe(201);
+
+        const waiting = await db.select().from(schema.migrationBatches)
+            .where(eq(schema.migrationBatches.status, 'needs_assistance')).all();
+        for (const r of waiting) {
+            // All THREE, not a flag: who agreed, when, and to WHICH WORDING. A
+            // boolean cannot be read back later as an answer to "agreed to what",
+            // and a name with no version is a signature on an unknown document.
+            expect(r.staffAccessAuthorizedBy).toBe(USER);
+            expect(r.staffAccessAuthorizedAt).toBeInstanceOf(Date);
+            expect(r.staffAccessAuthorizationVersion).toBe('1');
+        }
+        // The positive control: the loop above passes trivially on an empty
+        // list, and it is one status filter away from always being empty.
+        expect(waiting).toHaveLength(2);
+    });
+
     it('lets only an owner start the "I do not know what this is" route', async () => {
         const res = await post(
             { role: 'manager', store },

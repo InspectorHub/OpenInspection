@@ -1,16 +1,13 @@
-import type { Context } from 'hono';
 import { and, desc, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
-import { capabilitiesFor } from '../lib/middleware/require-capability';
 import { getBaseUrl } from '../lib/repair-gates';
 import { getDrizzle } from '../lib/route-helpers';
+import { auditFromContext } from '../lib/audit';
 import { Errors } from '../lib/errors';
-import { migrationBatches, migrationRows, type MigrationIntent } from '../lib/db/schema';
-import { MIGRATION_BATCH_STATUS, type MigrationBatchStatus } from '../lib/status/migration-batch-status';
-import type { HonoConfig } from '../types/hono';
+import { migrationBatches, migrationRows } from '../lib/db/schema';
+import { MIGRATION_BATCH_STATUS } from '../lib/status/migration-batch-status';
 import { assertSourceSizeWithin, limitsFor } from '../lib/migration-intake/limits';
 import { buildBundle, defaultMappingFor, matchAdapter } from '../lib/migration-intake/adapters/registry';
-import { STAFF_ACCESS_AUTHORIZATION_VERSION } from '../lib/migration-intake/authorizations';
 import { assertConversionByPersonAvailable } from '../lib/migration-intake/unreadable-file';
 import { MigrationStageService } from '../services/migration-intake/stage.service';
 import { MigrationReportService } from '../services/migration-intake/report.service';
@@ -19,10 +16,10 @@ import { MigrationRevertService } from '../services/migration-intake/revert.serv
 import { MigrationRepairService } from '../services/migration-intake/repair.service';
 import { MigrationSourceFileService, extForFileName } from '../services/migration-intake/source-file.service';
 import { expiryFor } from '../services/migration-intake/assistance.service';
+import { ABANDONABLE, assertIntentAllowed, loadGatedBatch } from './migration-intake/gates';
 import {
     abandonRoute,
     applyRoute,
-    assistanceRoute,
     createBatchRoute,
     getBatchRoute,
     listBatchesRoute,
@@ -30,79 +27,6 @@ import {
     repairRowRoute,
     revertRoute,
 } from './migration-intake/route-definitions';
-
-/**
- * Whether this actor may run THIS import.
- *
- * Per intent rather than one gate on the shared route, because a single gate is
- * wrong in one direction or the other by construction: it either hands template
- * import to somebody without the capability, or shuts out somebody who is
- * allowed to import contacts. The gates reused here are the ones the rest of
- * the product already enforces for the same actions.
- *
- * `assisted.full` is tightened to owner alone. It is a decision to put a file
- * containing third-party personal data in front of somebody outside the
- * company, which is not the same question as who may import data.
- *
- * Module-private, and it stays that way: the routes that edit an existing run
- * live in this file too, so they reach it directly. Exporting it would put a
- * second spelling of this gate within reach of somewhere that is not an import
- * route, which is how a gate and the thing it guards come apart.
- */
-async function assertIntentAllowed(c: Context<HonoConfig>, intent: MigrationIntent): Promise<void> {
-    if (intent === 'assisted.full') {
-        if (c.get('userRole') !== 'owner') {
-            throw Errors.Forbidden('Only an owner can send a file to be converted.');
-        }
-        return;
-    }
-    if (intent === 'contacts.import' || intent === 'members.invite') {
-        // The role floor on the route is the whole gate here, matching the
-        // existing contact-import and invite paths.
-        return;
-    }
-    const caps = await capabilitiesFor(c);
-    // BOTH, because the entry point that leads here is gated on
-    // `templateImport` (the Templates page renders its import button behind it,
-    // and POST /api/templates/import mounts requireCapability('templateImport'))
-    // while creating a template is gated on `templateCreate`. A route reached
-    // from a button must not accept somebody the button would have hidden from,
-    // and must not accept somebody who could not create the thing it is about
-    // to create.
-    if (!caps.templateImport) throw Errors.Forbidden("Requires the 'templateImport' capability");
-    if (!caps.templateCreate) throw Errors.Forbidden("Requires the 'templateCreate' capability");
-    if (intent === 'templates.overwrite' && !caps.templateEdit) {
-        throw Errors.Forbidden("Requires the 'templateEdit' capability");
-    }
-}
-
-/**
- * Loads a run this workspace owns and re-applies its own intent's gate.
- *
- * EVERY route below does this, not only the one that created the run. The gate
- * that mattered when the file was uploaded is the same gate that matters when
- * the rows are written, and an actor's capabilities can change in between.
- *
- * The 404 comes first and is the same sentence for a run that does not exist
- * and one belonging to somebody else: telling those two apart would confirm
- * that an id is real to a workspace with no business knowing it.
- */
-async function loadGatedBatch(c: Context<HonoConfig>, batchId: string) {
-    const tenantId = c.get('tenantId');
-    const db = getDrizzle(c);
-    const batch = await db.select().from(migrationBatches)
-        .where(and(eq(migrationBatches.id, batchId), eq(migrationBatches.tenantId, tenantId)))
-        .get();
-    if (!batch) throw Errors.NotFound('Migration batch not found');
-    await assertIntentAllowed(c, batch.intent);
-    return { db, batch, tenantId };
-}
-
-/** The two states a run can still be thrown away from. Anything else has written something. */
-const ABANDONABLE: MigrationBatchStatus[] = [
-    MIGRATION_BATCH_STATUS.STAGED,
-    MIGRATION_BATCH_STATUS.NEEDS_ASSISTANCE,
-];
 
 /** The handlers. Their shapes — and why they share one prefix — live next door. */
 const migrationIntakeRoutes = createApiRouter()
@@ -179,6 +103,12 @@ const migrationIntakeRoutes = createApiRouter()
                 uploadAuthorizedBy: userId,
                 staffAccessAuthorizedBy: userId,
             }));
+            // The vendor is deliberately absent: nothing has read this file, so
+            // naming one would be a guess written into a trail.
+            auditFromContext(c, 'migration.assistance_requested', 'migration_batch', {
+                entityId: created.batchId,
+                metadata: { intent },
+            });
             return c.json({
                 success: true as const,
                 data: {
@@ -211,6 +141,12 @@ const migrationIntakeRoutes = createApiRouter()
             expiresAt: expiryFor(false, now),
             uploadAuthorizedBy: userId,
         }));
+        // Counts and provenance only. The file name is left out on purpose: an
+        // export is routinely named after the person it is about.
+        auditFromContext(c, 'migration.staged', 'migration_batch', {
+            entityId: staged.batchId,
+            metadata: { intent, vendor: match.vendor, rows: staged.rows.length },
+        });
         return c.json({
             success: true as const,
             data: {
@@ -272,6 +208,10 @@ const migrationIntakeRoutes = createApiRouter()
         const { tenantId } = await loadGatedBatch(c, batchId);
         const repair = new MigrationRepairService(c.env.DB, c.env.PHOTOS);
         const data = await repair.remap({ tenantId, batchId, mapping, limits: limitsFor(c.var.profile) });
+        // The mapping itself stays out of the metadata: it is column headings
+        // from somebody else's export, and what a trail needs from this event is
+        // that the run was re-read under a different one.
+        auditFromContext(c, 'migration.remapped', 'migration_batch', { entityId: batchId });
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(repairRowRoute, async (c) => {
@@ -280,12 +220,19 @@ const migrationIntakeRoutes = createApiRouter()
         const { tenantId } = await loadGatedBatch(c, batchId);
         const repair = new MigrationRepairService(c.env.DB, c.env.PHOTOS);
         const data = await repair.repairRow({ tenantId, batchId, rowId, payload });
+        // The corrected VALUES stay out of the metadata: they are a third
+        // party's contact details, and the fact that this entry was edited is
+        // the part an audit trail is for. This and the re-map above are the only
+        // two actions on the pipeline that rewrite third-party personal data by
+        // hand, so a trail recording apply, undo and abandon but not these would
+        // be missing precisely the step a person typed.
+        auditFromContext(c, 'migration.row_repaired', 'migration_row', { entityId: rowId });
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(applyRoute, async (c) => {
         const { batchId } = c.req.valid('param');
         const body = c.req.valid('json');
-        const { tenantId } = await loadGatedBatch(c, batchId);
+        const { batch, tenantId } = await loadGatedBatch(c, batchId);
 
         const apply = new MigrationApplyService(c.env.DB);
         const result = await apply.apply({
@@ -317,6 +264,22 @@ const migrationIntakeRoutes = createApiRouter()
             }
         }
 
+        // Both invitation numbers are recorded, not just the successes: a run
+        // that sent nine of ten is the one somebody comes back to ask about,
+        // and a trail that logged only the nine could not tell it from a run of
+        // nine.
+        auditFromContext(c, 'migration.applied', 'migration_batch', {
+            entityId: batchId,
+            metadata: {
+                intent: batch.intent,
+                applied: result.applied,
+                skipped: result.skipped,
+                failed: result.failed,
+                invitesSent,
+                invitesFailed,
+            },
+        });
+
         return c.json({
             success: true as const,
             data: {
@@ -334,30 +297,26 @@ const migrationIntakeRoutes = createApiRouter()
         const { tenantId } = await loadGatedBatch(c, batchId);
         const revert = new MigrationRevertService(c.env.DB);
         const data = await revert.revert({ tenantId, batchId });
+        // A COUNT of refusals, not the refusals: each one carries the reason an
+        // entry could not be taken back, and those reasons name the entry.
+        auditFromContext(c, 'migration.reverted', 'migration_batch', {
+            entityId: batchId,
+            metadata: { reverted: data.reverted, refused: data.refused.length },
+        });
         return c.json({ success: true as const, data }, 200);
     })
-    .openapi(assistanceRoute, async (c) => {
-        const { batchId } = c.req.valid('param');
-        // The floor on this route is manager, but the decision to put a file of
-        // somebody else's personal data in front of an outside person is an
-        // owner's. Who may import data and who may make that call are not the
-        // same question — and the manager refused here can still apply the run.
-        if (c.get('userRole') !== 'owner') {
-            throw Errors.Forbidden('Only an owner can allow a person to open this file.');
-        }
-        const { db, batch, tenantId } = await loadGatedBatch(c, batchId);
-        if (batch.status !== MIGRATION_BATCH_STATUS.NEEDS_ASSISTANCE) {
-            throw Errors.Conflict('This import does not need converting.');
-        }
-        await db.update(migrationBatches).set({
-            staffAccessAuthorizedBy: c.get('user').sub,
-            staffAccessAuthorizedAt: new Date(),
-            // The version is stored verbatim, never derived: what somebody
-            // agreed to is the wording that was on the screen at the time.
-            staffAccessAuthorizationVersion: STAFF_ACCESS_AUTHORIZATION_VERSION,
-        }).where(and(eq(migrationBatches.id, batchId), eq(migrationBatches.tenantId, tenantId)));
-        return c.json({ success: true as const, data: { status: batch.status } }, 200);
-    })
+    /*
+     * There is deliberately NO route here for recording the staff-access
+     * agreement after the fact.
+     *
+     * A run only reaches `needs_assistance` through the upload above, which
+     * refuses — and stores nothing — unless that agreement came with the
+     * request; `createAssistanceBatch` then writes the name, the instant and
+     * the wording version in the same insert as the row. So there is no such
+     * thing as a waiting run missing the authorisation, and a route to add one
+     * later would have no reachable input. `routes-create.spec.ts` pins that
+     * property on the runs the real upload path produces.
+     */
     .openapi(abandonRoute, async (c) => {
         const { batchId } = c.req.valid('param');
         const { db, batch, tenantId } = await loadGatedBatch(c, batchId);
@@ -381,6 +340,11 @@ const migrationIntakeRoutes = createApiRouter()
             eq(migrationBatches.id, batchId),
             eq(migrationBatches.tenantId, tenantId),
         ));
+        // Written AFTER the row is gone, and it is the only thing left that says
+        // the run existed: this route deletes the record rather than clearing
+        // it, unlike the retention sweep, because the operator asked for it to
+        // go rather than simply stopping.
+        auditFromContext(c, 'migration.abandoned', 'migration_batch', { entityId: batchId });
         return c.json({ success: true as const, data: { deleted: true as const } }, 200);
     });
 

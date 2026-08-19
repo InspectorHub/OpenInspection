@@ -1,5 +1,5 @@
 /**
- * The two decisions that end a run: hand the file to a person, or throw it away.
+ * Throwing a run away, and the gate that has to be re-asked before it goes.
  *
  * The per-intent gate is asserted HERE rather than on the route that created
  * the run, because that is the claim the module makes and the one a
@@ -36,7 +36,7 @@ import { MIGRATION_BATCH_STATUS } from '../../../server/lib/status/migration-bat
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
 import { r2Keys } from '../../../server/lib/r2-keys';
 
-describe('handing a run to a person, and abandoning one', () => {
+describe('abandoning a run', () => {
     let db: BetterSQLite3Database<typeof schema>;
     let store: Map<string, string>;
     let run: StagedFixture;
@@ -67,63 +67,6 @@ describe('handing a run to a person, and abandoning one', () => {
                 { name: 'Alice Ng', email: 'alice@example.test' },
                 { name: 'Bob Ray', email: 'bob@example.test' },
             ]),
-        });
-    });
-
-    describe('POST /api/imports/{batchId}/assistance', () => {
-        function authorise(opts: { role?: string; tenantId?: string } = {}) {
-            return intakeRequest(
-                { store, ...opts }, `/api/imports/${run.batchId}/assistance`,
-                jsonBody({ staffAccessAuthorized: true }),
-            );
-        }
-
-        it('records who agreed, when, and to which wording', async () => {
-            await markNeedsAssistance();
-            const res = await authorise();
-            expect(res.status).toBe(200);
-            const body = await res.json() as { data: { status: string } };
-            expect(body.data.status).toBe(MIGRATION_BATCH_STATUS.NEEDS_ASSISTANCE);
-
-            const batch = await batchRow();
-            expect(batch?.staffAccessAuthorizedBy).toBe(USER);
-            // The VERSION, not just a flag: a boolean cannot be read back later
-            // as an answer to "agreed to what".
-            expect(batch?.staffAccessAuthorizationVersion).toBe('1');
-            expect(batch?.staffAccessAuthorizedAt).toBeInstanceOf(Date);
-        });
-
-        it('lets only an owner give this agreement, and says why', async () => {
-            await markNeedsAssistance();
-            const res = await authorise({ role: 'manager' });
-            expect(res.status).toBe(403);
-            // NOT the route's role floor — a manager is above that floor, and
-            // the same manager can apply this run. This is the narrower gate.
-            expect(await messageOf(res)).toBe('Only an owner can allow a person to open this file.');
-            expect((await batchRow())?.staffAccessAuthorizedBy).toBeNull();
-        });
-
-        it('is the same manager who CAN apply the run — the positive control', async () => {
-            const res = await intakeRequest(
-                { store, role: 'manager' }, `/api/imports/${run.batchId}/apply`,
-                jsonBody({ conflictPolicy: 'skip' }),
-            );
-            expect(res.status).toBe(200);
-        });
-
-        it('refuses a run that is not waiting for anybody', async () => {
-            const res = await authorise();
-            expect(res.status).toBe(409);
-            expect(await messageOf(res)).toBe('This import does not need converting.');
-            expect((await batchRow())?.staffAccessAuthorizedBy).toBeNull();
-        });
-
-        it('does not record an agreement against another workspace\'s run', async () => {
-            await markNeedsAssistance();
-            const res = await authorise({ tenantId: OTHER });
-            expect(res.status).toBe(404);
-            expect(await messageOf(res)).toBe('Migration batch not found');
-            expect((await batchRow())?.staffAccessAuthorizedBy).toBeNull();
         });
     });
 

@@ -132,8 +132,17 @@ export interface RetentionPolicyHeader {
  *         needs review specifically: two lifetimes (30 days staged, 90 days
  *         awaiting assistance) sharing one catalogue rule whose declared window
  *         is the longer of them, with the operative clock on a per-row column;
- *         and the fact that what expires is a THIRD PARTY's personal data
- *         uploaded by the operator, not the operator's own.
+ *         the fact that what expires is a THIRD PARTY's personal data uploaded
+ *         by the operator, not the operator's own; and — new at `.5` — that the
+ *         rule's action is `erase_in_place` rather than `delete`, so the RUN'S
+ *         RECORD SURVIVES its own expiry indefinitely. The surviving row holds
+ *         ids, timestamps, a vendor name and two authorisations given by the
+ *         operator's own people; the reasoning for keeping it is that a cleared
+ *         run must be distinguishable from one that never happened, and that
+ *         the record itself carries no third-party data. review has not been
+ *         asked whether an indefinitely-retained record of a data subject's
+ *         file having been uploaded is itself in scope. `.5` changed no window
+ *         and no other rule.
  *
  * That sixth entry is why the status did not move back to `interim`. Seventeen
  * of eighteen rules genuinely are approved-with-conditions and reverting would
@@ -160,15 +169,16 @@ export interface RetentionPolicyHeader {
  * every production store is covered.
  */
 export const RETENTION_POLICY: RetentionPolicyHeader = {
-    version: '2026-08-19.4',
+    version: '2026-08-19.5',
     status: 'approved_with_conditions',
     effectiveAt: '2026-08-08',
     // review remains what approved the seventeen rules it saw. It does NOT
     // cover `migration_batches` — see condition 6 above. `approvedAt` is left at
     // the round-34 date rather than moved forward with this version, because
-    // moving it would date an approval to a day nobody approved anything.
+    // moving it would date an approval to a day nobody approved anything, and
+    // `.5` changed only the unreviewed rule.
     approvedBy: '[redacted]',
     approvedAt: '2026-08-19',
-    supersedes: '2026-08-19.3',
-    rulesDigest: '3b9fe9d9a5ff55fb86e98e979c3b50922dc35721a87f3ca29681890de83fe631',
+    supersedes: '2026-08-19.4',
+    rulesDigest: 'b09824f19e586cf759c0bc53637c0a3562aefc49a30757b3c5339d596e9837fc',
 };

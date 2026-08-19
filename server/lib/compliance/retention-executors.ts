@@ -22,7 +22,7 @@
  * where a hold cannot be expressed as a filter and is handled by the driver
  * instead.
  */
-import { and, eq, exists, inArray, isNotNull, lt, notExists, or, sql } from 'drizzle-orm';
+import { and, eq, exists, isNotNull, lt, notExists, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { SQL } from 'drizzle-orm';
 import {
@@ -38,8 +38,6 @@ import {
     tenantLegalVersions,
     tenantMarketplaceImportHistory,
     tenantSlugHistory,
-    migrationBatches,
-    migrationRows,
 } from '../db/schema';
 import { DESTRUCTION_STATUS } from '../status/destruction-status';
 import { ANONYMIZE_AUDIT_PII } from './anonymize-pii';
@@ -48,6 +46,7 @@ import { notHeld } from './retention-executor-context';
 import type { Executor } from './retention-executor-context';
 import { PLATFORM_EXECUTORS } from './retention-executors-platform';
 import { reportPdfsExecutor } from './retention-report-pdfs';
+import { migrationBatchesExecutor } from './retention-migration-batches';
 
 // Re-exported so `retention-logs.ts` and the specs keep one import site for the
 // executor surface; `notHeld` and `ExecutorContext` are deliberately NOT
@@ -315,54 +314,9 @@ export const EXECUTORS: Record<string, Executor> = {
     },
 
     /**
-     * Intake runs, and the files they were created from.
-     *
-     * Compares each batch's OWN due date rather than the rule's `cutoff`: one
-     * table carries two lifetimes, and which one a batch has is a property of
-     * the batch. A row with no due date is left alone — that is a batch nothing
-     * has finished writing, not one that has been sitting for ninety days.
-     *
-     * The bucket is demanded only when a due batch actually has an object, for
-     * the same reason as the report-PDF rule: a deployment with nothing expired
-     * must not have its whole sweep refused over a binding it never needed.
-     *
-     * The hold filter is applied on the SELECT, not on the deletes, so the key
-     * list is built from the same filtered set. Filtering only the delete would
-     * honour a preservation order in D1 and break it in R2, and nothing would
-     * report the difference — the row would still be there.
+     * Intake runs. Lives in its own file with the report-PDF rule: both reach
+     * outside D1, and this one also CLEARS its row rather than deleting it, so
+     * what the sweep takes and what it leaves are two different answers.
      */
-    migration_batches: async (rawDb, _cutoff, ctx) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const db = rawDb as any;
-        const due = await db.select({ id: migrationBatches.id, sourceKey: migrationBatches.sourceKey })
-            .from(migrationBatches)
-            .where(and(
-                isNotNull(migrationBatches.expiresAt),
-                lt(migrationBatches.expiresAt, new Date(ctx.now)),
-                notHeld(migrationBatches.tenantId, ctx),
-            ))
-            .all();
-        if (due.length === 0) return 0;
-
-        const keys = due
-            .map((b: { sourceKey: string | null }) => b.sourceKey)
-            .filter((k: string | null): k is string => typeof k === 'string' && k.length > 0);
-
-        if (keys.length > 0) {
-            const bucket = ctx.stores.photos;
-            if (!bucket) {
-                throw new Error(
-                    'migration_batches retention needs the photos bucket — refusing to delete rows that '
-                    + 'point at objects nothing else can reach. Pass { photos } to runLogRetentionSweep.',
-                );
-            }
-            // Objects first. A throw here leaves every row intact.
-            await bucket.delete(keys);
-        }
-
-        const ids = due.map((b: { id: string }) => b.id);
-        await db.delete(migrationRows).where(inArray(migrationRows.batchId, ids)).run();
-        const res = await db.delete(migrationBatches).where(inArray(migrationBatches.id, ids)).run();
-        return changeCount(res);
-    },
+    migration_batches: migrationBatchesExecutor,
 };

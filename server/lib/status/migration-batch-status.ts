@@ -21,6 +21,12 @@ export const MIGRATION_BATCH_STATUSES = [
   'reverted',
   'partially_reverted',
   'abandoned',
+  // We looked at the file and concluded it could not be converted, and said so.
+  // Distinct from `abandoned` for the same reason `partially_applied` is
+  // distinct from `applied`: the two outcomes have opposite responsible
+  // parties, and a column that records both as one value is, on this point, not
+  // a status column.
+  'declined',
   // A run whose file no adapter could read. It is a STATE, not a dead end: the
   // file stays where it was put, and the run resumes as a normal staged batch
   // once somebody has converted it. Modelling it as a status rather than as an
@@ -42,6 +48,7 @@ export const MIGRATION_BATCH_STATUS = {
   REVERTED: 'reverted',
   PARTIALLY_REVERTED: 'partially_reverted',
   ABANDONED: 'abandoned',
+  DECLINED: 'declined',
   NEEDS_ASSISTANCE: 'needs_assistance',
   EXPIRED: 'expired',
 } as const satisfies Record<string, MigrationBatchStatus>;
