@@ -259,3 +259,37 @@ export const NOTIFICATION_RETENTION_MONTHS = 24;
  * rejection message.
  */
 export const QBO_SYNC_ERROR_RESOLVED_RETENTION_DAYS = 90;
+
+/**
+ * Deletion window for an intake run the operator staged and left alone
+ * (`migration_batches` in any non-assistance state).
+ *
+ * Thirty days because the operator was told, in as many words, that they can
+ * close the page and come back — that promise is what the stored file exists
+ * for. Thirty days after they last touched it, they are not still editing it.
+ *
+ * NOT the value the catalogue rule declares: a table gets one rule and this is
+ * the shorter of two lifetimes. See the rule's `rowWindowColumn`.
+ */
+export const MIGRATION_INTAKE_STAGED_RETENTION_DAYS = 30;
+
+/**
+ * Deletion window for an intake run waiting on a person to convert its file
+ * (`migration_batches` in the needs-assistance state).
+ *
+ * Longer than the staged window because the clock is on US, not on the
+ * operator. It is a limit and not a target: an object holding a third party's
+ * name, email address and phone number does not get to sit indefinitely
+ * because we have not delivered yet. Not having delivered is a reason to
+ * chase, not a reason to keep.
+ */
+export const MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS = 90;
+
+/**
+ * How long before an intake run's own expiry the operator is told it is coming.
+ *
+ * Seven days is enough to act on and short enough that the message is about
+ * something imminent. It rides the in-app notification path the rest of the
+ * intake flow uses; nothing new is introduced to carry it.
+ */
+export const MIGRATION_INTAKE_REMINDER_LEAD_DAYS = 7;

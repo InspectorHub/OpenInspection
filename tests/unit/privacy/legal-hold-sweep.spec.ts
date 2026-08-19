@@ -166,6 +166,28 @@ const SEEDERS: Record<string, Seeder> = {
              values (?, ?, ?, ?)`,
         ).run(id, t, LONG_AGO, LONG_AGO),
     },
+    migration_batches: {
+        // Its own `expires_at` is what this rule compares, not the catalogue
+        // window — a batch seeded only "long ago" by `created_at` would never
+        // be due and the case would prove nothing about holds.
+        //
+        // The staging row rides along because the executor deletes both, and a
+        // hold that preserved the batch while its rows went would preserve a
+        // header with nothing under it.
+        seed: (s, t, id) => {
+            s.prepare(
+                `insert into migration_batches
+                 (id, tenant_id, created_by, intent, vendor, adapter_name, adapter_version,
+                  manifest, status, created_at, expires_at, source_key)
+                 values (?, ?, 'u-1', 'contacts.import', 'csv_generic', 'csv-generic', '1',
+                         '{"warnings":[]}', 'staged', ?, ?, ?)`,
+            ).run(id, t, LONG_AGO, LONG_AGO, `${t}/migrations/${id}/source.csv`);
+            s.prepare(
+                `insert into migration_rows (id, batch_id, tenant_id, entity, position, payload, status)
+                 values (?, ?, ?, 'contact', 0, '{"name":"Alice","type":"client"}', 'pending')`,
+            ).run(`${id}-row`, id, t);
+        },
+    },
 };
 
 const TENANT_SCOPED = RETENTION_MANIFEST.filter((r) => r.legalHold === 'tenant_scoped');
