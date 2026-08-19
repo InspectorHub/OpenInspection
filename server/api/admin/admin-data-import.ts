@@ -117,15 +117,13 @@ const adminDataImportRoutes = createApiRouter()
 
         await new MigrationAssistanceService(c.env.DB).notifyDelivered(tenantId, batchId);
 
-        // The action this deserves is `migration.delivered` on a
-        // `migration_batch`, and neither word exists yet: the intake module's
-        // nine actions and its family are added to the registry in one pass
-        // rather than one route at a time, so that the enum, the registry
-        // entries and the call sites land together. Until then this wears the
-        // vocabulary the route already had.
-        auditFromContext(c, 'data.import', 'import', {
+        // A converted file landing on a run that has been waiting for one. This
+        // is the only event on the pipeline that is OURS rather than the
+        // operator's, which is why it has a name of its own rather than sharing
+        // `data.import` with starter-content installs.
+        auditFromContext(c, 'migration.delivered', 'migration_batch', {
             entityId: batchId,
-            metadata: { counts: { ...byEntity, total: result.rows.length } },
+            metadata: { rows: result.rows.length, byEntity },
         });
 
         return c.json({

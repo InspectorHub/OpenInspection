@@ -73,7 +73,6 @@ export type { SmsPublicApi, SmsAdminApi } from '../../server/api/sms';
 export type { SessionContextApi }     from '../../server/api/session-context';
 export type { TagsApi }               from '../../server/api/tags';
 export type { TeamApi }               from '../../server/api/team';
-export type { TemplateMigrationsApi } from '../../server/api/template-migrations';
 export type { TenantPresenceApi }     from '../../server/api/tenant-presence';
 export type { UsageApi }              from '../../server/api/usage';
 export type { UsersApi }              from '../../server/api/users';

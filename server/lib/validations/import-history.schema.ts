@@ -20,7 +20,7 @@ export interface ImportHistoryItem {
     id: string;
     templateId: string | null;
     libraryId: string | null;
-    action: 'install' | 'update' | 'replace' | 'migrate';
+    action: 'install' | 'update' | 'replace';
     sourceVersion: string | null;
     targetVersion: string | null;
     rowsAffected: number;

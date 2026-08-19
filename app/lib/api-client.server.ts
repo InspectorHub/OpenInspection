@@ -66,7 +66,6 @@ import type {
     SmsAdminApi,
     TagsApi,
     TeamApi,
-    TemplateMigrationsApi,
     TenantPresenceApi,
     UsageApi,
     UsersApi,
@@ -199,7 +198,6 @@ export interface Api {
     smsAdmin:           ReturnType<typeof hc<SmsAdminApi>>;
     tags:               ReturnType<typeof hc<TagsApi>>;
     team:               ReturnType<typeof hc<TeamApi>>;
-    templateMigrations: ReturnType<typeof hc<TemplateMigrationsApi>>;
     tenantPresence:     ReturnType<typeof hc<TenantPresenceApi>>;
     usage:              ReturnType<typeof hc<UsageApi>>;
     users:              ReturnType<typeof hc<UsersApi>>;
@@ -279,7 +277,6 @@ const MOUNT: Record<keyof Api, string> = {
     smsAdmin:           "/api/admin",
     tags:               "/api/tags",
     team:               "/api/team",
-    templateMigrations: "/api/templates",
     tenantPresence:     "/api/tenant",
     usage:              "/api/usage",
     users:              "/api/users",
@@ -377,7 +374,6 @@ export function createApi(context: LoadContext, opts: CreateApiOptions = {}): Ap
         smsAdmin:           mk<SmsAdminApi>(MOUNT.smsAdmin),
         tags:               mk<TagsApi>(MOUNT.tags),
         team:               mk<TeamApi>(MOUNT.team),
-        templateMigrations: mk<TemplateMigrationsApi>(MOUNT.templateMigrations),
         tenantPresence:     mk<TenantPresenceApi>(MOUNT.tenantPresence),
         usage:              mk<UsageApi>(MOUNT.usage),
         users:              mk<UsersApi>(MOUNT.users),

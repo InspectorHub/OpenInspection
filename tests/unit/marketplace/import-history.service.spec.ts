@@ -16,7 +16,7 @@ async function insertHistory(testDb: BetterSQLite3Database<typeof schema>, opts:
     tenantId?: string;
     templateId?: string | null;
     libraryId?: string | null;
-    action: 'install' | 'update' | 'replace' | 'migrate';
+    action: 'install' | 'update' | 'replace';
     createdAt?: number;
     metadata?: Record<string, unknown>;
 }) {
@@ -56,11 +56,11 @@ describe('ImportHistoryService', () => {
     it('lists tenant rows ordered by createdAt DESC', async () => {
         await insertHistory(testDb, { templateId: 't1', action: 'install', createdAt: 100 });
         await insertHistory(testDb, { templateId: 't1', action: 'update',  createdAt: 200 });
-        await insertHistory(testDb, { templateId: 't1', action: 'migrate', createdAt: 300 });
+        await insertHistory(testDb, { templateId: 't1', action: 'replace', createdAt: 300 });
 
         const result = await svc.list();
         expect(result.items).toHaveLength(3);
-        expect(result.items.map((i) => i.action)).toEqual(['migrate', 'update', 'install']);
+        expect(result.items.map((i) => i.action)).toEqual(['replace', 'update', 'install']);
     });
 
     it('filters by templateId', async () => {
@@ -96,11 +96,11 @@ describe('ImportHistoryService', () => {
     it('parses metadata JSON', async () => {
         await insertHistory(testDb, {
             templateId: 'A',
-            action: 'migrate',
-            metadata: { fromTemplateId: 'old', strategy: 'preserve_unknown' },
+            action: 'replace',
+            metadata: { fromSemver: '1.0.0', toSemver: '2.0.0' },
         });
         const result = await svc.list();
-        expect(result.items[0].metadata).toEqual({ fromTemplateId: 'old', strategy: 'preserve_unknown' });
+        expect(result.items[0].metadata).toEqual({ fromSemver: '1.0.0', toSemver: '2.0.0' });
     });
 
     it('respects pagination (hasMore + page/pageSize)', async () => {

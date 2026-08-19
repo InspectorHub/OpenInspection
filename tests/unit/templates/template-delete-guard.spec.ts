@@ -53,6 +53,44 @@ describe('deleteTemplate — the service catalogue reference', () => {
         } as never);
     }
 
+    async function addInspection(templateId: string) {
+        await db.insert(schema.inspections).values({
+            id: 'insp-guard', tenantId: TENANT, propertyAddress: '1 Main St',
+            templateId, date: '2026-05-08', createdAt: new Date(),
+        } as never);
+    }
+
+    // ── The FIRST branch of the guard, and the only one with a real foreign
+    // key behind it ────────────────────────────────────────────────────────
+    //
+    // It used to be covered only by the retired template-replacement service's
+    // own suite, which drove it through that service's post-replace delete
+    // helper. The service is gone and the branch is not: without a case here,
+    // removing one caller would have silently taken the coverage of a rule the
+    // surviving caller still enforces.
+
+    it('refuses to delete a template an inspection still references', async () => {
+        await addInspection(TEMPLATE_ID);
+        await expect(svc.deleteTemplate(TEMPLATE_ID, TENANT)).rejects.toThrow(/Cannot delete/);
+        const rows = await db.select().from(schema.templates).all();
+        expect(rows).toHaveLength(1);
+    });
+
+    it('does not refuse for an inspection pointing at some other template', async () => {
+        // The positive control. Without it the case above passes just as well
+        // against a guard that refuses every delete. The other template is a
+        // real row because `inspections.template_id` is a foreign key — a
+        // dangling id would fail the INSERT rather than reach the guard.
+        await db.insert(schema.templates).values({
+            id: 'tpl-2', tenantId: TENANT, name: 'Radon Test',
+            version: 1, schema: JSON.stringify({ sections: [] }), createdAt: new Date(),
+        } as never);
+        await addInspection('tpl-2');
+        await expect(svc.deleteTemplate(TEMPLATE_ID, TENANT)).resolves.not.toThrow();
+        const rows = await db.select().from(schema.templates).all();
+        expect(rows.map(r => r.id)).toEqual(['tpl-2']);
+    });
+
     it('refuses to delete a template a service defaults to', async () => {
         await addService('Sewer Scope', TEMPLATE_ID);
         await expect(svc.deleteTemplate(TEMPLATE_ID, TENANT)).rejects.toThrow(/Cannot delete/);

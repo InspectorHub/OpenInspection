@@ -13,7 +13,7 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | Columns | 1184 |
 | Indexes (excluding primary keys) | 170 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 555 (47%) |
+| Columns carrying a source comment | 554 (47%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -2575,7 +2575,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/marketplace.ts · 11 columns · primary key `id`</sub>
 
-> Sprint 2 Track 3 (S2-8) — per-import history. One row per install/update/replace/migrate event, indexed for fast tenant scoping and per-resource (template / library) lookups.
+> Sprint 2 Track 3 (S2-8) — per-import history. One row per install/update/replace event, indexed for fast tenant scoping and per-resource (template / library) lookups.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2583,13 +2583,13 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `library_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `template_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
-| `action` | text | NN |  |  | 'install' \| 'update' \| 'replace' \| 'migrate' |
-| `source_version` | text |  |  |  | The semver the tenant moved FROM / TO. source is NULL for 'install' (there was nothing to move from); BOTH are NULL for 'migrate', which moves between two LOCAL templates and has no catalogue version on either side — so a reader must not treat a null pair as missing data. |
-| `target_version` | text |  |  |  | NULL on a migrate: local -> local has no catalogue version either side |
+| `action` | text | NN |  |  | 'install' \| 'update' \| 'replace' |
+| `source_version` | text |  |  |  | The semver the tenant moved FROM / TO. source is NULL for 'install' — there was nothing to move from. |
+| `target_version` | text |  |  |  |  |
 | `rows_affected` | integer | NN | `0` |  | *An integer value.* |
 | `metadata` | text |  |  |  | JSON-encoded action-specific context (deleted ids, migration counts, …). Stored as TEXT so we can keep parity with raw SQL inserts in tests. |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
-| `created_by` | text | NN |  |  | The JWT sub of whoever caused the event — but only the library REPLACE and template MIGRATE routes actually pass one. |
+| `created_by` | text | NN |  |  | The JWT sub of whoever caused the event — but only the library replace route actually passes one. |
 
 **Indexes**
 
