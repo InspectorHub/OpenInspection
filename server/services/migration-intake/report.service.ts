@@ -13,6 +13,9 @@ import type { EntityKind } from '../../lib/migration-intake/bundle';
 import { getSeatUsage } from '../../features/seat-quota/usage';
 import { computeSeatsNeeded } from '../../features/seat-quota/batch';
 import { Errors } from '../../lib/errors';
+import { MigrationSourceFileService } from './source-file.service';
+import { defaultMappingFor, matchAdapter, type IntakeMapping } from '../../lib/migration-intake/adapters/registry';
+import type { AdapterInspection } from '../../lib/migration-intake/adapters/types';
 
 /** One entry that needs a person before the run can go ahead. */
 export interface BatchReportProblemRow {
@@ -24,6 +27,15 @@ export interface BatchReportProblemRow {
     reason: string;
     value?: string;
     suggestion?: string;
+    /**
+     * The entry as it currently stands.
+     *
+     * A repair REPLACES the whole entry, so the screen — which edits one field
+     * — has to send the rest back unchanged, and it has nowhere else to read
+     * them from. It is the same third-party data the entry already holds,
+     * going to the same person who uploaded it.
+     */
+    payloadEcho: Record<string, unknown>;
 }
 
 export interface BatchReport {
@@ -56,6 +68,19 @@ export interface BatchReport {
      * button can never disagree about whether the run is ready.
      */
     blockedReason: string | null;
+    /**
+     * The source file's columns and a few sample rows, or null.
+     *
+     * Null has two causes and the screen treats them the same: this source has
+     * no columns to point at (a vendor export), or its file is no longer
+     * stored. Either way there is no mapping question to ask — the same rule
+     * the adapter's missing `inspect` expresses on the server side.
+     */
+    inspection: AdapterInspection | null;
+    /** The mapping the step starts from, or null when there is no question. */
+    mapping: IntakeMapping | null;
+    /** When this run's entries are cleared, which is when its undo stops working. */
+    undoUntil: string | null;
 }
 
 export interface BuildReportParams {
@@ -85,7 +110,13 @@ function entries(n: number): string {
  * second thing to remember to update.
  */
 export class MigrationReportService {
-    constructor(private db: D1Database) {}
+    /**
+     * The bucket is needed because the mapping step's question is "which of
+     * YOUR columns holds what", and the columns are in the file — not in the
+     * staged entries, which are the mapping's OUTPUT and cannot be read
+     * backwards into it.
+     */
+    constructor(private db: D1Database, private bucket: R2Bucket) {}
 
     private getDrizzle() {
         return drizzle(this.db);
@@ -129,7 +160,38 @@ export class MigrationReportService {
             page,
             pageSize,
             blockedReason: await this.blockedReason(params, batch, rows, counts),
+            ...(await this.readSource(batch)),
+            undoUntil: batch.expiresAt ? batch.expiresAt.toISOString().slice(0, 10) : null,
         };
+    }
+
+    /**
+     * The columns and the starting mapping, re-derived from the stored file.
+     *
+     * Re-derived rather than stored, so a reopened run shows the file's real
+     * columns instead of a snapshot that may no longer describe it. The cost is
+     * one object read per report; the alternative is a table whose only job is
+     * to go stale.
+     *
+     * Both are null once the file is gone, and that is the answer rather than a
+     * degraded one: with no file there is nothing a re-map could re-read, so
+     * the step has no question left to ask.
+     */
+    private async readSource(
+        batch: typeof migrationBatches.$inferSelect,
+    ): Promise<{ inspection: AdapterInspection | null; mapping: IntakeMapping | null }> {
+        // `assisted.full` names no entity family, so there is no mapping any
+        // answer here could honestly describe — which is also why `matchAdapter`
+        // never matches it and why `defaultMappingFor` does not accept it.
+        if (batch.intent === 'assisted.full') return { inspection: null, mapping: null };
+        if (!batch.sourceKey) return { inspection: null, mapping: null };
+        const text = await new MigrationSourceFileService(this.bucket).readText(batch.sourceKey);
+        if (text === null) return { inspection: null, mapping: null };
+
+        const source = { fileName: batch.sourceKey, text };
+        const match = matchAdapter(batch.intent, source);
+        if (!match?.inspection) return { inspection: null, mapping: null };
+        return { inspection: match.inspection, mapping: defaultMappingFor(batch.intent, match.inspection, source) };
     }
 
     /**
@@ -168,6 +230,7 @@ export class MigrationReportService {
                     reason: problem.reason,
                     ...(problem.value === undefined ? {} : { value: problem.value }),
                     ...(problem.suggestion === undefined ? {} : { suggestion: problem.suggestion }),
+                    payloadEcho: payload as Record<string, unknown>,
                 });
                 continue;
             }

@@ -9,6 +9,7 @@ import { MIGRATION_BATCH_STATUS } from '../lib/status/migration-batch-status';
 import { assertSourceSizeWithin, limitsFor } from '../lib/migration-intake/limits';
 import { buildBundle, defaultMappingFor, matchAdapter } from '../lib/migration-intake/adapters/registry';
 import { assertConversionByPersonAvailable } from '../lib/migration-intake/unreadable-file';
+import { assertStaffAccessDecisionIsOwners } from '../services/migration-intake/staff-access';
 import { MigrationStageService } from '../services/migration-intake/stage.service';
 import { MigrationReportService } from '../services/migration-intake/report.service';
 import { MigrationApplyService } from '../services/migration-intake/apply.service';
@@ -92,7 +93,18 @@ const migrationIntakeRoutes = createApiRouter()
 
         /** Nothing here can read it: the run waits for a person, or it is refused unstored. */
         const openWaitingRun = async () => {
+            // BOTH doors into a waiting run pass through here, which is why the
+            // owner rule is stated here rather than only on the intent that
+            // names assistance outright. `assertIntentAllowed` sees the intent
+            // the operator chose; whether the file turns out to be readable is
+            // decided afterwards, so a manager importing contacts could reach
+            // this exact decision — put a third party's file in front of an
+            // outside person — through a gate that never asked about it.
+            // Order matters. Whether this path EXISTS is asked first, because on
+            // a deployment with no support path "only an owner can decide" would
+            // be false — no owner can either.
             assertConversionByPersonAvailable(profile, staffAccessAuthorized);
+            assertStaffAccessDecisionIsOwners(c.get('userRole'));
             const created = await withStoredFile((sourceKey) => stage.createAssistanceBatch({
                 tenantId,
                 createdBy: userId,
@@ -190,7 +202,7 @@ const migrationIntakeRoutes = createApiRouter()
     .openapi(getBatchRoute, async (c) => {
         const { batchId } = c.req.valid('param');
         const { page, pageSize } = c.req.valid('query');
-        const report = new MigrationReportService(c.env.DB);
+        const report = new MigrationReportService(c.env.DB, c.env.PHOTOS);
         const data = await report.build({
             // The verified tenant, never one named in the request: this id is
             // the whole of the scoping on a report that reads staged entries.
