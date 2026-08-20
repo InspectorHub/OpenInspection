@@ -91,7 +91,10 @@ describe('MigrationReportService', () => {
             tier: 'free', maxUsers: 12, createdAt: new Date(),
         });
         stage = new MigrationStageService({} as D1Database);
-        report = new MigrationReportService({} as D1Database);
+        // No run staged here records a source key, so the report never reaches
+        // the bucket. A stub that would THROW if it did is deliberate: it turns
+        // an accidental read into a failure rather than a quiet null.
+        report = new MigrationReportService({} as D1Database, {} as R2Bucket);
     });
 
     afterEach(() => {
