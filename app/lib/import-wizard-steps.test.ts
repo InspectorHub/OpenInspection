@@ -28,7 +28,6 @@ import {
 const copy = {
     needsFile: 'Choose the file you exported.',
     fixProblemsFirst: (n: number) => `${n} entries still need fixing.`,
-    needsNameColumn: 'Choose which column holds the name.',
 };
 
 function run(over: Partial<ImportRunView> = {}): ImportRunView {

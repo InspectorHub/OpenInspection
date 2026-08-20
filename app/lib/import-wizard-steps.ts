@@ -103,11 +103,20 @@ export function currentImportStep(run: ImportRunView): ImportStepId {
     return 'import';
 }
 
-/** The sentences this module needs, supplied by the caller so they stay translatable. */
+/**
+ * The sentences this module needs, supplied by the caller so they stay
+ * translatable.
+ *
+ * Two, not three. A `needsNameColumn` sentence sat here until the wizard was
+ * built and could be asked whether it read it: it does not, and could not —
+ * whether a mapping has been answered is a property of the mapping form's own
+ * unsaved draft, and this module is given the stored run. A required field that
+ * nothing reads is a caller obligation with no consequence, and the next reader
+ * would have implemented the rule twice trying to satisfy it.
+ */
 export interface ImportWizardCopy {
     needsFile: string;
     fixProblemsFirst: (n: number) => string;
-    needsNameColumn: string;
 }
 
 /**
