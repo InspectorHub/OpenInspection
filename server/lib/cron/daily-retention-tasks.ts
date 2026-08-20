@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { logger } from '../logger';
+import type { EmailServiceEnv } from '../email/build-email-service';
 
 /**
  * What the 04:00 tick does, separated from the schedule that decides when.
@@ -14,8 +15,15 @@ import { logger } from '../logger';
  * what it did, so it can be run on demand without waiting for four in the
  * morning.
  */
-export interface DailyRetentionEnv {
-    DB: D1Database;
+/**
+ * Everything the 04:00 tick needs.
+ *
+ * It is an `EmailServiceEnv` and not just a database, because the reminder half
+ * SENDS: the recipient of an expiry notice may not have signed in for weeks, so
+ * it goes out as email built for that tenant rather than as a row in a feed
+ * they are not reading. `ScheduledEnv` already satisfies this shape.
+ */
+export interface DailyRetentionEnv extends EmailServiceEnv {
     PHOTOS?: R2Bucket | undefined;
 }
 
@@ -54,11 +62,12 @@ export async function runDailyRetentionTasks(env: DailyRetentionEnv, at: Date): 
 
     try {
         const { MigrationAssistanceService } = await import('../../services/migration-intake/assistance.service');
-        const reminders = await new MigrationAssistanceService(env.DB).remindExpiring(at);
-        // Both numbers, always — including on a pass that reminded nobody. A
-        // line that only appeared when something happened could not tell a quiet
-        // day from a job that had stopped looking, and this one has no other
-        // witness.
+        const reminders = await new MigrationAssistanceService(env).remindExpiring(at);
+        // All THREE numbers, always — including on a pass that reminded nobody.
+        // A line that only appeared when something happened could not tell a
+        // quiet day from a job that had stopped looking, and this one has no
+        // other witness. `scanned` separates the two: a pass that examined
+        // nothing and a pass that found nothing due are different events.
         logger.info('[cron] migration intake expiry reminders', reminders);
     } catch (e) {
         logger.error(

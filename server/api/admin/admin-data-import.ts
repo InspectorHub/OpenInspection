@@ -1,22 +1,37 @@
 // Admin → data import & one-time migration sub-router.
 //
-// Two routes: delivery of a converted import bundle into the run it belongs to
-// (POST /import), and the one-time legacy finding-key migration
-// (POST /migrate-finding-keys). Route definitions are co-located with their
-// `.openapi()` handlers. Mounted at `/` by the admin aggregator.
+// Three routes, one subject: what can happen to an import run somebody sent us
+// to convert. Delivery of the converted bundle (POST /import), acknowledging
+// that a person has picked the file up (POST /import/acknowledge), and handing
+// it back unconverted (POST /import/decline).
+//
+// The one-time legacy finding-key migration moved to `admin-finding-keys.ts`
+// when this file crossed the size gate — it shared nothing with these but a
+// prefix. Route definitions are co-located with their `.openapi()` handlers.
+// Mounted at `/` by the admin aggregator.
 import { createRoute, z } from '@hono/zod-openapi';
+import type { Context } from 'hono';
+import type { HonoConfig } from '../../types/hono';
 import { createApiRouter } from '../../lib/openapi-router';
 import { eq, and } from 'drizzle-orm';
 import { auditFromContext } from '../../lib/audit';
+import { Errors } from '../../lib/errors';
 import { requireRole } from '../../lib/middleware/rbac';
 import { requireCapability } from '../../lib/middleware/require-capability';
 import { ImportResponseSchema } from '../../lib/validations/admin.schema';
-import { inspections, inspectionResults } from '../../lib/db/schema';
+import {
+    AcknowledgeImportRequestSchema,
+    AcknowledgedImportResponseSchema,
+    DeclineImportRequestSchema,
+    DeclinedImportResponseSchema,
+} from '../../lib/validations/admin/compliance';
+import { migrationBatches } from '../../lib/db/schema';
+import { MIGRATION_BATCH_STATUS } from '../../lib/status/migration-batch-status';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
-import { templateSnapshotSectionsOrNone } from '../../services/inspection/shared';
 import { getDrizzle } from '../../lib/route-helpers';
 import { MigrationStageService } from '../../services/migration-intake/stage.service';
 import { MigrationAssistanceService } from '../../services/migration-intake/assistance.service';
+import { assertStaffAccessAuthorized } from '../../services/migration-intake/staff-access';
 import { limitsFor } from '../../lib/migration-intake/limits';
 
 /**
@@ -65,44 +80,118 @@ const importDataRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended', capability: 'templateCreate' }));
 
 
-// --- Finding Key Migration (one-time data migration) ---
-//
-// Batch-converts inspection_results.data keys from the legacy `itemId`
-// format to the composite `_default:sectionId:itemId` format. Idempotent —
-// keys that already contain 2+ colons are skipped.
-
-const migrateFindingKeysRoute = createRoute(withMcpMetadata({
+/**
+ * POST /api/admin/import/decline
+ *
+ * Hands a waiting run back, unconverted, with the reason on the run.
+ *
+ * "Ten working days to deliver or hand back" is half a promise until handing
+ * back is something somebody can press. A run left alone reaches `expired`,
+ * which says the clock ran out; `abandoned` says the operator stopped. Neither
+ * is true of a file a person read and could not convert, and a trail that
+ * recorded it as either would name the wrong responsible party.
+ */
+const declineImportRoute = createRoute(withMcpMetadata({
     method: 'post',
-    path: '/migrate-finding-keys',
+    path: '/import/decline',
     tags: ['admin'],
-    summary: 'One-time migration: rewrite legacy finding keys to composite format',
-    middleware: [requireRole('owner')] as const,
+    summary: 'Hand a waiting import back unconverted',
+    description: 'Records that a waiting import run was looked at and could not be converted, stores the reason on the run, and emails the workspace. Distinct from expiry and from abandonment: this says we stopped, having looked.',
+    middleware: [requireRole('owner', 'manager'), requireCapability('templateCreate')] as const,
+    request: {
+        body: { content: { 'application/json': { schema: DeclineImportRequestSchema } } },
+    },
     responses: {
         200: {
-            content: {
-                'application/json': {
-                    schema: z.object({
-                        success: z.literal(true),
-                        data: z.object({
-                            processed: z.number(),
-                            migrated: z.number(),
-                            skipped: z.number(),
-                        }),
-                    }),
-                },
-            },
-            description: 'Migration complete',
+            content: { 'application/json': { schema: DeclinedImportResponseSchema.describe('The run and the state it now carries') } },
+            description: 'Import handed back',
         },
+        400: { description: 'No reason was given, or it is too short to act on' },
+        403: { description: "Missing the 'templateCreate' capability" },
+        404: { description: 'No such import run in this workspace' },
+        409: { description: 'That run is not waiting for a converted file' },
     },
-    operationId: 'migrateFindingKeys',
-    description: 'Batch-converts inspection_results.data keys from legacy itemId format to composite _default:sectionId:itemId format. Idempotent — already-composite keys are skipped.',
-}, { scopes: ['admin'], tier: 'extended' }));
+    operationId: 'declineTenantImport',
+}, { scopes: ['admin'], tier: 'extended', capability: 'templateCreate' }));
+
+/**
+ * POST /api/admin/import/acknowledge
+ *
+ * Says, to the person waiting, that their file has been picked up.
+ *
+ * The runbook's two-working-day acknowledgement is a deadline, and a deadline
+ * with no action behind it can only be kept by somebody remembering. With one,
+ * "nothing has happened yet" stops looking like "somebody is on it".
+ */
+const acknowledgeImportRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/import/acknowledge',
+    tags: ['admin'],
+    summary: 'Acknowledge a waiting import run',
+    description: 'Records that a waiting import run has been picked up and emails the workspace to say so. It does not move the run: acknowledging a file is not converting it.',
+    middleware: [requireRole('owner', 'manager'), requireCapability('templateCreate')] as const,
+    request: {
+        body: { content: { 'application/json': { schema: AcknowledgeImportRequestSchema } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: AcknowledgedImportResponseSchema.describe('The run and how many people were emailed') } },
+            description: 'Import acknowledged',
+        },
+        403: { description: "Missing the 'templateCreate' capability, or the run carries no staff-access authorisation" },
+        404: { description: 'No such import run in this workspace' },
+        409: { description: 'That run is not waiting for a converted file' },
+    },
+    operationId: 'acknowledgeTenantImport',
+}, { scopes: ['admin'], tier: 'extended', capability: 'templateCreate' }));
+
+
+
+
+
+/**
+ * Loads a run this workspace owns, for the three routes that act on one.
+ *
+ * The 404 comes first and is the same sentence for a run that does not exist
+ * and one belonging to somebody else: telling those apart would confirm that an
+ * id is real to a workspace with no business knowing it.
+ *
+ * `requireWaiting` is asked for by the two routes that are ANSWERS to a waiting
+ * run — acknowledging it and handing it back. The delivery route leaves it to
+ * `stageIntoBatch`, which re-reads the row and refuses inside the same call
+ * that writes: a status checked here and acted on there is a status that was
+ * true a moment ago.
+ */
+async function loadOwnBatch(
+    c: Context<HonoConfig>,
+    batchId: string,
+    tenantId: string,
+    opts: { requireWaiting: boolean },
+) {
+    const db = getDrizzle(c);
+    const batch = await db.select().from(migrationBatches)
+        .where(and(eq(migrationBatches.id, batchId), eq(migrationBatches.tenantId, tenantId)))
+        .get();
+    if (!batch) throw Errors.NotFound('Migration batch not found');
+    if (opts.requireWaiting && batch.status !== MIGRATION_BATCH_STATUS.NEEDS_ASSISTANCE) {
+        throw Errors.Conflict('This import is not waiting for a converted file.');
+    }
+    return { db, batch };
+}
 
 
 const adminDataImportRoutes = createApiRouter()
     .openapi(importDataRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { batchId, bundle } = c.req.valid('json');
+
+        // Before anything is parsed: a run nobody authorised a person to read
+        // does not receive what a person produced from reading it. Reading the
+        // file happens in object storage, where no code of ours is watching —
+        // so what this buys is that breaking the rule leaves a FAILURE rather
+        // than passing silently.
+        const { batch } = await loadOwnBatch(c, batchId, tenantId, { requireWaiting: false });
+        assertStaffAccessAuthorized(batch);
 
         const stage = new MigrationStageService(c.env.DB);
         const result = await stage.stageIntoBatch({
@@ -115,7 +204,8 @@ const adminDataImportRoutes = createApiRouter()
         const byEntity = { template: 0, contact: 0, member: 0 };
         for (const row of result.rows) byEntity[row.entity]++;
 
-        await new MigrationAssistanceService(c.env.DB).notifyDelivered(tenantId, batchId);
+        await new MigrationAssistanceService(c.env)
+            .notifyDelivered(c.var.services.email, tenantId, batchId);
 
         // A converted file landing on a run that has been waiting for one. This
         // is the only event on the pipeline that is OURS rather than the
@@ -131,114 +221,44 @@ const adminDataImportRoutes = createApiRouter()
             data: { batchId, rows: result.rows.length, byEntity },
         }, 200);
     })
-    .openapi(migrateFindingKeysRoute, async (c) => {
+    .openapi(declineImportRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const db = getDrizzle(c);
+        const { batchId, reason } = c.req.valid('json');
 
-        let processed = 0;
-        let migrated = 0;
-        let skipped = 0;
+        await new MigrationStageService(c.env.DB).declineBatch({ tenantId, batchId, reason });
 
-        const BATCH_SIZE = 50;
-        let offset = 0;
+        // The reason is on the run, not in the audit metadata: metadata is
+        // redacted on the way in, and a redacted reason is not a reason.
+        auditFromContext(c, 'migration.declined', 'migration_batch', { entityId: batchId });
 
-        // Process inspections in batches
-        while (true) {
-            const batch = await db.select({
-                id:                inspections.id,
-                templateId:        inspections.templateId,
-                templateSnapshot:  inspections.templateSnapshot,
-            })
-            .from(inspections)
-            .where(eq(inspections.tenantId, tenantId))
-            .limit(BATCH_SIZE)
-            .offset(offset);
-
-            if (batch.length === 0) break;
-            offset += batch.length;
-
-            for (const insp of batch) {
-                // Load the results row for this inspection
-                const resultsRow = await db.select()
-                    .from(inspectionResults)
-                    .where(and(
-                        eq(inspectionResults.inspectionId, insp.id),
-                        eq(inspectionResults.tenantId, tenantId),
-                    ))
-                    .get();
-
-                if (!resultsRow || !resultsRow.data) {
-                    skipped++;
-                    continue;
-                }
-
-                const data: Record<string, unknown> = typeof resultsRow.data === 'string'
-                    ? JSON.parse(resultsRow.data)
-                    : resultsRow.data as Record<string, unknown>;
-
-                // Build itemId → sectionId mapping from template snapshot or
-                // live template schema
-                const itemToSection = new Map<string, string>();
-
-                // #307 — the item→section map comes from the inspection's own
-                // snapshot and from nothing else. It used to fall back to the
-                // live template, which would rewrite legacy finding keys
-                // against TODAY's section layout rather than the one the
-                // results were recorded under — a silent mis-filing, not a
-                // missing label. With no snapshot the map is empty, the keys
-                // below are left alone, and the miss is logged.
-                interface SchemaSectionLite { id: string; items?: Array<{ id: string }> }
-                const sections = templateSnapshotSectionsOrNone<SchemaSectionLite>(insp, tenantId);
-
-                for (const sec of sections) {
-                    for (const item of (sec.items ?? [])) {
-                        itemToSection.set(item.id, sec.id);
-                    }
-                }
-
-                // Rewrite legacy keys
-                let changed = false;
-                const newData: Record<string, unknown> = {};
-                for (const [key, value] of Object.entries(data)) {
-                    // Already composite (has 2+ colons) — keep as-is
-                    if (key.split(':').length >= 3) {
-                        newData[key] = value;
-                        continue;
-                    }
-                    const sectionId = itemToSection.get(key) ?? '_unknown';
-                    const compositeKey = `_default:${sectionId}:${key}`;
-                    newData[compositeKey] = value;
-                    changed = true;
-                }
-
-                if (changed) {
-                    await db.update(inspectionResults)
-                        .set({ data: newData as unknown as object, lastSyncedAt: new Date() })
-                        // Scoped by tenant as well as by id. The row was read
-                        // under a tenant filter a few lines up, so this changes
-                        // nothing at runtime — but the write states its own
-                        // scope rather than inheriting it from a read, which is
-                        // what the tenant-scoping gate asks of every by-id write.
-                        .where(and(
-                            eq(inspectionResults.id, resultsRow.id),
-                            eq(inspectionResults.tenantId, tenantId),
-                        ));
-                    migrated++;
-                } else {
-                    skipped++;
-                }
-                processed++;
-            }
-        }
-
-        auditFromContext(c, 'admin.migrate_finding_keys', 'inspection_results', {
-            metadata: { processed, migrated, skipped },
-        });
+        await new MigrationAssistanceService(c.env)
+            .notifyDeclined(c.var.services.email, tenantId, batchId, reason);
 
         return c.json({
             success: true as const,
-            data: { processed, migrated, skipped },
+            data: { batchId, status: MIGRATION_BATCH_STATUS.DECLINED },
         }, 200);
+    })
+    .openapi(acknowledgeImportRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { batchId } = c.req.valid('json');
+
+        const { db, batch } = await loadOwnBatch(c, batchId, tenantId, { requireWaiting: true });
+        // The same precondition the delivery route applies, for the same
+        // reason: acknowledging a run is the moment a person says they have
+        // picked the file up.
+        assertStaffAccessAuthorized(batch);
+
+        const manifest = JSON.parse(batch.manifest) as Record<string, unknown>;
+        manifest.acknowledgedAt = new Date().toISOString();
+        await db.update(migrationBatches)
+            .set({ manifest: JSON.stringify(manifest) })
+            .where(and(eq(migrationBatches.id, batchId), eq(migrationBatches.tenantId, tenantId)));
+
+        const notified = await new MigrationAssistanceService(c.env)
+            .notifyReceived(c.var.services.email, tenantId, batchId);
+
+        return c.json({ success: true as const, data: { batchId, notified } }, 200);
     });
 
 export default adminDataImportRoutes;

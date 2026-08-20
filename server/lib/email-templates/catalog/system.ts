@@ -123,4 +123,83 @@ export const SYSTEM_TEMPLATES: EmailTemplateDescriptor[] = [
       { name: 'noticeBody', desc: 'The statement of which stores did not complete, built by the purge' },
     ],
   },
+
+  // The four messages an import run sends.
+  //
+  // `brand: 'tenant'` and `editable: true`: the recipient is the workspace's
+  // own owner reading about their own workspace, so it should look like their
+  // product — and unlike the quota notices there is no statement about OUR
+  // billing here that a tenant could soften into something untrue.
+  {
+    trigger: 'migration-import-received',
+    name: 'Import received',
+    category: 'system',
+    editable: true,
+    required: true,
+    brand: 'tenant',
+    defaultSubject: 'We have your import file',
+    blocks: [
+      { key: 'heading',  label: 'Heading', default: 'We have your file',                                                                                   multiline: false },
+      { key: 'body',     label: 'Body',    default: 'Somebody is looking at the file you uploaded. We will come back to you within ten working days, either with it converted and ready for you to review, or with an explanation of why it could not be.', multiline: true  },
+      { key: 'ctaLabel', label: 'Button',  default: 'View this import',                                                                                    multiline: false },
+    ],
+    variables: [{ name: 'importLink', desc: 'Link to this import run' }],
+    cta: { labelBlockKey: 'ctaLabel', urlVar: 'importLink' },
+  },
+
+  {
+    trigger: 'migration-import-ready',
+    name: 'Import ready to review',
+    category: 'system',
+    editable: true,
+    required: true,
+    brand: 'tenant',
+    defaultSubject: 'Your import is ready to review',
+    blocks: [
+      { key: 'heading',  label: 'Heading', default: 'Your import is ready to review',                                                                      multiline: false },
+      { key: 'body',     label: 'Body',    default: 'We have converted the file you sent. Nothing has been added to your workspace yet — open the import to see exactly what it will add, correct anything that needs it, and apply it when you are happy.', multiline: true  },
+      { key: 'ctaLabel', label: 'Button',  default: 'Review this import',                                                                                  multiline: false },
+    ],
+    variables: [{ name: 'importLink', desc: 'Link to this import run' }],
+    cta: { labelBlockKey: 'ctaLabel', urlVar: 'importLink' },
+  },
+
+  // No CTA on the refusal. The import is over; a button would imply there is
+  // something to do on that screen, and the next step is a different export or
+  // a conversation.
+  {
+    trigger: 'migration-import-declined',
+    name: 'Import could not be converted',
+    category: 'system',
+    editable: true,
+    required: true,
+    brand: 'tenant',
+    defaultSubject: 'We could not convert your import file',
+    blocks: [
+      { key: 'heading',  label: 'Heading',   default: 'We could not convert your file',                                                                    multiline: false },
+      { key: 'body',     label: 'Body',      default: '{{declineReason}}',                                                                                 multiline: true  },
+      { key: 'nextStep', label: 'Next step', default: 'Your file has not been kept. If you can export in another format, upload it and we will look again.', multiline: true },
+    ],
+    variables: [{ name: 'declineReason', desc: 'Why the file could not be converted, written by whoever looked at it' }],
+  },
+
+  {
+    trigger: 'migration-import-expiring',
+    name: 'Import about to be cleared',
+    category: 'system',
+    editable: true,
+    required: true,
+    brand: 'tenant',
+    defaultSubject: 'An import you started is about to be cleared',
+    blocks: [
+      { key: 'heading',  label: 'Heading', default: 'An import you started is about to be cleared',                                                        multiline: false },
+      { key: 'body',     label: 'Body',    default: 'The file you uploaded, and everything prepared from it, will be deleted on {{expiresOn}}. Finish the import before then, or start again later with a fresh upload.', multiline: true  },
+      { key: 'ctaLabel', label: 'Button',  default: 'Open this import',                                                                                    multiline: false },
+    ],
+    variables: [
+      { name: 'importLink', desc: 'Link to this import run' },
+      { name: 'expiresOn',  desc: 'The date the file and its prepared entries are deleted' },
+    ],
+    cta: { labelBlockKey: 'ctaLabel', urlVar: 'importLink' },
+  },
 ];

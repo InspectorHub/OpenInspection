@@ -28,6 +28,24 @@
     "description": "Deletes a run that was never applied, together with its prepared entries and the file it was created from. A run that has been applied cannot be deleted, because its entries are the only record of where the imported rows came from."
   },
   {
+    "operationId": "acknowledgeTenantImport",
+    "method": "POST",
+    "pathTemplate": "/api/admin/import/acknowledge",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/AcknowledgeImportRequest"
+      }
+    },
+    "summary": "Acknowledge a waiting import run",
+    "description": "Records that a waiting import run has been picked up and emails the workspace to say so. It does not move the run: acknowledging a file is not converting it."
+  },
+  {
     "operationId": "activateTotp",
     "method": "POST",
     "pathTemplate": "/api/auth/2fa/verify",
@@ -5426,6 +5444,24 @@
     },
     "summary": "Decline agreement (public, token-gated)",
     "description": "Auto-generated placeholder for declineBooking (POST /agreements/:token/decline, bookings domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "declineTenantImport",
+    "method": "POST",
+    "pathTemplate": "/api/admin/import/decline",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/DeclineImportRequest"
+      }
+    },
+    "summary": "Hand a waiting import back unconverted",
+    "description": "Records that a waiting import run was looked at and could not be converted, stores the reason on the run, and emails the workspace. Distinct from expiry and from abandonment: this says we stopped, having looked."
   },
   {
     "operationId": "deleteAutomation",
