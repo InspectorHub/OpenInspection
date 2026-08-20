@@ -1,5 +1,5 @@
 import { Link, redirect, useActionData, useLoaderData, useNavigation, useSearchParams } from "react-router";
-import { Card, EmptyState, Pill, Table, buttonClasses, type PillTone, type TableColumn } from "@core/shared-ui";
+import { Card, EmptyState, Pill, Table, buttonClasses, type TableColumn } from "@core/shared-ui";
 
 import type { Route } from "./+types/settings-imports";
 import { AccessDenied } from "~/components/AccessDenied";
@@ -16,6 +16,7 @@ import {
     importEntryPointsFor,
     type ImportEntryIntent,
 } from "~/lib/import-entry-points";
+import { importIntentLabel, importStatusLabel, importStatusTone } from "~/lib/import-run-labels";
 import { m } from "~/paraglide/messages";
 
 /** One row of `GET /api/imports`, which returns exactly these six fields. */
@@ -88,57 +89,6 @@ export async function action({ context, request }: Route.ActionArgs) {
     return redirect(`/settings/imports/${body.data.batchId}`);
 }
 
-/** What each entry point is called, and what each run was started as. Runs
- *  created before an intent existed still have to render, so the lookup falls
- *  back rather than throwing. */
-const INTENT_LABEL: Record<string, () => string> = {
-    "templates.create": m.imports_intent_templates_create,
-    "templates.overwrite": m.imports_intent_templates_overwrite,
-    "contacts.import": m.imports_intent_contacts_import,
-    "members.invite": m.imports_intent_members_invite,
-    "assisted.full": m.imports_intent_assisted_full,
-};
-
-const STATUS_LABEL: Record<string, () => string> = {
-    staged: m.imports_status_staged,
-    applying: m.imports_status_applying,
-    applied: m.imports_status_applied,
-    partially_applied: m.imports_status_partially_applied,
-    reverted: m.imports_status_reverted,
-    partially_reverted: m.imports_status_partially_reverted,
-    abandoned: m.imports_status_abandoned,
-    needs_assistance: m.imports_status_needs_assistance,
-    expired: m.imports_status_expired,
-};
-
-/**
- * The chip's colour per state. `monitor` is the one that means "this is
- * waiting for you"; `defect` means part of it did not land.
- *
- * These are Pill's tone names, which are NOT the DS token names — Pill maps
- * `sat`→ok, `monitor`→watch, `defect`→bad internally. A tone spelled with the
- * token name instead compiles to an undefined key and paints nothing.
- *
- * The four settled states share `info` rather than taking Pill's muted greys,
- * for a measured reason: `gen` / `ni` / `neutral` are all
- * `bg-ih-bg-muted text-ih-fg-3`, which composites to 4.34:1 on a card at the
- * chip's 11px — under AA, and invisible to `lint:contrast`, which reads the
- * stylesheet and never composites the chip over the surface beneath it. The
- * distinction between "Undone", "Abandoned" and "Expired" is carried by the
- * word, which is the part that actually says what happened.
- */
-const STATUS_TONE: Record<string, PillTone> = {
-    staged: "monitor",
-    applying: "info",
-    applied: "sat",
-    partially_applied: "defect",
-    reverted: "info",
-    partially_reverted: "defect",
-    abandoned: "info",
-    needs_assistance: "monitor",
-    expired: "info",
-};
-
 export default function SettingsImports() {
     const { forbidden, items } = useLoaderData<typeof loader>();
     const actionData = useActionData<typeof action>();
@@ -166,7 +116,7 @@ export default function SettingsImports() {
         {
             key: "intent",
             label: m.imports_col_what(),
-            cell: (r) => (INTENT_LABEL[r.intent] ?? m.imports_intent_assisted_full)(),
+            cell: (r) => importIntentLabel(r.intent),
         },
         {
             key: "vendor",
@@ -177,9 +127,7 @@ export default function SettingsImports() {
             key: "status",
             label: m.imports_col_status(),
             cell: (r) => (
-                <Pill tone={STATUS_TONE[r.status] ?? "info"}>
-                    {(STATUS_LABEL[r.status] ?? m.imports_status_staged)()}
-                </Pill>
+                <Pill tone={importStatusTone(r.status)}>{importStatusLabel(r.status)}</Pill>
             ),
         },
         {
@@ -271,7 +219,5 @@ export default function SettingsImports() {
 /** The assisted entry is named by the sentence a person would say, not by the
  *  noun the other three use — there is no noun, which is the point of it. */
 function entryLabel(intent: ImportEntryIntent): string {
-    return intent === "assisted.full"
-        ? m.imports_start_unknown()
-        : (INTENT_LABEL[intent] ?? m.imports_intent_assisted_full)();
+    return intent === "assisted.full" ? m.imports_start_unknown() : importIntentLabel(intent);
 }
