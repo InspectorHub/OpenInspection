@@ -13,6 +13,12 @@ const EXAMPLES: Record<string, string> = {
   // A real sentence, not a placeholder: this template's whole body is this one
   // variable, so a preview showing `{noticeBody}` would show nothing at all.
   noticeBody: 'Tenant destruction initiated on 2026-08-17 did not complete for the following stores: durable_objects. The database and cache portions completed. The remaining deletion is being remediated, and we will confirm when it is complete.',
+  importLink: 'https://app.example.com/settings/imports/abc123',
+  // A real sentence for the same reason `noticeBody` has one: the declined
+  // template's whole body is this variable, so a preview showing
+  // `{declineReason}` would show an admin nothing to judge their copy by.
+  declineReason: 'The export is a password-protected archive, and we have no way to open it without the password.',
+  expiresOn: 'September 17, 2026',
   clientName: 'Jordan Smith', inspectorName: 'Alex Rivera', agentName: 'Pat Lee',
   tenantName: 'Acme Inspections', workspaceName: 'Acme Inspections', agreementName: 'Inspection Agreement',
   date: 'July 1, 2026', time: '3:00 PM', amount: '$350.00',

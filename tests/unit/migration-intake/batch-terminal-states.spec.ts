@@ -25,6 +25,13 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { EXECUTORS } from '../../../server/lib/compliance/retention-executors';
 import type { ExecutorContext } from '../../../server/lib/compliance/retention-executor-context';
 import { MIGRATION_BATCH_STATUSES } from '../../../server/lib/status/migration-batch-status';
+import { expiryFor } from '../../../server/services/migration-intake/assistance.service';
+import {
+    MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS,
+    MIGRATION_INTAKE_STAGED_RETENTION_DAYS,
+} from '../../../server/lib/compliance/retention-windows';
+
+const DAY = 24 * 60 * 60 * 1000;
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const NOW = new Date('2026-08-18T04:00:00.000Z');
@@ -190,5 +197,31 @@ describe('migration_batches executor leaves a record behind', () => {
         expect(batch?.status).toBe('staged');
         expect(batch?.sourceKey).toBe(`${TENANT}/migrations/b-staged/source.csv`);
         expect(await db.select().from(schema.migrationRows).all()).toHaveLength(1);
+    });
+});
+
+/**
+ * The date the sweep above matches on, decided when the run is opened.
+ *
+ * It lives beside that sweep because the two are one mechanism read from
+ * opposite ends: this sets the clock, the sweep is what running out means.
+ */
+describe('expiryFor', () => {
+    it('gives a run waiting on a person the longer window', () => {
+        expect(expiryFor(true, NOW).getTime())
+            .toBe(NOW.getTime() + MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS * DAY);
+    });
+
+    it('gives a run the operator staged the shorter one', () => {
+        expect(expiryFor(false, NOW).getTime())
+            .toBe(NOW.getTime() + MIGRATION_INTAKE_STAGED_RETENTION_DAYS * DAY);
+    });
+
+    it('really is two different windows', () => {
+        // Positive control for the pair above: they would both pass against a
+        // function that ignored its argument if the two constants were equal.
+        expect(MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS)
+            .not.toBe(MIGRATION_INTAKE_STAGED_RETENTION_DAYS);
+        expect(expiryFor(true, NOW).getTime()).toBeGreaterThan(expiryFor(false, NOW).getTime());
     });
 });

@@ -172,6 +172,21 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     // resolved before the cascade rather than at the boundary.
     { id: 'destruction-incomplete', label: 'Workspace deletion did not finish', category: 'operational', required: true, channels: ['email'], audience: ['staff'] },
 
+    // ─── an import somebody sent us to convert
+    // Operational and `required`, for the reason the quota notices are: this is
+    // the platform telling a workspace owner how a file they themselves handed
+    // over is being handled. Two of the four report that something is about to
+    // be lost if they do nothing, and a preference that hid those would be a
+    // preference to be surprised.
+    //
+    // Email only, with no in-app twin. The recipient is someone in the middle
+    // of moving in — precisely when they are not yet signing in daily — so a
+    // notice on a screen they have not opened is not a notice.
+    { id: 'migration-import-received', label: 'We have your import file', category: 'operational', required: true, channels: ['email'], audience: ['staff'] },
+    { id: 'migration-import-ready',    label: 'Your import is ready to review', category: 'operational', required: true, channels: ['email'], audience: ['staff'] },
+    { id: 'migration-import-declined', label: 'Your import could not be converted', category: 'operational', required: true, channels: ['email'], audience: ['staff'] },
+    { id: 'migration-import-expiring', label: 'An import is about to be cleared', category: 'operational', required: true, channels: ['email'], audience: ['staff'] },
+
     // ─── not a notification to anyone but the sender
     // An admin sending their own message template to their own address to see
     // what it looks like. Classified so the boundary is never handed a send it

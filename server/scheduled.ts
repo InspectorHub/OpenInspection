@@ -4,6 +4,7 @@ import { maybeMetering } from './services/metering.service';
 import { AgreementService } from './services/agreement.service';
 import { buildTenantEmailService } from './lib/email/build-email-service';
 import type { EmailServiceEnv } from './lib/email/build-email-service';
+import type { DailyRetentionEnv } from './lib/cron/daily-retention-tasks';
 import { PlanQuotaGuard, readTenantTier } from './features/plan-quota/guard';
 import { tenantAiCapsLoader } from './features/plan-quota/ai-caps';
 import { getDeploymentProfile } from './lib/deployment-profile';
@@ -334,7 +335,14 @@ export async function scheduled(
         const at = new Date();
         if (at.getUTCHours() === 4 && at.getUTCMinutes() < 5) {
             const { runDailyRetentionTasks } = await import('./lib/cron/daily-retention-tasks');
-            await runDailyRetentionTasks(env, at);
+            // The same cast `buildTenantEmailService` is given above, for the
+            // same reason: `ScheduledEnv` declares the mail bindings optional
+            // because most cron blocks do not send, while this one does — its
+            // expiry reminder goes out as email built for the tenant. On a
+            // deployment genuinely missing `TENANT_CACHE` the mailer throws
+            // into that block's own try/catch and is logged, which is the loud
+            // failure we want rather than a sweep that quietly stops chasing.
+            await runDailyRetentionTasks(env as DailyRetentionEnv, at);
         }
     }
 

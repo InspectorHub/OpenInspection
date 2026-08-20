@@ -286,10 +286,30 @@ export const MIGRATION_INTAKE_STAGED_RETENTION_DAYS = 30;
 export const MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS = 90;
 
 /**
- * How long before an intake run's own expiry the operator is told it is coming.
+ * How long before an intake run's expiry the FIRST reminder goes out.
+ *
+ * A month, and it is the reminder that still leaves room to act: at this point
+ * the operator can send a different export, or ask what is holding it up, and
+ * there is time for either to work. The second reminder, a week out, is a
+ * different message — it reports that the file is about to go.
+ *
+ * It applies only to a run waiting on a person. A run the operator staged has a
+ * window as long as this lead, so a first reminder would fire on the day it was
+ * created.
+ *
+ * ⚠️ NOT a retention window, and no rule in `RETENTION_MANIFEST` points at it.
+ * It lives here because it is derived from the two windows above and would
+ * silently stop making sense if either moved — a lead longer than the staged
+ * window is the arithmetic that decides which runs get one reminder and which
+ * get two.
+ */
+export const MIGRATION_INTAKE_FIRST_REMINDER_LEAD_DAYS = 30;
+
+/**
+ * How long before an intake run's expiry the FINAL reminder goes out.
  *
  * Seven days is enough to act on and short enough that the message is about
- * something imminent. It rides the in-app notification path the rest of the
- * intake flow uses; nothing new is introduced to carry it.
+ * something imminent. Every unfinished run gets this one, whichever clock it is
+ * on; only a run waiting on a person also gets the earlier one above.
  */
 export const MIGRATION_INTAKE_REMINDER_LEAD_DAYS = 7;

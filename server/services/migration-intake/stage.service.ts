@@ -243,6 +243,40 @@ export class MigrationStageService {
         return { batchId: params.batchId, rows: rowValues.map(toStagedRow) };
     }
 
+    /**
+     * Records that a waiting run was looked at and could not be converted.
+     *
+     * A terminal state of its own, and not the one an untouched run reaches.
+     * `abandoned` means the operator stopped; this means we did, having looked.
+     * The two have opposite responsible parties, and a run that ends in the
+     * wrong one misattributes the failure to the person who was waiting.
+     *
+     * The reason rides on the manifest, beside the expiry-reminder marks: this
+     * table carries exactly one JSON payload, and a text column for a sentence
+     * written once per run would be a column almost every row leaves null.
+     */
+    async declineBatch(params: { tenantId: string; batchId: string; reason: string }): Promise<void> {
+        const db = this.getDB();
+        const batch = await db.select().from(migrationBatches)
+            .where(and(
+                eq(migrationBatches.id, params.batchId),
+                eq(migrationBatches.tenantId, params.tenantId),
+            ))
+            .get();
+        if (!batch) throw Errors.NotFound('Migration batch not found');
+        if (batch.status !== MIGRATION_BATCH_STATUS.NEEDS_ASSISTANCE) {
+            throw Errors.Conflict('This import is not waiting for a converted file.');
+        }
+        const manifest = JSON.parse(batch.manifest) as Record<string, unknown>;
+        manifest.declineReason = params.reason;
+        await db.update(migrationBatches)
+            .set({ status: MIGRATION_BATCH_STATUS.DECLINED, manifest: JSON.stringify(manifest) })
+            .where(and(
+                eq(migrationBatches.id, params.batchId),
+                eq(migrationBatches.tenantId, params.tenantId),
+            ));
+    }
+
     private parseOrThrow(input: unknown): MigrationBundleV1 {
         const parsed = parseMigrationBundle(input);
         if (!parsed.ok) {

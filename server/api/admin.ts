@@ -26,6 +26,7 @@ import adminCommentsRoutes from './admin/admin-comments';
 import adminDataRoutes from './admin/admin-data';
 import adminAiAssuranceRoutes from './admin/admin-ai-assurance';
 import adminDataImportRoutes from './admin/admin-data-import';
+import adminFindingKeyRoutes from './admin/admin-finding-keys';
 import adminContentInstallRoutes from './admin/admin-content-install';
 import adminSettingsRoutes from './admin/admin-settings';
 import adminConfigRoutes from './admin/admin-config';
@@ -41,6 +42,7 @@ const adminRoutes = createApiRouter()
     .route('/', adminDataRoutes)
     .route('/', adminAiAssuranceRoutes)
     .route('/', adminDataImportRoutes)
+    .route('/', adminFindingKeyRoutes)
     .route('/', adminContentInstallRoutes)
     .route('/', adminSettingsRoutes)
     .route('/', adminConfigRoutes)

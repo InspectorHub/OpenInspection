@@ -331,6 +331,60 @@ describe('POST /api/imports', () => {
         expect(body.data.status).toBe('needs_assistance');
     });
 
+    it('lets only an owner reach the SAME decision through the unreadable-file door', async () => {
+        // The rule is about the decision, not about the button that led to it:
+        // putting a file of somebody else's personal data in front of an
+        // outside person is an owner's call. A manager starting a contact
+        // import and happening to pick a file no adapter can read arrives at
+        // exactly that decision by a different route, and the intent gate never
+        // sees it — `contacts.import` is allowed for a manager, and the
+        // fallback is chosen afterwards by whether an adapter matched.
+        const res = await post(
+            { role: 'manager', store },
+            { intent: 'contacts.import', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { name: 'weird.json', text: UNREADABLE },
+        );
+        expect(res.status).toBe(403);
+        // Its own sentence: three other refusals on this route answer 403, and
+        // this one has to say what the manager could not decide.
+        expect(await message(res)).toBe(
+            'Nothing here can read that file, and only an owner can decide to have somebody open it.',
+        );
+        // Refused BEFORE the file is stored — the same rule the other two
+        // unreadable-file refusals follow.
+        expect(store.size).toBe(0);
+        expect(await db.select().from(schema.migrationBatches).all()).toEqual([]);
+    });
+
+    it('lets an owner through that same door — the same request, one role different', async () => {
+        // Positive control for the refusal above, on THIS door specifically:
+        // without it, "manager was refused" could be caused by the file, the
+        // intent, or the authorisation rather than by the role.
+        const res = await post(
+            { role: 'owner', store },
+            { intent: 'contacts.import', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { name: 'weird.json', text: UNREADABLE },
+        );
+        expect(res.status).toBe(201);
+        const body = await res.json() as { data: { status: string } };
+        expect(body.data.status).toBe('needs_assistance');
+        expect(store.size).toBe(1);
+    });
+
+    it('still lets a manager run an import of a file something CAN read', async () => {
+        // The other side of the same control: the owner rule must not have
+        // become a role floor on the whole route. A manager importing a
+        // readable spreadsheet decides nothing about staff access.
+        const res = await post(
+            { role: 'manager', store },
+            { intent: 'contacts.import', uploadAuthorized: 'true' },
+            { name: 'c.csv', text: CONTACTS_CSV },
+        );
+        expect(res.status).toBe(201);
+        const body = await res.json() as { data: { status: string } };
+        expect(body.data.status).toBe('staged');
+    });
+
     it('keeps an inspector out of the route entirely', async () => {
         const res = await post(
             { role: 'inspector', store },

@@ -73,10 +73,10 @@ export type AuditAction =
     | 'rating_system.deleted'
     | 'data.export'
     | 'data.import'
-    // Import runs. Eight, not one: a run is a sequence of separate decisions by
+    // Import runs. Nine, not one: a run is a sequence of separate decisions by
     // separate people, and a trail that recorded them all as 'data.import'
     // could not answer the question it exists for — who chose this. The last
-    // one is OURS; the rest are the operator's.
+    // TWO are OURS; the rest are the operator's.
     | 'migration.staged'
     | 'migration.assistance_requested'
     | 'migration.remapped'
@@ -85,6 +85,7 @@ export type AuditAction =
     | 'migration.reverted'
     | 'migration.abandoned'
     | 'migration.delivered'
+    | 'migration.declined'
     | 'data.delete'
     | 'audit.view'
     | 'comment.created'
