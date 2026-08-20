@@ -21,14 +21,29 @@
  *      deployment has anybody to hand the file to.
  */
 import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { createRoutesStub, Outlet } from "react-router";
 
 import SettingsImportsBatch from "~/routes/settings-imports-batch";
 
+interface ProblemFixture {
+    rowId: string;
+    entity: string;
+    position: number;
+    field?: string;
+    reason: string;
+    value?: string;
+    suggestion?: string;
+    payloadEcho: Record<string, unknown>;
+}
+
 interface ReportFixture {
     batch: { id: string; intent: string; vendor: string; status: string; createdAt: string };
     counts: { total: number; ok: number; conflicts: number; problems: number };
+    problemRows: ProblemFixture[];
+    problemRowsTotal: number;
+    page: number;
+    pageSize: number;
     blockedReason: string | null;
     inspection: unknown;
     mapping: unknown;
@@ -46,10 +61,30 @@ function report(over: Partial<ReportFixture> = {}): ReportFixture {
             createdAt: "2026-08-14T10:00:00.000Z",
         },
         counts: { total: 4, ok: 4, conflicts: 0, problems: 0 },
+        problemRows: [],
+        problemRowsTotal: 0,
+        page: 1,
+        pageSize: 25,
         blockedReason: null,
         inspection: { columns: ["Full Name", "Email"], sampleRows: [] },
-        mapping: { kind: "contacts", mapping: { name: "Full Name" } },
+        // `type` is part of what the server actually sends: a contact's type is
+        // never in the file, so the guess answers it with one value for
+        // everybody and the step asks whether that is right.
+        mapping: { kind: "contacts", mapping: { name: "Full Name", type: { fixed: "client" } } },
         undoUntil: "2026-09-13",
+        ...over,
+    };
+}
+
+/** One entry the server says cannot be written as it stands. */
+function problem(over: Partial<ProblemFixture> = {}): ProblemFixture {
+    return {
+        rowId: "row-1",
+        entity: "contact",
+        position: 0,
+        field: "name",
+        reason: "This entry has no name.",
+        payloadEcho: { name: "", email: "a@example.test", type: "client" },
         ...over,
     };
 }
@@ -60,6 +95,10 @@ function renderPage(opts: {
     hasAssistedMigration?: boolean;
     /** Omit the deployment block entirely — an older cached session payload. */
     noDeploymentBlock?: boolean;
+    /** Answers the report for the page the address asks for, so paging is real. */
+    reportForPage?: (page: number) => ReportFixture;
+    /** Records what each write actually posted. */
+    onAction?: (form: FormData) => void;
 } = {}) {
     // The viewer sits WEST of Greenwich on purpose. `undoUntil` is a civil day,
     // and a zone of UTC would let a page that read it as an instant pass the
@@ -82,10 +121,20 @@ function renderPage(opts: {
                 {
                     path: "settings/imports/:batchId",
                     Component: SettingsImportsBatch,
-                    loader: () => ({
-                        forbidden: opts.forbidden ?? false,
-                        report: opts.report === undefined ? report() : opts.report,
-                    }),
+                    loader: ({ request }) => {
+                        if (opts.reportForPage) {
+                            const page = Number(new URL(request.url).searchParams.get("page") ?? "1");
+                            return { forbidden: false, report: opts.reportForPage(page) };
+                        }
+                        return {
+                            forbidden: opts.forbidden ?? false,
+                            report: opts.report === undefined ? report() : opts.report,
+                        };
+                    },
+                    action: async ({ request }) => {
+                        opts.onAction?.(await request.formData());
+                        return { error: null };
+                    },
                 },
             ],
         },
@@ -280,6 +329,134 @@ describe("an import run whose file nothing could read", () => {
         renderPage({ report: report() });
         expect((await screen.findByTestId("import-counts")).textContent)
             .toBe("4 entries · 4 ready · 0 already exist · 0 need fixing");
+    });
+});
+
+describe("an import run: the three stages sit on their own steps", () => {
+    it("shows the mapping form only on the mapping step", async () => {
+        renderPage({ report: report() });
+        await railSteps();
+        // The run opens on Import, so the form is not on screen yet — a stage
+        // mounted on every step passes any "it renders" assertion and tells
+        // nobody which step they are on.
+        expect(screen.queryByLabelText("Name")).toBeNull();
+        fireEvent.click(screen.getByTestId("import-step-mapping"));
+        expect(screen.getByLabelText("Name")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Import" })).toBeNull();
+    });
+
+    it("posts the columns the operator chose, not the ones the report arrived with", async () => {
+        const posted: FormData[] = [];
+        renderPage({ report: report(), onAction: (f) => posted.push(f) });
+        await railSteps();
+        fireEvent.click(screen.getByTestId("import-step-mapping"));
+        fireEvent.change(screen.getByLabelText("Email"), { target: { value: "Email" } });
+        fireEvent.click(screen.getByRole("button", { name: "Use these columns" }));
+        await waitFor(() => expect(posted).toHaveLength(1));
+        expect(posted[0].get("op")).toBe("mapping");
+        expect(JSON.parse(String(posted[0].get("mapping")))).toEqual({
+            kind: "contacts",
+            mapping: { name: "Full Name", email: "Email", type: { fixed: "client" } },
+        });
+    });
+
+    it("drops the mapping step for a template run, whose mapping has no columns in it", async () => {
+        // A template mapping carries a NAME rather than a column choice. It
+        // cannot arrive with an inspection today; a step that rendered for it
+        // would show a form with nothing on it.
+        renderPage({
+            report: report({
+                batch: { id: "b", intent: "templates.create", vendor: "spectora", status: "staged", createdAt: "2026-08-14T10:00:00.000Z" },
+                mapping: { kind: "template", name: "Roof" },
+            }),
+        });
+        expect(await railSteps()).toEqual(["1Upload", "2Import"]);
+    });
+
+    it("posts one entry's whole payload from the fix step, with the edited field replaced", async () => {
+        const posted: FormData[] = [];
+        renderPage({
+            report: report({
+                counts: { total: 4, ok: 3, conflicts: 0, problems: 1 },
+                problemRows: [problem()],
+                problemRowsTotal: 1,
+            }),
+            onAction: (f) => posted.push(f),
+        });
+        await railSteps();
+        fireEvent.change(screen.getByLabelText("Contact 1 name"), { target: { value: "Alice Ng" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await waitFor(() => expect(posted).toHaveLength(1));
+        expect(posted[0].get("op")).toBe("repair");
+        expect(posted[0].get("rowId")).toBe("row-1");
+        expect(JSON.parse(String(posted[0].get("payload")))).toEqual({
+            name: "Alice Ng", email: "a@example.test", type: "client",
+        });
+    });
+
+    it("asks the server for the page that was clicked, and renders what comes back", async () => {
+        // Paging is the server's: the report carries one page of entries and the
+        // count behind it. A page control the screen answered itself would be
+        // paging a list it holds only the first slice of.
+        renderPage({
+            reportForPage: (page) => report({
+                counts: { total: 60, ok: 30, conflicts: 0, problems: 30 },
+                problemRows: [problem({ rowId: `row-${page}`, position: (page - 1) * 25 })],
+                problemRowsTotal: 30,
+                page,
+            }),
+        });
+        await railSteps();
+        expect(screen.getByText("Contact 1")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Page 2" }));
+        expect(await screen.findByText("Contact 26")).toBeTruthy();
+        expect(screen.queryByText("Contact 1")).toBeNull();
+    });
+
+    it("posts the clash policy the operator chose from the import step", async () => {
+        const posted: FormData[] = [];
+        renderPage({
+            report: report({ counts: { total: 4, ok: 1, conflicts: 3, problems: 0 } }),
+            onAction: (f) => posted.push(f),
+        });
+        await railSteps();
+        fireEvent.click(screen.getByRole("radio", { name: "Replace with the imported version" }));
+        fireEvent.click(screen.getByRole("button", { name: "Import" }));
+        await waitFor(() => expect(posted).toHaveLength(1));
+        expect(posted[0].get("op")).toBe("apply");
+        expect(posted[0].get("conflictPolicy")).toBe("overwrite");
+    });
+});
+
+describe("an import run: taking it back", () => {
+    it("asks before undoing, and posts nothing until the dialog is answered", async () => {
+        // An undo deletes real rows, and this repository does not use
+        // `window.confirm` — so the confirmation is a rendered dialog, and its
+        // presence is what the assertion reads.
+        const posted: FormData[] = [];
+        renderPage({
+            report: report({ batch: { id: "b", intent: "contacts.import", vendor: "csv_generic", status: "applied", createdAt: "2026-08-14T10:00:00.000Z" } }),
+            onAction: (f) => posted.push(f),
+        });
+        await railSteps();
+        // The date is the run's civil retention day, formatted once by the page.
+        expect(screen.getByText("Available until Sep 13, 2026.")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Undo this import" }));
+        expect(posted).toHaveLength(0);
+        expect(screen.getByText("Undo this import?")).toBeTruthy();
+    });
+
+    it("posts the undo once the dialog is confirmed", async () => {
+        const posted: FormData[] = [];
+        renderPage({
+            report: report({ batch: { id: "b", intent: "contacts.import", vendor: "csv_generic", status: "applied", createdAt: "2026-08-14T10:00:00.000Z" } }),
+            onAction: (f) => posted.push(f),
+        });
+        await railSteps();
+        fireEvent.click(screen.getByRole("button", { name: "Undo this import" }));
+        fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Undo this import" }));
+        await waitFor(() => expect(posted).toHaveLength(1));
+        expect(posted[0].get("op")).toBe("revert");
     });
 });
 

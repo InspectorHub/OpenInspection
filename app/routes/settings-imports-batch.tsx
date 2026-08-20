@@ -1,17 +1,29 @@
 import { useState } from "react";
-import { Link, useLoaderData, useNavigation } from "react-router";
-import { Card, EmptyState, Pill, buttonClasses } from "@core/shared-ui";
+import { Link, useLoaderData, useNavigation, useSearchParams } from "react-router";
+import { Banner, Card, EmptyState, Pill, buttonClasses } from "@core/shared-ui";
 
 import type { Route } from "./+types/settings-imports-batch";
 import { AccessDenied } from "~/components/AccessDenied";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { AssistanceStage } from "~/components/imports/AssistanceStage";
+import { ImportStage } from "~/components/imports/ImportStage";
 import { ImportWizardShell } from "~/components/imports/ImportWizardShell";
+import { MappingStage } from "~/components/imports/MappingStage";
+import { RepairStage } from "~/components/imports/RepairStage";
+import { SourcePanel } from "~/components/imports/SourcePanel";
 import { useDisplayLocale, useDisplayTimeZone, useSessionContext } from "~/hooks/useSessionContext";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { requireAdminLoader } from "~/lib/access.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatDate } from "~/lib/format";
 import { importIntentLabel, importStatusLabel, importStatusTone } from "~/lib/import-run-labels";
+import type {
+    AdapterInspection,
+    ColumnMapping,
+    ProblemRow,
+    StageMapping,
+} from "~/lib/imports-types";
 import {
     currentImportStep,
     importNextBlockedReason,
@@ -26,9 +38,7 @@ import { m } from "~/paraglide/messages";
  *
  * Declared rather than imported from the report service, because the two shapes
  * genuinely differ: `createdAt` is a `Date` on the server and a string by the
- * time JSON has been through the wire. Only the fields this screen reads are
- * listed — the entries needing a person, and their paging, belong to the step
- * that shows them.
+ * time JSON has been through the wire.
  */
 interface BatchReport {
     batch: {
@@ -39,16 +49,16 @@ interface BatchReport {
         createdAt: string;
     };
     counts: { total: number; ok: number; conflicts: number; problems: number };
+    /** Only the entries needing a person, and only this page of them. */
+    problemRows: ProblemRow[];
+    /** How many there are behind the page. Without it a page of three is unreadable. */
+    problemRowsTotal: number;
+    page: number;
+    pageSize: number;
     blockedReason: string | null;
-    /**
-     * The source file's columns, and the mapping to start from.
-     *
-     * Only their PRESENCE is read here, which is why neither is given a shape:
-     * whether there is a mapping question to ask is a fact about the run, and
-     * the shape of the answer belongs to the step that asks it.
-     */
-    inspection: unknown;
-    mapping: unknown;
+    /** The source file's columns, and the mapping to start from. Both null together. */
+    inspection: AdapterInspection | null;
+    mapping: StageMapping | null;
     /** The day this run's entries are cleared, as `YYYY-MM-DD`, or null. */
     undoUntil: string | null;
 }
@@ -61,10 +71,23 @@ export async function loader({ context, request, params }: Route.LoaderArgs) {
     const { forbidden, token } = await requireAdminLoader(context, request);
     if (forbidden) return { forbidden: true, report: null };
 
+    // The page travels in the URL rather than in component state, so the entries
+    // needing a person are paged by the SERVER — the report carries one page of
+    // them and the count behind it, and a screen that held the page locally
+    // would be paging a list it had only the first slice of. It is passed on
+    // unparsed: the query schema coerces and bounds it, and a second bound here
+    // would be a second answer to how big a page is.
+    const url = new URL(request.url);
+    const page = url.searchParams.get("page");
+    const pageSize = url.searchParams.get("pageSize");
+
     const api = createApi(context, { token });
     const res = await api.imports[":batchId"].$get({
         param: { batchId: params.batchId },
-        query: {},
+        query: {
+            ...(page ? { page } : {}),
+            ...(pageSize ? { pageSize } : {}),
+        },
     });
     // A run belonging to another workspace and a run that never existed answer
     // the same way, deliberately, and this screen keeps them the same: the two
@@ -80,6 +103,55 @@ export async function loader({ context, request, params }: Route.LoaderArgs) {
     return { forbidden: false, report: (body.data ?? null) as BatchReport | null };
 }
 
+/**
+ * The four things that can be done to a prepared run, dispatched by `op`.
+ *
+ * One action rather than four routes: they all name the same run, they all
+ * answer with a sentence when they refuse, and the screen returns to the same
+ * address afterwards. What comes back is the SERVER's message — it is the only
+ * party that knows whether the run has moved on, whether its file is still
+ * stored, or how many seats are left.
+ */
+export async function action({ context, request, params }: Route.ActionArgs) {
+    const { forbidden, token } = await requireAdminLoader(context, request);
+    if (forbidden) return { error: m.access_denied_title() };
+
+    const form = await request.formData();
+    const op = String(form.get("op") ?? "");
+    const api = createApi(context, { token });
+    const param = { batchId: params.batchId };
+    /** Trusted because this screen wrote it a moment ago; the server re-validates it. */
+    const json = (field: string): never =>
+        JSON.parse(String(form.get(field) ?? "null")) as never;
+
+    const res = await (async () => {
+        switch (op) {
+            case "mapping":
+                return api.imports[":batchId"].mapping.$patch({
+                    param, json: { mapping: json("mapping") },
+                });
+            case "repair":
+                return api.imports[":batchId"].rows[":rowId"].$patch({
+                    param: { ...param, rowId: String(form.get("rowId") ?? "") },
+                    json: { payload: json("payload") },
+                });
+            case "apply":
+                return api.imports[":batchId"].apply.$post({
+                    param, json: { conflictPolicy: String(form.get("conflictPolicy") ?? "") as never },
+                });
+            case "revert":
+                return api.imports[":batchId"].revert.$post({ param });
+            default:
+                return null;
+        }
+    })();
+
+    if (!res) return { error: m.imports_start_unknown_intent() };
+    if (res.ok) return { error: null };
+    const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    return { error: body?.error?.message ?? m.imports_run_not_found() };
+}
+
 /** Each step's name, which is the only thing the shell needs from the catalogue. */
 const STEP_LABEL: Record<ImportStepId, () => string> = {
     upload: m.imports_wizard_step_upload,
@@ -88,14 +160,32 @@ const STEP_LABEL: Record<ImportStepId, () => string> = {
     import: m.imports_wizard_step_import,
 };
 
+/**
+ * A mapping with columns to point at, or null.
+ *
+ * A TEMPLATE mapping carries a name rather than a column choice, and it cannot
+ * arrive here: the adapter that reads template exports implements no
+ * `inspect()`, so the report carries no columns for it. Narrowing rather than
+ * asserting keeps that a fact the compiler holds — and keeps the mapping step
+ * out of the rail for a run that would open an empty form.
+ */
+function columnMapping(report: BatchReport): ColumnMapping | null {
+    if (!report.inspection || !report.mapping) return null;
+    return report.mapping.kind === "template" ? null : report.mapping;
+}
+
 export default function SettingsImportsBatch() {
     const { forbidden, report } = useLoaderData<typeof loader>();
     const session = useSessionContext();
     const navigation = useNavigation();
+    const [, setSearchParams] = useSearchParams();
     const locale = useDisplayLocale();
     const timeZone = useDisplayTimeZone();
+    const { submit, fetcher, busy: submitting } = useGuardedSubmit<typeof action>();
     /** The step being looked at, once somebody has moved off the landing one. */
     const [step, setStep] = useState<ImportStepId | null>(null);
+    /** An undo deletes real rows, so it is confirmed — never with `window.confirm`. */
+    const [confirmRevert, setConfirmRevert] = useState(false);
 
     if (forbidden) return <AccessDenied />;
 
@@ -129,6 +219,7 @@ export default function SettingsImportsBatch() {
         );
     }
 
+    const mapping = columnMapping(report);
     const run: ImportRunView = {
         status: report.batch.status,
         // A run with columns to map is one whose REPORT carries them. Deriving
@@ -136,7 +227,7 @@ export default function SettingsImportsBatch() {
         // stored file has been swept, where the mapping can no longer be
         // changed by anybody — and would put this screen in charge of a list of
         // which products are special.
-        hasMapping: report.inspection !== null && report.mapping !== null,
+        hasMapping: mapping !== null,
         problemCount: report.counts.problems,
         blockedReason: report.blockedReason,
     };
@@ -146,6 +237,11 @@ export default function SettingsImportsBatch() {
         needsFile: m.imports_upload_needs_file(),
         fixProblemsFirst: (n) => m.imports_repair_fix_first({ count: String(n) }),
     });
+    // Both halves: the guarded submit covers a write in flight, and navigation
+    // covers the reload that follows it. A control released between the two
+    // takes a second press against a report that has not been rebuilt yet.
+    const busy = submitting || navigation.state !== "idle";
+    const failure = fetcher.data?.error ?? null;
 
     // The date-only retention day is rendered IN UTC, unlike every other date on
     // this page. The server sent a civil day rather than an instant, so reading
@@ -154,6 +250,14 @@ export default function SettingsImportsBatch() {
     const keptUntil = report.undoUntil
         ? formatDate(report.undoUntil, { locale, timeZone: "UTC" })
         : null;
+
+    /** Rewrites one query parameter, keeping whatever else is in the address. */
+    const setQuery = (key: string, value: number) =>
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set(key, String(value));
+            return next;
+        });
 
     return (
         <div className="space-y-ih-list">
@@ -183,6 +287,11 @@ export default function SettingsImportsBatch() {
                 )}
             </Card>
 
+            {/* The server's refusal, printed where the control that caused it is.
+                It is the only party that knows the run has moved on, or that its
+                file is gone, or how many seats are left. */}
+            {failure && <Banner tone="danger">{failure}</Banner>}
+
             {report.batch.status === "needs_assistance" ? (
                 <AssistanceStage
                     // `?.deployment?.` on BOTH hops. A session payload written
@@ -198,7 +307,7 @@ export default function SettingsImportsBatch() {
                     current={current}
                     stepLabel={(s) => STEP_LABEL[s]()}
                     blockedReason={blockedReason}
-                    busy={navigation.state !== "idle"}
+                    busy={busy}
                     onStep={setStep}
                 >
                     {current === "upload" && (
@@ -208,52 +317,64 @@ export default function SettingsImportsBatch() {
                             keptUntil={keptUntil}
                         />
                     )}
+
+                    {current === "mapping" && report.inspection && mapping && (
+                        <MappingStage
+                            inspection={report.inspection}
+                            mapping={mapping}
+                            busy={busy}
+                            onApply={(chosen) => submit(
+                                { op: "mapping", mapping: JSON.stringify(chosen) },
+                                { method: "post" },
+                            )}
+                        />
+                    )}
+
+                    {current === "repair" && (
+                        <RepairStage
+                            rows={report.problemRows}
+                            total={report.problemRowsTotal}
+                            page={report.page}
+                            pageSize={report.pageSize}
+                            busy={busy}
+                            onSave={(rowId, payload) => submit(
+                                { op: "repair", rowId, payload: JSON.stringify(payload) },
+                                { method: "post" },
+                            )}
+                            onPage={(p) => setQuery("page", p)}
+                            onPageSize={(size) => setQuery("pageSize", size)}
+                        />
+                    )}
+
+                    {current === "import" && (
+                        <ImportStage
+                            counts={report.counts}
+                            blockedReason={report.blockedReason}
+                            status={report.batch.status}
+                            undoUntil={keptUntil}
+                            busy={busy}
+                            onApply={(conflictPolicy) => submit(
+                                { op: "apply", conflictPolicy },
+                                { method: "post" },
+                            )}
+                            onRevert={() => setConfirmRevert(true)}
+                        />
+                    )}
                 </ImportWizardShell>
             )}
-        </div>
-    );
-}
 
-/**
- * The Upload step of a run that already has its file.
- *
- * There is no file control here, and the sentence at the bottom says why: the
- * file a run was read from is the run. Replacing it would silently discard
- * every correction made since, so the way to a different file is a different
- * run — which is also the only shape the server offers.
- */
-function SourcePanel({
-    vendor,
-    started,
-    keptUntil,
-}: {
-    vendor: string;
-    started: string;
-    /** Already formatted, or null when this run is kept by another rule. */
-    keptUntil: string | null;
-}) {
-    return (
-        <Card className="p-5 space-y-4">
-            <h3 className="text-[15px] font-bold text-ih-fg-1">{m.imports_source_title()}</h3>
-            <dl className="grid gap-3 sm:grid-cols-3 text-[13px]">
-                <SourceFact label={m.imports_col_source()} value={vendor} />
-                <SourceFact label={m.imports_col_started()} value={started} />
-                {/* A dash rather than an empty cell: a run kept by another rule
-                    is a real answer, and a blank reads as missing data. */}
-                <SourceFact label={m.imports_col_expires()} value={keptUntil ?? "—"} />
-            </dl>
-            <p className="text-[12px] text-ih-fg-2">{m.imports_source_replace_note()}</p>
-        </Card>
-    );
-}
-
-function SourceFact({ label, value }: { label: string; value: string }) {
-    return (
-        <div>
-            <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-ih-fg-3">
-                {label}
-            </dt>
-            <dd className="mt-0.5 text-ih-fg-1">{value}</dd>
+            <ConfirmDialog
+                open={confirmRevert}
+                title={m.imports_revert_confirm_title()}
+                message={m.imports_revert_confirm_body()}
+                confirmLabel={m.imports_revert()}
+                busy={busy}
+                onCancel={() => setConfirmRevert(false)}
+                onConfirm={() => {
+                    setConfirmRevert(false);
+                    submit({ op: "revert" }, { method: "post" });
+                }}
+            />
         </div>
     );
 }
