@@ -55,9 +55,15 @@ const LIMITS = limitsFor(SAAS_PROFILE);
 
 const EMPTY: EntityCounts = { readFromSource: 0, emitted: 0, dropped: [] };
 
-const DOC: TemplateSchemaV2 = { schemaVersion: 2, sections: [] };
+/**
+ * One section, not none. A template with no sections is now a PROBLEM ROW — the
+ * apply path asks `describeRowProblem` before it writes anything, so an empty
+ * document would fail here for a reason that has nothing to do with the
+ * conflict re-check these specs are about.
+ */
+const DOC: TemplateSchemaV2 = { schemaVersion: 2, sections: [{ id: 'sec_a', title: 'Roof', items: [] }] };
 const STATS: BundleTemplate['stats'] = {
-    sections: 0, items: 0, information: 0, limitations: 0, defects: 0, unknownCommentTypes: [],
+    sections: 1, items: 0, information: 0, limitations: 0, defects: 0, unknownCommentTypes: [],
 };
 
 function contactsBundle(list: { name: string; email: string }[]): MigrationBundleV1 {

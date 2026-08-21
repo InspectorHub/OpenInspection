@@ -273,4 +273,134 @@ describe('MigrationApplyService — member rows', () => {
         // the template is not an override.
         expect(invite?.permissionOverrides).toEqual({ templateDelete: false });
     });
+
+    /**
+     * The constraint that survives a bad row being allowed to STAGE.
+     *
+     * The staging format now carries an entry whose address is not one, so that
+     * somebody can be shown it and correct it. What must not follow is an
+     * invitation going anywhere on the strength of it — the address IS the
+     * delivery instruction, and a row that cannot say where the invitation goes
+     * cannot produce one.
+     *
+     * Every refusal below is paired with the SAME row corrected and applied, so
+     * "no invitation was created" can never be a check that simply says no.
+     */
+    describe('an address that is not one never becomes an invitation', () => {
+        /** What a repair writes, without going through the repair service's file reads. */
+        async function rewriteRow(batchId: string, position: number, payload: BundleMember) {
+            const row = (await db.select().from(schema.migrationRows)
+                .where(eq(schema.migrationRows.batchId, batchId)).all())
+                .find((r) => r.position === position)!;
+            await db.update(schema.migrationRows)
+                .set({ payload: JSON.stringify(payload) })
+                .where(eq(schema.migrationRows.id, row.id));
+            return row.id;
+        }
+
+        it('fails the malformed row, invites the good one, and sends nothing to the bad address', async () => {
+            const staged = await stageMembers([
+                { email: 'good@example.test', role: 'inspector' },
+                { email: 'not-an-address', role: 'inspector' },
+                { email: 'agentish@example.test', role: 'agent' },
+            ]);
+
+            const result = await apply.apply({
+                tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
+            });
+
+            // The buckets add up over the whole run, so "one failed" cannot be
+            // true of a run where everything failed.
+            expect(result).toMatchObject({ status: 'partially_applied', applied: 1, skipped: 0, failed: 2 });
+            expect(result.invites.map((i) => i.email)).toEqual(['good@example.test']);
+
+            const invites = await db.select().from(schema.tenantInvites).all();
+            expect(invites.map((i) => i.email)).toEqual(['good@example.test']);
+
+            // The reason travels with the row, and it is the describer's own
+            // sentence rather than a database error the operator cannot act on.
+            const rows = await db.select().from(schema.migrationRows)
+                .where(eq(schema.migrationRows.batchId, staged.batchId)).all();
+            const byPosition = new Map(rows.map((r) => [r.position, r]));
+            expect(byPosition.get(0)?.status).toBe('applied');
+            expect(byPosition.get(1)?.status).toBe('failed');
+            expect(byPosition.get(1)?.outcome).toMatch(/does not look like an email address/);
+            expect(byPosition.get(2)?.status).toBe('failed');
+            expect(byPosition.get(2)?.outcome).toMatch(/per inspection/);
+            expect(byPosition.get(1)?.createdId).toBeNull();
+            expect(byPosition.get(2)?.createdId).toBeNull();
+        });
+
+        it('positive control: the same rows, corrected, ARE invited', async () => {
+            const staged = await stageMembers([
+                { email: 'good@example.test', role: 'inspector' },
+                { email: 'not-an-address', role: 'inspector' },
+                { email: 'agentish@example.test', role: 'agent' },
+            ]);
+            await rewriteRow(staged.batchId, 1, { email: 'fixed@example.test', role: 'inspector' });
+            await rewriteRow(staged.batchId, 2, { email: 'agentish@example.test', role: 'inspector' });
+
+            const result = await apply.apply({
+                tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
+            });
+
+            expect(result).toMatchObject({ status: 'applied', applied: 3, failed: 0 });
+            expect((await db.select().from(schema.tenantInvites).all()).map((i) => i.email).sort())
+                .toEqual(['agentish@example.test', 'fixed@example.test', 'good@example.test']);
+        });
+
+        it('leaves a row with no address at all uninvited, and says where an invitation would go', async () => {
+            const staged = await stageMembers([
+                { email: 'good@example.test', role: 'inspector' },
+                { email: '', role: 'inspector' },
+            ]);
+            const result = await apply.apply({
+                tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
+            });
+            expect(result).toMatchObject({ applied: 1, failed: 1 });
+            expect((await db.select().from(schema.tenantInvites).all()).map((i) => i.email))
+                .toEqual(['good@example.test']);
+            const rows = await db.select().from(schema.migrationRows)
+                .where(eq(schema.migrationRows.batchId, staged.batchId)).all();
+            expect(rows.find((r) => r.position === 1)?.outcome).toMatch(/nowhere else to go/);
+        });
+
+        it('does not spend a seat on a row that can never be invited', async () => {
+            // Two seats free, three rows, one of which is unwritable. Counting it
+            // would refuse the whole batch over capacity nothing was ever going
+            // to take — and would quote a number the operator cannot reconcile
+            // with anything on their screen.
+            await setCap(3);
+            await seedMember('u1', 'boss@example.test', 'owner');
+            const staged = await stageMembers([
+                { email: 'a@example.test', role: 'inspector' },
+                { email: 'b@example.test', role: 'inspector' },
+                { email: 'not-an-address', role: 'inspector' },
+            ]);
+
+            const result = await apply.apply({
+                tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
+            });
+            expect(result).toMatchObject({ applied: 2, failed: 1 });
+        });
+
+        it('positive control: the same batch IS refused once that row is a real address', async () => {
+            // The seat rule has not been weakened — only the count of what can
+            // actually take a seat has changed. Correct the third row and the
+            // batch needs three, which is one more than there is room for.
+            await setCap(3);
+            await seedMember('u1', 'boss@example.test', 'owner');
+            const staged = await stageMembers([
+                { email: 'a@example.test', role: 'inspector' },
+                { email: 'b@example.test', role: 'inspector' },
+                { email: 'not-an-address', role: 'inspector' },
+            ]);
+            await rewriteRow(staged.batchId, 2, { email: 'c@example.test', role: 'inspector' });
+
+            await expect(apply.apply({
+                tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
+            })).rejects.toThrow(/needs 3 seats and 2 are available/);
+            expect(await db.select().from(schema.tenantInvites).all()).toEqual([]);
+        });
+    });
 });

@@ -15,15 +15,16 @@
  * nothing to notice — and this feature exists because a silent wrong answer was
  * shipped once already.
  *
- * `role` subtracts `agent` at runtime rather than naming three literals, which
- * is the same subtraction the adapter makes and for the same reason: agent
- * access is granted per inspection and holds no seat, so a bulk import cannot
- * grant it — while a role ADDED to the taxonomy should appear in this dropdown
- * on the day it exists.
+ * `role` subtracts `agent` — but the subtraction is no longer PERFORMED here.
+ * It was, and so was the same subtraction in the adapter, beside a hand-written
+ * `['owner', 'manager', 'inspector']` in the row describer and a third enum in
+ * the remap schema. Four spellings of one list is three chances for a dropdown
+ * to keep offering a role an upload has stopped accepting, so the list is now
+ * read from the vocabulary module like the contact types beside it.
  */
-import { ROLE, ROLES } from "../../server/lib/auth/roles";
 import {
     BUNDLE_CONTACT_TYPES,
+    BUNDLE_MEMBER_ROLES,
     type BundleContactType,
     type BundleMemberRole,
 } from "../../server/lib/migration-intake/bundle";
@@ -32,8 +33,7 @@ import {
 export const IMPORT_CONTACT_TYPES: readonly BundleContactType[] = BUNDLE_CONTACT_TYPES;
 
 /** What a bulk invitation may grant: the taxonomy minus the one it cannot. */
-export const IMPORT_MEMBER_ROLES: readonly BundleMemberRole[] =
-    ROLES.filter((r): r is BundleMemberRole => r !== ROLE.AGENT);
+export const IMPORT_MEMBER_ROLES: readonly BundleMemberRole[] = BUNDLE_MEMBER_ROLES;
 
 /**
  * How an entry that clashes with something already here is settled.

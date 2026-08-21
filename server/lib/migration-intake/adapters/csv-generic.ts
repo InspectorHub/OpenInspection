@@ -1,4 +1,4 @@
-import { ROLE, ROLES } from '../../auth/roles';
+import { ROLES } from '../../auth/roles';
 import { parseCsvTable } from '../csv';
 import {
     BUNDLE_CONTACT_TYPES,
@@ -14,18 +14,22 @@ import { emptyEntityCounts } from './types';
 const CSV_GENERIC_ADAPTER_VERSION = '1';
 
 /**
- * The roles a member row may name: the role taxonomy minus the one this format
- * excludes, subtracted at runtime rather than re-typed as literals.
+ * A vocabulary word as WE spell it when the file's spelling matches one, and the
+ * file's own text when it does not.
  *
- * The compiler does NOT check this — a type predicate is an unchecked
- * assertion, verified. What the subtraction buys is behavioural: a role added
- * to the taxonomy is accepted by an upload the day it exists, whereas a
- * hand-written list keeps matching its own three literals and refuses the new
- * role with "not one of owner, manager, inspector" — a message that reads like
- * the operator's file is wrong.
+ * Both halves matter. Case-folding is what lets a file saying "Client" or
+ * "Inspector" import without anybody editing it. Passing the unmatched text
+ * through UNCHANGED is what lets the repair screen show the operator the word
+ * they actually typed — "Buyer", not "buyer" — so they can find it in their
+ * spreadsheet. The row is judged later, by the describer, not here.
+ *
+ * The role list handed in is the FULL taxonomy including `agent`, deliberately:
+ * canonicalising `Agent` to `agent` is what earns that row the describer's own
+ * sentence about per-inspection access instead of a generic "not one of".
  */
-const BUNDLE_MEMBER_ROLES: readonly BundleMemberRole[] =
-    ROLES.filter((r): r is BundleMemberRole => r !== ROLE.AGENT);
+function canonicalise(vocabulary: readonly string[], text: string): string {
+    return vocabulary.find((word) => word === text.toLowerCase()) ?? text;
+}
 
 /**
  * Where a value comes from: a column in the uploaded file, or a single answer
@@ -126,37 +130,42 @@ export const csvGenericAdapter: MigrationAdapter<CsvGenericOptions> = {
         const contacts: BundleContact[] = [];
         const members: BundleMember[] = [];
 
+        // A LINE IS NOT DROPPED FOR BEING WRONG. It is emitted as the file wrote
+        // it, and what is wrong with it is said against that row on the repair
+        // screen — one bad value costs the operator one row, not the upload.
+        //
+        // This used to drop four kinds of row: an empty mapped name, a contact
+        // type outside our vocabulary, the agent role, and a role outside the
+        // ones an import may grant. The describer has a sentence for every one
+        // of them, and none of those sentences could ever be shown, because the
+        // rows they describe never reached a staging table.
+        //
+        // ONE drop remains, and it is not a judgement about the data: a line
+        // with nothing in ANY mapped column. There is no value on it to repair
+        // and no entry it could ever become — it is a spreadsheet artefact, and
+        // `dropped` still names its line so the count and the file agree.
         table.rows.forEach((row, i) => {
             const at = `line ${table.lineNumbers[i]}`;
 
             if (options.entity === 'contact') {
                 const m = options.mapping;
                 const name = cell(row, m.name);
-                if (!name) {
-                    counts.dropped.push({ at, reason: 'the mapped name column is empty' });
+                const email = cell(row, m.email);
+                const phone = cell(row, m.phone);
+                const agency = cell(row, m.agency);
+                const typeCell = 'fixed' in m.type ? '' : cell(row, m.type.column);
+                if (!name && !email && !phone && !agency && !typeCell) {
+                    counts.dropped.push({ at, reason: 'every mapped column is empty on this line' });
                     return;
                 }
-                let type: BundleContactType;
-                if ('fixed' in m.type) {
-                    type = m.type.fixed;
-                } else {
-                    const raw = cell(row, m.type.column).toLowerCase();
-                    const match = BUNDLE_CONTACT_TYPES.find((t) => t === raw);
-                    if (!match) {
-                        counts.dropped.push({
-                            at,
-                            reason: `contact type "${cell(row, m.type.column)}" is not one of ${BUNDLE_CONTACT_TYPES.join(', ')}`,
-                        });
-                        return;
-                    }
-                    type = match;
-                }
-                const entry: BundleContact = { name, type };
-                const email = cell(row, m.email);
+                const entry: BundleContact = {
+                    name,
+                    type: 'fixed' in m.type
+                        ? m.type.fixed
+                        : canonicalise(BUNDLE_CONTACT_TYPES, typeCell),
+                };
                 if (email) entry.email = email;
-                const phone = cell(row, m.phone);
                 if (phone) entry.phone = phone;
-                const agency = cell(row, m.agency);
                 if (agency) entry.agency = agency;
                 contacts.push(entry);
                 counts.emitted++;
@@ -165,34 +174,19 @@ export const csvGenericAdapter: MigrationAdapter<CsvGenericOptions> = {
 
             const m = options.mapping;
             const email = cell(row, m.email);
-            if (!email) {
-                counts.dropped.push({ at, reason: 'the mapped email column is empty' });
+            const name = cell(row, m.name);
+            const roleCell = 'fixed' in m.role ? '' : cell(row, m.role.column);
+            if (!email && !name && !roleCell) {
+                counts.dropped.push({ at, reason: 'every mapped column is empty on this line' });
                 return;
             }
-            let role: BundleMemberRole;
-            if ('fixed' in m.role) {
-                role = m.role.fixed;
-            } else {
-                const raw = cell(row, m.role.column).toLowerCase();
-                if (raw === ROLE.AGENT) {
-                    counts.dropped.push({
-                        at,
-                        reason: 'agent access is granted per inspection and cannot be imported here',
-                    });
-                    return;
-                }
-                const match = BUNDLE_MEMBER_ROLES.find((r) => r === raw);
-                if (!match) {
-                    counts.dropped.push({
-                        at,
-                        reason: `role "${cell(row, m.role.column)}" is not one of ${BUNDLE_MEMBER_ROLES.join(', ')}`,
-                    });
-                    return;
-                }
-                role = match;
-            }
-            const entry: BundleMember = { email, role };
-            const name = cell(row, m.name);
+            // `email` is written even when the cell was empty. The field is
+            // required by the format because it is where the invitation goes,
+            // and an entry that omitted it would be a row no screen can repair.
+            const entry: BundleMember = {
+                email,
+                role: 'fixed' in m.role ? m.role.fixed : canonicalise(ROLES, roleCell),
+            };
             if (name) entry.name = name;
             members.push(entry);
             counts.emitted++;

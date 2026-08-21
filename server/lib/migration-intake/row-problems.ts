@@ -1,4 +1,10 @@
-import { BUNDLE_CONTACT_TYPES, type EntityKind } from './bundle';
+import { ROLE } from '../auth/roles';
+import {
+    BUNDLE_CONTACT_TYPES,
+    BUNDLE_MEMBER_ROLES,
+    looksLikeEmailAddress,
+    type EntityKind,
+} from './bundle';
 
 /**
  * Why one staged entry cannot be written as it stands.
@@ -18,16 +24,17 @@ export interface RowProblem {
 }
 
 /**
- * The roles a bulk import may grant.
+ * The roles a bulk import may grant, and what an address looks like, are both
+ * read from the vocabulary module rather than restated here.
  *
- * `agent` is missing on purpose and is answered with its own sentence below:
- * agent access is granted per inspection and holds no seat, so "not one of the
- * roles" would be a true statement that explains nothing.
+ * They used to be restated. The role list was a hand-written
+ * `['owner', 'manager', 'inspector']` beside an adapter that derived the same
+ * list by subtraction, and the address rule was a regex here beside a
+ * `z.string().email()` in the bundle validator that disagreed with it — two
+ * rules in one feature, and the operator was shown one and refused by the
+ * other. `agent` is still answered with its own sentence, because "not one of
+ * the roles" is a true statement that explains nothing.
  */
-const STAFF_ROLES = ['owner', 'manager', 'inspector'];
-
-/** Deliberately loose. This is a "did somebody type an address here" check, not an RFC. */
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function asRecord(payload: unknown): Record<string, unknown> {
     return (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
@@ -46,7 +53,7 @@ function contactProblem(row: Record<string, unknown>): RowProblem | null {
         };
     }
     const email = str(row.email);
-    if (email && !EMAIL_SHAPE.test(email)) {
+    if (email && !looksLikeEmailAddress(email)) {
         return {
             field: 'email', value: email,
             reason: 'This does not look like an email address. Correct it, or clear it — a contact without one is fine.',
@@ -71,24 +78,24 @@ function memberProblem(row: Record<string, unknown>): RowProblem | null {
             reason: 'This entry has no email address, and an invitation has nowhere else to go.',
         };
     }
-    if (!EMAIL_SHAPE.test(email)) {
+    if (!looksLikeEmailAddress(email)) {
         return {
             field: 'email', value: email,
             reason: 'This does not look like an email address, so the invitation could not be delivered.',
         };
     }
     const role = str(row.role);
-    if (role === 'agent') {
+    if (role === ROLE.AGENT) {
         return {
             field: 'role', value: role,
             reason: 'Agent access is granted per inspection rather than held as a seat, so it cannot be given here.',
             suggestion: 'inspector',
         };
     }
-    if (!STAFF_ROLES.includes(role)) {
+    if (!(BUNDLE_MEMBER_ROLES as readonly string[]).includes(role)) {
         return {
             field: 'role', value: role,
-            reason: `A team member has to be one of ${STAFF_ROLES.join(', ')}.`,
+            reason: `A team member has to be one of ${BUNDLE_MEMBER_ROLES.join(', ')}.`,
             suggestion: 'inspector',
         };
     }

@@ -1,6 +1,6 @@
 import type { migrationRows } from '../../lib/db/schema';
 import { TeamService } from '../team.service';
-import type { BundleMember } from '../../lib/migration-intake/bundle';
+import { asBundleMemberRole, type BundleMember } from '../../lib/migration-intake/bundle';
 
 type StagedRowRecord = typeof migrationRows.$inferSelect;
 
@@ -27,9 +27,9 @@ export interface InviteDispatch {
  * row runs — the two halves are easier to keep honest when the one that writes
  * is the only thing in this file.
  *
- * Never throws for a reason of its own: a row that cannot be written throws
- * from underneath, and the caller's per-row catch is what turns that into a
- * failed row without ending the run.
+ * Throws for exactly ONE reason of its own — a role that is not one an import
+ * may grant — and otherwise only from underneath. Either way the caller's
+ * per-row catch turns it into a failed row without ending the run.
  */
 export async function applyMemberRow(
     db: D1Database,
@@ -54,11 +54,20 @@ export async function applyMemberRow(
         };
     }
 
+    // The format carries the role as the FILE spelled it, so it is narrowed
+    // here before it can become a grant. The caller has already refused every
+    // row the describer objects to — including `agent`, which has its own
+    // sentence — so this throw is unreachable through the apply path and is
+    // there to keep it that way: a widened value must never reach a grant
+    // silently, and the caller's own catch turns it into a failed row.
+    const role = asBundleMemberRole(payload.role);
+    if (!role) throw new Error(`"${payload.role}" is not a role an import may grant.`);
+
     const team = new TeamService(db);
     const invite = await team.createInvite({
         tenantId: params.tenantId,
         email: payload.email,
-        role: payload.role,
+        role,
         permissionOverrides: payload.permissionOverrides ?? null,
     });
     invites.push({
