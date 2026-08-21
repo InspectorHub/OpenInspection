@@ -55,10 +55,9 @@ function makeR2() {
  *
  * `survivesWhere` is the SQL that counts rows still holding what the rule was
  * about to take. It is `1=1` for a `delete` rule — the row itself is the
- * answer — and a column predicate for the one `erase_in_place` rule, where the
- * row survives either way and only its actor columns tell you whether the sweep
- * reached it. Taking it from `rule.action` rather than restating it means a rule
- * that changes verb cannot leave a test asserting the old one.
+ * answer — and a column predicate for each `erase_in_place` rule, where the
+ * row survives either way and only the cleared columns tell you whether the
+ * sweep reached it.
  */
 interface Seeder {
     seed: (sqlite: ReturnType<typeof createTestDb>['sqlite'], tenantId: string, id: string) => void;
@@ -67,7 +66,7 @@ interface Seeder {
 
 const SEEDERS: Record<string, Seeder> = {
     audit_logs: {
-        // The one erase_in_place rule: the row is kept and the actor is cleared,
+        // An erase_in_place rule: the row is kept and the actor is cleared,
         // so "survives" has to mean "still identifies somebody".
         survivesWhere: 'user_id is not null',
         seed: (s, t, id) => s.prepare(
@@ -165,6 +164,33 @@ const SEEDERS: Record<string, Seeder> = {
             `insert into tenant_slug_history (old_slug, tenant_id, changed_at, retired_until)
              values (?, ?, ?, ?)`,
         ).run(id, t, LONG_AGO, LONG_AGO),
+    },
+    migration_batches: {
+        // The second erase_in_place rule: the batch row is kept and its file
+        // key and due date are cleared, so "survives" means "still points at a
+        // file". A `1=1` count here would report the preserved and the swept
+        // tenant identically, because both rows are still there.
+        survivesWhere: 'source_key is not null',
+        // Its own `expires_at` is what this rule compares, not the catalogue
+        // window — a batch seeded only "long ago" by `created_at` would never
+        // be due and the case would prove nothing about holds.
+        //
+        // The staging row rides along because the executor takes both, and a
+        // hold that preserved the batch while its rows went would preserve a
+        // header with nothing under it.
+        seed: (s, t, id) => {
+            s.prepare(
+                `insert into migration_batches
+                 (id, tenant_id, created_by, intent, vendor, adapter_name, adapter_version,
+                  manifest, status, created_at, expires_at, source_key)
+                 values (?, ?, 'u-1', 'contacts.import', 'csv_generic', 'csv-generic', '1',
+                         '{"warnings":[]}', 'staged', ?, ?, ?)`,
+            ).run(id, t, LONG_AGO, LONG_AGO, `${t}/migrations/${id}/source.csv`);
+            s.prepare(
+                `insert into migration_rows (id, batch_id, tenant_id, entity, position, payload, status)
+                 values (?, ?, ?, 'contact', 0, '{"name":"Alice","type":"client"}', 'pending')`,
+            ).run(`${id}-row`, id, t);
+        },
     },
 };
 

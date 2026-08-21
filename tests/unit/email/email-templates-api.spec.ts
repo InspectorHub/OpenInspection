@@ -68,7 +68,7 @@ describe('GET /api/admin/email-templates', () => {
         expect(res.status).toBe(200);
         const body = await res.json() as { success: boolean; data: Array<{ trigger: string; name: string; required: boolean; enabled: boolean; isCustomized: boolean; subject: string; category: string }> };
         expect(body.success).toBe(true);
-        expect(body.data).toHaveLength(21);
+        expect(body.data).toHaveLength(25);
         // The editor lists what a TENANT may rewrite. Account recovery and our
         // own billing notices are ours, so they must never appear here — assert
         // the rule, not just its first instance.

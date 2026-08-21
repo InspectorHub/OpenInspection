@@ -27,6 +27,15 @@ type Evaluation = {
     failures: string[];
 };
 
+type Ratchet = {
+    ok: boolean;
+    awaitingTotal: number;
+    ceilingTotal: number;
+    over: string[];
+    under: string[];
+    failures: string[];
+};
+
 let findSubmitCallSites: (source: string) => Hit[];
 let findBusyViolations: (source: string) => BusyViolation[];
 let evaluate: (input: {
@@ -37,6 +46,11 @@ let evaluate: (input: {
     busyConsumers: number;
     busyViolations: string[];
 }) => Evaluation;
+let awaitingByFile: (baseline: Record<string, string>) => Map<string, number>;
+let evaluateAwaitingRatchet: (input: {
+    awaiting: Map<string, number>;
+    ceiling: Record<string, number> | null;
+}) => Ratchet;
 
 beforeAll(async () => {
     const scriptPath = path.resolve(
@@ -44,9 +58,8 @@ beforeAll(async () => {
         '../../../scripts/check-submit-guard.mjs',
     );
     // @vite-ignore — load the .mjs via native Node import.
-    ({ findSubmitCallSites, findBusyViolations, evaluate } = await import(
-        /* @vite-ignore */ pathToFileURL(scriptPath).href
-    ));
+    ({ findSubmitCallSites, findBusyViolations, evaluate, awaitingByFile, evaluateAwaitingRatchet } =
+        await import(/* @vite-ignore */ pathToFileURL(scriptPath).href));
 });
 
 describe('findSubmitCallSites — the call shape, not the name', () => {
@@ -83,6 +96,51 @@ describe('findSubmitCallSites — the call shape, not the name', () => {
         const hits = findSubmitCallSites(src);
         expect(hits).toHaveLength(5);
         expect(hits.map((h) => h.line)).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    it('flags a fetcher whose NAME does not contain "fetcher"', () => {
+        // Miscount #2, and the reason the `*Fetcher` rule above is not enough:
+        // it covers 53 identifiers and every one of them ends in "fetcher", so
+        // a fetcher called `write` was never seen at all — not reported, not
+        // baselined, not counted in the awaiting ceiling. Three real files were
+        // in that state (StaffNoticeBell, CommunicationSection, messages.tsx).
+        const src = [
+            `const write = useFetcher<{ ok?: boolean }>();`,
+            `write.submit({ intent }, { method: "post" });`,
+        ].join('\n');
+        const hits = findSubmitCallSites(src);
+        expect(hits).toHaveLength(1);
+        expect(hits[0].line).toBe(2);
+        expect(hits[0].ident).toBe('write');
+    });
+
+    it('counts a declared fetcher ONCE even when its name also matches the shape rule', () => {
+        // The two passes must not double-count: `deleteFetcher` is found by the
+        // shape rule AND declared via useFetcher. A duplicate here would inflate
+        // rawSites past hits.size and trip the key-collision failure instead.
+        const src = [
+            `const deleteFetcher = useFetcher();`,
+            `deleteFetcher.submit(a, post);`,
+        ].join('\n');
+        expect(findSubmitCallSites(src)).toHaveLength(1);
+    });
+
+    it('does NOT flag a `.submit()` on something the file never declared as a fetcher', () => {
+        // The blunt fix for miscount #2 — `\\w+\\.submit\\s*\\(` — matches this and
+        // every unrelated member chain in the tree. The rule reads DECLARATIONS
+        // instead, so a form is still a form.
+        expect(findSubmitCallSites(`formRef.current.submit();`)).toEqual([]);
+        expect(findSubmitCallSites(`const form = document.forms[0];\nform.submit();`)).toEqual([]);
+    });
+
+    it('finds hits in source order regardless of which pass saw them', () => {
+        const src = [
+            `const write = useFetcher();`,
+            `deleteFetcher.submit(a, post);`,
+            `write.submit(b, post);`,
+            `coverFetcher.submit(c, post);`,
+        ].join('\n');
+        expect(findSubmitCallSites(src).map((h) => h.line)).toEqual([2, 3, 4]);
     });
 
     it('tolerates whitespace before the paren', () => {
@@ -277,5 +335,164 @@ describe('findBusyViolations — the non-destructured consumer shape', () => {
     it('honours the escape hatch on the namespace form too', () => {
         const src = `${IMPORT}\n// submit-guard-allow-no-busy: the trigger unmounts on click.\nconst install = useGuardedSubmit<Res>();\ninstall.submit(p, post);\n`;
         expect(findBusyViolations(src)).toEqual([]);
+    });
+});
+
+const AWAITING = 'AWAITING #106 CONVERSION — a user mutation, not converted yet.';
+const EXEMPT = 'Not a mutation — a poll.';
+
+describe('awaitingByFile — the debt the baseline DECLARES', () => {
+    it('counts only entries carrying the AWAITING marker, grouped by file', () => {
+        const per = awaitingByFile({
+            'a.tsx::x::fetcher.submit(1);': AWAITING,
+            'a.tsx::y::fetcher.submit(2);': AWAITING,
+            'a.tsx::z::fetcher.submit(3);': EXEMPT,
+            'b.tsx::x::fetcher.submit(4);': AWAITING,
+        });
+        expect([...per.entries()].sort()).toEqual([
+            ['a.tsx', 2],
+            ['b.tsx', 1],
+        ]);
+    });
+
+    it('reads the debt from the BASELINE, so a converted site stays counted until --update', () => {
+        // Converting a call site removes the raw submit, which makes its key
+        // stale — reported, not failed — and the entry survives until someone
+        // runs the flag. Counting HITS instead would turn every conversion red
+        // and teach people to run --update without reading it.
+        expect(awaitingByFile({ 'gone.tsx::x::fetcher.submit(1);': AWAITING }).get('gone.tsx')).toBe(1);
+    });
+
+    it('does not count an entry with no reason at all', () => {
+        expect(awaitingByFile({ 'a.tsx::x::fetcher.submit(1);': '' }).size).toBe(0);
+    });
+});
+
+describe('evaluateAwaitingRatchet — the backlog may only shrink', () => {
+    it('passes when the declared debt equals the ceiling', () => {
+        const r = evaluateAwaitingRatchet({ awaiting: new Map([['a.tsx', 2]]), ceiling: { 'a.tsx': 2 } });
+        expect(r.ok).toBe(true);
+        expect([r.awaitingTotal, r.ceilingTotal]).toEqual([2, 2]);
+    });
+
+    it('FAILS when the backlog grows, and NAMES the file', () => {
+        const r = evaluateAwaitingRatchet({ awaiting: new Map([['a.tsx', 3]]), ceiling: { 'a.tsx': 2 } });
+        expect(r.ok).toBe(false);
+        expect(r.over).toEqual(['a.tsx']);
+        expect(r.failures.join(' ')).toMatch(/GREW: 3 awaiting against a ceiling of 2.*a\.tsx \(3 > 2\)/);
+    });
+
+    it('POSITIVE CONTROL — a file the ceiling declares NOTHING about is visible, not skipped', () => {
+        // The shape a new offender actually arrives in: a path that appears in
+        // no ceiling entry at all. A gate that iterates the ceiling instead of
+        // the union would never look at it, and would report green.
+        const r = evaluateAwaitingRatchet({
+            awaiting: new Map([
+                ['known.tsx', 2],
+                ['brand-new.tsx', 1],
+            ]),
+            ceiling: { 'known.tsx': 2 },
+        });
+        expect(r.ok).toBe(false);
+        expect(r.over).toEqual(['brand-new.tsx']);
+        expect(r.failures.join(' ')).toContain('brand-new.tsx (1 > 0)');
+    });
+
+    it('FAILS on a slack ceiling too, and NAMES the file — free slots are how debt returns', () => {
+        const r = evaluateAwaitingRatchet({ awaiting: new Map([['a.tsx', 1]]), ceiling: { 'a.tsx': 2 } });
+        expect(r.ok).toBe(false);
+        expect(r.under).toEqual(['a.tsx']);
+        expect(r.failures.join(' ')).toMatch(/slack.*1 free slot\(s\).*a\.tsx \(1 < 2\)/);
+    });
+
+    it('lets a move between files pass — the verdict is on the total, not per file', () => {
+        // Per-file numbers are diagnosis. Enforcing them would make renaming a
+        // component a gate failure, which is the false-alarm direction that
+        // teaches people to bypass a gate.
+        const r = evaluateAwaitingRatchet({
+            awaiting: new Map([['moved.tsx', 2]]),
+            ceiling: { 'original.tsx': 2 },
+        });
+        expect(r.ok).toBe(true);
+        expect([r.over, r.under]).toEqual([['moved.tsx'], ['original.tsx']]);
+    });
+
+    it('FAILS when the marker matches nothing while the ceiling still holds debt', () => {
+        // An empty result reads as a finished burn-down, and that is the most
+        // attractive wrong answer this gate can give.
+        const r = evaluateAwaitingRatchet({ awaiting: new Map(), ceiling: { 'a.tsx': 2 } });
+        expect(r.ok).toBe(false);
+        expect(r.failures.join(' ')).toMatch(/matched ZERO baseline entries while the ceiling still holds 2/);
+    });
+
+    it('FAILS when the ceiling cannot be read — an unreadable input is never "nothing to report"', () => {
+        for (const ceiling of [null, [] as unknown as Record<string, number>]) {
+            const r = evaluateAwaitingRatchet({ awaiting: new Map([['a.tsx', 1]]), ceiling });
+            expect(r.ok).toBe(false);
+            expect(r.failures.join(' ')).toMatch(/missing or is not a JSON object/);
+        }
+    });
+
+    it('FAILS on a ceiling value that is not a non-negative integer', () => {
+        const r = evaluateAwaitingRatchet({
+            awaiting: new Map([['a.tsx', 1]]),
+            ceiling: { 'a.tsx': 1, 'b.tsx': -1, 'c.tsx': 'many' as unknown as number },
+        });
+        expect(r.ok).toBe(false);
+        expect(r.failures.join(' ')).toMatch(/b\.tsx = -1.*c\.tsx = "many"/);
+    });
+
+    it('passes an empty ceiling against an empty backlog — nothing frozen, nothing owed', () => {
+        expect(evaluateAwaitingRatchet({ awaiting: new Map(), ceiling: {} }).ok).toBe(true);
+    });
+});
+
+describe('the two committed files agree', () => {
+    it('the ceiling equals the baseline\'s declared debt, file by file', async () => {
+        // The seed is by hand and the ratchet only ever tightens, so the two can
+        // drift apart in exactly one way: somebody edits the baseline and not
+        // the ceiling. That is the drift the gate exists to catch, and this
+        // asserts the committed state is the state the gate reports green.
+        const { readFileSync } = await import('node:fs');
+        const dir = path.resolve(import.meta.dirname ?? process.cwd(), '../../../scripts');
+        const baseline = JSON.parse(readFileSync(path.join(dir, 'submit-guard-baseline.json'), 'utf8'));
+        const ceiling = JSON.parse(readFileSync(path.join(dir, 'submit-guard-awaiting-ceiling.json'), 'utf8'));
+        const r = evaluateAwaitingRatchet({ awaiting: awaitingByFile(baseline), ceiling });
+        expect({ over: r.over, under: r.under, failures: r.failures }).toEqual({
+            over: [],
+            under: [],
+            failures: [],
+        });
+
+        // The burn-down is DONE: zero awaiting, and a ceiling of exactly {}.
+        //
+        // ⚠️ This used to read `expect(r.awaitingTotal).toBeGreaterThan(0)` — a
+        // guard against a vacuously green ratchet, and the right assertion right
+        // up until the day the debt actually reached zero. Deleting it outright
+        // would leave "0 == 0" as the whole test, which passes just as happily
+        // when the marker has stopped matching as when the work is finished.
+        // So the emptiness is asserted POSITIVELY instead, against the two facts
+        // that distinguish the two states: the baseline is large and every entry
+        // in it carries a written reason, and the ceiling is the empty object
+        // rather than a stale set of open slots. The marker's own liveness is
+        // pinned separately by the awaitingByFile block above, which hands it a
+        // genuine AWAITING reason and requires a count of 1.
+        expect(r.awaitingTotal).toBe(0);
+        expect(ceiling).toEqual({});
+        const keys = Object.keys(baseline);
+        expect(keys.length).toBeGreaterThan(40);
+        expect(keys.filter((k) => !String(baseline[k] ?? '').trim())).toEqual([]);
+    });
+
+    it('a single AWAITING entry fails against the zeroed ceiling', () => {
+        // What the zero actually buys, asserted rather than assumed: with no
+        // slots left open, one new debt entry is `1 > 0` and fails on the spot.
+        const r = evaluateAwaitingRatchet({
+            awaiting: awaitingByFile({ 'new.tsx::onSave::fetcher.submit(x);': AWAITING }),
+            ceiling: {},
+        });
+        expect(r.ok).toBe(false);
+        expect(r.failures.join(' ')).toMatch(/backlog GREW: 1 awaiting against a ceiling of 0/);
+        expect(r.over).toEqual(['new.tsx']);
     });
 });

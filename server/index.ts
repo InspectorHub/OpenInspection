@@ -65,6 +65,7 @@ import scheduleWeekSummaryRoutes from './api/schedule-week-summary';
 import teamRoutes from './api/team';
 import contactRoutes from './api/contacts';
 import contactsImportRoutes from './api/contacts/import';
+import migrationIntakeRoutes from './api/migration-intake';
 import invoiceRoutes from './api/invoices';
 import { servicesRoutes } from './api/services';
 import automationsRoutes from './api/automations';
@@ -72,7 +73,6 @@ import messageTemplateRoutes from './api/message-templates';
 import metricsRoutes from './api/metrics';
 import auditRoutes from './api/audit';
 import marketplaceRoutes from './api/marketplace';
-import templateMigrationRoutes from './api/template-migrations';
 import dataRoutes from './api/data';
 import icsRoutes from './api/ics';
 import userRoutes from './api/users';
@@ -418,6 +418,7 @@ const routes = app
   .route('/api/contacts', contactRoutes)
   // Import sub-router — extracted to fix hono/client type-collapse (C-10)
   .route('/api/contacts', contactsImportRoutes)
+  .route('/api/imports', migrationIntakeRoutes)
   .route('/api/recommendations', recommendationsRoutes)
   .route('/api/contractor-types', contractorTypesRoutes)
   .route('/api/role-profiles', roleProfilesRoutes)
@@ -430,9 +431,6 @@ const routes = app
   .route('/api/metrics', metricsRoutes)
   .route('/api/audit', auditRoutes)
   .route('/api/templates/marketplace', marketplaceRoutes)
-  // Sprint 2 S2-6 — migrate inspections from one template to another.
-  // Mounted at /api/templates so the path is /api/templates/:oldId/migrate-to/:newId.
-  .route('/api/templates', templateMigrationRoutes)
   .route('/api/data', dataRoutes)
   .route('/api/ics', icsRoutes)
   .route('/api/users', userRoutes)

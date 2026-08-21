@@ -404,6 +404,10 @@ npx playwright test --grep "estimate range"
 SEED_E2E=1 npm run test:e2e
 ```
 
-The cross-repo rationale for `directory = suite` (shared with the portal and CMS
-repos) lives in the private superproject at
-`[redacted]`.
+**Why `directory = suite` at all.** A spec's home decides which config collects
+it, so classification is a filesystem fact rather than a convention somebody has
+to remember — and `npm run lint:tests` can then check it. The alternative,
+tagging each spec with the suite it belongs to, puts the answer inside the file
+that a misfiled spec is already wrong about, and no gate can see the
+disagreement. Every config's `include` glob is the whole rule; read them
+together with the table above and the layout is complete.

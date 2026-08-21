@@ -293,8 +293,9 @@ export async function seedStarterContent(
 
     // ── contractor types ────────────────────────────────────────────────
     // Standard contractor taxonomy (e.g. "Licensed Electrician") backing the
-    // repair-item contractor dropdown. Idempotent on (tenant, name) — a tenant
-    // that already has any contractor_types is skipped row-by-row.
+    // repair-item contractor dropdown. Idempotent row-by-row, but on TWO
+    // different keys: canonical rows on `trade_slug`, the extras on `name`,
+    // because only the canonical ones have a slug to be keyed on.
     let contractorTypesSeeded = 0;
     {
         const existing = await d
@@ -303,8 +304,11 @@ export async function seedStarterContent(
         const existingNames = new Set(existing.map(r => r.name as string));
         // Canonical rows are matched by SLUG, not by name (#277). A workspace that
         // renamed "Licensed Electrician" to "Our Sparky" still HAS that trade, and
-        // keying on name would seed a second row for it on the next run. There is
-        // no unique index on this table, so nothing downstream would object.
+        // keying on name would seed a second row for it on the next run.
+        // `uq_contractor_types_tenant_trade` now rejects that second row rather
+        // than letting it through, so the cost of getting this wrong is a failed
+        // re-seed, not a silently doubled dropdown. Match on the slug anyway: the
+        // index is the backstop, not the check.
         const existingSlugs = new Set(existing.map(r => r.tradeSlug).filter(Boolean) as string[]);
         const now = new Date();
         const rows = CONTRACTOR_TYPES.filter(ct =>

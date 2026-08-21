@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useFetcher } from "react-router";
 import { Modal, Button } from "@core/shared-ui";
 import type { Severity } from "~/lib/severity";
 import { SEVERITIES, SEVERITY_LABEL } from "~/lib/severity";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export interface CommentEditorProps {
@@ -30,7 +30,9 @@ export interface CommentEditorProps {
  * by the buyer or their agent, in the repair request.
  */
 export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: CommentEditorProps) {
-  const fetcher = useFetcher<{ ok?: boolean }>();
+  // #106 - user mutation: saves a canned comment. The Save button is
+  // already `disabled={saving}`, so the guard never has to refuse a click.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<{ ok?: boolean }>();
   const editing = !!comment;
   const [text, setText] = useState("");
   const [section, setSection] = useState("");
@@ -58,13 +60,12 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
   }, [fetcher.state, fetcher.data, onClose]);
 
   const error = !text.trim() ? m.comment_editor_error_text_required() : null;
-  const saving = fetcher.state !== "idle";
   const isDefect = severity === "significant";
 
   function save() {
     if (error) return;
     submittedRef.current = true;
-    fetcher.submit(
+    submit(
       {
         intent: editing ? "edit" : "save",
         ...(editing ? { id: comment!.id } : {}),

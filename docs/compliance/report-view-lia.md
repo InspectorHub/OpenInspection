@@ -553,6 +553,12 @@ basis changes, and the change is from legitimate interests to consent.
 - **Populating a report identifier with something that is not a report
   identifier.** Section 3.4(b).
 
+Each item above is also carried in the code it governs, as a
+`view-invariant:` comment at the site that would have to change first.
+`npm run lint:view-invariants` fails when one of them loses its anchor, or
+when an anchor names a condition this section does not state — so the two
+halves cannot drift apart quietly.
+
 If a change in this list is wanted, the correct move is a new assessment
 reaching a new conclusion — most likely that consent is required — not an
 amendment to this one.

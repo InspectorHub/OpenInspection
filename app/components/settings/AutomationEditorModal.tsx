@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Link, useFetcher } from "react-router";
+import { Link } from "react-router";
 import { Modal, Icon } from "@core/shared-ui";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import type { Rule, Svc, TemplateSummary, RoleProfileOption, Conditions } from "~/routes/settings-automations";
 import { TRIGGER_LABELS, RECIPIENT_KIND_LABELS, type RecipientKindOption } from "~/routes/settings-automations";
@@ -22,8 +23,9 @@ export function AutomationEditorModal({
   onClose: () => void;
 }) {
   const parsed: Conditions = rule?.conditions ? (JSON.parse(rule.conditions) as Conditions) : {};
-  const fetcher = useFetcher<{ ok: boolean; error?: string }>();
-  const submitting = fetcher.state !== "idle";
+  // #106 - deleting an automation rule is irreversible. The delete button is
+  // already `disabled={submitting}`, so the guard never has to refuse a click.
+  const { fetcher, submit, busy: submitting } = useGuardedSubmit<{ ok: boolean; error?: string }>();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Track L (Task 9) — channel multi-select. Default email for a new rule.
@@ -62,7 +64,7 @@ export function AutomationEditorModal({
             <button type="button" disabled={submitting}
               onClick={() => {
                 if (!confirmDelete) { setConfirmDelete(true); return; }
-                fetcher.submit({ intent: "delete", id: rule.id }, { method: "post" });
+                submit({ intent: "delete", id: rule.id }, { method: "post" });
               }}
               className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-bad-fg disabled:opacity-50">
               {confirmDelete ? m.settings_automations_confirm_delete() : m.common_delete()}

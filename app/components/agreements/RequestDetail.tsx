@@ -3,6 +3,7 @@ import { useFetcher } from "react-router";
 import { SignerList, type SignerRow } from "~/components/agreements/SignerList";
 import type { action } from "~/routes/resources/agreement-signers";
 import { AGREEMENT_SIGNERS_ACTION } from "~/routes/resources/agreement-signers";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -15,7 +16,10 @@ import { m } from "~/paraglide/messages";
 export function RequestDetail({ requestId }: { requestId: string }) {
   const loadFetcher = useFetcher<typeof action>();
   // Separate fetchers per competing mutation (RR rule: shared fetcher aborts in-flight).
-  const remindFetcher = useFetcher<typeof action>();
+  // #106 - a reminder sends a real email to a real signer. The two load
+  // fetchers around it stay raw: they are selects, not writes.
+  // submit-guard-allow-no-busy: the row swaps to a "sent" state on the reply.
+  const { fetcher: remindFetcher, submit: submitRemind } = useGuardedSubmit<typeof action>();
   const copyFetcher = useFetcher<typeof action>();
   const post = { method: "post", action: AGREEMENT_SIGNERS_ACTION } as const;
 
@@ -47,7 +51,7 @@ export function RequestDetail({ requestId }: { requestId: string }) {
   // Remind is fire-and-forget through its own fetcher; the result (including a
   // 429/409 friendly message) renders as an inline banner, never an alert.
   const onRemind = (signerId: string) => {
-    remindFetcher.submit({ intent: "remind", requestId, signerId }, post);
+    submitRemind({ intent: "remind", requestId, signerId }, post);
   };
 
   // Copy-link resolves the persistent URL via its own fetcher, then SignerList

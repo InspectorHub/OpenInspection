@@ -24,8 +24,8 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import { useEffect, useRef, useState } from "react";
-import { useFetcher } from "react-router";
 import { Button, Banner } from "@core/shared-ui";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 interface AgentMagicLoginActionResult {
@@ -54,7 +54,9 @@ export function AgentReportActions({
   hasAccount,
   reportPath,
 }: AgentReportActionsProps) {
-  const fetcher = useFetcher<AgentMagicLoginActionResult>();
+  // #106 - user mutation: mints a magic-login and creates the agent workspace
+  // session. The CTA is already `disabled={submitting}`.
+  const { fetcher, submit, busy: submitting } = useGuardedSubmit<AgentMagicLoginActionResult>();
   const [error, setError] = useState(false);
   const [sent, setSent] = useState(false);
   const lastHandled = useRef<AgentMagicLoginActionResult | undefined>(undefined);
@@ -96,7 +98,6 @@ export function AgentReportActions({
     );
   }
 
-  const submitting = fetcher.state !== "idle";
 
   if (sent) {
     return (
@@ -120,7 +121,7 @@ export function AgentReportActions({
             data-testid="agent-report-workspace-cta"
             onClick={() => {
               setError(false);
-              fetcher.submit(
+              submit(
                 { intent: "agent-magic-login", tenant, inspectionId, token },
                 { method: "POST" },
               );

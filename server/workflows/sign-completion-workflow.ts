@@ -10,10 +10,70 @@ import { buildTenantEmailService } from '../lib/email/build-email-service';
 import { getDeploymentProfile } from '../lib/deployment-profile';
 import { PlanQuotaGuard, readTenantTier } from '../features/plan-quota/guard';
 import { tenantAiCapsLoader } from '../features/plan-quota/ai-caps';
-import { drizzle } from 'drizzle-orm/d1';
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
 import { r2Keys } from '../lib/r2-keys';
+
+/**
+ * The machine-readable half of the evidence pack — extracted from the workflow
+ * step so it can be asserted directly.
+ *
+ * `contractingEntity` is read from the envelope's FROZEN identity columns, never
+ * from `tenant_configs`. The zip's certificate.pdf already names the entity, but
+ * only as rasterized pixels; anyone processing an evidence pack programmatically
+ * (opposing review e-discovery, an insurer, our own verifier) had no field to
+ * read it from. NULL means the envelope predates identity capture and says so —
+ * resolving today's name here would assert something untrue about what was
+ * signed, which is the defect the snapshot columns exist to prevent.
+ */
+export async function buildAuditTrailPayload(
+    db: DrizzleD1Database<typeof schema>,
+    tenantId: string,
+    requestId: string,
+    pubKey: { pem: string; fingerprint: string },
+) {
+    const envelope = await db.select({
+        signerLegalName: schema.agreementRequests.signerLegalName,
+        signerCompanyName: schema.agreementRequests.signerCompanyName,
+    })
+        .from(schema.agreementRequests)
+        .where(and(
+            eq(schema.agreementRequests.tenantId, tenantId),
+            eq(schema.agreementRequests.id, requestId),
+        ))
+        .get();
+    const auditRows = await db.select().from(schema.esignAuditLogs)
+        .where(and(
+            eq(schema.esignAuditLogs.tenantId, tenantId),
+            eq(schema.esignAuditLogs.requestId, requestId),
+        ))
+        .all();
+    return {
+        envelopeId: requestId,
+        algorithm: 'Ed25519',
+        publicKeyPem: pubKey.pem,
+        keyFingerprint: pubKey.fingerprint,
+        // Both names, because they answer different questions: the legal name is
+        // who the client contracted with, the company name is what they saw on
+        // the page while doing it.
+        contractingEntity: {
+            legalName: envelope?.signerLegalName ?? null,
+            companyName: envelope?.signerCompanyName ?? null,
+            capturedAt: 'envelope-creation' as const,
+        },
+        events: auditRows.map((r) => ({
+            id: r.id,
+            event: r.event,
+            createdAt: r.createdAt,
+            payloadJson: r.payloadJson,
+            prevHash: r.prevHash,
+            hash: r.hash,
+            signature: r.signature,
+            keyFingerprint: r.keyFingerprint,
+        })),
+    };
+}
 
 export interface SignCompletionParams {
     requestId: string;
@@ -133,28 +193,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                 const pubKey = await signing.getPublicKey(tenantId);
                 if (!pubKey) return null;
                 const db = drizzle(env.DB, { schema });
-                const auditRows = await db.select().from(schema.esignAuditLogs)
-                    .where(and(
-                        eq(schema.esignAuditLogs.tenantId, tenantId),
-                        eq(schema.esignAuditLogs.requestId, requestId),
-                    ))
-                    .all();
-                const auditPayload = {
-                    envelopeId: requestId,
-                    algorithm: 'Ed25519',
-                    publicKeyPem: pubKey.pem,
-                    keyFingerprint: pubKey.fingerprint,
-                    events: auditRows.map((r) => ({
-                        id: r.id,
-                        event: r.event,
-                        createdAt: r.createdAt,
-                        payloadJson: r.payloadJson,
-                        prevHash: r.prevHash,
-                        hash: r.hash,
-                        signature: r.signature,
-                        keyFingerprint: r.keyFingerprint,
-                    })),
-                };
+                const auditPayload = await buildAuditTrailPayload(db, tenantId, requestId, pubKey);
                 const zipBuf = await buildEvidencePack({
                     r2: env.PHOTOS,
                     auditTrailJson: JSON.stringify(auditPayload, null, 2),

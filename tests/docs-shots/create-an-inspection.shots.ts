@@ -3,11 +3,13 @@ import { loginAsSeedUser } from '../e2e/helpers/seed-login';
 import { SEED_EMAILS, SEED_TENANT_SLUG } from '../seed-fixtures';
 
 /**
- * Captures for docs/user-guide/create-an-inspection.md.
+ * Captures for the "Creating an inspection" guide, published at
+ * <https://inspectorhub.io/docs/create-an-inspection>.
  *
  * NO COPY LIVES HERE. Every id below has a matching
- * `<!-- shot: <id> | … -->` in that file, and the docs build fails if the two
- * sets differ in either direction.
+ * `<!-- shot: <id> | … -->` in that guide's markdown, which lives with the
+ * hosted docs rather than in this repository, and the docs build there fails if
+ * the two sets differ in either direction.
  *
  * Self-sufficient by contract: it seeds nothing of its own beyond the shared
  * `SEED_E2E` fixtures, logs in itself, and never depends on another guide

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useFetcher, useRevalidator, useSearchParams } from "react-router";
+import { useRevalidator, useSearchParams } from "react-router";
 import { Banner, RadioCardGroup } from "@core/shared-ui";
 import { GoogleSignInButton } from "~/components/GoogleSignInButton";
 import { CalendarGlyph } from "~/components/settings/CalendarGlyph";
@@ -14,6 +14,7 @@ import {
   type CalendarPickerData,
 } from "~/components/settings/CalendarReadSetPicker";
 import type { action } from "~/routes/settings-schedule";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export type CalendarCapability = "availability_read" | "events_read_write";
@@ -41,8 +42,12 @@ export function CalendarConnectPanel({
   const [capability, setCapability] = useState<CalendarCapability>("events_read_write");
   const [connecting, setConnecting] = useState(false);
   const popupPollRef = useRef<number | null>(null);
-  const syncFetcher = useFetcher<typeof action>();
-  const disconnectFetcher = useFetcher<typeof action>();
+  // #106 - a sync pulls the remote calendar and a disconnect drops the stored
+  // grant. Two guards so one cannot abort the other.
+  const { fetcher: syncFetcher, submit: submitSync, busy: syncing } =
+    useGuardedSubmit<typeof action>();
+  const { fetcher: disconnectFetcher, submit: submitDisconnect, busy: disconnecting } =
+    useGuardedSubmit<typeof action>();
   const revalidator = useRevalidator();
   const [searchParams, setSearchParams] = useSearchParams();
   const connectHref = `/api/calendar/connect?capability=${capability}&provider=google`;
@@ -124,8 +129,6 @@ export function CalendarConnectPanel({
     }, 400);
   }, [connectHref]);
 
-  const syncing = syncFetcher.state !== "idle";
-  const disconnecting = disconnectFetcher.state !== "idle";
   const syncResult =
     syncFetcher.state === "idle" && syncFetcher.data?.intent === "calendar-sync"
       ? syncFetcher.data
@@ -176,7 +179,7 @@ export function CalendarConnectPanel({
             <button
               type="button"
               disabled={syncing}
-              onClick={() => syncFetcher.submit({ intent: "calendar-sync" }, { method: "post" })}
+              onClick={() => submitSync({ intent: "calendar-sync" }, { method: "post" })}
               className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
             >
               {syncing ? m.settings_calconnect_syncing() : m.settings_calconnect_sync_now()}
@@ -185,7 +188,7 @@ export function CalendarConnectPanel({
               type="button"
               disabled={disconnecting}
               onClick={() =>
-                disconnectFetcher.submit({ intent: "calendar-disconnect" }, { method: "post" })
+                submitDisconnect({ intent: "calendar-disconnect" }, { method: "post" })
               }
               className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60"
             >

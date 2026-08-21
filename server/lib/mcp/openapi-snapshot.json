@@ -1,5 +1,51 @@
 [
   {
+    "operationId": "abandonImportRun",
+    "method": "DELETE",
+    "pathTemplate": "/api/imports/{batchId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "imports",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "batchId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the import run being read or changed",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id of the import run being read or changed"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Abandon an import run and its file",
+    "description": "Deletes a run that was never applied, together with its prepared entries and the file it was created from. A run that has been applied cannot be deleted, because its entries are the only record of where the imported rows came from."
+  },
+  {
+    "operationId": "acknowledgeTenantImport",
+    "method": "POST",
+    "pathTemplate": "/api/admin/import/acknowledge",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/AcknowledgeImportRequest"
+      }
+    },
+    "summary": "Acknowledge a waiting import run",
+    "description": "Records that a waiting import run has been picked up and emails the workspace to say so. It does not move the run: acknowledging a file is not converting it."
+  },
+  {
     "operationId": "activateTotp",
     "method": "POST",
     "pathTemplate": "/api/auth/2fa/verify",
@@ -288,6 +334,36 @@
     },
     "summary": "Mint the SMS opt-in link for a notice the agent owns",
     "description": "Mints the sealed double-opt-in token for the contact row the notice is addressed to — the agent's own contact in the sending company. Keyed to a notice the caller already owns, so it cannot be aimed at anyone else."
+  },
+  {
+    "operationId": "applyImportRun",
+    "method": "POST",
+    "pathTemplate": "/api/imports/{batchId}/apply",
+    "scopes": [
+      "write"
+    ],
+    "tag": "imports",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "batchId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the import run being read or changed",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id of the import run being read or changed"
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/ApplyRequest"
+      }
+    },
+    "summary": "Apply a prepared import run",
+    "description": "Writes every prepared entry to its real table, settling clashes by the chosen policy, and sends any invitations the run created. Resumable: pressing it again finishes a run that stopped part way, without repeating what already landed. Invitation delivery is reported as two numbers rather than folded into success, because a message that did not go out does not take its invitation back."
   },
   {
     "operationId": "applyTenantReportLinkExpiry",
@@ -1609,6 +1685,22 @@
     },
     "summary": "Create a scheduling event type",
     "description": "Creates a scheduling event type for the tenant. The slug must be unique per tenant; defaults are applied for omitted duration/price/color/sortOrder."
+  },
+  {
+    "operationId": "createImportRun",
+    "method": "POST",
+    "pathTemplate": "/api/imports",
+    "scopes": [
+      "write"
+    ],
+    "tag": "imports",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Start an import run from an uploaded file",
+    "description": "Accepts an uploaded export or spreadsheet, stores it, and stages an import run from it. When no adapter can read the file the run is opened in a waiting state instead — and where no support path exists, the upload is refused before anything is stored."
   },
   {
     "operationId": "createInspection",
@@ -5035,68 +5127,6 @@
     "description": "Auto-generated placeholder for createTagItemsTags (POST /{id}/items/{itemId}/tags, tags domain). TODO: replace with a real description sourced from the handler."
   },
   {
-    "operationId": "createTemplateMigrationMigrateTo",
-    "method": "POST",
-    "pathTemplate": "/api/templates/{oldId}/migrate-to/{newId}",
-    "scopes": [
-      "write"
-    ],
-    "tag": "templates",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [
-        {
-          "name": "oldId",
-          "in": "path",
-          "required": true,
-          "description": "TODO describe oldId field for the OpenInspection MCP integration",
-          "schema": {
-            "type": "string",
-            "minLength": 1,
-            "description": "TODO describe oldId field for the OpenInspection MCP integration"
-          }
-        },
-        {
-          "name": "newId",
-          "in": "path",
-          "required": true,
-          "description": "TODO describe newId field for the OpenInspection MCP integration",
-          "schema": {
-            "type": "string",
-            "minLength": 1,
-            "description": "TODO describe newId field for the OpenInspection MCP integration"
-          }
-        }
-      ],
-      "body": {
-        "type": "object",
-        "properties": {
-          "strategy": {
-            "type": "string",
-            "enum": [
-              "preserve_unknown",
-              "refuse_incompatible",
-              "force"
-            ],
-            "default": "preserve_unknown",
-            "description": "TODO describe strategy field for the OpenInspection MCP integration"
-          },
-          "dryRun": {
-            "type": "boolean",
-            "description": "TODO describe dryRun field for the OpenInspection MCP integration"
-          },
-          "deleteOldTemplate": {
-            "type": "boolean",
-            "description": "TODO describe deleteOldTemplate field for the OpenInspection MCP integration"
-          }
-        },
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
-      }
-    },
-    "summary": "Migrate inspections from old template to new template",
-    "description": "Auto-generated placeholder for createTemplateMigrationMigrateTo (POST /{oldId}/migrate-to/{newId}, templates domain). TODO: replace with a real description sourced from the handler."
-  },
-  {
     "operationId": "createTenantAgreements",
     "method": "POST",
     "pathTemplate": "/api/admin/agreements",
@@ -5133,26 +5163,56 @@
             "enum": [
               "inspection.sync_conflict_resolved"
             ],
-            "description": "TODO describe action field for the OpenInspection MCP integration"
+            "description": "The audit action to record. Constrained to the actions an inspector-driven request may write."
           },
           "resourceType": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64,
-            "description": "TODO describe resourceType field for the OpenInspection MCP integration"
+            "enum": [
+              "agent",
+              "agreement_request",
+              "audit_log",
+              "bulk_export",
+              "client",
+              "comment",
+              "contact_role_profile",
+              "contractor_type",
+              "credential",
+              "defect_category",
+              "import",
+              "inspection",
+              "inspection_item",
+              "inspection_results",
+              "inspector_service_areas",
+              "library",
+              "mcp_grant",
+              "migration_batch",
+              "migration_row",
+              "rating_system",
+              "recommendation",
+              "signing_key",
+              "starter_content",
+              "tag",
+              "template",
+              "tenant",
+              "tenant_config",
+              "user",
+              "user_service_origin",
+              "widget"
+            ],
+            "description": "The entity family the action touched."
           },
           "resourceId": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "description": "TODO describe resourceId field for the OpenInspection MCP integration"
+            "description": "Id of the entity the action touched."
           },
           "detail": {
             "type": "object",
             "additionalProperties": {
               "nullable": true
             },
-            "description": "TODO describe detail field for the OpenInspection MCP integration"
+            "description": "Free-form metadata. Redacted by value shape at write time."
           }
         },
         "required": [
@@ -5160,7 +5220,7 @@
           "resourceType",
           "resourceId"
         ],
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "An inspector-driven audit event."
       }
     },
     "summary": "Record an inspector-driven audit event",
@@ -5384,6 +5444,24 @@
     },
     "summary": "Decline agreement (public, token-gated)",
     "description": "Auto-generated placeholder for declineBooking (POST /agreements/:token/decline, bookings domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "declineTenantImport",
+    "method": "POST",
+    "pathTemplate": "/api/admin/import/decline",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/DeclineImportRequest"
+      }
+    },
+    "summary": "Hand a waiting import back unconverted",
+    "description": "Records that a waiting import run was looked at and could not be converted, stores the reason on the run, and emails the workspace. Distinct from expiry and from abandonment: this says we stopped, having looked."
   },
   {
     "operationId": "deleteAutomation",
@@ -7360,6 +7438,57 @@
     "description": "Returns the tenant-scoped audit_logs entries for a single entity id, newest first, with the actor name resolved."
   },
   {
+    "operationId": "getImportRun",
+    "method": "GET",
+    "pathTemplate": "/api/imports/{batchId}",
+    "scopes": [
+      "read"
+    ],
+    "tag": "imports",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "batchId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the import run being read or changed",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id of the import run being read or changed"
+          }
+        },
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "description": "Which page of entries needing attention to return",
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Which page of entries needing attention to return"
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "required": false,
+          "description": "How many entries needing attention per page",
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "How many entries needing attention per page"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Read what an import run will do",
+    "description": "Returns the run counts split into three exclusive buckets, the entries that still need a person, and the sentence explaining why the run cannot be applied yet when it cannot."
+  },
+  {
     "operationId": "getInspection",
     "method": "GET",
     "pathTemplate": "/api/inspections/{id}",
@@ -9221,52 +9350,27 @@
       "body": {
         "type": "object",
         "properties": {
-          "inspections": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": {
-                "nullable": true
-              }
-            },
-            "description": "TODO describe inspections field for the OpenInspection MCP integration"
+          "batchId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id of the waiting import run this bundle was converted for"
           },
-          "templates": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": {
-                "nullable": true
-              }
+          "bundle": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
             },
-            "description": "TODO describe templates field for the OpenInspection MCP integration"
-          },
-          "agreements": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": {
-                "nullable": true
-              }
-            },
-            "description": "TODO describe agreements field for the OpenInspection MCP integration"
-          },
-          "inspectionResults": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": {
-                "nullable": true
-              }
-            },
-            "description": "TODO describe inspectionResults field for the OpenInspection MCP integration"
+            "description": "The converted file in the normalised import format, validated on arrival"
           }
         },
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "required": [
+          "batchId",
+          "bundle"
+        ]
       }
     },
-    "summary": "Import tenant for current tenant",
-    "description": "Auto-generated placeholder for importTenant (POST /import, admin domain). TODO: replace with a real description sourced from the handler."
+    "summary": "Deliver a converted import bundle",
+    "description": "Delivers a converted file, in the normalised import format, into the waiting import run it belongs to. The run becomes a prepared import the workspace reviews and applies; this route writes nothing to a real table."
   },
   {
     "operationId": "initializeFirstTenant",
@@ -10256,6 +10360,35 @@
     },
     "summary": "List scheduling event types",
     "description": "Lists the tenant scheduling event types (Radon, Sewer Scope, etc.) used by the calendar + booking flow, ordered by sortOrder."
+  },
+  {
+    "operationId": "listImportRuns",
+    "method": "GET",
+    "pathTemplate": "/api/imports",
+    "scopes": [
+      "read"
+    ],
+    "tag": "imports",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "description": "How many runs to return, newest first",
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "How many runs to return, newest first"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List import runs for this workspace",
+    "description": "Returns this workspace's import runs, newest first, so somebody can see what was imported and reach the undo for any of it."
   },
   {
     "operationId": "listInspectionCostItems",
@@ -16074,6 +16207,36 @@
     "description": "Restores the agreement/payment gate for this inspection and clears the recorded unlock reason."
   },
   {
+    "operationId": "remapImportRun",
+    "method": "PATCH",
+    "pathTemplate": "/api/imports/{batchId}/mapping",
+    "scopes": [
+      "write"
+    ],
+    "tag": "imports",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "batchId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the import run being read or changed",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id of the import run being read or changed"
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/RemapRequest"
+      }
+    },
+    "summary": "Change which column feeds which field",
+    "description": "Re-reads the file this run was created from, rebuilds every entry with the given column mapping, and replaces the run entries. Allowed only while the run is still being prepared, and it discards any correction made since the last mapping — the count of what it replaced is returned so that can be said out loud."
+  },
+  {
     "operationId": "remindTenantAgreementsRequestSigner",
     "method": "POST",
     "pathTemplate": "/api/admin/agreements/requests/{requestId}/signers/{signerId}/remind",
@@ -16350,6 +16513,47 @@
     },
     "summary": "Reorder an item's photos (array order = report order)",
     "description": "Auto-generated placeholder for reorderInspectionItemPhotos (POST /{id}/items/{itemId}/photos/reorder, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "repairImportRunEntry",
+    "method": "PATCH",
+    "pathTemplate": "/api/imports/{batchId}/rows/{rowId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "imports",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "batchId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the import run the entry belongs to",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id of the import run the entry belongs to"
+          }
+        },
+        {
+          "name": "rowId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the prepared entry being corrected",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id of the prepared entry being corrected"
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/RepairRowRequest"
+      }
+    },
+    "summary": "Correct one entry of an import run",
+    "description": "Writes a corrected entry back in place and recomputes whether it clashes with anything. A still-incomplete correction is saved anyway, and what remains wrong is returned."
   },
   {
     "operationId": "replaceContact",
@@ -17002,6 +17206,34 @@
     },
     "summary": "Return submitted report to inspector for revision",
     "description": "Transitions reportStatus from submitted → in_progress. Requires publish capability."
+  },
+  {
+    "operationId": "revertImportRun",
+    "method": "POST",
+    "pathTemplate": "/api/imports/{batchId}/revert",
+    "scopes": [
+      "write"
+    ],
+    "tag": "imports",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "batchId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the import run being read or changed",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id of the import run being read or changed"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Undo an applied import run",
+    "description": "Takes back everything this run created or replaced, entry by entry. An entry that cannot be taken back does not stop the others; each refusal is named with its reason."
   },
   {
     "operationId": "revertInspectionItemPhoto",

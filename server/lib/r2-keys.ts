@@ -41,4 +41,10 @@ export const r2Keys = {
     `${t}/inspector-photos/${filename}`,
   messageAttachment: (t: string, messageId: string, attachmentId: string, ext: string) =>
     `${t}/messages/${messageId}/${attachmentId}.${ext}`,
+  // The file an intake run was created from. Under the plain tenant prefix on
+  // purpose: the tenant-level export and the tenant-level purge both walk
+  // `{tenantId}/`, so an object here is reachable by both without either being
+  // taught that intake exists.
+  migrationSource: (t: string, batchId: string, ext: string) =>
+    `${t}/migrations/${batchId}/source.${ext}`,
 };

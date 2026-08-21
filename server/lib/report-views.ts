@@ -14,6 +14,17 @@
  * `docs/compliance/report-view-lia.md`. Adding any client-side signal to this
  * feature — including one meant to IMPROVE the counters' accuracy — voids it.
  *
+ * The conditions that void it are restated as invariants and checked by
+ * `npm run lint:view-invariants`, so a change here is stopped by this
+ * repository rather than by a document that is not in it.
+ *
+ * view-invariant: no-client-instrumentation - no client-side instrumentation,
+ *   for any reason, including one added to improve the accuracy of the
+ *   counters. Everything this module decides is resolved server-side.
+ * view-invariant: no-per-section-tracking - no dwell time, scroll depth,
+ *   expanded sections or viewed photos. Three counters per (recipient, order)
+ *   is the whole observation; anything finer is inference about the reader.
+ *
  * This module holds the whole decision so it can be tested as a unit and so the
  * caller in `server/api/public-report.ts` stays one call wide.
  */
@@ -219,6 +230,11 @@ export async function recordReportView(
             firstViewedAt: at,
             lastViewedAt: at,
             viewCount: 1,
+        // view-invariant: no-event-log - this UPSERT is what keeps the feature
+        // inside its assessment. One row per (recipient, order), updated in
+        // place; an insert per view would be a chronology of when a named
+        // person read a document, which is a different processing operation
+        // needing a different lawful basis.
         }).onConflictDoUpdate({
             target: [reportViews.tenantId, reportViews.inspectionId, reportViews.accessTokenId],
             set: {

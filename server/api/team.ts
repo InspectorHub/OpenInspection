@@ -9,6 +9,7 @@ import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validation
 import { requireSeatAvailable } from '../features/seat-quota';
 import { getBaseUrl } from '../lib/url';
 import { tenantConfigs } from '../lib/db/schema';
+import { auditFromContext } from '../lib/audit';
 import {
     InviteMemberSchema,
     UpdateMemberSchema,
@@ -243,6 +244,20 @@ const teamRoutes = createApiRouter()
             email: body.email,
             role:  body.role,
             permissionOverrides: body.permissionOverrides ?? null,
+        });
+
+        // Who added whom to this company, on the durable record. The
+        // `user.invited` outbox event this handler also produces is a
+        // replication receipt with a two-cycle life; it answers "did the other
+        // side get it", not "who did this".
+        //
+        // No entityId: `tenant_invites.id` IS the join token that appears in
+        // the link below, so writing it here would park a live credential in a
+        // table an audit UI reads. No email either -- metadata is redacted by
+        // value shape at write time, so an address would be stripped anyway,
+        // and the invite row already holds it.
+        auditFromContext(c, 'user.invite', 'user', {
+            metadata: { role: body.role },
         });
 
         const inviteLink = `${getBaseUrl(c)}/join?token=${token}`;

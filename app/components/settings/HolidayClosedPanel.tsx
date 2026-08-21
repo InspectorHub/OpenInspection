@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useFetcher } from "react-router";
 import { Banner } from "@core/shared-ui";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import type { action } from "~/routes/settings-booking";
@@ -9,6 +8,7 @@ import {
   HolidayRegionSwitch,
   type HolidayPolicyId,
 } from "./HolidayPolicyCards";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export type HolidayPublicPolicy = "open" | "block" | "advisory";
@@ -51,7 +51,11 @@ export function HolidayClosedPanel({
   /** Current civil year (from the loader) — compared against `dataMaxYear`. */
   currentYear?: number;
 }) {
-  const fetcher = useFetcher<typeof action>();
+  // #106 - all three writes here (policy save, custom-holiday add and
+  // delete) change the days the company will take bookings on. They share
+  // one fetcher, so they share one guard: the controls that fire them are
+  // all disabled while it is busy, so a refused click is not reachable.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
   const [region, setRegion] = useState<string | null>(initialConfig.holidayRegion);
   const [publicPolicy, setPublicPolicy] = useState<HolidayPublicPolicy>(
     initialConfig.holidayPublicPolicy,
@@ -66,7 +70,6 @@ export function HolidayClosedPanel({
   const [newDate, setNewDate] = useState("");
   const [newName, setNewName] = useState("");
 
-  const saving = fetcher.state !== "idle";
   const saved =
     fetcher.state === "idle" &&
     fetcher.data?.intent === "holidays-save" &&
@@ -112,7 +115,7 @@ export function HolidayClosedPanel({
     conciergeReviewRequired: boolean;
   }) {
     setDirty(false);
-    fetcher.submit(
+    submit(
       {
         intent: "holidays-save",
         holidayRegion: next.holidayRegion ?? "",
@@ -278,13 +281,13 @@ export function HolidayClosedPanel({
         onDirty={() => setDirty(true)}
         onAddCustom={() => {
           if (!newDate || !newName.trim()) return;
-          fetcher.submit(
+          submit(
             { intent: "holiday-custom-add", date: newDate, name: newName.trim() },
             { method: "post" },
           );
         }}
         onRemoveCustom={(id) => {
-          fetcher.submit(
+          submit(
             { intent: "holiday-custom-delete", id },
             { method: "post" },
           );

@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import { MoneyInput } from "~/components/MoneyInput";
 import { formatCents } from "~/lib/money";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import {
     depositChoiceOf,
     depositPolicyFromChoice,
@@ -58,7 +58,10 @@ function describePolicy(
 }
 
 export function DepositWidget({ serviceId, policy, companyDefault }: DepositWidgetProps) {
-    const fetcher = useFetcher<typeof action>({ key: `deposit-${serviceId}` });
+    // #106 — a deposit policy decides what the client is charged up front, so
+    // the save goes through the guard. The per-service fetcher key is kept: it
+    // is what stops one row's pending state leaking into its siblings'.
+    const { fetcher, submit, busy } = useGuardedSubmit<typeof action>({ key: `deposit-${serviceId}` });
     const [open, setOpen] = useState(false);
     const [choice, setChoice] = useState<DepositChoice>(depositChoiceOf(policy));
     const [percentText, setPercentText] = useState(
@@ -71,7 +74,6 @@ export function DepositWidget({ serviceId, policy, companyDefault }: DepositWidg
     const [attempted, setAttempted] = useState(false);
 
     const money = { locale: useDisplayLocale(), currency: useDisplayCurrency() };
-    const busy = fetcher.state !== "idle";
     const result = fetcher.state === "idle" ? fetcher.data : undefined;
     const serverError =
         result && "intent" in result && "ok" in result && result.intent === "deposit-policy-save" && result.ok === false
@@ -98,7 +100,7 @@ export function DepositWidget({ serviceId, policy, companyDefault }: DepositWidg
         // policy that reads as configured while charging nothing is exactly the
         // half-saved state this control exists to prevent.
         if (!parsed.ok) return;
-        fetcher.submit(
+        const sent = submit(
             {
                 intent: "deposit-policy-save",
                 serviceId,
@@ -110,7 +112,9 @@ export function DepositWidget({ serviceId, policy, companyDefault }: DepositWidg
             },
             { method: "post" },
         );
-        setOpen(false);
+        // Only close on a call the guard accepted — closing on a refused second
+        // click would hide the panel while nothing had been sent.
+        if (sent) setOpen(false);
     }
 
     return (

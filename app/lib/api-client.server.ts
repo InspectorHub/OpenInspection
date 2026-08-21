@@ -41,6 +41,7 @@ import type {
     MessagesApi,
     InspectorMessagesApi,
     MetricsApi,
+    MigrationIntakeApi,
     AuditApi,
     NotificationsApi,
     PlacesApi,
@@ -66,7 +67,6 @@ import type {
     SmsAdminApi,
     TagsApi,
     TeamApi,
-    TemplateMigrationsApi,
     TenantPresenceApi,
     UsageApi,
     UsersApi,
@@ -161,6 +161,7 @@ export interface Api {
     inspectionSync:     ReturnType<typeof hc<InspectionSyncApi>>;
     inspectionTag:      ReturnType<typeof hc<InspectionTagApi>>;
     integrations:       ReturnType<typeof hc<IntegrationsApi>>;
+    imports:            ReturnType<typeof hc<MigrationIntakeApi>>;
     invoices:           ReturnType<typeof hc<InvoicesApi>>;
     marketplace:        ReturnType<typeof hc<MarketplaceApi>>;
     mcpGrants:          ReturnType<typeof hc<McpGrantsApi>>;
@@ -199,7 +200,6 @@ export interface Api {
     smsAdmin:           ReturnType<typeof hc<SmsAdminApi>>;
     tags:               ReturnType<typeof hc<TagsApi>>;
     team:               ReturnType<typeof hc<TeamApi>>;
-    templateMigrations: ReturnType<typeof hc<TemplateMigrationsApi>>;
     tenantPresence:     ReturnType<typeof hc<TenantPresenceApi>>;
     usage:              ReturnType<typeof hc<UsageApi>>;
     users:              ReturnType<typeof hc<UsersApi>>;
@@ -247,6 +247,7 @@ const MOUNT: Record<keyof Api, string> = {
     inspectionSync:     "/api/inspections",
     inspectionTag:      "/api/inspections",
     integrations:       "/api/integrations",
+    imports:            "/api/imports",
     invoices:           "/api/invoices",
     marketplace:        "/api/templates/marketplace",
     mcpGrants:          "/api/mcp",
@@ -279,7 +280,6 @@ const MOUNT: Record<keyof Api, string> = {
     smsAdmin:           "/api/admin",
     tags:               "/api/tags",
     team:               "/api/team",
-    templateMigrations: "/api/templates",
     tenantPresence:     "/api/tenant",
     usage:              "/api/usage",
     users:              "/api/users",
@@ -345,6 +345,7 @@ export function createApi(context: LoadContext, opts: CreateApiOptions = {}): Ap
         inspectionSync:     mk<InspectionSyncApi>(MOUNT.inspectionSync),
         inspectionTag:      mk<InspectionTagApi>(MOUNT.inspectionTag),
         integrations:       mk<IntegrationsApi>(MOUNT.integrations),
+        imports:            mk<MigrationIntakeApi>(MOUNT.imports),
         invoices:           mk<InvoicesApi>(MOUNT.invoices),
         marketplace:        mk<MarketplaceApi>(MOUNT.marketplace),
         mcpGrants:          mk<McpGrantsApi>(MOUNT.mcpGrants),
@@ -377,7 +378,6 @@ export function createApi(context: LoadContext, opts: CreateApiOptions = {}): Ap
         smsAdmin:           mk<SmsAdminApi>(MOUNT.smsAdmin),
         tags:               mk<TagsApi>(MOUNT.tags),
         team:               mk<TeamApi>(MOUNT.team),
-        templateMigrations: mk<TemplateMigrationsApi>(MOUNT.templateMigrations),
         tenantPresence:     mk<TenantPresenceApi>(MOUNT.tenantPresence),
         usage:              mk<UsageApi>(MOUNT.usage),
         users:              mk<UsersApi>(MOUNT.users),

@@ -73,7 +73,7 @@ Want to evaluate the product without running any infrastructure? Register at [**
 2. Cloudflare reads the committed `wrangler.jsonc` (which carries **placeholder IDs only**) and **auto-provisions and binds** the required resources — D1 (`DB`), KV (`TENANT_CACHE`), R2 (`PHOTOS`), the `BROWSER` binding, the Durable Objects and the Workflow — injecting the real resource IDs for you. There is no manual ID editing.
 3. After the deploy finishes, visit `/setup` on your new Worker URL and enter your **`SETUP_CODE`** to create the first admin account. For the one-click path, the wizard reads [`.dev.vars.example`](.dev.vars.example) and surfaces `SETUP_CODE` as a secret field you fill in **during** the deploy — that is the value you type at `/setup`. It must be any value of at least 6 characters. `/setup` is gated solely on this secret: if `SETUP_CODE` is unset the endpoint refuses to proceed, so an unprovisioned Worker can't be claimed. You can change it later in the dashboard under **Settings → Variables and Secrets**.
 
-Deep dive: [`docs/self-host/deploy.md`](docs/self-host/deploy.md).
+Deep dive: [`docs/operate/deploy.md`](docs/operate/deploy.md).
 
 ### 3. Deploy with the CLI
 
@@ -89,15 +89,15 @@ npm run deploy              # full react-router build, then wrangler deploy
 - Use `npm run deploy`, **not** raw `wrangler deploy` — the npm script runs the full `react-router build` (bundling `server/` API + `app/` SSR into one worker) before deploying. Its tail then runs idempotent ensure-steps that provision the JWT keypair and **print the `SETUP_CODE` in the deploy output** if one is not already set (it never overwrites an existing value). Visit `/setup` with that code for your first login.
 - For local development, use `npm run dev:hmr` (Vite dev server with hot module replacement, port 5173) for the fast iteration loop, or `npm run dev` (build-based — `react-router build` then `wrangler dev` on port 8788) to run the real bundled worker.
 
-Deep dive: [`docs/self-host/deploy.md`](docs/self-host/deploy.md). Architecture overview: [`docs/develop/architecture.md`](docs/develop/architecture.md).
+Deep dive: [`docs/operate/deploy.md`](docs/operate/deploy.md). Architecture overview: [`docs/develop/architecture.md`](docs/develop/architecture.md).
 
 ## Documentation
 
 **[`docs/README.md`](docs/README.md) is the map.** The most-used entries:
 
-- [Deploy](docs/self-host/deploy.md) — first-time setup on Cloudflare
-- [Upgrading](docs/self-host/upgrade.md) — upgrade an existing deployment to a newer release
-- [User guide](docs/user-guide/README.md) — the inspection workflow end to end
+- [Deploy](docs/operate/deploy.md) — first-time setup on Cloudflare
+- [Upgrading](docs/operate/upgrade.md) — upgrade an existing deployment to a newer release
+- [User guide](https://inspectorhub.io/docs) — the inspection workflow end to end, for hosted and self-hosted alike
 - [Architecture](docs/develop/architecture.md) — module map, request flow, cost model
 - [Design System](docs/develop/design-system.md) — tokens, shared-ui components, dark mode, `lint:ds`
 - [Contributing](CONTRIBUTING.md) — code conventions and PR process, including the [Versioning & Deprecation Policy](CONTRIBUTING.md#versioning--deprecation-policy)

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useFetcher } from "react-router";
+import { Link } from "react-router";
 import {
   clauseStateOf,
   feeChoiceOf,
@@ -13,6 +13,7 @@ import {
 } from "../../../server/lib/billing/cancellation-policy";
 import { CancellationFeeRow } from "./CancellationFeeRow";
 import type { action } from "~/routes/settings-booking";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -72,7 +73,8 @@ interface Props {
 }
 
 export function CancellationPolicyPanel({ policy, clause, agreements }: Props) {
-  const fetcher = useFetcher<typeof action>();
+  // #106 - user mutation: saves the cancellation policy, which sets the fee a client is charged.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
 
   const [noticeHoursText, setNoticeHoursText] = useState(
     policy ? String(policy.noticeHours) : "24",
@@ -143,7 +145,6 @@ export function CancellationPolicyPanel({ policy, clause, agreements }: Props) {
       ? m.settings_cancellation_clause_required()
       : null;
 
-  const saving = fetcher.state !== "idle";
   const settled = fetcher.state === "idle" && fetcher.data?.intent === "cancellation-policy-save";
   const saved = settled && fetcher.data?.ok === true;
   const failed = settled && fetcher.data?.ok === false;
@@ -155,7 +156,7 @@ export function CancellationPolicyPanel({ policy, clause, agreements }: Props) {
     // second of two gates, and it exists because the server's refusal arrives
     // as a sentence in a red line, with no way to see WHICH control caused it.
     if (willChargeFees && !clauseSatisfied) return;
-    fetcher.submit(
+    submit(
       {
         intent: "cancellation-policy-save",
         cancellationPolicy: JSON.stringify(built.policy),

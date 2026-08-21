@@ -59,6 +59,14 @@ const DESCRIPTIONS: Record<keyof DeploymentProfile, string> = {
         'Whether a platform stores the authoritative tenant record and this worker reads a projection of it. Decides which admin provider is constructed; in standalone this deployment owns the row outright.',
     hasPortalIntegrationApi:
         'Whether the portal machine-to-machine surface (`/api/integration/*`) is mounted. Standalone 404s the whole prefix rather than answering on an API nobody can authenticate to.',
+    hasAssistedMigration:
+        'An import whose file no adapter can read may be handed to a support team. Absent in standalone, where the file is refused before it is stored rather than kept for nobody.',
+    importMaxCsvBytes:
+        'Largest spreadsheet an import accepts, in bytes. Override per deployment with `IMPORT_MAX_CSV_BYTES`; a value that is not a positive integer is ignored and the default stands.',
+    importMaxVendorExportBytes:
+        'Largest vendor export (JSON) an import accepts, in bytes. Override per deployment with `IMPORT_MAX_VENDOR_EXPORT_BYTES`.',
+    importMaxRows:
+        'Most entries one import may carry; beyond it the run is refused with the real count. Override per deployment with `IMPORT_MAX_ROWS`.',
     botProtectionMandatory:
         'Whether the public booking form and agent signup MUST carry a bot challenge. Saas always challenges — with no `TURNSTILE_SECRET_KEY` it uses Cloudflare\'s published test key rather than skipping, so the mechanism is permissive but never off. Standalone leaves it to the operator: no key, no challenge.',
 };
@@ -84,13 +92,31 @@ function cell(value: unknown): string {
     return `\`${String(value)}\``;
 }
 
+/**
+ * Rows whose VALUE trips `lint:no-portal-routes`, with the reason.
+ *
+ * It lives here rather than in the generated markdown because that file is
+ * regenerated from this script: an exemption hand-written into the table
+ * survives exactly until the next `npm run docs:modes`, and nothing gates the
+ * generated file for drift, so it would revert silently.
+ *
+ * Line-scoped rather than file-scoped on purpose — a file-scoped allow on a
+ * generated document would also exempt every hosted path a FUTURE row happens
+ * to introduce, which is the leak the gate exists to catch.
+ */
+const ROUTE_ALLOW: Partial<Record<keyof DeploymentProfile, string>> = {
+    mcpApiRoute:
+        "this cell is the VALUE of this engine's own mcpApiRoute setting, not a link to a hosted screen",
+};
+
 export function renderModesTable(): string {
     const keys = Object.keys(DESCRIPTIONS) as (keyof DeploymentProfile)[];
     const rows = keys.map((k) => {
         const d = DERIVED[k];
         const standalone = d?.standalone ?? cell(STANDALONE_PROFILE[k]);
         const saas = d?.saas ?? cell(SAAS_PROFILE[k]);
-        return `| \`${k}\` | ${standalone} | ${saas} | ${DESCRIPTIONS[k]} |`;
+        const allow = ROUTE_ALLOW[k] ? ` <!-- no-portal-routes-allow: ${ROUTE_ALLOW[k]} -->` : '';
+        return `| \`${k}\` | ${standalone} | ${saas} | ${DESCRIPTIONS[k]} |${allow}`;
     });
     return [
         '| Capability | standalone | saas | What it decides |',

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useFetcher } from "react-router";
 import { Modal, Button } from "@core/shared-ui";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export interface EditorDefectCategory {
@@ -28,7 +28,9 @@ export function DefectCategoryEditor({
   onClose: () => void;
   category?: EditorDefectCategory | null;
 }) {
-  const fetcher = useFetcher<{ ok?: boolean; error?: string }>();
+  // #106 - user mutation: saves a defect category. The Save button is
+  // already `disabled={saving || ...}`.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<{ ok?: boolean; error?: string }>();
   const editing = !!category;
 
   const [name, setName] = useState("");
@@ -52,7 +54,6 @@ export function DefectCategoryEditor({
     }
   }, [open, category]);
 
-  const saving = fetcher.state !== "idle";
   const submittedRef = useRef(false);
   useEffect(() => {
     if (submittedRef.current && fetcher.state === "idle" && fetcher.data?.ok) {
@@ -66,7 +67,7 @@ export function DefectCategoryEditor({
   function save() {
     if (error && error !== fetcher.data?.error) return;
     submittedRef.current = true;
-    fetcher.submit(
+    submit(
       {
         intent: editing ? "edit" : "save",
         ...(category ? { id: category.id } : {}),

@@ -297,7 +297,7 @@ const templatesRoutes = createApiRouter()
     })
     .openapi(importSpectoraRoute, async (c) => {
         const body = c.req.valid('json');
-        const { convertSpectoraTemplate } = await import('../../lib/spectora-import');
+        const { convertSpectoraTemplate } = await import('../../lib/migration-intake/adapters/spectora');
         const { template: schema, stats } = convertSpectoraTemplate(body.spectora as Parameters<typeof convertSpectoraTemplate>[0]);
         // createTemplate accepts a plain Record<string, unknown> schema; the
         // converter's TemplateSchemaV2 interface is structurally compatible,

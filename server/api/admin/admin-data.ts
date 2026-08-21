@@ -23,6 +23,7 @@ import {
     EraseDataResponseSchema,
 } from '../../lib/validations/admin.schema';
 import { SuccessResponseSchema } from '../../lib/validations/shared.schema';
+import { InspectorAuditLogSchema } from '../../lib/validations/audit-log-write.schema';
 import { erasureLog } from '../../lib/db/schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { getDrizzle } from '../../lib/route-helpers';
@@ -151,7 +152,9 @@ const getAuditLogsRoute = createRoute(withMcpMetadata({
  * entries. The action enum is constrained to the small set inspectors
  * can legitimately log; all other audit actions are server-side only.
  */
-const InspectorAuditActionSchema = z.enum(['inspection.sync_conflict_resolved']);
+// The schemas moved to `lib/validations/audit-log-write.schema.ts` (repo rule: Zod lives
+// there, not inline in a handler). `resourceType` used to be an unconstrained
+// 64-character string; it is now the closed family list.
 
 const postAuditLogRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -163,12 +166,7 @@ const postAuditLogRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: z.object({
-                        action:       InspectorAuditActionSchema.describe('TODO describe action field for the OpenInspection MCP integration'),
-                        resourceType: z.string().min(1).max(64).describe('TODO describe resourceType field for the OpenInspection MCP integration'),
-                        resourceId:   z.string().min(1).max(128).describe('TODO describe resourceId field for the OpenInspection MCP integration'),
-                        detail:       z.record(z.string(), z.unknown()).optional().describe('TODO describe detail field for the OpenInspection MCP integration'),
-                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: InspectorAuditLogSchema,
                 },
             },
         },

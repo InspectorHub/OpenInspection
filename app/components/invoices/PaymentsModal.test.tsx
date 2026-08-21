@@ -15,6 +15,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { PaymentsModal, type PaymentRow } from "./PaymentsModal";
+import type { GuardedSubmit } from "~/hooks/useGuardedSubmit";
 
 const INVOICE = { id: "inv-1", clientName: "Dana Reyes", amountCents: 45000, currency: "USD" };
 
@@ -34,12 +35,30 @@ function mockFetcher(data?: unknown) {
     return { state: "idle" as const, data, submit: vi.fn(), load: vi.fn(), Form: () => null };
 }
 
-function renderModal(payments: PaymentRow[], fetcher = mockFetcher()) {
+/**
+ * #106 — the two writes here move money, so the surface no longer owns a raw
+ * `fetcher.submit`. `/invoices` holds the guard and passes it down, and the
+ * guard returns `true` when it accepted the call; the stub says so.
+ */
+function guardedSubmit() {
+    return vi.fn<GuardedSubmit>(() => true);
+}
+
+function renderModal(payments: PaymentRow[], fetcher = mockFetcher(), submit = guardedSubmit(), busy = false) {
     const utils = render(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        <PaymentsModal invoice={INVOICE} payments={payments} loading={false} fetcher={fetcher as any} locale="en-US" onClose={() => {}} />,
+        <PaymentsModal
+            invoice={INVOICE}
+            payments={payments}
+            loading={false}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            fetcher={fetcher as any}
+            submit={submit}
+            busy={busy}
+            locale="en-US"
+            onClose={() => {}}
+        />,
     );
-    return { ...utils, fetcher };
+    return { ...utils, fetcher, submit };
 }
 
 /** The browser's own calendar day, the same way the component computes it. */
@@ -62,13 +81,13 @@ describe("PaymentsModal — the date", () => {
     it("submits the day the money moved, not the moment the form was posted", () => {
         // Tuesday's cash, recorded today. If the surface defaulted to now(), the
         // submitted instant would land on today's date and this would fail.
-        const { container, getByText, fetcher } = renderModal([]);
+        const { container, getByText, submit } = renderModal([]);
         fireEvent.change(container.querySelector('input[type="number"]')!, { target: { value: "200" } });
         fireEvent.change(container.querySelector('input[type="date"]')!, { target: { value: "2026-03-03" } });
         fireEvent.click(getByText("Record payment"));
 
-        expect(fetcher.submit).toHaveBeenCalledTimes(1);
-        const sent = fetcher.submit.mock.calls[0][0] as Record<string, string>;
+        expect(submit).toHaveBeenCalledTimes(1);
+        const sent = submit.mock.calls[0][0] as Record<string, string>;
         expect(sent.intent).toBe("record-payment");
         expect(sent.amount).toBe("200");
         // A full instant on the wire, and it is Tuesday's — in the browser's own
@@ -156,7 +175,49 @@ describe("PaymentsModal — overpayment", () => {
         expect(anyway).toBeTruthy();
 
         fireEvent.click(anyway!);
-        const sent = refused.fetcher.submit.mock.calls[0][0] as Record<string, string>;
+        const sent = refused.submit.mock.calls[0][0] as Record<string, string>;
         expect(sent.allowOverpayment).toBe("1");
+    });
+});
+
+describe("PaymentsModal — the guard (#106)", () => {
+    it("routes both money writes through the guard, never a raw fetcher.submit", () => {
+        const fetcher = mockFetcher();
+        const { container, getByText } = renderModal([CASH], fetcher);
+        fireEvent.change(container.querySelector('input[type="number"]')!, { target: { value: "100" } });
+        fireEvent.click(getByText("Record payment"));
+
+        // The correction path too — open the row's editor and submit it.
+        fireEvent.click([...container.querySelectorAll("button")].find((b) => b.textContent === "Correct")!);
+        const amounts = [...container.querySelectorAll('input[type="number"]')] as HTMLInputElement[];
+        fireEvent.change(amounts[amounts.length - 1], { target: { value: "50" } });
+        fireEvent.click(getByText("Save correction"));
+
+        // The fetcher is read here (data, state) and never submitted through.
+        expect(fetcher.submit).not.toHaveBeenCalled();
+    });
+
+    it("keeps the correction form filled when the guard refuses the click", () => {
+        // A refused submit means nothing was sent. Clearing the form anyway
+        // would tell the user the correction was taken.
+        const refuse = vi.fn<GuardedSubmit>(() => false);
+        const { container, getByText } = renderModal([CASH], mockFetcher(), refuse);
+        fireEvent.click([...container.querySelectorAll("button")].find((b) => b.textContent === "Correct")!);
+        const amounts = [...container.querySelectorAll('input[type="number"]')] as HTMLInputElement[];
+        const corrected = amounts[amounts.length - 1];
+        fireEvent.change(corrected, { target: { value: "50" } });
+        fireEvent.click(getByText("Save correction"));
+
+        expect(refuse).toHaveBeenCalledTimes(1);
+        // Still open, still holding what was typed.
+        expect(getByText("Save correction")).toBeTruthy();
+        expect((container.querySelectorAll('input[type="number"]')[1] as HTMLInputElement).value).toBe("50");
+    });
+
+    it("disables both money buttons while the guard is in flight", () => {
+        const { container, getByText } = renderModal([CASH], mockFetcher(), guardedSubmit(), true);
+        expect((getByText("Recording…").closest("button") as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.click([...container.querySelectorAll("button")].find((b) => b.textContent === "Correct")!);
+        expect((getByText("Save correction").closest("button") as HTMLButtonElement).disabled).toBe(true);
     });
 });

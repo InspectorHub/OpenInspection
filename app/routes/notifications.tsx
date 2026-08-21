@@ -1,4 +1,4 @@
-import { useFetcher, useLoaderData, useRevalidator } from "react-router";
+import { useLoaderData, useRevalidator } from "react-router";
 import { useEffect } from "react";
 import type { Route } from "./+types/notifications";
 import { requireToken } from "~/lib/session.server";
@@ -6,6 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, EmptyState, Banner } from "@core/shared-ui";
 import { NoticeList } from "~/components/notices/NoticeList";
 import type { NoticeRowData } from "~/lib/notice-view";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -53,7 +54,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 export default function NotificationsPage() {
   const { notifications, loadFailed } = useLoaderData<typeof loader>();
-  const fetcher = useFetcher<{ ok?: boolean }>();
+  // #106 - dismissing a staff notice writes the read record.
+  // Successive dismissals are the expected gesture on this page, and the guard
+  // refuses the second one while the first is in flight - so NoticeList's
+  // buttons are disabled for that window rather than swallowing the click.
+  const { fetcher, submit, busy } = useGuardedSubmit<{ ok?: boolean }>();
   const revalidator = useRevalidator();
 
   // A dismissal changes what the loader returned; re-read rather than patch a
@@ -105,12 +110,13 @@ export default function NotificationsPage() {
             emailComposer={false}
             emptyBody={m.notice_empty_body_staff()}
             onDismiss={(id) =>
-              fetcher.submit(
+              submit(
                 { intent: "notice-dismiss", noticeId: id },
                 { method: "post", action: "/resources/staff-notices" },
               )
             }
             onRemedy={() => {}}
+            busy={busy}
           />
         </Card>
       )}

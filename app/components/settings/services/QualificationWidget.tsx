@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useFetcher } from "react-router";
 import type { action } from "~/routes/settings-services";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 interface Service {
@@ -25,7 +25,9 @@ interface QualificationWidgetProps {
 }
 
 export function QualificationWidget({ service, initialUserIds, members }: QualificationWidgetProps) {
-  const fetcher = useFetcher<typeof action>({ key: `qual-${service.id}` });
+  // #106 — who is qualified to run a service decides who can be dispatched to
+  // it, so the save goes through the guard. The per-service key is kept.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>({ key: `qual-${service.id}` });
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set(initialUserIds));
   const [dirty, setDirty] = useState(false);
@@ -37,7 +39,6 @@ export function QualificationWidget({ service, initialUserIds, members }: Qualif
     setDirty(false);
   }, [initialUserIds]);
 
-  const saving = fetcher.state !== "idle";
   const lastResult = fetcher.state === "idle" ? fetcher.data : undefined;
   const saved =
     !dirty &&
@@ -75,7 +76,7 @@ export function QualificationWidget({ service, initialUserIds, members }: Qualif
 
   function handleSave() {
     setDirty(false);
-    fetcher.submit(
+    submit(
       {
         intent: "qualification-save",
         serviceId: service.id,

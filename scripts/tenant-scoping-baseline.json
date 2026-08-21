@@ -1,6 +1,4 @@
 [
-  "server/api/admin/admin-data-import.ts::resolveRoleId::.where(eq(inspectionResults.id, resultsRow.id));",
-  "server/api/admin/admin-data-import.ts::resolveRoleId::.where(eq(inspections.id, r.inspectionId))",
   "server/api/agreements-render.ts::agreementRenderHandler::.where(eq(schema.agreementRequests.id, requestId)).get();",
   "server/api/agreements-render.ts::agreementRenderHandler::.where(eq(schema.agreements.id, reqRow.agreementId)).get();",
   "server/api/agreements-render.ts::certRenderHandler::.where(eq(schema.agreementRequests.id, requestId)).get();",
@@ -55,6 +53,8 @@
   "server/services/marketplace.service.ts::updateTemplateImport::.where(eq(tenantLibraryImports.id, existing.id));",
   "server/services/marketplace/library-replace.ts::resolveLibraryUpdate::.where(eq(marketplaceLibraries.id, libraryId))",
   "server/services/message.service.ts::createMessage::const [row] = await this.db().select().from(inspectionMessages).where(eq(inspectionMessages.id, id)).limit(1);",
+  "server/services/migration-intake/apply.service.ts::apply::}).where(eq(migrationRows.id, row.id));",
+  "server/services/migration-intake/revert.service.ts::revert::.where(eq(migrationRows.id, row.id));",
   "server/services/notice-inbox.ts::archiveNotice::.where(and(",
   "server/services/notice-inbox.ts::getOwnedNotice::.where(and(eq(notifications.id, id), inArray(notifications.contactId, contactIds)))",
   "server/services/portal-access.service.ts::issueToken::.where(eq(inspectionAccessTokens.id, existing.id))",
@@ -66,7 +66,6 @@
   "server/services/report-pdf.service.ts::markQueued::.where(eq(reportPdfs.id, existing.id));",
   "server/services/service.service.ts::createService::const rows = await db.select().from(services).where(eq(services.id, id));",
   "server/services/service.service.ts::updateService::const rows = await db.select().from(services).where(eq(services.id, id));",
-  "server/services/template-migration.service.ts::migrate::.where(eq(inspectionResults.id, row.id as string))",
   "server/services/template.service.ts::deleteTemplate::await db.delete(templates).where(eq(templates.id, id));",
   "server/services/template.service.ts::updateTemplate::await db.update(templates).set(updateData).where(eq(templates.id, id));"
 ]

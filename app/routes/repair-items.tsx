@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useLoaderData, useFetcher } from "react-router";
+import { useLoaderData } from "react-router";
 import type { Route } from "./+types/repair-items";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
@@ -94,8 +95,10 @@ const EMPTY = {
 
 export default function RepairItemsPage() {
   const { items, contractorTypes, loadFailed } = useLoaderData<typeof loader>();
-  const fetcher = useFetcher<typeof action>();
-  const deleteFetcher = useFetcher<typeof action>();
+  // #106 - the editor writes a library item and the delete removes one. Two
+  // guards so the modal save and a delete cannot abort one another.
+  const { submit: submitItem, busy: saving } = useGuardedSubmit<typeof action>();
+  const { submit: submitDelete, busy: deleting } = useGuardedSubmit<typeof action>();
   const [pendingDelete, setPendingDelete] = useState<RepairItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -110,8 +113,9 @@ export default function RepairItemsPage() {
     setModalOpen(true);
   }
   function submit(intent: string) {
-    fetcher.submit({ ...form, intent }, { method: "POST" });
-    setModalOpen(false);
+    // Close only on a call the guard accepted, so a refused second click does
+    // not discard what is in the form.
+    if (submitItem({ ...form, intent }, { method: "POST" })) setModalOpen(false);
   }
 
   return (
@@ -183,7 +187,7 @@ export default function RepairItemsPage() {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">{m.common_cancel()}</button>
-              <button onClick={() => submit(form.id ? "update" : "create")} disabled={!form.name.trim() || !form.defaultRepairSummary.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50">{m.common_save()}</button>
+              <button onClick={() => submit(form.id ? "update" : "create")} disabled={saving || !form.name.trim() || !form.defaultRepairSummary.trim()} aria-busy={saving || undefined} className="px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50">{m.common_save()}</button>
             </div>
           </div>
         </div>
@@ -193,10 +197,12 @@ export default function RepairItemsPage() {
         open={!!pendingDelete}
         title={m.repair_items_delete_title()}
         message={pendingDelete ? m.repair_items_delete_message({ name: pendingDelete.name }) : ""}
-        busy={deleteFetcher.state !== "idle"}
+        busy={deleting}
         onConfirm={() => {
-          if (pendingDelete) deleteFetcher.submit({ intent: "delete", id: pendingDelete.id }, { method: "POST" });
-          setPendingDelete(null);
+          if (!pendingDelete) return;
+          if (submitDelete({ intent: "delete", id: pendingDelete.id }, { method: "POST" })) {
+            setPendingDelete(null);
+          }
         }}
         onCancel={() => setPendingDelete(null)}
       />

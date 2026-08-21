@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData, useSearchParams, useFetcher } from "react-router";
+import { useLoaderData, useSearchParams } from "react-router";
 import type { Route } from "./+types/comments";
 import { useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { requireToken } from "~/lib/session.server";
@@ -12,6 +12,7 @@ import { CommentEditor } from "~/components/CommentEditor";
 import { EntityAuditTrail } from "~/components/audit/EntityAuditTrail";
 import type { Severity } from "~/lib/severity";
 import { SEVERITIES, SEVERITY_LABEL, isSeverity } from "~/lib/severity";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
@@ -132,7 +133,10 @@ export default function CommentsPage() {
   const { setPage, setPageSize } = usePagination();
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<LibraryComment | null>(null);
-  const deleteFetcher = useFetcher<typeof action>();
+  // #106 - both deletes are irreversible. One guard for both, because both
+  // confirmations are already `busy={busy}` and cannot be fired at once.
+  const { fetcher: deleteFetcher, submit: submitDelete, busy } =
+    useGuardedSubmit<typeof action>();
   const [pendingDelete, setPendingDelete] = useState<LibraryComment | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -144,7 +148,6 @@ export default function CommentsPage() {
   // would race the first click after mount.
   const selectedComments = comments.filter((c) => selected.includes(c.id));
   const soleSelected = selectedComments.length === 1 ? selectedComments[0] : null;
-  const busy = deleteFetcher.state !== "idle";
   const deleteFailed = deleteFetcher.state === "idle" && deleteFetcher.data?.ok === false;
 
   function toggle(id: string) {
@@ -287,8 +290,10 @@ export default function CommentsPage() {
         message={pendingDelete ? m.comments_delete_message({ text: preview(pendingDelete.text) }) : ""}
         busy={busy}
         onConfirm={() => {
-          if (pendingDelete) deleteFetcher.submit({ intent: "delete", id: pendingDelete.id }, { method: "POST" });
-          setPendingDelete(null);
+          if (!pendingDelete) return;
+          if (submitDelete({ intent: "delete", id: pendingDelete.id }, { method: "POST" })) {
+            setPendingDelete(null);
+          }
         }}
         onCancel={() => setPendingDelete(null)}
       />
@@ -303,10 +308,13 @@ export default function CommentsPage() {
           : m.comments_delete_many_message({ count: selectedComments.length })}
         busy={busy}
         onConfirm={() => {
-          deleteFetcher.submit(
+          const sent = submitDelete(
             { intent: "delete-many", ids: selectedComments.map((c) => c.id).join(",") },
             { method: "POST" },
           );
+          // A refused click sent nothing, so the selection and the confirmation
+          // both stay as they were.
+          if (!sent) return;
           setBulkConfirm(false);
           setSelected([]);
         }}

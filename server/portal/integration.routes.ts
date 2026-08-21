@@ -238,9 +238,9 @@ api.post('/sync-quota', requireServiceBinding, async (c) => {
  * GET /api/integration/tenants/:slug/seat-usage
  * Reverse seat-sync read: lets the portal reconcile a tenant's Stripe seat
  * quantity against the ACTUAL count of active (non-soft-deleted) members,
- * rather than trusting portal's own last-written value. Thin wrapper around
- * getSeatUsage (server/features/seat-quota/usage.ts) — same active-member
- * definition (`deleted_at IS NULL`) used by the invite/seat-guard middleware.
+ * rather than trusting portal's own last-written value. Reads getSeatUsage's
+ * `members` (`deleted_at IS NULL`), NOT its `used`, which also reserves seats
+ * outstanding invitations can still claim — that is a quota, not a bill.
  */
 api.get('/tenants/:slug/seat-usage', requireServiceBinding, async (c) => {
     const slug = c.req.param('slug');
@@ -249,7 +249,7 @@ api.get('/tenants/:slug/seat-usage', requireServiceBinding, async (c) => {
     if (!t) return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
 
     const usage = await getSeatUsage(t.id as string, c.env.DB);
-    return c.json({ success: true, data: { used: usage.used, max: usage.max } });
+    return c.json({ success: true, data: { used: usage.members, max: usage.max } });
 });
 
 /**

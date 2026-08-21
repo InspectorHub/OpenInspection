@@ -10,6 +10,7 @@ import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table, Banner } from "@core/shared-ui";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { isAdminRole } from "~/lib/access";
 
@@ -118,7 +119,9 @@ const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "m
 
 export default function TeamPage() {
   const { members, canManage, loadFailed } = useLoaderData<typeof loader>();
-  const cancelFetcher = useFetcher<{ ok?: boolean }>();
+  // #106 - cancelling an invite burns the token; a second cancel would 404
+  // and read as a failure. `resendFetcher` below is a <Form>, not a submit.
+  const { submit: submitCancel, busy: cancelBusy } = useGuardedSubmit<{ ok?: boolean }>();
   const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean }>();
   const [pendingCancel, setPendingCancel] = useState<{ token: string; email: string } | null>(null);
   const sessionCtx = useSessionContext();
@@ -313,14 +316,17 @@ export default function TeamPage() {
         title={m.settings_team_cancel_invite_title()}
         message={pendingCancel ? m.settings_team_cancel_invite_confirm({ email: pendingCancel.email }) : ""}
         confirmLabel={m.settings_team_cancel_invite()}
-        busy={cancelFetcher.state !== "idle"}
+        busy={cancelBusy}
         onConfirm={() => {
           if (pendingCancel) {
-            cancelFetcher.submit(
-              { intent: "cancel-invite", token: pendingCancel.token },
-              { method: "post" },
-            );
-            setPendingCancel(null);
+            if (
+              submitCancel(
+                { intent: "cancel-invite", token: pendingCancel.token },
+                { method: "post" },
+              )
+            ) {
+              setPendingCancel(null);
+            }
           }
         }}
         onCancel={() => setPendingCancel(null)}

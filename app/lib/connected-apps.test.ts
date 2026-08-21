@@ -160,7 +160,7 @@ beforeEach(() => {
         },
         branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
                 defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h' },
-        deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true, hasContentMarketplace: false, videoBackendManaged: false, hasManagedCompliance: false },
+        deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true, hasContentMarketplace: false, videoBackendManaged: false, hasManagedCompliance: false, hasAssistedMigration: false },
         seatUsage: null, outboundCoolingWindow: null,
     });
 });
@@ -307,7 +307,7 @@ describe('SettingsConnectedApps component render', () => {
             },
             branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
                 defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h' },
-            deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true, hasContentMarketplace: false, videoBackendManaged: false, hasManagedCompliance: false },
+            deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true, hasContentMarketplace: false, videoBackendManaged: false, hasManagedCompliance: false, hasAssistedMigration: false },
             seatUsage: null, outboundCoolingWindow: null,
         });
         const html = renderToStaticMarkup(createElement(SettingsConnectedApps));

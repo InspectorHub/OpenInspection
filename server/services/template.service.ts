@@ -12,7 +12,7 @@ import { TemplateSchemaV2Schema } from '../lib/validations/template.schema';
  * the marketplace pack. A "Conflict" with no subject sends a tenant hunting
  * through their inspections for a reference that is in their catalogue.
  */
-export interface TemplateBlockingReference {
+interface TemplateBlockingReference {
     kind:  'inspection' | 'service' | 'report' | 'marketplace_import';
     label: string | null;
 }
@@ -20,13 +20,16 @@ export interface TemplateBlockingReference {
 /**
  * The ONE place that answers "may this template be deleted".
  *
- * A standalone function rather than a `TemplateService` method because the
- * second caller is a different service with its own db handle:
- * `TemplateService` resolves drizzle through `this.getDrizzle()` while
- * `TemplateMigrationService` holds `this.db` directly. Both pass their handle
- * in, because a second implementation of an authorization rule is a second
- * place for it to be wrong — which is exactly what
- * `template-migration.service.ts` was, checking `inspections` and nothing else.
+ * A standalone function rather than a method, because a second implementation
+ * of an authorization rule is a second place for it to be wrong. Every caller
+ * asks this one, and none of them re-derives it from the tables it happens to
+ * remember. Module-private, deliberately: the one gate is reached by calling
+ * the delete, not by importing the check and running it somewhere else.
+ *
+ * The guard takes a Drizzle handle as a PARAMETER rather than reading one off a
+ * service field, and is generic in the schema parameter so it binds a handle
+ * whether or not drizzle was constructed with a schema. Widening the parameter
+ * instead would erase the column types the query needs.
  *
  * Order is deliberate: the two references a tenant is most likely to hit come
  * first, so the common refusal is also the cheapest.
@@ -37,13 +40,7 @@ export interface TemplateBlockingReference {
  * dangling id there is correct rather than an oversight. Said here so it does
  * not read as the same miss as the four below.
  */
-// Generic over the schema parameter, because the two callers do NOT hold the
-// same drizzle type: `TemplateService.getDrizzle()` returns
-// `DrizzleD1Database<Record<string, never>>` (drizzle called with no schema)
-// while `TemplateMigrationService.db` is typed `ReturnType<typeof drizzle>`,
-// i.e. `Record<string, unknown>`. A bare `DrizzleD1Database` binds the former
-// and rejects the latter, which is the whole reason this is a shared function.
-export async function findTemplateBlockingReference<TSchema extends Record<string, unknown>>(
+async function findTemplateBlockingReference<TSchema extends Record<string, unknown>>(
     db: DrizzleD1Database<TSchema>,
     id: string,
     tenantId: string,
@@ -416,8 +413,9 @@ export class TemplateService {
      * Deletes a template, but only if nothing still references it.
      *
      * The four blocking references live in `findTemplateBlockingReference`,
-     * which `TemplateMigrationService.tryDeleteOldTemplate` also calls — there
-     * is one gate, not two.
+     * which is the one gate: there is a single answer to "is anything using
+     * this", and every caller reads it rather than each checking a table they
+     * happened to think of.
      */
     async deleteTemplate(id: string, tenantId: string) {
         const db = this.getDrizzle();

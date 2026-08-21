@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLoaderData, useRevalidator, useFetcher } from "react-router";
+import { useLoaderData, useRevalidator } from "react-router";
 import type { Route } from "./+types/agreements";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -10,6 +10,7 @@ import { AgreementTemplateModal } from "~/components/agreements/AgreementTemplat
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import type { AgreementTemplateSaveResult } from "~/routes/resources/agreement-templates";
 import { AGREEMENT_TEMPLATES_ACTION } from "~/routes/resources/agreement-templates";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
@@ -91,7 +92,10 @@ type TemplateSummary = { id: string; name?: string; updatedAt?: string; createdA
 export default function AgreementsPage() {
   const { templates, attestedAgreementId, loadFailed } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
-  const deleteFetcher = useFetcher<AgreementTemplateSaveResult>();
+  // #106 - deleting an agreement template is irreversible and can revoke the
+  // cancellation-fee attestation with it.
+  const { fetcher: deleteFetcher, submit: submitDelete, busy: deleteBusy } =
+    useGuardedSubmit<AgreementTemplateSaveResult>();
 
   /** `undefined` = closed; `null` = creating; a string = editing that id. */
   const [editorFor, setEditorFor] = useState<string | null | undefined>(undefined);
@@ -109,7 +113,6 @@ export default function AgreementsPage() {
    */
   const [clauseRevoked, setClauseRevoked] = useState(false);
 
-  const deleteBusy = deleteFetcher.state !== "idle";
   const deleteError =
     deleteFetcher.state === "idle" && deleteFetcher.data && !deleteFetcher.data.ok
       ? deleteFetcher.data.error
@@ -213,11 +216,16 @@ export default function AgreementsPage() {
         onCancel={() => setDeleting(null)}
         onConfirm={() => {
           if (!deleting) return;
-          deleteFetcher.submit(
-            { intent: "delete", id: deleting.id },
-            { method: "post", action: AGREEMENT_TEMPLATES_ACTION },
-          );
-          setDeleting(null);
+          // Keep the confirmation open when the guard refuses - closing it
+          // would say the template had been deleted.
+          if (
+            submitDelete(
+              { intent: "delete", id: deleting.id },
+              { method: "post", action: AGREEMENT_TEMPLATES_ACTION },
+            )
+          ) {
+            setDeleting(null);
+          }
         }}
       />
     </div>

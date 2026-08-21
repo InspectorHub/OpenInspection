@@ -4,8 +4,8 @@ Everything OpenInspection talks to that is not OpenInspection. One page per
 service: what it is for, which credentials it needs and where they go, which
 direction data actually flows, and what happens when it is not configured.
 
-These pages were split out of `self-host/` because they answer a different
-question. `self-host/deploy.md` and `upgrade.md` are about running the engine;
+These pages were split out of `operate/` because they answer a different
+question. `operate/deploy.md` and `upgrade.md` are about running the engine;
 these are about connecting it to somebody else's system, which is a job you do
 once per service and then forget until it breaks.
 
@@ -43,7 +43,7 @@ Worker binding names, which is what lets the middleware merge them transparently
 **Tenant-stored credentials are encrypted at rest** and never returned to the
 browser — the settings forms show a masked placeholder and send a value only
 when you actually type a new one. Rotation is
-[`self-host/rotate-secrets.md`](../self-host/rotate-secrets.md).
+[`operate/rotate-jwt-keyring.md`](../operate/rotate-jwt-keyring.md).
 
 **Absent credentials fail closed, not silently.** A missing key disables the
 feature it belongs to and says so on the settings page; it does not fall back to

@@ -1,11 +1,12 @@
 /**
- * The one retention executor that reaches outside D1.
+ * One of the two retention executors that reach outside D1.
  *
- * Every other rule is a `db.delete(...)` and lives in `retention-executors.ts`.
- * This one is here because it is a different KIND of operation, not because the
- * other file was long: the row points at an R2 object, so two stores have to
- * agree, and the order they are touched in is a correctness property rather
- * than a detail.
+ * Every other rule is a `db.delete(...)` against one store and lives in
+ * `retention-executors.ts`. This one is here because it is a different KIND of
+ * operation, not because the other file was long: the row points at an R2
+ * object, so two stores have to agree, and the order they are touched in is a
+ * correctness property rather than a detail. The intake rule
+ * (`retention-migration-batches.ts`) is here for the same reason.
  *
  * It is also the only rule whose window is per-tenant, which is why it takes
  * `now` from the context and computes its own cutoffs instead of using the one

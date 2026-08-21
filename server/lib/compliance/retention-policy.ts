@@ -23,13 +23,26 @@
  * copy is the one an auditor would be shown. Git is the version control that
  * was asked for.
  *
- * ── Why `interim` is the honest value ───────────────────────────────────────
+ * ── How the status got where it is ─────────────────────────────
+ * This section was headed "Why `interim` is the honest value" and said
+ * `approvedBy` and `approvedAt` stay null. That stopped being true at `.2` and
+ * the prose did not follow, so the file argued with its own header for two
+ * versions. Rewritten rather than deleted, because the reasoning still governs
+ * anything added from here.
+ *
  * review reviewed the portal's six windows on 2026-08-14 and approved NONE as
  * final — not because a period was unlawful, but because none carried a
- * purpose-based derivation. These fourteen were never put to review at all.
- * `approvedBy` and `approvedAt` stay null until that changes, and the gate does
- * not care whether they are null: it only cares that the rules cannot change
- * without this header changing with them.
+ * purpose-based derivation. The engine's own windows were not put to review
+ * at all until rounds 33 and 34, which is what moved this header off `interim`
+ * and set `approvedBy` to a round document.
+ *
+ * A rule added AFTER that ruling does not inherit it. The status does NOT
+ * regress to `interim` when one arrives — that would misdescribe the seventeen
+ * that were reviewed — it gains a numbered condition naming the new rule and
+ * what about it still needs review. See condition 6.
+ *
+ * The gate does not care what any of these fields say: it only cares that the
+ * rules cannot change without this header changing with them.
  *
  * ── The engine-specific hazard the ratchet has to survive ───────────────────
  * The portal's rules carry literal windows (`'P30D'`), so hashing the manifest
@@ -111,6 +124,30 @@ export interface RetentionPolicyHeader {
  *   4. ❌ the customer ToS re-accept flow names the liability cap in its change
  *         summary (portal — built, pending the ToS publish)
  *   5. ❌ approval/version registration completed before the new ToS publishes
+ *   6. ❌ `migration_batches` — added 2026-08-19, NOT put to review. Rounds 33
+ *         and 34 ruled on the seventeen rules that existed then; this one came
+ *         after and has had no external review. It is named here rather than
+ *         left to be inferred from a date, because `approved_with_conditions`
+ *         at the top of this header would otherwise read as covering it. What
+ *         needs review specifically: two lifetimes (30 days staged, 90 days
+ *         awaiting assistance) sharing one catalogue rule whose declared window
+ *         is the longer of them, with the operative clock on a per-row column;
+ *         the fact that what expires is a THIRD PARTY's personal data uploaded
+ *         by the operator, not the operator's own; and — new at `.5` — that the
+ *         rule's action is `erase_in_place` rather than `delete`, so the RUN'S
+ *         RECORD SURVIVES its own expiry indefinitely. The surviving row holds
+ *         ids, timestamps, a vendor name and two authorisations given by the
+ *         operator's own people; the reasoning for keeping it is that a cleared
+ *         run must be distinguishable from one that never happened, and that
+ *         the record itself carries no third-party data. review has not been
+ *         asked whether an indefinitely-retained record of a data subject's
+ *         file having been uploaded is itself in scope. `.5` changed no window
+ *         and no other rule.
+ *
+ * That sixth entry is why the status did not move back to `interim`. Seventeen
+ * of eighteen rules genuinely are approved-with-conditions and reverting would
+ * destroy the provenance in `approvedBy`; but "approved with conditions" is only
+ * honest here because one of the conditions now says which rule is not.
  *
  * ⚠️ AND A METHOD RULE from review, which cost a wasted ruling to learn:
  * do not classify retention behaviour from the manifest or the table name. The
@@ -132,11 +169,16 @@ export interface RetentionPolicyHeader {
  * every production store is covered.
  */
 export const RETENTION_POLICY: RetentionPolicyHeader = {
-    version: '2026-08-19.3',
+    version: '2026-08-19.5',
     status: 'approved_with_conditions',
     effectiveAt: '2026-08-08',
+    // review remains what approved the seventeen rules it saw. It does NOT
+    // cover `migration_batches` — see condition 6 above. `approvedAt` is left at
+    // the round-34 date rather than moved forward with this version, because
+    // moving it would date an approval to a day nobody approved anything, and
+    // `.5` changed only the unreviewed rule.
     approvedBy: '[redacted]',
     approvedAt: '2026-08-19',
-    supersedes: '2026-08-19.2',
-    rulesDigest: '872f2ae78321aa0825ed05c9629f2623e564bb784a5e8d4cc4d925451bb8be76',
+    supersedes: '2026-08-19.4',
+    rulesDigest: 'b09824f19e586cf759c0bc53637c0a3562aefc49a30757b3c5339d596e9837fc',
 };

@@ -37,6 +37,10 @@ function renderModal() {
             roleProfiles={ROLES as never}
             isAdmin
             fetcher={{ state: "idle", data: undefined, submit: () => {} } as never}
+            // #106 - the add goes through the guard PeopleEditor owns; these
+            // assertions never submit, so a no-op stub is enough.
+            submit={() => true}
+            submitting={false}
           />
         );
       },

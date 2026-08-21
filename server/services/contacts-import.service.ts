@@ -1,5 +1,8 @@
 /**
- * Contacts CSV import — parser + two-phase bulk insert.
+ * Contacts CSV import — two-phase bulk insert.
+ *
+ * Tokenising is not done here: the file is read through the shared CSV
+ * tokeniser so the preview and the commit cannot disagree about columns.
  *
  * Two-step UX:
  *  1. POST /api/contacts/import/preview — `parseCsvPreview` returns the first
@@ -27,16 +30,9 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, isNotNull, isNull, and } from 'drizzle-orm';
 import { contacts } from '../lib/db/schema';
 import type { ContactType } from '../lib/db/schema/contact';
+import { parseCsvLine } from '../lib/migration-intake/csv';
 
-const MAX_PREVIEW_ROWS = 20;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export interface CsvPreviewResult {
-    columns: string[];
-    rows: Record<string, string>[];
-    totalRowsDetected: number;
-    truncated: boolean;
-}
 
 export interface ImportMapping {
     name: string;
@@ -50,46 +46,6 @@ export interface ImportResult {
     inserted: number;
     skipped: number;
     errors: { row: number; message: string }[];
-}
-
-/**
- * Tokenises a single CSV line respecting double-quoted fields (RFC 4180 lite).
- * Embedded `""` escapes a literal quote. Commas outside quotes split fields.
- */
-function parseCsvLine(line: string): string[] {
-    const out: string[] = [];
-    let cur = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (inQuotes) {
-            if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
-            else if (ch === '"') { inQuotes = false; }
-            else { cur += ch; }
-        } else {
-            if (ch === ',') { out.push(cur); cur = ''; }
-            else if (ch === '"' && cur === '') { inQuotes = true; }
-            else { cur += ch; }
-        }
-    }
-    out.push(cur);
-    return out;
-}
-
-export function parseCsvPreview(csv: string): CsvPreviewResult {
-    const lines = csv.split(/\r?\n/).filter((l) => l.length > 0);
-    if (lines.length === 0) return { columns: [], rows: [], totalRowsDetected: 0, truncated: false };
-    const columns = parseCsvLine(lines[0]);
-    const dataLines = lines.slice(1);
-    const totalRowsDetected = dataLines.length;
-    const previewLines = dataLines.slice(0, MAX_PREVIEW_ROWS);
-    const rows = previewLines.map((line) => {
-        const fields = parseCsvLine(line);
-        const row: Record<string, string> = {};
-        columns.forEach((col, i) => { row[col] = fields[i] ?? ''; });
-        return row;
-    });
-    return { columns, rows, totalRowsDetected, truncated: totalRowsDetected > MAX_PREVIEW_ROWS };
 }
 
 export async function importContacts(

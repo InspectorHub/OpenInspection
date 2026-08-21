@@ -526,7 +526,7 @@
   "settings_mcw_save_carrier": "Guardar el operador",
   "settings_mcw_update_business_info": "Actualizar la información de la empresa",
   "settings_mcw_business_info": "Información de la empresa",
-  "settings_mcw_business_info_desc": "Se exige para el registro de marca o campaña 10DLC o para la verificación de número gratuito. Se envía directamente a The Campaign Registry (TCR) o a Twilio. En las respuestas sobre el caso de uso y el consentimiento, describa el consentimiento por capas con honestidad: consumidores = consentimiento registrado; partes comerciales del trabajo = relación comercial establecida; STOP para todos. Consulte docs/self-host/sms-compliance.md para ver un texto de ejemplo.",
+  "settings_mcw_business_info_desc": "Se exige para el registro de marca o campaña 10DLC o para la verificación de número gratuito. Se envía directamente a The Campaign Registry (TCR) o a Twilio. En las respuestas sobre el caso de uso y el consentimiento, describa el consentimiento por capas con honestidad: consumidores = consentimiento registrado; partes comerciales del trabajo = relación comercial establecida; STOP para todos. Consulte docs/operate/sms-compliance.md para ver un texto de ejemplo.",
   "settings_mcw_registration_channel": "Canal de registro",
   "settings_mcw_channel_10dlc_label": "Número local 10DLC",
   "settings_mcw_channel_10dlc_desc": "Número local dedicado mediante marca + campaña (TCR). Ideal para A2P de alto volumen.",

@@ -20,7 +20,7 @@ npm run setup:cloudflare    # provisions D1 / R2 / KV (or use --local)
 npm run dev                 # http://localhost:8788
 ```
 
-Detailed setup including Cloudflare bindings and environment variables: [`docs/self-host/deploy.md`](docs/self-host/deploy.md). Architecture overview: [`docs/develop/architecture.md`](docs/develop/architecture.md). Everything else: [`docs/README.md`](docs/README.md).
+Detailed setup including Cloudflare bindings and environment variables: [`docs/operate/deploy.md`](docs/operate/deploy.md). Architecture overview: [`docs/develop/architecture.md`](docs/develop/architecture.md). Everything else: [`docs/README.md`](docs/README.md).
 
 ## Code conventions
 
@@ -59,7 +59,7 @@ OpenInspection follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.
 
 - **Breaking changes** ship only in a **major** version bump. A `feat!:` / `fix!:` commit or a `BREAKING CHANGE:` footer drives the major increment; the change is described in the release's breaking-change section.
 - **Deprecations** are announced in the `CHANGELOG` and kept for **at least one minor version** before removal, giving self-hosters a window to migrate.
-- **Migrations are forward-only** — there is no down migration and no downgrade path (matching the schema-first Drizzle policy). Back up D1 before upgrading. A major version may additionally **rebuild the baseline migration**, regenerating `0000_baseline.sql` and removing the forward files it now covers; because `wrangler` matches applied migrations by filename, an existing database needs a documented one-time reconcile in that case and the automated migrate step will not perform it. Such a release carries a `BREAKING CHANGE:` footer. See the [upgrade guide](docs/self-host/upgrade.md).
+- **Migrations are forward-only** — there is no down migration and no downgrade path (matching the schema-first Drizzle policy). Back up D1 before upgrading. A major version may additionally **rebuild the baseline migration**, regenerating `0000_baseline.sql` and removing the forward files it now covers; because `wrangler` matches applied migrations by filename, an existing database needs a documented one-time reconcile in that case and the automated migrate step will not perform it. Such a release carries a `BREAKING CHANGE:` footer. See the [upgrade guide](docs/operate/upgrade.md).
 - **Security fixes** are called out explicitly in the release notes so operators can prioritize the upgrade. Report vulnerabilities privately (see [Security disclosures](#security-disclosures)).
 
 ## Pull requests

@@ -64,6 +64,14 @@ const NEVER_OFF = [
     'office-alert-inspection-completed', 'office-alert-report-published',
     'office-alert-invoice-created', 'office-alert-payment-received',
     'office-alert-agreement-signed',
+    // The four messages about a file the recipient handed us to convert. Two of
+    // them report that something is about to be lost if they do nothing, and
+    // the other two are the only record they get of what happened to it.
+    // They are NOT in ACCOUNT_EMAIL_CLASSES: that list's bar is "blocking it
+    // locks a paying customer out" or "it carries a statutory deadline that is
+    // not ours", and none of these is either.
+    'migration-import-received', 'migration-import-ready',
+    'migration-import-declined', 'migration-import-expiring',
 ];
 
 /** Spec §2.2-§2.4 — the recipient's call. */

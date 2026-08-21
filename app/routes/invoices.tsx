@@ -7,6 +7,7 @@ import { PageHeader, Card, StatCard, Button, EmptyState, Table, Banner, Modal } 
 import { formatCurrency, formatDate } from "~/lib/format";
 import { InvoiceAmountCell } from "~/components/invoices/InvoiceAmountCell";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 import { NewInvoiceModal, type InspectionOption } from "~/components/invoices/NewInvoiceModal";
@@ -199,7 +200,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 export default function InvoicesPage() {
   const { invoices, inspections, loadFailed } = useLoaderData<typeof loader>();
-  const fetcher = useFetcher<typeof action>();
+  // #106 — mark-paid and void both change what an invoice says about money, so
+  // they go out through the guard. `fetcher` is still read here for `formData`
+  // (the optimistic row disable) and `data` (the failure banner).
+  const { fetcher, submit, busy } = useGuardedSubmit<typeof action>();
   const locale = useDisplayLocale();
   const currency = useDisplayCurrency();
   const [pickerFor, setPickerFor] = useState<string | null>(null);
@@ -210,7 +214,10 @@ export default function InvoicesPage() {
   // on this route, so recording or correcting a payment refreshes both the rows
   // and the balance without a second request written by hand.
   const ledgerFetcher = useFetcher<typeof loader>();
-  const paymentFetcher = useFetcher<typeof action>();
+  // The payments modal writes money too. It is presentational and takes the
+  // guard as a prop, so the raw submit lives in exactly one place per surface.
+  const { fetcher: paymentFetcher, submit: submitPayment, busy: paymentBusy } =
+    useGuardedSubmit<typeof action>();
   const [paymentsFor, setPaymentsFor] = useState<InvoiceRow | null>(null);
   function openPayments(invoice: InvoiceRow) {
     setPaymentsFor(invoice);
@@ -239,12 +246,14 @@ export default function InvoicesPage() {
   const [pendingVoid, setPendingVoid] = useState<InvoiceRow | null>(null);
   function confirmVoid() {
     if (!pendingVoid) return;
-    fetcher.submit({ intent: "void-invoice", id: pendingVoid.id }, { method: "post" });
+    // Keep the confirmation open when the guard refuses — closing it would tell
+    // the user the void was taken while nothing had been sent.
+    if (!submit({ intent: "void-invoice", id: pendingVoid.id }, { method: "post" })) return;
     setPendingVoid(null);
   }
 
   function markPaid(id: string, method: string) {
-    fetcher.submit({ intent: "mark-paid", id, method }, { method: "post" });
+    if (!submit({ intent: "mark-paid", id, method }, { method: "post" })) return;
     setPickerFor(null);
   }
 
@@ -274,6 +283,8 @@ export default function InvoicesPage() {
         payments={ledgerFetcher.data?.payments ?? []}
         loading={ledgerFetcher.state !== "idle"}
         fetcher={paymentFetcher}
+        submit={submitPayment}
+        busy={paymentBusy}
         locale={locale}
         onClose={() => setPaymentsFor(null)}
       />
@@ -289,7 +300,9 @@ export default function InvoicesPage() {
         footer={
           <>
             <Button variant="secondary" onClick={() => setPendingVoid(null)}>{m.common_cancel()}</Button>
-            <Button variant="danger" onClick={confirmVoid}>{m.invoices_action_void()}</Button>
+            <Button variant="danger" onClick={confirmVoid} disabled={busy} aria-busy={busy || undefined}>
+              {m.invoices_action_void()}
+            </Button>
           </>
         }
       >

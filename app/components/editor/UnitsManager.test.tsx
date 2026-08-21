@@ -10,9 +10,12 @@ const units: UnitScopeRow[] = [
 ];
 
 function makeFetcher(overrides: Partial<{ state: string; data: unknown }> = {}) {
-  const submit = vi.fn();
+  // #106 - the panel no longer owns a raw fetcher.submit; the editor passes the
+  // guarded submit in. The stub returns true, which is what the guard returns
+  // when it accepted the call.
+  const submit = vi.fn((_fields: Record<string, string>) => true);
   const fetcher = {
-    submit,
+    submit: vi.fn(),
     state: overrides.state ?? "idle",
     data: overrides.data,
   } as unknown as UnitsManagerProps["fetcher"];
@@ -29,6 +32,8 @@ function renderManager(props: Partial<UnitsManagerProps> = {}) {
       units={units}
       mode="per_unit"
       fetcher={fetcher}
+      guardedSubmit={submit}
+      busy={(fetcher as { state?: string }).state !== "idle"}
       {...props}
     />,
   );

@@ -6,15 +6,20 @@ import path from 'node:path';
  * Shared machinery for the user-guide captures.
  *
  * A `*.shots.ts` file contains ACTIONS AND NOTHING ELSE. Every word a reader
- * sees lives in `docs/user-guide/<slug>.md`, joined to these captures by a
- * marker:
+ * sees lives in the guide's markdown, joined to these captures by a marker:
  *
  *   <!-- shot: pick-template | The template picker with Residential selected -->
  *
- * The two are matched id-for-id by `scripts/lib/docs-shots.mjs`, and a
- * disagreement in either direction fails the docs build. Keeping copy out of
- * this file is what makes that check meaningful: if captions lived beside the
- * clicks, the prose would be reviewed as code and read by nobody.
+ * THE PROSE IS NOT IN THIS REPOSITORY. It is published from the hosted docs
+ * site (<https://inspectorhub.io/docs>), and so is the code that matches the two
+ * id-for-id; a disagreement in either direction fails the docs build there. This
+ * side is deliberately one-way: it writes `<SHOT_ROOT>/<slug>/<id>.png` and
+ * knows nothing about markers, so it stays useful to anyone driving this app
+ * with Playwright.
+ *
+ * Keeping copy out of this file is what makes that check meaningful: if captions
+ * lived beside the clicks, the prose would be reviewed as code and read by
+ * nobody.
  */
 
 /** Where captures land. Gitignored — the published copies live in the CMS. */

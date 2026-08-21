@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import { SegmentedControl } from "@core/shared-ui";
 import { MoneyInput } from "~/components/MoneyInput";
 import {
@@ -9,6 +8,7 @@ import {
 } from "~/lib/deposit-policy-form";
 import type { DepositPolicy } from "../../../server/lib/billing/deposit-policy";
 import type { action } from "~/routes/settings-booking";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 interface TenantConfig {
@@ -20,7 +20,8 @@ interface TenantConfig {
 }
 
 export function BookingPoliciesPanel({ initialConfig }: { initialConfig: TenantConfig }) {
-  const fetcher = useFetcher<typeof action>();
+  // #106 - user mutation: saves the tenant-wide booking policy.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
   const [concierge, setConcierge] = useState(initialConfig.conciergeReviewRequired);
   const [blockUnsigned, setBlockUnsigned] = useState(initialConfig.blockUnsignedAgreement);
   const [allowChoice, setAllowChoice] = useState(initialConfig.allowInspectorChoice);
@@ -48,7 +49,6 @@ export function BookingPoliciesPanel({ initialConfig }: { initialConfig: TenantC
       : m.settings_deposit_error_amount()
     : null;
 
-  const saving = fetcher.state !== "idle";
   const saved =
     fetcher.state === "idle" &&
     fetcher.data?.intent === "policies-save" &&
@@ -71,7 +71,7 @@ export function BookingPoliciesPanel({ initialConfig }: { initialConfig: TenantC
     // clears the column, which is also where every company already is.
     const policy = depositResult.policy?.type === "none" ? null : depositResult.policy;
     setDirty(false);
-    fetcher.submit(
+    submit(
       {
         intent: "policies-save",
         conciergeReviewRequired: String(concierge),

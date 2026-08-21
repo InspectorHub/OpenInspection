@@ -137,10 +137,14 @@ export const auditLogs = sqliteTable('audit_logs', {
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     userId: text('user_id'),
     action: text('action').notNull(),       // e.g. 'inspection.create'
-    // The entity family the action touched ('inspection', 'widget', 'agent', …).
-    // Free-form — each caller passes its own string, there is no registry — and
+    // The entity family the action touched ('inspection', 'widget', 'agent', …),
     // exposed as the `?entityType=` filter on the admin audit list. Survives the
     // retention anonymize, which clears the actor columns and keeps the event.
+    // The COLUMN is free-form text, but the writers are not: the audit helpers
+    // type it as `AuditFamily` (`server/lib/audit-families.ts`), which is the
+    // closed list of spellings. Historical rows may still hold anything, and
+    // one direct writer outside those helpers still does — see DIRECT_WRITERS in
+    // `scripts/check-audit-registry.mjs`.
     entityType: text('entity_type').notNull(),
     entityId: text('entity_id'),
     metadata: text('metadata', { mode: 'json' }),

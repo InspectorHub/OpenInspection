@@ -45,13 +45,17 @@ that way.
 | `hasSetupWizard` | yes | no | `/setup` exists, gated on the `SETUP_CODE` secret, to create the first account. |
 | `aiDevMockFallback` | yes | no | AI calls may fall back to a local mock when no credential resolves. |
 | `hasManagedAi` | no | yes | A platform-provided AI credential can ever be resolved. Standalone has no platform, so the managed path is absent rather than disabled — use your own key in Settings → Advanced → AI. |
-| `mcpApiRoute` | `/mcp` | `/company/` | Where the MCP OAuth surface mounts. |
+| `mcpApiRoute` | `/mcp` | `/company/` | Where the MCP OAuth surface mounts. | <!-- no-portal-routes-allow: this cell is the VALUE of this engine's own mcpApiRoute setting, not a link to a hosted screen -->
 | `videoBackendManaged` | no | yes | Whether the platform picks the video backend. Standalone operators set `videoMode` themselves, which is why the self-host settings form exists and the saas one refuses to save. |
 | `hasManagedCompliance` | no | yes | A platform-operated compliance path (managed SMS 10DLC brand/campaign filing) exists. Absent in standalone — nobody can file on your behalf. |
 | `hasContentMarketplace` | no | yes | The content marketplace surface exists. Standalone 404s the browse route rather than rendering an empty shelf: the catalogue is curated first-party and nothing can reach it. |
 | `qboAppManaged` | no | yes | The platform supplies the Intuit app tenants connect through, so nobody is asked for a Client ID. Standalone brings its own: Intuit matches a redirect URI byte for byte and a self-hosted deploy answers on its own domain, so the platform app cannot work there — which is why the credential form, including `QBO_ENV`, renders only in standalone. |
 | `tenantRecordOwnedByPortal` | no | yes | Whether a platform stores the authoritative tenant record and this worker reads a projection of it. Decides which admin provider is constructed; in standalone this deployment owns the row outright. |
 | `hasPortalIntegrationApi` | no | yes | Whether the portal machine-to-machine surface (`/api/integration/*`) is mounted. Standalone 404s the whole prefix rather than answering on an API nobody can authenticate to. |
+| `hasAssistedMigration` | no | yes | An import whose file no adapter can read may be handed to a support team. Absent in standalone, where the file is refused before it is stored rather than kept for nobody. |
+| `importMaxCsvBytes` | `1000000` | `5000000` | Largest spreadsheet an import accepts, in bytes. Override per deployment with `IMPORT_MAX_CSV_BYTES`; a value that is not a positive integer is ignored and the default stands. |
+| `importMaxVendorExportBytes` | `2000000` | `20000000` | Largest vendor export (JSON) an import accepts, in bytes. Override per deployment with `IMPORT_MAX_VENDOR_EXPORT_BYTES`. |
+| `importMaxRows` | `1000` | `10000` | Most entries one import may carry; beyond it the run is refused with the real count. Override per deployment with `IMPORT_MAX_ROWS`. |
 | `botProtectionMandatory` | no | yes | Whether the public booking form and agent signup MUST carry a bot challenge. Saas always challenges — with no `TURNSTILE_SECRET_KEY` it uses Cloudflare's published test key rather than skipping, so the mechanism is permissive but never off. Standalone leaves it to the operator: no key, no challenge. |
 
 <!-- END GENERATED: capability table -->

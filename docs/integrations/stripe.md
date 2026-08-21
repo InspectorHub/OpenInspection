@@ -70,6 +70,6 @@ the report pay-gate still releases on that. Nothing is silently skipped.
 
 ## Related
 
-- [Invoicing and payments](../user-guide/invoicing-and-payments.md) — the user's view
-- [Rotate secrets](../self-host/rotate-secrets.md)
+- [Invoicing and payments](https://inspectorhub.io/docs/invoicing-and-payments) — the user's view
+- [Rotate the JWT keyring](../operate/rotate-jwt-keyring.md)
 - [Integration adapters](../develop/integration-adapters.md) — for changing this code

@@ -139,6 +139,10 @@ export function HolidayAdvancedDetails({
                 </span>
                 <button
                   type="button"
+                  // #106 - disabled while a write is in flight: the panel now
+                  // routes through a guard that REFUSES a second call, so an
+                  // enabled control here would swallow the click in silence.
+                  disabled={saving}
                   onClick={() => onRemoveCustom(h.id)}
                   className="text-[12px] font-bold text-ih-bad-fg hover:underline"
                 >

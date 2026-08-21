@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import { Card, Button, Modal } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { MoneyInput } from "~/components/MoneyInput";
 import { formatCents } from "~/lib/hub-blocks";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import type { action } from "~/routes/inspector-portal";
 
@@ -53,9 +53,13 @@ export function ServicesCard({
     catalog: CatalogService[];
     canManage: boolean;
 }) {
-    const addFetcher = useFetcher<typeof action>();
-    const priceFetcher = useFetcher<typeof action>();
-    const removeFetcher = useFetcher<typeof action>();
+    // #106 - all three change what the client is billed for this order. Three
+    // guards, not one: they are reachable from three modals and a shared
+    // fetcher would let one abort another.
+    const { fetcher: addFetcher, submit: submitAdd, busy: adding } = useGuardedSubmit<typeof action>();
+    const { fetcher: priceFetcher, submit: submitPrice, busy: pricing } = useGuardedSubmit<typeof action>();
+    const { fetcher: removeFetcher, submit: submitRemove, busy: removingBusy } =
+        useGuardedSubmit<typeof action>();
 
     const [addOpen, setAddOpen] = useState(false);
     const [repricing, setRepricing] = useState<ServiceLine | null>(null);
@@ -141,7 +145,7 @@ export function ServicesCard({
                         variant="secondary"
                         size="sm"
                         onClick={() => setAddOpen(true)}
-                        disabled={addFetcher.state !== "idle"}
+                        disabled={adding}
                     >
                         {m.inspections_hub_services_add()}
                     </Button>
@@ -152,35 +156,22 @@ export function ServicesCard({
                 open={addOpen}
                 available={available}
                 catalogEmpty={catalog.length === 0}
-                submitting={addFetcher.state !== "idle"}
+                submitting={adding}
                 onClose={() => setAddOpen(false)}
                 onAdd={(serviceId, cents) => {
-                    addFetcher.submit(
-                        {
-                            intent: "service-add",
-                            serviceId,
-                            priceOverrideCents: cents == null ? "" : String(cents),
-                        },
-                        { method: "post" },
-                    );
-                    setAddOpen(false);
+                    // Close only on a call the guard accepted.
+                    const line = { intent: "service-add", serviceId, priceOverrideCents: cents == null ? "" : String(cents) };
+                    if (submitAdd(line, { method: "post" })) setAddOpen(false);
                 }}
             />
 
             <RepriceModal
                 line={repricing}
-                submitting={priceFetcher.state !== "idle"}
+                submitting={pricing}
                 onClose={() => setRepricing(null)}
                 onSave={(lineId, cents) => {
-                    priceFetcher.submit(
-                        {
-                            intent: "service-price",
-                            lineId,
-                            priceOverrideCents: cents == null ? "" : String(cents),
-                        },
-                        { method: "post" },
-                    );
-                    setRepricing(null);
+                    const line = { intent: "service-price", lineId, priceOverrideCents: cents == null ? "" : String(cents) };
+                    if (submitPrice(line, { method: "post" })) setRepricing(null);
                 }}
             />
 
@@ -199,14 +190,12 @@ export function ServicesCard({
                         <Button
                             variant="primary"
                             size="sm"
-                            disabled={removeFetcher.state !== "idle"}
+                            disabled={removingBusy}
                             onClick={() => {
                                 if (!removing) return;
-                                removeFetcher.submit(
-                                    { intent: "service-remove", lineId: removing.id },
-                                    { method: "post" },
-                                );
-                                setRemoving(null);
+                                if (submitRemove({ intent: "service-remove", lineId: removing.id }, { method: "post" })) {
+                                    setRemoving(null);
+                                }
                             }}
                         >
                             {m.inspections_hub_services_remove()}

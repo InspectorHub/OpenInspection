@@ -190,6 +190,8 @@ export default [
       route("settings/communication/templates/:trigger", "routes/settings-communication-template.tsx"),
       route("settings/automations", "routes/settings-automations.tsx"),
       route("settings/data", "routes/settings-data.tsx"),
+      route("settings/imports", "routes/settings-imports.tsx"),
+      route("settings/imports/:batchId", "routes/settings-imports-batch.tsx"),
       route("settings/compliance", "routes/settings-compliance.tsx"),
       route("settings/account", "routes/settings-account.tsx"),
       route("settings/advanced", "routes/settings-advanced.tsx"),
