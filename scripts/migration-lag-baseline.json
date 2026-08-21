@@ -27,7 +27,7 @@
     "ADD A NAME HERE ONLY IF you deliberately chose to leave the pre-rebuild rows in place, and",
     "only after confirming that the database's SCHEMA is current. This file silences a report; it",
     "reconciles nothing. Self-hosters upgrading across the baseline rebuild should follow",
-    "docs/self-host/upgrade.md instead — the ledger rewrite it describes leaves this file empty."
+    "docs/operate/upgrade.md instead — the ledger rewrite it describes leaves this file empty."
   ],
   "saas": {
     "acceptedExtra": []

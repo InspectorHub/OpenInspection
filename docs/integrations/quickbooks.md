@@ -98,6 +98,6 @@ Mappings are cleared on purpose. Reconnecting can land on a **different** QuickB
 
 ## Related
 
-- [Deploy](../self-host/deploy.md) — setting Worker secrets
-- [Rotate secrets](../self-host/rotate-secrets.md)
-- [Invoicing and payments](../user-guide/invoicing-and-payments.md) — what syncs, from the user's side
+- [Deploy](../operate/deploy.md) — setting Worker secrets
+- [Rotate the JWT keyring](../operate/rotate-jwt-keyring.md)
+- [Invoicing and payments](https://inspectorhub.io/docs/invoicing-and-payments) — what syncs, from the user's side

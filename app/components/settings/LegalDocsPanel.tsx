@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import { SegmentedControl } from "@core/shared-ui";
 import { useCopyClipboard } from "~/hooks/useCopyClipboard";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export type LegalDocsInitial = {
@@ -24,7 +24,8 @@ type LegalSaveResult = {
 
 /** Settings → Compliance → Privacy & Terms (hosted vs custom TFV URLs). */
 export function LegalDocsPanel({ initial }: { initial: LegalDocsInitial }) {
-  const fetcher = useFetcher<LegalSaveResult>();
+  // #106 - user mutation: publishes the tenant Privacy and Terms documents.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<LegalSaveResult>();
   const { copied, copy } = useCopyClipboard();
   const [mode, setMode] = useState<"hosted" | "custom">(initial.legalMode);
   const [customPrivacyUrl, setCustomPrivacyUrl] = useState(initial.customPrivacyUrl);
@@ -33,7 +34,6 @@ export function LegalDocsPanel({ initial }: { initial: LegalDocsInitial }) {
   const [termsBody, setTermsBody] = useState(initial.termsBody);
   const [dirty, setDirty] = useState(false);
 
-  const saving = fetcher.state !== "idle";
   const saved =
     fetcher.state === "idle" &&
     fetcher.data?.intent === "legal-save" &&
@@ -51,7 +51,7 @@ export function LegalDocsPanel({ initial }: { initial: LegalDocsInitial }) {
 
   function handleSave() {
     setDirty(false);
-    fetcher.submit(
+    submit(
       {
         intent: "legal-save",
         legalMode: mode,

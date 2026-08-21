@@ -4,8 +4,9 @@ Start here. Pick the section that matches what you are trying to do.
 
 | I want to… | Go to |
 |---|---|
-| Run OpenInspection for my own inspection business | [`self-host/`](#self-hosting) |
-| Use the product day to day | [`user-guide/`](#using-the-product) |
+| Get something running for the first time, today | [`quickstart.md`](quickstart.md) |
+| Run OpenInspection for my own inspection business | [`operate/`](#operating-a-deployment) |
+| Use the product day to day | [inspectorhub.io/docs](#using-the-product) |
 | Change the code or send a pull request | [`develop/`](#developing) |
 | Connect it to QuickBooks, Stripe, a calendar, email or SMS | [`integrations/`](#integrations) |
 | Look up an endpoint, a table, a role | [`reference/`](#reference) |
@@ -14,26 +15,35 @@ Start here. Pick the section that matches what you are trying to do.
 
 ---
 
-## Self-hosting
+## Operating a deployment
 
-Running the engine on your own Cloudflare account.
+Running the engine on your own Cloudflare account. Start at the quickstart if you
+have never deployed it; it is the same path with every deferrable decision
+deferred.
 
 | Doc | Topic |
 |---|---|
-| [`self-host/deploy.md`](self-host/deploy.md) | First-time production deploy — one-click, CLI, and what gets provisioned |
-| [`self-host/upgrade.md`](self-host/upgrade.md) | Move an existing deployment to a newer release (forward-only) — including the one-time reconcile a rebuilt baseline needs |
-| [`self-host/sms-compliance.md`](self-host/sms-compliance.md) | Privacy/Terms pages, carrier registration, TCPA/CTIA wording |
-| [`self-host/rotate-secrets.md`](self-host/rotate-secrets.md) | Rotating the ES256 JWT keyring without invalidating live sessions, and the tenant e-signature key without invalidating signed evidence |
+| [`quickstart.md`](quickstart.md) | Empty Cloudflare account to a workspace you can log into, in about 20 minutes |
+| [`operate/deploy.md`](operate/deploy.md) | First-time production deploy — one-click, CLI, and what gets provisioned |
+| [`operate/upgrade.md`](operate/upgrade.md) | Move an existing deployment to a newer release (forward-only) — including the one-time reconcile a rebuilt baseline needs |
+| [`operate/sms-compliance.md`](operate/sms-compliance.md) | Privacy/Terms pages, carrier registration, TCPA/CTIA wording |
+| [`operate/rotate-jwt-keyring.md`](operate/rotate-jwt-keyring.md) | Rotating the ES256 JWT keyring without invalidating live sessions |
 
 ## Using the product
 
-| Doc | Topic |
-|---|---|
-| [`user-guide/README.md`](user-guide/README.md) | The inspection workflow end to end — create, inspect, publish, deliver, get paid |
+**Not here.** The user guide lives at <https://inspectorhub.io/docs> — the
+inspection workflow end to end: create, inspect, publish, deliver, get paid.
 
-> Illustrated, step-by-step versions of these walkthroughs (with screenshots)
-> live at <https://inspectorhub.io/docs>. The text here is complete on its own;
-> the hosted copy adds the pictures.
+It is not in this repository because it is not about this repository. A page
+explaining how to record a finding or send a report describes the product, and
+the product is the same product whether you run it yourself or somebody runs it
+for you — so one copy serves both, illustrated with screenshots taken from the
+software in this repository (`tests/docs-shots/`). Splitting it would give
+self-hosters the worse of two guides.
+
+Where a screen genuinely differs by deployment mode, the hosted page says so
+inline. Capability by capability, the difference is
+[`reference/deployment-modes.md`](reference/deployment-modes.md).
 
 ## Integrations
 

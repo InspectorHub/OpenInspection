@@ -6,7 +6,7 @@ SaaS deployment can supply a managed one.
 
 **Sending SMS in the United States is a regulated activity, not a technical
 one.** Carrier registration, the wording of your opt-in, and quiet hours are
-covered in [`../self-host/sms-compliance.md`](../self-host/sms-compliance.md).
+covered in [`../operate/sms-compliance.md`](../operate/sms-compliance.md).
 That page is not optional reading, and the credentials below will not get a
 message delivered without it.
 
@@ -76,6 +76,6 @@ deployment cannot use.
 
 ## Related
 
-- [SMS compliance](../self-host/sms-compliance.md) — **read this first**
+- [SMS compliance](../operate/sms-compliance.md) — **read this first**
 - [Email](email.md) — the other channel, same own-vs-platform shape
 - [Integration adapters](../develop/integration-adapters.md)

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import { SegmentedControl, Select } from "@core/shared-ui";
 import type { action } from "~/routes/settings-booking";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export type BookingSlotMode = "open" | "fixed";
@@ -29,14 +29,14 @@ export function BookingSlotRulesPanel({ initial }: { initial: BookingSlotRules }
     { value: "60", label: m.settings_slotrules_interval_60() },
   ];
 
-  const fetcher = useFetcher<typeof action>();
+  // #106 - user mutation: saves the booking slot rules.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
   const [mode, setMode] = useState<BookingSlotMode>(initial.bookingSlotMode);
   const [intervalMin, setIntervalMin] = useState<BookingSlotIntervalMin>(
     initial.bookingSlotIntervalMin,
   );
   const [dirty, setDirty] = useState(false);
 
-  const saving = fetcher.state !== "idle";
   const saved =
     fetcher.state === "idle" &&
     fetcher.data?.intent === "slot-rules-save" &&
@@ -50,7 +50,7 @@ export function BookingSlotRulesPanel({ initial }: { initial: BookingSlotRules }
 
   function handleSave() {
     setDirty(false);
-    fetcher.submit(
+    submit(
       {
         intent: "slot-rules-save",
         bookingSlotMode: mode,

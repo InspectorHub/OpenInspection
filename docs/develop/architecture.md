@@ -159,7 +159,7 @@ tenant. You never manage tenants or subdomains. Tenant resolution lives in
 `server/features/tenant-routing/`; in standalone the `tenantRouter` middleware simply pins
 the request to `profile.fixedTenantId` (`resolve-by-fixed-tenant.ts`).
 
-> A SaaS overlay (`server/portal/`, active only when `APP_MODE=saas`) integrates the engine with the InspectorHub control plane. It is out of scope for self-hosting — standalone builds execute none of it. See the super-project `docs/saas-ops/`.
+> A SaaS overlay (`server/portal/`, active only when `APP_MODE=saas`) lets a multi-tenant deployment hand tenant records, seats and credentials to an external control plane over the machine-to-machine seam described in [`reference/api.md`](../reference/api.md). Standalone builds execute none of it: `hasPortalIntegrationApi` is false, so `/api/integration/*` is not mounted at all. The code is here and readable; what runs on the other end of that seam is not part of this repository.
 
 ### Reading a deployment capability
 

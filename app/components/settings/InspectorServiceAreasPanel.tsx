@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useFetcher } from "react-router";
 import { Input, Select } from "@core/shared-ui";
 import type { action } from "~/routes/settings-booking";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export interface ServiceAreaMember {
@@ -35,7 +35,9 @@ export function parseZipList(raw: string): string[] {
  * never opens this panel gets.
  */
 export function InspectorServiceAreasPanel({ members }: { members: ServiceAreaMember[] }) {
-  const fetcher = useFetcher<typeof action>();
+  // #106 - both writes save an inspector's dispatch geography. Each button
+  // is already `disabled={saving}`, so the guard never has to refuse one.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
   const [selectedId, setSelectedId] = useState(members[0]?.id ?? "");
   const selected = members.find((x) => x.id === selectedId) ?? null;
 
@@ -50,7 +52,6 @@ export function InspectorServiceAreasPanel({ members }: { members: ServiceAreaMe
     setOrigin(next?.originAddress ?? "");
   }, [selectedId, members]);
 
-  const saving = fetcher.state !== "idle";
   const result =
     fetcher.state === "idle" &&
     (fetcher.data?.intent === "service-areas-save" || fetcher.data?.intent === "service-origin-save")
@@ -109,7 +110,7 @@ export function InspectorServiceAreasPanel({ members }: { members: ServiceAreaMe
         <button
           type="button"
           disabled={saving || !selectedId}
-          onClick={() => fetcher.submit(
+          onClick={() => submit(
             { intent: "service-areas-save", userId: selectedId, zipPrefixes: parsed.join(",") },
             { method: "post" },
           )}
@@ -137,7 +138,7 @@ export function InspectorServiceAreasPanel({ members }: { members: ServiceAreaMe
         <button
           type="button"
           disabled={saving || !selectedId}
-          onClick={() => fetcher.submit(
+          onClick={() => submit(
             { intent: "service-origin-save", userId: selectedId, address: origin },
             { method: "post" },
           )}

@@ -4,6 +4,7 @@ import { SignaturePad } from "~/components/SignaturePad";
 import { PhotoCropper } from "~/components/media-studio/PhotoCropper";
 import { blobToDataUri, readAsDataUri, validateImageFile, isVectorImage, SIGNATURE_MAX_LONG_EDGE } from "~/lib/image-upload";
 import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -29,7 +30,9 @@ type SaveResult = { success?: boolean; error?: string; intent?: string };
 export function EmailSignatureCard({
   enabled, previewHtml,
 }: { enabled: boolean; previewHtml: string | null }) {
-  const fetcher = useFetcher<SaveResult>();
+  // #106 - the toggle decides whether every outbound email carries the
+  // signature. The checkbox is disabled while the guard is busy.
+  const { fetcher, submit, busy } = useGuardedSubmit<SaveResult>();
   const failed = fetcher.data?.intent === "signature-toggle" && fetcher.data?.success === false;
   useNotificationSaveToast({
     data: fetcher.data?.intent === "signature-toggle" ? fetcher.data : null,
@@ -50,8 +53,8 @@ export function EmailSignatureCard({
         <input
           type="checkbox"
           defaultChecked={enabled}
-          disabled={fetcher.state !== "idle"}
-          onChange={(e) => fetcher.submit(
+          disabled={busy}
+          onChange={(e) => submit(
             { intent: "signature-toggle", signatureEnabled: String(e.currentTarget.checked) },
             { method: "post" },
           )}

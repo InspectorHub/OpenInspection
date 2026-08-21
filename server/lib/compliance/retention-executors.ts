@@ -46,6 +46,7 @@ import { notHeld } from './retention-executor-context';
 import type { Executor } from './retention-executor-context';
 import { PLATFORM_EXECUTORS } from './retention-executors-platform';
 import { reportPdfsExecutor } from './retention-report-pdfs';
+import { migrationBatchesExecutor } from './retention-migration-batches';
 
 // Re-exported so `retention-logs.ts` and the specs keep one import site for the
 // executor surface; `notHeld` and `ExecutorContext` are deliberately NOT
@@ -311,4 +312,11 @@ export const EXECUTORS: Record<string, Executor> = {
             .run();
         return changeCount(res);
     },
+
+    /**
+     * Intake runs. Lives in its own file with the report-PDF rule: both reach
+     * outside D1, and this one also CLEARS its row rather than deleting it, so
+     * what the sweep takes and what it leaves are two different answers.
+     */
+    migration_batches: migrationBatchesExecutor,
 };

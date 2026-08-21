@@ -10,6 +10,7 @@ import { getBaseUrl } from '../lib/url';
 import { checkRateLimit } from '../lib/rate-limit';
 import { requireCsrfToken } from '../lib/middleware/csrf';
 import { signJwt } from '../lib/jwt-keyring';
+import { writeAuditLog, auditFromContext } from '../lib/audit';
 import {
     LoginSchema,
     ChangePasswordSchema,
@@ -341,6 +342,16 @@ const coreAuthRoutes = createApiRouter()
         const body = c.req.valid('json');
         await c.var.services.auth.updatePassword(user.sub, body.currentPassword, body.newPassword);
 
+        // The service also emits a `user.password_changed` outbox event. That
+        // is replication and it expires after two cycles; this row is the
+        // durable half, and it is the half a later reader asks for.
+        //
+        // Deliberately no metadata: nothing about a password belongs in a
+        // column whose redaction is documented as knowingly incomplete.
+        auditFromContext(c, 'user.password_change', 'user', {
+            entityId: user.sub,
+        });
+
         return c.json({ success: true }, 200);
     })
     .openapi(joinTeamRoute, async (c) => {
@@ -367,6 +378,24 @@ const coreAuthRoutes = createApiRouter()
         }, keyring);
 
         setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
+
+        // An invite being ACCEPTED is the other half of the invite being sent,
+        // and the pair is what answers "how did this person get in".
+        //
+        // `writeAuditLog` and not `auditFromContext`: the JWT middleware returns
+        // early for `/join`, so there is no tenant on the context here. The
+        // tenant is the one the invite belongs to, which is what `joinTeam`
+        // just returned.
+        writeAuditLog({
+            db: c.env.DB,
+            tenantId: user.tenantId,
+            userId: user.id,
+            action: 'user.join',
+            entityType: 'user',
+            entityId: user.id,
+            metadata: { role: user.role },
+            ipAddress: c.req.header('CF-Connecting-IP'),
+        });
 
         return c.json({
             success: true,

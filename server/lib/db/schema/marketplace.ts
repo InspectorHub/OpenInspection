@@ -88,30 +88,28 @@ export const tenantLibraryImports = sqliteTable('tenant_library_imports', {
 ]);
 
 // Sprint 2 Track 3 (S2-8) — per-import history. One row per
-// install/update/replace/migrate event, indexed for fast tenant scoping
+// install/update/replace event, indexed for fast tenant scoping
 // and per-resource (template / library) lookups.
 export const tenantMarketplaceImportHistory = sqliteTable('tenant_marketplace_import_history', {
   id:            text('id').primaryKey(),
   tenantId:      text('tenant_id').notNull(),
   libraryId:     text('library_id'),
   templateId:    text('template_id'),
-  // 'install' | 'update' | 'replace' | 'migrate'
+  // 'install' | 'update' | 'replace'
   action:        text('action').notNull(),
-  // The semver the tenant moved FROM / TO. source is NULL for 'install' (there
-  // was nothing to move from); BOTH are NULL for 'migrate', which moves between
-  // two LOCAL templates and has no catalogue version on either side — so a
-  // reader must not treat a null pair as missing data.
+  // The semver the tenant moved FROM / TO. source is NULL for 'install' —
+  // there was nothing to move from.
   sourceVersion: text('source_version'),
-  targetVersion: text('target_version'),   // NULL on a migrate: local -> local has no catalogue version either side
+  targetVersion: text('target_version'),
   rowsAffected:  integer('rows_affected').notNull().default(0),
   // JSON-encoded action-specific context (deleted ids, migration counts, …).
   // Stored as TEXT so we can keep parity with raw SQL inserts in tests.
   metadata:      text('metadata'),
   createdAt:     integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  // The JWT sub of whoever caused the event — but only the library REPLACE and
-  // template MIGRATE routes actually pass one. Install and plain update call the
-  // service with no userId, so their rows carry the literal 'system': a
-  // 'system' value means "the route did not say", not "no human did it".
+  // The JWT sub of whoever caused the event — but only the library replace
+  // route actually passes one. Install and plain update call the service with
+  // no userId, so their rows carry the literal 'system': a 'system' value means
+  // "the route did not say", not "no human did it".
   createdBy:     text('created_by').notNull(),
 }, (t) => [
   index('idx_marketplace_history_tenant').on(t.tenantId, t.createdAt),

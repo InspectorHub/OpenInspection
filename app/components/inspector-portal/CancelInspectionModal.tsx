@@ -3,6 +3,7 @@ import { useFetcher } from "react-router";
 import { Modal, Button, Select, Textarea } from "@core/shared-ui";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { formatCents } from "~/lib/hub-blocks";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import {
     CANCELLATION_REASONS,
@@ -73,7 +74,10 @@ export function CancelInspectionModal({
     // reason changes, the other is the write. Sharing one would let a re-quote
     // in flight overwrite the cancel's result.
     const quoteFetcher = useFetcher<typeof quoteLoader>();
-    const cancelFetcher = useFetcher<typeof cancelAction>();
+    // #106 - cancelling charges the acknowledged fee and closes the order. The
+    // quote fetcher above stays a plain read.
+    const { fetcher: cancelFetcher, submit: submitCancel, busy: cancelling } =
+        useGuardedSubmit<typeof cancelAction>();
 
     const [reason, setReason] = useState<CancellationReason>("client_cancelled");
     const [notes, setNotes] = useState("");
@@ -117,13 +121,12 @@ export function CancelInspectionModal({
     const quote: CancellationQuoteView | undefined = loaded?.ok ? loaded.quote : undefined;
     const quoteError = loaded && !loaded.ok ? loaded.error : undefined;
     const quoting = quoteFetcher.state !== "idle";
-    const cancelling = cancelFetcher.state !== "idle";
     const cancelError = cancelResult && !cancelResult.ok ? cancelResult.error : undefined;
 
     function submit() {
         if (!quote) return;
-        setConfirming(false);
-        cancelFetcher.submit(
+        // Dismiss the confirmation only for a call the guard accepted.
+        const sent = submitCancel(
             {
                 id: inspectionId,
                 reason,
@@ -133,6 +136,7 @@ export function CancelInspectionModal({
             },
             { method: "post", action: QUOTE_ROUTE },
         );
+        if (sent) setConfirming(false);
     }
 
     return (

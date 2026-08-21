@@ -150,6 +150,26 @@ describe('the deployment payload carries every capability the chrome gates on', 
         }
     });
 
+    it('ships hasAssistedMigration, which is declared ahead of its reader', () => {
+        // Deliberately NOT added to GATED_IN_APP above: nothing under `app/`
+        // reads it yet — the import wizard is a later task — and that list is a
+        // claim about what app/ actually gates on. Padding it would make the
+        // list stop meaning anything, which is the failure recorded next door.
+        //
+        // It is still pinned, because the payload is the allowlist: a capability
+        // dropped from `deploymentPayload` is unreadable in the browser at any
+        // price, and the wizard would gate on `undefined` and read it as false.
+        for (const profile of [STANDALONE_PROFILE, SAAS_PROFILE]) {
+            const shipped = deploymentPayload(profile, {});
+            expect(typeof shipped.hasAssistedMigration).toBe('boolean');
+            expect(shipped.hasAssistedMigration).toBe(profile.hasAssistedMigration);
+        }
+        // The control: the two profiles must not agree, or "carries it through"
+        // would be satisfied by a hardcoded false.
+        expect(STANDALONE_PROFILE.hasAssistedMigration)
+            .not.toBe(SAAS_PROFILE.hasAssistedMigration);
+    });
+
     it('does NOT ship the server-only fields of the profile', () => {
         // The positive control for the assertion above. Without it, "ship
         // everything" passes — and that would put `fixedTenantId` and the portal

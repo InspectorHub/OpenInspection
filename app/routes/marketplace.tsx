@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFetcher, useLoaderData, useNavigate } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/marketplace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -8,6 +8,7 @@ import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination, Banner } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { usePagination } from "~/hooks/usePagination";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
@@ -80,12 +81,17 @@ export default function MarketplacePage() {
   // tracked so only its button shows the pending state. On success we jump to
   // the freshly imported template in the library.
   const navigate = useNavigate();
-  const installFetcher = useFetcher<{ ok: boolean; localTemplateId?: string | null; error?: string }>();
+  // #106 - an install writes a template into the tenant library.
+  const { fetcher: installFetcher, submit: submitInstall, busy: installing } =
+    useGuardedSubmit<{ ok: boolean; localTemplateId?: string | null; error?: string }>();
   const [installingId, setInstallingId] = useState<string | null>(null);
 
   function handleInstall(id: string) {
-    setInstallingId(id);
-    installFetcher.submit({ templateId: id }, { method: "post", action: "/resources/marketplace-install" });
+    // Track the row only for a call the guard accepted, so a refused click
+    // cannot leave a button spinning against no request.
+    if (submitInstall({ templateId: id }, { method: "post", action: "/resources/marketplace-install" })) {
+      setInstallingId(id);
+    }
   }
 
   useEffect(() => {
@@ -161,7 +167,7 @@ export default function MarketplacePage() {
                       variant="primary"
                       size="sm"
                       onClick={() => handleInstall(t.id)}
-                      disabled={installFetcher.state !== "idle"}
+                      disabled={installing}
                     >
                       {installingId === t.id ? m.marketplace_installing() : m.marketplace_install()}
                     </Button>

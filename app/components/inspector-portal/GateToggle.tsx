@@ -1,4 +1,4 @@
-import { useFetcher } from "react-router";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import type { action } from "~/routes/inspector-portal";
 
@@ -31,8 +31,10 @@ export function GateToggle({
     label: string;
     testId?: string;
 }) {
-    const fetcher = useFetcher<typeof action>();
-    const saving = fetcher.state !== "idle";
+    // #106 — the toggle writes an order-level gate; it goes through the guard.
+    // The checkbox is already `disabled={saving}` while in flight, so the guard
+    // never has to refuse a second change the user could still make.
+    const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
 
     // Optimistic: the switch follows the pending submission so it doesn't snap
     // back for the length of a round trip.
@@ -53,7 +55,7 @@ export function GateToggle({
                     disabled={saving}
                     data-testid={testId}
                     onChange={(e) =>
-                        fetcher.submit(
+                        submit(
                             {
                                 intent: "save-order",
                                 payload: JSON.stringify({ [field]: e.target.checked }),

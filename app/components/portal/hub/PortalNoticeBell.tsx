@@ -13,7 +13,8 @@
  *    change (portal access is keyed on the address — see design §3.16).
  */
 import { useEffect } from "react";
-import { useFetcher, useNavigate, useRevalidator } from "react-router";
+import { useNavigate, useRevalidator } from "react-router";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { NoticeBell } from "~/components/notices/NoticeBell";
 import { hubSectionNavHref } from "~/components/portal/ClientPortalHub";
@@ -32,7 +33,9 @@ export function PortalNoticeBell({
    *  surface, since the Hub itself is organised per inspection. */
   settingsHref?: string;
 }) {
-  const fetcher = useFetcher<{ ok?: boolean; intent?: string; url?: string }>();
+  // #106 - dismiss, mark-all-read and the opt-in link all write.
+  const { fetcher, submit: guardedSubmit, busy } =
+    useGuardedSubmit<{ ok?: boolean; intent?: string; url?: string }>();
   const revalidator = useRevalidator();
   const navigate = useNavigate();
 
@@ -65,7 +68,7 @@ export function PortalNoticeBell({
   }, [fetcher.data]);
 
   const submit = (intent: string, noticeId?: string) =>
-    fetcher.submit({ intent, ...(noticeId ? { noticeId } : {}) }, { method: "post" });
+    guardedSubmit({ intent, ...(noticeId ? { noticeId } : {}) }, { method: "post" });
 
   const onRemedy = (remedy: NoticeRemedy) => {
     if (remedy.kind === "sms-consent") {
@@ -87,6 +90,7 @@ export function PortalNoticeBell({
       onMarkAllRead={() => submit("notice-mark-all-read")}
       onDismiss={(id) => submit("notice-dismiss", id)}
       onRemedy={onRemedy}
+      busy={busy}
     />
   );
 }

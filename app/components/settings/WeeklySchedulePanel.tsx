@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import type { action } from "~/routes/settings-schedule";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 interface AvailabilitySlot {
@@ -55,7 +55,8 @@ export function WeeklySchedulePanel({
     m.settings_day_friday(),
     m.settings_day_saturday(),
   ];
-  const fetcher = useFetcher<typeof action>();
+  // #106 - user mutation: saves the weekly availability schedule.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
   const [days, setDays] = useState<DayState[]>(() => buildDayMap(initialSlots));
   // dirty tracks whether local state differs from the last saved state
   const [dirty, setDirty] = useState(false);
@@ -73,7 +74,6 @@ export function WeeklySchedulePanel({
     fetcher.data.ok === false &&
     !dirty;
 
-  const saving = fetcher.state !== "idle";
 
   function updateDay(idx: number, patch: Partial<DayState>) {
     setDays((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
@@ -85,7 +85,7 @@ export function WeeklySchedulePanel({
       .map((d, i) => (d.enabled ? { dayOfWeek: i, startTime: d.startTime, endTime: d.endTime } : null))
       .filter(Boolean);
     setDirty(false);
-    fetcher.submit(
+    submit(
       {
         intent: "schedule-save",
         slots: JSON.stringify(slots),

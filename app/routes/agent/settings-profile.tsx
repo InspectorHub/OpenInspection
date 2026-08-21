@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData, useFetcher, useNavigate } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -11,6 +11,7 @@ import type { AlwaysSentItem, ChannelId, ChoiceRow } from "~/components/notifica
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezone-options";
 import type { SmsConsent } from "~/components/notifications/SmsConsentBlock";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -152,8 +153,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function AgentSettingsProfilePage() {
   const { agent, notifications } = useLoaderData<typeof loader>();
   const [slug, setSlug] = useState(agent.slug || "");
-  const slugFetcher = useFetcher<typeof action>();
-  const slugSaving = slugFetcher.state !== "idle";
+  // #106 - both writes change the agent's own record. Separate guards so the
+  // slug save and the timezone save cannot abort one another.
+  const { fetcher: slugFetcher, submit: submitSlug, busy: slugSaving } =
+    useGuardedSubmit<typeof action>();
   const slugResult = slugFetcher.data?.intent === "save-slug" ? slugFetcher.data : null;
   const slugError = slugResult && !slugResult.ok ? slugResult.error : null;
 
@@ -161,7 +164,8 @@ export default function AgentSettingsProfilePage() {
   const navigate = useNavigate();
   const locale = useDisplayLocale();
 
-  const tzFetcher = useFetcher<typeof action>();
+  const { fetcher: tzFetcher, submit: submitTz, busy: tzSaving } =
+    useGuardedSubmit<typeof action>();
   const tzResult = tzFetcher.data?.intent === "save-timezone" ? tzFetcher.data : null;
   const tzError = tzResult && !tzResult.ok ? tzResult.error : null;
   const tzSaved = tzResult?.ok === true;
@@ -169,7 +173,7 @@ export default function AgentSettingsProfilePage() {
 
   function saveTimezone(next: string) {
     setTz(next);
-    tzFetcher.submit({ intent: "save-timezone", timezone: next }, { method: "post" });
+    submitTz({ intent: "save-timezone", timezone: next }, { method: "post" });
   }
 
   const previewLink = slug
@@ -177,7 +181,7 @@ export default function AgentSettingsProfilePage() {
     : null;
 
   function saveSlug() {
-    slugFetcher.submit({ intent: "save-slug", slug }, { method: "post" });
+    submitSlug({ intent: "save-slug", slug }, { method: "post" });
   }
 
   function selectCompany(id: string) {
@@ -299,7 +303,7 @@ export default function AgentSettingsProfilePage() {
           label={m.agent_portal_settings_timezone_label()}
           value={tz}
           onChange={(e) => saveTimezone(e.target.value)}
-          disabled={tzFetcher.state !== "idle"}
+          disabled={tzSaving}
           options={[
             { value: "", label: m.agent_portal_settings_timezone_company_option() },
             ...TIMEZONE_SELECT_OPTIONS,

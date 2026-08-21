@@ -642,6 +642,8 @@ apply at all.
 
 - `auth_agent_invite_prop3_title`, `media_cropper_free` — English "Free" is price in one place and shape in the other. On the agent-portal invite it is the cost of the account (*Gratis*); in the photo cropper it is the unconstrained aspect ratio beside Portrait and Landscape (*Libre*). *Gratis* on a crop button says the crop costs nothing, which is not a thing anyone was wondering.
 
+- `schedule_heatmap_open`, `imports_open` — English "Open" is an adjective in one place and a verb in the other. On the schedule heatmap it describes a slot with nothing booked in it (*Disponible*); in the imports table it is the action that opens one import run (*Abrir*). *Abrir* on the heatmap turns a description of availability into a command, and *Disponible* in a table's action column stops being a link at all.
+
 *(Add further divergences as `- \`key_one\`, \`key_two\` — reason.)*
 
 ## Working through a module

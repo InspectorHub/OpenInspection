@@ -13,6 +13,8 @@ import { describe, it, expect } from "vitest";
 import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
+import { IDEMPOTENCY_FIELD } from "~/hooks/useGuardedSubmit";
+
 import CommentsPage from "~/routes/comments";
 
 const A = { id: "c1", text: "Cracked flue tile observed at the chimney crown.", severity: "significant" as const, section: "Chimney" };
@@ -85,7 +87,14 @@ describe("/library/comments — delete (#291)", () => {
     fireEvent.click(rowDeleteButtons()[1]);
     await confirm();
 
-    await waitFor(() => expect(calls).toEqual([{ intent: "delete", id: "c2" }]));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    // #106 - the delete now leaves through useGuardedSubmit, so the request
+    // carries the idempotency key the server guard reads. Asserted as its own
+    // field: folding it into the payload would let a future change drop it
+    // without a single test noticing.
+    const { [IDEMPOTENCY_FIELD]: key, ...payload } = calls[0];
+    expect(payload).toEqual({ intent: "delete", id: "c2" });
+    expect(key).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it("states how many will be deleted when several are selected", async () => {
@@ -119,7 +128,10 @@ describe("/library/comments — delete (#291)", () => {
     fireEvent.click(screen.getByRole("button", { name: /delete selected \(1\)/i }));
     await confirm();
 
-    await waitFor(() => expect(calls).toEqual([{ intent: "delete-many", ids: "c1" }]));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    const { [IDEMPOTENCY_FIELD]: bulkKey, ...bulkPayload } = calls[0];
+    expect(bulkPayload).toEqual({ intent: "delete-many", ids: "c1" });
+    expect(bulkKey).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it("says nothing was removed when the delete fails", async () => {

@@ -5,7 +5,8 @@ import {
     ContactImportPreviewSchema, ContactImportPreviewResponseSchema,
     ContactImportSchema, ContactImportResponseSchema,
 } from '../../lib/validations/contact.schema';
-import { parseCsvPreview, importContacts } from '../../services/contacts-import.service';
+import { importContacts } from '../../services/contacts-import.service';
+import { parseCsvPreview } from '../../lib/migration-intake/csv';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
 

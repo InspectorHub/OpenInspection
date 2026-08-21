@@ -223,7 +223,7 @@ fi
 #    CI still runs them individually via `npm run lint` -- that stays the
 #    authoritative gate, and jscpd is a child process either way.
 step "Conformance gates"
-if node scripts/run-gates.mjs; then
+if node scripts/run-gates.mjs --rung precommit; then
     :
 else
     FAILED=1

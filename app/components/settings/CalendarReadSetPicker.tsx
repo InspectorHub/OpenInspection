@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import type { action } from "~/routes/settings-schedule";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 interface CalendarEntry {
@@ -26,7 +26,8 @@ const WRITABLE = new Set(["owner", "writer"]);
  * the user can edit. Saves through the settings-schedule action.
  */
 export function CalendarReadSetPicker({ picker }: { picker: CalendarPickerData }) {
-  const fetcher = useFetcher<typeof action>();
+  // #106 - user mutation: chooses which calendars are read for conflicts.
+  const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
   const primaryId = picker.calendars.find((c) => c.primary)?.id;
 
   const [readIds, setReadIds] = useState<Set<string>>(() => {
@@ -36,7 +37,6 @@ export function CalendarReadSetPicker({ picker }: { picker: CalendarPickerData }
   });
   const [writeId, setWriteId] = useState(picker.writeCalendarId);
 
-  const saving = fetcher.state !== "idle";
   const result =
     fetcher.state === "idle" && fetcher.data?.intent === "calendar-read-set-save"
       ? fetcher.data
@@ -58,7 +58,7 @@ export function CalendarReadSetPicker({ picker }: { picker: CalendarPickerData }
   );
 
   function save() {
-    fetcher.submit(
+    submit(
       {
         intent: "calendar-read-set-save",
         connectionId: picker.connectionId,

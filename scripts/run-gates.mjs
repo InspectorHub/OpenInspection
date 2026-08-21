@@ -26,76 +26,29 @@
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { SCRIPT_GATES, DUP_GATE, PRECOMMIT, PUSH } from './lib/gate-registry.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 
-/** Gates that are plain node scripts in this repo. */
-const SCRIPT_GATES = [
-    { key: 'ds', label: 'DS token conformance', script: 'check-ds-tokens.mjs', fix: 'npm run lint:ds' },
-    { key: 'contrast', label: 'Small-text WCAG AA contrast', script: 'check-contrast.mjs', fix: 'npm run lint:contrast' },
-    { key: 'svg', label: 'SVG dimensions', script: 'check-svg-dimensions.mjs', fix: 'npm run lint:svg' },
-    { key: 'migrefs', label: 'Migration-reference hygiene', script: 'check-migration-refs.mjs', fix: 'npm run lint:migrefs' },
-    { key: 'filesize', label: 'Large-file ratchet', script: 'check-file-size.mjs', fix: 'npm run lint:filesize' },
-    { key: 'tz', label: 'Calendar timezone-safety', script: 'check-tz-safety.mjs', fix: 'npm run lint:tz' },
-    { key: 'idempotency', label: 'Mutating-route retry safety', script: 'check-idempotency-coverage.mjs', fix: 'npm run lint:idempotency' },
-    // Pre-commit and not CI because a collision is created at exactly one moment
-    // -- when a file is added or renamed -- and this is the rung that sees that
-    // moment. It is also the rung where the fix is free: renaming a file nobody
-    // has pulled yet costs nothing, renaming one after it lands costs everyone a
-    // merge. An fs walk of ~2765 files, no parsing; among the cheapest here.
-    { key: 'extcollide', label: 'Extension collisions (files invisible to tsc)', script: 'check-extension-collisions.mjs', fix: 'npm run lint:ext-collisions' },
-    // Belongs at pre-commit rather than CI: what it catches is a CAPABILITY
-    // being added -- a money column, a money field on the inspection record, a
-    // money input on a new screen. By the time CI sees one it is written and
-    // argued for. ~0.1s inside this shared process.
-    { key: 'price', label: 'Price capability inventory', script: 'check-price-capability.mjs', fix: 'npm run lint:price-capability' },
-    // Here for the same reason as the price gate: what it catches is a
-    // CAPABILITY arriving -- a beacon, an analytics global, a pixel. By the time
-    // CI sees one it is written and argued for, and "we already ship no
-    // tracking" is much easier to hold than "please remove the tracking you
-    // added". Costs ~0.8s (it reads ~976 client files), against ~0.1s for the
-    // price gate -- the most expensive entry in this set, and still small next
-    // to the eslint and tsc steps around it.
-    { key: 'zerotrack', label: 'Zero client-side tracking', script: 'check-zero-tracking.mjs', fix: 'npm run lint:zero-tracking' },
-    // Third entry with the same justification, and the clearest case of it: what
-    // it catches is an AI capability arriving with nobody having said what kind
-    // of statement it produces, or reaching a model without going through the
-    // one method that asks. The compiler already refuses an unclassified prompt;
-    // this covers the second route to a provider, which no type can see. 0.4s,
-    // between the price gate and the tracking gate.
-    { key: 'aiclass', label: 'AI output classification', script: 'check-ai-classification.mjs', fix: 'npm run lint:ai-classification' },
-    // Two file reads and a set comparison -- the cheapest gate in this list by an
-    // order of magnitude, and the one whose failure is most easily argued away
-    // later. It belongs at pre-commit for the same reason the price and tracking
-    // gates do: what it catches is a spec being written OFF the type-check, and
-    // the moment to question that is while the line is being typed.
-    { key: 'teststsconfig', label: 'tests tsconfig exclude ratchet', script: 'check-tests-tsconfig.mjs', fix: 'npm run lint:tests-tsconfig' },
-    // Pre-commit for the same reason as the price, tracking and AI gates: what it
-    // catches is a raw `fetcher.submit` ARRIVING -- an unguarded mutation with no
-    // idempotency key and no pending affordance. That is cheapest to argue about
-    // while the line is being typed, and by the time CI sees one it is written.
-    // An fs walk of ~680 client files with two regexes; comparable to the
-    // tracking gate.
-    { key: 'submitguard', label: 'Client submit-guard coverage', script: 'check-submit-guard.mjs', fix: 'npm run lint:submit-guard' },
-    // Pre-commit rather than CI, and for a reason the gates above do not share:
-    // a seeder that nothing runs automatically has NO other rung. The CLI
-    // self-host setup script is invoked by hand, months apart, so CI would never
-    // report it — it rots until a human hits the error. The demo PCA seeder was
-    // the same story and ended worse: twelve of its column names had drifted
-    // away from the schema, its first INSERT could not run, and nobody found out
-    // for months. It has since been retired into `tests/seed-fixtures.ts`, which
-    // e2e globalSetup does run. That one still fails a rung LATE — several
-    // minutes and one push after the mistake was typed — which is why this gate
-    // reads it here instead.
-    // Reads 31 files with two regexes.
-    { key: 'seedsql', label: 'Seed SQL vs schema', script: 'check-seed-sql.mjs', fix: 'npm run lint:seed-sql' },
-];
-
-const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup' };
-
 const onlyArg = process.argv.indexOf('--only');
 const only = onlyArg === -1 ? null : new Set((process.argv[onlyArg + 1] ?? '').split(',').filter(Boolean));
-const wanted = (key) => !only || only.has(key);
+
+/**
+ * `--rung <name>` selects by ladder rung; omitting it runs everything.
+ *
+ * PUSH is a superset of PRECOMMIT, so `--rung push` runs both. An UNKNOWN rung
+ * name EXITS rather than selecting nothing — a typo that silently ran zero
+ * gates would report a clean run, which is the failure this whole file exists
+ * to avoid.
+ */
+const rungArg = process.argv.indexOf('--rung');
+const rung = rungArg === -1 ? null : process.argv[rungArg + 1];
+if (rung !== null && rung !== PRECOMMIT && rung !== PUSH) {
+    console.error(`run-gates: unknown --rung "${rung}" (expected ${PRECOMMIT} or ${PUSH})`);
+    process.exit(2);
+}
+const inRung = (gate) => rung === null || gate.rung === rung || (rung === PUSH && gate.rung === PRECOMMIT);
+const wanted = (gate) => (!only || only.has(gate.key)) && inRung(gate);
 
 const EXIT_SENTINEL = Symbol('gate-exit');
 
@@ -126,6 +79,11 @@ async function runScriptGate(gate) {
     // check-tz-safety.mjs only runs when invoked as the entry script; make its
     // `import.meta.url === process.argv[1]` guard see itself as the entry point.
     process.argv[1] = scriptPath;
+    // A gate whose npm script passes a flag (`gen-schema-doc.mjs --check`) reads
+    // it off argv like any CLI would. Splicing rather than replacing keeps
+    // argv[0]/argv[1] intact for the entry-point guards above.
+    const realArgvTail = process.argv.slice(2);
+    if (gate.args?.length) process.argv.splice(2, process.argv.length - 2, ...gate.args);
 
     let thrown = null;
     try {
@@ -137,6 +95,7 @@ async function runScriptGate(gate) {
         process.stdout.write = realOut;
         process.stderr.write = realErr;
         process.argv[1] = realArgv1;
+        process.argv.splice(2, process.argv.length - 2, ...realArgvTail);
     }
 
     if (thrown) {
@@ -154,25 +113,60 @@ function runDupGate() {
     return { ok: res.status === 0, output: `${res.stdout ?? ''}${res.stderr ?? ''}` };
 }
 
+const ALL_GATES = [...SCRIPT_GATES, DUP_GATE];
+const selected = ALL_GATES.filter(wanted);
+
+/**
+ * A selection that matches nothing is a FAILURE, not an empty success.
+ *
+ * Measured before this existed: `--only nonexistent-gate` exited 0 having
+ * printed nothing at all. A mistyped key in the hook would have read as "gates
+ * passed" — the emptiest possible false green, and the shape this repo keeps
+ * meeting. The count is printed either way so the number is checkable on the
+ * day it is right, not only on the day it is wrong.
+ */
+if (selected.length === 0) {
+    console.error(
+        `run-gates: 0 selected of ${ALL_GATES.length} — nothing to run, which is a failure and not a clean run.\n` +
+        `           ${only ? `--only ${[...only].join(',')}` : ''}${rung ? ` --rung ${rung}` : ''} matched no gate.`,
+    );
+    process.exit(2);
+}
+
 const results = [];
 for (const gate of SCRIPT_GATES) {
-    if (!wanted(gate.key)) continue;
+    if (!wanted(gate)) continue;
     results.push([gate, await runScriptGate(gate)]);
 }
-if (wanted(DUP_GATE.key)) {
+if (wanted(DUP_GATE)) {
     results.push([DUP_GATE, runDupGate()]);
 }
 
-let failed = false;
+let failedCount = 0;
 for (const [gate, result] of results) {
     if (result.ok) {
         process.stdout.write(`  ✓  ${gate.label} passed\n`);
     } else {
-        failed = true;
+        failedCount += 1;
         process.stdout.write(`  ✗  ${gate.label} failed  →  ${gate.fix}\n`);
         const detail = result.output.trim();
         if (detail) process.stdout.write(`${detail.replace(/^/gm, '     ')}\n`);
     }
 }
 
-process.exit(failed ? 1 : 0);
+/**
+ * Both numbers, on every run, pass or fail.
+ *
+ * "1 gate failed" and "1 failed, 47 passed, 0 not selected" are different
+ * claims and only the second is checkable: the first cannot distinguish a run
+ * that caught one violation from a run that only ever looked at one gate. The
+ * `not selected` term is what makes a rung filter visible — a hook that quietly
+ * narrowed to three gates says so here rather than looking like a full run.
+ */
+const passedCount = results.length - failedCount;
+process.stdout.write(
+    `\n  gates: ${results.length} selected of ${ALL_GATES.length}` +
+    `  ·  ${passedCount} passed · ${failedCount} failed · ${ALL_GATES.length - results.length} not selected\n`,
+);
+
+process.exit(failedCount > 0 ? 1 : 0);

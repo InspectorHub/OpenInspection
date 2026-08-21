@@ -1,4 +1,4 @@
-import { useLoaderData } from "react-router";
+import { Link, useLoaderData } from "react-router";
 import { Banner, Button } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-data";
@@ -86,16 +86,17 @@ export default function SettingsData() {
             {m.settings_data_import_subtitle()}
           </p>
         </div>
-        <label className="block cursor-pointer">
-          <div className="inline-flex items-center gap-3">
-            <span className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors inline-flex items-center gap-2">
-              <UploadIcon />
-              {m.settings_data_import_choose_file()}
-            </span>
-            <span className="text-[11px] text-ih-fg-3">{m.settings_data_import_file_hint()}</span>
-          </div>
-          <input type="file" accept=".csv,text/csv" className="hidden" />
-        </label>
+        {/* Was a file input with no onChange, no form and no action: it opened
+            a picker and then did nothing with what it was given. Importing is
+            now a page of its own, because a run outlives the click that
+            started it — you can close the tab and come back to it. */}
+        <Link
+          to="/settings/imports"
+          className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors inline-flex items-center gap-2 w-fit"
+        >
+          <UploadIcon />
+          {m.imports_start_heading()}
+        </Link>
       </section>
 
       {/* Data cleanup */}

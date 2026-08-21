@@ -76,6 +76,9 @@ export interface SessionContext {
     hasContentMarketplace: boolean;
     videoBackendManaged: boolean;
     hasManagedCompliance: boolean;
+    /** Whether the import wizard may offer to hand an unreadable file to a
+     *  person. False self-hosted, where the route does not exist at all. */
+    hasAssistedMigration: boolean;
   };
   seatUsage: { used: number; limit: number } | null;
   /**

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { useFetcher } from "react-router";
 import { Modal, Button, Input, Select, Banner } from "@core/shared-ui";
+import type { GuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { m } from "~/paraglide/messages";
 
@@ -47,7 +48,16 @@ interface Props {
   invoice: PaymentsInvoice | null;
   payments: PaymentRow[];
   loading: boolean;
+  /** Read-only here: `data` drives the error banner, `state` the busy affordance. */
   fetcher: Fetcher;
+  /**
+   * #106 — both writes on this surface move money, so neither may go out as a
+   * raw `fetcher.submit`. The owner (`/invoices`) holds the guard; this leaf
+   * only fires it.
+   */
+  submit: GuardedSubmit;
+  /** The guard's own in-flight flag — the pending affordance on both buttons. */
+  busy: boolean;
   locale: string;
   onClose: () => void;
 }
@@ -89,7 +99,7 @@ function civilDayToInstant(day: string): string {
   return new Date(`${day}T00:00:00`).toISOString();
 }
 
-export function PaymentsModal({ invoice, payments, loading, fetcher, locale, onClose }: Props) {
+export function PaymentsModal({ invoice, payments, loading, fetcher, submit, busy, locale, onClose }: Props) {
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("cash");
   const [occurredOn, setOccurredOn] = useState(todayLocal());
@@ -101,7 +111,6 @@ export function PaymentsModal({ invoice, payments, loading, fetcher, locale, onC
   if (!invoice) return null;
   const currency = invoice.currency;
   const data = fetcher.data as ActionData;
-  const busy = fetcher.state !== "idle";
 
   // Receipts add, refunds subtract — the same one rule the ledger applies. A
   // correction is a refund-kind row, so it lands here without a special case.
@@ -119,7 +128,7 @@ export function PaymentsModal({ invoice, payments, loading, fetcher, locale, onC
     data?.intent === "record-payment" && data.ok === false && /exceeds/i.test(data.error ?? "");
 
   function submitPayment(allowOverpayment: boolean) {
-    fetcher.submit(
+    submit(
       {
         intent: "record-payment",
         id: invoice!.id,
@@ -134,10 +143,14 @@ export function PaymentsModal({ invoice, payments, loading, fetcher, locale, onC
   }
 
   function submitCorrection(paymentId: string) {
-    fetcher.submit(
+    // Only clear the form when the guard actually accepted the call. Clearing
+    // on a refused second click would wipe the amount and reason the user is
+    // still waiting on an answer for.
+    const sent = submit(
       { intent: "correct-payment", id: invoice!.id, paymentId, amount: correctedAmount, reason },
       { method: "post" },
     );
+    if (!sent) return;
     setCorrecting(null);
     setCorrectedAmount("");
     setReason("");

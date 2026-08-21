@@ -259,3 +259,57 @@ export const NOTIFICATION_RETENTION_MONTHS = 24;
  * rejection message.
  */
 export const QBO_SYNC_ERROR_RESOLVED_RETENTION_DAYS = 90;
+
+/**
+ * Deletion window for an intake run the operator staged and left alone
+ * (`migration_batches` in any non-assistance state).
+ *
+ * Thirty days because the operator was told, in as many words, that they can
+ * close the page and come back — that promise is what the stored file exists
+ * for. Thirty days after they last touched it, they are not still editing it.
+ *
+ * NOT the value the catalogue rule declares: a table gets one rule and this is
+ * the shorter of two lifetimes. See the rule's `rowWindowColumn`.
+ */
+export const MIGRATION_INTAKE_STAGED_RETENTION_DAYS = 30;
+
+/**
+ * Deletion window for an intake run waiting on a person to convert its file
+ * (`migration_batches` in the needs-assistance state).
+ *
+ * Longer than the staged window because the clock is on US, not on the
+ * operator. It is a limit and not a target: an object holding a third party's
+ * name, email address and phone number does not get to sit indefinitely
+ * because we have not delivered yet. Not having delivered is a reason to
+ * chase, not a reason to keep.
+ */
+export const MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS = 90;
+
+/**
+ * How long before an intake run's expiry the FIRST reminder goes out.
+ *
+ * A month, and it is the reminder that still leaves room to act: at this point
+ * the operator can send a different export, or ask what is holding it up, and
+ * there is time for either to work. The second reminder, a week out, is a
+ * different message — it reports that the file is about to go.
+ *
+ * It applies only to a run waiting on a person. A run the operator staged has a
+ * window as long as this lead, so a first reminder would fire on the day it was
+ * created.
+ *
+ * ⚠️ NOT a retention window, and no rule in `RETENTION_MANIFEST` points at it.
+ * It lives here because it is derived from the two windows above and would
+ * silently stop making sense if either moved — a lead longer than the staged
+ * window is the arithmetic that decides which runs get one reminder and which
+ * get two.
+ */
+export const MIGRATION_INTAKE_FIRST_REMINDER_LEAD_DAYS = 30;
+
+/**
+ * How long before an intake run's expiry the FINAL reminder goes out.
+ *
+ * Seven days is enough to act on and short enough that the message is about
+ * something imminent. Every unfinished run gets this one, whichever clock it is
+ * on; only a run waiting on a person also gets the earlier one above.
+ */
+export const MIGRATION_INTAKE_REMINDER_LEAD_DAYS = 7;

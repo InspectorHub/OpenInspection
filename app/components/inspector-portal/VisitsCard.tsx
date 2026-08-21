@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import { Card, Button, Pill } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { isAdminRole } from "~/lib/access";
 import { AddVisitModal } from "./AddVisitModal";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { EVENT_STATUS } from "~/lib/status";
 import type { action } from "~/routes/inspector-portal";
@@ -190,13 +190,17 @@ export function VisitsCard({
     role: string;
     formatDate: (iso: string) => string;
 }) {
-    const statusFetcher = useFetcher<typeof action>();
-    const addFetcher = useFetcher<typeof action>();
+    // #106 - a visit status write closes out an appointment and an add creates
+    // one. Two guards so neither aborts the other.
+    const { fetcher: statusFetcher, submit: submitStatusGuarded, busy: statusBusy } =
+        useGuardedSubmit<typeof action>();
+    const { fetcher: addFetcher, submit: submitAdd, busy: addBusy } =
+        useGuardedSubmit<typeof action>();
     const [addOpen, setAddOpen] = useState(false);
     const [cancelling, setCancelling] = useState<VisitRowData | null>(null);
 
     const canManage = isAdminRole(role);
-    const busy = statusFetcher.state !== "idle" || addFetcher.state !== "idle";
+    const busy = statusBusy || addBusy;
     const typeName = (id: string) => visitTypes.find((t) => t.id === id)?.name ?? id;
 
     const error = [statusFetcher, addFetcher]
@@ -208,7 +212,7 @@ export function VisitsCard({
         .find(Boolean);
 
     const submitStatus = (visit: VisitRowData, status: VisitStatus) =>
-        statusFetcher.submit(
+        submitStatusGuarded(
             { intent: "visit-status", eventId: visit.id, status },
             { method: "post" },
         );
@@ -255,19 +259,23 @@ export function VisitsCard({
                 open={addOpen}
                 visitTypes={visitTypes}
                 suggestedTypeIds={suggestedTypeIds}
-                submitting={addFetcher.state !== "idle"}
+                submitting={addBusy}
                 onClose={() => setAddOpen(false)}
                 onAdd={(eventTypeId, scheduledAt, durationMin) => {
-                    addFetcher.submit(
-                        {
-                            intent: "visit-add",
-                            eventTypeId,
-                            scheduledAt,
-                            durationMin: String(durationMin),
-                        },
-                        { method: "post" },
-                    );
-                    setAddOpen(false);
+                    // Close only on a call the guard accepted.
+                    if (
+                        submitAdd(
+                            {
+                                intent: "visit-add",
+                                eventTypeId,
+                                scheduledAt,
+                                durationMin: String(durationMin),
+                            },
+                            { method: "post" },
+                        )
+                    ) {
+                        setAddOpen(false);
+                    }
                 }}
             />
 

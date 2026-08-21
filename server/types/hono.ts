@@ -282,7 +282,6 @@ import type { ReportPdfService } from '../services/report-pdf.service';
 import type { ReportExportService } from '../services/report-export.service';
 import type { SigningKeyService } from '../services/signing-key.service';
 import type { AuditLogService } from '../services/audit-log.service';
-import type { TemplateMigrationService } from '../services/template-migration.service';
 import type { ImportHistoryService } from '../services/import-history.service';
 import type { InspectionRequestService } from '../services/inspection-request.service';
 import type { RatingSystemService } from '../services/rating-system.service';
@@ -337,7 +336,6 @@ export interface AppServices {
     reportExport: ReportExportService;
     signingKey: SigningKeyService;
     auditLog: AuditLogService;
-    templateMigration: TemplateMigrationService;
     importHistory: ImportHistoryService;
     inspectionRequest: InspectionRequestService;
     ratingSystem: RatingSystemService;

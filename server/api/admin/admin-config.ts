@@ -458,7 +458,7 @@ const adminConfigRoutes = createApiRouter()
         const brandingService = c.var.services.branding;
         await brandingService.updateBranding(tenantId, { enablePdfPipeline: enabled });
 
-        auditFromContext(c, 'config.tenant_config.patch', 'tenant_configs', {
+        auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
             metadata: { field: 'enablePdfPipeline', enabled },
         });
 

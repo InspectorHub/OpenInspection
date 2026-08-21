@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import { Modal, Button } from "@core/shared-ui";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -30,16 +30,17 @@ export function ReportGateUnlock({
     /** Hub-supplied formatter so the date reads in the tenant's timezone. */
     formatDate: (iso: string) => string;
 }) {
-    const fetcher = useFetcher();
+    // #106 — unlocking and re-locking the report gate both change whether a
+    // client who has not paid can read the report.
+    const { submit: guardedSubmit, busy } = useGuardedSubmit();
     const [open, setOpen] = useState(false);
     const [reason, setReason] = useState("");
-    const busy = fetcher.state !== "idle";
 
     function submit() {
-        fetcher.submit(
-            { intent: "unlock-report", reason: reason.trim() },
-            { method: "post" },
-        );
+        // A refused click sent nothing, so the reason the user typed stays.
+        if (!guardedSubmit({ intent: "unlock-report", reason: reason.trim() }, { method: "post" })) {
+            return;
+        }
         setOpen(false);
         setReason("");
     }
@@ -64,7 +65,7 @@ export function ReportGateUnlock({
                 <button
                     type="button"
                     disabled={busy}
-                    onClick={() => fetcher.submit({ intent: "relock-report" }, { method: "post" })}
+                    onClick={() => guardedSubmit({ intent: "relock-report" }, { method: "post" })}
                     className="mt-2 text-[12px] font-bold text-ih-primary-text hover:underline disabled:opacity-50"
                 >
                     {m.hub_gate_relock_action()}

@@ -61,6 +61,7 @@ export function OutboxList({
   groups,
   onGetConsent,
   onResend,
+  resending = false,
 }: {
   groups: NoticeGroup[];
   /** Scrolls to / opens the SMS-consent control on the People card. */
@@ -68,6 +69,12 @@ export function OutboxList({
   /** Re-issues a FAILED manual send to that one recipient (A2.2). Automation
    *  rows never offer it — re-firing a rule is the Automations page's job. */
   onResend?: (row: DeliveryRow) => void;
+  /**
+   * #106 - the resend goes through useGuardedSubmit, which REFUSES a second
+   * call while one is in flight. An enabled control would swallow that click
+   * in silence, so the button is disabled instead of lying about it.
+   */
+  resending?: boolean;
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const timeZone = useDisplayTimeZone();
@@ -152,7 +159,9 @@ export function OutboxList({
                           <button
                             type="button"
                             onClick={() => onResend(r)}
-                            className="mt-1 ml-1.5 inline-flex h-7 items-center px-2.5 rounded-lg border border-ih-border bg-ih-bg-card text-[11px] font-semibold text-ih-fg-2 hover:text-ih-fg-1 transition-colors"
+                            disabled={resending}
+                            aria-busy={resending || undefined}
+                            className="mt-1 ml-1.5 inline-flex h-7 items-center px-2.5 rounded-lg border border-ih-border bg-ih-bg-card text-[11px] font-semibold text-ih-fg-2 hover:text-ih-fg-1 disabled:opacity-50 transition-colors"
                           >
                             {m.comm_action_resend()}
                           </button>

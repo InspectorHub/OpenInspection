@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useLoaderData, useFetcher, useNavigate, useSearchParams } from "react-router";
+import { useLoaderData, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/templates";
 import { useDisplayTimeZone, useCapability } from "~/hooks/useSessionContext";
 import { requireToken } from "~/lib/session.server";
@@ -14,6 +14,7 @@ import { CreateTemplateModal } from "~/components/templates/CreateTemplateModal"
 import { ImportSpectoraModal } from "~/components/templates/ImportSpectoraModal";
 import { DeleteTemplateModal } from "~/components/templates/DeleteTemplateModal";
 import { SpectoraMappingModal } from "~/components/templates/SpectoraMappingModal";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -153,9 +154,16 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 export default function TemplatesPage() {
   const { templates, meta, q: loaderQ, spectoraMappingSeen: loaderMappingSeen } = useLoaderData<typeof loader>();
-  const fetcher = useFetcher();
+  // #106 - create, duplicate, delete and import all write a template. One
+  // guard: they are four separate user paths and only one can be open at a
+  // time, so a refused call is not reachable.
+  const { fetcher, submit, busy: writing } = useGuardedSubmit();
   const displayTz = useDisplayTimeZone();
-  const mappingFetcher = useFetcher();
+  // The mapping notice is its own write and must not contend with the import
+  // that triggers it. It fires from the modal's own dismiss, which closes on
+  // the same click.
+  // submit-guard-allow-no-busy: the modal this fires from closes on the click.
+  const { submit: submitMappingSeen } = useGuardedSubmit();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { setPage, setPageSize } = usePagination();
@@ -246,13 +254,13 @@ export default function TemplatesPage() {
   /* ---- Actions ---- */
   const handleCreate = () => {
     if (!newName.trim()) return;
-    fetcher.submit({ intent: "create", name: newName.trim() }, { method: "post" });
+    if (!submit({ intent: "create", name: newName.trim() }, { method: "post" })) return;
     setCreateOpen(false);
     setNewName("");
   };
 
   const handleDuplicate = (t: Template) => {
-    fetcher.submit(
+    submit(
       { intent: "duplicate", id: t.id, name: t.name, schema: JSON.stringify(t.schema || { schemaVersion: 2, sections: [] }) },
       { method: "post" },
     );
@@ -260,16 +268,20 @@ export default function TemplatesPage() {
 
   const handleDelete = () => {
     if (!deleteConfirm) return;
-    fetcher.submit({ intent: "delete", id: deleteConfirm }, { method: "post" });
+    if (!submit({ intent: "delete", id: deleteConfirm }, { method: "post" })) return;
     setDeleteConfirm(null);
   };
 
   const handleImport = () => {
     if (!importName.trim() || !importPayload.trim()) return;
-    fetcher.submit(
-      { intent: "import-spectora", name: importName.trim(), payload: importPayload.trim() },
-      { method: "post" },
-    );
+    if (
+      !submit(
+        { intent: "import-spectora", name: importName.trim(), payload: importPayload.trim() },
+        { method: "post" },
+      )
+    ) {
+      return;
+    }
     setImportOpen(false);
     setImportName("");
     setImportPayload("");
@@ -279,7 +291,7 @@ export default function TemplatesPage() {
     // Navigate to the imported template if we have its id, then mark seen.
     setMappingModalOpen(false);
     setMappingSeenOptimistic(true);
-    mappingFetcher.submit({ intent: "mark-spectora-mapping-seen" }, { method: "post" });
+    submitMappingSeen({ intent: "mark-spectora-mapping-seen" }, { method: "post" });
     // Navigate to the newly imported template after dismissing the modal.
     if (fetcherData?.newId && typeof fetcherData.newId === "string") {
       navigate(`/templates/${fetcherData.newId}/edit`);
@@ -425,6 +437,7 @@ export default function TemplatesPage() {
         open={deleteConfirm !== null}
         setDeleteConfirm={setDeleteConfirm}
         handleDelete={handleDelete}
+        busy={writing}
       />
 
       {/* Concept-mapping modal — shown once after first Spectora import */}

@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
 import { Card, Button, Modal } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import { toLocalInputValue, fromLocalInputValue } from "~/lib/datetime-local";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import type { action } from "~/routes/inspector-portal";
 
@@ -44,14 +44,14 @@ export function ScheduleCard({
 }) {
     const fmt = useInspectionDateTimeFormat();
     const [open, setOpen] = useState(false);
-    const fetcher = useFetcher<typeof action>();
-    const saving = fetcher.state !== "idle";
+    // #106 — rescheduling moves the appointment and reassigns the inspector.
+    const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
 
     const save = (form: HTMLFormElement) => {
         const data = new FormData(form);
         const local = String(data.get("date") ?? "");
         const nextInspector = String(data.get("inspectorId") ?? "");
-        fetcher.submit(
+        const sent = submit(
             {
                 intent: "save-order",
                 payload: JSON.stringify({
@@ -64,7 +64,8 @@ export function ScheduleCard({
             },
             { method: "post" },
         );
-        setOpen(false);
+        // Close only on a call the guard accepted.
+        if (sent) setOpen(false);
     };
 
     const error =

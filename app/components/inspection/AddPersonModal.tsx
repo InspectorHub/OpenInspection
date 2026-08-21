@@ -4,6 +4,7 @@ import { Modal, Button, Input, Select } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { capabilitiesForProfile } from "../../../server/lib/people/capabilities";
+import type { GuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
 /** A contact returned by the "search-contacts" hub action intent. */
@@ -29,12 +30,22 @@ export function AddPersonModal({
   roleProfiles,
   isAdmin,
   fetcher,
+  submit,
+  submitting,
 }: {
   open: boolean;
   onClose: () => void;
   roleProfiles: RoleProfile[];
   isAdmin: boolean;
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
+  /**
+   * #106 - adding a person creates a contact and can hand out report access,
+   * so the add goes through the guard. PeopleEditor owns it; this modal fires
+   * it. `searchFetcher` below stays raw - it is a debounced select.
+   */
+  submit: GuardedSubmit;
+  /** The guard's in-flight flag. */
+  submitting: boolean;
   /** IA-133 — the add returned ok but created nothing: this contact already
    *  holds this role. The modal stays OPEN and says so, because the notice
    *  above it is what sends operators here to "refresh" a revoked link. */
@@ -94,7 +105,6 @@ export function AddPersonModal({
     setSelectedContact(null);
   }
 
-  const submitting = fetcher.state !== "idle";
   const error =
     fetcher.data?.intent === "person-add" && !fetcher.data.ok ? fetcher.data.error : undefined;
 
@@ -119,7 +129,7 @@ export function AddPersonModal({
   function handleSubmit() {
     if (!canSubmit) return;
     if (createMode) {
-      fetcher.submit(
+      submit(
         {
           intent: "person-add",
           roleProfileId,
@@ -134,7 +144,7 @@ export function AddPersonModal({
       return;
     }
     if (selectedContact) {
-      fetcher.submit(
+      submit(
         { intent: "person-add", roleProfileId, contactId: selectedContact.id },
         { method: "post" },
       );

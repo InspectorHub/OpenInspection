@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useLoaderData, useFetcher, useNavigate, useNavigation } from "react-router";
+import { useLoaderData, useNavigate, useNavigation } from "react-router";
 import type { Route } from "./+types/calendar";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -28,6 +28,7 @@ import { CalendarLoadingSkeleton } from "~/components/calendar/CalendarLoadingSk
 import { MonthView } from "~/components/calendar/MonthView";
 import { WeekView } from "~/components/calendar/WeekView";
 import { DayView } from "~/components/calendar/DayView";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
@@ -189,7 +190,11 @@ export default function CalendarPage() {
   const displayTz = useDisplayTimeZone();
   const locale = useDisplayLocale();
   const navigate = useNavigate();
-  const fetcher = useFetcher();
+  // #106 - a drag-and-drop reschedule moves a real appointment.
+  // The drop target is the calendar grid itself: there is no button to disable,
+  // and a second drag cannot be completed inside one request round trip.
+  // submit-guard-allow-no-busy: the control is a drag target, not a button.
+  const { submit: submitReschedule } = useGuardedSubmit();
   const navigation = useNavigation();
   const isLoading = navigation.state === "loading";
   const canManageTeam = isAdminRole(role);
@@ -282,7 +287,7 @@ export default function CalendarPage() {
   };
 
   const handleDrop = (eventId: string, newDate: string) => {
-    fetcher.submit({ intent: "reschedule", id: eventId, date: newDate }, { method: "post" });
+    submitReschedule({ intent: "reschedule", id: eventId, date: newDate }, { method: "post" });
   };
 
   function setScope(nextScope: CalendarScope) {

@@ -112,6 +112,34 @@ describe('agreement identity snapshot', () => {
         expect(html).toContain('not recorded');
     });
 
+    // The test the snapshot exists for. "The certificate shows the company
+    // name" passes just as well against a LIVE lookup, so it proves nothing
+    // about freezing. Only a rename AFTER execution separates the two: an
+    // executed instrument must keep naming the entity it was signed under, and
+    // a certificate that renames itself is a false attestation, not a stale one.
+    it('a rename AFTER signing does not change the entity the executed certificate names', async () => {
+        const env = await svc.findOrCreate(TENANT, INSP_ID);
+        await testDb.update(agreementRequests).set({ status: 'signed', signedAt: new Date() })
+            .where(eq(agreementRequests.id, env.requestId));
+
+        await testDb.update(tenantConfigs)
+            .set({ legalName: 'Beta Holdings LLC', companyName: 'Beta Inspections' })
+            .where(eq(tenantConfigs.tenantId, TENANT));
+
+        // POSITIVE CONTROL for the negative assertion below. Without it, an
+        // UPDATE that silently matched no row would make `not.toContain` pass
+        // for the wrong reason — the test would be asserting the absence of a
+        // name that was never anywhere to begin with.
+        const cfg = await testDb.select().from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, TENANT)).get();
+        expect(cfg?.legalName).toBe('Beta Holdings LLC');
+
+        const res = await certRenderHandler(RAW_D1, env.requestId, 'https://example.test');
+        const html = await res.text();
+        expect(html).toContain('Acme Holdings LLC');
+        expect(html).not.toContain('Beta Holdings LLC');
+    });
+
     it('the certificate names the frozen contracting entity when one was recorded', async () => {
         const env = await svc.findOrCreate(TENANT, INSP_ID);
         // The certificate only renders for a signed envelope.

@@ -5,9 +5,11 @@ interface DeleteTemplateModalProps {
   open: boolean;
   setDeleteConfirm: (id: string | null) => void;
   handleDelete: () => void;
+  /** #106 - the delete goes through useGuardedSubmit; this is its in-flight flag. */
+  busy?: boolean;
 }
 
-export function DeleteTemplateModal({ open, setDeleteConfirm, handleDelete }: DeleteTemplateModalProps) {
+export function DeleteTemplateModal({ open, setDeleteConfirm, handleDelete, busy = false }: DeleteTemplateModalProps) {
   return (
     <Modal
       open={open}
@@ -26,7 +28,9 @@ export function DeleteTemplateModal({ open, setDeleteConfirm, handleDelete }: De
           <button
             type="button"
             onClick={handleDelete}
-            className="h-8 px-4 rounded-md bg-ih-bad-fg text-white font-bold text-[13px] hover:bg-ih-bad-fg"
+            disabled={busy}
+            aria-busy={busy || undefined}
+            className="h-8 px-4 rounded-md bg-ih-bad-fg text-white font-bold text-[13px] hover:bg-ih-bad-fg disabled:opacity-50"
           >
             {m.common_delete()}
           </button>

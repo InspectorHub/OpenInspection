@@ -6,6 +6,7 @@ import { makeCustomDefect } from "~/lib/custom-defects";
 import { useInspectionState, type InspectionSchema, type ItemFilter } from "~/hooks/useInspection";
 import { findingKey } from "~/hooks/findings/shared";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
 import { useScopeLoader } from "~/hooks/useScopeLoader";
@@ -44,7 +45,6 @@ import { resolveActivePropertyPreset } from "~/lib/property-preset";
 import { PcaNarrativePanel } from "~/components/inspection/PcaNarrativePanel";
 import { CompliancePanel } from "~/components/inspection-edit/CompliancePanel";
 import { CommercialReportControls, type ReportTier } from "~/components/editor/CommercialReportControls";
-import type { PcaNarrativeData } from "~/components/portal/sections/report/types";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
 import { CoverCropper, coverCropFor } from "~/components/media-studio/CoverCropper";
 import { PhotoCropper } from "~/components/media-studio/PhotoCropper";
@@ -159,19 +159,24 @@ export default function InspectionEditPage() {
  // completed") is NOT swallowed by the generic autosave "Save failed" toast
  // (which only watches fetcher/notesFetcher/uploadFetcher). The real server
  // message is surfaced inline in the publish modal instead.
- const publishFetcher = useFetcher<{ ok: boolean; intent?: string; error?: string }>();
+ // #106 — publishing is the tier-1 surface: it mints a report version, signs
+ // it and notifies the client, and a double click would do all three twice.
+ const { fetcher: publishFetcher, submit: submitPublish, busy: publishBusy } =
+  useGuardedSubmit<{ ok: boolean; intent?: string; error?: string }>();
  const [publishError, setPublishError] = useState<string | null>(null);
  // Order-lifecycle "Finish fieldwork" — its own fetcher so marking the on-site
  // work complete never contends with an in-flight autosave or publish.
- const completeFetcher = useFetcher<{ ok: boolean; intent?: string }>();
- // Commercial PCA Phase S — narrative editor panel. Own fetcher (mirrors the
- // notes/upload isolation reasoning above) so a per-block blur save cannot be
- // aborted by an unrelated in-flight mutation. Dispatches the "save-pca-narrative"
- // intent through the route action (BFF pattern) — never a client fetch to /api/...
- const narrativeFetcher = useFetcher();
- const saveNarrative = useCallback((key: keyof PcaNarrativeData, value: string) => {
-  narrativeFetcher.submit({ intent: "save-pca-narrative", key, value }, { method: "POST" });
- }, [narrativeFetcher]);
+ // #106 — finishing fieldwork closes the order axis and is what the client
+ // notification and the invoice clock key off; it goes through the guard.
+ const { fetcher: completeFetcher, submit: submitComplete, busy: completeBusy } =
+  useGuardedSubmit<{ ok: boolean; intent?: string }>();
+ // Commercial PCA Phase S — the narrative panel now owns ONE GUARD PER BLOCK
+ // (#106). It used to save through a single `narrativeFetcher` held here, which
+ // a guard cannot wrap: `useGuardedSubmit` refuses a second submit while one is
+ // in flight, and tabbing from one narrative block to the next inside a round
+ // trip would have dropped the second block's text in silence. The per-block
+ // guard lives in PcaNarrativePanel and still dispatches the same
+ // "save-pca-narrative" route intent (BFF pattern — never a client fetch).
  // Commercial PCA Phase T — the commercial subtype + report tier selectors
  // (CommercialReportControls) get their own fetchers for the same reason the
  // narrative panel does: a selector change must not be aborted by an
@@ -184,14 +189,20 @@ export default function InspectionEditPage() {
  // /api/inspections/:id/property-facts endpoint. (PropertyInfoForm now persists
  // its own strip fields via propertyFactsFetcher below — same intent, separate
  // fetcher.)
- const subtypeFetcher = useFetcher();
- const tierFetcher = useFetcher();
- const saveSubtype = useCallback((subtype: string | null) => {
-  subtypeFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify({ commercialSubtype: subtype }) }, { method: "POST" });
- }, [subtypeFetcher]);
- const saveTier = useCallback((tier: "light_commercial" | "full_pca") => {
-  tierFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify({ reportTier: tier }) }, { method: "POST" });
- }, [tierFetcher]);
+ // #106 — one guard EACH, never one shared: the guard refuses a second call
+ // while one is in flight, so a shared instance would let a tier click be
+ // swallowed by an in-flight subtype save. Each selector also writes its local
+ // state only when its own guard ACCEPTED the call (see onChangeSubtype /
+ // onChangeTier below) — an optimistic update on a refused submit is exactly
+ // the silent divergence between screen and server this gate exists to stop.
+ const { submit: submitSubtype, busy: subtypeBusy } = useGuardedSubmit();
+ const { submit: submitTier, busy: tierBusy } = useGuardedSubmit();
+ const saveSubtype = useCallback((subtype: string | null) => (
+  submitSubtype({ intent: "save-property-facts", payload: JSON.stringify({ commercialSubtype: subtype }) }, { method: "POST" })
+ ), [submitSubtype]);
+ const saveTier = useCallback((tier: "light_commercial" | "full_pca") => (
+  submitTier({ intent: "save-property-facts", payload: JSON.stringify({ reportTier: tier }) }, { method: "POST" })
+ ), [submitTier]);
  // Property Facts strip (PropertyInfoForm) durable save. A SINGLE shared fetcher
  // is abort-safe here — unlike subtype/tier above — because onCommit hands us a
  // FULL snapshot of every field each time, so a later PATCH is a strict superset
@@ -208,7 +219,10 @@ export default function InspectionEditPage() {
  // Commercial PCA Phase U (Batch C2b) — the units-manager mutation fetcher
  // (create/rename/delete/duplicate/bulk/mode-switch) and the lazy per-unit
  // results-slice fetcher (scope switch → merge missing findings).
- const unitsFetcher = useFetcher<{ ok: boolean; intent?: string }>();
+ // #106 - the units panel is presentational and takes the guard as a prop;
+ // this route owns the fetcher because it also watches it to revalidate.
+ const { fetcher: unitsFetcher, submit: submitUnits, busy: unitsBusy } =
+  useGuardedSubmit<{ ok: boolean; intent?: string }>();
  const scopeFetcher = useFetcher<{ ok: boolean; intent?: string; scope?: string; results?: ResultMap }>();
  const navigate = useNavigate();
  // Task 16 — split the single photo input into a camera capture input
@@ -617,7 +631,12 @@ export default function InspectionEditPage() {
  /* Auto-sign toggle + manual sign modal */
  /* ---------------------------------------------------------------- */
 
- const signFetcher = useFetcher<{ ok: boolean }>();
+ // #106 — applying the inspector signature writes an e-sign record, so it
+ // goes through the guard. The pad closes the modal on submit, so there is no
+ // control left on screen to carry a pending affordance; a failure comes back
+ // through SignModal's `failed` prop, which reads `signFetcher.data`.
+ // submit-guard-allow-no-busy: the control this fires unmounts on submit.
+ const { fetcher: signFetcher, submit: submitSign } = useGuardedSubmit<{ ok: boolean }>();
  const [autoSign, setAutoSign] = useState<boolean>(
   !!(state.inspection as Record<string, unknown>).autoSignOnPublish,
  );
@@ -638,13 +657,13 @@ export default function InspectionEditPage() {
 
  const handleSignSubmit = useCallback(
   async (dataUri: string) => {
-   signFetcher.submit(
-    { intent: "sign-inspector", signatureBase64: dataUri },
-    { method: "post" },
-   );
-   setSignModalOpen(false);
+   // Close only on a call the guard accepted: a refused second submit sent
+   // nothing, and closing anyway would say the signature had been applied.
+   if (submitSign({ intent: "sign-inspector", signatureBase64: dataUri }, { method: "post" })) {
+    setSignModalOpen(false);
+   }
   },
-  [signFetcher],
+  [submitSign],
  );
 
  /* ---------------------------------------------------------------- */
@@ -677,8 +696,8 @@ export default function InspectionEditPage() {
 
  /* Finish fieldwork — advisory order-lifecycle move (never a publish gate). */
  const handleFinishFieldwork = useCallback(() => {
-  completeFetcher.submit({ intent: "complete" }, { method: "post" });
- }, [completeFetcher]);
+  submitComplete({ intent: "complete" }, { method: "post" });
+ }, [submitComplete]);
 
  /* ---------------------------------------------------------------- */
  /* Item attribute handler */
@@ -1792,7 +1811,7 @@ export default function InspectionEditPage() {
  progress={{ rated: state.progress.rated, total: state.progress.total, pct: state.progress.pct }}
  status={state.inspection.status as string}
  publishError={publishError}
- isSubmitting={publishFetcher.state !== "idle"}
+ isSubmitting={publishBusy}
  onClose={() => { setPublishError(null); state.setShowPublishModal(false); }}
  onPublish={(markComplete: boolean) => {
  // Keep the modal open: the publish-result effect closes it on success
@@ -1811,7 +1830,7 @@ export default function InspectionEditPage() {
  // publish signed — the worst shape for a bug like this, because the
  // reader concludes they mis-clicked rather than that a report went out
  // unsigned.
- publishFetcher.submit(
+ submitPublish(
  {
  intent: "publish",
  autoSignOnPublish: String(autoSign),
@@ -1906,7 +1925,7 @@ export default function InspectionEditPage() {
  onSign={() => setSignModalOpen(true)}
  onOpenSettings={() => state.setSettingsOpen(true)}
  onFinishFieldwork={(state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null}
- finishingFieldwork={completeFetcher.state !== "idle"}
+ finishingFieldwork={completeBusy}
  onPreviewReport={
   loaderData.tenantSlug
   ? () => window.open(`/report-view/${loaderData.tenantSlug}/${state.inspection.id}`, "_blank", "noopener")
@@ -2228,7 +2247,7 @@ export default function InspectionEditPage() {
  setSignModalOpen={setSignModalOpen}
  handlePublishClick={handlePublishClick}
  handleFinishFieldwork={handleFinishFieldwork}
- finishingFieldwork={completeFetcher.state !== "idle"}
+ finishingFieldwork={completeBusy}
  collabEditing={loaderData.collabEditing}
  onOpenVersionHistory={() => setVersionHistoryOpen(true)}
  onChangeTemplate={() => state.setSettingsOpen(true)}
@@ -2282,6 +2301,8 @@ export default function InspectionEditPage() {
    units={units}
    mode={unitInspectionMode}
    fetcher={unitsFetcher}
+   guardedSubmit={submitUnits}
+   busy={unitsBusy}
   />
  )}
  {/* Commercial PCA Phase C Task 13b — cost items drawer (Opinion of Cost) */}
@@ -2389,14 +2410,15 @@ export default function InspectionEditPage() {
     <CommercialReportControls
      commercialSubtype={((state.inspection as Record<string, unknown>).commercialSubtype as string | null | undefined) ?? null}
      reportTier={((state.inspection as Record<string, unknown>).reportTier as ReportTier | null | undefined) ?? null}
-     saving={subtypeFetcher.state !== "idle" || tierFetcher.state !== "idle"}
+     saving={subtypeBusy || tierBusy}
      onChangeSubtype={(subtype) => {
-      state.setInspection((prev) => ({ ...prev, commercialSubtype: subtype }));
-      saveSubtype(subtype);
+      // Optimistic ONLY on acceptance: a refused submit sent nothing, and
+      // moving the local value anyway would show a subtype the server does
+      // not hold. Refused means the control snaps back, which is visible.
+      if (saveSubtype(subtype)) state.setInspection((prev) => ({ ...prev, commercialSubtype: subtype }));
      }}
      onChangeTier={(tier) => {
-      state.setInspection((prev) => ({ ...prev, reportTier: tier }));
-      saveTier(tier);
+      if (saveTier(tier)) state.setInspection((prev) => ({ ...prev, reportTier: tier }));
      }}
     />
    </div>
@@ -2406,11 +2428,7 @@ export default function InspectionEditPage() {
      decide PCA-only sections apply. */}
   {(state.inspection as Record<string, unknown>).propertyType === "commercial" ? (
    <div className="mt-8 border-t border-ih-border pt-6">
-    <PcaNarrativePanel
-     narrative={loaderData.pcaNarrative}
-     onSave={saveNarrative}
-     saving={narrativeFetcher.state !== "idle"}
-    />
+    <PcaNarrativePanel narrative={loaderData.pcaNarrative} />
    </div>
   ) : null}
   {/* Commercial PCA Phase M Task 10 — compliance panel (dual sign-off / PSQ /

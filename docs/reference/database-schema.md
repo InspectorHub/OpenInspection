@@ -9,11 +9,11 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 98 |
-| Columns | 1149 |
-| Indexes (excluding primary keys) | 166 |
+| Tables | 100 |
+| Columns | 1184 |
+| Indexes (excluding primary keys) | 170 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 540 (47%) |
+| Columns carrying a source comment | 554 (47%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
 
-That is 10 of 98. If a table you just added appears here,
+That is 10 of 100. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 183 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 190 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -227,7 +227,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `user_id` | text |  |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
 | `action` | text | NN |  |  | e.g. 'inspection.create' |
-| `entity_type` | text | NN IX |  |  | The entity family the action touched ('inspection', 'widget', 'agent', …). Free-form — each caller passes its own string, there is no registry — and exposed as the `?entityType=` filter on the admin audit list. |
+| `entity_type` | text | NN IX |  |  | The entity family the action touched ('inspection', 'widget', 'agent', …), exposed as the `?entityType=` filter on the admin audit list. **[more]** |
 | `entity_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `metadata` | text |  |  |  | *Structured extra context, JSON-encoded.* |
 | `ip_address` | text |  |  |  | `CF-Connecting-IP`, and only on the `auditFromContext` path — a direct `writeAuditLog` caller passes its own or nothing, so NULL means "no request context", not "no IP". |
@@ -1568,6 +1568,73 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ---
 
+## `migration_batches`
+
+<sub>server/lib/db/schema/migration-intake.ts · 22 columns · primary key `id`</sub>
+
+> One staged intake run. Staging exists so an import is resumable and undoable: nothing here touches a real table, and a run can be staged repeatedly — each attempt is a new batch and the previous one stays readable for comparison.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `created_by` | text | NN |  | `MIGRATION_INTENTS` | users.id of the operator who staged it. Soft reference. |
+| `intent` | text | NN |  | `MIGRATION_INTENTS` |  |
+| `target_id` | text |  |  |  | The row this run overwrites. Set ONLY for `templates.overwrite`, where the operator was standing on the template when they started; NULL for every other intent, because nothing else has a single named target. |
+| `vendor` | text | NN |  |  | Provenance for display ("imported from Spectora on ...") — never matched on. |
+| `adapter_name` | text | NN |  |  | *A name.* |
+| `adapter_version` | text | NN |  |  |  |
+| `manifest` | text | NN |  |  | The bundle manifest, stringified ONCE at stage time and JSON.parsed straight back — never re-serialized from a re-read row, so what a report shows is the bytes the producing run made. |
+| `conflict_policy` | text |  |  | `MIGRATION_CONFLICT_POLICIES` | NULL while staged: the policy is a decision made at apply time, and a default here would answer it for the operator. |
+| `status` | text | NN | `'staged'` | `...MIGRATION_BATCH_STATUSES` | *State-machine column — see the Values column for the vocabulary.* |
+| `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
+| `applied_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `reverted_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `source_key` | text |  |  |  | Where the uploaded file went in object storage, or NULL when nothing was stored. The ONLY record of that location — re-mapping re-reads the file, and the retention sweep deletes it, so both read this column. |
+| `expires_at` | integer | IX |  |  | When this batch's stored file and rows become due for deletion. A per-batch clock rather than one window for the table, because a run waiting on a human has a different reason to exist from one the operator staged and left. |
+| `upload_authorized_by` | text |  |  |  | Authorisation A — keeping the uploaded file, so a re-map is possible and the page can be closed and reopened. |
+| `upload_authorized_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `upload_authorization_version` | text |  |  |  |  |
+| `staff_access_authorized_by` | text |  |  |  | Authorisation B — a person on our side opening the file to convert it. Asked ONLY when the operator chooses that route, and NULL everywhere else. **[more]** |
+| `staff_access_authorized_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `staff_access_authorization_version` | text |  |  |  |  |
+
+**Indexes**
+
+- `idx_migration_batches_tenant_created` (tenant_id, created_at)
+- `idx_migration_batches_expires` (expires_at)
+
+---
+
+## `migration_rows`
+
+<sub>server/lib/db/schema/migration-intake.ts · 13 columns · primary key `id`</sub>
+
+> One staged entity, one row. This granularity is the whole reason the design has staging tables at all: it is what makes an interrupted apply resumable, what makes an undo per-row rather than all-or-nothing, and what lets a report name the failing entry instead of counting it.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `batch_id` | text | NN IX |  |  | *App-layer reference to another row — no database foreign key.* |
+| `tenant_id` | text | NN IX |  | `MIGRATION_ENTITY_KINDS` | *Tenant isolation key. Every read and write must filter on it.* |
+| `entity` | text | NN |  | `MIGRATION_ENTITY_KINDS` |  |
+| `position` | integer | NN |  |  | Index within the bundle's array for this entity kind — how a report names the entry. |
+| `payload` | text | NN |  |  | The bundle entry, stringified once at stage time. |
+| `conflict_with` | text |  |  | `MIGRATION_ROW_RESOLUTIONS` | id of the existing row this one collides with; NULL = no collision. |
+| `resolution` | text |  |  | `MIGRATION_ROW_RESOLUTIONS` |  |
+| `status` | text | NN IX | `'pending'` | `...MIGRATION_ROW_STATUSES` | *State-machine column — see the Values column for the vocabulary.* |
+| `outcome` | text |  |  |  | Why this row ended where it did, in words rather than a code. NULL does NOT mean "never failed" — it means "not carrying a reason right now". |
+| `created_id` | text |  |  |  | id of the row this one produced in the real table — the undo reads it. |
+| `prior_state` | text |  |  |  | What the overwritten row held before, captured during apply. Captured at apply time and not at stage time on purpose: staging can sit for a while, and a snapshot taken before an unrelated edit would restore the wrong content. |
+| `applied_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+
+**Indexes**
+
+- `idx_migration_rows_batch_status` (batch_id, status)
+- `idx_migration_rows_tenant` (tenant_id)
+
+---
+
 ## `notification_preferences`
 
 <sub>server/lib/db/schema/notification-preferences.ts · 9 columns · primary key `id`</sub>
@@ -2508,7 +2575,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/marketplace.ts · 11 columns · primary key `id`</sub>
 
-> Sprint 2 Track 3 (S2-8) — per-import history. One row per install/update/replace/migrate event, indexed for fast tenant scoping and per-resource (template / library) lookups.
+> Sprint 2 Track 3 (S2-8) — per-import history. One row per install/update/replace event, indexed for fast tenant scoping and per-resource (template / library) lookups.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2516,13 +2583,13 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `library_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `template_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
-| `action` | text | NN |  |  | 'install' \| 'update' \| 'replace' \| 'migrate' |
-| `source_version` | text |  |  |  | The semver the tenant moved FROM / TO. source is NULL for 'install' (there was nothing to move from); BOTH are NULL for 'migrate', which moves between two LOCAL templates and has no catalogue version on either side — so a reader must not treat a null pair as missing data. |
-| `target_version` | text |  |  |  | NULL on a migrate: local -> local has no catalogue version either side |
+| `action` | text | NN |  |  | 'install' \| 'update' \| 'replace' |
+| `source_version` | text |  |  |  | The semver the tenant moved FROM / TO. source is NULL for 'install' — there was nothing to move from. |
+| `target_version` | text |  |  |  |  |
 | `rows_affected` | integer | NN | `0` |  | *An integer value.* |
 | `metadata` | text |  |  |  | JSON-encoded action-specific context (deleted ids, migration counts, …). Stored as TEXT so we can keep parity with raw SQL inserts in tests. |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
-| `created_by` | text | NN |  |  | The JWT sub of whoever caused the event — but only the library REPLACE and template MIGRATE routes actually pass one. |
+| `created_by` | text | NN |  |  | The JWT sub of whoever caused the event — but only the library replace route actually passes one. |
 
 **Indexes**
 
