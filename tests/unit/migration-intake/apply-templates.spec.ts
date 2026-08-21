@@ -329,12 +329,22 @@ describe('MigrationApplyService — template rows', () => {
                 { name: 'Bad', schema: SCHEMA_B },
             ]),
         });
-        // Corrupt the second row's payload so its write cannot succeed.
+        // Corrupt the second row's payload so its WRITE cannot succeed — while
+        // leaving it something `describeRowProblem` has no objection to. The
+        // apply path now refuses a problem row before it tries, so a payload
+        // with no sections would be failed by that gate instead and this spec
+        // would stop exercising the per-row catch it exists for.
         const rows = await db.select().from(schema.migrationRows)
             .where(eq(schema.migrationRows.batchId, staged.batchId)).all();
         const second = rows.find((r) => r.position === 1)!;
         await db.update(schema.migrationRows)
-            .set({ payload: JSON.stringify({ name: 'Bad', schema: { schemaVersion: 99 }, stats: STATS }) })
+            .set({
+                payload: JSON.stringify({
+                    name: 'Bad',
+                    schema: { schemaVersion: 99, sections: [{ id: 'sec_x', title: 'Roof', items: [] }] },
+                    stats: STATS,
+                }),
+            })
             .where(eq(schema.migrationRows.id, second.id));
 
         const result = await apply.apply({

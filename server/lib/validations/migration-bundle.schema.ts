@@ -13,7 +13,6 @@
  */
 import { z } from 'zod';
 import {
-    BUNDLE_CONTACT_TYPES,
     MIGRATION_ENTITY_KINDS,
     VENDOR_IDS,
     type EntityKind,
@@ -43,7 +42,16 @@ const bundleWarningSchema = z.object({
  * vendor identifier reaches a writer that was never asked to consider one.
  */
 const bundleTemplateSchema = z.object({
-    name: z.string().min(1).max(100),
+    // Empty is admitted for the same reason as an empty contact name: the
+    // describer has a sentence for it, and the wizard's own default produces
+    // one — the starting template name is the file name with its extension
+    // removed, which is empty for a file called `.json`.
+    //
+    // The 100-character cap STAYS, and is the one refusal left here that no
+    // row-level sentence explains. It is kept rather than relaxed because
+    // admitting an unbounded name would put it in a staging payload and then in
+    // a column, and the describer would need a sentence before either.
+    name: z.string().max(100),
     schema: TemplateSchemaV2Schema,
     stats: z.object({
         sections: z.number().int().min(0),
@@ -55,18 +63,49 @@ const bundleTemplateSchema = z.object({
     }),
 }).strict();
 
+/**
+ * A ROW's own faults are not the FILE's faults.
+ *
+ * Every field below was once judged here and is now judged by
+ * `describeRowProblem`, one row at a time, because judging them here voided the
+ * whole upload: a single malformed address in a five-hundred-row spreadsheet
+ * answered "that file is not a valid migration bundle" and named neither the
+ * row nor the column. The likeliest cause of that address is not dirty data but
+ * a mapping aimed at the wrong column — a mistake this refusal could not
+ * describe and the mapping step could not be reached to correct.
+ *
+ * The permissiveness is bounded by exactly one rule: a value may be admitted
+ * here only if the describer has a sentence for it. It has sentences for a
+ * missing name, an address that is not one, a contact type outside our
+ * vocabulary, a role outside the ones an import may grant, and the `agent` role
+ * specifically. It has none for a wrong TYPE — a name that arrives as a number
+ * cannot be explained to anybody — so the shapes stay.
+ *
+ * `.strict()` stays for the same reason it was added: an unexpected key is how
+ * a vendor identifier reaches a writer that was never asked to consider one.
+ */
 const bundleContactSchema = z.object({
-    name: z.string().min(1),
-    email: z.string().email().optional(),
+    name: z.string(),
+    email: z.string().optional(),
     phone: z.string().optional(),
     agency: z.string().optional(),
-    type: z.enum(BUNDLE_CONTACT_TYPES),
+    /**
+     * Present but unjudged. The KEY is still required — a bundle that never
+     * mentioned the type did not describe the row, whereas a bundle that says
+     * "Buyer" described a row somebody can fix.
+     */
+    type: z.string(),
 }).strict();
 
 const bundleMemberSchema = z.object({
-    email: z.string().email(),
+    /**
+     * REQUIRED, and that has not changed. This is where the invitation goes;
+     * a row that does not carry the field is a row no screen can repair,
+     * whereas an empty or malformed one is a problem row with a sentence.
+     */
+    email: z.string(),
     name: z.string().optional(),
-    role: z.enum(['owner', 'manager', 'inspector']),
+    role: z.string(),
     permissionOverrides: z.record(z.string(), z.boolean()).optional(),
 }).strict();
 

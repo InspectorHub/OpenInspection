@@ -50,16 +50,22 @@ const EMPTY: EntityCounts = { readFromSource: 0, emitted: 0, dropped: [] };
  * point the name at — a mapping change nobody can see in the result would
  * prove nothing about whether the adapter ran again.
  *
- * The second row's brokerage is BLANK on purpose, so the two mappings below
- * produce a different NUMBER of entries as well as different words. Without
- * that, "how many entries this replaced" and "how many it produced" would be
- * the same number in every assertion, and a service that reported the wrong one
- * would be green.
+ * The second row carries NOTHING but its name, on purpose: under the second
+ * mapping neither of its mapped columns holds anything, which is the one
+ * remaining reason a line is dropped rather than staged. The two mappings
+ * therefore still produce a different NUMBER of entries as well as different
+ * words. Without that, "how many entries this replaced" and "how many it
+ * produced" would be the same number in every assertion, and a service that
+ * reported the wrong one would be green.
+ *
+ * A blank BROKERAGE alone no longer does it. An entry with no name now stages
+ * as a problem row instead of being lost, which is the change this file's
+ * fixture had to move out of the way of.
  */
 const CSV = [
     'Full Name,Email,Brokerage',
     'Alice Ng,alice@example.test,Acme Realty',
-    'Bob Ray,bob@example.test,',
+    'Bob Ray,,',
 ].join('\n');
 
 /** What the operator started with: names from the name column. */
@@ -315,7 +321,7 @@ describe('MigrationRepairService', () => {
             expect(counts.readFromSource).toBe(2);
             expect(counts.emitted).toBe(1);
             expect(counts.dropped).toEqual([
-                { at: 'line 3', reason: 'the mapped name column is empty' },
+                { at: 'line 3', reason: 'every mapped column is empty on this line' },
             ]);
         });
 

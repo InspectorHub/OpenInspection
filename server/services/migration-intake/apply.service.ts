@@ -1,25 +1,23 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, asc, eq } from 'drizzle-orm';
 import {
-    contacts,
     migrationBatches,
     migrationRows,
-    templates,
     type MigrationConflictPolicy,
     type MigrationRowResolution,
 } from '../../lib/db/schema';
 import { MIGRATION_BATCH_STATUS, type MigrationBatchStatus } from '../../lib/status/migration-batch-status';
 import { MIGRATION_ROW_STATUS } from '../../lib/status/migration-row-status';
-import { TemplateService } from '../template.service';
 import { applyMemberRow, type InviteDispatch } from './member-rows';
-import { captureContactPriorState } from './contact-snapshot';
+import { applyContactRow, applyTemplateRow, type RowOutcome } from './row-writers';
 import { expiryFor } from './assistance.service';
 import { getSeatUsage } from '../../features/seat-quota/usage';
 import { assertBatchSeatsAvailable, computeSeatsNeeded } from '../../features/seat-quota/batch';
 import { Errors } from '../../lib/errors';
 import { claimBatchForApply } from '../../lib/migration-intake/apply-claim';
 import { conflictDrift } from '../../lib/migration-intake/conflict-drift';
-import type { BundleContact, BundleTemplate } from '../../lib/migration-intake/bundle';
+import { describeRowProblem } from '../../lib/migration-intake/row-problems';
+import type { IntakeDb } from '../../lib/migration-intake/conflicts';
 
 export interface ApplyParams {
     tenantId: string;
@@ -50,21 +48,6 @@ export interface ApplyResult {
 
 type StagedRowRecord = typeof migrationRows.$inferSelect;
 type StagedBatchRecord = typeof migrationBatches.$inferSelect;
-
-type IntakeDb = ReturnType<typeof drizzle>;
-
-/**
- * What one row's write produced.
- *
- * `skipped` and `failed` are separate answers and are never merged: a skip is a
- * decision the operator made, a failure is something that went wrong, and a
- * report that calls one the other is telling the operator to go looking for a
- * bug that is not there — or not to look for one that is.
- */
-type RowOutcome =
-    | { kind: 'applied'; createdId: string; priorState: string | null }
-    | { kind: 'skipped'; reason: string }
-    | { kind: 'failed'; reason: string };
 
 /**
  * Consumes a staged batch row by row.
@@ -212,7 +195,13 @@ export class MigrationApplyService {
      * headroom now.
      */
     private async beforeRows(params: ApplyParams, rows: StagedRowRecord[]): Promise<void> {
-        const needed = computeSeatsNeeded(rows);
+        // Rows the describer objects to are left OUT of the count. They will be
+        // failed a moment from now and no invitation will go to any of them, so
+        // counting them would refuse a whole batch over seats nothing was ever
+        // going to take — and would state a number the operator cannot reconcile
+        // with anything on their screen.
+        const invitable = rows.filter((r) => describeRowProblem(r.entity, JSON.parse(r.payload)) === null);
+        const needed = computeSeatsNeeded(invitable);
         if (needed === 0) return;
         const usage = await getSeatUsage(params.tenantId, this.db);
         assertBatchSeatsAvailable({
@@ -253,124 +242,40 @@ export class MigrationApplyService {
         invites: InviteDispatch[],
     ): Promise<RowOutcome> {
         try {
+            // THE ROW'S OWN FAULTS, ASKED FIRST AND ANSWERED THE SAME WAY THE
+            // SCREEN ANSWERS THEM.
+            //
+            // The staging format now carries entries that cannot be written —
+            // an address that is not one, a contact type outside our vocabulary,
+            // the agent role — because that is what makes them repairable. The
+            // consequence is that this method can be handed one, so it asks the
+            // same question the report asks and refuses with the same sentence.
+            // Without it the widened format would reach a column enum, and an
+            // address that is not one would become a real invitation.
+            //
+            // It refuses the ROW, not the batch: that is the whole ruling. The
+            // rows around it still get their turn.
+            const problem = describeRowProblem(row.entity, JSON.parse(row.payload));
+            if (problem) return { kind: 'failed', reason: problem.reason };
             // Re-asked here rather than trusted from staging: the world can
             // move between the two, and a row whose answer moved is failed
             // rather than settled on either version of it.
             const drift = await conflictDrift(db, params.tenantId, batch.targetId, row);
             if (drift) return { kind: 'failed', reason: drift };
-            if (row.entity === 'template') return await this.applyTemplateRow(db, params, batch, row);
-            if (row.entity === 'contact') return await this.applyContactRow(db, params, row);
+            // `resolutionFor` is asked unconditionally now that the writers
+            // live next door. It is a pure read of what the operator answered,
+            // and a writer with no clash to settle ignores it.
+            const resolution = this.resolutionFor(params, row);
+            if (row.entity === 'template') {
+                return await applyTemplateRow(db, this.db, params.tenantId, batch, row, resolution);
+            }
+            if (row.entity === 'contact') {
+                return await applyContactRow(db, params.tenantId, row, resolution);
+            }
             if (row.entity === 'member') return await applyMemberRow(this.db, params, row, invites);
             return { kind: 'failed', reason: `No writer is wired for ${row.entity} rows.` };
         } catch (err) {
             return { kind: 'failed', reason: err instanceof Error ? err.message : String(err) };
         }
-    }
-
-    private async applyTemplateRow(
-        db: IntakeDb,
-        params: ApplyParams,
-        batch: StagedBatchRecord,
-        row: StagedRowRecord,
-    ): Promise<RowOutcome> {
-        const payload = JSON.parse(row.payload) as BundleTemplate;
-        const service = new TemplateService(this.db);
-
-        if (batch.intent === 'templates.overwrite') {
-            const targetId = row.conflictWith ?? batch.targetId;
-            if (!targetId) return { kind: 'failed', reason: 'This overwrite has no target template.' };
-            if (this.resolutionFor(params, row) === 'skip') {
-                return { kind: 'skipped', reason: 'The existing template was kept, so this entry was not imported.' };
-            }
-            // Read what is live HERE, not at stage time: staging can sit for a
-            // while, and a snapshot taken before an unrelated edit would
-            // restore content the operator never had.
-            const live = await db.select({ schema: templates.schema }).from(templates)
-                .where(and(eq(templates.id, targetId), eq(templates.tenantId, params.tenantId)))
-                .get();
-            if (!live) return { kind: 'failed', reason: 'The template being replaced no longer exists.' };
-            // The column is json-mode, so a row written through this service
-            // reads back as the string it was handed while one written as an
-            // object reads back as an object. Both are stored as the text the
-            // undo will hand straight back.
-            const priorState = typeof live.schema === 'string' ? live.schema : JSON.stringify(live.schema);
-
-            // The NAME is left alone deliberately. The operator was standing on
-            // this template when they started, so it is this template they meant
-            // to refill — renaming it to whatever the export happened to be
-            // called changes the thing they were pointing at. It also keeps the
-            // snapshot above complete: the document is the only field this path
-            // touches, so the document is the only field the undo has to
-            // restore.
-            await service.updateTemplate(
-                targetId,
-                params.tenantId,
-                undefined,
-                payload.schema as unknown as Record<string, unknown>,
-            );
-            return { kind: 'applied', createdId: targetId, priorState };
-        }
-
-        const created = await service.createTemplate(
-            params.tenantId,
-            payload.name,
-            payload.schema as unknown as Record<string, unknown>,
-        );
-        return { kind: 'applied', createdId: created.id, priorState: null };
-    }
-
-    private async applyContactRow(
-        db: IntakeDb,
-        params: ApplyParams,
-        row: StagedRowRecord,
-    ): Promise<RowOutcome> {
-        const payload = JSON.parse(row.payload) as BundleContact;
-
-        if (row.conflictWith) {
-            if (this.resolutionFor(params, row) === 'skip') {
-                return {
-                    kind: 'skipped',
-                    reason: 'A contact with this email address already exists and was left as it was.',
-                };
-            }
-            const live = await db.select().from(contacts)
-                .where(and(eq(contacts.id, row.conflictWith), eq(contacts.tenantId, params.tenantId)))
-                .get();
-            if (!live) return { kind: 'failed', reason: 'The contact being replaced no longer exists.' };
-            // The snapshot an undo restores. Captured through the shared pair
-            // rather than assembled here, so the shape this path writes and the
-            // shape the undo path reads cannot drift: a field missing from the
-            // snapshot is a field the undo silently fails to bring back.
-            const priorState = captureContactPriorState(live);
-
-            // EMAIL IS NOT WRITTEN, and its absence here is the point rather
-            // than an omission: the address is what identified this row as the
-            // one to replace, so rewriting it would make the row a different
-            // person while claiming to have updated the same one. Every other
-            // field takes what the file said, including the empty ones — a row
-            // that blends the file with what was already there is a row no
-            // source can account for.
-            await db.update(contacts).set({
-                name: payload.name,
-                phone: payload.phone ?? null,
-                agency: payload.agency ?? null,
-                type: payload.type,
-            }).where(and(eq(contacts.id, live.id), eq(contacts.tenantId, params.tenantId)));
-
-            return { kind: 'applied', createdId: live.id, priorState };
-        }
-
-        const id = crypto.randomUUID();
-        await db.insert(contacts).values({
-            id,
-            tenantId: params.tenantId,
-            type: payload.type,
-            name: payload.name,
-            email: payload.email ?? null,
-            phone: payload.phone ?? null,
-            agency: payload.agency ?? null,
-            createdAt: new Date(),
-        });
-        return { kind: 'applied', createdId: id, priorState: null };
     }
 }
