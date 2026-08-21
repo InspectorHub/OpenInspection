@@ -7,6 +7,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v1.0.0...openinspection-v1.1.0) (2026-08-21)
+
+
+### Features
+
+* **#100:** name the contracting entity in audit-trail.json ([bdf63c5](https://github.com/InspectorHub/OpenInspection/commit/bdf63c59e1c609549a799104734e5e079fef07f6))
+* **#106:** convert every guarded submit site, and stop the gate banning a name ([e35ffd3](https://github.com/InspectorHub/OpenInspection/commit/e35ffd319f39ffcc046a193578682d7de8bbe75e))
+* **agent:** agent terms belong to the deployment, and the signup page finally shows them ([c6adf43](https://github.com/InspectorHub/OpenInspection/commit/c6adf43b52f42e77fc8e4e50c1dc7ba2dd7661b4))
+* **compliance:** two classifications that were absences become findings with reasons ([08a9d07](https://github.com/InspectorHub/OpenInspection/commit/08a9d0731ecfda06e4ba1b79232b16203a31abed))
+* **compliance:** what is stored, what may be sent, and what we claim about it ([765a566](https://github.com/InspectorHub/OpenInspection/commit/765a566235d34cde3dc2338624d3613ed67b0bac))
+* **defects:** a hand-written defect can name its trade too ([45f5d37](https://github.com/InspectorHub/OpenInspection/commit/45f5d371ba1ba171e56ead915e37b0e2bb9c98fe))
+* **destruction:** a record now says what it measured, and completed stops implying certifiable ([186100f](https://github.com/InspectorHub/OpenInspection/commit/186100f9482b2b927c1cbc3c1c9e1d282ee19ee6))
+* **destruction:** tell the controller we did not finish, while there is still an address to tell ([855d3fa](https://github.com/InspectorHub/OpenInspection/commit/855d3fa034abfbd7d4c2b5efaca9bf0678fae0f9))
+* **erasure-gate:** warn before the deadline, and print the number on green runs ([1f7e64c](https://github.com/InspectorHub/OpenInspection/commit/1f7e64c1f65f55c95f87d3c021d63a2c653090db))
+* **esign:** a signature records that someone acted, not that a picture exists ([6d515b6](https://github.com/InspectorHub/OpenInspection/commit/6d515b60a046b2594b7fd38026367b8d4fd6dcd8))
+* **imports:** the /settings/imports list, and the entry points that start a run ([1948daa](https://github.com/InspectorHub/OpenInspection/commit/1948daad4698f2c0295484c09facc9db292f0fca))
+* **imports:** the Mapping, Repair and Import stages ([d59cc68](https://github.com/InspectorHub/OpenInspection/commit/d59cc68b552e5746fb91bc9b11d810be97bcbb25))
+* **imports:** the run wizard — shell, Upload stage, and the assisted branch ([8909b1b](https://github.com/InspectorHub/OpenInspection/commit/8909b1bdbbbe3c0a2bf5de00f73a71a066a467c4))
+* **legal:** an agent is a third party, and now signs something that says so ([b08c9fe](https://github.com/InspectorHub/OpenInspection/commit/b08c9fed1063f43a37507e9a2f7813d598ccc308))
+* **legal:** the acceptance ledger the seam has been describing for weeks ([569eefb](https://github.com/InspectorHub/OpenInspection/commit/569eefb4543c79f9918b4974427656b285aa83d5))
+* **legal:** the acceptance rides the same write as the account, at every door that opens one ([f869cc6](https://github.com/InspectorHub/OpenInspection/commit/f869cc6ef8b8d1a1d73a8193b9a696d99dfca8e4))
+* **migration-intake:** /api/admin/import delivers a bundle into a waiting batch ([9430cb5](https://github.com/InspectorHub/OpenInspection/commit/9430cb58874b906a385f2f2892831b8d0d8a7127))
+* **migration-intake:** apply the template and contact rows ([6f5fffa](https://github.com/InspectorHub/OpenInspection/commit/6f5fffa776ac414947f5957da0e5b280537250a0))
+* **migration-intake:** claim the batch, and re-check the conflict before writing ([77484b6](https://github.com/InspectorHub/OpenInspection/commit/77484b6bdc0e91e1a06bb86dcd6924451546df22))
+* **migration-intake:** count invites as seats, and refuse a batch before it starts ([2802807](https://github.com/InspectorHub/OpenInspection/commit/2802807722e1f2621f66c54fa1f8cf461a01215a))
+* **migration-intake:** decline, confirm receipt, four emails and two reminders — and close the owner-only gap ([8377db1](https://github.com/InspectorHub/OpenInspection/commit/8377db1fa545d2d867a21c9446677aaa82bce4bc))
+* **migration-intake:** eight audit actions, the declined status, and a route that could not be reached ([89d5284](https://github.com/InspectorHub/OpenInspection/commit/89d5284d4393ec2bb6d9e886498a0c5600566efc))
+* **migration-intake:** repair a staged row, re-map a batch, and run the assisted clock ([bc42dec](https://github.com/InspectorHub/OpenInspection/commit/bc42decaf11b7d00703aa024ebd3ffc64e93e723))
+* **migration-intake:** retention for the intake batches, and per-deployment import ceilings ([d029f2a](https://github.com/InspectorHub/OpenInspection/commit/d029f2ab8f28702069071f3b434ebd01064d6bf8))
+* **migration-intake:** revert, and the column it must not read ([f11eb81](https://github.com/InspectorHub/OpenInspection/commit/f11eb81f40ac4fef69aa7789ef6cc02298979f40))
+* **migration-intake:** the adapter registry, with the skip rule derived rather than written down ([5e86a4e](https://github.com/InspectorHub/OpenInspection/commit/5e86a4e00f4b469ff9e31969ae93c7ddc04163c5))
+* **migration-intake:** the assisted entry point, the row ceiling, and batch metadata ([0766ba3](https://github.com/InspectorHub/OpenInspection/commit/0766ba3cbefbc621b006c63cfa9dbc91aa321ab0))
+* **migration-intake:** the batch lifecycle surface, and the source file in R2 ([6f56aa1](https://github.com/InspectorHub/OpenInspection/commit/6f56aa1144a0ed425e32f9ae7bc30be02c600921))
+* **migration-intake:** the batch report — three mutually exclusive buckets ([be04db7](https://github.com/InspectorHub/OpenInspection/commit/be04db7f746e09c812d1de8d4996e67028b521ae))
+* **migration-intake:** the generic CSV adapter, and a uniqueness claim that was not true ([905dad1](https://github.com/InspectorHub/OpenInspection/commit/905dad15c05bde43c5963e13465c82303f97b64a))
+* **migration-intake:** the HTTP surface — create a batch, list them, read a report ([08f858e](https://github.com/InspectorHub/OpenInspection/commit/08f858ef6e9971486f54639e3499c52cee93c26d))
+* **migration-intake:** the lifecycle routes — remap, repair, apply, revert, assist, abandon ([c518706](https://github.com/InspectorHub/OpenInspection/commit/c518706933e6b2471e726276503be8647bf63b0c))
+* **migration-intake:** the report carries the file's columns, its mapping and the undo deadline ([d2bae1e](https://github.com/InspectorHub/OpenInspection/commit/d2bae1e23962676b5dcc97b36532314220b1195c))
+* **migration-intake:** the stage service, and an expiry term the index does not have ([acc1dba](https://github.com/InspectorHub/OpenInspection/commit/acc1dba37a667296ea251cd9c6cfa362efc754f6))
+* **migration-intake:** the wizard stage model, derived from adapter shape ([8d7150a](https://github.com/InspectorHub/OpenInspection/commit/8d7150aa42a4fd2867b26a5ad8f06f1c259f683c))
+* **notifications:** the class vocabulary stops lying, learns to be asked, and gains the two messages that were never sent ([660e9f7](https://github.com/InspectorHub/OpenInspection/commit/660e9f7276db36638553c0a7d7688d395808af28))
+* **privacy:** report-view counting becomes a decision the tenant can actually make ([f146ec6](https://github.com/InspectorHub/OpenInspection/commit/f146ec630679460bb43b28f05b67c8ea2999a73b))
+* **privacy:** the cross-tenant lookup says what it does, and a person can leave it ([95688db](https://github.com/InspectorHub/OpenInspection/commit/95688dbe9c481c647dd730b6bf8276a5023399e4))
+* **purge:** destroy the collaborative documents too, and refuse to call it finished when we could not ([99c6cbf](https://github.com/InspectorHub/OpenInspection/commit/99c6cbfd554c7c5cab01333e501a1cc3b1de06bb))
+* **purge:** the two Durable Objects that hold storage learn how to empty it ([cf90bda](https://github.com/InspectorHub/OpenInspection/commit/cf90bdafe02df3cd0e763bc81b1f6826341cec7f))
+* **retention:** report PDFs actually expire, and a rule that cannot finish says so ([8a9d284](https://github.com/InspectorHub/OpenInspection/commit/8a9d2841e0ba603aab99d4aa66618a785dd3ea4d))
+* **retention:** report PDFs get a window, and the disclosure says who chose it ([fb4f21d](https://github.com/InspectorHub/OpenInspection/commit/fb4f21d34c44cc6568cd668efe42d9655fe0861d))
+* **retention:** the signature and the PDF holding its picture expire together ([43196cd](https://github.com/InspectorHub/OpenInspection/commit/43196cd6acf7f1dde4e69736cba59de63d56ded6))
+* **sms:** a consent points at text that can no longer move ([a5018a6](https://github.com/InspectorHub/OpenInspection/commit/a5018a683fa3d209898e036b32bf1d9e90d86d5c))
+* **sms:** jurisdictional messaging rules become data, with the citations and the gaps both named ([bc631ab](https://github.com/InspectorHub/OpenInspection/commit/bc631abcee53a15850a32f5446cf9058aba17162))
+* **sms:** marketing content cannot ride a transactional consent, and the check cannot be skipped ([02d07fb](https://github.com/InspectorHub/OpenInspection/commit/02d07fbdb8030f4b04c46477f6453c4ecdf1a392))
+* **sms:** who sent it, and on whose behalf — recorded rather than inferred ([b8bda8b](https://github.com/InspectorHub/OpenInspection/commit/b8bda8bf73afcfb58494fa894197dc68a7b7a2a7))
+
+
+### Bug Fixes
+
+* **contacts:** the form accepted two of the three kinds its select offers ([4eabee1](https://github.com/InspectorHub/OpenInspection/commit/4eabee11b5fcf194c27b67a7898c874ad6bd73e2))
+* **contractor-types:** backfill trade_slug for existing workspaces ([a87245f](https://github.com/InspectorHub/OpenInspection/commit/a87245f75e428b096a280336a4f1e722e2eba2d9))
+* **deps:** collapse every brace-expansion copy onto the patched version ([#284](https://github.com/InspectorHub/OpenInspection/issues/284)) ([d093cf6](https://github.com/InspectorHub/OpenInspection/commit/d093cf648c6038ffcb64ab805d9cbbb398e6c29f))
+* **deps:** dompurify 3.4.12 -&gt; 3.4.13 (GHSA IN_PLACE hook removal XSS) ([#303](https://github.com/InspectorHub/OpenInspection/issues/303)) ([9b29bcf](https://github.com/InspectorHub/OpenInspection/commit/9b29bcff9df7dfdeac8bdddd4fcfe3f72711724a))
+* **deps:** patch brace-expansion and postcss ([#282](https://github.com/InspectorHub/OpenInspection/issues/282)) ([737f6e3](https://github.com/InspectorHub/OpenInspection/commit/737f6e3f8035188c10e5990f4442beb2813cf977))
+* **deps:** transitive nanoid, and a pre-push gate that asks the registry directly ([#304](https://github.com/InspectorHub/OpenInspection/issues/304)) ([3d5d625](https://github.com/InspectorHub/OpenInspection/commit/3d5d6252456faaca201e15c5a11b2af939c2ab27))
+* **gates:** the store registry called a SaaS queue deleted because it could not see the config ([2489f7b](https://github.com/InspectorHub/OpenInspection/commit/2489f7bab772065770c109edda9c975f2d7c102d))
+* **hooks:** the live-contract gate measured a new branch from the fork's stale main ([92c0038](https://github.com/InspectorHub/OpenInspection/commit/92c0038f25a8336f63d4065eb624d7d4f30ab47a))
+* **idempotency:** a claim whose holder died blocked the key forever ([#300](https://github.com/InspectorHub/OpenInspection/issues/300)) ([b95a696](https://github.com/InspectorHub/OpenInspection/commit/b95a6969d301d99b36aab39b8892aed3859964cf))
+* **kv:** a token that outlives its tenant by thirty days becomes reachable by prefix ([95f8f78](https://github.com/InspectorHub/OpenInspection/commit/95f8f786296aef0c344655e74d08ea0566bff222))
+* **legal:** joining a team stopped working, and the refusal that broke it was inconsistent ([80b0977](https://github.com/InspectorHub/OpenInspection/commit/80b0977a40ebd569aa7a22b311d8f3eb0c15be84))
+* **migration-intake:** a bad row fails the row, not the upload ([aa28f46](https://github.com/InspectorHub/OpenInspection/commit/aa28f468be69da3e528b6f3b9238e84de6d204cb))
+* **qbo:** nine paths that had never worked, and a contract suite so the tenth is found by a test ([#312](https://github.com/InspectorHub/OpenInspection/issues/312)) ([a51e148](https://github.com/InspectorHub/OpenInspection/commit/a51e1481e12bd89c56e1a642b16629c88241e790))
+* **qbo:** one QuickBooks company binds to one workspace, and the webhook says so ([56d4b4b](https://github.com/InspectorHub/OpenInspection/commit/56d4b4bea15279ddf870f1a288b3d79a8605743e))
+* **qbo:** three paths that never worked, the deployment mode they hid in, and two gates ([#313](https://github.com/InspectorHub/OpenInspection/issues/313)) ([e21aae1](https://github.com/InspectorHub/OpenInspection/commit/e21aae1ddce33ba6c585fd98a066cf5180fe8dd4))
+* **seats:** check the cap where the seat is taken, and count it once ([0ce5d1f](https://github.com/InspectorHub/OpenInspection/commit/0ce5d1ff9a96f4a9acc44b3654886edb9c6dcb0c))
+
+
+### Performance Improvements
+
+* **gates:** skip the api type-check on front-end commits, and stop recompiling messages ([#288](https://github.com/InspectorHub/OpenInspection/issues/288)) ([01c7442](https://github.com/InspectorHub/OpenInspection/commit/01c7442a925ee3acbd1ad71e1f9541f0b83c9920))
+
 ## [1.0.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v1.0.0-rc.1...openinspection-v1.0.0) (2026-07-22)
 
 
