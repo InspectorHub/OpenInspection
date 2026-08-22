@@ -232,6 +232,13 @@
       "when": 1787407283120,
       "tag": "0032_agent_terms_acceptances",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1787415769809,
+      "tag": "0033_audit_platform_actor",
+      "breakpoints": true
     }
   ]
 }

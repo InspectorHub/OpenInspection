@@ -28,6 +28,7 @@ import type * as schema from '../db/schema';
 import type { HonoConfig } from '../../types/hono';
 import type { UserRole } from '../../types/auth';
 import { bearerToken, AUTH_COOKIE_NAME } from '../auth-helpers';
+import { readPlatformActorClaim } from '../platform-actor-claims';
 import { QBO_CALLBACK_PATH } from '../qbo-oauth-paths';
 
 // Static asset extensions — these bypass JWT verification. We use a strict allowlist
@@ -162,6 +163,18 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
                 tenantId: '' as string,
             });
         }
+
+        // A SUPPORT SESSION SAYS SO IN ITS OWN TOKEN.
+        //
+        // Somebody at the deployment operator opens a workspace by being signed in
+        // AS one of its own administrators, so `sub` is a real member of that
+        // workspace and stays that way — it is the account the action ran under.
+        // This carries the second fact nothing recorded before: somebody else was
+        // driving. Trustworthy for the same reason `custom:tenantId` is — the
+        // keyring signed it — and never read from a request header. The pair rule
+        // and the claim names live in ./platform-actor-claims.ts.
+        const supportActor = readPlatformActorClaim(payload as Record<string, unknown>);
+        if (supportActor) c.set('platformActor', supportActor);
 
     } catch (err: unknown) {
         // Clear the bad cookie so the browser stops re-sending it on every request.

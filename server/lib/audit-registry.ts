@@ -210,6 +210,10 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'migration.remapped': { family: 'migration_batch', label: 'audit_action_migration_remapped', meta: {}, status: { kind: 'live' } },
     'migration.reverted': { family: 'migration_batch', label: 'audit_action_migration_reverted', meta: { refused: 'count', reverted: 'count' }, status: { kind: 'live' } },
     'migration.row_repaired': { family: 'migration_row', label: 'audit_action_migration_row_repaired', meta: {}, status: { kind: 'live' } },
+    // `ext` is the stored file's extension, not its name: the name is the
+    // workspace's own and would put a customer's filename in a column the
+    // erasure sweep treats as staff data.
+    'migration.source_downloaded': { family: 'migration_batch', label: 'audit_action_migration_source_downloaded', meta: { ext: 'name' }, status: { kind: 'live' } },
     'migration.staged': { family: 'migration_batch', label: 'audit_action_migration_staged', meta: { intent: 'name', rows: 'count', vendor: 'name' }, status: { kind: 'live' } },
     'portal_access.revoked': { family: 'inspection', label: 'audit_action_portal_access_revoked', meta: { previousTokenHash: 'id', reason: 'reason', recipientEmail: 'person' }, status: { kind: 'live' } },
     'portal_access.rotated': { family: 'inspection', label: 'audit_action_portal_access_rotated', meta: { previousTokenHash: 'id', recipientEmail: 'person' }, status: { kind: 'live' } },

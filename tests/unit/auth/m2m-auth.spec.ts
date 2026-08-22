@@ -32,12 +32,12 @@ describe('m2m-auth handshake', () => {
 
     it('verifies a freshly-signed header (round-trip)', async () => {
         const header = await signM2mHeader(ENV_A);
-        expect(await verifyM2mHeader(ENV_A, header)).toBe(true);
+        expect((await verifyM2mHeader(ENV_A, header)).ok).toBe(true);
     });
 
     it('rejects a header signed under a different shared keyring', async () => {
         const header = await signM2mHeader(ENV_A);
-        expect(await verifyM2mHeader(ENV_B, header)).toBe(false);
+        expect((await verifyM2mHeader(ENV_B, header)).ok).toBe(false);
     });
 
     it('rejects a tampered MAC', async () => {
@@ -47,16 +47,16 @@ describe('m2m-auth handshake', () => {
         const mac = header.slice(dot + 1);
         const last = mac.slice(-1);
         const flipped = mac.slice(0, -1) + (last === '0' ? '1' : '0');
-        expect(await verifyM2mHeader(ENV_A, `${ts}.${flipped}`)).toBe(false);
+        expect((await verifyM2mHeader(ENV_A, `${ts}.${flipped}`)).ok).toBe(false);
     });
 
     it('rejects missing / malformed headers without throwing', async () => {
-        expect(await verifyM2mHeader(ENV_A, undefined)).toBe(false);
-        expect(await verifyM2mHeader(ENV_A, null)).toBe(false);
-        expect(await verifyM2mHeader(ENV_A, '')).toBe(false);
-        expect(await verifyM2mHeader(ENV_A, 'no-dot-here')).toBe(false);
-        expect(await verifyM2mHeader(ENV_A, '.deadbeef')).toBe(false);
-        expect(await verifyM2mHeader(ENV_A, 'notanumber.deadbeef')).toBe(false);
+        expect((await verifyM2mHeader(ENV_A, undefined)).ok).toBe(false);
+        expect((await verifyM2mHeader(ENV_A, null)).ok).toBe(false);
+        expect((await verifyM2mHeader(ENV_A, '')).ok).toBe(false);
+        expect((await verifyM2mHeader(ENV_A, 'no-dot-here')).ok).toBe(false);
+        expect((await verifyM2mHeader(ENV_A, '.deadbeef')).ok).toBe(false);
+        expect((await verifyM2mHeader(ENV_A, 'notanumber.deadbeef')).ok).toBe(false);
     });
 
     it('rejects a validly-signed but stale header (replay window > ±300s)', async () => {
@@ -67,11 +67,11 @@ describe('m2m-auth handshake', () => {
         // +360s — beyond MAX_SKEW_SECONDS (300): the signature is still
         // cryptographically valid, but the window check must reject it.
         vi.setSystemTime(new Date('2026-06-03T00:06:00Z'));
-        expect(await verifyM2mHeader(ENV_A, stale)).toBe(false);
+        expect((await verifyM2mHeader(ENV_A, stale)).ok).toBe(false);
 
         // Sanity: a header signed inside the window still verifies.
         const fresh = await signM2mHeader(ENV_A);
         vi.setSystemTime(new Date('2026-06-03T00:06:30Z')); // +30s from `fresh`
-        expect(await verifyM2mHeader(ENV_A, fresh)).toBe(true);
+        expect((await verifyM2mHeader(ENV_A, fresh)).ok).toBe(true);
     });
 });

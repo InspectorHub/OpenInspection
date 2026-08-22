@@ -6,143 +6,42 @@ import { logger } from './logger';
 import type { HonoConfig } from '../types/hono';
 import type { AuditFamily } from './audit-families';
 
-export type AuditAction =
-    | 'inspection.create'
-    | 'inspection.delete'
-    | 'inspection.status_change'
-    | 'inspection.complete'
-    | 'inspection.send_pdf'
-    // The order-wide report gate released for one inspection, and put back.
-    // Audited because an unlock hands a client a report the tenant's own rules
-    // said to hold, and the reason for that is worth keeping.
-    | 'inspection.report_unlocked'
-    | 'inspection.report_relocked'
-    | 'inspection.send_sms'
-    | 'inspection.rescheduled'
-    | 'inspection.bulk_assign'
-    | 'inspection.bulk_status'
-    | 'inspection.template_upgraded'
-    | 'inspection.results_batch_patched'
-    | 'inspection.sync_conflict_resolved'
-    | 'inspection.share_agent'
-    | 'inspection.property_facts.update'
-    | 'inspection.pca_narrative.update'
-    // The inspector's report-level narrative on `reports`. Distinct from
-    // `pca_narrative` above, which is the commercial PCA block set on
-    // `inspections` — two different fields on two different tables.
-    | 'inspection.report_narrative.update'
-    | 'inspection.media.attach'
-    | 'inspection.media.video.finalize'
-    | 'inspection.media.video.delete'
-    | 'template.create'
-    | 'template.update'
-    | 'template.delete'
-    | 'template.marketplace.updated'
-    | 'library.marketplace.updated'
-    | 'user.invite'
-    | 'user.join'
-    | 'user.password_change'
-    | 'agreement.create'
-    | 'agreement.send'
-    | 'agreement.remind'
-    | 'agreement.sent'
-    | 'agreement.viewed'
-    | 'agreement.declined'
-    | 'agreement.inspector_signed'
-    // The tenant retired its e-signature key and minted a replacement. Nothing
-    // already signed changes, but WHICH key covers which stretch of a company's
-    // evidence is exactly the question a later reader will have, and only this
-    // row answers it.
-    | 'signing_key.rotate'
-    | 'recommendation.created'
-    | 'recommendation.updated'
-    | 'recommendation.deleted'
-    | 'contractor_type.created'
-    | 'contractor_type.updated'
-    | 'contractor_type.deleted'
-    | 'credential.created'
-    | 'credential.updated'
-    | 'credential.deleted'
-    | 'credential.image_uploaded'
-    | 'defect_category.created'
-    | 'defect_category.updated'
-    | 'defect_category.deleted'
-    | 'rating_system.created'
-    | 'rating_system.updated'
-    | 'rating_system.cloned'
-    | 'rating_system.deleted'
-    | 'data.export'
-    | 'data.import'
-    // Import runs. Nine, not one: a run is a sequence of separate decisions by
-    // separate people, and a trail that recorded them all as 'data.import'
-    // could not answer the question it exists for — who chose this. The last
-    // TWO are OURS; the rest are the operator's.
-    | 'migration.staged'
-    | 'migration.assistance_requested'
-    | 'migration.remapped'
-    | 'migration.row_repaired'
-    | 'migration.applied'
-    | 'migration.reverted'
-    | 'migration.abandoned'
-    | 'migration.delivered'
-    | 'migration.declined'
-    | 'data.delete'
-    | 'audit.view'
-    | 'comment.created'
-    | 'comment.updated'
-    | 'comment.deleted'
-    | 'config.integration.update'
-    | 'config.secrets.update'
-    | 'config.attention_thresholds.update'
-    | 'config.dashboard_columns.update'
-    | 'config.tenant_config.patch'
-    // The ZIP territories that decide who is even OFFERED a booking. Audited
-    // because clearing a list silently widens one inspector's reach and
-    // narrowing one can make a workspace look closed in a whole postcode.
-    | 'config.service_areas.replace'
-    | 'tag.created'
-    | 'tag.updated'
-    | 'tag.deleted'
-    | 'tag.linked'
-    | 'tag.unlinked'
-    | 'inspection.property_facts.autofill'
-    | 'inspection.template_snapshot.update'
-    | 'inspection.rating_system.switch'
-    | 'admin.migrate_finding_keys'
-    | 'sms.consent.attest'
-    | 'sms.test_send'
-    | 'sms.compliance.provision'
-    | 'sms.compliance.resubmit'
-    | 'mcp.grant.created'
-    | 'mcp.grant.revoked'
-    // Commercial PCA Phase M — ASTM compliance artifacts (dual sign-off / PSQ / doc-review).
-    | 'inspection.compliance.signoff'
-    | 'inspection.compliance.signoff_removed'
-    | 'inspection.compliance.doc_review_seeded'
-    | 'inspection.compliance.doc_review_updated'
-    | 'inspection.compliance.psq_updated'
-    | 'inspection.compliance.psq_status_changed'
-    // Agent unified link (Spec 3, Task 2) — single-use magic-login code issue.
-    | 'agent.magic_login.issued'
-    // Written by fulfill-booking.ts through the slug writer, which until now
-    // typed `action` as string — this entry and that type closed together.
-    | 'booking.routing.applied'
-    // IA-36 ④ — report-delivery credential lifecycle. Rotation destroys the old
-    // secret in place (the (inspection, recipient) unique index leaves no dead
-    // row behind), so these events are the ONLY durable answer to "the customer
-    // says their old link still opens / stopped opening — what happened?".
-    // Metadata carries the previous token's HASH; the plaintext is never logged.
-    | 'portal_access.rotated'
-    | 'portal_access.revoked'
-    // Two-layer role model — a role profile's capability overrides changed.
-    // Metadata carries the RESOLVED before/after sets, so "who widened this,
-    // and when" is answerable without replaying kind baselines by hand.
-    | 'role_profile.capabilities_updated';
+/**
+ * The action vocabulary moved to `./audit-actions.ts` — see the note there. It
+ * is re-exported here so that `import type { AuditAction } from './audit'`,
+ * which is what every caller writes, keeps resolving.
+ */
+export type { AuditAction } from './audit-actions';
+import type { AuditAction } from './audit-actions';
+
+/**
+ * WHICH KIND of actor produced an audit row.
+ *
+ * Three values, not a boolean. A boolean asks "was it us" and has nowhere to put
+ * the third case, which is already the truth of a large share of these rows: a
+ * cron pass, a queue consumer, an applier acting on a command — nobody at all.
+ * Filing that under "not us" makes `false` mean two things, and leaves the reader
+ * who has to tell them apart no column to ask.
+ *
+ *  - `tenant_user`    — somebody in the workspace, acting for themselves.
+ *  - `platform_staff` — somebody at the deployment operator, acting on the
+ *                       workspace's behalf. `platformActorId` names which one.
+ *  - `system`         — no person: scheduled work, a consumer, a backfill.
+ *
+ * `writeAuditLogWithSlug` deliberately does not take this: it exists to stamp an
+ * INSPECTOR's slug on an inspector's own event, so its rows are `tenant_user` by
+ * construction and take the column default.
+ */
+type AuditActorKind = 'tenant_user' | 'platform_staff' | 'system';
 
 interface AuditParams {
     db: D1Database;
     tenantId: string;
     userId?: string | undefined;
+    /** Defaults to `tenant_user`. A caller with no person behind it says `system`. */
+    actorKind?: AuditActorKind | undefined;
+    /** Portal's `platform_admins.id`. Only meaningful with `platform_staff`. */
+    platformActorId?: string | undefined;
     action: AuditAction;
     entityType: AuditFamily;
     entityId?: string | undefined;
@@ -224,24 +123,44 @@ function redactAuditMetadata(metadata: Record<string, unknown> | undefined): Rec
  * insert would fail a NOT NULL constraint into the swallowed error path), and a
  * React Router action, which has no Hono context at all.
  */
+/**
+ * The insert itself, AWAITABLE and with nothing swallowed.
+ *
+ * For the caller whose whole reason to exist is that the row landed. The
+ * ordinary contract below is the opposite — recording that something happened
+ * must never fail a request that did happen — and that is right for almost
+ * everything. It is wrong for a route like the staff source download, where a
+ * response served with no audit row is exactly the state the route was built to
+ * make impossible. Such a caller awaits this and lets it throw.
+ */
+export async function writeAuditRow(params: Omit<AuditParams, 'executionCtx'>): Promise<void> {
+    await drizzle(params.db).insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        tenantId: params.tenantId,
+        userId: params.userId ?? null,
+        action: params.action,
+        entityType: params.entityType,
+        entityId: params.entityId ?? null,
+        metadata: redactAuditMetadata(params.metadata),
+        ipAddress: params.ipAddress ?? null,
+        createdAt: new Date(),
+        actorKind: params.actorKind ?? 'tenant_user',
+        // Only a platform actor gets an id here. A caller that passes one
+        // alongside any other kind is describing something this column cannot
+        // express, and the row would read as a support action.
+        platformActorId: params.actorKind === 'platform_staff' ? (params.platformActorId ?? null) : null,
+    });
+}
+
 export function writeAuditLog(params: AuditParams): void {
-    const { db, executionCtx, ...rest } = params;
+    const { executionCtx, ...rest } = params;
     // Fire-and-forget by contract: recording that something happened must never
     // turn a request that DID happen into a 500. The async rejection path was
     // already swallowed; the query construction itself is wrapped too.
     let write: Promise<void>;
     try {
-        write = drizzle(db).insert(auditLogs).values({
-            id: crypto.randomUUID(),
-            tenantId: rest.tenantId,
-            userId: rest.userId ?? null,
-            action: rest.action,
-            entityType: rest.entityType,
-            entityId: rest.entityId ?? null,
-            metadata: redactAuditMetadata(rest.metadata),
-            ipAddress: rest.ipAddress ?? null,
-            createdAt: new Date(),
-        }).then(() => {}).catch((e) => logger.error('[audit] write failed', {}, e instanceof Error ? e : undefined));
+        write = writeAuditRow(rest)
+            .catch((e) => logger.error('[audit] write failed', {}, e instanceof Error ? e : undefined));
     } catch (e) {
         logger.error('[audit] write failed', {}, e instanceof Error ? e : undefined);
         return;
@@ -263,6 +182,12 @@ export function auditFromContext(
     options?: { entityId?: string; metadata?: Record<string, unknown> }
 ): void {
     const user = c.get('user');
+    // A support session reaches these routes signed in AS one of the workspace's
+    // own administrators, so `user.sub` is a real tenant user and stays where it
+    // is — it is the account the action ran under and that remains true. What was
+    // missing is the second fact: that somebody else was driving. `platformActor`
+    // is set only by the seam guard, from a value covered by the M2M signature.
+    const platformActor = c.get('platformActor');
     // `c.executionCtx` THROWS when the context was created without one (any
     // non-Workers invocation path). Recording an audit event must never be the
     // thing that fails a request that otherwise succeeded, so read it defensively
@@ -273,6 +198,8 @@ export function auditFromContext(
         db: c.env.DB,
         tenantId: c.get('tenantId') as string,
         userId: user?.sub,
+        actorKind: platformActor ? 'platform_staff' : 'tenant_user',
+        platformActorId: platformActor?.platformAdminId,
         action,
         entityType,
         entityId: options?.entityId,

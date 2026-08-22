@@ -158,6 +158,32 @@ export const auditLogs = sqliteTable('audit_logs', {
     // dashboard's per-inspector grouping.
     inspectorSlug: text('inspector_slug'),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    /**
+     * WHICH KIND of actor produced this row: 'tenant_user' | 'platform_staff' |
+     * 'system' (`AuditActorKind` in server/lib/audit.ts, which is where the
+     * writers are typed — the column is free-form text like `action` is).
+     *
+     * An enum and not a boolean. A boolean answers "was it us" and cannot say
+     * anything about the third case, which is already in the data: a cron pass
+     * or a queue consumer acting with no person behind it.
+     *
+     * The default is what makes existing rows readable, and it is a weaker
+     * statement than it looks: 'tenant_user' on a row written before this column
+     * existed means "we do not know it was NOT a tenant user", not "we checked".
+     * A row that predates the column cannot be used to clear anybody.
+     */
+    actorKind: text('actor_kind').notNull().default('tenant_user'),
+    /**
+     * The platform person behind a `platform_staff` row, by their STABLE ID —
+     * portal's `platform_admins.id`, carried across the seam inside the signed
+     * M2M header. NULL for every other actor kind.
+     *
+     * The id and not the email: the email is the display value, it changes, and
+     * this database has nothing that could keep the two in step. The console
+     * resolves the id back to a person on the portal side, where that mapping
+     * actually lives.
+     */
+    platformActorId: text('platform_actor_id'),
 }, (t) => [
     index('idx_audit_tenant_created').on(t.tenantId, t.createdAt),
     index('idx_audit_entity').on(t.entityType, t.entityId),

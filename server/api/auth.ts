@@ -28,6 +28,7 @@ import { findGlobalAgentById } from '../services/agent/account';
 import totpRoutes from './auth/totp';
 import profileRoutes from './auth/profile';
 import { getDrizzle } from '../lib/route-helpers';
+import { platformActorClaims } from '../lib/platform-actor-claims';
 
 // --- Routes ---
 
@@ -412,7 +413,7 @@ const coreAuthRoutes = createApiRouter()
         // can't piggyback on a still-resolving call.
         await c.env.TENANT_CACHE.delete(`sso:${code}`);
 
-        let parsed: { userId?: string; tenantId?: string };
+        let parsed: { userId?: string; tenantId?: string; actor?: { platformAdminId?: string; email?: string } | null };
         try { parsed = JSON.parse(raw); } catch { return c.redirect('/login?sso=invalid', 302); }
         if (!parsed.userId) return c.redirect('/login?sso=invalid', 302);
 
@@ -472,6 +473,7 @@ const coreAuthRoutes = createApiRouter()
             // this session was minted via portal handoff rather than direct
             // password login.
             'custom:sso': true,
+            ...platformActorClaims(parsed.actor), // a support session, when it is one
         }, keyring);
 
         setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
@@ -523,7 +525,6 @@ const coreAuthRoutes = createApiRouter()
             return c.json({ success: false, error: { code: 'already_initialized', message: 'System already initialized' } }, 409);
         }
 
-
         const body = c.req.valid('json');
 
         // 2. Verification Code Check — gated solely by the SETUP_CODE secret.
@@ -535,7 +536,6 @@ const coreAuthRoutes = createApiRouter()
         if (body.verificationCode !== storedCode) {
             return c.json({ success: false, error: { code: 'invalid_code', message: 'Invalid verification code' } }, 400);
         }
-
 
         // 3. Initialize Workspace
         const passwordHash = await c.var.services.auth.hashPassword(body.password);

@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 102 |
-| Columns | 1214 |
+| Columns | 1216 |
 | Indexes (excluding primary keys) | 172 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 578 (48%) |
+| Columns carrying a source comment | 580 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -243,7 +243,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `audit_logs`
 
-<sub>server/lib/db/schema/tenant/integration.ts · 10 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/tenant/integration.ts · 12 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -257,6 +257,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `ip_address` | text |  |  |  | `CF-Connecting-IP`, and only on the `auditFromContext` path — a direct `writeAuditLog` caller passes its own or nothing, so NULL means "no request context", not "no IP". |
 | `inspector_slug` | text |  |  |  | Sprint B-3 — populated on inspector-facing events (writeAuditLogWithSlug helper); NULL otherwise so the column stays signal-rich for the audit dashboard's per-inspector grouping. |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
+| `actor_kind` | text | NN | `'tenant_user'` |  | WHICH KIND of actor produced this row: 'tenant_user' \| 'platform_staff' \| 'system' (`AuditActorKind` in server/lib/audit.ts, which is where the writers are typed — the column is free-form text like `action` is). **[more]** |
+| `platform_actor_id` | text |  |  |  | The platform person behind a `platform_staff` row, by their STABLE ID — portal's `platform_admins.id`, carried across the seam inside the signed M2M header. **[more]** |
 
 **Indexes**
 

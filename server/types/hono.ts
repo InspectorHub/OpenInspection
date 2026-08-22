@@ -385,6 +385,9 @@ type AppVariables = AuthVariables & {
      *  Tenant-independent (email ownership is global); cross-tenant isolation
      *  comes from every portal query being scoped to the path's tenantId. */
     portalEmail?: string;
+    /** The platform person behind this request, if any. Written only from signed
+     *  material — the M2M header (seam guard) or a session claim (jwtAuth). */
+    platformActor?: import('../lib/m2m-auth').PlatformActor;
 };
 
 /**
