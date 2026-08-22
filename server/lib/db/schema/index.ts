@@ -122,3 +122,11 @@ export type {
 // read-only; nothing here is ever deleted (see the file for why).
 export { statutoryFormVersions } from './statutory-forms';
 export type { StatutoryFormVersionRow, NewStatutoryFormVersionRow } from './statutory-forms';
+
+// What the scheduled watcher SAW on an authority's page — the other half of
+// detect-but-never-adopt, and a different table on purpose: a sighting records
+// bytes, never a decision that this deployment offers them.
+export { statutoryFormSightings } from './statutory-form-sightings';
+export type {
+    StatutoryFormSightingRow, NewStatutoryFormSightingRow,
+} from './statutory-form-sightings';

@@ -10,17 +10,39 @@ import { describe, it, expect } from 'vitest';
 import { CRON_JOBS, TICK, DAILY_03, DAILY_04 } from '../../../server/cron/registry';
 
 describe('cron registry', () => {
-    it('declares every job the monolithic handler used to run', () => {
-        // The list the pre-refactor scheduled() ran, in order — blocks 1, 2, 3a,
-        // 3, 4, 5, 5a-bis, 5b, 5c, 5d, 6, 6b, 7. Checked against the registry
-        // rather than retyped from memory at review time.
-        const EXPECTED = [
-            'agreement-expiry', 'qbo-cdc', 'reminder-enqueue', 'automation-flush',
-            'portal-outbox', 'pending-attachments', 'report-generation',
-            'orphan-media', 'managed-compliance', 'calendar-sync',
-            'retention-agreements', 'retention-logs', 'r2-usage',
-        ];
-        expect(CRON_JOBS.map((j) => j.key)).toEqual(EXPECTED);
+    // The list the pre-refactor scheduled() ran, in order — blocks 1, 2, 3a,
+    // 3, 4, 5, 5a-bis, 5b, 5c, 5d, 6, 6b, 7. Checked against the registry
+    // rather than retyped from memory at review time.
+    const LEGACY = [
+        'agreement-expiry', 'qbo-cdc', 'reminder-enqueue', 'automation-flush',
+        'portal-outbox', 'pending-attachments', 'report-generation',
+        'orphan-media', 'managed-compliance', 'calendar-sync',
+        'retention-agreements', 'retention-logs', 'r2-usage',
+    ];
+
+    /**
+     * Jobs added after the refactor. This list is the ratchet: a new job must be
+     * named here as well as in the registry, so one can never appear by
+     * accident. It is SEPARATE from LEGACY because the two claims are different
+     * — one is "nothing the old handler ran was lost", the other is "nothing
+     * arrived unannounced" — and the single equality that used to carry both
+     * reported the second failure using the first one's name.
+     */
+    const ADDED_SINCE = ['statutory-revision-watch'];
+
+    it('declares every job the monolithic handler used to run, in order', () => {
+        const keys = CRON_JOBS.map((j) => j.key);
+        expect(keys.filter((k) => LEGACY.includes(k))).toEqual(LEGACY);
+    });
+
+    it('has no job that is neither a legacy job nor a declared addition', () => {
+        const keys = CRON_JOBS.map((j) => j.key);
+        expect(keys.filter((k) => !LEGACY.includes(k) && !ADDED_SINCE.includes(k))).toEqual([]);
+        // Positive control: the filter really can produce a name, so an empty
+        // result above means the registry is clean and not that the predicate
+        // never matches anything.
+        expect([...keys, 'ghost-job'].filter((k) => !LEGACY.includes(k) && !ADDED_SINCE.includes(k)))
+            .toEqual(['ghost-job']);
     });
 
     it('has unique keys', () => {

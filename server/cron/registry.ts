@@ -38,6 +38,7 @@ import {
     calendarSyncJob, managedComplianceJob, portalOutboxJob, qboCdcJob,
 } from './jobs/integrations';
 import { orphanMediaJob, pendingAttachmentsJob } from './jobs/media';
+import { statutoryRevisionWatchJob } from './jobs/statutory';
 import type { CronJob } from './types';
 
 export { TICK, DAILY_03, DAILY_04 } from './types';
@@ -63,4 +64,9 @@ export const CRON_JOBS: CronJob[] = [
     retentionAgreementsJob,
     retentionLogsJob,
     r2UsageJob,
+    // Added after the thirteen. Last because it is the only job that talks to a
+    // server nobody here operates, and because its probe is an array length: on
+    // a deployment that publishes no statutory form it never reaches an
+    // invocation at all.
+    statutoryRevisionWatchJob,
 ];

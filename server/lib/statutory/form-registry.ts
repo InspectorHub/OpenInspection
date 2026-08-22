@@ -25,6 +25,15 @@
  * early is a decision, and a registry that made it silently would be
  * substituting one statutory document for another.
  *
+ * ── Only a PUBLISHED revision is ever selected ──────────────────────────────
+ * Both functions admit a row only if it carries the marks of a publication
+ * decision — see `isPublishedVersion`. A scheduled watcher detects that an
+ * authority changed its form (`revision-watch.ts`); what it learns is a page, a
+ * digest and a date it looked, and none of that is an effective date or a
+ * publisher. So a row assembled from a detection is refused here rather than
+ * quietly selected, and detection can never become adoption by someone copying
+ * fields across.
+ *
  * ── This file holds no PDF bytes and no field map ───────────────────────────
  * A version identifies bytes by `sourceHash`; where those bytes live is object
  * storage, recorded on the `statutory_form_versions` row. The map from our
@@ -69,6 +78,45 @@ export interface StatutoryFormVersion {
     publishedAt: number;
 }
 
+/** A sha256 as this subsystem spells it everywhere: lowercase hex, no separators. */
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/**
+ * Did a PERSON publish this revision, or is it something we merely observed?
+ *
+ * The distinction is not decorative. A scheduled watcher polls the authority's
+ * page and can establish four things: which form it was looking for, the page,
+ * the digest of the bytes served, and when it looked (`revision-watch.ts`). It
+ * cannot establish the date a revision takes effect, the date it becomes
+ * mandatory, or whose decision it was that this deployment offers it — those
+ * are not observations, they are a publication.
+ *
+ * So the marks below are exactly the ones detection cannot forge by being
+ * copied: a row assembled out of a sighting has a blank publisher and a zero
+ * publication date, and is refused here. Without this the detect/adopt line
+ * would be a convention — true only while nobody wrote the twelve lines that
+ * fill a version row in from a sighting, which is a thing somebody writes on
+ * the day a state changes its form and everybody is in a hurry.
+ *
+ * Deliberately NOT exported: there is no caller outside this module, and a
+ * published predicate with no consumer is one somebody calls INSTEAD of going
+ * through `selectableVersions`, which is the one door that applies it.
+ *
+ * ⚠️ It cannot check that the DATES are right — an operator who publishes a
+ * revision with the wrong effective date gets a version that is selected on the
+ * wrong days, and nothing here can tell. This refuses an unpublished revision,
+ * not a mis-published one.
+ */
+function isPublishedVersion(version: StatutoryFormVersion): boolean {
+    if (version.publishedBy.trim() === '') return false;
+    if (!Number.isFinite(version.publishedAt) || version.publishedAt <= 0) return false;
+    if (!Number.isFinite(version.effectiveFrom)) return false;
+    // The join between the row, the stored bytes and the field map authored
+    // against them. A row whose hash is not one is a row nothing can be
+    // rendered from, so it is not offered as though it could be.
+    return SHA256_HEX.test(version.sourceHash);
+}
+
 /** Is this revision usable for an inspection performed at `inspectedAt`? */
 function isSelectable(version: StatutoryFormVersion, inspectedAt: number): boolean {
     if (inspectedAt < version.effectiveFrom) return false;
@@ -93,7 +141,11 @@ export function selectableVersions(
     versions: readonly StatutoryFormVersion[],
 ): readonly StatutoryFormVersion[] {
     return versions
-        .filter((v) => v.formId === formId && isSelectable(v, inspectedAt))
+        // `isPublishedVersion` FIRST, and in this function rather than in the
+        // caller: this is the single door every selection goes through, and a
+        // check the caller has to remember is a check that is missing from the
+        // caller written next year.
+        .filter((v) => isPublishedVersion(v) && v.formId === formId && isSelectable(v, inspectedAt))
         // Sorted here rather than trusted from the caller: the list arrives from
         // a table with no guaranteed order, and both consumers below read
         // position.

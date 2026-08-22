@@ -9,22 +9,22 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 103 |
-| Columns | 1227 |
-| Indexes (excluding primary keys) | 174 |
+| Tables | 104 |
+| Columns | 1234 |
+| Indexes (excluding primary keys) | 176 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 589 (48%) |
+| Columns carrying a source comment | 593 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
 a tenant, which is the only reason to be missing it:
 
-`agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_versions` · `sync_outbox` · `tenants`
+`agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants`
 
-That is 12 of 103. If a table you just added appears here,
+That is 13 of 104. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 196 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 198 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -2334,6 +2334,29 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `text` | text | NN |  |  |  |
 | `published_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `content_hash` | text |  |  |  | SHA-256 of `text` at publication, lowercase hex. The consent row copies it, so a consent proves WHAT was shown rather than which row number was current at the time. **[more]** |
+
+---
+
+## `statutory_form_sightings`
+
+<sub>server/lib/db/schema/statutory-form-sightings.ts · 7 columns · primary key `id`</sub>
+
+> What the scheduled watcher SAW on an authority's page. Not a form we offer.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `form_id` | text | NN UQ IX |  |  | The form we were looking for — never a revision of it. Soft reference. |
+| `source_url` | text | NN UQ |  |  | The authority page that was polled, verbatim from the published revision. |
+| `observed_hash` | text | NN UQ |  |  | sha256 (lowercase hex) of the bytes that page served. |
+| `verdict` | text | NN |  | `SIGHTING_VERDICTS` | How that digest compared with every revision of this form we publish. `unrecognised` is its own answer rather than a flavour of `changed`: with nothing published on our side there is nothing to compare against, and an alarm raised out of that would be one we invented. |
+| `first_seen_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `last_seen_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+
+**Indexes**
+
+- **UNIQUE** `uq_statutory_form_sightings_seen` (form_id, source_url, observed_hash)
+- `idx_statutory_form_sightings_form` (form_id, last_seen_at)
 
 ---
 

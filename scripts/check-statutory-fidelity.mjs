@@ -111,6 +111,77 @@ for (const form of forms) {
     for (const problem of problems) failures.push(`  ✘ ${form.file} ${problem}.`);
 }
 
+// ── Detection may notice a new revision. It may never publish one ───────────
+//
+// The scheduled watcher reads an authority's page and records what it saw. If
+// it could also write `statutory_form_versions`, a page edited by an agency
+// would become a form offered to inspectors with nobody in between — and the
+// field map, which is hand-authored against one revision's bytes and may never
+// be inherited, would still be the old one. So the detection path is checked
+// for that table by name.
+//
+// ⚠️ COMMENTS ARE STRIPPED FIRST. Every file below EXPLAINS that it must not
+// write that table, so a raw grep fails on the prose that documents the rule —
+// the same trap this repository has hit six times with content-matching gates,
+// and it bites hardest on the sentence saying "we deliberately do not use X".
+const DETECTION_FILES = [
+    'server/lib/statutory/revision-watch.ts',
+    'server/services/statutory/revision-watch.service.ts',
+    'server/cron/jobs/statutory.ts',
+];
+const VERSIONS_TABLE = /statutoryFormVersions|statutory_form_versions/;
+const stripComments = (src) => src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+const detection = DETECTION_FILES
+    .filter((f) => existsSync(join(root, f)))
+    .map((f) => ({ file: f, code: stripComments(readFileSync(join(root, f), 'utf8')) }));
+
+// A file list that resolves to nothing reads exactly like a clean pass. If the
+// watcher moved, this gate is blind and must say so rather than go green.
+if (detection.length !== DETECTION_FILES.length) {
+    const missing = DETECTION_FILES.filter((f) => !existsSync(join(root, f)));
+    failures.push(`  ✘ detect/adopt separation is UNCHECKED: ${missing.join(', ')} not found. `
+        + 'A moved detection path makes this gate blind, which is a failure, not a pass.');
+}
+
+// The positive control on the matcher itself. The schema module for the
+// versions table names it in code; if the pattern cannot find it there, a
+// clean run over the detection files proves nothing about the detection files.
+const VERSIONS_SCHEMA = join(root, 'server/lib/db/schema/statutory-forms.ts');
+const controlSees = existsSync(VERSIONS_SCHEMA)
+    && VERSIONS_TABLE.test(stripComments(readFileSync(VERSIONS_SCHEMA, 'utf8')));
+if (!controlSees) {
+    failures.push('  ✘ detect/adopt separation is UNCHECKED: the control file '
+        + 'server/lib/db/schema/statutory-forms.ts does not match the pattern, so a clean '
+        + 'result over the detection path would mean nothing.');
+}
+
+const adopters = detection.filter((d) => VERSIONS_TABLE.test(d.code));
+for (const bad of adopters) {
+    failures.push(`  ✘ ${bad.file} reaches statutory_form_versions in CODE. Detection records `
+        + 'what a page served; publishing a revision is a person\'s decision and needs a field '
+        + 'map authored against those exact bytes.');
+}
+
+// The other half of the same claim: the registry admits only rows that carry a
+// publication decision, so a version assembled out of a sighting is refused
+// rather than selected. Named here because it is the assertion that makes the
+// separation structural instead of a convention.
+const REGISTRY = join(root, 'server/lib/statutory/form-registry.ts');
+const registryCode = existsSync(REGISTRY) ? stripComments(readFileSync(REGISTRY, 'utf8')) : '';
+const admissionUses = (registryCode.match(/isPublishedVersion/g) ?? []).length;
+if (admissionUses < 2) {
+    failures.push(`  ✘ form-registry.ts names isPublishedVersion ${admissionUses} time(s) in code; `
+        + 'it must be both defined and applied, or selection admits an unpublished revision.');
+}
+
+console.log(`statutory-detection: ${detection.length}/${DETECTION_FILES.length} detection file(s) `
+    + `scanned · ${adopters.length} reaching statutory_form_versions · matcher control `
+    + `${controlSees ? 'sees' : 'MISSES'} the known occurrence · registry admission check applied `
+    + `${admissionUses} time(s).`);
+
 // Both numbers, side by side, on every run — pass or fail. A gate that speaks
 // only when it is angry cannot be checked on the day it is quiet.
 console.log(`statutory-fidelity: ${forms.length} published form revision(s) / `
@@ -133,6 +204,15 @@ if (forms.length === 0) {
     console.log(`    "${reason}"`);
     console.log('  ⚠️ This gate proves a map exists, names the right revision, and carries a');
     console.log('     name. It cannot prove anybody read the form.');
+    // The detect/adopt checks are about the WATCHER, not about the catalogue,
+    // so an empty catalogue must not carry them out of the building with it.
+    // Before this line a broken separation passed on every deployment that had
+    // published nothing yet — which is every deployment, today.
+    if (failures.length) {
+        console.log(`\n✘ Statutory-fidelity gate — ${failures.length} problem(s):`);
+        console.log(failures.join('\n'));
+        process.exit(1);
+    }
     process.exit(0);
 }
 
