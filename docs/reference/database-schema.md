@@ -9,22 +9,22 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 101 |
-| Columns | 1206 |
-| Indexes (excluding primary keys) | 171 |
+| Tables | 102 |
+| Columns | 1214 |
+| Indexes (excluding primary keys) | 172 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 573 (48%) |
+| Columns carrying a source comment | 578 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
 a tenant, which is the only reason to be missing it:
 
-`deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
+`agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
 
-That is 10 of 101. If a table you just added appears here,
+That is 11 of 102. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 191 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 192 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -67,6 +67,29 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - **UNIQUE** `uq_account_acceptances_user_doc_version` (user_id, doc, version)
 - `idx_account_acceptances_tenant` (tenant_id, accepted_at)
+
+---
+
+## `agent_terms_acceptances`
+
+<sub>server/lib/db/schema/compliance.ts · 8 columns · primary key `id`</sub>
+
+> Every agent terms acceptance, kept. `users.terms_accepted` holds the same facts for the newest one and is what the request-path gate reads; it is a PROJECTION of this table's latest row, not a second source.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `user_id` | text | NN IX |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
+| `doc` | text | NN |  | `agent_terms` | Same enum discipline as `deployment_legal_versions` — a typo cannot mint a doc. |
+| `version` | text | NN |  |  | `YYYY-MM-DD`, the version string the signer was shown. |
+| `content_hash` | text | NN |  |  | SHA-256 hex of the body that was on screen, copied at acceptance time. The version proves WHICH document; only the hash proves WHAT it said, and it is what joins a row back to `deployment_legal_versions.body_snapshot`. |
+| `accepted_at` | integer | NN IX |  |  | The real event time — never synthesised, never backfilled. |
+| `ip` | text |  |  |  | Request evidence, both optional: NULL where there was no browser request. |
+| `country` | text |  |  |  |  |
+
+**Indexes**
+
+- `idx_agent_terms_acceptances_user` (user_id, accepted_at)
 
 ---
 

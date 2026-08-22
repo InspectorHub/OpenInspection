@@ -7,7 +7,21 @@ canonical reference for the three things you need to get right: **where a spec
 lives**, **how to write it**, and **how the run is initialized**.
 
 The layout is enforced — `npm run lint:tests` (`scripts/check-test-layout.mjs`)
-fails the build on a misplaced spec, and it runs in `npm run lint` + pre-commit.
+fails the build on a misplaced spec, and it runs in `npm run lint` (pre-push and
+CI's `verify` job; it is not in the pre-commit rung).
+
+Collection is enforced in **both** directions, by two gates rather than one:
+
+- `npm run lint:tests` proves every literal `testMatch` in `playwright.config.ts`
+  resolves to a file that exists — a project may not point at nothing.
+- `npm run lint:e2e-coverage` (`scripts/check-e2e-spec-coverage.mjs`) proves the
+  reverse: every spec in `tests/e2e/` is collected by some config. A spec nobody
+  collects never runs, and a spec that never runs looks exactly like a spec that
+  passes. It asks Playwright (`--list`) instead of re-reading `testMatch`, so it
+  agrees with the runner by construction, and it discounts **sweep** configs —
+  a config with no `projects` collects any file dropped into `testDir`, so it
+  cannot testify that a particular spec was ever wired up. It prints the configs
+  it consulted, both counts, and the name of every orphan, on every run.
 
 ---
 
@@ -391,7 +405,8 @@ npm run test:unit                      # api/service unit (node + better-sqlite3
 npm run test:workers                   # real workerd (queues, DOs)
 npm run test:e2e                       # Playwright, seeds real D1
 npm run test:types                     # type-level (*.spec-d.ts)
-npm run lint:tests                     # layout gate
+npm run lint:tests                     # layout gate (projects must resolve to files)
+npm run lint:e2e-coverage              # coverage gate (files must be collected by a config)
 
 # fresh full E2E (what CI does):
 rm -rf build .wrangler/state && npm run test:e2e

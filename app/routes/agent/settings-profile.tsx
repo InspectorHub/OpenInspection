@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData, useNavigate } from "react-router";
+import { Link, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -290,6 +290,24 @@ export default function AgentSettingsProfilePage() {
             </div>
           </>
         )}
+      </section>
+
+      {/* Agreements — the entry point to the acceptance record.
+          A settings page nothing links to is a page that only exists for
+          whoever remembers its URL, so the record ships with the way in rather
+          than waiting for a nav pass. */}
+      <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
+        <p className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest mb-1">{m.agent_portal_settings_legal_eyebrow()}</p>
+        <h2 className="text-sm font-bold text-ih-fg-1 mb-1">{m.agent_portal_settings_legal_heading()}</h2>
+        <p className="text-[13px] text-ih-fg-3 mb-3">
+          {m.agent_portal_settings_legal_desc()}
+        </p>
+        <Link
+          to="/agent-settings/legal"
+          className="text-[13px] font-medium text-ih-primary-text hover:underline"
+        >
+          {m.agent_portal_settings_legal_link()}
+        </Link>
       </section>
 
       {/* Timezone */}

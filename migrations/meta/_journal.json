@@ -225,6 +225,13 @@
       "when": 1787400155198,
       "tag": "0031_report_translations",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1787407283120,
+      "tag": "0032_agent_terms_acceptances",
+      "breakpoints": true
     }
   ]
 }

@@ -111,6 +111,20 @@ export default defineConfig({
             testMatch: 'route-auth-boundary.spec.ts',
         },
         {
+            // Anonymous like route-auth-boundary above, and next to it for the
+            // same reason: it asserts that the retired /inspections/:id/form
+            // surface resolves to no route (404), which needs no workspace.
+            //
+            // ⚠️ It had NO project until `lint:e2e-coverage` was written. The
+            // spec existed, read as a guard in review, and was collected only by
+            // playwright.remote.config.ts — a testDir-wide sweep with no npm
+            // script, run by hand against a deployment. So the guard against
+            // reintroducing the parallel form surface had never once executed.
+            // That is the exact failure the coverage gate exists to name.
+            name: 'form-route-retired',
+            testMatch: 'form-route-retired.spec.ts',
+        },
+        {
             // Its beforeAll seeds the admin password and then logs in, so it
             // needs the workspace to exist. That was true before this line and
             // it worked anyway, because with workers:1 the projects run in

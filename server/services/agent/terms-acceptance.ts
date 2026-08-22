@@ -11,26 +11,25 @@
  * created before this rule existed reaches the product through those two doors
  * with no acceptance at all, which is the hole this closes.
  *
- * ── Where the acceptance lives, and why it is one row and not a ledger ───────
- * `users.terms_accepted` — the same JSON blob signup writes, unchanged. The
- * general acceptance ledger next door (`account_acceptances`) cannot hold this:
- * its `tenant_id` is NOT NULL and an agent is global (`users.tenant_id IS NULL`),
- * so a row there would need a tenant id invented for the occasion — a guess that
- * later reads as a fact, which is the reason `deployment_legal_versions` has no
- * tenant column either.
+ * ── Where the acceptance lives: a ledger, and a projection of it ────────────
+ * `agent_terms_acceptances` is the evidence of record — append-only, one row per
+ * acceptance, tenant-less for the same reason `deployment_legal_versions` is.
+ * (The general ledger next door, `account_acceptances`, cannot hold these: its
+ * `tenant_id` is NOT NULL and an agent is global, so a row there would need a
+ * tenant id invented for the occasion — a guess that later reads as a fact.)
  *
- * KNOWN LIMIT, stated here rather than discovered later: that blob holds ONE
- * acceptance, so accepting a new version REPLACES the previous one. It answers
- * "is this agent bound by the text in force" completely and "what did this agent
- * accept in 2026" not at all. Closing that needs an append-only, tenant-less
- * per-user acceptance ledger — the same shape as `deployment_legal_versions`, one
- * row per (user, doc, version) — which is a schema change and deliberately not
- * smuggled in here.
+ * `users.terms_accepted` — the same JSON blob signup writes — stays, demoted to
+ * a PROJECTION of the newest row. It is what the request-path gate reads, and a
+ * gate that runs on every agent request should not run a join. It holds ONE
+ * acceptance by construction, which is fine for the question it answers ("is
+ * this agent bound by the text in force") and was never enough for the other one
+ * ("what did this agent accept, and when") — that one is `agentTermsHistory`.
  */
 
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users } from '../../lib/db/schema/tenant';
+import { agentTermsAcceptances, deploymentLegalVersions } from '../../lib/db/schema/compliance';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { DeploymentLegalService } from '../deployment-legal.service';
@@ -283,11 +282,33 @@ export async function recordAgentTermsAcceptance(
         );
     }
 
+    // ONE clock read for both writes. Two would let the ledger row and the
+    // projection of it disagree by a millisecond about an event that happened
+    // once, and a reader comparing them would have no way to tell which is the
+    // event and which is the copy.
+    const acceptedAt = new Date();
+
+    // The ledger row FIRST. It is the evidence of record; the `users` slot below
+    // is a projection of it. Writing the projection first and then failing would
+    // leave the deployment asserting an acceptance it holds no record of, which
+    // is the one ordering of these two statements that produces a false record
+    // rather than a missing one.
+    await db.insert(agentTermsAcceptances).values({
+        id: crypto.randomUUID(),
+        userId: input.userId,
+        doc: 'agent_terms',
+        version: inForce.version,
+        contentHash: inForce.contentHash,
+        acceptedAt,
+        ip: input.ip ?? null,
+        country: input.country ?? null,
+    });
+
     await db
         .update(users)
         .set({
             termsAccepted: {
-                at: new Date().toISOString(),
+                at: acceptedAt.toISOString(),
                 version: inForce.version,
                 contentHash: inForce.contentHash,
                 ...(input.ip ? { ip: input.ip } : {}),
@@ -298,4 +319,72 @@ export async function recordAgentTermsAcceptance(
 
     logger.info('agent.terms.accepted', { userId: input.userId, version: inForce.version });
     return { version: inForce.version, contentHash: inForce.contentHash };
+}
+
+/**
+ * One acceptance, as the agent who made it can read it back.
+ *
+ * `body` is the text that was in force AT THE TIME, taken from the version the
+ * acceptance names — never the text in force now. Those are the same thing right
+ * up until the day they are not, and on that day showing the current document
+ * would show a signer something they never agreed to, which is the failure this
+ * whole record exists to end.
+ */
+export interface AgentAcceptance {
+    version: string;
+    contentHash: string;
+    /** Unix ms. */
+    acceptedAt: number;
+    /**
+     * Whether the words themselves can still be produced. Normally true —
+     * `deployment_legal_versions.body_snapshot` is NOT NULL, so a published
+     * version always carries its body. It is false when the operator has removed
+     * the version this acceptance names.
+     */
+    bodyAvailable: boolean;
+    /** The archived body, or null when it is not available. Never a substitute. */
+    body: string | null;
+}
+
+/**
+ * Every agent terms acceptance this agent made, newest first.
+ *
+ * Scoped to ONE user id and nothing else. The route ahead of it also checks the
+ * session, but a service that would happily answer for whoever it is asked about
+ * is the shape that leaks the day a second caller passes an id from somewhere
+ * less careful — so the scope is here, where the query is.
+ *
+ * The body is a join on `(doc, content_hash)`, which is
+ * `uq_deployment_legal_versions_doc_hash`. The hash rather than the version
+ * string, because the hash is the thing the acceptance actually attests to: a
+ * version string is a label, and joining on a label would return whatever text
+ * currently wears it.
+ */
+export async function agentTermsHistory(db: Db, userId: string): Promise<AgentAcceptance[]> {
+    const rows = await db
+        .select({
+            version: agentTermsAcceptances.version,
+            contentHash: agentTermsAcceptances.contentHash,
+            acceptedAt: agentTermsAcceptances.acceptedAt,
+            body: deploymentLegalVersions.bodySnapshot,
+        })
+        .from(agentTermsAcceptances)
+        // LEFT, deliberately. An inner join would make an acceptance whose
+        // version the operator removed vanish from the agent's own history —
+        // turning "we cannot show you those words any more" into "you never
+        // accepted anything", which is a different and false statement.
+        .leftJoin(deploymentLegalVersions, and(
+            eq(deploymentLegalVersions.doc, agentTermsAcceptances.doc),
+            eq(deploymentLegalVersions.contentHash, agentTermsAcceptances.contentHash),
+        ))
+        .where(eq(agentTermsAcceptances.userId, userId))
+        .orderBy(desc(agentTermsAcceptances.acceptedAt));
+
+    return rows.map((r) => ({
+        version: r.version,
+        contentHash: r.contentHash,
+        acceptedAt: r.acceptedAt.getTime(),
+        bodyAvailable: r.body !== null,
+        body: r.body,
+    }));
 }

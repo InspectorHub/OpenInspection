@@ -231,6 +231,10 @@ export default [
   layout("routes/agent-layout.tsx", [
     route("agent-dashboard", "routes/agent/dashboard.tsx"),
     route("agent-settings/profile", "routes/agent/settings-profile.tsx"),
+    // The agent's own acceptance record. Under agent-layout like every other
+    // account page, so a gated agent is sent to accept before reading history —
+    // which is the ordinary ordering and needs no exemption anywhere.
+    route("agent-settings/legal", "routes/agent/settings-legal.tsx"),
     route("agent-inspectors", "routes/agent/inspectors.tsx"),
     route("agent-repair-items", "routes/agent/repair-items.tsx"),
     // IA-54 — old path 301s to the renamed one.

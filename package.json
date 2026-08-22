@@ -74,6 +74,7 @@
     "lint:provider-helpers": "node scripts/check-provider-helpers.mjs",
     "lint:notification-dispatch": "node scripts/check-notification-dispatch.mjs",
     "lint:tests": "node scripts/check-test-layout.mjs",
+    "lint:e2e-coverage": "node scripts/check-e2e-spec-coverage.mjs",
     "lint:tests-tsconfig": "node scripts/check-tests-tsconfig.mjs",
     "lint:test-imports": "node scripts/check-test-imports.mjs",
     "lint:cron-budget": "node scripts/check-cron-budget.mjs",

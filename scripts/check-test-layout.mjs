@@ -5,6 +5,12 @@
  *  - no .spec.ts directly under tests/unit/ (must live in a domain dir)
  *  - E2E is the single tests/e2e/ — tests/web/unit, tests/web/e2e, tests/integration must not exist
  *  - every playwright.config.ts project testMatch resolves to a file in tests/e2e
+ *
+ * That last rule is ONE-DIRECTIONAL: it proves a project points at a file, not
+ * that a file is pointed at by a project. The reverse — a spec collected by no
+ * config, which never runs and therefore never fails — is `lint:e2e-coverage`,
+ * a separate gate because it has to ask Playwright rather than read a file, and
+ * that costs seconds where everything here costs milliseconds.
  */
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';

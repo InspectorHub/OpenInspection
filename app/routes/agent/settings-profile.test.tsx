@@ -340,4 +340,15 @@ describe("AgentSettingsProfilePage rendering", () => {
 
     await findByText("Slug already taken");
   });
+  /**
+   * A settings page with no link is the defect this came from: a surface that
+   * exists, works, and can only be reached by typing its URL. Asserted on the
+   * HREF and not on the words, because the words are translated and the address
+   * is the thing that has to be right.
+   */
+  it("links to the legal page", async () => {
+    const { findByRole } = renderPage();
+    const link = await findByRole("link", { name: /terms|legal/i });
+    expect(link.getAttribute("href")).toBe("/agent-settings/legal");
+  });
 });

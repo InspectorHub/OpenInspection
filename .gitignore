@@ -60,3 +60,9 @@ drizzle-introspect-db.sqlite
 
 # Generated user-guide captures — the published copies live in the CMS.
 .docs-shots/
+
+# Transient calibration probe written by scripts/check-e2e-spec-coverage.mjs
+# while it runs, and deleted in a finally. Ignored so an interrupted run cannot
+# leave a spec nothing collects in a commit; the gate refuses to start when the
+# file is present and names it.
+tests/e2e/zz-e2e-coverage-probe.spec.ts

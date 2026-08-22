@@ -287,3 +287,48 @@ export const deploymentLegalVersions = sqliteTable('deployment_legal_versions', 
     uniqueIndex('uq_deployment_legal_versions_doc_hash').on(t.doc, t.contentHash),
     index('idx_deployment_legal_versions_latest').on(t.doc, t.publishedAt),
 ]);
+
+/**
+ * Every agent terms acceptance, kept.
+ *
+ * `users.terms_accepted` holds the same facts for the newest one and is what the
+ * request-path gate reads; it is a PROJECTION of this table's latest row, not a
+ * second source. It stays because a gate that runs on every agent request should
+ * not run a join, and it is the only reader that needs to be fast.
+ *
+ * That slot on its own could only ever state the most recent acceptance, because
+ * accepting a new version overwrote the previous one — at exactly the moment the
+ * previous one starts to matter, since the only reason it changed is that the
+ * words changed.
+ *
+ * NO tenant_id, deliberately, and against the default rule for new tables: an
+ * agent is global (`users.tenant_id IS NULL`) and these terms are the deployment
+ * operator's, not any tenant's — the same reason `deployment_legal_versions`
+ * above has no tenant column. A tenant column here would have nothing to put in
+ * it, and a value invented for the occasion is a guess that later reads as a
+ * fact. Do not add one.
+ *
+ * Append-only. Nothing updates or deletes a row; erasure is handled by the
+ * account-deletion path, which is a different obligation with its own record.
+ */
+export const agentTermsAcceptances = sqliteTable('agent_terms_acceptances', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    /** Same enum discipline as `deployment_legal_versions` — a typo cannot mint a doc. */
+    doc: text('doc', { enum: ['agent_terms'] }).notNull(),
+    /** `YYYY-MM-DD`, the version string the signer was shown. */
+    version: text('version').notNull(),
+    /**
+     * SHA-256 hex of the body that was on screen, copied at acceptance time.
+     * The version proves WHICH document; only the hash proves WHAT it said, and
+     * it is what joins a row back to `deployment_legal_versions.body_snapshot`.
+     */
+    contentHash: text('content_hash').notNull(),
+    /** The real event time — never synthesised, never backfilled. */
+    acceptedAt: integer('accepted_at', { mode: 'timestamp_ms' }).notNull(),
+    /** Request evidence, both optional: NULL where there was no browser request. */
+    ip: text('ip'),
+    country: text('country'),
+}, (t) => [
+    index('idx_agent_terms_acceptances_user').on(t.userId, t.acceptedAt),
+]);

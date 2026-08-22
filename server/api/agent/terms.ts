@@ -3,7 +3,7 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { Errors } from '../../lib/errors';
 import { getDrizzle } from '../../lib/route-helpers';
-import { recordAgentTermsAcceptance } from '../../services/agent/terms-acceptance';
+import { recordAgentTermsAcceptance, agentTermsHistory } from '../../services/agent/terms-acceptance';
 
 /**
  * How a signed-in agent accepts the agent terms.
@@ -15,10 +15,17 @@ import { recordAgentTermsAcceptance } from '../../services/agent/terms-acceptanc
  * would be a wall rather than a door, so this endpoint is on that gate's short
  * exemption list and this file and that one have to be read together.
  *
- * The TEXT is not served here. `GET /api/agent-signup/terms` already returns the
- * version, the hash and the body in force, and it is public because the signup
- * page has to render it before anyone has an account. A second read endpoint
- * would be a second thing to keep in step with the registry, for no new fact.
+ * The text IN FORCE is not served here. `GET /api/agent-signup/terms` already
+ * returns the version, the hash and the body in force, and it is public because
+ * the signup page has to render it before anyone has an account. A second read
+ * endpoint would be a second thing to keep in step with the registry, for no new
+ * fact.
+ *
+ * `GET /terms/history` below is a different question and therefore a different
+ * endpoint: not "what is in force" but "what did THIS agent accept, and when".
+ * Its answer is per-account, so it can never be public, and the bodies it
+ * returns are the ARCHIVED ones — the text each acceptance actually named, not
+ * whatever is current.
  */
 
 const AcceptBodySchema = z
@@ -82,6 +89,65 @@ const acceptRoute = createRoute(withMcpMetadata({
     operationId: 'acceptAgentTerms',
 }, { scopes: [], tier: 'excluded' }));
 
+const HistoryRowSchema = z
+    .object({
+        version: z.string().describe('The version string the signer was shown.'),
+        contentHash: z.string().describe(
+            'SHA-256 hex of the body that was on screen. The version says WHICH document; '
+            + 'this says WHAT it said.',
+        ),
+        acceptedAt: z.number().int().describe('Unix milliseconds — the real event time.'),
+        bodyAvailable: z.boolean().describe(
+            'Whether the words themselves can still be produced. False when the operator has '
+            + 'removed the version this acceptance names.',
+        ),
+        body: z.string().nullable().describe(
+            'The ARCHIVED body of the version accepted, or null when it is not available. '
+            + 'Never the text in force today — substituting it would show a signer something '
+            + 'they never agreed to.',
+        ),
+    })
+    .openapi('AgentTermsAcceptanceRecord');
+
+const HistoryResponseSchema = z
+    .object({ success: z.literal(true), data: z.array(HistoryRowSchema) })
+    .openapi('AgentTermsHistoryResponse');
+
+/**
+ * The agent's own acceptance record.
+ *
+ * Takes no input at all — no query parameter, no path parameter, no body. The
+ * account is the one in the session and there is nothing for a caller to say
+ * about it, so there is nothing to get wrong: an endpoint that accepted a user
+ * id would be one bad authorization check away from answering for somebody else.
+ *
+ * NOT on the agent-terms gate's exemption list, unlike `/accept-terms`. That
+ * list exists for the ways OUT of the gate, and reading history is not one of
+ * them; an agent who owes an acceptance is sent to accept it first, which is the
+ * ordinary behaviour and needs no entry here.
+ */
+const historyRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/terms/history',
+    tags: ['agents'],
+    summary: "Every agent-terms acceptance on the signed-in agent's account",
+    description:
+        "Returns the signed-in agent's own agent-terms acceptances, newest first, each with "
+        + 'the version, the content hash of the body that was shown, when it was accepted, and '
+        + 'that body where it is still archived. Scoped to the session and nothing else — the '
+        + 'endpoint takes no account identifier, because the only account it can answer for is '
+        + 'the one holding the session.',
+    responses: {
+        200: {
+            content: { 'application/json': { schema: HistoryResponseSchema } },
+            description: "The agent's acceptances, newest first",
+        },
+        401: { description: 'Not an agent session' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'listAgentTermsHistory',
+}, { scopes: [], tier: 'excluded' }));
+
 export const agentTermsRoutes = createApiRouter()
     .openapi(acceptRoute, async (c) => {
         // Checked HERE and not inherited from anything. The gate exempts this
@@ -104,6 +170,18 @@ export const agentTermsRoutes = createApiRouter()
         });
 
         return c.json({ success: true as const, data: { version: recorded.version } }, 200);
+    })
+    .openapi(historyRoute, async (c) => {
+        // Same check, same reason as above, and stated rather than shared: the
+        // JWT middleware does not reject a token-less request, it simply sets
+        // nothing, so an anonymous GET reaches this handler.
+        const agentUserId = c.get('agentUserId');
+        if (!agentUserId) {
+            throw Errors.Unauthorized('Sign in as an agent to read your acceptance history');
+        }
+
+        const data = await agentTermsHistory(getDrizzle(c) as never, agentUserId);
+        return c.json({ success: true as const, data }, 200);
     });
 
 export type AgentTermsApi = typeof agentTermsRoutes;

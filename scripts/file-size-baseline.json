@@ -45,7 +45,7 @@
   "server/portal/integration.routes.ts": 488,
   "server/services/report-export-consumer.ts": 482,
   "server/api/admin/admin-config.ts": 472,
-  "server/lib/compliance/erasure-manifest.ts": 468,
+  "server/lib/compliance/erasure-manifest.ts": 476,
   "server/services/inspection/inspection-core.service.ts": 465,
   "app/components/inspection/PeopleEditor.tsx": 462,
   "server/api/calendar.ts": 453,

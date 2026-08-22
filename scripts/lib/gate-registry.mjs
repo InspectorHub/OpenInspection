@@ -111,6 +111,23 @@ export const SCRIPT_GATES = [
     { key: 'providerhelpers', label: 'lint:provider-helpers', script: 'check-provider-helpers.mjs', fix: 'npm run lint:provider-helpers', rung: PUSH },
     { key: 'notificationdispatch', label: 'lint:notification-dispatch', script: 'check-notification-dispatch.mjs', fix: 'npm run lint:notification-dispatch', rung: PUSH },
     { key: 'tests', label: 'lint:tests', script: 'check-test-layout.mjs', fix: 'npm run lint:tests', rung: PUSH },
+    // The other direction of `tests` above, and the most expensive entry in
+    // this list by an order of magnitude: it spawns `playwright test --list`
+    // once per playwright config (5 today, ~10-15s in total) because Playwright
+    // is the only authority on what `testMatch` collects.
+    //
+    // PUSH and emphatically not PRECOMMIT. The registry's rule for the rungs
+    // above is that a pre-commit row is a cost decision paid by every commit in
+    // the repo, and the cheapest row up there is two file reads; this one is
+    // three orders of magnitude dearer and would be paid on doc-only commits
+    // too. Nor is it a keystroke gate: what it catches is a spec file EXISTING
+    // with no project pointing at it, which is a state a branch is in for as
+    // long as it takes to write the spec — a commit mid-way through writing one
+    // is normal, and failing it there would train people to `--no-verify`. PUSH
+    // is the first rung where the answer is complete, and it is a rung before
+    // CI actually runs the suite, so the spec still gets wired up before anyone
+    // could mistake "never collected" for "passing".
+    { key: 'e2ecoverage', label: 'lint:e2e-coverage', script: 'check-e2e-spec-coverage.mjs', fix: 'npm run lint:e2e-coverage', rung: PUSH },
     { key: 'testimports', label: 'lint:test-imports', script: 'check-test-imports.mjs', fix: 'npm run lint:test-imports', rung: PUSH },
     { key: 'deadcode', label: 'lint:deadcode', script: 'check-deadcode.mjs', fix: 'npm run lint:deadcode', rung: PUSH },
     { key: 'timestamps', label: 'lint:timestamps', script: 'check-timestamps.mjs', fix: 'npm run lint:timestamps', rung: PUSH },

@@ -9710,6 +9710,20 @@
     "description": "Lists the signed-in agent's referred inspections across every tenant they have an active agent_tenant_link with, newest first, for the agent-portal dashboard."
   },
   {
+    "operationId": "listAgentTermsHistory",
+    "method": "GET",
+    "pathTemplate": "/api/agent/terms/history",
+    "scopes": [],
+    "tag": "agents",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Every agent-terms acceptance on the signed-in agent's account",
+    "description": "Returns the signed-in agent's own agent-terms acceptances, newest first, each with the version, the content hash of the body that was shown, when it was accepted, and that body where it is still archived. Scoped to the session and nothing else — the endpoint takes no account identifier, because the only account it can answer for is the one holding the session."
+  },
+  {
     "operationId": "listAllInspectorServiceAreas",
     "method": "GET",
     "pathTemplate": "/api/admin/service-areas/all",

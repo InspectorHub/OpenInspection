@@ -265,6 +265,14 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // TCPA consent ledger — append-only proof a grant/revoke happened.
     { table: 'sms_consent_log', column: 'ip',         category: 'user.device.ip_address',  action: 'retain', legalBasis: 'art_17_3_b' },
     { table: 'sms_consent_log', column: 'user_agent', category: 'user.device.user_agent',  action: 'retain', legalBasis: 'art_17_3_b' },
+    // Agent terms acceptances — same shape as the row above, retained for the
+    // same reason. NOT `erase_in_place` like `agreement_signers`, which looks
+    // alike: that is a signature on a document about somebody's house and the
+    // subject may have it erased; this is the operator's own proof that a third
+    // party agreed to its terms, which must survive the account. Scrubbing in
+    // place would also contradict the table's invariant — nothing updates a row.
+    { table: 'agent_terms_acceptances', column: 'ip',      category: 'user.device.ip_address', action: 'retain', legalBasis: 'art_17_3_b' },
+    { table: 'agent_terms_acceptances', column: 'country', category: 'user.location.country',  action: 'retain', legalBasis: 'art_17_3_b' },
     // The erasure decision record itself (Art. 5(2)/30 accountability — you
     // cannot prove you honored a request if you delete the record of it).
     { table: 'erasure_log', column: 'subject_email', category: 'user.contact.email', action: 'retain', legalBasis: 'art_17_3_b' },
