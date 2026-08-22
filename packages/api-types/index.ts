@@ -39,6 +39,7 @@ export type { InspectionTypesApi }    from '../../server/api/inspection-types';
 export type { InspectionSyncApi }     from '../../server/api/inspection-sync';
 export type { InspectionTagApi }      from '../../server/api/tags';
 export type { IntegrationsApi }       from '../../server/api/integrations';
+export type { IntegrationsAiApi }     from '../../server/api/integrations-ai';
 export type { InvoicesApi }           from '../../server/api/invoices';
 export type { MarketplaceApi }        from '../../server/api/marketplace';
 export type { MigrationIntakeApi }    from '../../server/api/migration-intake';

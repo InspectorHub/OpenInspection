@@ -35,11 +35,25 @@ export const EmailValidateOkSchema = z
  * network. `apiKey` is accepted here and never echoed back — see
  * `lib/ai/connection-test.ts`.
  */
+/**
+ * What a workspace saves as its AI provider configuration.
+ *
+ * Blank is allowed and MEANS UNSET — the endpoint boxes are how a workspace
+ * clears a destination, so refusing an empty string here would leave them with
+ * no way to undo one. `saveAiConfig` turns blank into null; this schema only
+ * decides what the client may send.
+ */
+export const AiConfigBodySchema = z.object({
+    aiEnabled: z.boolean().describe('Whether this workspace may be offered AI at all.'),
+    aiBaseUrl: z.string().max(300).describe('OpenAI-compatible base URL. Blank means unset.'),
+    aiModel: z.string().max(200).describe('Model id to send. Blank means unset.'),
+}).openapi('AiConfigBody');
+
 export const AiConnectionTestBodySchema = z
     .object({
         baseUrl: z.string().url().describe('Root of an OpenAI-compatible API, e.g. https://host/v1.'),
         model: z.string().min(1).describe('Model id as the chosen backend names it.'),
-        apiKey: z.string().min(1).describe('The API key to probe with. Never stored by this endpoint and never returned.'),
+        apiKey: z.string().describe('The key to probe with. BLANK means the key this workspace already stored — never a deployment default. Never stored by this endpoint and never returned.'),
     })
     .openapi('AiConnectionTestBody');
 

@@ -35,12 +35,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
 
-  // Fetch Stripe connect status + secrets in parallel.
-  // ai.status has no server route — omit it and default geminiConfigured to false.
-  const [stripeRes, secretsRes, testResultsRes] = await Promise.all([
+  // Fetch Stripe connect status + secrets + AI configuration in parallel.
+  const [stripeRes, secretsRes, testResultsRes, aiConfigRes] = await Promise.all([
     api.admin["stripe-connect"].$get().catch(() => null),
     api.secrets.secrets.$get().catch(() => null),
     api.integrations["test-results"].$get().catch(() => null),
+    api.integrationsAi.config.$get().catch(() => null),
   ]);
 
   let stripeConnected = false;
@@ -63,8 +63,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const testResults = await parseTestResults(testResultsRes);
 
+  // A failed read reads as "not configured yet", which is what an unreachable
+  // config and an unset one look like to the person on this page. The switch
+  // defaults to the column's own default rather than to a second opinion.
+  const aiCfgBody = aiConfigRes?.ok ? ((await aiConfigRes.json()) as { data?: { aiEnabled: boolean; aiBaseUrl: string; aiModel: string } }) : null;
+  const ai = aiCfgBody?.data ?? { aiEnabled: true, aiBaseUrl: "", aiModel: "" };
+
   return {
     config: { stripeConnected, stripeAccountId, geminiConfigured } as AdvancedConfig,
+    ai,
     secrets: {
       GEMINI_API_KEY: secrets.GEMINI_API_KEY || "",
       GOOGLE_PLACES_API_KEY: secrets.GOOGLE_PLACES_API_KEY || "",
@@ -148,24 +155,44 @@ export async function action({ request, context }: Route.ActionArgs) {
         test: null,
       };
     }
+    // The provider configuration is not a secret and does not live with the
+    // key. Saving it after the key means a rejected attestation leaves BOTH
+    // untouched, rather than storing an endpoint for a key that was refused.
+    const cfgRes = await api.integrationsAi.config.$put({
+      json: {
+        aiEnabled: fd.get("aiEnabled") === "on",
+        aiBaseUrl: String(fd.get("aiBaseUrl") ?? ""),
+        aiModel: String(fd.get("aiModel") ?? ""),
+      },
+    });
+    if (!cfgRes.ok) {
+      return { intent, success: false, error: m.settings_advanced_ai_save_error(), field: "aiBaseUrl", test: null };
+    }
     return { intent, success: true, error: null, field: null, test: null };
   }
 
-  if (intent === "test-gemini") {
-    const res = await api.integrations.gemini.test.$post();
+  if (intent === "test-ai") {
+    const res = await api.integrationsAi.test.$post({
+      json: {
+        baseUrl: String(fd.get("aiBaseUrl") ?? ""),
+        model: String(fd.get("aiModel") ?? ""),
+        apiKey: String(fd.get("aiApiKey") ?? ""),
+      },
+    });
+    // This endpoint always answers 200 — the outcome is IN the body, with
+    // `field` naming which input to blame. A transport failure and a rejected
+    // configuration are different things and only one of them has a field.
     const body = (await res.json().catch(() => null)) as
-      | { data?: { ok: true }; error?: { message?: string } }
+      | { data?: { ok: true } | { ok: false; field: string; message: string } }
       | null;
-    if (!res.ok || !body?.data) {
-      return {
-        intent,
-        success: false,
-        error: body?.error?.message ?? m.settings_connection_test_failed(),
-        field: null,
-        test: null,
-      };
+    const result = body?.data;
+    if (!result) {
+      return { intent, success: false, error: m.settings_connection_test_failed(), field: null, test: null };
     }
-    return { intent, success: true, error: null, field: null, test: body.data };
+    if (!result.ok) {
+      return { intent, success: false, error: result.message, field: result.field, test: null };
+    }
+    return { intent, success: true, error: null, field: null, test: { ok: true as const } };
   }
 
   if (intent === "save-advanced-secrets") {
@@ -231,7 +258,7 @@ export default function SettingsAdvancedPage() {
   );
 
   if ("forbidden" in loaderResult) return <AccessDenied />;
-  const { config, secrets, testResults } = loaderResult;
+  const { config, secrets, testResults, ai } = loaderResult;
 
   // Map a server `field` error back onto the matching SecretField.
   const secretFieldError = (name: string): string | undefined => {
@@ -292,6 +319,9 @@ export default function SettingsAdvancedPage() {
       <div id="ai-features" className="scroll-mt-12">
         <AiFeaturesPanel
           geminiConfigured={config.geminiConfigured}
+          aiEnabled={ai.aiEnabled}
+          aiBaseUrl={ai.aiBaseUrl}
+          aiModel={ai.aiModel}
           value={secrets.GEMINI_API_KEY}
           fieldError={secretFieldError}
           saving={savingAi}

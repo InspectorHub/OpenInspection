@@ -36,6 +36,7 @@ import coreAuthRoutes from './api/auth';
 import testHooksRoutes from './api/test-hooks';
 import identityRoutes from './api/identity';
 import integrationsApiRoutes from './api/integrations';
+import integrationsAiRoutes from './api/integrations-ai';
 import analyticsRoutes from './api/analytics';
 import billingRoutes from './api/billing';
 import usageRoutes from './api/usage';
@@ -325,6 +326,10 @@ const routes = app
   // Design System 0520 subsystem E — identity / integrations / analytics.
   .route('/api/identities', identityRoutes)
   .route('/api/integrations', integrationsApiRoutes)
+  // Its own base path, not a second router on /api/integrations: two routers
+  // under one path collapse to the first in the typed client, so the second's
+  // routes would exist at runtime and be uncallable from a loader.
+  .route('/api/integrations/ai', integrationsAiRoutes)
   .route('/api/analytics', analyticsRoutes)
   .route('/api/inspections', inspectionsRoutes)
   .route('/api/credentials', credentialsRoutes)

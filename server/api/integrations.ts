@@ -13,8 +13,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { requireRole } from '../lib/middleware/rbac';
-import { EmailValidateBodySchema, EmailValidateOkSchema, AiConnectionTestBodySchema, AiConnectionTestResultSchema } from '../lib/validations/integrations.schema';
-import { testAiConnection } from '../lib/ai/connection-test';
+import { EmailValidateBodySchema, EmailValidateOkSchema } from '../lib/validations/integrations.schema';
 import { resolveEmailProvider } from '../lib/email/resolve-provider';
 import { logger } from '../lib/logger';
 import { recordIntegrationTest, listIntegrationTestResults, type IntegrationTarget } from '../lib/integration-test-results';
@@ -96,7 +95,7 @@ const stripeWebhookLogRoute = createRoute(withMcpMetadata({
     description: 'Reads the per-tenant KV rolling log written by the Stripe webhook handler. Metadata only (timestamp, event type, result) — payloads are never stored. Backs the settings-page Recent Deliveries panel.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-// ─── POST /resend/test + /gemini/test ─────────────────────────────────────────
+// ─── POST /resend/test + /ai/test + PUT /ai/config ─────────────────────────────────────────
 
 const resendTestRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -111,44 +110,6 @@ const resendTestRoute = createRoute(withMcpMetadata({
     },
     operationId: 'testResendConnection',
     description: "Calls Resend GET /domains with the tenant's STORED API key (merged into env by the integration-secrets middleware) — the on-demand diagnostic behind the Communication settings Test connection button.",
-}, { scopes: ['admin'], tier: 'extended' }));
-
-const geminiTestRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/gemini/test',
-    tags: ['integrations'],
-    summary: 'Verify the stored Gemini API key against the live API',
-    middleware: [requireRole('owner', 'manager')],
-    responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ ok: z.literal(true) }) }).openapi('GeminiTestResponse') } }, description: 'Key is valid' },
-        502: { description: 'Google rejected the stored key' },
-        503: { description: 'No Gemini API key configured' },
-    },
-    operationId: 'testGeminiConnection',
-    description: "Calls the Gemini models list with the tenant's STORED bring-your-own key — the on-demand diagnostic behind the Advanced settings Test connection button.",
-}, { scopes: ['admin'], tier: 'extended' }));
-
-const aiTestRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/ai/test',
-    tags: ['integrations'],
-    summary: 'Probe a submitted AI endpoint, model and key',
-    middleware: [requireRole('owner', 'manager')],
-    request: {
-        body: { content: { 'application/json': { schema: AiConnectionTestBodySchema } } },
-    },
-    responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: AiConnectionTestResultSchema }).openapi('AiConnectionTestResponse') } }, description: 'Probe ran; `data.ok` says whether the configuration works' },
-    },
-    operationId: 'testAiConnection',
-    description: [
-        'Sends a one-token chat completion to the SUBMITTED base URL, model and key —',
-        'not to a stored credential and not to a deployment default. That is the whole',
-        'point: after the destination became something a workspace chooses, a probe of',
-        'anything else would go green while every real call failed. Always 200; the',
-        'outcome is in the body, with `field` naming which input to blame. The',
-        "provider's own response body is never returned or logged.",
-    ].join(' '),
 }, { scopes: ['admin'], tier: 'extended' }));
 
 // ─── POST /email/validate ─────────────────────────────────────────────────────
@@ -263,42 +224,6 @@ const integrationsRoutes = createApiRouter()
         const domains = await provider.countVerifiedDomains();
         await logTest(c.env, tenantId, uid, 'email', true, `Resend key valid${domains > 0 ? ` · ${domains} verified domain${domains === 1 ? '' : 's'}` : ''}.`, 'resend');
         return c.json({ success: true as const, data: { domains } }, 200);
-    })
-    .openapi(geminiTestRoute, async (c) => {
-        const env = c.env;
-        const tenantId = c.get('tenantId');
-        const uid = c.get('user')?.sub ?? null;
-        const key = env.GEMINI_API_KEY;
-        if (!key) {
-            await logTest(c.env, tenantId, uid, 'gemini', false, 'No Gemini API key is configured.');
-            return c.json({ success: false as const, error: { code: 'GEMINI_NOT_CONFIGURED', message: 'No Gemini API key is configured.' } }, 503);
-        }
-        const probe = await fetch(
-            `https://generativelanguage.googleapis.com/v1/models?pageSize=1&key=${encodeURIComponent(key)}`,
-        ).catch(() => null);
-        if (!probe || !probe.ok) {
-            await logTest(c.env, tenantId, uid, 'gemini', false, 'Google rejected the stored Gemini API key.');
-            return c.json({ success: false as const, error: { code: 'GEMINI_KEY_INVALID', message: 'Google rejected the stored Gemini API key.' } }, 502);
-        }
-        await logTest(c.env, tenantId, uid, 'gemini', true, 'Gemini API key valid.');
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(aiTestRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const uid = c.get('user')?.sub ?? null;
-        const body = c.req.valid('json');
-        const result = await testAiConnection(body);
-        // The stored target key is still 'gemini'. It is a LEGACY LABEL for
-        // "the AI integration", kept because existing rows carry it and the
-        // settings grid keys off it; it no longer names a vendor, and the
-        // engine no longer has one. Renaming it is its own pass across the
-        // schema enum, the service and the settings UI.
-        //
-        // `detail` carries the FIELD that failed — never the message shown to
-        // the workspace, and never the provider's own words.
-        await logTest(c.env, tenantId, uid, 'gemini', result.ok,
-            result.ok ? 'AI endpoint accepted a test completion.' : `AI endpoint test failed on: ${result.field}.`);
-        return c.json({ success: true as const, data: result }, 200);
     })
     .openapi(emailValidateRoute, async (c) => {
         const { provider } = c.req.valid('json');

@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Form, type useFetcher } from "react-router";
-import { Checkbox } from "@core/shared-ui";
+import { Checkbox, Input } from "@core/shared-ui";
 import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
@@ -8,6 +9,11 @@ import { m } from "~/paraglide/messages";
 
 interface AiFeaturesPanelProps {
   geminiConfigured: boolean;
+  /** Whether this workspace may be offered AI at all — a provisioning answer,
+   *  not a permission. Whether a given call runs is decided server-side. */
+  aiEnabled: boolean;
+  aiBaseUrl: string;
+  aiModel: string;
   value: string;
   fieldError: (name: string) => string | undefined;
   saving: boolean;
@@ -16,8 +22,15 @@ interface AiFeaturesPanelProps {
   testResults?: ConnectionTestResult[];
 }
 
-export function AiFeaturesPanel({ geminiConfigured, value, fieldError, saving, geminiTestFetcher, testResults = [] }: AiFeaturesPanelProps) {
-  const geminiTest = geminiTestFetcher.data;
+export function AiFeaturesPanel({ geminiConfigured, aiEnabled, aiBaseUrl, aiModel, value, fieldError, saving, geminiTestFetcher, testResults = [] }: AiFeaturesPanelProps) {
+  const aiTest = geminiTestFetcher.data;
+  // Held in state so the Test button can probe what is ON SCREEN rather than
+  // what was last saved — testing the saved value would answer a question
+  // nobody asked, which is the defect the old Gemini probe had.
+  const [baseUrl, setBaseUrl] = useState(aiBaseUrl);
+  const [model, setModel] = useState(aiModel);
+  const [apiKey, setApiKey] = useState("");
+  const testField = aiTest && "intent" in aiTest && aiTest.intent === "test-ai" ? aiTest.field : null;
 
   return (
     <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
@@ -31,13 +44,10 @@ export function AiFeaturesPanel({ geminiConfigured, value, fieldError, saving, g
           {geminiConfigured ? m.settings_ai_configured() : m.settings_ai_not_configured()}
         </span>
       </div>
-      <p className="text-[13px] text-ih-fg-3">
-        {m.settings_ai_desc()}{" "}
-        <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer"
-          className="text-ih-primary-text hover:underline">
-          aistudio.google.com
-        </a>.
-      </p>
+      {/* No vendor link. The destination is whatever endpoint this workspace
+          configures, so naming one provider here would be the same defect the
+          old Test button had: describing a fixed vendor the engine no longer has. */}
+      <p className="text-[13px] text-ih-fg-3">{m.settings_ai_desc()}</p>
       <Form method="post" className="space-y-3 max-w-xl">
         <input type="hidden" name="intent" value="save-ai" />
         {/* Lets the action accept a confirmation for a key that is already
@@ -49,7 +59,39 @@ export function AiFeaturesPanel({ geminiConfigured, value, fieldError, saving, g
           value={value}
           error={fieldError("GEMINI_API_KEY")}
           hint={m.settings_ai_key_hint()}
+          onChange={setApiKey}
         />
+        <Input
+          id="aiBaseUrl"
+          name="aiBaseUrl"
+          label={m.settings_ai_base_url_label()}
+          value={baseUrl}
+          onChange={(e) => setBaseUrl(e.currentTarget.value)}
+          placeholder="https://api.example.com/v1"
+          error={testField === "baseUrl" ? typeof aiTest?.error === "string" ? aiTest.error : undefined : fieldError("aiBaseUrl")}
+          hint={m.settings_ai_base_url_hint()}
+        />
+        <Input
+          id="aiModel"
+          name="aiModel"
+          label={m.settings_ai_model_label()}
+          value={model}
+          onChange={(e) => setModel(e.currentTarget.value)}
+          error={testField === "model" ? typeof aiTest?.error === "string" ? aiTest.error : undefined : fieldError("aiModel")}
+          hint={m.settings_ai_model_hint()}
+        />
+        <div>
+          <Checkbox
+            name="aiEnabled"
+            value="on"
+            defaultChecked={aiEnabled}
+            label={m.settings_ai_enabled_label()}
+          />
+          {/* The one line of helper text this panel gets. It is here because it
+              states a promise the save path has to keep, not because a checkbox
+              needs explaining. */}
+          <p className="text-[12px] text-ih-fg-3 mt-1 ml-6">{m.settings_ai_enabled_hint()}</p>
+        </div>
 
         {/*
           Disclosure, then attestation — two different things on purpose. The
@@ -83,13 +125,19 @@ export function AiFeaturesPanel({ geminiConfigured, value, fieldError, saving, g
         </div>
       </Form>
 
-      {/* Test connection — probes the STORED Gemini key, no re-entry needed */}
-      <TestConnectionButton fetcher={geminiTestFetcher} intent="test-gemini">
-        {geminiTest && "intent" in geminiTest && geminiTest.intent === "test-gemini" && geminiTest.test && (
-          <span className="text-[12px] text-ih-fg-2">{m.settings_ai_key_valid()}</span>
+      {/* Probes what is ON SCREEN. A blank key falls back to the one this
+          workspace already stored — never to a deployment default, which is
+          how the endpoint this replaced could go green on a configuration no
+          tenant call ever used. */}
+      <TestConnectionButton fetcher={geminiTestFetcher} intent="test-ai">
+        <input type="hidden" name="aiBaseUrl" value={baseUrl} />
+        <input type="hidden" name="aiModel" value={model} />
+        <input type="hidden" name="aiApiKey" value={apiKey} />
+        {aiTest && "intent" in aiTest && aiTest.intent === "test-ai" && aiTest.test && (
+          <span className="text-[12px] text-ih-fg-2">{m.settings_ai_test_ok()}</span>
         )}
-        {geminiTest && "intent" in geminiTest && geminiTest.intent === "test-gemini" && "success" in geminiTest && !geminiTest.success && (
-          <span className="text-[12px] text-ih-bad-fg">{geminiTest.error}</span>
+        {aiTest && "intent" in aiTest && aiTest.intent === "test-ai" && "success" in aiTest && !aiTest.success && !aiTest.field && (
+          <span className="text-[12px] text-ih-bad-fg">{aiTest.error}</span>
         )}
       </TestConnectionButton>
 

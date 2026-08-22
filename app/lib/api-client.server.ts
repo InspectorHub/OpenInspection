@@ -35,6 +35,7 @@ import type {
     InspectionSyncApi,
     InspectionTagApi,
     IntegrationsApi,
+    IntegrationsAiApi,
     InvoicesApi,
     MarketplaceApi,
     McpGrantsApi,
@@ -166,6 +167,7 @@ export interface Api {
     inspectionSync:     ReturnType<typeof hc<InspectionSyncApi>>;
     inspectionTag:      ReturnType<typeof hc<InspectionTagApi>>;
     integrations:       ReturnType<typeof hc<IntegrationsApi>>;
+    integrationsAi:     ReturnType<typeof hc<IntegrationsAiApi>>;
     imports:            ReturnType<typeof hc<MigrationIntakeApi>>;
     invoices:           ReturnType<typeof hc<InvoicesApi>>;
     marketplace:        ReturnType<typeof hc<MarketplaceApi>>;
@@ -253,6 +255,7 @@ const MOUNT: Record<keyof Api, string> = {
     inspectionSync:     "/api/inspections",
     inspectionTag:      "/api/inspections",
     integrations:       "/api/integrations",
+    integrationsAi:     "/api/integrations/ai",
     imports:            "/api/imports",
     invoices:           "/api/invoices",
     marketplace:        "/api/templates/marketplace",
@@ -352,6 +355,7 @@ export function createApi(context: LoadContext, opts: CreateApiOptions = {}): Ap
         inspectionSync:     mk<InspectionSyncApi>(MOUNT.inspectionSync),
         inspectionTag:      mk<InspectionTagApi>(MOUNT.inspectionTag),
         integrations:       mk<IntegrationsApi>(MOUNT.integrations),
+        integrationsAi:     mk<IntegrationsAiApi>(MOUNT.integrationsAi),
         imports:            mk<MigrationIntakeApi>(MOUNT.imports),
         invoices:           mk<InvoicesApi>(MOUNT.invoices),
         marketplace:        mk<MarketplaceApi>(MOUNT.marketplace),

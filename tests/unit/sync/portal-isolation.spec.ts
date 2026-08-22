@@ -116,7 +116,12 @@ describe('SaaS-Portal isolation', () => {
     const hits = gitGrepFiles(`(from|import\\()[[:space:]]*['"][^'"]*portal/`, 'server');
     const ALLOWED_IMPORTERS = [
       'server/index.ts',
-      'server/scheduled.ts',
+      // Was `server/scheduled.ts`. The cron refactor moved the job bodies out of
+      // that file into `server/cron/jobs/*`, so the scheduled composition point
+      // moved with them — same architecture, new address. `scheduled.ts` now
+      // imports nothing from portal at all, which is why it is gone from here
+      // rather than kept alongside.
+      'server/cron/jobs/integrations.ts',
       'server/lib/middleware/di.ts',
     ];
     const stray = hits.filter(

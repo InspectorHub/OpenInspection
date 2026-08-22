@@ -21,6 +21,7 @@ export function SecretField({
   emptyPlaceholder = "Not configured",
   emptyBadge = "",
   type = "password",
+  onChange,
 }: {
   name: string;
   label: string;
@@ -29,6 +30,10 @@ export function SecretField({
   hint?: string;
   /** Validation error to render under the field (conditional only). */
   error?: string;
+  /** Notified as the field is typed into, so a sibling control can probe the
+   *  value on screen rather than the one last saved. The field keeps owning
+   *  its own state — this only mirrors it out. */
+  onChange?: (value: string) => void;
   /**
    * What an empty field means, when it does not mean "unset". A key this
    * deployment supplies through its Worker env is in force but has no stored
@@ -99,7 +104,7 @@ export function SecretField({
           placeholder={isSet ? "" : emptyPlaceholder}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={(e) => { setInputValue(e.target.value); onChange?.(e.target.value); }}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"

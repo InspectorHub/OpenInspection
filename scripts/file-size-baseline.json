@@ -12,7 +12,7 @@
   "server/services/inspection.service.ts": 742,
   "server/api/inspections/report-delivery.ts": 736,
   "app/routes/template-edit.tsx": 721,
-  "server/index.ts": 736,
+  "server/index.ts": 741,
   "app/components/media-studio/PhotoAnnotator.tsx": 692,
   "app/hooks/usePhotoOps.ts": 670,
   "app/components/editor/ItemEditor.tsx": 658,

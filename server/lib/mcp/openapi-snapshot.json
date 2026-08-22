@@ -7136,6 +7136,22 @@
     "description": "Returns the deployment's current agent-terms version, its content hash, and the body to display at signup. 404 when the deployment has published none — in which case agent signup is closed."
   },
   {
+    "operationId": "getAiConfig",
+    "method": "GET",
+    "pathTemplate": "/api/integrations/ai/config",
+    "scopes": [
+      "read"
+    ],
+    "tag": "integrations",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Read this workspace's AI endpoint, model and switch",
+    "description": "Never returns a credential — the key lives in encrypted secrets and is surfaced separately."
+  },
+  {
     "operationId": "getBookingAvailability",
     "method": "GET",
     "pathTemplate": "/api/public/availability/{inspectorId}",
@@ -17479,6 +17495,24 @@
     "description": "Records one explicit choice against the agent's contact row at one company, or at every company currently linked to them when scope is \"all\". A choice that matches the class default deletes the row rather than storing it."
   },
   {
+    "operationId": "saveAiConfig",
+    "method": "PUT",
+    "pathTemplate": "/api/integrations/ai/config",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "integrations",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/AiConfigBody"
+      }
+    },
+    "summary": "Store this workspace's AI endpoint, model and switch",
+    "description": "Blank values mean UNSET and are stored as null, which is how a workspace clears a destination. Turning the switch off keeps the endpoint and model — the control says so, and this is what makes that true. Every save bumps a version so anything holding a resolved endpoint can tell it is stale."
+  },
+  {
     "operationId": "saveEmailTemplate",
     "method": "PUT",
     "pathTemplate": "/api/admin/email-templates/{trigger}",
@@ -18432,22 +18466,6 @@
     },
     "summary": "Probe a submitted AI endpoint, model and key",
     "description": "Sends a one-token chat completion to the SUBMITTED base URL, model and key — not to a stored credential and not to a deployment default. That is the whole point: after the destination became something a workspace chooses, a probe of anything else would go green while every real call failed. Always 200; the outcome is in the body, with `field` naming which input to blame. The provider's own response body is never returned or logged."
-  },
-  {
-    "operationId": "testGeminiConnection",
-    "method": "POST",
-    "pathTemplate": "/api/integrations/gemini/test",
-    "scopes": [
-      "admin"
-    ],
-    "tag": "integrations",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [],
-      "body": null
-    },
-    "summary": "Verify the stored Gemini API key against the live API",
-    "description": "Calls the Gemini models list with the tenant's STORED bring-your-own key — the on-demand diagnostic behind the Advanced settings Test connection button."
   },
   {
     "operationId": "testResendConnection",
