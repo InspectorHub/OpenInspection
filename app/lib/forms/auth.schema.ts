@@ -145,6 +145,22 @@ export function makeAgentSignupSchema() {
 }
 
 /**
+ * The same tick, for an account that already exists (`/agent-accept-terms`).
+ *
+ * Deliberately its own schema rather than a `.pick()` off the signup one. They
+ * validate different forms with different fields, and the day signup gains a
+ * field, a derived schema would either drag it onto this page or need a second
+ * edit anyway. The one field they share is the one that matters, and it carries
+ * the same message on both.
+ */
+export function makeAgentTermsAcceptSchema() {
+  return z.object({
+    agentTerms: requiredText(m.auth_validation_agent_terms_required())
+      .refine((v) => v === "on", m.auth_validation_agent_terms_required()),
+  });
+}
+
+/**
  * Task 5 — core agent password login (`/agent-login`, primary form). Mirrors
  * the API's `AgentLoginSchema` (server/lib/validations/agent-login.schema.ts):
  * email + password min(1) — this authenticates an EXISTING account, so no

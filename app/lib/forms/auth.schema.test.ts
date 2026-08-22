@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, afterEach } from 'vitest';
-import { makeForgotPasswordSchema, makeResetPasswordSchema, makePasswordHint, makeLoginSchema } from './auth.schema';
+import { makeForgotPasswordSchema, makeResetPasswordSchema, makePasswordHint, makeLoginSchema, makeAgentSignupSchema } from './auth.schema';
 import { overwriteGetLocale } from '~/paraglide/runtime';
 import { m } from '~/paraglide/messages';
 
@@ -13,6 +13,64 @@ describe('makeForgotPasswordSchema', () => {
   });
   it('rejects a malformed email', () => {
     expect(makeForgotPasswordSchema().safeParse({ email: 'nope' }).success).toBe(false);
+  });
+});
+
+/**
+ * The agent-terms tick is the only thing standing between an OAuth visitor and
+ * an account created with no recorded acceptance, and nothing pinned it.
+ *
+ * The path that makes this load-bearing: a Google sign-in whose email has no
+ * agent account is not an error — portal bounces it to `/agent-signup?email=…`
+ * with the address pre-filled. So the busiest way into this form arrives with
+ * one field already answered and momentum behind it. The server refuses without
+ * an acceptance too (`server/services/agent/signup.ts`), and that is the real
+ * guard; this is the one the person actually meets.
+ *
+ * `signup.tsx`'s action sends `termsAccepted: true` as a literal, and it is
+ * right to — reaching the action means `parseWithZod` already passed. That is
+ * exactly why the schema needs its own test: delete the refine and the hardcoded
+ * `true` becomes a lie that nothing else in the suite contradicts.
+ */
+describe('makeAgentSignupSchema — the tick', () => {
+  const VALID = {
+    name: 'Dana Agent',
+    email: 'dana@example.com',
+    password: 'CorrectHorse123!Battery',
+    agentTerms: 'on',
+  };
+
+  // What a browser actually posts with the box unticked: the field is ABSENT,
+  // not empty. Written out rather than derived by subtracting a key from VALID
+  // — the shape under test should be readable without running the subtraction.
+  const WITHOUT_TICK = { name: VALID.name, email: VALID.email, password: VALID.password };
+
+  // The positive control. Without it, a schema that rejected EVERYTHING would
+  // satisfy every other assertion here.
+  it('accepts a submission with the box ticked', () => {
+    expect(makeAgentSignupSchema().safeParse(VALID).success).toBe(true);
+  });
+
+  it('rejects a submission with the box UNTICKED — an absent field, which is what a browser sends', () => {
+    expect(makeAgentSignupSchema().safeParse(WITHOUT_TICK).success).toBe(false);
+  });
+
+  it('rejects a value that is present but is not the tick', () => {
+    // A hand-crafted POST, or a checkbox given a `value` other than the default.
+    expect(makeAgentSignupSchema().safeParse({ ...VALID, agentTerms: 'off' }).success).toBe(false);
+    expect(makeAgentSignupSchema().safeParse({ ...VALID, agentTerms: 'true' }).success).toBe(false);
+    expect(makeAgentSignupSchema().safeParse({ ...VALID, agentTerms: '' }).success).toBe(false);
+  });
+
+  // The refusal has to be attributable, or a form shows "something is wrong"
+  // beside the wrong field. Both shapes above must name THIS field.
+  it('attributes the failure to agentTerms in both the absent and the wrong-value case', () => {
+    for (const input of [WITHOUT_TICK, { ...VALID, agentTerms: 'off' }]) {
+      const res = makeAgentSignupSchema().safeParse(input);
+      expect(res.success).toBe(false);
+      if (res.success) continue;
+      expect(res.error.issues.some(i => i.path[0] === 'agentTerms')).toBe(true);
+    }
   });
 });
 

@@ -6,6 +6,7 @@ import type {
     AgentsApi,
     AgentSignupApi,
     AgentLoginApi,
+    AgentTermsApi,
     AgentMagicLoginRequestApi,
     AiApi,
     AnalyticsApi,
@@ -134,6 +135,10 @@ export interface Api {
     // `typeof <router>` types) — merging them into one hc<T> would hit the same
     // structural-check depth limit this per-module split exists to avoid (C-10).
     agentMagicLogin:    ReturnType<typeof hc<AgentMagicLoginRequestApi>>;
+    // POST /api/agent/accept-terms — the door in the agent-terms gate. Its own
+    // key at the same mount for the same hono/client type-collapse reason as
+    // agentLogin/agentMagicLogin above (C-10).
+    agentTerms:         ReturnType<typeof hc<AgentTermsApi>>;
     ai:                 ReturnType<typeof hc<AiApi>>;
     analytics:          ReturnType<typeof hc<AnalyticsApi>>;
     auth:               ReturnType<typeof hc<CoreAuthApi>>;
@@ -220,6 +225,7 @@ const MOUNT: Record<keyof Api, string> = {
     agentSignup:        "/api/agent-signup",
     agentLogin:         "/api/agent",
     agentMagicLogin:    "/api/agent",
+    agentTerms:         "/api/agent",
     ai:                 "/api/ai",
     analytics:          "/api/analytics",
     auth:               "/api/auth",
@@ -318,6 +324,7 @@ export function createApi(context: LoadContext, opts: CreateApiOptions = {}): Ap
         agentSignup:        mk<AgentSignupApi>(MOUNT.agentSignup),
         agentLogin:         mk<AgentLoginApi>(MOUNT.agentLogin),
         agentMagicLogin:    mk<AgentMagicLoginRequestApi>(MOUNT.agentMagicLogin),
+        agentTerms:         mk<AgentTermsApi>(MOUNT.agentTerms),
         ai:                 mk<AiApi>(MOUNT.ai),
         analytics:          mk<AnalyticsApi>(MOUNT.analytics),
         auth:               mk<CoreAuthApi>(MOUNT.auth),

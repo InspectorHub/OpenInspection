@@ -295,14 +295,36 @@ export default defineConfig({
         { name: 'people-role-profiles', testMatch: 'people-role-profiles.spec.ts', dependencies: ['editor-seed'] },
         // Workspace responsive smoke — the authenticated counterpart to
         // public-pages-responsive. Depends on editor-seed for a login.
+        //
         // It also depends on `people-role-profiles`, which is NOT a data
-        // dependency — it is a scheduling one. This spec opens by POSTing 25
-        // long-string contacts in beforeAll, and it already allows itself 60s
-        // just for the worker to answer /status; people-role-profiles runs
-        // three UI logins against that same worker and was the project whose
-        // budget was thinnest. Both were released together by the shared
-        // `editor-seed` dependency, so the burst landed exactly on top of the
-        // logins. Ordering them costs one serial slot and removes the window.
+        // dependency — it is a scheduling one. The rationale originally written
+        // here was: "This spec opens by POSTing 25 long-string contacts in
+        // beforeAll … so the burst landed exactly on top of the logins."
+        //
+        // ⚠️ THAT RATIONALE WAS FACTUALLY WRONG, and is kept above rather than
+        // deleted because it is the reasoning anyone auditing this line will
+        // otherwise reconstruct. THE BURST NEVER HAPPENED. The spec's
+        // `beforeAll` logged in with `POST /api/auth/login`, which carries
+        // `requireCsrfToken`; without the double-submit pair it 403s, the hook
+        // read no cookie and `return`ed, and it silently skipped BOTH the
+        // 25-contact fixture AND the /status readiness poll. Measured from the
+        // worker log: 2 × `POST /api/contacts 201` per run (the two this
+        // project's own tests create), never 27. So this dependency was
+        // ordering against contention that did not exist.
+        //
+        // The login is fixed (`csrfHeaders()` on that call, in the spec's
+        // `beforeAll`). After the fix a run logged 27 contacts created, zero
+        // 403s, 54 passed — i.e. the burst described above exists for the FIRST
+        // time now. That is what this dependency is worth today: not a repair of
+        // an observed collision, but one serial slot spent so the newly-real
+        // 25-request burst and people-role-profiles' three UI logins are not
+        // released simultaneously by their shared `editor-seed` dependency. It
+        // is kept on that prospective basis, stated plainly, rather than removed
+        // on the grounds that its original justification was fiction.
+        //
+        // It is NOT a fix for the intermittent `contacts @ ipad-portrait` stall
+        // documented at the top of the spec — that one is a workerd request
+        // delivery gap, and no amount of scheduling touches it.
         { name: 'workspace-pages-responsive', testMatch: 'workspace-pages-responsive.spec.ts', dependencies: ['editor-seed', 'people-role-profiles'] },
         // Issue #250 — settings-communication sticky section-nav (scroll-spy).
         { name: 'settings-communication-nav', testMatch: 'settings-communication-nav.spec.ts', dependencies: ['editor-seed'] },

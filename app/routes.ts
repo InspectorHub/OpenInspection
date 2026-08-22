@@ -85,6 +85,11 @@ export default [
   route("agent-signup", "routes/agent/signup.tsx"),
   // Spec 3 Task 5 — core dual-mode agent front door (password + magic-link).
   route("agent-login", "routes/agent/login.tsx"),
+  // The way out of the agent-terms gate. Standalone on purpose: agent-layout's
+  // loader is what redirects a gated agent here, so a page under that layout
+  // would redirect to itself. Keeps the `agent-` prefix so loginPathFor() sends
+  // an expired session on this page to the agent door, not the staff one.
+  route("agent-accept-terms", "routes/agent/accept-terms.tsx"),
   // Error / utility pages (bare, outside auth)
   route("not-found", "routes/not-found.tsx"),
   route("feature-disabled", "routes/feature-disabled.tsx"),

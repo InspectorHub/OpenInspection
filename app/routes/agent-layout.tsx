@@ -2,6 +2,7 @@ import { Outlet, NavLink, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/agent-layout";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { throwIfAgentTermsRequired } from "~/lib/agent-terms.server";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { AgentNoticeBell } from "~/components/agent/AgentNoticeBell";
 import type { NoticeRowData } from "~/lib/notice-view";
@@ -15,10 +16,34 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // no personal override (dates then follow each inspecting company's tz).
   let timezone: string | null = null;
   const api = createApi(context, { token });
+
+  // Fetched OUTSIDE the try below, and this is load-bearing rather than a style
+  // choice. `throwIfAgentTermsRequired` signals by THROWING a redirect, and a
+  // bare `catch` around it swallows that redirect as if it were a failed
+  // timezone read — the agent would then sit on a data-less page forever
+  // instead of being sent to the one screen that fixes it.
+  let profileRes: Awaited<ReturnType<typeof api.agent.profile.$get>> | null = null;
   try {
-    const res = await api.agent.profile.$get();
-    if (res.ok) {
-      const body = (await res.json()) as { data?: { timezone?: string | null } };
+    profileRes = await api.agent.profile.$get();
+  } catch {
+    profileRes = null;
+  }
+
+  // The agent-terms gate refuses every authenticated agent request with 428
+  // until the terms in force are accepted
+  // (server/lib/middleware/agent-terms-gate.ts). This turns that refusal into
+  // the screen that resolves it, carrying where they were trying to go.
+  //
+  // Read off a call this loader already makes rather than asking a status
+  // endpoint of its own: every agent page runs this loader, so one extra round
+  // trip here is one extra round trip everywhere. The gate is what actually
+  // refuses — this is the redirect, not the enforcement — so the worst a miss
+  // here can do is leave an agent on a page with no data.
+  if (profileRes) await throwIfAgentTermsRequired(profileRes, request);
+
+  try {
+    if (profileRes?.ok) {
+      const body = (await profileRes.json()) as { data?: { timezone?: string | null } };
       timezone = body.data?.timezone ?? null;
     }
   } catch {

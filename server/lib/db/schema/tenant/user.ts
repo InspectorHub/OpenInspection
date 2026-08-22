@@ -71,7 +71,7 @@ export const users = sqliteTable('users', {
     // role-extension columns of the apprentice / specialist / guest subsystems,
     // all three removed 2026-06-13. They were marked DEAD and kept, and stayed
     // dead: a grep of every production path found no reader and no writer.
-    // Account soft-delete marker — set by POST /api/account/delete after
+    // Account soft-delete marker — set by POST /api/identities/account/delete after
     // the user retypes their email to confirm. NULL = active. Kept rather
     // than hard-deleted so audit-linked rows remain referentially intact.
     deletedAt:            integer('deleted_at', { mode: 'timestamp_ms' }),

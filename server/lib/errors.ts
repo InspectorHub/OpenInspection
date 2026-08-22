@@ -34,6 +34,14 @@ export enum ErrorCode {
     // UI renders the "what still works + BYO escape hatch" copy off it, and an
     // operator reading logs can tell a deliberate refusal from a provider outage.
     OUTBOUND_COOLING_WINDOW = 'OUTBOUND_COOLING_WINDOW',
+    // An authenticated agent has no acceptance of the agent terms in force. A
+    // code of its own, not a 401 or a 403, because the three answer different
+    // questions and the client has to tell them apart: 401 says "sign in", 403
+    // says "you may not do this at all", and this one says "you are signed in,
+    // your account is fine, and there is one document to read first". Collapsing
+    // it into either of the others would send the agent back to a login page
+    // they just came from, or to a dead end with no action available.
+    AGENT_TERMS_REQUIRED = 'AGENT_TERMS_REQUIRED',
 }
 
 /**
@@ -102,6 +110,38 @@ export const Errors = {
             403,
             ErrorCode.OUTBOUND_COOLING_WINDOW,
             `New companies cannot send client email on the shared sender for the first ${details.windowHours} hours. Everything else works, and connecting your own email provider removes the wait entirely.`,
+            details,
+        ),
+    /**
+     * 428 Precondition Required — the request must satisfy a precondition the
+     * caller can meet, and the body says which one.
+     *
+     * 428 rather than 401/403: the session is valid and the account is in good
+     * standing, so neither of those is true. It is also unused anywhere else in
+     * this API, so a 428 on an agent route means this and nothing else — checked
+     * before adopting it, because a status shared with a second meaning is a
+     * status a client cannot branch on.
+     *
+     * `details.acceptPath` is in the payload rather than assumed by the client:
+     * the page that collects the acceptance is this deployment's, and a client
+     * hard-coding the path would have to be redeployed to follow it.
+     */
+    AgentTermsRequired: (details: {
+        /**
+         * Which fact stopped the request. Only the two refusing states can reach
+         * here — `NOT_IN_FORCE` and `ACCEPTED` both pass the gate, and the type
+         * says so rather than leaving it to a comment.
+         */
+        state: 'REQUIRED' | 'UNREADABLE';
+        /** What the agent can do about it. An outage is not their move to make. */
+        reason: 'never_accepted' | 'superseded' | 'unreadable';
+        acceptPath: string;
+        requiredVersion: string | null;
+    }) =>
+        new AppError(
+            428,
+            ErrorCode.AGENT_TERMS_REQUIRED,
+            'The agent terms in force have not been accepted on this account.',
             details,
         ),
 };

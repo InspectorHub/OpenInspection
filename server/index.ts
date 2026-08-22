@@ -26,6 +26,7 @@ import { r2Keys } from './lib/r2-keys';
 import { setupWizardRoutes } from './features/setup-wizard';
 
 import { jwtAuthMiddleware } from './lib/middleware/jwt-auth';
+import { agentTermsGate } from './lib/middleware/agent-terms-gate';
 import { idempotencyMiddleware } from './lib/middleware/idempotency';
 import { agreementSignPath, agreementRenderPath } from './lib/public-urls';
 import { loadVerifyData } from './lib/verify-data';
@@ -57,6 +58,7 @@ import { agentMagicLoginRequestRoutes, agentMagicLoginRedeemRoutes } from './api
 import { agentReportContextRoutes } from './api/agent/report-context'; // Spec 3 Task 3
 import { agentNoticeRoutes } from './api/agent/notices'; // C3 — agent Notices inbox
 import { agentLoginRoutes } from './api/agent/login'; // Spec 3 Task 5
+import { agentTermsRoutes } from './api/agent/terms'; // the way out of the agent-terms gate
 import placesRoutes from './api/places';
 import { availabilityRoutes } from './api/availability';
 import calendarRoutes from './api/calendar';
@@ -253,6 +255,14 @@ app.use('*', enforceTenantActive);
 // eslint.config.js), and authentication code must not be.
 app.use('*', jwtAuthMiddleware);
 
+// The agent terms, in front of every authenticated agent request. Position is
+// load-bearing and pinned by tests/unit/legal/agent-terms-gate.spec.ts: AFTER
+// the JWT middleware (which is what sets the `agentUserId` this reads) and
+// BEFORE the idempotency guard (a stored 428 would be replayed to an agent who
+// has since accepted). Why it is on `*` rather than on the agent route groups is
+// in the middleware's own header.
+app.use('*', agentTermsGate);
+
 // Idempotency guard (portal #107) — claims an `Idempotency-Key`, replays the
 // stored response on a repeat, and answers 409 while the first attempt is still
 // running. MUST stay AFTER the JWT middleware: the key is scoped to the
@@ -400,6 +410,8 @@ const routes = app
   // Spec 3 Task 5 — POST /api/agent/login + POST /api/agent/login-link (core
   // dual-mode front door: password primary, magic-link fallback).
   .route('/api/agent', agentLoginRoutes)
+  // POST /api/agent/accept-terms — the door in the agent-terms gate.
+  .route('/api/agent', agentTermsRoutes)
   // Agent Accounts A1 — invite + accept endpoints
   .route('/api/agents', agentsRoutes)
   // Agent Accounts A1 — self-serve signup

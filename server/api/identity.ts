@@ -1,8 +1,15 @@
 /**
  * GDPR/CCPA account export + soft-delete routes.
  *
- *   POST /api/identity/account/export — export the caller's account data
- *   POST /api/identity/account/delete — soft-delete the caller's account
+ *   POST /api/identities/account/export — export the caller's account data
+ *   POST /api/identities/account/delete — soft-delete the caller's account
+ *
+ * The mount is `/api/identities` (PLURAL, `server/index.ts`) and these two lines
+ * are the full paths, not the route-relative ones. The export line said
+ * `/api/identity/…` until 2026-08-21, which mattered more than a stale comment
+ * usually does: `server/lib/middleware/agent-terms-gate.ts` exempts both of
+ * these by EXACT string, and a reader who trusted this header would have written
+ * an exemption that matched nothing.
  */
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';

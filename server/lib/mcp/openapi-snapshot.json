@@ -28,6 +28,22 @@
     "description": "Deletes a run that was never applied, together with its prepared entries and the file it was created from. A run that has been applied cannot be deleted, because its entries are the only record of where the imported rows came from."
   },
   {
+    "operationId": "acceptAgentTerms",
+    "method": "POST",
+    "pathTemplate": "/api/agent/accept-terms",
+    "scopes": [],
+    "tag": "agents",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/AgentTermsAcceptBody"
+      }
+    },
+    "summary": "Record that the signed-in agent accepts the agent terms in force",
+    "description": "Records the agent terms acceptance on the signed-in agent account. The version and content hash stored are read server-side from the document in force; the caller supplies only the tick and the hash of the body it rendered, and a body that no longer matches the text in force is refused so a stale page cannot record an acceptance of a version its signer was never shown. Requires an agent session — this is the one authenticated agent route the agent-terms gate lets through, because it is the way out of that gate."
+  },
+  {
     "operationId": "acknowledgeTenantImport",
     "method": "POST",
     "pathTemplate": "/api/admin/import/acknowledge",

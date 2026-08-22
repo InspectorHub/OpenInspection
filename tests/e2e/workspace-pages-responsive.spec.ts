@@ -24,6 +24,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { readEditorSeed } from './helpers/editor-seed';
+import { csrfHeaders } from './helpers/csrf';
 
 const BASE_URL = 'http://127.0.0.1:8789';
 
@@ -120,9 +121,20 @@ async function overflowCulprits(page: Page): Promise<string[]> {
 }
 
 /**
- * ⚠️ OPEN, UNDIAGNOSED — `contacts @ ipad-portrait` fails deterministically when
- * this project runs on its own (`--workers=1`), and passes in the full suite at
- * `workers: 3`. Verified 2026-08-05 across eight runs.
+ * ⚠️ OPEN — `contacts @ ipad-portrait` sometimes stalls when this project runs
+ * on its own (`--workers=1`); it has not been seen to stall in the full suite at
+ * `workers: 3`.
+ *
+ * ── CORRECTION (2026-08-21): INTERMITTENT, not deterministic ────────────────
+ * This note used to open with "fails deterministically … verified 2026-08-05
+ * across eight runs". That sentence is WITHDRAWN, and kept visible here because
+ * it is the claim a reader is most likely to arrive holding. What actually
+ * happened: it reproduced 4/4 inside one ~20-minute window, and then passed 6
+ * consecutive times on a byte-identical tree, with no controlled variable
+ * explaining where the boundary between those two stretches fell. So a green
+ * run is not evidence that it is fixed, and a red run is not evidence that a
+ * change caused it. Anything written here — or in a commit message — that
+ * asserts determinism about this failure is wrong.
  *
  * The failure is always the FIRST test in the matrix, never any of the other 49
  * that issue the identical `beforeEach` navigation: `page.goto('/login')` never
@@ -130,8 +142,28 @@ async function overflowCulprits(page: Page): Promise<string[]> {
  * reported as `net::ERR_ABORTED; maybe frame was detached`, which looks like a
  * navigation bug and is really the teardown.
  *
+ * ── CORRECTION: NO TIMEOUT CAN EVER HELP, and the arithmetic says why ───────
+ * The stall length EQUALS the test timeout — it does not merely exceed it:
+ *
+ *   default 30s      → the request eventually logged `200 OK (37007ms)`
+ *   --timeout=120000 → the same request logged `200 OK (128053ms)`
+ *
+ * The queued request is released when the CLIENT disconnects (~7–8s after the
+ * timeout fires, which matches `browserContext.close`), not by any server-side
+ * progress. Raising the timeout therefore RAISES the stall; it can never outrun
+ * it. Anyone reaching for a bigger budget here is buying a longer red run.
+ *
+ * ── Where the 30s actually goes (recorded so nobody re-derives it) ──────────
+ * Between miniflare's entry worker and the user worker. Miniflare timestamps
+ * the request in immediately, the application handles it in ~5ms once it
+ * arrives, and the whole gap is workerd not delivering the request on that one
+ * connection. That is why the ruled-out list below reads as complete in the
+ * direction it was pointing: application code, Playwright hook semantics and
+ * cold start are all out, because none of them is running during the stall.
+ *
  * Ruled out by experiment, each with its own run — none of these is the cause:
- *   - slowness / cold start: a 90s budget times out the same way
+ *   - slowness / cold start: a 90s budget times out the same way (and, per the
+ *     equality above, that is exactly what a bigger budget must do)
  *   - `waitUntil: 'load'` hanging on a subresource: `domcontentloaded` identical
  *   - the worker not being up: /status answers before the hook runs
  *   - retrying the goto: the test timeout kills the hook, so the catch is dead
@@ -153,8 +185,14 @@ test.describe('Workspace pages — responsive smoke', () => {
     test.beforeAll(async ({ request }) => {
         const seed = readEditorSeed();
         if (!seed) return;
+        // POST /api/auth/login carries `requireCsrfToken` (server/api/auth.ts), a
+        // stateless double-submit check. Without the pair this call 403s, the
+        // token below is '', and the hook `return`s — silently skipping BOTH the
+        // 25-contact fixture this spec is built on AND the /status readiness
+        // poll. Mint the pair the same way every other spec does.
         const login = await request.post(`${BASE_URL}/api/auth/login`, {
             data: { email: seed.email, password: seed.password },
+            headers: csrfHeaders().headers,
         });
         const token = (login.headers()['set-cookie'] ?? '').match(/__Host-inspector_token=([^;]+)/)?.[1] ?? '';
         if (!token) return;
