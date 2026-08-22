@@ -37,13 +37,43 @@ export type SubjectExportReply = {
     manifest: { rows: number; photos: number; photosEmbedded: number };
 };
 
-export type SubjectErasedReply = {
-    anonymizedCount: number;
-    deletedCount: number;
-    retainedCount: number;
-    decisions: ErasureDecision[];
-    coverage: ErasureCoverageDisclosure;
-};
+/**
+ * What core sends back for `cmd.subject.erase`.
+ *
+ * A UNION, because a subject erasure has two honest endings and only one of
+ * them is an erasure. `outcome` is the discriminant, and `coverage` — the field
+ * portal reads before it records a request as complete — exists on exactly one
+ * branch. That is the guarantee: a preserved run cannot be mistaken for a
+ * completed one by a consumer that reads the payload rather than the prose,
+ * because the payload does not contain the thing a completion is made of.
+ *
+ * There is no third branch for a run that could not happen. That case does not
+ * reply at all — see the header on `applySubjectErase`.
+ */
+export type SubjectErasedReply =
+    | {
+        /** The subject's data was erased. The only outcome that may be recorded as done. */
+        outcome: 'erased';
+        anonymizedCount: number;
+        deletedCount: number;
+        retainedCount: number;
+        decisions: ErasureDecision[];
+        coverage: ErasureCoverageDisclosure;
+    }
+    | {
+        /**
+         * The request was accepted and executed, and a preservation order
+         * required the data to stay. NOT a refusal and NOT a failure — the
+         * request was answered, and this is the answer.
+         */
+        outcome: 'held';
+        /** How many scopes were kept. Tenant-wide today, so this is 1 or 0. */
+        preserved: number;
+        /** The sentence the data subject is given. Not an internal code. */
+        reason: string;
+        /** The exception record: what was preserved, and on what grounds. */
+        decisions: ErasureDecision[];
+    };
 
 /**
  * Assemble the subject's data and stream it into the shared exports bucket.
@@ -90,6 +120,16 @@ export async function applySubjectExport(
  * idempotent, so a retry is safe and may well succeed), and on exhaustion the
  * DLQ marks the outbox row `failed`. The DSAR then sits visibly at `fulfilling`
  * with a failed command beside it, which is the honest state.
+ *
+ * A HELD RUN DOES REPLY, and that is not an exception to the rule above — it is
+ * the other side of it. A partial run is a run that may yet succeed, so not
+ * replying leaves it to retry. A preservation order is not a transient fault:
+ * it can outlast every retry the queue has, and staying silent would leave the
+ * request unanswered while a statutory clock runs. So the run replies, with a
+ * payload that carries no coverage disclosure and says plainly that the data
+ * was preserved. Refusing the request outright is equally wrong and is not what
+ * this does — the request was admitted, executed and recorded; what changed is
+ * the answer, not whether there is one.
  */
 export async function applySubjectErase(
     db: AnyDb,
@@ -134,7 +174,29 @@ export async function applySubjectErase(
         );
     }
 
+    if (summary.status === 'held') {
+        // Checked AFTER the failure branch above, deliberately. An unreadable
+        // holds table comes back as `refused` carrying an errored decision, so
+        // it is caught there and does not reply — which is right, because that
+        // one IS transient and a retry may read the table. Only a run that was
+        // executed and preserved reaches here.
+        logger.info('[cmd] subject erasure preserved under a legal hold', {
+            tenantId: data.tenantId, preserved: summary.preservedCount,
+        });
+        return {
+            outcome: 'held',
+            preserved: summary.preservedCount,
+            // The reason travels from the arbiter rather than being written
+            // again here: two sentences for one fact drift, and this one is
+            // read by a person deciding whether we answered them honestly.
+            reason: summary.decisions.find((d) => d.action === 'preserve')?.holdReason
+                ?? 'An active legal hold covers this workspace.',
+            decisions: summary.decisions,
+        };
+    }
+
     return {
+        outcome: 'erased',
         anonymizedCount: summary.anonymizedCount,
         deletedCount: summary.deletedCount,
         retainedCount: summary.retainedCount,

@@ -277,6 +277,7 @@
   "settings_compliance_status_completed": "Completed",
   "settings_compliance_status_partial": "Partial",
   "settings_compliance_status_refused": "Refused",
+  "settings_compliance_status_held": "Preserved (legal hold)",
   "settings_compliance_ai_heading": "AI assurance record",
   "settings_compliance_ai_desc": "Every AI call this workspace made, the prompt version and model that produced the text, and who reviewed the result. Read-only.",
   "settings_compliance_ai_empty": "No AI calls recorded. Nothing in this workspace has been drafted with model assistance.",

@@ -173,8 +173,10 @@ export const EraseDataResponseSchema = createApiResponseSchema(z.object({
     matched: z.number().optional().describe('Number of inspections the subject appeared on.'),
     deletedAgreements: z.number().optional().describe('Legacy additive field — number of matched inspections (mirrors matched).'),
     // Orchestrator summary fields (Track I-a).
-    status: z.enum(['completed', 'partially_completed', 'refused']).optional()
-        .describe('Overall erasure outcome. partially_completed means at least one step threw; the rest still landed.'),
+    status: z.enum(['completed', 'partially_completed', 'refused', 'held']).optional()
+        .describe('Overall erasure outcome. partially_completed means at least one step threw; the rest still landed. held means an active legal hold covered the workspace, so the request was recorded and nothing was erased — distinct from refused, which means the run could not be carried out at all.'),
+    preservedCount: z.number().int().optional()
+        .describe('Scopes kept because a legal hold covers them. Separate from retainedCount, which counts rows kept under an Art. 17(3) exemption — a preservation order and an evidence exemption are different grounds and a reader must be able to tell them apart.'),
     logId: z.string().optional().describe('UUID of the append-only erasure_log decision row (Art. 5(2)/30).'),
     anonymizedCount: z.number().int().optional()
         .describe('Total rows anonymized (PII sentinel-cleared, evidence retained under Art. 17(3) exemption).'),
@@ -200,8 +202,8 @@ export const EraseDataResponseSchema = createApiResponseSchema(z.object({
         // worse than one with an unfashionable word in it.
         //
         // New writes emit `erase_in_place`. Old rows keep what they said.
-        action: z.enum(['delete', 'null', 'anonymize', 'erase_in_place'])
-            .describe('Action taken on this table. `erase_in_place` on new rows; `anonymize` on rows written before 2026-08-17 and on the versioned portal reply event.'),
+        action: z.enum(['delete', 'null', 'anonymize', 'erase_in_place', 'preserve'])
+            .describe('Action taken on this table. `erase_in_place` on new rows; `anonymize` on rows written before 2026-08-17 and on the versioned portal reply event. `preserve` means nothing was done to it because a legal hold covers it.'),
         count: z.number().int().describe('Rows affected.'),
         legalBasis: z.enum(['art_17_3_b', 'art_17_3_e']).optional()
             .describe('GDPR Art. 17(3) exemption invoked, when retaining evidence.'),
@@ -209,6 +211,8 @@ export const EraseDataResponseSchema = createApiResponseSchema(z.object({
             .describe('Unix-MS integer: signedAt + retentionYears. Present on erase_in_place steps (`anonymize` on rows predating the rename).'),
         error: z.string().optional()
             .describe('Set when this step threw (fail-closed accountability).'),
+        holdReason: z.string().optional()
+            .describe('Set on `preserve`: why this was kept, in the words the data subject is given. Never set on the other actions.'),
     })).optional().describe('Per-table erasure decisions recorded in the log row.'),
 })).openapi('EraseDataResponse');
 

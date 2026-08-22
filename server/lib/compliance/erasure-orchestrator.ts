@@ -52,7 +52,6 @@ import {
     reportViews,
     reports,
     auditLogs,
-    erasureLog,
 } from '../db/schema';
 import {
     ANONYMIZE_SIGNER_PII,
@@ -62,6 +61,7 @@ import {
 } from './anonymize-pii';
 import { changeCount, toMs, addYearsMs } from './db-row-utils';
 import { eraseRepairRequests } from './erase-repair-requests';
+import { holdGate, writeErasureLog } from './erasure-hold-gate';
 
 /**
  * What a report title becomes. Not blank: a reader of the version chain needs
@@ -79,13 +79,15 @@ const ANONYMIZED_TITLE = 'Inspection Report (details removed)';
  */
 export interface ErasureDecision {
     table: string;
-    action: 'delete' | 'null' | 'erase_in_place';
+    action: 'delete' | 'null' | 'erase_in_place' | 'preserve';
     count: number;
     legalBasis?: 'art_17_3_b' | 'art_17_3_e';
     /** Unix-MS integer: signedAt + retentionYears. Present on in-place erasures. */
     retentionExpiry?: number;
     /** Set when this step threw (fail-closed accountability). */
     error?: string;
+    /** Set on `preserve` only: why this was kept. */
+    holdReason?: string;
 }
 
 export interface RunErasureInput {
@@ -97,10 +99,15 @@ export interface RunErasureInput {
 }
 
 export interface ErasureSummary {
-    status: 'completed' | 'partially_completed' | 'refused';
+    /** `held` is NOT a flavour of `refused`: refused means we could not act,
+     *  held means we deliberately did not. See `erasure-hold-gate.ts`. */
+    status: 'completed' | 'partially_completed' | 'refused' | 'held';
     anonymizedCount: number;
     deletedCount: number;
     retainedCount: number;
+    /** Scopes kept because a legal hold covers them — a different ground from
+     *  `retainedCount`, which counts rows kept under an Art. 17(3) exemption. */
+    preservedCount: number;
     decisions: ErasureDecision[];
     logId: string;
 }
@@ -146,6 +153,12 @@ export async function runErasure(
             });
         }
     }
+
+    // Before anything is deleted, ask whether anything may be. `holdGate` answers
+    // null when the run may proceed, and an already-logged summary when it may not.
+    const subject = { tenantId, subjectEmail, requestedBy: input.requestedBy, identityBasis: input.identityBasis };
+    const gated = await holdGate(db, subject);
+    if (gated) return gated;
 
     // ── Locate agreement envelopes for the subject (signed vs draft split) ────
     // Envelopes the subject is the named client on, OR is a signer on.
@@ -465,23 +478,10 @@ export async function runErasure(
         return changeCount(res);
     });
 
-    // ── Write the single append-only decision-log row ─────────────────────────
+    // ── The single append-only decision-log row. `preservedCount` is 0 on every
+    // path reaching here: this run was not covered by a hold. ────────────────
     const status: ErasureSummary['status'] = failed ? 'partially_completed' : 'completed';
-    const logId = crypto.randomUUID();
-    await db.insert(erasureLog).values({
-        id: logId,
-        tenantId,
-        subjectEmail,
-        requestedBy: input.requestedBy ?? null,
-        identityBasis: input.identityBasis ?? null,
-        status,
-        decisionsJson: JSON.stringify(decisions),
-        retainedCount,
-        anonymizedCount,
-        deletedCount,
-        responseNote: null,
-        createdAt: new Date(),
-    });
-
-    return { status, anonymizedCount, deletedCount, retainedCount, decisions, logId };
+    const counts = { retained: retainedCount, anonymized: anonymizedCount, deleted: deletedCount };
+    const logId = await writeErasureLog(db, subject, status, decisions, counts, null);
+    return { status, anonymizedCount, deletedCount, retainedCount, preservedCount: 0, decisions, logId };
 }

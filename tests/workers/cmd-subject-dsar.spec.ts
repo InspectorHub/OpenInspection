@@ -37,6 +37,10 @@ const erasureSummary = {
     anonymizedCount: 1,
     deletedCount: 2,
     retainedCount: 1,
+    // Zero, and stated rather than omitted: this stub stands in for a run that
+    // was NOT covered by a legal hold, which is the only kind that reaches the
+    // reply path at all.
+    preservedCount: 0,
     decisions: cleanDecisions(),
     logId: 'log-1',
 };

@@ -277,6 +277,7 @@
   "settings_compliance_status_completed": "Completado",
   "settings_compliance_status_partial": "Parcial",
   "settings_compliance_status_refused": "Denegado",
+  "settings_compliance_status_held": "Conservado (retención legal)",
   "settings_compliance_ai_heading": "Registro de garantía de IA",
   "settings_compliance_ai_desc": "Cada llamada de IA que hizo este espacio de trabajo, la versión del prompt y el modelo que generaron el texto, y quién revisó el resultado. Solo lectura.",
   "settings_compliance_ai_empty": "No hay llamadas de IA registradas. Nada en este espacio de trabajo se redactó con asistencia de un modelo.",

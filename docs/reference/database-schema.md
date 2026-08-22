@@ -13,7 +13,7 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | Columns | 1184 |
 | Indexes (excluding primary keys) | 170 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 554 (47%) |
+| Columns carrying a source comment | 555 (47%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -841,8 +841,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `subject_email` | text | NN |  |  | The data subject (client) whose erasure was requested. |
 | `requested_by` | text |  |  |  | The admin/user sub who ran the erasure (accountability). Nullable for system-initiated runs. |
-| `identity_basis` | text |  |  | `completed, partially_completed, refused` | How the subject's identity was verified — free text or 'admin_action'. |
-| `status` | text | NN |  | `completed, partially_completed, refused` | *State-machine column — see the Values column for the vocabulary.* |
+| `identity_basis` | text |  |  |  | How the subject's identity was verified — free text or 'admin_action'. |
+| `status` | text | NN |  | `completed, partially_completed, refused, held` | `held` is deliberately separate from `refused`. Refused means the run could not happen; held means it happened, was considered, and a preservation order required the data to stay. |
 | `decisions_json` | text | NN |  |  | Serialized decision array (see file docblock). |
 | `retained_count` | integer | NN | `0` |  | Rows kept under an exemption (signed evidence retained). |
 | `anonymized_count` | integer | NN | `0` |  | *A count.* |

@@ -231,7 +231,7 @@ const eraseDataRoute = createRoute(withMcpMetadata({
 const ErasureLogRowSchema = z.object({
     id:              z.string(),
     subjectEmail:    z.string().describe('Data subject whose erasure was requested (admin already sees this).'),
-    status:          z.string().describe('completed | partially_completed | refused.'),
+    status:          z.string().describe('completed | partially_completed | refused | held.'),
     retainedCount:   z.number(),
     anonymizedCount: z.number(),
     deletedCount:    z.number(),

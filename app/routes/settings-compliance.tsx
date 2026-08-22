@@ -337,15 +337,21 @@ function ErasureLogView({ rows }: { rows: ErasureLogRow[] }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  // `held` is neither a success nor a fault, so it reads as neither: the run
+  // did exactly what it was required to do. It is kept apart from `refused`
+  // here for the same reason it is kept apart in the record — one says a
+  // preservation order applied, the other says we could not act at all.
   const tone: Record<string, PillTone> = {
     completed: "sat",
     partially_completed: "warning",
     refused: "defect",
+    held: "warning",
   };
   const label: Record<string, string> = {
     completed: m.settings_compliance_status_completed(),
     partially_completed: m.settings_compliance_status_partial(),
     refused: m.settings_compliance_status_refused(),
+    held: m.settings_compliance_status_held(),
   };
   return (
     <Pill tone={tone[status] ?? "neutral"} className="uppercase tracking-wide">

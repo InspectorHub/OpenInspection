@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { applySubjectErase } from '../../../server/portal/apply-subject-commands';
+import { applySubjectErase, type SubjectErasedReply } from '../../../server/portal/apply-subject-commands';
 import {
     cmdSubjectEraseDataSchema,
     cmdSubjectExportDataSchema,
@@ -24,6 +24,20 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 const TENANT_A = '00000000-0000-0000-0000-0000000000c1';
 const SUBJECT = 'erase-me@example.com';
 const REPLYTO = 'dsar:req-42';
+
+/**
+ * Narrow a reply to the branch that actually erased something.
+ *
+ * `SubjectErasedReply` became a union when a preservation order gained its own
+ * outcome, and every assertion in this file is about the erased branch. The
+ * discriminant is ASSERTED rather than cast: a reply that came back `held`
+ * should fail here saying so, not fail three lines later on a missing property.
+ */
+function erased(reply: SubjectErasedReply): Extract<SubjectErasedReply, { outcome: 'erased' }> {
+    expect(reply.outcome).toBe('erased');
+    if (reply.outcome !== 'erased') throw new Error(`expected an erased reply, got '${reply.outcome}'`);
+    return reply;
+}
 
 describe('applySubjectErase', () => {
     let db: BetterSQLite3Database<typeof schema>;
@@ -59,7 +73,7 @@ describe('applySubjectErase', () => {
     });
 
     it('replies with a coverage disclosure — the thing portal refuses to complete without', async () => {
-        const reply = await applySubjectErase(db, { tenantId: TENANT_A, subjectEmail: SUBJECT }, { requestedBy: REPLYTO });
+        const reply = erased(await applySubjectErase(db, { tenantId: TENANT_A, subjectEmail: SUBJECT }, { requestedBy: REPLYTO }));
         expect(reply.coverage).toBeDefined();
         expect(reply.coverage.catalogueIsAdvisory).toBe(true);
         expect(reply.coverage.pendingRules.length).toBe(reply.coverage.pendingEnforcementCount);
@@ -70,7 +84,7 @@ describe('applySubjectErase', () => {
     });
 
     it('discloses the EMAIL axis, because that is the only axis runErasure has', async () => {
-        const reply = await applySubjectErase(db, { tenantId: TENANT_A, subjectEmail: SUBJECT });
+        const reply = erased(await applySubjectErase(db, { tenantId: TENANT_A, subjectEmail: SUBJECT }));
         expect(reply.coverage.subjectAxis).toBe('email');
     });
 
@@ -103,8 +117,8 @@ describe('applySubjectErase', () => {
     });
 
     it('is idempotent — a queue redelivery finds nothing left and still completes', async () => {
-        const first = await applySubjectErase(db, { tenantId: TENANT_A, subjectEmail: SUBJECT });
-        const second = await applySubjectErase(db, { tenantId: TENANT_A, subjectEmail: SUBJECT });
+        const first = erased(await applySubjectErase(db, { tenantId: TENANT_A, subjectEmail: SUBJECT }));
+        const second = erased(await applySubjectErase(db, { tenantId: TENANT_A, subjectEmail: SUBJECT }));
         expect(first.deletedCount).toBeGreaterThan(0);
         expect(second.deletedCount).toBe(0);
         expect(second.coverage.executedTables).toEqual([]);

@@ -26,7 +26,15 @@ export const erasureLog = sqliteTable('erasure_log', {
     requestedBy:     text('requested_by'),
     // How the subject's identity was verified — free text or 'admin_action'.
     identityBasis:   text('identity_basis'),
-    status:          text('status', { enum: ['completed', 'partially_completed', 'refused'] }).notNull(),
+    /**
+     * `held` is deliberately separate from `refused`. Refused means the run
+     * could not happen; held means it happened, was considered, and a
+     * preservation order required the data to stay. Reading a held run as a
+     * refusal would say we failed the person, and reading it as a completion
+     * would say we erased data that is still there — both are false, and only
+     * a third value can be true.
+     */
+    status:          text('status', { enum: ['completed', 'partially_completed', 'refused', 'held'] }).notNull(),
     // Serialized decision array (see file docblock).
     decisionsJson:   text('decisions_json').notNull(),
     // Rows kept under an exemption (signed evidence retained).

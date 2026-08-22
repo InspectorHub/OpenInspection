@@ -65,3 +65,50 @@ export async function loadActiveHolds(rawDb: AnyDb): Promise<ActiveHolds> {
     for (const r of rows as Array<{ tenantId: string }>) heldTenantIds.add(r.tenantId);
     return { heldTenantIds, activeHoldCount: rows.length };
 }
+
+/**
+ * Whether something belonging to this tenant may be deleted right now.
+ *
+ * ── Why a function and not an `if` at each call site ────────────────────────
+ * There are three deletion paths — the scheduled sweep, a subject erasure, and
+ * a tenant purge — and the failure this exists to prevent is exactly that they
+ * disagreed. They did: the sweep asked about holds and the erasure did not, so
+ * a preservation order stopped one and not the other. One function they all ask
+ * makes disagreement impossible rather than unlikely.
+ *
+ * ── This answers ONE of three questions, and must not be read as all three ──
+ * Three separate things can be true of a workspace's data at once, and they are
+ * arbitrated rather than ranked:
+ *
+ *   ordinary lifecycle — a retention window expired, so delete on schedule
+ *   preservation order — a matter requires this data to stay
+ *   subject erasure    — a person asked for their data to go
+ *
+ * This function answers only the middle one: does an order cover this tenant.
+ * It deliberately does NOT decide what the asker should do about that, because
+ * the right answer differs by asker. A sweep that is told `preserve` skips the
+ * night and owes nobody an explanation. A subject erasure that is told
+ * `preserve` still has to be admitted, recorded, and answered — refusing it at
+ * the door is as wrong as ignoring the order, and folding the two askers into
+ * one boolean here is how that distinction gets lost.
+ *
+ * ── Why it takes no scope ───────────────────────────────────────────────────
+ * A hold covers a tenant. `legal_holds` has no scope column, and its schema
+ * header explains that as a decision: a narrow hold must enumerate coverage
+ * before anyone knows what the matter will need, and every record it failed to
+ * name is deleted on schedule while a hold is nominally in force. This is the
+ * seam a narrower rule would land on if one is ever wanted — the signature
+ * already takes the tenant rather than a boolean, so adding scope later widens
+ * this function instead of rewriting its callers.
+ */
+export type HoldDisposition =
+    | { action: 'delete' }
+    | { action: 'preserve'; reason: string };
+
+export function holdDisposition(tenantId: string, holds: ActiveHolds): HoldDisposition {
+    if (!holds.heldTenantIds.has(tenantId)) return { action: 'delete' };
+    return {
+        action: 'preserve',
+        reason: 'An active legal hold covers this workspace, so this data is preserved rather than erased.',
+    };
+}
