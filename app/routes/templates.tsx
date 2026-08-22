@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useLoaderData, useNavigate, useSearchParams } from "react-router";
+import { Link, useLoaderData, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/templates";
 import { useDisplayTimeZone, useCapability } from "~/hooks/useSessionContext";
 import { requireToken } from "~/lib/session.server";
@@ -11,9 +11,8 @@ import type { SortKey, Template } from "~/components/templates/types";
 import { TemplatesListView } from "~/components/templates/TemplatesListView";
 import { TemplatesCardView } from "~/components/templates/TemplatesCardView";
 import { CreateTemplateModal } from "~/components/templates/CreateTemplateModal";
-import { ImportSpectoraModal } from "~/components/templates/ImportSpectoraModal";
 import { DeleteTemplateModal } from "~/components/templates/DeleteTemplateModal";
-import { SpectoraMappingModal } from "~/components/templates/SpectoraMappingModal";
+import { importEntryHref } from "~/lib/import-entry-points";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
@@ -33,33 +32,19 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const pageSize = url.searchParams.get("pageSize") ?? "50";
     const q        = url.searchParams.get("q")        ?? "";
     const api = createApi(context, { token });
-    // Best-effort /api/auth/me to read spectoraMappingSeen (same pattern as dashboard IA-12).
-    // TODO(C-10): same hono/client collapse as auth.me — localized cast.
-    const meGet = api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>;
-    const [res, meRes] = await Promise.all([
-      api.inspections.templates.$get({ query: { page, pageSize, ...(q ? { q } : {}) } }),
-      meGet().catch(() => null),
-    ]);
+    const res = await api.inspections.templates.$get({ query: { page, pageSize, ...(q ? { q } : {}) } });
     const body = res.ok
       ? ((await res.json()) as { data?: unknown[]; meta?: { total: number; page: number; pageSize: number; totalPages: number } })
       : { data: [], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 } };
     const templates = (body.data ?? []) as Template[];
     const meta = body.meta ?? { total: 0, page: 1, pageSize: 50, totalPages: 1 };
-    let spectoraMappingSeen = false;
-    if (meRes && meRes.ok) {
-      const meBody = (await meRes.json().catch(() => ({}))) as {
-        data?: { user?: { onboardingState?: Record<string, boolean> | null } };
-      };
-      spectoraMappingSeen = meBody.data?.user?.onboardingState?.spectoraMappingSeen === true;
-    }
-    return { templates, meta, q, token, spectoraMappingSeen };
+    return { templates, meta, q, token };
   } catch {
     return {
       templates: [] as Template[],
       meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 },
       q: "",
       token: "",
-      spectoraMappingSeen: false,
     };
   }
 }
@@ -118,33 +103,6 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { error: m.templates_duplicate_error_failed(), intent: "duplicate" };
   }
 
-  if (intent === "import-spectora") {
-    const name = (formData.get("name") as string)?.trim();
-    const payload = (formData.get("payload") as string)?.trim();
-    if (!name || !payload) return { error: m.templates_import_error_name_json_required() };
-    let parsed: unknown;
-    try { parsed = JSON.parse(payload); } catch { return { error: m.templates_import_error_invalid_json() }; }
-    const res = await api.inspections.templates["import-spectora"].$post({
-      json: { name, spectora: parsed as Record<string, unknown> },
-    });
-    if (res.ok) {
-      const result = await res.json();
-      const d = (result as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-      const stats = d?.stats as Record<string, unknown> | undefined;
-      return { ok: true, newId: extractTemplateId(result), stats, intent: "import-spectora" };
-    }
-    const err = await res.json().catch(() => ({}));
-    return { error: (err as Record<string, unknown>)?.message || m.templates_import_error_failed() };
-  }
-
-  if (intent === "mark-spectora-mapping-seen") {
-    // Persist spectoraMappingSeen flag via the generic onboarding-flag endpoint.
-    // TODO(C-10): same hono/client collapse as dashboard dismiss — localized cast.
-    const flagPost = api.auth.onboarding.flag.$post as unknown as (args?: unknown) => Promise<Response>;
-    await flagPost({ json: { flag: "spectoraMappingSeen" } }).catch(() => null);
-    return { ok: true, intent: "mark-spectora-mapping-seen" as const };
-  }
-
   return { ok: false };
 }
 
@@ -153,17 +111,13 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function TemplatesPage() {
-  const { templates, meta, q: loaderQ, spectoraMappingSeen: loaderMappingSeen } = useLoaderData<typeof loader>();
-  // #106 - create, duplicate, delete and import all write a template. One
-  // guard: they are four separate user paths and only one can be open at a
-  // time, so a refused call is not reachable.
+  const { templates, meta, q: loaderQ } = useLoaderData<typeof loader>();
+  // #106 - create, duplicate and delete all write a template. One guard:
+  // they are three separate user paths and only one can be open at a time,
+  // so a refused call is not reachable. Import is no longer among them --
+  // it is a link to the shared wizard and writes nothing from this page.
   const { fetcher, submit, busy: writing } = useGuardedSubmit();
   const displayTz = useDisplayTimeZone();
-  // The mapping notice is its own write and must not contend with the import
-  // that triggers it. It fires from the modal's own dismiss, which closes on
-  // the same click.
-  // submit-guard-allow-no-busy: the modal this fires from closes on the click.
-  const { submit: submitMappingSeen } = useGuardedSubmit();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { setPage, setPageSize } = usePagination();
@@ -184,16 +138,8 @@ export default function TemplatesPage() {
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("name");
   const [createOpen, setCreateOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
-  const [importName, setImportName] = useState("");
-  const [importPayload, setImportPayload] = useState("");
-  // Concept-mapping modal: shown once after a successful Spectora import.
-  const [mappingModalOpen, setMappingModalOpen] = useState(false);
-  // Optimistic seen state — hide immediately once the user clicks "Got it".
-  const [mappingSeenOptimistic, setMappingSeenOptimistic] = useState(false);
-  const spectoraMappingSeen = loaderMappingSeen || mappingSeenOptimistic;
 
   // Debounced URL-based search: triggers loader re-run for server-side filtering
   useEffect(() => {
@@ -214,25 +160,8 @@ export default function TemplatesPage() {
   // Navigate to newly created/duplicated template.
   const fetcherData = fetcher.data as Record<string, unknown> | undefined;
   if (fetcherData?.ok && fetcherData?.newId && typeof fetcherData.newId === "string") {
-    if (fetcherData?.intent !== "import-spectora") {
-      navigate(`/templates/${fetcherData.newId}/edit`);
-    }
+    navigate(`/templates/${fetcherData.newId}/edit`);
   }
-
-  // Show the concept-mapping card once after a successful Spectora import (if not already seen).
-  const prevImportIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (
-      fetcherData?.ok &&
-      fetcherData?.intent === "import-spectora" &&
-      typeof fetcherData.newId === "string" &&
-      fetcherData.newId !== prevImportIdRef.current &&
-      !spectoraMappingSeen
-    ) {
-      prevImportIdRef.current = fetcherData.newId as string;
-      setMappingModalOpen(true);
-    }
-  }, [fetcherData, spectoraMappingSeen]);
 
   /* ---- Sort (search filtering is now server-side via URL ?q=) ---- */
   const filtered = useMemo(() => {
@@ -272,32 +201,6 @@ export default function TemplatesPage() {
     setDeleteConfirm(null);
   };
 
-  const handleImport = () => {
-    if (!importName.trim() || !importPayload.trim()) return;
-    if (
-      !submit(
-        { intent: "import-spectora", name: importName.trim(), payload: importPayload.trim() },
-        { method: "post" },
-      )
-    ) {
-      return;
-    }
-    setImportOpen(false);
-    setImportName("");
-    setImportPayload("");
-  };
-
-  const handleMappingDismiss = () => {
-    // Navigate to the imported template if we have its id, then mark seen.
-    setMappingModalOpen(false);
-    setMappingSeenOptimistic(true);
-    submitMappingSeen({ intent: "mark-spectora-mapping-seen" }, { method: "post" });
-    // Navigate to the newly imported template after dismissing the modal.
-    if (fetcherData?.newId && typeof fetcherData.newId === "string") {
-      navigate(`/templates/${fetcherData.newId}/edit`);
-    }
-  };
-
   /* ---- Meta text ---- */
   const metaParts: string[] = [
     templates.length === 1
@@ -316,10 +219,17 @@ export default function TemplatesPage() {
         actions={
           <>
             {canImport && (
-              <button onClick={() => setImportOpen(true)} className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2">
+              // One front door. The address is built by `importEntryHref` so
+              // this control, the two empty states and anything that later
+              // points at the wizard cannot drift into three spellings of the
+              // same query string.
+              <Link
+                to={importEntryHref("templates.create")}
+                className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2"
+              >
                 <Icon name="download" size={16} strokeWidth={1.75} />
-                {m.templates_action_import_spectora()}
-              </button>
+                {m.templates_action_import()}
+              </Link>
             )}
             {canCreate && (
               <button onClick={() => setCreateOpen(true)} className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2">
@@ -376,7 +286,6 @@ export default function TemplatesPage() {
         <TemplatesListView
           filtered={filtered}
           searchQuery={searchQuery}
-          setImportOpen={setImportOpen}
           setCreateOpen={setCreateOpen}
           handleDuplicate={handleDuplicate}
           setDeleteConfirm={setDeleteConfirm}
@@ -392,7 +301,6 @@ export default function TemplatesPage() {
         <TemplatesCardView
           filtered={filtered}
           searchQuery={searchQuery}
-          setImportOpen={setImportOpen}
           setCreateOpen={setCreateOpen}
           handleDuplicate={handleDuplicate}
           setDeleteConfirm={setDeleteConfirm}
@@ -421,17 +329,6 @@ export default function TemplatesPage() {
         error={fetcherData?.error}
       />
 
-      {/* Import Spectora modal */}
-      <ImportSpectoraModal
-        open={importOpen}
-        setImportOpen={setImportOpen}
-        importName={importName}
-        setImportName={setImportName}
-        importPayload={importPayload}
-        setImportPayload={setImportPayload}
-        handleImport={handleImport}
-      />
-
       {/* Delete confirmation modal */}
       <DeleteTemplateModal
         open={deleteConfirm !== null}
@@ -439,9 +336,6 @@ export default function TemplatesPage() {
         handleDelete={handleDelete}
         busy={writing}
       />
-
-      {/* Concept-mapping modal — shown once after first Spectora import */}
-      <SpectoraMappingModal open={mappingModalOpen} handleMappingDismiss={handleMappingDismiss} />
     </div>
   );
 }

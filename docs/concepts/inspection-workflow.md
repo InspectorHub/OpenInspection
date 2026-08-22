@@ -94,7 +94,8 @@ Both call Gemini 1.5 Flash. Temperature 0.2.
 | `POST /api/inspections/templates` | admin/owner | Create (name + schema JSON) |
 | `PUT /api/inspections/templates/:id` | admin/owner | Update, bumps version |
 | `DELETE /api/inspections/templates/:id` | admin/owner | Delete (409 if in use) |
-| `POST /api/inspections/templates/import-spectora` | admin/owner | Import from Spectora export |
+
+Bringing templates over from another product is not an endpoint on this router: it goes through the import wizard at `/settings/imports?intent=templates.create`, which asks which product the file came from, shows what the conversion produced before anything is written, and stages the run so it can be reviewed and repaired.
 
 **Marketplace**: a curated catalogue of first-party template packs, served by `GET /api/marketplace/templates` with one-click install. It is **not** community-contributed content, and the browsing UI is **SaaS-only** — in the default `standalone` deployment mode nothing populates the catalogue, so `/library/marketplace` returns 404 and the Library hub does not offer the tile. The API handlers remain mounted in both modes. To pick up starter content a release ships, use Settings → Data → **Install what's new** (`POST /api/admin/data/install-bundled-content`).
 

@@ -170,7 +170,12 @@ export interface TemplateSection {
     };
 }
 
-export interface RatingLevel {
+// Not exported: the only consumer is `RatingSystem` below, which is not
+// exported either. It was exported for the JSON paste adapter that read
+// another product's four-bucket comment model, and that adapter went with the
+// endpoint it served. Index through `RatingSystem['levels'][number]` rather
+// than re-exporting it for one call site.
+interface RatingLevel {
     id: string;
     label: string;
     abbreviation?: string;

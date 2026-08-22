@@ -1,4 +1,4 @@
-// Template CRUD, duplicates, and Spectora import sub-router.
+// Template CRUD and duplication sub-router.
 // Behavior-preserving extraction from inspections.ts — handler bodies + route
 // definitions are byte-identical to the original (only their location changed).
 import { createRoute, z } from '@hono/zod-openapi';
@@ -145,56 +145,6 @@ const createTemplateRoute = createRoute(withMcpMetadata({
 
 
 /**
- * POST /api/inspections/templates/import-spectora
- * Thin wrapper over `convertSpectoraTemplate` + the existing createTemplate
- * path. Accepts a raw Spectora export payload and returns both the freshly
- * created template row and the conversion stats (for the diff display in
- * the upcoming import-from-Spectora UI).
- */
-const importSpectoraRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/templates/import-spectora',
-    tags: ["inspections", "templates"],
-    summary: "Create inspection templates import spectora",
-    description: 'Convert a Spectora export to v2 and create a new template from it.',
-    request: {
-        body: {
-            content: {
-                'application/json': {
-                    schema: z.object({
-                        name: z.string().min(1).max(100).describe('TODO describe name field for the OpenInspection MCP integration'),
-                        // Spectora exports vary; keep the inner shape permissive
-                        // and let `convertSpectoraTemplate` do the structural work.
-                        spectora: z.object({
-                            id: z.string().optional().describe('TODO describe id field for the OpenInspection MCP integration'),
-                            name: z.string().optional().describe('TODO describe name field for the OpenInspection MCP integration'),
-                            sections: z.array(z.unknown()).optional().describe('TODO describe sections field for the OpenInspection MCP integration'),
-                        }).passthrough().describe('TODO describe spectora field for the OpenInspection MCP integration'),
-                    }),
-                },
-            },
-        },
-    },
-    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('templateImport')],
-    responses: {
-        201: {
-            content: {
-                'application/json': {
-                    schema: createApiResponseSchema(z.object({
-                        template: z.unknown().describe('TODO describe template field for the OpenInspection MCP integration'),
-                        stats:    z.unknown().describe('TODO describe stats field for the OpenInspection MCP integration'),
-                    })),
-                },
-            },
-            description: 'Imported',
-        },
-        403: { description: "Missing the 'templateImport' capability" },
-    },
-    operationId: "createInspectionTemplatesImportSpectora"
-}, { scopes: ['write'], tier: 'extended', capability: 'templateImport' }));
-
-
-/**
  * PUT /api/inspections/templates/:id
  */
 const updateTemplateRoute = createRoute(withMcpMetadata({
@@ -294,25 +244,6 @@ const templatesRoutes = createApiRouter()
             metadata: { name: template.name },
         });
         return c.json({ success: true, data: { template } }, 201);
-    })
-    .openapi(importSpectoraRoute, async (c) => {
-        const body = c.req.valid('json');
-        const { convertSpectoraTemplate } = await import('../../lib/migration-intake/adapters/spectora');
-        const { template: schema, stats } = convertSpectoraTemplate(body.spectora as Parameters<typeof convertSpectoraTemplate>[0]);
-        // createTemplate accepts a plain Record<string, unknown> schema; the
-        // converter's TemplateSchemaV2 interface is structurally compatible,
-        // so cast it through unknown to placate the strict index signature
-        // requirement on the service entry-point.
-        const template = await c.var.services.template.createTemplate(
-            c.get('tenantId'),
-            body.name,
-            schema as unknown as Record<string, unknown>,
-        );
-        auditFromContext(c, 'template.create', 'template', {
-            entityId: template.id,
-            metadata: { name: template.name, source: 'spectora-import' },
-        });
-        return c.json({ success: true, data: { template, stats } }, 201);
     })
     .openapi(updateTemplateRoute, async (c) => {
         const { id } = c.req.valid('param');

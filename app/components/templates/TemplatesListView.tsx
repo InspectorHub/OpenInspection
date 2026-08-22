@@ -3,12 +3,12 @@ import { Table, Icon } from "@core/shared-ui";
 import { TemplateIcon } from "./TemplateIcon";
 import { countItems, type Template } from "./types";
 import { EntityAuditTrail } from "~/components/audit/EntityAuditTrail";
+import { importEntryHref } from "~/lib/import-entry-points";
 import { m } from "~/paraglide/messages";
 
 interface TemplatesListViewProps {
   filtered: Template[];
   searchQuery: string;
-  setImportOpen: (open: boolean) => void;
   setCreateOpen: (open: boolean) => void;
   handleDuplicate: (t: Template) => void;
   setDeleteConfirm: (id: string | null) => void;
@@ -20,6 +20,8 @@ interface TemplatesListViewProps {
    *  a UI capability applied to one of two views is a control the other view
    *  keeps offering. */
   canCreate: boolean;
+  /** Whether to offer the import entrance at all — the wizard link is
+   *  hidden rather than disabled, matching the page header. */
   canImport: boolean;
   canDelete: boolean;
 }
@@ -27,7 +29,6 @@ interface TemplatesListViewProps {
 export function TemplatesListView({
   filtered,
   searchQuery,
-  setImportOpen,
   setCreateOpen,
   handleDuplicate,
   setDeleteConfirm,
@@ -57,13 +58,17 @@ export function TemplatesListView({
               </div>
               <div className="flex items-center gap-2">
                 {canImport && (
-                  <button
-                    onClick={() => setImportOpen(true)}
+                  // Same address as the page header's control, from the same
+                  // builder. This empty state is where a person with no
+                  // templates starts, so it is the entrance most likely to be
+                  // the FIRST one used and the one most easily left behind.
+                  <Link
+                    to={importEntryHref("templates.create")}
                     className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
                   >
                     <Icon name="download" size={16} strokeWidth={1.75} />
-                    {m.templates_import_title()}
-                  </button>
+                    {m.templates_action_import()}
+                  </Link>
                 )}
                 {canCreate && (
                   <button

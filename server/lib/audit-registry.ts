@@ -231,7 +231,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'tag.linked': { family: 'inspection_item', label: 'audit_action_tag_linked', meta: { itemId: 'id', tagId: 'id' }, status: { kind: 'live' } },
     'tag.unlinked': { family: 'inspection_item', label: 'audit_action_tag_unlinked', meta: { itemId: 'id', tagId: 'id' }, status: { kind: 'live' } },
     'tag.updated': { family: 'tag', label: 'audit_action_tag_updated', meta: {}, status: { kind: 'live' } },
-    'template.create': { family: 'template', label: 'audit_action_template_create', meta: { name: 'name', source: 'name' }, status: { kind: 'live' } },
+    'template.create': { family: 'template', label: 'audit_action_template_create', meta: { name: 'name' }, status: { kind: 'live' } },
     'template.delete': { family: 'template', label: 'audit_action_template_delete', meta: {}, status: { kind: 'live' } },
     'template.marketplace.updated': { family: 'template', label: 'audit_action_template_marketplace_updated', meta: { fromSemver: 'from', marketplaceId: 'id', newLocalId: 'id', oldLocalId: 'id', toSemver: 'to' }, status: { kind: 'live' } },
     'template.update': { family: 'template', label: 'audit_action_template_update', meta: { name: 'name' }, status: { kind: 'live' } },

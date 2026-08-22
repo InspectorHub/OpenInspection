@@ -4182,60 +4182,6 @@
     "description": "Create a new inspection template. (POST /templates, inspections domain)."
   },
   {
-    "operationId": "createInspectionTemplatesImportSpectora",
-    "method": "POST",
-    "pathTemplate": "/api/inspections/templates/import-spectora",
-    "scopes": [
-      "write"
-    ],
-    "tag": "inspections",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [],
-      "body": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100,
-            "description": "TODO describe name field for the OpenInspection MCP integration"
-          },
-          "spectora": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "TODO describe id field for the OpenInspection MCP integration"
-              },
-              "name": {
-                "type": "string",
-                "description": "TODO describe name field for the OpenInspection MCP integration"
-              },
-              "sections": {
-                "type": "array",
-                "items": {
-                  "nullable": true
-                },
-                "description": "TODO describe sections field for the OpenInspection MCP integration"
-              }
-            },
-            "additionalProperties": {
-              "nullable": true
-            },
-            "description": "TODO describe spectora field for the OpenInspection MCP integration"
-          }
-        },
-        "required": [
-          "name",
-          "spectora"
-        ]
-      }
-    },
-    "summary": "Create inspection templates import spectora",
-    "description": "Convert a Spectora export to v2 and create a new template from it."
-  },
-  {
     "operationId": "createInspectionUncancel",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/uncancel",
@@ -6627,7 +6573,7 @@
       "body": null
     },
     "summary": "Download Certificate of Completion PDF",
-    "description": "Streams the workflow-rendered certificate.pdf from R2."
+    "description": "Streams the workflow-rendered certificate.pdf from R2. Every 200 carries `x-artifact-status: current | superseded`: a correction published against the inspection supersedes this file, which stays retrievable as historical evidence but stops being the current answer. Cache directives match the claim, so no response can outlive it."
   },
   {
     "operationId": "downloadEvidencePack",
@@ -6654,7 +6600,7 @@
       "body": null
     },
     "summary": "Download evidence pack zip",
-    "description": "Returns evidence.zip from R2 (signed.pdf + certificate.pdf + audit-trail.json + public-key.pem)."
+    "description": "Returns evidence.zip from R2 (signed.pdf + certificate.pdf + audit-trail.json + public-key.pem). Every 200 carries `x-artifact-status: current | superseded`: a correction published against the inspection supersedes this file, which stays retrievable as historical evidence but stops being the current answer. Cache directives match the claim, so no response can outlive it."
   },
   {
     "operationId": "downloadInspectionExport",
@@ -6757,7 +6703,7 @@
       "body": null
     },
     "summary": "Download signed agreement PDF (Worker-proxied from R2)",
-    "description": "Streams the workflow-rendered signed.pdf for an agreement request from R2 storage to the caller."
+    "description": "Streams the workflow-rendered signed.pdf for an agreement request from R2 storage to the caller. Every 200 carries `x-artifact-status: current | superseded`: a correction published against the inspection supersedes this file, which stays retrievable as historical evidence but stops being the current answer. Cache directives match the claim, so no response can outlive it."
   },
   {
     "operationId": "duplicateInspectionUnit",
@@ -12653,8 +12599,7 @@
           "flag": {
             "type": "string",
             "enum": [
-              "checklistDismissed",
-              "spectoraMappingSeen"
+              "checklistDismissed"
             ],
             "description": "The onboarding flag to mark as true."
           }
@@ -12665,7 +12610,7 @@
       }
     },
     "summary": "Mark a one-time onboarding flag as seen",
-    "description": "Sets a boolean flag in the current user's onboardingState. Allowlisted flags only: checklistDismissed, spectoraMappingSeen. Idempotent."
+    "description": "Sets a boolean flag in the current user's onboardingState. Allowlisted flags only: checklistDismissed. Idempotent."
   },
   {
     "operationId": "markOnboardingStep",

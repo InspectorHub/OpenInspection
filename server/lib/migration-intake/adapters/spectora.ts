@@ -12,9 +12,8 @@
  * the export button produces, and the four buckets are not what the file marks:
  * every row carries `info`, `limit` or `defect`, which are already our three
  * comment tabs. The mapping that was made complicated is the identity. The JSON
- * reader lives on in `spectora-json.ts` for the one older endpoint that takes a
- * pasted document, and is re-exported here so that endpoint's import still
- * resolves while it exists.
+ * reader that served the retired paste endpoint is gone with it; a file in that
+ * shape now arrives through the same upload the export button's file does.
  *
  * ── Purity ──────────────────────────────────────────────────────────────────
  * Ids are derived from a row's POSITION in the file, never minted. The same
@@ -34,8 +33,6 @@ import {
 import { readXlsxSheet } from '../formats/xlsx-sheet';
 import type { AdapterInspection, BundleResult, MigrationAdapter } from './types';
 import { emptyEntityCounts } from './types';
-
-export { convertSpectoraTemplate, type SpectoraTemplate } from './spectora-json';
 
 /** ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. Our own adapter's version. */
 const SPECTORA_ADAPTER_VERSION = '2';

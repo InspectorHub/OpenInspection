@@ -2738,7 +2738,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `is_signature_enabled` | integer | NN | `true` |  | 2026-06-14 — per-inspector opt-in for the business-card email footer (independent of Point of Contact). |
 | `slug` | text | UQ |  |  | FROZEN for inspectors (2026-06-06, DB-12/IA-26): the per-inspector booking slug is retired — /book/:tenant is the canonical public entry and no inspector-facing route writes this column anymore. **[more]** |
 | `role` | text | NN | `'manager'` | `ROLES` | DDL default is FROZEN (D1 cannot alter column defaults without a table rebuild and users is FK-referenced). |
-| `onboarding_state` | text |  |  |  | Sparse map of one-time UI flags — an ABSENT key means "not done yet", so a NULL column is simply a fresh account and nothing has to backfill it. **[more]** |
+| `onboarding_state` | text |  |  |  | Sparse map of one-time UI flags — an ABSENT key means "not done yet", so a NULL column is simply a fresh account and nothing has to backfill it. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `totp_secret` | text |  |  |  | Spec 4A — TOTP 2FA. All fields are per-user opt-in; nullable until enabled. |
 | `is_totp_enabled` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |

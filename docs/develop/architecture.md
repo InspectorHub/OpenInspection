@@ -216,6 +216,10 @@ Customer signs at `/agreements/sign/:tenant/:token` → API writes an `agreement
 
 Browser Run requires `compatibility_date >= "2026-03-24"` in `wrangler.jsonc` and uses the free tier (10 browser-minutes/day — sufficient for typical inspection volume). Admin download endpoints for signed.pdf, certificate.pdf, and evidence.zip are Worker-proxied from R2.
 
+**Correction, and what the three downloads say about themselves.** A published report is corrected by AMENDMENT, never in place: `correctReport` (`server/services/report-correction.service.ts`) applies the change to the record and publishes version N+1 through the same snapshot path, so the delivered version stays byte-identical and its hash chain goes on verifying. The three downloads above are part of the same graph rather than a separate one — they are files the product actively serves, not an archive or a backup, so each 200 carries `x-artifact-status: current | superseded`, resolved from the amendment ledger by `server/lib/artifact-status.ts`. A superseded artefact is still retrievable as historical evidence; what changes is that it no longer claims to be the current answer.
+
+The cache directives are part of that claim rather than a separate concern. A status header describes right now, so `current` responses are sent `private, no-cache, must-revalidate` and `superseded` ones `private, no-store`. The `private, max-age=300` these endpoints used to send let a copy fetched shortly before a correction go on claiming `current` for five minutes afterwards inside the client's own cache.
+
 ### Verification flow
 
 - **Public verifier** (`/v/:verificationToken`): SSR page resolves the token to an envelope, runs a server-side audit-chain integrity check and Ed25519 signature check, and displays the result with download links. QR code on signed.pdf and certificate.pdf points here.

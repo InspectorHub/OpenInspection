@@ -59,7 +59,7 @@ const dismissChecklistRoute = createRoute(withMcpMetadata({
 
 // Allowlist of boolean flags that can be set via the generic onboarding-flag endpoint.
 // Adding a new flag here is the only server-side change needed for new one-time UI states.
-const ONBOARDING_FLAG_ALLOWLIST = ['checklistDismissed', 'spectoraMappingSeen'] as const;
+const ONBOARDING_FLAG_ALLOWLIST = ['checklistDismissed'] as const;
 type OnboardingFlag = typeof ONBOARDING_FLAG_ALLOWLIST[number];
 
 const markOnboardingFlagRoute = createRoute(withMcpMetadata({
@@ -67,7 +67,7 @@ const markOnboardingFlagRoute = createRoute(withMcpMetadata({
     path: '/onboarding/flag',
     operationId: 'markOnboardingFlag',
     summary: 'Mark a one-time onboarding flag as seen',
-    description: 'Sets a boolean flag in the current user\'s onboardingState. Allowlisted flags only: checklistDismissed, spectoraMappingSeen. Idempotent.',
+    description: 'Sets a boolean flag in the current user\'s onboardingState. Allowlisted flags only: checklistDismissed. Idempotent.',
     tags: ['auth'],
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {

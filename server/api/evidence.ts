@@ -6,12 +6,50 @@ import * as schema from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { r2Keys } from '../lib/r2-keys';
+import {
+    ARTIFACT_CACHE_CONTROL,
+    ARTIFACT_STATUS_HEADER,
+    resolveArtifactStatus,
+} from '../lib/artifact-status';
 
 /**
  * Pure download helpers exported for unit testing. The OpenAPIHono route
  * handlers below are thin wrappers that pull tenantId from the JWT context
  * and forward to these.
+ *
+ * ⚠️ THREE helpers, three independent `r2.get` calls, no shared fetch layer.
+ * Anything that has to be true of a served deliverable has to be true in all
+ * three, and nothing in this file will tell you which one you missed — so the
+ * rule itself lives in `server/lib/artifact-status.ts` and each helper reads
+ * one answer from it through `deliverableHeaders` below.
  */
+
+/**
+ * The headers every live deliverable carries, whichever of the three it is.
+ *
+ * `x-artifact-status` says whether this object is still the current answer or
+ * has been superseded by a published correction. The cache directives are part
+ * of the same statement rather than a separate concern: a status header is a
+ * claim about right now, and the `private, max-age=300` these three used to
+ * send let a response fetched before a correction keep claiming `current` for
+ * five minutes after it landed.
+ */
+async function deliverableHeaders(
+    d1: D1Database,
+    tenantId: string,
+    inspectionId: string,
+    producedAt: Date | null,
+    contentType: string,
+    contentDisposition: string,
+): Promise<Record<string, string>> {
+    const status = await resolveArtifactStatus(d1, tenantId, inspectionId, producedAt);
+    return {
+        'Content-Type': contentType,
+        'Content-Disposition': contentDisposition,
+        [ARTIFACT_STATUS_HEADER]: status,
+        'Cache-Control': ARTIFACT_CACHE_CONTROL[status],
+    };
+}
 export async function downloadAgreementPdf(
     d1: D1Database,
     r2: R2Bucket | undefined,
@@ -30,11 +68,11 @@ export async function downloadAgreementPdf(
     if (!obj) return new Response('Not Found', { status: 404 });
     return new Response(obj.body, {
         status: 200,
-        headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `inline; filename="signed-agreement-${envelopeId.slice(0, 8)}.pdf"`,
-            'Cache-Control': 'private, max-age=300',
-        },
+        headers: await deliverableHeaders(
+            d1, tenantId, row.inspectionId, row.signedAt ?? row.createdAt,
+            'application/pdf',
+            `inline; filename="signed-agreement-${envelopeId.slice(0, 8)}.pdf"`,
+        ),
     });
 }
 
@@ -56,11 +94,11 @@ export async function downloadCertPdf(
     if (!obj) return new Response('Not Found', { status: 404 });
     return new Response(obj.body, {
         status: 200,
-        headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `inline; filename="certificate-${envelopeId.slice(0, 8)}.pdf"`,
-            'Cache-Control': 'private, max-age=300',
-        },
+        headers: await deliverableHeaders(
+            d1, tenantId, row.inspectionId, row.signedAt ?? row.createdAt,
+            'application/pdf',
+            `inline; filename="certificate-${envelopeId.slice(0, 8)}.pdf"`,
+        ),
     });
 }
 
@@ -82,11 +120,11 @@ export async function downloadEvidenceZip(
     if (!obj) return new Response('Not Found', { status: 404 });
     return new Response(obj.body, {
         status: 200,
-        headers: {
-            'Content-Type': 'application/zip',
-            'Content-Disposition': `attachment; filename="evidence-${envelopeId.slice(0, 8)}.zip"`,
-            'Cache-Control': 'private, max-age=300',
-        },
+        headers: await deliverableHeaders(
+            d1, tenantId, row.inspectionId, row.signedAt ?? row.createdAt,
+            'application/zip',
+            `attachment; filename="evidence-${envelopeId.slice(0, 8)}.zip"`,
+        ),
     });
 }
 
@@ -98,11 +136,11 @@ const downloadAgreementRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')],
     request: { params: z.object({ id: z.string().describe('Agreement request (envelope) identifier') }) },
     responses: {
-        200: { content: { 'application/pdf': { schema: z.any() } }, description: 'PDF bytes' },
+        200: { content: { 'application/pdf': { schema: z.any() } }, description: 'PDF bytes, with x-artifact-status' },
         404: { description: 'Not signed or missing object' },
     },
     operationId: 'downloadSignedAgreement',
-    description: 'Streams the workflow-rendered signed.pdf for an agreement request from R2 storage to the caller.',
+    description: 'Streams the workflow-rendered signed.pdf for an agreement request from R2 storage to the caller. Every 200 carries `x-artifact-status: current | superseded`: a correction published against the inspection supersedes this file, which stays retrievable as historical evidence but stops being the current answer. Cache directives match the claim, so no response can outlive it.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 const downloadCertRoute = createRoute(withMcpMetadata({
@@ -113,11 +151,11 @@ const downloadCertRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')],
     request: { params: z.object({ id: z.string().describe('Agreement request (envelope) identifier') }) },
     responses: {
-        200: { content: { 'application/pdf': { schema: z.any() } }, description: 'PDF bytes' },
+        200: { content: { 'application/pdf': { schema: z.any() } }, description: 'PDF bytes, with x-artifact-status' },
         404: { description: 'Cert not yet rendered or missing' },
     },
     operationId: 'downloadCertificatePdf',
-    description: 'Streams the workflow-rendered certificate.pdf from R2.',
+    description: 'Streams the workflow-rendered certificate.pdf from R2. Every 200 carries `x-artifact-status: current | superseded`: a correction published against the inspection supersedes this file, which stays retrievable as historical evidence but stops being the current answer. Cache directives match the claim, so no response can outlive it.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 const downloadEvidenceRoute = createRoute(withMcpMetadata({
@@ -128,11 +166,11 @@ const downloadEvidenceRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')],
     request: { params: z.object({ id: z.string().describe('Agreement request (envelope) identifier') }) },
     responses: {
-        200: { content: { 'application/zip': { schema: z.any() } }, description: 'evidence zip' },
+        200: { content: { 'application/zip': { schema: z.any() } }, description: 'evidence zip, with x-artifact-status' },
         404: { description: 'Missing' },
     },
     operationId: 'downloadEvidencePack',
-    description: 'Returns evidence.zip from R2 (signed.pdf + certificate.pdf + audit-trail.json + public-key.pem).',
+    description: 'Returns evidence.zip from R2 (signed.pdf + certificate.pdf + audit-trail.json + public-key.pem). Every 200 carries `x-artifact-status: current | superseded`: a correction published against the inspection supersedes this file, which stays retrievable as historical evidence but stops being the current answer. Cache directives match the claim, so no response can outlive it.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 const evidenceRoutes = createApiRouter()
